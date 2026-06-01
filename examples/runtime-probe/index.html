@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ouroforge Runtime Probe</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+      background: #101820;
+      color: #f2f6f8;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+    main {
+      width: min(92vw, 760px);
+      display: grid;
+      gap: 1rem;
+    }
+    canvas {
+      width: 100%;
+      image-rendering: pixelated;
+      border: 1px solid #40515f;
+      background: #172532;
+    }
+    code, pre {
+      background: #172532;
+      border: 1px solid #40515f;
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Ouroforge Runtime Probe</h1>
+    <canvas id="world" width="320" height="180" aria-label="Ouroforge moving-square probe"></canvas>
+    <p>
+      This page exposes <code>window.__OUROFORGE__</code> for harness observability only.
+      It is intentionally a tiny deterministic moving-square probe, not a game engine.
+    </p>
+    <pre id="state" aria-live="polite"></pre>
+  </main>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('world');
+      const context = canvas.getContext('2d');
+      const stateElement = document.getElementById('state');
+      const fixedDeltaMs = 16;
+      const bounds = { width: canvas.width, height: canvas.height };
+      const input = { left: false, right: true, up: false, down: false };
+      const events = [];
+      const square = { id: 'probe-square', x: 24, y: 72, size: 18, speed: 2 };
+      let tick = 0;
+      let totalSteps = 0;
+      let lastStepCount = 0;
+      let paused = false;
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function record(type, payload = {}) {
+        events.push({ tick, type, payload: clone(payload) });
+        if (events.length > 32) {
+          events.shift();
+        }
+      }
+
+      function velocity() {
+        const horizontal = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        const vertical = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+        return { x: horizontal * square.speed, y: vertical * square.speed };
+      }
+
+      function advanceOneTick() {
+        const delta = velocity();
+        square.x += delta.x;
+        square.y += delta.y;
+
+        if (square.x < 0 || square.x + square.size > bounds.width) {
+          input.left = !input.left;
+          input.right = !input.right;
+          square.x = Math.max(0, Math.min(bounds.width - square.size, square.x));
+          record('probe.square.bounced-x', { x: square.x });
+        }
+        if (square.y < 0 || square.y + square.size > bounds.height) {
+          input.up = !input.up;
+          input.down = !input.down;
+          square.y = Math.max(0, Math.min(bounds.height - square.size, square.y));
+          record('probe.square.bounced-y', { y: square.y });
+        }
+
+        tick += 1;
+        totalSteps += 1;
+      }
+
+      function draw() {
+        context.clearRect(0, 0, bounds.width, bounds.height);
+        context.fillStyle = '#172532';
+        context.fillRect(0, 0, bounds.width, bounds.height);
+        context.fillStyle = '#5eead4';
+        context.fillRect(square.x, square.y, square.size, square.size);
+        context.fillStyle = '#f2f6f8';
+        context.font = '10px ui-monospace, monospace';
+        context.fillText(`tick=${tick}`, 8, 16);
+        stateElement.textContent = JSON.stringify(window.__OUROFORGE__.getWorldState(), null, 2);
+      }
+
+      function step(count = 1) {
+        const steps = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+        for (let index = 0; index < steps; index += 1) {
+          advanceOneTick();
+        }
+        lastStepCount = steps;
+        draw();
+        return window.__OUROFORGE__.getWorldState();
+      }
+
+      window.__OUROFORGE__ = Object.freeze({
+        getWorldState() {
+          return clone({
+            tick,
+            fixedDeltaMs,
+            paused,
+            bounds,
+            object: square,
+            input,
+          });
+        },
+        getFrameStats() {
+          return clone({
+            tick,
+            fixedDeltaMs,
+            totalSteps,
+            lastStepCount,
+            eventCount: events.length,
+          });
+        },
+        getEvents() {
+          return clone(events);
+        },
+        step,
+        pause() {
+          paused = true;
+          record('probe.paused');
+          draw();
+          return this.getFrameStats();
+        },
+        resume() {
+          paused = false;
+          record('probe.resumed');
+          draw();
+          return this.getFrameStats();
+        },
+        setInput(nextInput = {}) {
+          for (const key of Object.keys(input)) {
+            if (Object.prototype.hasOwnProperty.call(nextInput, key)) {
+              input[key] = Boolean(nextInput[key]);
+            }
+          }
+          record('probe.input.changed', { input });
+          draw();
+          return this.getWorldState();
+        },
+        snapshot() {
+          return clone({ tick, totalSteps, lastStepCount, paused, input, square, events });
+        },
+        restore(snapshot) {
+          if (!snapshot || typeof snapshot !== 'object') {
+            throw new Error('snapshot object is required');
+          }
+          tick = Number(snapshot.tick) || 0;
+          totalSteps = Number(snapshot.totalSteps) || 0;
+          lastStepCount = Number(snapshot.lastStepCount) || 0;
+          paused = Boolean(snapshot.paused);
+          Object.assign(input, clone(snapshot.input || {}));
+          Object.assign(square, clone(snapshot.square || {}));
+          events.splice(0, events.length, ...clone(snapshot.events || []));
+          record('probe.restored');
+          draw();
+          return this.getWorldState();
+        },
+      });
+
+      record('probe.loaded', { api: Object.keys(window.__OUROFORGE__) });
+      step(1);
+
+      function loop() {
+        if (!paused) {
+          step(1);
+        }
+        window.requestAnimationFrame(loop);
+      }
+      window.requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
