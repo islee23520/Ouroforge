@@ -2,8 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_run, evaluate_run, list_evidence_artifacts,
-    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios,
-    BrowserSmokeConfig, BrowserSmokePoolConfig, ScenarioRunConfig, Seed, WorkerId,
+    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
+    update_journal, BrowserSmokeConfig, BrowserSmokePoolConfig, ScenarioRunConfig, Seed, WorkerId,
 };
 use std::path::PathBuf;
 
@@ -43,6 +43,10 @@ enum Commands {
     Evaluate {
         run_dir: PathBuf,
     },
+    Journal {
+        #[command(subcommand)]
+        command: JournalCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -79,6 +83,12 @@ enum BrowserCommand {
         #[arg(long, default_value_t = 1)]
         workers: usize,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum JournalCommand {
+    Update { run_dir: PathBuf },
+    Show { run_dir: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -213,6 +223,18 @@ fn main() -> Result<()> {
         Commands::Evaluate { run_dir } => {
             let verdict = evaluate_run(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&verdict)?);
+        }
+        Commands::Journal {
+            command: JournalCommand::Update { run_dir },
+        } => {
+            let journal = update_journal(run_dir)?;
+            print!("{journal}");
+        }
+        Commands::Journal {
+            command: JournalCommand::Show { run_dir },
+        } => {
+            let journal = show_journal(run_dir)?;
+            print!("{journal}");
         }
     }
 
