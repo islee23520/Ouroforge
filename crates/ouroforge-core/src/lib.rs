@@ -2172,7 +2172,10 @@ fn evaluate_scenario_assertions(
 fn read_json_path<'a>(value: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     let mut current = value;
     for segment in path.split('.') {
-        current = current.get(segment)?;
+        current = match current {
+            serde_json::Value::Array(items) => items.get(segment.parse::<usize>().ok()?)?,
+            _ => current.get(segment)?,
+        };
     }
     Some(current)
 }
@@ -3712,20 +3715,31 @@ scenarios:
                         equals: json!("missing"),
                     },
                 },
+                ScenarioAssertion::WorldState {
+                    world_state: JsonPathAssertion {
+                        path: "collisions.0.pairId".to_string(),
+                        equals: json!("goal:player"),
+                    },
+                },
             ],
         };
 
         let assertions = evaluate_scenario_assertions(
             &scenario,
-            &json!({ "tick": 2, "object": { "id": "probe-square" } }),
+            &json!({
+                "tick": 2,
+                "object": { "id": "probe-square" },
+                "collisions": [{ "pairId": "goal:player" }]
+            }),
             &json!({ "fixedDeltaMs": 16 }),
         );
 
-        assert_eq!(assertions.len(), 3);
+        assert_eq!(assertions.len(), 4);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
         assert_eq!(assertions[2]["actual"], "probe-square");
+        assert_eq!(assertions[3]["passed"], true);
     }
 
     #[test]

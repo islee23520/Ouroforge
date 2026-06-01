@@ -1,0 +1,36 @@
+id: runtime-v1.collision
+title: Runtime v1 Collision Seed
+goal: Drive the Runtime v1 browser scene into a deterministic AABB collision and capture collision-linked evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - A dynamic player collider overlaps the static goal collider deterministically.
+  - Collision state is observable through the runtime probe world state.
+  - Scenario results and verdict evidence link the collision observation.
+scenarios:
+  - id: collide-with-goal
+    description: Move the player right until the dynamic player collider overlaps the static goal collider.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: collide-right
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 113
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: collisions.0.pairId
+          equals: "goal:player"
+      - world_state:
+          path: collisions.0.dynamicEntityId
+          equals: "player"
+      - world_state:
+          path: collisions.0.otherEntityId
+          equals: "goal"
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
