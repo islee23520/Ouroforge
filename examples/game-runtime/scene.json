@@ -1,6 +1,11 @@
 {
+  "schemaVersion": "1",
   "id": "foundation-scene",
   "bounds": { "width": 320, "height": 180 },
+  "metadata": {
+    "title": "Runtime v1 foundation scene",
+    "runtime": "small-game-capable-browser"
+  },
   "entities": [
     {
       "id": "player",
@@ -9,8 +14,16 @@
         "transform": { "x": 32, "y": 72 },
         "velocity": { "x": 0, "y": 0 },
         "size": { "width": 16, "height": 16 },
-        "controllable": true
-      }
+        "controllable": true,
+        "collider": {
+          "shape": "aabb",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "width": 16, "height": 16 },
+          "sensor": false
+        }
+      },
+      "tags": ["player", "controllable"],
+      "metadata": { "role": "avatar" }
     },
     {
       "id": "goal",
@@ -19,8 +32,16 @@
         "transform": { "x": 272, "y": 72 },
         "velocity": { "x": 0, "y": 0 },
         "size": { "width": 16, "height": 16 },
-        "controllable": false
-      }
+        "controllable": false,
+        "collider": {
+          "shape": "aabb",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "width": 16, "height": 16 },
+          "sensor": true
+        }
+      },
+      "tags": ["goal"],
+      "metadata": { "role": "objective" }
     }
   ]
 }
