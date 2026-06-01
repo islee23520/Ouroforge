@@ -1,5 +1,5 @@
 name: Bug report
-about: Report a reproducible Ouroforge MVP issue with evidence
+description: Report a reproducible Ouroforge MVP issue with evidence
 labels: [bug]
 body:
   - type: markdown

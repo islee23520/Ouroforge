@@ -1,5 +1,5 @@
 name: Scoped feature request
-about: Propose a feature tied to the evidence-native loop
+description: Propose a feature tied to the evidence-native loop
 labels: [enhancement]
 body:
   - type: markdown
