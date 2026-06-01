@@ -13,3 +13,6 @@ The scene now uses Runtime v1 schema shape (`schemaVersion`, stable entity IDs,
 sprite declarations, transform/velocity/size/controllable components, collider
 declarations, tags, and metadata). `window.__OUROFORGE__.getWorldState()`
 exposes the normalized schema v1 scene for evidence capture.
+Runtime v1 collision detection is intentionally minimal: axis-aligned collider
+declarations marked `dynamic` or `static` produce deterministic collision events
+in `getEvents()` and the current `collisions` list in `getWorldState()`.
