@@ -2063,9 +2063,14 @@ fn execute_scenario_step<T: CdpTransport>(
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SceneDocument {
+    #[serde(rename = "schemaVersion")]
+    #[serde(default = "scene_schema_v1")]
+    pub schema_version: String,
     pub id: String,
     pub bounds: SceneBounds,
     pub entities: Vec<SceneEntity>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -2081,12 +2086,18 @@ pub struct SceneEntity {
     pub id: String,
     pub sprite: SceneSprite,
     pub components: SceneComponents,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SceneSprite {
     pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -2096,9 +2107,11 @@ pub struct SceneComponents {
     pub velocity: ScenePoint,
     pub size: SceneSize,
     pub controllable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collider: Option<SceneCollider>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ScenePoint {
     pub x: i64,
@@ -2112,11 +2125,35 @@ pub struct SceneSize {
     pub height: i64,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCollider {
+    #[serde(default = "aabb_collider_shape")]
+    pub shape: String,
+    #[serde(default)]
+    pub offset: ScenePoint,
+    pub size: SceneSize,
+    #[serde(default)]
+    pub sensor: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneEdit {
     pub entity_id: String,
     pub path: String,
     pub value: serde_json::Value,
+}
+
+fn scene_schema_v1() -> String {
+    "1".to_string()
+}
+
+fn aabb_collider_shape() -> String {
+    "aabb".to_string()
+}
+
+fn empty_json_object() -> serde_json::Value {
+    json!({})
 }
 
 pub fn read_scene(scene_path: impl AsRef<Path>) -> Result<SceneDocument> {
@@ -2141,10 +2178,14 @@ pub fn edit_scene(scene_path: impl AsRef<Path>, edit: SceneEdit) -> Result<Scene
 }
 
 fn validate_scene(scene: &SceneDocument) -> Result<()> {
+    if scene.schema_version != "1" {
+        return Err(anyhow!("scene schemaVersion must be 1 for scene schema v1"));
+    }
     validate_path_component("scene id", &scene.id)?;
     if scene.bounds.width <= 0 || scene.bounds.height <= 0 {
         return Err(anyhow!("scene bounds must be positive"));
     }
+    validate_scene_metadata("scene metadata", &scene.metadata)?;
     let mut ids = std::collections::BTreeSet::new();
     for entity in &scene.entities {
         validate_path_component("scene entity id", &entity.id)?;
@@ -2152,8 +2193,71 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             return Err(anyhow!("duplicate scene entity id: {}", entity.id));
         }
         validate_scene_color(&entity.sprite.color)?;
+        if let Some(asset) = &entity.sprite.asset {
+            validate_scene_local_path("scene sprite asset", asset)?;
+        }
         if entity.components.size.width <= 0 || entity.components.size.height <= 0 {
             return Err(anyhow!("scene entity {} size must be positive", entity.id));
+        }
+        if let Some(collider) = &entity.components.collider {
+            validate_scene_collider(&entity.id, collider)?;
+        }
+        validate_scene_tags(&entity.id, &entity.tags)?;
+        validate_scene_metadata(
+            &format!("scene entity {} metadata", entity.id),
+            &entity.metadata,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<()> {
+    if collider.shape != "aabb" {
+        return Err(anyhow!(
+            "scene entity {entity_id} collider shape must be aabb"
+        ));
+    }
+    if collider.size.width <= 0 || collider.size.height <= 0 {
+        return Err(anyhow!(
+            "scene entity {entity_id} collider size must be positive"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_scene_tags(entity_id: &str, tags: &[String]) -> Result<()> {
+    let mut seen = std::collections::BTreeSet::new();
+    for tag in tags {
+        validate_path_component(&format!("scene entity {entity_id} tag"), tag)?;
+        if !seen.insert(tag) {
+            return Err(anyhow!("duplicate scene entity {entity_id} tag: {tag}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_metadata(field: &str, metadata: &serde_json::Value) -> Result<()> {
+    if metadata.is_object() {
+        Ok(())
+    } else {
+        Err(anyhow!("{field} must be a JSON object"))
+    }
+}
+
+fn validate_scene_local_path(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "{field} must stay inside the local scene asset tree"
+                ))
+            }
         }
     }
     Ok(())
@@ -3592,6 +3696,148 @@ scenarios:
         assert!(rejected.to_string().contains("unsupported scene edit path"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_schema_v1_accepts_entities_components_and_metadata() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "metadata": { "title": "fixture" },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": {
+                        "color": "#5eead4",
+                        "asset": "assets/sprites/player.png"
+                    },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "collider": {
+                            "shape": "aabb",
+                            "offset": { "x": 0, "y": 0 },
+                            "size": { "width": 16, "height": 16 },
+                            "sensor": false
+                        }
+                    },
+                    "tags": ["player", "spawn"],
+                    "metadata": { "role": "hero" }
+                },
+                {
+                    "id": "goal",
+                    "sprite": { "color": "#facc15" },
+                    "components": {
+                        "transform": { "x": 272, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    },
+                    "tags": ["goal"],
+                    "metadata": {}
+                }
+            ]
+        }))
+        .expect("scene fixture parses");
+
+        validate_scene(&scene).expect("scene schema v1 validates");
+        assert_eq!(scene.schema_version, "1");
+        assert_eq!(scene.entities.len(), 2);
+        assert_eq!(
+            scene.entities[0]
+                .components
+                .collider
+                .as_ref()
+                .unwrap()
+                .shape,
+            "aabb"
+        );
+    }
+
+    #[test]
+    fn scene_schema_v1_rejects_invalid_entities_and_paths() {
+        let duplicate = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                },
+                {
+                    "id": "player",
+                    "sprite": { "color": "#facc15" },
+                    "components": {
+                        "transform": { "x": 272, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    }
+                }
+            ]
+        }))
+        .expect("duplicate fixture parses");
+        let rejected = validate_scene(&duplicate).expect_err("duplicate ids rejected");
+        assert!(rejected.to_string().contains("duplicate scene entity id"));
+
+        let path_escape = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": {
+                        "color": "#5eead4",
+                        "asset": "../outside.png"
+                    },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("path fixture parses");
+        let rejected = validate_scene(&path_escape).expect_err("asset path escape rejected");
+        assert!(rejected.to_string().contains("local scene asset tree"));
+
+        let future_collider = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "collider": {
+                            "shape": "circle",
+                            "size": { "width": 16, "height": 16 }
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("collider fixture parses");
+        let rejected = validate_scene(&future_collider).expect_err("future collider rejected");
+        assert!(rejected.to_string().contains("collider shape must be aabb"));
     }
 
     #[test]
