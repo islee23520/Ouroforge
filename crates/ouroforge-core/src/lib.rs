@@ -5,7 +5,7 @@ use serde_json::json;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
@@ -167,6 +167,7 @@ pub fn add_evidence_artifact(
     require_text("evidence artifact id", id)?;
     require_text("evidence artifact kind", kind)?;
     require_text("evidence artifact path", path)?;
+    validate_evidence_artifact_path(path)?;
 
     let mut index = read_evidence_index(&run_dir)?;
     if index.artifacts.iter().any(|artifact| artifact.id == id) {
@@ -187,6 +188,27 @@ pub fn add_evidence_artifact(
 
 pub fn list_evidence_artifacts(run_dir: impl AsRef<Path>) -> Result<Vec<EvidenceArtifact>> {
     Ok(read_evidence_index(run_dir)?.artifacts)
+}
+
+fn validate_evidence_artifact_path(path: &str) -> Result<()> {
+    let evidence_path = Path::new(path);
+    if evidence_path.is_absolute() {
+        return Err(anyhow!("evidence artifact path must be relative"));
+    }
+    if !path.starts_with("evidence/") {
+        return Err(anyhow!("evidence artifact path must start with evidence/"));
+    }
+    for component in evidence_path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "evidence artifact path must stay inside the run evidence tree"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn read_evidence_index(run_dir: impl AsRef<Path>) -> Result<EvidenceIndex> {
@@ -584,11 +606,56 @@ fn parse_cdp_targets(input: &str) -> Result<Vec<CdpTargetInfo>> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkerId(String);
+
+impl WorkerId {
+    pub fn new(value: impl Into<String>) -> Result<Self> {
+        let value = value.into();
+        require_text("worker id", &value)?;
+        if !value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+        {
+            return Err(anyhow!(
+                "worker id may only contain ASCII letters, numbers, '-' or '_'"
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn evidence_dir(&self) -> String {
+        format!("evidence/workers/{}", self.0)
+    }
+
+    pub fn screenshot_path(&self, suffix: u128) -> String {
+        format!("{}/browser-smoke-{suffix}.png", self.evidence_dir())
+    }
+
+    pub fn performance_metrics_path(&self, suffix: u128) -> String {
+        format!(
+            "{}/browser-smoke-metrics-{suffix}.json",
+            self.evidence_dir()
+        )
+    }
+}
+
+impl Default for WorkerId {
+    fn default() -> Self {
+        Self("worker-1".to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserSmokeConfig {
     pub run_dir: PathBuf,
     pub url: String,
     pub debugging_http_url: String,
     pub target_selection: CdpTargetSelection,
+    pub worker_id: WorkerId,
 }
 
 impl BrowserSmokeConfig {
@@ -600,6 +667,7 @@ impl BrowserSmokeConfig {
             url,
             debugging_http_url: "http://127.0.0.1:9222".to_string(),
             target_selection: CdpTargetSelection::first_page(),
+            worker_id: WorkerId::default(),
         })
     }
 }
@@ -614,7 +682,11 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
         &config.run_dir,
         "browser.worker.started",
         "browser-smoke",
-        json!({ "url": config.url, "debugging_http_url": config.debugging_http_url }),
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "debugging_http_url": config.debugging_http_url
+        }),
     )?;
 
     let result = run_browser_smoke_inner(config);
@@ -624,7 +696,10 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
                 &config.run_dir,
                 "browser.worker.completed",
                 "browser-smoke",
-                json!({ "screenshot_path": smoke.screenshot_path.to_string_lossy() }),
+                json!({
+                    "worker_id": config.worker_id.as_str(),
+                    "screenshot_path": smoke.screenshot_path.to_string_lossy()
+                }),
             )?;
         }
         Err(error) => {
@@ -632,7 +707,7 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
                 &config.run_dir,
                 "browser.worker.failed",
                 "browser-smoke",
-                json!({ "error": error.to_string() }),
+                json!({ "worker_id": config.worker_id.as_str(), "error": error.to_string() }),
             );
         }
     }
@@ -652,14 +727,27 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         &config.run_dir,
         "browser.navigation.completed",
         "browser-smoke",
-        json!({ "url": config.url, "frame_id": navigation.frame_id, "loader_id": navigation.loader_id }),
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "frame_id": navigation.frame_id,
+            "loader_id": navigation.loader_id
+        }),
     )?;
 
     std::thread::sleep(Duration::from_millis(300));
     let _ = client.bring_page_to_front();
     let screenshot = client.capture_screenshot_png()?;
     let artifact_id_suffix = unix_millis()?;
-    let screenshot_rel_path = format!("evidence/browser-smoke-{artifact_id_suffix}.png");
+    let worker_evidence_dir = config.worker_id.evidence_dir();
+    fs::create_dir_all(config.run_dir.join(&worker_evidence_dir)).with_context(|| {
+        format!(
+            "failed to create worker evidence directory {}",
+            config.run_dir.join(&worker_evidence_dir).display()
+        )
+    })?;
+    let screenshot_rel_path =
+        format!("{worker_evidence_dir}/browser-smoke-{artifact_id_suffix}.png");
     let screenshot_path = config.run_dir.join(&screenshot_rel_path);
     fs::write(&screenshot_path, screenshot)
         .with_context(|| format!("failed to write screenshot {}", screenshot_path.display()))?;
@@ -668,13 +756,13 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         &format!("browser-smoke-screenshot-{artifact_id_suffix}"),
         "image/png",
         &screenshot_rel_path,
-        json!({ "url": config.url }),
+        json!({ "worker_id": config.worker_id.as_str(), "url": config.url }),
     )?;
     append_ledger_event(
         &config.run_dir,
         "browser.capture.screenshot",
         "browser-smoke",
-        json!({ "path": screenshot_rel_path }),
+        json!({ "worker_id": config.worker_id.as_str(), "path": screenshot_rel_path }),
     )?;
 
     match client
@@ -682,8 +770,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         .and_then(|_| client.performance_metrics())
     {
         Ok(metrics) => {
-            let metrics_rel_path =
-                format!("evidence/browser-smoke-metrics-{}.json", unix_millis()?);
+            let metrics_rel_path = config.worker_id.performance_metrics_path(unix_millis()?);
             let metrics_path = config.run_dir.join(&metrics_rel_path);
             write_json(&metrics_path, &metrics)?;
             let _ = add_evidence_artifact(
@@ -691,13 +778,17 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
                 &format!("browser-smoke-performance-{}", unix_millis()?),
                 "application/json",
                 &metrics_rel_path,
-                json!({ "url": config.url, "optional": true }),
+                json!({ "worker_id": config.worker_id.as_str(), "url": config.url, "optional": true }),
             );
             append_ledger_event(
                 &config.run_dir,
                 "browser.capture.performance",
                 "browser-smoke",
-                json!({ "path": metrics_rel_path, "optional": true }),
+                json!({
+                    "worker_id": config.worker_id.as_str(),
+                    "path": metrics_rel_path,
+                    "optional": true
+                }),
             )?;
         }
         Err(error) => {
@@ -705,7 +796,11 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
                 &config.run_dir,
                 "browser.capture.performance.skipped",
                 "browser-smoke",
-                json!({ "error": error.to_string(), "optional": true }),
+                json!({
+                    "worker_id": config.worker_id.as_str(),
+                    "error": error.to_string(),
+                    "optional": true
+                }),
             )?;
         }
     }
@@ -991,6 +1086,25 @@ scenarios:
     }
 
     #[test]
+    fn rejects_evidence_artifact_paths_outside_evidence_tree() {
+        let (root, artifacts) = create_test_run("ouroforge-evidence-path-test");
+
+        for path in ["../escape.txt", "/tmp/escape.txt", "artifact.txt"] {
+            let error = add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("artifact-{path}"),
+                "text/plain",
+                path,
+                json!({}),
+            )
+            .expect_err("invalid evidence path fails");
+            assert!(error.to_string().contains("evidence artifact path"));
+        }
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn rejects_malformed_evidence_index_and_duplicate_ids() {
         let (root, artifacts) = create_test_run("ouroforge-bad-evidence-test");
 
@@ -1079,6 +1193,47 @@ scenarios:
             .expect_err("navigation errorText fails");
 
         assert!(error.to_string().contains("net::ERR_CONNECTION_REFUSED"));
+    }
+
+    #[test]
+    fn worker_id_defines_isolated_evidence_directory() {
+        let worker = WorkerId::new("worker-4").expect("worker id parses");
+        assert_eq!(worker.as_str(), "worker-4");
+        assert_eq!(worker.evidence_dir(), "evidence/workers/worker-4");
+        assert_eq!(
+            worker.screenshot_path(42),
+            "evidence/workers/worker-4/browser-smoke-42.png"
+        );
+        assert_eq!(
+            worker.performance_metrics_path(42),
+            "evidence/workers/worker-4/browser-smoke-metrics-42.json"
+        );
+    }
+
+    #[test]
+    fn worker_artifact_paths_do_not_conflict() {
+        let worker_1 = WorkerId::new("worker-1").expect("worker 1 parses");
+        let worker_2 = WorkerId::new("worker-2").expect("worker 2 parses");
+
+        assert_ne!(worker_1.screenshot_path(7), worker_2.screenshot_path(7));
+        assert_ne!(
+            worker_1.performance_metrics_path(7),
+            worker_2.performance_metrics_path(7)
+        );
+    }
+
+    #[test]
+    fn rejects_worker_ids_that_escape_paths() {
+        let error = WorkerId::new("../worker").expect_err("path-like worker id fails");
+        assert!(error.to_string().contains("worker id may only contain"));
+    }
+
+    #[test]
+    fn browser_smoke_config_defaults_to_worker_one() {
+        let config = BrowserSmokeConfig::new("runs/run-test", "http://localhost:8765")
+            .expect("config builds");
+        assert_eq!(config.worker_id.as_str(), "worker-1");
+        assert_eq!(config.worker_id.evidence_dir(), "evidence/workers/worker-1");
     }
 
     struct ScreenshotTransport;

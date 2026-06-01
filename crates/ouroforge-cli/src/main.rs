@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
-    read_ledger_events, run_browser_smoke, BrowserSmokeConfig, Seed,
+    read_ledger_events, run_browser_smoke, BrowserSmokeConfig, Seed, WorkerId,
 };
 use std::path::PathBuf;
 
@@ -66,6 +66,8 @@ enum BrowserCommand {
         url: String,
         #[arg(long, default_value = "http://127.0.0.1:9222")]
         cdp: String,
+        #[arg(long, default_value = "worker-1")]
+        worker_id: String,
     },
 }
 
@@ -141,10 +143,17 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&artifacts)?);
         }
         Commands::Browser {
-            command: BrowserCommand::Smoke { run_dir, url, cdp },
+            command:
+                BrowserCommand::Smoke {
+                    run_dir,
+                    url,
+                    cdp,
+                    worker_id,
+                },
         } => {
             let mut config = BrowserSmokeConfig::new(run_dir, url)?;
             config.debugging_http_url = cdp;
+            config.worker_id = WorkerId::new(worker_id)?;
             let result = run_browser_smoke(&config)?;
             println!(
                 "Browser smoke captured: {}",
