@@ -1,5 +1,5 @@
 name: Public readiness task
-about: Track release-readiness remediation without publishing automatically
+description: Track release-readiness remediation without publishing automatically
 labels: [public-readiness]
 body:
   - type: markdown
