@@ -377,21 +377,19 @@ fn run_private_mvp(run_dir: &Path, workers: usize) -> Result<serde_json::Value> 
         let mut scenario_config = ScenarioRunConfig::new(run_dir, runtime_url)?;
         scenario_config.debugging_http_url = cdp_url;
         let scenarios = run_scenarios(&scenario_config)?;
-        if scenarios.has_failures() {
-            return Err(anyhow!(
-                "private MVP scenarios failed for {} of {} scenario(s)",
-                scenarios.failed,
-                scenarios.scenarios
-            ));
-        }
         let verdict = evaluate_run(run_dir)?;
-        let journal = update_journal(run_dir)?;
+        let evolve = if verdict.status == "failed" {
+            Some(evolve_run(run_dir)?)
+        } else {
+            let _journal = update_journal(run_dir)?;
+            None
+        };
         Ok(json_mvp_summary(
             workers,
             &smoke,
             &scenarios,
             &verdict,
-            !journal.is_empty(),
+            evolve.as_ref(),
         ))
     })();
 
@@ -406,15 +404,17 @@ fn json_mvp_summary(
     smoke: &ouroforge_core::BrowserSmokePoolResult,
     scenarios: &ouroforge_core::ScenarioRunSummary,
     verdict: &ouroforge_core::EvaluationVerdict,
-    journal_updated: bool,
+    evolve: Option<&ouroforge_core::EvolveSummary>,
 ) -> serde_json::Value {
     serde_json::json!({
         "mvp": "private-local",
+        "status": verdict.status,
         "workers": workers,
         "browser_smoke": smoke,
         "scenarios": scenarios,
         "verdict": verdict,
-        "journal_updated": journal_updated
+        "journal_updated": true,
+        "evolve": evolve
     })
 }
 
