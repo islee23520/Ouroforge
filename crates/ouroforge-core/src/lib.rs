@@ -1261,6 +1261,114 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     Ok(BrowserSmokeResult { screenshot_path })
 }
 
+pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
+    let run_dir = run_dir.as_ref();
+    let seed = Seed::from_path(run_dir.join("seed.snapshot.yaml"))?;
+    let evidence = read_evidence_index(run_dir)?;
+    let ledger = read_ledger_events(run_dir)?;
+    let verdict_input = fs::read_to_string(run_dir.join("verdict.json"))
+        .context("failed to read verdict for journal")?;
+    let verdict: serde_json::Value =
+        serde_json::from_str(&verdict_input).context("failed to parse verdict for journal")?;
+    let journal = render_journal(&seed, &evidence, &ledger, &verdict);
+    fs::write(run_dir.join("journal.md"), &journal).context("failed to write journal")?;
+    Ok(journal)
+}
+
+pub fn show_journal(run_dir: impl AsRef<Path>) -> Result<String> {
+    fs::read_to_string(run_dir.as_ref().join("journal.md")).context("failed to read journal")
+}
+
+fn render_journal(
+    seed: &Seed,
+    evidence: &EvidenceIndex,
+    ledger: &[serde_json::Value],
+    verdict: &serde_json::Value,
+) -> String {
+    let mut out = String::new();
+    out.push_str("# Ouroforge Run Journal\n\n");
+    out.push_str("## Seed Summary\n\n");
+    out.push_str(&format!("- Seed: `{}` — {}\n", seed.id, seed.title));
+    out.push_str(&format!("- Goal: {}\n", seed.goal));
+    out.push_str(&format!("- Target: `{}`\n\n", seed.constraints.target));
+
+    out.push_str("## Expected Criteria\n\n");
+    for item in &seed.acceptance {
+        out.push_str(&format!("- {}\n", item));
+    }
+    out.push('\n');
+
+    out.push_str("## Executed Scenarios\n\n");
+    for scenario in &seed.scenarios {
+        let started = ledger.iter().any(|event| {
+            event["event"] == "scenario.started"
+                && event["payload"]["scenario_id"] == scenario.id.as_str()
+        });
+        let completed = ledger.iter().any(|event| {
+            event["event"] == "scenario.completed"
+                && event["payload"]["scenario_id"] == scenario.id.as_str()
+        });
+        out.push_str(&format!(
+            "- `{}`: {} (started: {}, completed: {})\n",
+            scenario.id, scenario.description, started, completed
+        ));
+    }
+    out.push('\n');
+
+    out.push_str("## Observations\n\n");
+    out.push_str(&format!("- Ledger events recorded: {}\n", ledger.len()));
+    out.push_str(&format!(
+        "- Evidence artifacts indexed: {}\n\n",
+        evidence.artifacts.len()
+    ));
+
+    out.push_str("## Evidence\n\n");
+    if evidence.artifacts.is_empty() {
+        out.push_str("- No evidence artifacts indexed.\n");
+    } else {
+        for artifact in &evidence.artifacts {
+            out.push_str(&format!(
+                "- `{}` ({}) → `{}`\n",
+                artifact.id, artifact.kind, artifact.path
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Verdict Summary\n\n");
+    out.push_str(&format!(
+        "- Status: `{}`\n",
+        verdict["status"].as_str().unwrap_or("unknown")
+    ));
+    out.push_str(&format!(
+        "- Summary: {}\n\n",
+        verdict["summary"]
+            .as_str()
+            .unwrap_or("No summary available.")
+    ));
+
+    out.push_str("## Failed Criteria\n\n");
+    let failures = verdict["failures"].as_array().cloned().unwrap_or_default();
+    if failures.is_empty() {
+        out.push_str("- None recorded.\n");
+    } else {
+        for failure in failures {
+            out.push_str(&format!(
+                "- `{}`: {}\n",
+                failure["kind"].as_str().unwrap_or("failure"),
+                failure
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## Open Questions\n\n");
+    out.push_str("- None recorded by deterministic artifacts.\n\n");
+    out.push_str("## Next Mutation\n\n");
+    out.push_str("- Placeholder only; mutation proposal generation is deferred.\n");
+    out
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct EvaluationVerdict {
     pub status: String,
@@ -2305,6 +2413,40 @@ scenarios:
                     .to_string(),
             );
             Ok(json!({ "result": { "value": {} } }))
+        }
+    }
+
+    #[test]
+    fn journal_renders_pass_fail_and_pending_verdicts() {
+        let seed = Seed::from_yaml_str(VALID_SEED).expect("seed parses");
+        let evidence = EvidenceIndex {
+            artifacts: vec![EvidenceArtifact {
+                id: "artifact-1".to_string(),
+                kind: "application/json".to_string(),
+                path: "evidence/artifact-1.json".to_string(),
+                metadata: json!({}),
+                added_at_unix_ms: 1,
+            }],
+        };
+        let ledger = vec![json!({
+            "event": "scenario.completed",
+            "payload": { "scenario_id": "smoke" }
+        })];
+
+        for status in ["passed", "failed", "pending"] {
+            let journal = render_journal(
+                &seed,
+                &evidence,
+                &ledger,
+                &json!({
+                    "status": status,
+                    "summary": format!("{status} summary"),
+                    "failures": if status == "failed" { vec![json!({"kind": "scenario_failed"})] } else { Vec::new() }
+                }),
+            );
+            assert!(journal.contains(&format!("- Status: `{status}`")));
+            assert!(journal.contains("`artifact-1`"));
+            assert!(journal.contains("## Next Mutation"));
         }
     }
 
