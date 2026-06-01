@@ -10,6 +10,9 @@ const OuroforgeCockpit = (() => {
     ['components.controllable', 'boolean'],
   ];
 
+  const DEFAULT_SCENE_PATH = 'examples/game-runtime/scene.json';
+  const DEFAULT_DASHBOARD_DATA_PATH = '../evidence-dashboard/dashboard-data.json';
+
   function cloneScene(scene) {
     return JSON.parse(JSON.stringify(scene));
   }
@@ -55,11 +58,28 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- scene edit ${scenePath} --entity ${entityId} --path ${path} --value '${JSON.stringify(value)}'`;
   }
 
+  function qaCommand(seedPath = 'seeds/platformer.yaml', workers = 4) {
+    return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers}`;
+  }
+
+  function dashboardExportCommand(output = 'examples/evidence-dashboard/dashboard-data.json') {
+    return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
+  }
+
+  function artifactHref(artifact, run) {
+    const runDir = run?.summary?.run_dir || '';
+    return `../../${runDir}/${artifact.path}`;
+  }
+
+  function latestRun(runs = []) {
+    return [...runs].sort((left, right) => Number(right.summary.created_at_unix_ms || 0) - Number(left.summary.created_at_unix_ms || 0))[0] || null;
+  }
+
   function renderTree(scene, selectedId) {
     return scene.entities.map((entity) => `<button class="tree-button ${entity.id === selectedId ? 'active' : ''}" data-entity-id="${entity.id}">${entity.id}<br><small>${entity.components.controllable ? 'controllable' : 'static'}</small></button>`).join('');
   }
 
-  function renderInspector(scene, entityId, scenePath = 'examples/game-runtime/scene.json') {
+  function renderInspector(scene, entityId, scenePath = DEFAULT_SCENE_PATH) {
     const entity = scene.entities.find((candidate) => candidate.id === entityId);
     if (!entity) return '<div class="empty">Select an entity to inspect supported properties.</div>';
     const fields = EDITABLE_FIELDS.map(([path, kind]) => {
@@ -72,26 +92,64 @@ const OuroforgeCockpit = (() => {
     return `<div class="inspector"><div class="panel"><h2>${entity.id}</h2><div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${JSON.stringify(entity, null, 2)}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x)}</pre></div></div>`;
   }
 
+  function renderPreview(scenePath = '../game-runtime/index.html') {
+    return `<section class="panel"><h2>Live browser preview</h2><iframe class="preview" title="Game runtime preview" src="${scenePath}"></iframe></section>`;
+  }
+
+  function renderQaPanel() {
+    return `<section class="panel"><h2>Run QA</h2><p class="hint">Run the evidence-native QA command, then export dashboard data to refresh evidence and journal panes.</p><button id="run-qa-button" class="primary" type="button">Show QA command</button><pre id="qa-command">${qaCommand()}</pre><pre>${dashboardExportCommand()}</pre></section>`;
+  }
+
+  function renderEvidencePane(run) {
+    if (!run) {
+      return '<section class="panel"><h2>Evidence + Journal</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to populate this pane.</p></section>';
+    }
+    const screenshots = (run.screenshots || []).slice(0, 4).map((artifact) => `<a href="${artifactHref(artifact, run)}" target="_blank" rel="noreferrer">${artifact.id}</a>`).join('<br>') || 'No screenshots recorded.';
+    return `<section class="panel"><h2>Evidence + Journal</h2><div class="field-grid"><div><strong>Run</strong><br>${run.summary.id}</div><div><strong>Verdict</strong><br>${run.summary.verdict_status}</div><div><strong>Evidence</strong><br>${run.evidence.length}</div><div><strong>Mutations</strong><br>${run.mutations.length}</div></div><h3>Screenshots</h3><p>${screenshots}</p><h3>Journal</h3><pre>${run.journal || 'No journal loaded.'}</pre></section>`;
+  }
+
+  function renderIntegration(run) {
+    return `${renderPreview()}${renderQaPanel()}${renderEvidencePane(run)}`;
+  }
+
+  async function loadDashboardData(path = DEFAULT_DASHBOARD_DATA_PATH) {
+    const response = await fetch(path, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`failed to load dashboard data: ${response.status}`);
+    return response.json();
+  }
+
   async function init() {
     const treeEl = document.getElementById('scene-tree');
     const inspectorEl = document.getElementById('inspector');
+    const integrationEl = document.getElementById('integration');
     let scene = await fetch('../game-runtime/scene.json').then((response) => response.json());
     let selectedId = scene.entities[0]?.id;
+    let latest = null;
+    try {
+      const dashboardData = await loadDashboardData();
+      latest = latestRun(dashboardData.runs || []);
+    } catch (_) {
+      latest = null;
+    }
     const paint = () => {
       treeEl.innerHTML = renderTree(scene, selectedId);
       inspectorEl.innerHTML = renderInspector(scene, selectedId);
+      integrationEl.innerHTML = renderIntegration(latest);
       treeEl.querySelectorAll('[data-entity-id]').forEach((button) => button.addEventListener('click', () => { selectedId = button.dataset.entityId; paint(); }));
       inspectorEl.querySelectorAll('[data-edit-path]').forEach((input) => input.addEventListener('change', () => {
         const path = input.dataset.editPath;
         scene = applyEdit(scene, selectedId, path, input.value);
         const entity = scene.entities.find((candidate) => candidate.id === selectedId);
-        document.getElementById('edit-command').textContent = cliCommand('examples/game-runtime/scene.json', selectedId, path, getValue(entity, path));
+        document.getElementById('edit-command').textContent = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
       }));
+      document.getElementById('run-qa-button')?.addEventListener('click', () => {
+        document.getElementById('qa-command').textContent = `${qaCommand()}\n${dashboardExportCommand()}`;
+      });
     };
     paint();
   }
 
-  return { EDITABLE_FIELDS, applyEdit, cliCommand, getValue, init, renderInspector, renderTree, validateEdit };
+  return { EDITABLE_FIELDS, applyEdit, artifactHref, cliCommand, dashboardExportCommand, getValue, init, latestRun, loadDashboardData, qaCommand, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
