@@ -6,8 +6,13 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
+
+static LEDGER_APPEND_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static EVIDENCE_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -116,12 +121,16 @@ pub fn append_ledger_event(
         "created_at_unix_ms": unix_millis()?,
     });
     let ledger_path = run_dir.as_ref().join("ledger.jsonl");
+    let line = serde_json::to_string(&event).context("failed to serialize ledger event")?;
+    let _guard = LEDGER_APPEND_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| anyhow!("ledger append lock poisoned"))?;
     let mut file = OpenOptions::new()
         .create(false)
         .append(true)
         .open(&ledger_path)
         .with_context(|| format!("failed to open ledger for append {}", ledger_path.display()))?;
-    let line = serde_json::to_string(&event).context("failed to serialize ledger event")?;
     writeln!(file, "{line}").context("failed to append ledger event")?;
     Ok(event)
 }
@@ -169,6 +178,10 @@ pub fn add_evidence_artifact(
     require_text("evidence artifact path", path)?;
     validate_evidence_artifact_path(path)?;
 
+    let _guard = EVIDENCE_INDEX_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| anyhow!("evidence index lock poisoned"))?;
     let mut index = read_evidence_index(&run_dir)?;
     if index.artifacts.iter().any(|artifact| artifact.id == id) {
         return Err(anyhow!("evidence artifact id already exists: {id}"));
@@ -415,6 +428,19 @@ pub fn read_cdp_targets(debugging_http_url: &str) -> Result<Vec<CdpTargetInfo>> 
     parse_cdp_targets(&body)
 }
 
+pub fn create_cdp_page_target(
+    debugging_http_url: &str,
+    initial_url: &str,
+) -> Result<CdpConnectionConfig> {
+    require_text("CDP debugging HTTP URL", debugging_http_url)?;
+    require_text("CDP target initial URL", initial_url)?;
+    let endpoint = CdpHttpEndpoint::parse(debugging_http_url)?;
+    let body = endpoint.put(&format!("/json/new?{initial_url}"))?;
+    let target: CdpTargetInfo =
+        serde_json::from_str(&body).context("failed to parse created CDP target")?;
+    CdpConnectionConfig::new(target.web_socket_debugger_url)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CdpHttpEndpoint {
     host: IpAddr,
@@ -438,6 +464,14 @@ impl CdpHttpEndpoint {
     }
 
     fn get(&self, path: &str) -> Result<String> {
+        self.request("GET", path)
+    }
+
+    fn put(&self, path: &str) -> Result<String> {
+        self.request("PUT", path)
+    }
+
+    fn request(&self, method: &str, path: &str) -> Result<String> {
         let mut stream =
             connect_with_timeout(self.host, self.port, self.timeout).with_context(|| {
                 format!(
@@ -448,7 +482,7 @@ impl CdpHttpEndpoint {
         set_tcp_stream_timeouts(&stream, self.timeout)?;
         write!(
             stream,
-            "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
             format_host_authority(self.host, self.port)
         )
         .context("failed to write CDP HTTP request")?;
@@ -655,6 +689,7 @@ pub struct BrowserSmokeConfig {
     pub url: String,
     pub debugging_http_url: String,
     pub target_selection: CdpTargetSelection,
+    pub target_ws_url: Option<String>,
     pub worker_id: WorkerId,
 }
 
@@ -667,6 +702,7 @@ impl BrowserSmokeConfig {
             url,
             debugging_http_url: "http://127.0.0.1:9222".to_string(),
             target_selection: CdpTargetSelection::first_page(),
+            target_ws_url: None,
             worker_id: WorkerId::default(),
         })
     }
@@ -675,6 +711,160 @@ impl BrowserSmokeConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserSmokeResult {
     pub screenshot_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrowserSmokePoolConfig {
+    pub base: BrowserSmokeConfig,
+    pub workers: usize,
+}
+
+impl BrowserSmokePoolConfig {
+    pub fn new(base: BrowserSmokeConfig, workers: usize) -> Result<Self> {
+        if workers == 0 {
+            return Err(anyhow!("browser smoke workers must be at least 1"));
+        }
+        Ok(Self { base, workers })
+    }
+
+    pub fn worker_config(&self, index: usize) -> Result<BrowserSmokeConfig> {
+        if index >= self.workers {
+            return Err(anyhow!("worker index {index} is out of range"));
+        }
+        let mut config = self.base.clone();
+        if self.workers > 1 {
+            config.worker_id = WorkerId::new(format!("worker-{}", index + 1))?;
+        }
+        Ok(config)
+    }
+
+    pub fn worker_configs(&self) -> Result<Vec<BrowserSmokeConfig>> {
+        (0..self.workers)
+            .map(|index| self.worker_config(index))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct BrowserSmokeWorkerOutcome {
+    pub worker_id: String,
+    pub ok: bool,
+    pub screenshot_path: Option<PathBuf>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct BrowserSmokePoolResult {
+    pub workers: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub outcomes: Vec<BrowserSmokeWorkerOutcome>,
+}
+
+impl BrowserSmokePoolResult {
+    pub fn has_failures(&self) -> bool {
+        self.failed > 0
+    }
+}
+
+pub fn run_browser_smoke_pool(config: &BrowserSmokePoolConfig) -> BrowserSmokePoolResult {
+    let worker_configs = match config.worker_configs() {
+        Ok(worker_configs) => worker_configs,
+        Err(error) => {
+            return BrowserSmokePoolResult {
+                workers: config.workers,
+                succeeded: 0,
+                failed: 1,
+                outcomes: vec![BrowserSmokeWorkerOutcome {
+                    worker_id: "pool".to_string(),
+                    ok: false,
+                    screenshot_path: None,
+                    error: Some(error.to_string()),
+                }],
+            };
+        }
+    };
+
+    let mut setup_failures = Vec::new();
+    let worker_configs: Vec<_> = worker_configs
+        .into_iter()
+        .filter_map(|mut worker_config| {
+            if config.workers > 1 {
+                match create_cdp_page_target(&worker_config.debugging_http_url, "about:blank") {
+                    Ok(connection) => {
+                        worker_config.target_ws_url = Some(connection.target_ws_url);
+                    }
+                    Err(error) => {
+                        let error_message = error.to_string();
+                        let _ = append_ledger_event(
+                            &worker_config.run_dir,
+                            "browser.worker.failed",
+                            "browser-smoke",
+                            json!({
+                                "worker_id": worker_config.worker_id.as_str(),
+                                "error": error_message,
+                                "phase": "target_setup"
+                            }),
+                        );
+                        setup_failures.push(BrowserSmokeWorkerOutcome {
+                            worker_id: worker_config.worker_id.as_str().to_string(),
+                            ok: false,
+                            screenshot_path: None,
+                            error: Some(error_message),
+                        });
+                        return None;
+                    }
+                }
+            }
+            Some(worker_config)
+        })
+        .collect();
+
+    let handles: Vec<_> = worker_configs
+        .into_iter()
+        .map(|worker_config| {
+            thread::spawn(move || {
+                let worker_id = worker_config.worker_id.as_str().to_string();
+                match run_browser_smoke(&worker_config) {
+                    Ok(result) => BrowserSmokeWorkerOutcome {
+                        worker_id,
+                        ok: true,
+                        screenshot_path: Some(result.screenshot_path),
+                        error: None,
+                    },
+                    Err(error) => BrowserSmokeWorkerOutcome {
+                        worker_id,
+                        ok: false,
+                        screenshot_path: None,
+                        error: Some(error.to_string()),
+                    },
+                }
+            })
+        })
+        .collect();
+
+    let mut outcomes = setup_failures;
+    outcomes.reserve(handles.len());
+    for handle in handles {
+        match handle.join() {
+            Ok(outcome) => outcomes.push(outcome),
+            Err(_) => outcomes.push(BrowserSmokeWorkerOutcome {
+                worker_id: "unknown".to_string(),
+                ok: false,
+                screenshot_path: None,
+                error: Some("browser smoke worker panicked".to_string()),
+            }),
+        }
+    }
+    outcomes.sort_by(|left, right| left.worker_id.cmp(&right.worker_id));
+    let succeeded = outcomes.iter().filter(|outcome| outcome.ok).count();
+    let failed = outcomes.len().saturating_sub(succeeded);
+    BrowserSmokePoolResult {
+        workers: config.workers,
+        succeeded,
+        failed,
+        outcomes,
+    }
 }
 
 pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
@@ -715,8 +905,12 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
 }
 
 fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
-    let targets = read_cdp_targets(&config.debugging_http_url)?;
-    let connection = select_page_target(&targets, &config.target_selection)?;
+    let connection = if let Some(target_ws_url) = &config.target_ws_url {
+        CdpConnectionConfig::new(target_ws_url.clone())?
+    } else {
+        let targets = read_cdp_targets(&config.debugging_http_url)?;
+        select_page_target(&targets, &config.target_selection)?
+    };
     let transport = WebSocketCdpTransport::connect(&connection)?;
     let mut client = CdpClient::new(transport);
 
@@ -753,7 +947,10 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         .with_context(|| format!("failed to write screenshot {}", screenshot_path.display()))?;
     add_evidence_artifact(
         &config.run_dir,
-        &format!("browser-smoke-screenshot-{artifact_id_suffix}"),
+        &format!(
+            "browser-smoke-screenshot-{}-{artifact_id_suffix}",
+            config.worker_id.as_str()
+        ),
         "image/png",
         &screenshot_rel_path,
         json!({ "worker_id": config.worker_id.as_str(), "url": config.url }),
@@ -775,7 +972,11 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
             write_json(&metrics_path, &metrics)?;
             let _ = add_evidence_artifact(
                 &config.run_dir,
-                &format!("browser-smoke-performance-{}", unix_millis()?),
+                &format!(
+                    "browser-smoke-performance-{}-{}",
+                    config.worker_id.as_str(),
+                    unix_millis()?
+                ),
                 "application/json",
                 &metrics_rel_path,
                 json!({ "worker_id": config.worker_id.as_str(), "url": config.url, "optional": true }),
@@ -1234,6 +1435,73 @@ scenarios:
             .expect("config builds");
         assert_eq!(config.worker_id.as_str(), "worker-1");
         assert_eq!(config.worker_id.evidence_dir(), "evidence/workers/worker-1");
+    }
+
+    #[test]
+    fn browser_smoke_pool_assigns_stable_worker_ids() {
+        let mut base = BrowserSmokeConfig::new("runs/run-test", "http://localhost:8765")
+            .expect("config builds");
+        base.worker_id = WorkerId::new("custom-worker").expect("worker id parses");
+
+        let single = BrowserSmokePoolConfig::new(base.clone(), 1).expect("single worker pool");
+        assert_eq!(
+            single.worker_config(0).unwrap().worker_id.as_str(),
+            "custom-worker"
+        );
+
+        let pool = BrowserSmokePoolConfig::new(base, 3).expect("pool config builds");
+        let worker_ids: Vec<_> = pool
+            .worker_configs()
+            .expect("worker configs build")
+            .into_iter()
+            .map(|config| config.worker_id.as_str().to_string())
+            .collect();
+        assert_eq!(worker_ids, vec!["worker-1", "worker-2", "worker-3"]);
+    }
+
+    #[test]
+    fn browser_smoke_pool_rejects_zero_workers() {
+        let base = BrowserSmokeConfig::new("runs/run-test", "http://localhost:8765")
+            .expect("config builds");
+        let error = BrowserSmokePoolConfig::new(base, 0).expect_err("zero workers fail");
+        assert!(error.to_string().contains("workers must be at least 1"));
+    }
+
+    #[test]
+    fn browser_smoke_pool_reports_each_worker_failure() {
+        let (root, artifacts) = create_test_run("ouroforge-browser-pool-failure-test");
+        let mut base = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8765")
+            .expect("config builds");
+        base.debugging_http_url = "http://127.0.0.1:9".to_string();
+        let pool = BrowserSmokePoolConfig::new(base, 3).expect("pool config builds");
+
+        let result = run_browser_smoke_pool(&pool);
+
+        assert_eq!(result.workers, 3);
+        assert_eq!(result.succeeded, 0);
+        assert_eq!(result.failed, 3);
+        assert_eq!(
+            result
+                .outcomes
+                .iter()
+                .map(|outcome| outcome.worker_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["worker-1", "worker-2", "worker-3"]
+        );
+        assert!(result.outcomes.iter().all(|outcome| !outcome.ok));
+
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        let failed_workers: Vec<_> = events
+            .iter()
+            .filter(|event| event["event"] == "browser.worker.failed")
+            .filter_map(|event| event["payload"]["worker_id"].as_str())
+            .collect();
+        assert_eq!(failed_workers.len(), 3);
+        assert!(failed_workers.contains(&"worker-1"));
+        assert!(failed_workers.contains(&"worker-2"));
+        assert!(failed_workers.contains(&"worker-3"));
+
+        fs::remove_dir_all(root).ok();
     }
 
     struct ScreenshotTransport;

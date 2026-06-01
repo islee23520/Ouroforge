@@ -1,8 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
-    read_ledger_events, run_browser_smoke, BrowserSmokeConfig, Seed, WorkerId,
+    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, Seed, WorkerId,
 };
 use std::path::PathBuf;
 
@@ -68,6 +69,8 @@ enum BrowserCommand {
         cdp: String,
         #[arg(long, default_value = "worker-1")]
         worker_id: String,
+        #[arg(long, default_value_t = 1)]
+        workers: usize,
     },
 }
 
@@ -149,16 +152,30 @@ fn main() -> Result<()> {
                     url,
                     cdp,
                     worker_id,
+                    workers,
                 },
         } => {
             let mut config = BrowserSmokeConfig::new(run_dir, url)?;
             config.debugging_http_url = cdp;
             config.worker_id = WorkerId::new(worker_id)?;
-            let result = run_browser_smoke(&config)?;
-            println!(
-                "Browser smoke captured: {}",
-                result.screenshot_path.display()
-            );
+            if workers == 1 {
+                let result = run_browser_smoke(&config)?;
+                println!(
+                    "Browser smoke captured: {}",
+                    result.screenshot_path.display()
+                );
+            } else {
+                let pool_config = BrowserSmokePoolConfig::new(config, workers)?;
+                let result = run_browser_smoke_pool(&pool_config);
+                println!("{}", serde_json::to_string_pretty(&result)?);
+                if result.has_failures() {
+                    return Err(anyhow!(
+                        "browser smoke failed for {} of {} worker(s)",
+                        result.failed,
+                        result.workers
+                    ));
+                }
+            }
         }
     }
 
