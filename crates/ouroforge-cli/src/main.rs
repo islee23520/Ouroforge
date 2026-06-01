@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
-    add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
+    add_evidence_artifact, append_ledger_event, create_run, evaluate_run, list_evidence_artifacts,
     read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios,
     BrowserSmokeConfig, BrowserSmokePoolConfig, ScenarioRunConfig, Seed, WorkerId,
 };
@@ -39,6 +39,9 @@ enum Commands {
     Scenario {
         #[command(subcommand)]
         command: ScenarioCommand,
+    },
+    Evaluate {
+        run_dir: PathBuf,
     },
 }
 
@@ -206,6 +209,10 @@ fn main() -> Result<()> {
                     summary.scenarios
                 ));
             }
+        }
+        Commands::Evaluate { run_dir } => {
+            let verdict = evaluate_run(run_dir)?;
+            println!("{}", serde_json::to_string_pretty(&verdict)?);
         }
     }
 

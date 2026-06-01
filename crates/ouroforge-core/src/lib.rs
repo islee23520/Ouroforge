@@ -1261,6 +1261,137 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     Ok(BrowserSmokeResult { screenshot_path })
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct EvaluationVerdict {
+    pub status: String,
+    pub summary: String,
+    pub failures: Vec<serde_json::Value>,
+    pub evidence_refs: Vec<String>,
+    pub metadata: serde_json::Value,
+}
+
+pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
+    let run_dir = run_dir.as_ref();
+    let evidence = read_evidence_index(run_dir)?;
+    let mut failures = Vec::new();
+    let mut evidence_refs = Vec::new();
+    let mut scenario_results = Vec::new();
+
+    for artifact in &evidence.artifacts {
+        let artifact_path = run_dir.join(&artifact.path);
+        if !artifact_path.is_file() {
+            failures.push(json!({
+                "kind": "missing_evidence",
+                "artifact_id": artifact.id,
+                "path": artifact.path
+            }));
+            continue;
+        }
+        evidence_refs.push(artifact.path.clone());
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("scenario_result")
+        {
+            let input = fs::read_to_string(&artifact_path).with_context(|| {
+                format!("failed to read scenario result {}", artifact_path.display())
+            })?;
+            let result: serde_json::Value = serde_json::from_str(&input).with_context(|| {
+                format!(
+                    "failed to parse scenario result {}",
+                    artifact_path.display()
+                )
+            })?;
+            scenario_results.push((artifact.path.clone(), result));
+        }
+    }
+
+    if scenario_results.is_empty() {
+        let status = if failures.is_empty() {
+            "pending"
+        } else {
+            "failed"
+        };
+        let summary = if failures.is_empty() {
+            "No scenario result artifacts are available yet.".to_string()
+        } else {
+            format!(
+                "{} evidence consistency failure(s) found before scenario results were available.",
+                failures.len()
+            )
+        };
+        let verdict = EvaluationVerdict {
+            status: status.to_string(),
+            summary,
+            failures,
+            evidence_refs,
+            metadata: json!({
+                "evaluator": "ouroforge-evaluator-v0",
+                "scenario_results": 0
+            }),
+        };
+        write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
+        return Ok(verdict);
+    }
+
+    for (path, result) in &scenario_results {
+        if result.get("status").and_then(|value| value.as_str()) != Some("passed") {
+            failures.push(json!({
+                "kind": "scenario_failed",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "assertions": result.get("assertions").cloned().unwrap_or_else(|| json!([]))
+            }));
+        }
+        for evidence_path in ["world_state", "frame_stats"] {
+            if let Some(path) = result
+                .get("evidence")
+                .and_then(|evidence| evidence.get(evidence_path))
+                .and_then(|value| value.as_str())
+            {
+                if !run_dir.join(path).is_file() {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
+                }
+            }
+        }
+    }
+
+    let status = if failures.is_empty() {
+        "passed"
+    } else {
+        "failed"
+    };
+    let summary = if failures.is_empty() {
+        format!(
+            "{} scenario result(s) passed with consistent evidence.",
+            scenario_results.len()
+        )
+    } else {
+        format!(
+            "{} failure(s) found across {} scenario result(s).",
+            failures.len(),
+            scenario_results.len()
+        )
+    };
+    let verdict = EvaluationVerdict {
+        status: status.to_string(),
+        summary,
+        failures,
+        evidence_refs,
+        metadata: json!({
+            "evaluator": "ouroforge-evaluator-v0",
+            "scenario_results": scenario_results.len()
+        }),
+    };
+    write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
+    Ok(verdict)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioRunConfig {
     pub run_dir: PathBuf,
@@ -2178,6 +2309,66 @@ scenarios:
     }
 
     #[test]
+    fn evaluator_marks_run_pending_without_scenario_results() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-pending-test");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "pending");
+        assert!(artifacts.run_dir.join("verdict.json").is_file());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_marks_passing_scenario_results_passed() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-pass-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "passed");
+        assert!(verdict.failures.is_empty());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_marks_failed_scenario_results_failed() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-fail-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "failed");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "scenario_failed"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_marks_missing_evidence_failed() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-missing-evidence-test");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-artifact",
+            "application/json",
+            "evidence/missing.json",
+            json!({}),
+        )
+        .expect("missing artifact indexed");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "missing_evidence"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn evaluates_scenario_assertions_against_captured_state() {
         let scenario = Scenario {
             id: "probe-smoke".to_string(),
@@ -2439,6 +2630,46 @@ scenarios:
 
         let error = first_page_target(&targets).expect_err("missing page fails");
         assert!(error.to_string().contains("no matching page CDP target"));
+    }
+
+    fn write_scenario_result_fixture(run_dir: &Path, status: &str) {
+        let scenario_dir = run_dir.join("evidence/scenarios/bootstrap-smoke");
+        fs::create_dir_all(&scenario_dir).expect("scenario dir created");
+        fs::write(scenario_dir.join("world-state.json"), "{}\n").expect("world state written");
+        fs::write(scenario_dir.join("frame-stats.json"), "{}\n").expect("frame stats written");
+        fs::write(
+            scenario_dir.join("scenario-result.json"),
+            format!(
+                "{{\n  \"scenario_id\": \"bootstrap-smoke\",\n  \"status\": \"{status}\",\n  \"evidence\": {{\n    \"world_state\": \"evidence/scenarios/bootstrap-smoke/world-state.json\",\n    \"frame_stats\": \"evidence/scenarios/bootstrap-smoke/frame-stats.json\"\n  }},\n  \"assertions\": []\n}}\n"
+            ),
+        )
+        .expect("scenario result written");
+        for (id, path, artifact) in [
+            (
+                "fixture-world-state",
+                "evidence/scenarios/bootstrap-smoke/world-state.json",
+                "world_state",
+            ),
+            (
+                "fixture-frame-stats",
+                "evidence/scenarios/bootstrap-smoke/frame-stats.json",
+                "frame_stats",
+            ),
+            (
+                "fixture-scenario-result",
+                "evidence/scenarios/bootstrap-smoke/scenario-result.json",
+                "scenario_result",
+            ),
+        ] {
+            add_evidence_artifact(
+                run_dir,
+                id,
+                "application/json",
+                path,
+                json!({ "artifact": artifact, "scenario_id": "bootstrap-smoke" }),
+            )
+            .expect("artifact indexed");
+        }
     }
 
     fn create_test_run(prefix: &str) -> (PathBuf, RunArtifacts) {
