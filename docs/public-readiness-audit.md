@@ -23,10 +23,10 @@ Ouroforge has a working local evidence-native MVP path, but it is **not ready fo
 | Area | Status | Evidence | Required remediation |
 | --- | --- | --- | --- |
 | README | Blocked | README is only a title and one-line tagline. | Add accurate private-MVP positioning, prerequisites, setup, demo, artifact inspection, and maturity boundaries. |
-| License | Blocked | No `LICENSE` file is tracked. | Choose and add an explicit OSS license before public release. |
+| License | Remediated by #46 | `LICENSE` adds MIT terms. | Confirm license choice before public visibility changes. |
 | Architecture docs | Blocked | No durable architecture doc is tracked. | Document Seed → Run → Ledger/Evidence → Evaluator → Journal → Mutation → UI boundaries. |
 | Contribution guide | Blocked | No `CONTRIBUTING.md` is tracked. | Add contribution workflow, test expectations, stacked PR guidance, and scope rules. |
-| Security posture | Blocked | No `SECURITY.md`; local browser/Chrome execution requirements are not documented as a security boundary. | Add reporting policy and local-execution safety notes. |
+| Security posture | Remediated by #46 | `SECURITY.md` documents reporting expectations and local Chrome/browser execution boundaries. | Replace temporary private reporting guidance with a dedicated public security contact before launch. |
 | Dependency posture | Needs hardening | Dependencies are small and pinned by `Cargo.lock`, but no public dependency policy/audit notes are documented. | Document dependency review and run a formal vulnerability audit before launch. |
 | Demo quality | Partial | MVP command can run locally and produce artifacts; UI examples are static and still require manual command/export steps. | Add demo walkthrough, screenshots/recordings, and known limitations. |
 | Issue templates | Blocked | No `.github/ISSUE_TEMPLATE` files are tracked. | Add bug/feature/security-adjacent templates with scope boundaries. |
@@ -62,8 +62,8 @@ Known environment requirement: local Chrome must be available at a standard path
 
 ## Launch checklist if blockers are resolved later
 
-- [ ] Add `LICENSE` with chosen OSS license.
-- [ ] Add `SECURITY.md` with vulnerability reporting and local execution caveats.
+- [x] Add `LICENSE` with chosen OSS license.
+- [x] Add `SECURITY.md` with vulnerability reporting and local execution caveats.
 - [ ] Add `CONTRIBUTING.md` with verification commands and scope rules.
 - [ ] Expand `README.md` with accurate MVP positioning, prerequisites, quickstart, demo, and artifact inspection.
 - [ ] Add architecture docs for artifact contracts and UI boundaries.
