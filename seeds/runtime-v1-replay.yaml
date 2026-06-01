@@ -1,0 +1,30 @@
+id: runtime-v1.replay
+title: Runtime v1 Deterministic Replay Seed
+goal: Drive the Runtime v1 browser scene through frame-based input replay and capture replay-linked evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Input replay schema v1 validates before execution.
+  - Replay execution moves the player deterministically without wall-clock timing.
+  - Run artifacts link replay input evidence to the resulting world state and verdict.
+scenarios:
+  - id: replay-move-right
+    description: Hold right for four fixed-timestep frames through input replay.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: move-right-four-frames
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 4
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 40
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
