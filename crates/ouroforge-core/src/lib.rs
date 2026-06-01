@@ -1261,6 +1261,124 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     Ok(BrowserSmokeResult { screenshot_path })
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct EvolveSummary {
+    pub status: String,
+    pub proposals_created: usize,
+    pub proposal_ids: Vec<String>,
+    pub reason: String,
+}
+
+pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
+    let run_dir = run_dir.as_ref();
+    append_ledger_event(run_dir, "evolve.started", "evolve-cli", json!({}))?;
+
+    let verdict_input = fs::read_to_string(run_dir.join("verdict.json"))
+        .context("failed to read verdict for evolve")?;
+    let verdict: serde_json::Value =
+        serde_json::from_str(&verdict_input).context("failed to parse verdict for evolve")?;
+    let verdict_status = verdict["status"].as_str().unwrap_or("unknown");
+
+    if verdict_status != "failed" {
+        let summary = EvolveSummary {
+            status: "noop".to_string(),
+            proposals_created: 0,
+            proposal_ids: Vec::new(),
+            reason: format!("verdict status is {verdict_status}; evolve v0 only proposes mutations for failed runs"),
+        };
+        append_ledger_event(
+            run_dir,
+            "evolve.completed",
+            "evolve-cli",
+            json!({ "status": summary.status, "proposals_created": 0 }),
+        )?;
+        update_journal(run_dir)?;
+        return Ok(summary);
+    }
+
+    let evidence = read_evidence_index(run_dir)?;
+    let failures = verdict["failures"].as_array().cloned().unwrap_or_default();
+    let mut proposal_ids = Vec::new();
+    let failure = failures
+        .first()
+        .cloned()
+        .unwrap_or_else(|| json!({ "kind": "failed_verdict" }));
+    let evidence_id = select_evidence_id_for_failure(&evidence, &failure, &verdict)
+        .ok_or_else(|| anyhow!("failed verdict has no evidence artifact to link"))?;
+    let proposal = create_mutation_proposal(
+        run_dir,
+        MutationProposalInput {
+            reason: format!(
+                "Deterministic evolve v0 placeholder for verdict failure `{}`",
+                failure["kind"].as_str().unwrap_or("failed_verdict")
+            ),
+            evidence_id,
+            target: "seeds/platformer.yaml".to_string(),
+            path: "scenarios.bootstrap-smoke.assertions".to_string(),
+            from: "current evidence-linked failing criteria".to_string(),
+            to: "review evidence and adjust the next explicit implementation issue".to_string(),
+        },
+    )?;
+    proposal_ids.push(proposal.id);
+
+    let summary = EvolveSummary {
+        status: "proposed".to_string(),
+        proposals_created: proposal_ids.len(),
+        proposal_ids,
+        reason: "failed verdict produced deterministic placeholder mutation proposal".to_string(),
+    };
+    append_ledger_event(
+        run_dir,
+        "evolve.completed",
+        "evolve-cli",
+        json!({
+            "status": summary.status,
+            "proposals_created": summary.proposals_created,
+            "proposal_ids": summary.proposal_ids
+        }),
+    )?;
+    update_journal(run_dir)?;
+    Ok(summary)
+}
+
+fn select_evidence_id_for_failure(
+    evidence: &EvidenceIndex,
+    failure: &serde_json::Value,
+    verdict: &serde_json::Value,
+) -> Option<String> {
+    for key in ["path", "evidence_path"] {
+        if let Some(path) = failure.get(key).and_then(|value| value.as_str()) {
+            if let Some(artifact) = evidence
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.path == path)
+            {
+                return Some(artifact.id.clone());
+            }
+        }
+    }
+    verdict
+        .get("evidence_refs")
+        .and_then(|value| value.as_array())
+        .and_then(|refs| {
+            refs.iter()
+                .filter_map(|value| value.as_str())
+                .find_map(|path| {
+                    evidence
+                        .artifacts
+                        .iter()
+                        .find(|artifact| artifact.path == path)
+                        .map(|artifact| artifact.id.clone())
+                })
+        })
+        .or_else(|| {
+            evidence
+                .artifacts
+                .first()
+                .map(|artifact| artifact.id.clone())
+        })
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct MutationProposal {
@@ -1392,7 +1510,8 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         .context("failed to read verdict for journal")?;
     let verdict: serde_json::Value =
         serde_json::from_str(&verdict_input).context("failed to parse verdict for journal")?;
-    let journal = render_journal(&seed, &evidence, &ledger, &verdict);
+    let proposals = read_mutation_proposals(run_dir)?.proposals;
+    let journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals);
     fs::write(run_dir.join("journal.md"), &journal).context("failed to write journal")?;
     Ok(journal)
 }
@@ -1406,6 +1525,7 @@ fn render_journal(
     evidence: &EvidenceIndex,
     ledger: &[serde_json::Value],
     verdict: &serde_json::Value,
+    proposals: &[MutationProposal],
 ) -> String {
     let mut out = String::new();
     out.push_str("# Ouroforge Run Journal\n\n");
@@ -1487,7 +1607,21 @@ fn render_journal(
     out.push_str("## Open Questions\n\n");
     out.push_str("- None recorded by deterministic artifacts.\n\n");
     out.push_str("## Next Mutation\n\n");
-    out.push_str("- Placeholder only; mutation proposal generation is deferred.\n");
+    if proposals.is_empty() {
+        out.push_str("- No mutation proposals recorded.\n");
+    } else {
+        for proposal in proposals {
+            out.push_str(&format!(
+                "- `{}`: {} (target `{}` path `{}` evidence `{}` status `{}`)\n",
+                proposal.id,
+                proposal.reason,
+                proposal.target,
+                proposal.path,
+                proposal.evidence_id,
+                proposal.status
+            ));
+        }
+    }
     out
 }
 
@@ -2539,6 +2673,73 @@ scenarios:
     }
 
     #[test]
+    fn evolve_failed_run_creates_proposal_and_updates_journal() {
+        let (root, artifacts) = create_test_run("ouroforge-evolve-failed-test");
+        fs::write(artifacts.run_dir.join("evidence/failure.json"), "{}\n")
+            .expect("evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "failure-evidence",
+            "application/json",
+            "evidence/failure.json",
+            json!({}),
+        )
+        .expect("evidence indexed");
+        write_json(
+            &artifacts.run_dir.join("verdict.json"),
+            &json!({
+                "status": "failed",
+                "summary": "failed",
+                "failures": [{ "kind": "scenario_failed", "path": "evidence/failure.json" }],
+                "evidence_refs": ["evidence/failure.json"],
+                "metadata": {}
+            }),
+        )
+        .expect("verdict written");
+
+        let summary = evolve_run(&artifacts.run_dir).expect("evolve succeeds");
+
+        assert_eq!(summary.status, "proposed");
+        assert_eq!(summary.proposals_created, 1);
+        let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
+        assert_eq!(proposals[0].evidence_id, "failure-evidence");
+        let journal = show_journal(&artifacts.run_dir).expect("journal reads");
+        assert!(journal.contains(&proposals[0].id));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evolve_passed_run_is_noop() {
+        let (root, artifacts) = create_test_run("ouroforge-evolve-passed-test");
+        write_json(
+            &artifacts.run_dir.join("verdict.json"),
+            &json!({ "status": "passed", "summary": "passed", "failures": [], "evidence_refs": [], "metadata": {} }),
+        )
+        .expect("verdict written");
+
+        let summary = evolve_run(&artifacts.run_dir).expect("evolve succeeds");
+
+        assert_eq!(summary.status, "noop");
+        assert!(list_mutation_proposals(&artifacts.run_dir)
+            .unwrap()
+            .is_empty());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evolve_missing_verdict_fails_clearly() {
+        let (root, artifacts) = create_test_run("ouroforge-evolve-missing-verdict-test");
+        fs::remove_file(artifacts.run_dir.join("verdict.json")).expect("verdict removed");
+
+        let error = evolve_run(&artifacts.run_dir).expect_err("missing verdict fails");
+
+        assert!(error
+            .to_string()
+            .contains("failed to read verdict for evolve"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn creates_and_lists_mutation_proposals_without_applying() {
         let (root, artifacts) = create_test_run("ouroforge-mutation-test");
         fs::write(artifacts.run_dir.join("evidence/source.json"), "{}\n")
@@ -2621,6 +2822,7 @@ scenarios:
                     "summary": format!("{status} summary"),
                     "failures": if status == "failed" { vec![json!({"kind": "scenario_failed"})] } else { Vec::new() }
                 }),
+                &[],
             );
             assert!(journal.contains(&format!("- Status: `{status}`")));
             assert!(journal.contains("`artifact-1`"));
