@@ -68,6 +68,37 @@ pub struct InputStep {
     pub down: Option<bool>,
 }
 
+const INPUT_REPLAY_SCHEMA_VERSION: &str = "1";
+const MAX_INPUT_REPLAY_EVENTS: usize = 10_000;
+const MAX_INPUT_REPLAY_FRAME: u32 = 100_000;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct InputReplay {
+    #[serde(rename = "schemaVersion")]
+    #[serde(default = "input_replay_schema_v1")]
+    pub schema_version: String,
+    pub id: String,
+    pub events: Vec<InputReplayEvent>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct InputReplayEvent {
+    pub frame: u32,
+    pub key: ReplayKey,
+    pub pressed: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplayKey {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum ScenarioAssertion {
@@ -161,6 +192,61 @@ impl ScenarioStep {
         }
         Ok(())
     }
+}
+
+impl InputReplay {
+    pub fn from_yaml_str(input: &str) -> Result<Self> {
+        let replay: InputReplay =
+            serde_yaml::from_str(input).context("failed to parse Input Replay YAML")?;
+        replay.validate()?;
+        Ok(replay)
+    }
+
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let replay: InputReplay =
+            serde_json::from_str(input).context("failed to parse Input Replay JSON")?;
+        replay.validate()?;
+        Ok(replay)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != INPUT_REPLAY_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "input replay schemaVersion must be {INPUT_REPLAY_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("input replay id", &self.id)?;
+        if self.events.is_empty() {
+            return Err(anyhow!(
+                "input replay events must contain at least one event"
+            ));
+        }
+        if self.events.len() > MAX_INPUT_REPLAY_EVENTS {
+            return Err(anyhow!(
+                "input replay events must contain at most {MAX_INPUT_REPLAY_EVENTS} events"
+            ));
+        }
+
+        let mut last_frame = 0;
+        for (index, event) in self.events.iter().enumerate() {
+            if event.frame > MAX_INPUT_REPLAY_FRAME {
+                return Err(anyhow!(
+                    "input replay events[{index}].frame must be <= {MAX_INPUT_REPLAY_FRAME}"
+                ));
+            }
+            if index > 0 && event.frame < last_frame {
+                return Err(anyhow!(
+                    "input replay events must be ordered by nondecreasing frame"
+                ));
+            }
+            last_frame = event.frame;
+        }
+        Ok(())
+    }
+}
+
+fn input_replay_schema_v1() -> String {
+    INPUT_REPLAY_SCHEMA_VERSION.to_string()
 }
 
 impl ScenarioAssertion {
@@ -2677,6 +2763,90 @@ scenarios:
 
         assert_eq!(seed.scenarios[0].steps.len(), 2);
         assert_eq!(seed.scenarios[0].assertions.len(), 2);
+    }
+
+    #[test]
+    fn parses_valid_input_replay_v1() {
+        let replay = InputReplay::from_yaml_str(
+            r#"
+schemaVersion: "1"
+id: move-right
+events:
+  - frame: 0
+    key: right
+    pressed: true
+  - frame: 4
+    key: right
+    pressed: false
+"#,
+        )
+        .expect("valid replay parses");
+
+        assert_eq!(replay.id, "move-right");
+        assert_eq!(replay.events.len(), 2);
+        assert_eq!(replay.events[0].key, ReplayKey::Right);
+        assert!(replay.events[0].pressed);
+    }
+
+    #[test]
+    fn rejects_invalid_input_replay_v1() {
+        let unordered = InputReplay::from_yaml_str(
+            r#"
+schemaVersion: "1"
+id: move-right
+events:
+  - frame: 4
+    key: right
+    pressed: true
+  - frame: 3
+    key: right
+    pressed: false
+"#,
+        )
+        .expect_err("unordered replay rejected");
+        assert!(unordered
+            .to_string()
+            .contains("ordered by nondecreasing frame"));
+
+        let unknown_key = InputReplay::from_yaml_str(
+            r#"
+schemaVersion: "1"
+id: pointer-replay
+events:
+  - frame: 0
+    key: pointer
+    pressed: true
+"#,
+        )
+        .expect_err("unsupported key rejected");
+        assert!(unknown_key.to_string().contains("failed to parse"));
+
+        let too_large = InputReplay::from_yaml_str(
+            r#"
+schemaVersion: "1"
+id: huge-frame
+events:
+  - frame: 100001
+    key: left
+    pressed: true
+"#,
+        )
+        .expect_err("oversized frame rejected");
+        assert!(too_large.to_string().contains("frame must be <= 100000"));
+
+        let malformed = InputReplay::from_yaml_str(
+            r#"
+schemaVersion: "1"
+id: malformed
+events:
+  - frame: 0
+    key: left
+    pressed: true
+    pointer: 10
+"#,
+        )
+        .expect_err("malformed replay rejected");
+        assert!(malformed.to_string().contains("failed to parse"));
     }
 
     #[test]
