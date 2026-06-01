@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
-    add_evidence_artifact, append_ledger_event, create_run, evaluate_run, list_evidence_artifacts,
-    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
-    update_journal, BrowserSmokeConfig, BrowserSmokePoolConfig, ScenarioRunConfig, Seed, WorkerId,
+    add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, evaluate_run,
+    list_evidence_artifacts, list_mutation_proposals, read_ledger_events, run_browser_smoke,
+    run_browser_smoke_pool, run_scenarios, show_journal, update_journal, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed, WorkerId,
 };
 use std::path::PathBuf;
 
@@ -47,6 +48,10 @@ enum Commands {
         #[command(subcommand)]
         command: JournalCommand,
     },
+    Mutation {
+        #[command(subcommand)]
+        command: MutationCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -82,6 +87,28 @@ enum BrowserCommand {
         worker_id: String,
         #[arg(long, default_value_t = 1)]
         workers: usize,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum MutationCommand {
+    Create {
+        run_dir: PathBuf,
+        #[arg(long)]
+        reason: String,
+        #[arg(long)]
+        evidence: String,
+        #[arg(long)]
+        target: String,
+        #[arg(long)]
+        path: String,
+        #[arg(long)]
+        from: String,
+        #[arg(long)]
+        to: String,
+    },
+    List {
+        run_dir: PathBuf,
     },
 }
 
@@ -235,6 +262,37 @@ fn main() -> Result<()> {
         } => {
             let journal = show_journal(run_dir)?;
             print!("{journal}");
+        }
+        Commands::Mutation {
+            command:
+                MutationCommand::Create {
+                    run_dir,
+                    reason,
+                    evidence,
+                    target,
+                    path,
+                    from,
+                    to,
+                },
+        } => {
+            let proposal = create_mutation_proposal(
+                run_dir,
+                MutationProposalInput {
+                    reason,
+                    evidence_id: evidence,
+                    target,
+                    path,
+                    from,
+                    to,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&proposal)?);
+        }
+        Commands::Mutation {
+            command: MutationCommand::List { run_dir },
+        } => {
+            let proposals = list_mutation_proposals(run_dir)?;
+            println!("{}", serde_json::to_string_pretty(&proposals)?);
         }
     }
 

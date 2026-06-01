@@ -1261,6 +1261,128 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     Ok(BrowserSmokeResult { screenshot_path })
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationProposal {
+    pub id: String,
+    pub reason: String,
+    pub evidence_id: String,
+    pub target: String,
+    pub path: String,
+    pub from: String,
+    pub to: String,
+    pub confidence: String,
+    pub status: String,
+    pub verdict_status: String,
+    pub created_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct MutationProposalIndex {
+    pub proposals: Vec<MutationProposal>,
+}
+
+pub struct MutationProposalInput {
+    pub reason: String,
+    pub evidence_id: String,
+    pub target: String,
+    pub path: String,
+    pub from: String,
+    pub to: String,
+}
+
+pub fn create_mutation_proposal(
+    run_dir: impl AsRef<Path>,
+    input: MutationProposalInput,
+) -> Result<MutationProposal> {
+    let run_dir = run_dir.as_ref();
+    require_text("mutation reason", &input.reason)?;
+    require_text("mutation evidence", &input.evidence_id)?;
+    require_text("mutation target", &input.target)?;
+    require_text("mutation path", &input.path)?;
+    require_text("mutation from", &input.from)?;
+    require_text("mutation to", &input.to)?;
+    let evidence = read_evidence_index(run_dir)?;
+    if !evidence
+        .artifacts
+        .iter()
+        .any(|artifact| artifact.id == input.evidence_id)
+    {
+        return Err(anyhow!(
+            "mutation evidence id not found: {}",
+            input.evidence_id
+        ));
+    }
+    let verdict_status = fs::read_to_string(run_dir.join("verdict.json"))
+        .ok()
+        .and_then(|input| serde_json::from_str::<serde_json::Value>(&input).ok())
+        .and_then(|value| {
+            value
+                .get("status")
+                .and_then(|status| status.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+    let mut index = read_mutation_proposals(run_dir)?;
+    let created_at_unix_ms = unix_millis()?;
+    let proposal = MutationProposal {
+        id: format!(
+            "mutation-{created_at_unix_ms}-{}",
+            index.proposals.len() + 1
+        ),
+        reason: input.reason,
+        evidence_id: input.evidence_id,
+        target: input.target,
+        path: input.path,
+        from: input.from,
+        to: input.to,
+        confidence: "medium".to_string(),
+        status: "proposed".to_string(),
+        verdict_status,
+        created_at_unix_ms,
+    };
+    index.proposals.push(proposal.clone());
+    write_mutation_proposals(run_dir, &index)?;
+    append_ledger_event(
+        run_dir,
+        "mutation.proposed",
+        "mutation-cli",
+        json!({
+            "proposal_id": proposal.id,
+            "evidence_id": proposal.evidence_id,
+            "target": proposal.target,
+            "path": proposal.path,
+            "status": proposal.status
+        }),
+    )?;
+    Ok(proposal)
+}
+
+pub fn list_mutation_proposals(run_dir: impl AsRef<Path>) -> Result<Vec<MutationProposal>> {
+    Ok(read_mutation_proposals(run_dir)?.proposals)
+}
+
+fn read_mutation_proposals(run_dir: impl AsRef<Path>) -> Result<MutationProposalIndex> {
+    let path = run_dir.as_ref().join("mutation/proposals.json");
+    if !path.exists() {
+        return Ok(MutationProposalIndex::default());
+    }
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read mutation proposals {}", path.display()))?;
+    serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse mutation proposals {}", path.display()))
+}
+
+fn write_mutation_proposals(
+    run_dir: impl AsRef<Path>,
+    index: &MutationProposalIndex,
+) -> Result<()> {
+    let dir = run_dir.as_ref().join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    write_json_atomic(&dir.join("proposals.json"), &json!(index))
+}
+
 pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let run_dir = run_dir.as_ref();
     let seed = Seed::from_path(run_dir.join("seed.snapshot.yaml"))?;
@@ -2414,6 +2536,62 @@ scenarios:
             );
             Ok(json!({ "result": { "value": {} } }))
         }
+    }
+
+    #[test]
+    fn creates_and_lists_mutation_proposals_without_applying() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-test");
+        fs::write(artifacts.run_dir.join("evidence/source.json"), "{}\n")
+            .expect("evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "evidence-1",
+            "application/json",
+            "evidence/source.json",
+            json!({}),
+        )
+        .expect("evidence indexed");
+
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "test".to_string(),
+                evidence_id: "evidence-1".to_string(),
+                target: "scenes/platformer.yaml".to_string(),
+                path: "entities.player.jump_impulse".to_string(),
+                from: "7.5".to_string(),
+                to: "9.0".to_string(),
+            },
+        )
+        .expect("proposal created");
+
+        assert_eq!(proposal.status, "proposed");
+        assert!(!Path::new("scenes/platformer.yaml").exists());
+        let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
+        assert_eq!(proposals.len(), 1);
+        assert_eq!(proposals[0].evidence_id, "evidence-1");
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_mutation_proposal_with_unknown_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-bad-evidence-test");
+
+        let error = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "test".to_string(),
+                evidence_id: "missing".to_string(),
+                target: "scenes/platformer.yaml".to_string(),
+                path: "entities.player.jump_impulse".to_string(),
+                from: "7.5".to_string(),
+                to: "9.0".to_string(),
+            },
+        )
+        .expect_err("missing evidence fails");
+
+        assert!(error.to_string().contains("evidence id not found"));
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
