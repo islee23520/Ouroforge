@@ -7,3 +7,4 @@ edition = "2021"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 ouroforge-core = { path = "../ouroforge-core" }
+serde_json = "1"
