@@ -8,4 +8,4 @@ Serve locally:
 python3 -m http.server 8771 --bind 127.0.0.1 --directory examples/game-runtime
 ```
 
-Rendering and scene loading are intentionally deferred to #14.2.
+Rendering now draws simple colored rectangle sprites to canvas and loads `scene.json`. Demo Seed/scenario integration is intentionally deferred to #14.3.

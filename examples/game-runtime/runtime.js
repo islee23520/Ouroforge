@@ -2,14 +2,13 @@
   const fixedDeltaMs = 16;
   const input = { left: false, right: false, up: false, down: false };
   const events = [];
-  const world = {
-    tick: 0,
-    fixedDeltaMs,
-    paused: false,
+  const defaultScene = {
+    id: 'fallback-scene',
     bounds: { width: 320, height: 180 },
     entities: [
       {
         id: 'player',
+        sprite: { color: '#5eead4' },
         components: {
           transform: { x: 32, y: 72 },
           velocity: { x: 0, y: 0 },
@@ -18,6 +17,14 @@
         },
       },
     ],
+  };
+  const world = {
+    sceneId: defaultScene.id,
+    tick: 0,
+    fixedDeltaMs,
+    paused: false,
+    bounds: clone(defaultScene.bounds),
+    entities: clone(defaultScene.entities),
   };
 
   function clone(value) {
@@ -53,9 +60,38 @@
     world.tick += 1;
   }
 
+  function renderCanvas() {
+    const canvas = document.getElementById('game');
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#172532';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    for (const entity of world.entities) {
+      const transform = entity.components.transform;
+      const size = entity.components.size;
+      context.fillStyle = entity.sprite?.color || '#f2f6f8';
+      context.fillRect(transform.x, transform.y, size.width, size.height);
+    }
+    context.fillStyle = '#f2f6f8';
+    context.font = '10px ui-monospace, monospace';
+    context.fillText(`scene=${world.sceneId} tick=${world.tick}`, 8, 14);
+  }
+
   function renderDebug() {
+    renderCanvas();
     const debug = document.getElementById('debug');
     if (debug) debug.textContent = JSON.stringify(api.getWorldState(), null, 2);
+  }
+
+  function loadScene(scene) {
+    world.sceneId = scene.id || 'unnamed-scene';
+    world.bounds = clone(scene.bounds || defaultScene.bounds);
+    world.entities = clone(scene.entities || defaultScene.entities);
+    world.tick = 0;
+    record('runtime.scene.loaded', { sceneId: world.sceneId });
+    renderDebug();
+    return api.getWorldState();
   }
 
   function setInput(nextInput = {}) {
@@ -121,6 +157,7 @@
     setInput,
     snapshot,
     restore,
+    loadScene,
   });
 
   window.addEventListener('keydown', (event) => {
@@ -139,4 +176,8 @@
   window.__OUROFORGE__ = api;
   record('runtime.loaded', { api: Object.keys(api) });
   renderDebug();
+  fetch('scene.json')
+    .then((response) => response.json())
+    .then((scene) => loadScene(scene))
+    .catch((error) => record('runtime.scene.load_failed', { error: String(error) }));
 })();
