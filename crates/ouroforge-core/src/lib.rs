@@ -2045,6 +2045,196 @@ fn execute_scenario_step<T: CdpTransport>(
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardSummary {
+    pub id: String,
+    pub run_dir: PathBuf,
+    pub seed_id: String,
+    pub seed_title: String,
+    pub run_status: String,
+    pub verdict_status: String,
+    pub created_at_unix_ms: u128,
+    pub evidence_count: usize,
+    pub mutation_count: usize,
+    pub journal_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardArtifact {
+    pub id: String,
+    pub kind: String,
+    pub path: String,
+    pub metadata: serde_json::Value,
+    pub value: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReadModel {
+    pub summary: RunDashboardSummary,
+    pub run: serde_json::Value,
+    pub verdict: serde_json::Value,
+    pub journal: String,
+    pub evidence: Vec<EvidenceArtifact>,
+    pub screenshots: Vec<RunDashboardArtifact>,
+    pub console_logs: Vec<RunDashboardArtifact>,
+    pub world_states: Vec<RunDashboardArtifact>,
+    pub mutations: Vec<MutationProposal>,
+}
+
+pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
+    let runs_root = runs_root.as_ref();
+    if !runs_root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut runs = Vec::new();
+    for entry in fs::read_dir(runs_root)
+        .with_context(|| format!("failed to read runs root {}", runs_root.display()))?
+    {
+        let entry = entry.context("failed to read runs root entry")?;
+        let path = entry.path();
+        if !path.is_dir() || !path.join("run.json").is_file() {
+            continue;
+        }
+        runs.push(read_dashboard_run_summary(&path)?);
+    }
+    runs.sort_by(|left, right| {
+        right
+            .created_at_unix_ms
+            .cmp(&left.created_at_unix_ms)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    Ok(runs)
+}
+
+pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadModel> {
+    let run_dir = run_dir.as_ref();
+    let summary = read_dashboard_run_summary(run_dir)?;
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let verdict = read_json_value(run_dir.join("verdict.json"))?;
+    let journal = fs::read_to_string(run_dir.join("journal.md"))
+        .with_context(|| format!("failed to read journal for {}", run_dir.display()))?;
+    let evidence = read_evidence_index(run_dir)?.artifacts;
+    let screenshots =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_screenshot)?;
+    let console_logs =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_console_log)?;
+    let world_states =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_world_state)?;
+    let mutations = list_mutation_proposals(run_dir)?;
+    Ok(RunDashboardReadModel {
+        summary,
+        run,
+        verdict,
+        journal,
+        evidence,
+        screenshots,
+        console_logs,
+        world_states,
+        mutations,
+    })
+}
+
+fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let evidence_count = read_evidence_index(run_dir)?.artifacts.len();
+    let mutations = list_mutation_proposals(run_dir)?;
+    let verdict = read_json_value(run_dir.join("verdict.json"))?;
+    let id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    Ok(RunDashboardSummary {
+        id,
+        run_dir: run_dir.to_path_buf(),
+        seed_id: json_string(&run, "seed_id").unwrap_or_else(|| "unknown-seed".to_string()),
+        seed_title: json_string(&run, "seed_title").unwrap_or_else(|| "Untitled Seed".to_string()),
+        run_status: json_string(&run, "status").unwrap_or_else(|| "unknown".to_string()),
+        verdict_status: json_string(&verdict, "status").unwrap_or_else(|| "unknown".to_string()),
+        created_at_unix_ms: run
+            .get("created_at_unix_ms")
+            .and_then(|value| value.as_u64())
+            .map(u128::from)
+            .unwrap_or(0),
+        evidence_count,
+        mutation_count: mutations.len(),
+        journal_path: run_dir.join("journal.md"),
+    })
+}
+
+fn select_dashboard_artifacts(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+    predicate: fn(&EvidenceArtifact) -> bool,
+) -> Result<Vec<RunDashboardArtifact>> {
+    evidence
+        .iter()
+        .filter(|artifact| predicate(artifact))
+        .map(|artifact| dashboard_artifact(run_dir, artifact))
+        .collect()
+}
+
+fn dashboard_artifact(run_dir: &Path, artifact: &EvidenceArtifact) -> Result<RunDashboardArtifact> {
+    let value = if artifact.kind == "application/json" || artifact.path.ends_with(".json") {
+        Some(read_json_value(run_dir.join(&artifact.path))?)
+    } else {
+        None
+    };
+    Ok(RunDashboardArtifact {
+        id: artifact.id.clone(),
+        kind: artifact.kind.clone(),
+        path: artifact.path.clone(),
+        metadata: artifact.metadata.clone(),
+        value,
+    })
+}
+
+fn dashboard_artifact_is_screenshot(artifact: &EvidenceArtifact) -> bool {
+    artifact.kind == "image/png" || artifact.path.ends_with(".png")
+}
+
+fn dashboard_artifact_is_console_log(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("console_log")
+        || artifact.id.contains("console")
+        || artifact.path.contains("console")
+}
+
+fn dashboard_artifact_is_world_state(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("world_state")
+        || artifact
+            .metadata
+            .get("probe_call")
+            .and_then(|value| value.as_str())
+            == Some("getWorldState")
+        || artifact.id.contains("world-state")
+        || artifact.path.contains("world-state")
+}
+
+fn read_json_value(path: impl AsRef<Path>) -> Result<serde_json::Value> {
+    let path = path.as_ref();
+    let input = fs::read_to_string(path)
+        .with_context(|| format!("failed to read JSON file {}", path.display()))?;
+    serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse JSON file {}", path.display()))
+}
+
+fn json_string(value: &serde_json::Value, field: &str) -> Option<String> {
+    value
+        .get(field)
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunArtifacts {
     pub run_dir: PathBuf,
@@ -3133,6 +3323,101 @@ scenarios:
             config.target_ws_url,
             "ws://127.0.0.1:9222/devtools/page/page-1"
         );
+    }
+
+    #[test]
+    fn dashboard_read_model_lists_runs_and_categorizes_artifacts() {
+        let (root, artifacts) = create_test_run("dashboard-read-model");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"failed\",\"summary\":\"fixture failure\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/browser-smoke.png"),
+            b"png fixture",
+        )
+        .expect("screenshot written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            "{\"object\":{\"x\":40}}\n",
+        )
+        .expect("world state written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/console-log.json"),
+            "[{\"level\":\"info\",\"text\":\"ready\"}]\n",
+        )
+        .expect("console log written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-screenshot",
+            "image/png",
+            "evidence/workers/worker-1/browser-smoke.png",
+            json!({ "worker_id": "worker-1" }),
+        )
+        .expect("screenshot indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world state indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-console-log",
+            "application/json",
+            "evidence/workers/worker-1/console-log.json",
+            json!({ "artifact": "console_log", "worker_id": "worker-1" }),
+        )
+        .expect("console log indexed");
+        create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "fixture failure".to_string(),
+                evidence_id: "fixture-world-state".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.bootstrap-smoke.assertions".to_string(),
+                from: "x == -1".to_string(),
+                to: "x == 40".to_string(),
+            },
+        )
+        .expect("mutation proposal created");
+
+        let runs = list_dashboard_runs(root.join("runs")).expect("dashboard runs listed");
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].verdict_status, "failed");
+        assert_eq!(runs[0].evidence_count, 3);
+        assert_eq!(runs[0].mutation_count, 1);
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run read");
+        assert_eq!(model.summary.id, runs[0].id);
+        assert_eq!(model.evidence.len(), 3);
+        assert_eq!(model.screenshots.len(), 1);
+        assert_eq!(model.world_states.len(), 1);
+        assert_eq!(model.console_logs.len(), 1);
+        assert_eq!(model.mutations.len(), 1);
+        let world_state = model.world_states[0]
+            .value
+            .as_ref()
+            .expect("world state JSON loaded");
+        let console_log = model.console_logs[0]
+            .value
+            .as_ref()
+            .expect("console log JSON loaded");
+        assert_eq!(world_state["object"]["x"], json!(40));
+        assert_eq!(console_log[0]["text"], json!("ready"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
