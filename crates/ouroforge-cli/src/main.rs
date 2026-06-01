@@ -2,12 +2,14 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, evaluate_run,
-    evolve_run, list_evidence_artifacts, list_mutation_proposals, read_ledger_events,
-    run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal, update_journal,
-    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed,
-    WorkerId,
+    evolve_run, list_evidence_artifacts, list_mutation_proposals, read_cdp_targets,
+    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
+    update_journal, BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput,
+    ScenarioRunConfig, Seed, WorkerId,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Parser)]
 #[command(name = "ouroforge")]
@@ -163,12 +165,13 @@ fn main() -> Result<()> {
             let seed = Seed::from_path(seed_path)?;
             println!("Seed valid: {}", seed.id);
         }
-        Commands::Run {
-            seed_path,
-            workers: _,
-        } => {
+        Commands::Run { seed_path, workers } => {
             let artifacts = create_run(seed_path, "runs")?;
             println!("Run created: {}", artifacts.run_dir.display());
+            if workers > 1 {
+                let summary = run_private_mvp(&artifacts.run_dir, workers)?;
+                println!("{}", serde_json::to_string_pretty(&summary)?);
+            }
         }
         Commands::Ledger {
             command:
@@ -310,6 +313,160 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn run_private_mvp(run_dir: &Path, workers: usize) -> Result<serde_json::Value> {
+    let runtime_dir = PathBuf::from("examples/game-runtime");
+    if !runtime_dir.join("index.html").is_file() {
+        return Err(anyhow!(
+            "game runtime page is missing: {}",
+            runtime_dir.display()
+        ));
+    }
+    let http_port = reserve_loopback_port()?;
+    let cdp_port = reserve_loopback_port()?;
+    let profile_dir = std::env::temp_dir().join(format!(
+        "ouroforge-mvp-chrome-{}-{}",
+        std::process::id(),
+        monotonic_millis()?
+    ));
+
+    let mut server = Command::new("python3")
+        .args([
+            "-m",
+            "http.server",
+            &http_port.to_string(),
+            "--bind",
+            "127.0.0.1",
+            "--directory",
+            runtime_dir.to_str().unwrap_or("examples/game-runtime"),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("failed to start local runtime server")?;
+    let chrome_path = find_chrome()?;
+    let mut chrome = Command::new(&chrome_path)
+        .arg("--headless=new")
+        .arg("--disable-gpu")
+        .arg("--remote-debugging-address=127.0.0.1")
+        .arg(format!("--remote-debugging-port={cdp_port}"))
+        .arg(format!("--user-data-dir={}", profile_dir.display()))
+        .arg("about:blank")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .with_context(|| format!("failed to start Chrome at {}", chrome_path.display()))?;
+
+    let result = (|| {
+        let runtime_url = format!("http://127.0.0.1:{http_port}/");
+        let cdp_url = format!("http://127.0.0.1:{cdp_port}");
+        wait_for_cdp(&cdp_url)?;
+
+        let mut smoke_config = BrowserSmokeConfig::new(run_dir, runtime_url.clone())?;
+        smoke_config.debugging_http_url = cdp_url.clone();
+        let smoke = run_browser_smoke_pool(&BrowserSmokePoolConfig::new(smoke_config, workers)?);
+        if smoke.has_failures() {
+            return Err(anyhow!(
+                "private MVP browser smoke failed for {} of {} worker(s)",
+                smoke.failed,
+                smoke.workers
+            ));
+        }
+
+        let mut scenario_config = ScenarioRunConfig::new(run_dir, runtime_url)?;
+        scenario_config.debugging_http_url = cdp_url;
+        let scenarios = run_scenarios(&scenario_config)?;
+        if scenarios.has_failures() {
+            return Err(anyhow!(
+                "private MVP scenarios failed for {} of {} scenario(s)",
+                scenarios.failed,
+                scenarios.scenarios
+            ));
+        }
+        let verdict = evaluate_run(run_dir)?;
+        let journal = update_journal(run_dir)?;
+        Ok(json_mvp_summary(
+            workers,
+            &smoke,
+            &scenarios,
+            &verdict,
+            !journal.is_empty(),
+        ))
+    })();
+
+    terminate_child(&mut chrome);
+    terminate_child(&mut server);
+    let _ = std::fs::remove_dir_all(profile_dir);
+    result
+}
+
+fn json_mvp_summary(
+    workers: usize,
+    smoke: &ouroforge_core::BrowserSmokePoolResult,
+    scenarios: &ouroforge_core::ScenarioRunSummary,
+    verdict: &ouroforge_core::EvaluationVerdict,
+    journal_updated: bool,
+) -> serde_json::Value {
+    serde_json::json!({
+        "mvp": "private-local",
+        "workers": workers,
+        "browser_smoke": smoke,
+        "scenarios": scenarios,
+        "verdict": verdict,
+        "journal_updated": journal_updated
+    })
+}
+
+fn reserve_loopback_port() -> Result<u16> {
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").context("failed to reserve loopback port")?;
+    Ok(listener.local_addr()?.port())
+}
+
+fn wait_for_cdp(cdp_url: &str) -> Result<()> {
+    for _ in 0..100 {
+        if read_cdp_targets(cdp_url).is_ok() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Err(anyhow!(
+        "Chrome CDP endpoint did not become ready: {cdp_url}"
+    ))
+}
+
+fn find_chrome() -> Result<PathBuf> {
+    if let Ok(path) = std::env::var("OUROFORGE_CHROME") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+    for candidate in [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/usr/bin/google-chrome",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+    ] {
+        let path = PathBuf::from(candidate);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+    Err(anyhow!("Chrome executable not found; set OUROFORGE_CHROME"))
+}
+
+fn terminate_child(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn monotonic_millis() -> Result<u128> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX_EPOCH")?
+        .as_millis())
 }
 
 fn parse_json_arg(input: &str) -> Result<serde_json::Value> {

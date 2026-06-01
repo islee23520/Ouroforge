@@ -1,23 +1,23 @@
 id: platformer.v0
 title: Platformer Harness Seed
-goal: Prove the initial Ouroforge Seed → Run → Ledger → Evidence Index → Journal → Verdict contract.
+goal: Drive the local private MVP loop through the minimal 2D runtime and evidence pipeline.
 constraints:
-  target: file-harness
+  target: game-runtime
 acceptance:
   - Seed validation reports the platformer.v0 seed as valid.
-  - Running the seed creates the required file-based run artifacts.
+  - Running the seed with workers creates independent browser evidence, scenario results, a verdict, and a journal.
 scenarios:
   - id: bootstrap-smoke
-    description: Validate the minimal runtime probe contract without executing it yet.
+    description: Move the player right for four fixed-timestep frames in the minimal game runtime.
     steps:
-      - wait:
-          frames: 2
       - input:
           right: true
+      - wait:
+          frames: 4
     assertions:
       - world_state:
-          path: object.id
-          equals: probe-square
+          path: object.x
+          equals: 40
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
