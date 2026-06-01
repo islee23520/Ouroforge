@@ -3,8 +3,10 @@
   const input = { left: false, right: false, up: false, down: false };
   const events = [];
   const defaultScene = {
+    schemaVersion: '1',
     id: 'fallback-scene',
     bounds: { width: 320, height: 180 },
+    metadata: {},
     entities: [
       {
         id: 'player',
@@ -15,16 +17,20 @@
           size: { width: 16, height: 16 },
           controllable: true,
         },
+        tags: ['player'],
+        metadata: {},
       },
     ],
   };
   const world = {
+    schemaVersion: defaultScene.schemaVersion,
     sceneId: defaultScene.id,
     tick: 0,
     fixedDeltaMs,
     paused: false,
     bounds: clone(defaultScene.bounds),
     entities: clone(defaultScene.entities),
+    metadata: clone(defaultScene.metadata),
   };
 
   function clone(value) {
@@ -37,7 +43,67 @@
   }
 
   function player() {
-    return world.entities.find((entity) => entity.id === 'player');
+    return world.entities.find((entity) => entity.id === 'player') || world.entities[0];
+  }
+
+  function point(value = {}, fallback = { x: 0, y: 0 }) {
+    return {
+      x: Number.isFinite(value.x) ? value.x : fallback.x,
+      y: Number.isFinite(value.y) ? value.y : fallback.y,
+    };
+  }
+
+  function size(value = {}, fallback = { width: 16, height: 16 }) {
+    return {
+      width: Number.isFinite(value.width) && value.width > 0 ? value.width : fallback.width,
+      height: Number.isFinite(value.height) && value.height > 0 ? value.height : fallback.height,
+    };
+  }
+
+  function objectValue(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? clone(value) : {};
+  }
+
+  function normalizeEntity(entity = {}, index = 0) {
+    const components = entity.components || {};
+    const sprite = entity.sprite || {};
+    const normalized = {
+      id: String(entity.id || `entity-${index}`),
+      sprite: {
+        color: typeof sprite.color === 'string' ? sprite.color : '#f2f6f8',
+      },
+      components: {
+        transform: point(components.transform),
+        velocity: point(components.velocity),
+        size: size(components.size),
+        controllable: Boolean(components.controllable),
+      },
+      tags: Array.isArray(entity.tags) ? entity.tags.map(String) : [],
+      metadata: objectValue(entity.metadata),
+    };
+    if (typeof sprite.asset === 'string') normalized.sprite.asset = sprite.asset;
+    if (components.collider) {
+      normalized.components.collider = {
+        shape: components.collider.shape || 'aabb',
+        offset: point(components.collider.offset),
+        size: size(components.collider.size, normalized.components.size),
+        sensor: Boolean(components.collider.sensor),
+      };
+    }
+    return normalized;
+  }
+
+  function normalizeScene(scene = {}) {
+    const sourceEntities = Array.isArray(scene.entities) && scene.entities.length > 0
+      ? scene.entities
+      : defaultScene.entities;
+    return {
+      schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
+      id: String(scene.id || 'unnamed-scene'),
+      bounds: size(scene.bounds, defaultScene.bounds),
+      metadata: objectValue(scene.metadata),
+      entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
+    };
   }
 
   function applyInput() {
@@ -85,11 +151,18 @@
   }
 
   function loadScene(scene) {
-    world.sceneId = scene.id || 'unnamed-scene';
-    world.bounds = clone(scene.bounds || defaultScene.bounds);
-    world.entities = clone(scene.entities || defaultScene.entities);
+    const normalized = normalizeScene(scene);
+    world.schemaVersion = normalized.schemaVersion;
+    world.sceneId = normalized.id;
+    world.bounds = clone(normalized.bounds);
+    world.entities = clone(normalized.entities);
+    world.metadata = clone(normalized.metadata);
     world.tick = 0;
-    record('runtime.scene.loaded', { sceneId: world.sceneId });
+    record('runtime.scene.loaded', {
+      schemaVersion: world.schemaVersion,
+      sceneId: world.sceneId,
+      entityCount: world.entities.length,
+    });
     renderDebug();
     return api.getWorldState();
   }
@@ -130,10 +203,11 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      const currentPlayer = player();
       state.object = {
-        id: player().id,
-        ...clone(player().components.transform),
-        ...clone(player().components.size),
+        id: currentPlayer.id,
+        ...clone(currentPlayer.components.transform),
+        ...clone(currentPlayer.components.size),
       };
       return state;
     },

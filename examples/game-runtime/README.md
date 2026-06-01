@@ -8,4 +8,8 @@ Serve locally:
 python3 -m http.server 8771 --bind 127.0.0.1 --directory examples/game-runtime
 ```
 
-Rendering now draws simple colored rectangle sprites to canvas and loads `scene.json`. Demo Seed/scenario integration is intentionally deferred to #14.3.
+Rendering draws simple colored rectangle sprites to canvas and loads `scene.json`.
+The scene now uses Runtime v1 schema shape (`schemaVersion`, stable entity IDs,
+sprite declarations, transform/velocity/size/controllable components, collider
+declarations, tags, and metadata). `window.__OUROFORGE__.getWorldState()`
+exposes the normalized schema v1 scene for evidence capture.
