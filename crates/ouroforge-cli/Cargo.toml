@@ -1,0 +1,9 @@
+[package]
+name = "ouroforge-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+ouroforge-core = { path = "../ouroforge-core" }

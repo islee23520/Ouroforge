@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "crates/ouroforge-core",
+  "crates/ouroforge-cli",
+]
+resolver = "2"

@@ -1,0 +1,11 @@
+id: platformer.v0
+title: Platformer Harness Seed
+goal: Prove the initial Ouroforge Seed → Run → Ledger → Evidence Index → Journal → Verdict contract.
+constraints:
+  target: file-harness
+acceptance:
+  - Seed validation reports the platformer.v0 seed as valid.
+  - Running the seed creates the required file-based run artifacts.
+scenarios:
+  - id: bootstrap-smoke
+    description: Create an initial run directory without browser, game loop, or scenario execution.
