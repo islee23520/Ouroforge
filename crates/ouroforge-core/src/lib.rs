@@ -2045,6 +2045,175 @@ fn execute_scenario_step<T: CdpTransport>(
     Ok(())
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneDocument {
+    pub id: String,
+    pub bounds: SceneBounds,
+    pub entities: Vec<SceneEntity>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneBounds {
+    pub width: i64,
+    pub height: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneEntity {
+    pub id: String,
+    pub sprite: SceneSprite,
+    pub components: SceneComponents,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneSprite {
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneComponents {
+    pub transform: ScenePoint,
+    pub velocity: ScenePoint,
+    pub size: SceneSize,
+    pub controllable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenePoint {
+    pub x: i64,
+    pub y: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneSize {
+    pub width: i64,
+    pub height: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneEdit {
+    pub entity_id: String,
+    pub path: String,
+    pub value: serde_json::Value,
+}
+
+pub fn read_scene(scene_path: impl AsRef<Path>) -> Result<SceneDocument> {
+    let scene_path = scene_path.as_ref();
+    let input = fs::read_to_string(scene_path)
+        .with_context(|| format!("failed to read scene {}", scene_path.display()))?;
+    let scene: SceneDocument = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse scene {}", scene_path.display()))?;
+    validate_scene(&scene)?;
+    Ok(scene)
+}
+
+pub fn edit_scene(scene_path: impl AsRef<Path>, edit: SceneEdit) -> Result<SceneDocument> {
+    let scene_path = scene_path.as_ref();
+    validate_path_component("scene edit entity", &edit.entity_id)?;
+    require_text("scene edit path", &edit.path)?;
+    let mut scene = read_scene(scene_path)?;
+    apply_scene_edit(&mut scene, edit)?;
+    validate_scene(&scene)?;
+    write_json(scene_path, &json!(scene))?;
+    Ok(scene)
+}
+
+fn validate_scene(scene: &SceneDocument) -> Result<()> {
+    validate_path_component("scene id", &scene.id)?;
+    if scene.bounds.width <= 0 || scene.bounds.height <= 0 {
+        return Err(anyhow!("scene bounds must be positive"));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    for entity in &scene.entities {
+        validate_path_component("scene entity id", &entity.id)?;
+        if !ids.insert(entity.id.clone()) {
+            return Err(anyhow!("duplicate scene entity id: {}", entity.id));
+        }
+        validate_scene_color(&entity.sprite.color)?;
+        if entity.components.size.width <= 0 || entity.components.size.height <= 0 {
+            return Err(anyhow!("scene entity {} size must be positive", entity.id));
+        }
+    }
+    Ok(())
+}
+
+fn apply_scene_edit(scene: &mut SceneDocument, edit: SceneEdit) -> Result<()> {
+    let entity = scene
+        .entities
+        .iter_mut()
+        .find(|entity| entity.id == edit.entity_id)
+        .ok_or_else(|| anyhow!("scene entity not found: {}", edit.entity_id))?;
+    match edit.path.as_str() {
+        "sprite.color" => entity.sprite.color = scene_edit_string(&edit.value, &edit.path)?,
+        "components.transform.x" => {
+            entity.components.transform.x = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.transform.y" => {
+            entity.components.transform.y = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.velocity.x" => {
+            entity.components.velocity.x = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.velocity.y" => {
+            entity.components.velocity.y = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.size.width" => {
+            entity.components.size.width = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.size.height" => {
+            entity.components.size.height = scene_edit_i64(&edit.value, &edit.path)?
+        }
+        "components.controllable" => {
+            entity.components.controllable = scene_edit_bool(&edit.value, &edit.path)?
+        }
+        _ => {
+            return Err(anyhow!(
+                "unsupported scene edit path `{}`; supported paths are sprite.color, components.transform.x/y, components.velocity.x/y, components.size.width/height, components.controllable",
+                edit.path
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn scene_edit_i64(value: &serde_json::Value, path: &str) -> Result<i64> {
+    value
+        .as_i64()
+        .ok_or_else(|| anyhow!("scene edit path `{path}` requires an integer value"))
+}
+
+fn scene_edit_bool(value: &serde_json::Value, path: &str) -> Result<bool> {
+    value
+        .as_bool()
+        .ok_or_else(|| anyhow!("scene edit path `{path}` requires a boolean value"))
+}
+
+fn scene_edit_string(value: &serde_json::Value, path: &str) -> Result<String> {
+    let value = value
+        .as_str()
+        .ok_or_else(|| anyhow!("scene edit path `{path}` requires a string value"))?
+        .to_string();
+    validate_scene_color(&value)?;
+    Ok(value)
+}
+
+fn validate_scene_color(color: &str) -> Result<()> {
+    let Some(hex) = color.strip_prefix('#') else {
+        return Err(anyhow!("scene sprite color must be a #RRGGBB hex value"));
+    };
+    if hex.len() != 6 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err(anyhow!("scene sprite color must be a #RRGGBB hex value"));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunDashboardSummary {
     pub id: String,
@@ -3323,6 +3492,67 @@ scenarios:
             config.target_ws_url,
             "ws://127.0.0.1:9222/devtools/page/page-1"
         );
+    }
+
+    #[test]
+    fn scene_edit_model_validates_and_preserves_scene_shape() {
+        let root = unique_temp_dir("scene-edit-model");
+        fs::create_dir_all(&root).expect("temp root exists");
+        let scene_path = root.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene fixture written");
+
+        let scene = read_scene(&scene_path).expect("scene reads");
+        assert_eq!(scene.entities[0].id, "player");
+
+        let edited = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+        )
+        .expect("transform edit applies");
+        assert_eq!(edited.entities[0].components.transform.x, 48);
+
+        let edited = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "sprite.color".to_string(),
+                value: json!("#ffffff"),
+            },
+        )
+        .expect("color edit applies");
+        assert_eq!(edited.entities[0].sprite.color, "#ffffff");
+
+        let rejected = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.size.width".to_string(),
+                value: json!(0),
+            },
+        )
+        .expect_err("invalid size rejected");
+        assert!(rejected.to_string().contains("size must be positive"));
+
+        let rejected = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.script".to_string(),
+                value: json!("future"),
+            },
+        )
+        .expect_err("unsupported edit rejected");
+        assert!(rejected.to_string().contains("unsupported scene edit path"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]

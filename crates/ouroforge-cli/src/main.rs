@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
-    add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, evaluate_run,
-    evolve_run, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
-    read_cdp_targets, read_dashboard_run, read_ledger_events, run_browser_smoke,
-    run_browser_smoke_pool, run_scenarios, show_journal, update_journal, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed, WorkerId,
+    add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, edit_scene,
+    evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
+    list_mutation_proposals, read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene,
+    run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal, update_journal,
+    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig,
+    SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -64,6 +65,10 @@ enum Commands {
         #[command(subcommand)]
         command: DashboardCommand,
     },
+    Scene {
+        #[command(subcommand)]
+        command: SceneCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -99,6 +104,22 @@ enum BrowserCommand {
         worker_id: String,
         #[arg(long, default_value_t = 1)]
         workers: usize,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum SceneCommand {
+    Show {
+        scene_path: PathBuf,
+    },
+    Edit {
+        scene_path: PathBuf,
+        #[arg(long)]
+        entity: String,
+        #[arg(long)]
+        path: String,
+        #[arg(long, value_name = "JSON")]
+        value: String,
     },
 }
 
@@ -351,6 +372,34 @@ fn main() -> Result<()> {
             std::fs::write(&output, serde_json::to_string_pretty(&payload)?)
                 .with_context(|| format!("failed to write dashboard data {}", output.display()))?;
             println!("Dashboard data exported: {}", output.display());
+        }
+        Commands::Scene {
+            command: SceneCommand::Show { scene_path },
+        } => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&read_scene(scene_path)?)?
+            );
+        }
+        Commands::Scene {
+            command:
+                SceneCommand::Edit {
+                    scene_path,
+                    entity,
+                    path,
+                    value,
+                },
+        } => {
+            let value = parse_json_arg(&value)?;
+            let scene = edit_scene(
+                &scene_path,
+                SceneEdit {
+                    entity_id: entity,
+                    path,
+                    value,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&scene)?);
         }
     }
 
