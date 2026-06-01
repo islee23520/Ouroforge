@@ -58,13 +58,13 @@ pub struct WaitStep {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InputStep {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub left: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub right: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub up: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down: Option<bool>,
 }
 
@@ -202,6 +202,19 @@ fn validate_scenario_path(path: &str) -> Result<()> {
                 "scenario assertion paths may only contain ASCII letters, numbers, '_', '-' and '.'"
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_path_component(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '-' or '_'"
+        ));
     }
     Ok(())
 }
@@ -420,6 +433,10 @@ pub struct CdpClient<T> {
 impl<T: CdpTransport> CdpClient<T> {
     pub fn new(transport: T) -> Self {
         Self { transport }
+    }
+
+    pub fn into_transport(self) -> T {
+        self.transport
     }
 
     pub fn navigate(&mut self, url: &str) -> Result<CdpNavigateResult> {
@@ -791,15 +808,7 @@ pub struct WorkerId(String);
 impl WorkerId {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
-        require_text("worker id", &value)?;
-        if !value
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-        {
-            return Err(anyhow!(
-                "worker id may only contain ASCII letters, numbers, '-' or '_'"
-            ));
-        }
+        validate_path_component("worker id", &value)?;
         Ok(Self(value))
     }
 
@@ -1250,6 +1259,120 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     }
 
     Ok(BrowserSmokeResult { screenshot_path })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioRunConfig {
+    pub run_dir: PathBuf,
+    pub url: String,
+    pub debugging_http_url: String,
+}
+
+impl ScenarioRunConfig {
+    pub fn new(run_dir: impl Into<PathBuf>, url: impl Into<String>) -> Result<Self> {
+        let url = url.into();
+        require_text("scenario run URL", &url)?;
+        Ok(Self {
+            run_dir: run_dir.into(),
+            url,
+            debugging_http_url: "http://127.0.0.1:9222".to_string(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ScenarioRunSummary {
+    pub scenarios: usize,
+    pub completed: usize,
+    pub evidence_paths: Vec<String>,
+}
+
+pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
+    let seed = Seed::from_path(config.run_dir.join("seed.snapshot.yaml"))?;
+    let connection = create_cdp_page_target(&config.debugging_http_url, "about:blank")?;
+    let transport = WebSocketCdpTransport::connect(&connection)?;
+    let mut client = CdpClient::new(transport);
+
+    client.enable_page()?;
+    let _ = client.bring_page_to_front();
+    client.navigate(&config.url)?;
+    std::thread::sleep(Duration::from_millis(300));
+
+    let mut evidence_paths = Vec::new();
+    for scenario in &seed.scenarios {
+        let evidence_path = run_scenario(config, &mut client, scenario)?;
+        evidence_paths.push(evidence_path);
+    }
+
+    Ok(ScenarioRunSummary {
+        scenarios: seed.scenarios.len(),
+        completed: evidence_paths.len(),
+        evidence_paths,
+    })
+}
+
+fn run_scenario<T: CdpTransport>(
+    config: &ScenarioRunConfig,
+    client: &mut CdpClient<T>,
+    scenario: &Scenario,
+) -> Result<String> {
+    validate_path_component("scenario id", &scenario.id)?;
+    append_ledger_event(
+        &config.run_dir,
+        "scenario.started",
+        "scenario-runner",
+        json!({ "scenario_id": scenario.id, "url": config.url }),
+    )?;
+
+    for step in &scenario.steps {
+        execute_scenario_step(client, step)?;
+    }
+
+    let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
+    let suffix = unix_millis()?;
+    let scenario_dir = format!("evidence/scenarios/{}", scenario.id);
+    fs::create_dir_all(config.run_dir.join(&scenario_dir)).with_context(|| {
+        format!(
+            "failed to create scenario evidence directory {}",
+            config.run_dir.join(&scenario_dir).display()
+        )
+    })?;
+    let rel_path = format!("{scenario_dir}/world-state-{suffix}.json");
+    write_json(&config.run_dir.join(&rel_path), &world_state)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("scenario-world-state-{}-{suffix}", scenario.id),
+        "application/json",
+        &rel_path,
+        json!({ "scenario_id": scenario.id, "url": config.url, "artifact": "world_state" }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "scenario.completed",
+        "scenario-runner",
+        json!({
+            "scenario_id": scenario.id,
+            "world_state_path": rel_path
+        }),
+    )?;
+    Ok(rel_path)
+}
+
+fn execute_scenario_step<T: CdpTransport>(
+    client: &mut CdpClient<T>,
+    step: &ScenarioStep,
+) -> Result<()> {
+    match step {
+        ScenarioStep::Wait { wait } => {
+            client.evaluate_json(&format!("window.__OUROFORGE__.step({})", wait.frames))?;
+        }
+        ScenarioStep::Input { input } => {
+            let input_json =
+                serde_json::to_string(input).context("failed to serialize input step")?;
+            client.evaluate_json(&format!("window.__OUROFORGE__.setInput({input_json})"))?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1884,6 +2007,57 @@ scenarios:
             .evaluate_json("window.__OUROFORGE__.getWorldState()")
             .expect_err("exception fails");
         assert!(error.to_string().contains("runtime evaluation failed"));
+    }
+
+    struct RecordingRuntimeTransport {
+        calls: Vec<String>,
+    }
+
+    impl CdpTransport for RecordingRuntimeTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            assert_eq!(method, "Runtime.evaluate");
+            self.calls.push(
+                params["expression"]
+                    .as_str()
+                    .expect("expression is present")
+                    .to_string(),
+            );
+            Ok(json!({ "result": { "value": {} } }))
+        }
+    }
+
+    #[test]
+    fn scenario_steps_call_runtime_probe_api() {
+        let mut client = CdpClient::new(RecordingRuntimeTransport { calls: Vec::new() });
+
+        execute_scenario_step(
+            &mut client,
+            &ScenarioStep::Wait {
+                wait: WaitStep { frames: 3 },
+            },
+        )
+        .expect("wait executes");
+        execute_scenario_step(
+            &mut client,
+            &ScenarioStep::Input {
+                input: InputStep {
+                    right: Some(true),
+                    ..InputStep::default()
+                },
+            },
+        )
+        .expect("input executes");
+
+        let transport = client.into_transport();
+        assert_eq!(transport.calls[0], "window.__OUROFORGE__.step(3)");
+        assert_eq!(
+            transport.calls[1],
+            "window.__OUROFORGE__.setInput({\"right\":true})"
+        );
     }
 
     #[test]

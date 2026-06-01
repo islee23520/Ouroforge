@@ -2,8 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
-    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, Seed, WorkerId,
+    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios,
+    BrowserSmokeConfig, BrowserSmokePoolConfig, ScenarioRunConfig, Seed, WorkerId,
 };
 use std::path::PathBuf;
 
@@ -35,6 +35,10 @@ enum Commands {
     Browser {
         #[command(subcommand)]
         command: BrowserCommand,
+    },
+    Scenario {
+        #[command(subcommand)]
+        command: ScenarioCommand,
     },
 }
 
@@ -71,6 +75,17 @@ enum BrowserCommand {
         worker_id: String,
         #[arg(long, default_value_t = 1)]
         workers: usize,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ScenarioCommand {
+    Run {
+        run_dir: PathBuf,
+        #[arg(long)]
+        url: String,
+        #[arg(long, default_value = "http://127.0.0.1:9222")]
+        cdp: String,
     },
 }
 
@@ -176,6 +191,14 @@ fn main() -> Result<()> {
                     ));
                 }
             }
+        }
+        Commands::Scenario {
+            command: ScenarioCommand::Run { run_dir, url, cdp },
+        } => {
+            let mut config = ScenarioRunConfig::new(run_dir, url)?;
+            config.debugging_http_url = cdp;
+            let summary = run_scenarios(&config)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
         }
     }
 
