@@ -645,7 +645,7 @@ impl CdpHttpEndpoint {
         set_tcp_stream_timeouts(&stream, self.timeout)?;
         write!(
             stream,
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             format_host_authority(self.host, self.port)
         )
         .context("failed to write CDP HTTP request")?;
@@ -655,7 +655,12 @@ impl CdpHttpEndpoint {
         loop {
             match stream.read(&mut buffer) {
                 Ok(0) => break,
-                Ok(read) => response_bytes.extend_from_slice(&buffer[..read]),
+                Ok(read) => {
+                    response_bytes.extend_from_slice(&buffer[..read]);
+                    if http_response_has_complete_body(&response_bytes) {
+                        break;
+                    }
+                }
                 Err(error)
                     if error.kind() == ErrorKind::WouldBlock && !response_bytes.is_empty() =>
                 {
@@ -677,6 +682,29 @@ impl CdpHttpEndpoint {
         }
         Ok(body.to_string())
     }
+}
+
+fn http_response_has_complete_body(response_bytes: &[u8]) -> bool {
+    let Some(header_end) = response_bytes
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+    else {
+        return false;
+    };
+    let Ok(headers) = std::str::from_utf8(&response_bytes[..header_end]) else {
+        return false;
+    };
+    let Some(content_length) = headers.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        if name.eq_ignore_ascii_case("content-length") {
+            value.trim().parse::<usize>().ok()
+        } else {
+            None
+        }
+    }) else {
+        return false;
+    };
+    response_bytes.len().saturating_sub(header_end + 4) >= content_length
 }
 
 pub fn select_page_target(
@@ -3105,6 +3133,19 @@ scenarios:
             config.target_ws_url,
             "ws://127.0.0.1:9222/devtools/page/page-1"
         );
+    }
+
+    #[test]
+    fn detects_complete_http_response_body_by_content_length() {
+        assert!(http_response_has_complete_body(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}"
+        ));
+        assert!(!http_response_has_complete_body(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{}"
+        ));
+        assert!(!http_response_has_complete_body(
+            b"HTTP/1.1 200 OK\r\n\r\n{}"
+        ));
     }
 
     #[test]
