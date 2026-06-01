@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security-sensitive report
+    url: https://github.com/shaun0927/Ouroforge/issues/new?template=public_readiness.yml
+    about: Do not post exploit details publicly. Use this only to request private maintainer contact until SECURITY.md lists a dedicated channel.

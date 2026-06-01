@@ -1,0 +1,47 @@
+name: Scoped feature request
+about: Propose a feature tied to the evidence-native loop
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ouroforge accepts narrowly scoped feature requests that preserve the evidence-native loop. Avoid broad editor/engine/platform requests unless they include concrete MVP evidence and non-goals.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What specific user or evidence-loop problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed scope
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or artifact context
+      description: Link run ids, journals, verdicts, screenshots, or docs that justify the request.
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Explicit non-goals
+      description: What should this not include?
+    validations:
+      required: true
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: This request does not require cloud hosting, auth, marketplace, native packaging, or plugin systems unless explicitly justified.
+          required: true
+        - label: This request does not claim Ouroforge is a Godot replacement.
+          required: true
+        - label: This request can be verified with local artifacts or commands.
+          required: true

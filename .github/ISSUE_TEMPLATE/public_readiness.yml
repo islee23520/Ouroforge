@@ -1,0 +1,42 @@
+name: Public readiness task
+about: Track release-readiness remediation without publishing automatically
+labels: [public-readiness]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Public readiness tasks must not change repository visibility or publish announcements. They should improve evidence, docs, governance, or demo reproducibility.
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Readiness blocker
+      description: Which public-readiness blocker does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Remediation scope
+      description: Describe the exact documentation, evidence, audit, or template change.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification evidence
+      description: Commands, fresh-clone smoke output, screenshots, recordings, or audit output required to close this task.
+    validations:
+      required: true
+  - type: checkboxes
+    id: release_guardrails
+    attributes:
+      label: Release guardrails
+      options:
+        - label: This does not change repository visibility.
+          required: true
+        - label: This does not publish a release announcement.
+          required: true
+        - label: This does not promise compatibility before MVP stabilization.
+          required: true
+        - label: This does not overstate Ouroforge maturity.
+          required: true

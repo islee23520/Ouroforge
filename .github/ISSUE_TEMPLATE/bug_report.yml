@@ -1,0 +1,54 @@
+name: Bug report
+about: Report a reproducible Ouroforge MVP issue with evidence
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Ouroforge is a local pre-release MVP. Please include evidence and avoid posting secrets, private paths, or generated files that contain sensitive data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include exact commands and Seed/runtime files involved.
+      placeholder: |
+        1. cargo run -p ouroforge-cli -- ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste relevant command output, run id, verdict status, journal excerpt, or artifact paths.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Rust version, Node version, Chrome/Chromium path or OUROFORGE_CHROME, and branch/commit.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Scope boundaries
+      options:
+        - label: I did not include secrets, tokens, private screenshots, or sensitive local paths.
+          required: true
+        - label: This report is about the local MVP, not hosted/cloud/auth behavior.
+          required: true
