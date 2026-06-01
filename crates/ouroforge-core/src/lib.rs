@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Context, Result};
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -279,6 +280,41 @@ impl<T: CdpTransport> CdpClient<T> {
                 .map(str::to_string),
         })
     }
+
+    pub fn enable_page(&mut self) -> Result<()> {
+        self.transport.send_command("Page.enable", json!({}))?;
+        Ok(())
+    }
+
+    pub fn bring_page_to_front(&mut self) -> Result<()> {
+        self.transport
+            .send_command("Page.bringToFront", json!({}))?;
+        Ok(())
+    }
+
+    pub fn capture_screenshot_png(&mut self) -> Result<Vec<u8>> {
+        let result = self
+            .transport
+            .send_command("Page.captureScreenshot", json!({ "format": "png" }))?;
+        let data = result
+            .get("data")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("CDP screenshot response missing data"))?;
+        base64::engine::general_purpose::STANDARD
+            .decode(data)
+            .context("failed to decode CDP screenshot data")
+    }
+
+    pub fn enable_performance(&mut self) -> Result<()> {
+        self.transport
+            .send_command("Performance.enable", json!({}))?;
+        Ok(())
+    }
+
+    pub fn performance_metrics(&mut self) -> Result<serde_json::Value> {
+        self.transport
+            .send_command("Performance.getMetrics", json!({}))
+    }
 }
 
 pub struct WebSocketCdpTransport {
@@ -395,10 +431,25 @@ impl CdpHttpEndpoint {
         )
         .context("failed to write CDP HTTP request")?;
 
-        let mut response = String::new();
-        stream
-            .read_to_string(&mut response)
-            .context("failed to read CDP HTTP response")?;
+        let mut response_bytes = Vec::new();
+        let mut buffer = [0_u8; 8192];
+        loop {
+            match stream.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => response_bytes.extend_from_slice(&buffer[..read]),
+                Err(error)
+                    if error.kind() == ErrorKind::WouldBlock && !response_bytes.is_empty() =>
+                {
+                    break;
+                }
+                Err(error) if error.kind() == ErrorKind::TimedOut && !response_bytes.is_empty() => {
+                    break;
+                }
+                Err(error) => return Err(error).context("failed to read CDP HTTP response"),
+            }
+        }
+        let response =
+            String::from_utf8(response_bytes).context("CDP HTTP response was not UTF-8")?;
         let (headers, body) = response
             .split_once("\r\n\r\n")
             .ok_or_else(|| anyhow!("invalid CDP HTTP response"))?;
@@ -530,6 +581,136 @@ impl CdpWebSocketEndpoint {
 
 fn parse_cdp_targets(input: &str) -> Result<Vec<CdpTargetInfo>> {
     serde_json::from_str(input).context("failed to parse CDP target list")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrowserSmokeConfig {
+    pub run_dir: PathBuf,
+    pub url: String,
+    pub debugging_http_url: String,
+    pub target_selection: CdpTargetSelection,
+}
+
+impl BrowserSmokeConfig {
+    pub fn new(run_dir: impl Into<PathBuf>, url: impl Into<String>) -> Result<Self> {
+        let url = url.into();
+        require_text("browser smoke URL", &url)?;
+        Ok(Self {
+            run_dir: run_dir.into(),
+            url,
+            debugging_http_url: "http://127.0.0.1:9222".to_string(),
+            target_selection: CdpTargetSelection::first_page(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrowserSmokeResult {
+    pub screenshot_path: PathBuf,
+}
+
+pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
+    append_ledger_event(
+        &config.run_dir,
+        "browser.worker.started",
+        "browser-smoke",
+        json!({ "url": config.url, "debugging_http_url": config.debugging_http_url }),
+    )?;
+
+    let result = run_browser_smoke_inner(config);
+    match &result {
+        Ok(smoke) => {
+            append_ledger_event(
+                &config.run_dir,
+                "browser.worker.completed",
+                "browser-smoke",
+                json!({ "screenshot_path": smoke.screenshot_path.to_string_lossy() }),
+            )?;
+        }
+        Err(error) => {
+            let _ = append_ledger_event(
+                &config.run_dir,
+                "browser.worker.failed",
+                "browser-smoke",
+                json!({ "error": error.to_string() }),
+            );
+        }
+    }
+    result
+}
+
+fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
+    let targets = read_cdp_targets(&config.debugging_http_url)?;
+    let connection = select_page_target(&targets, &config.target_selection)?;
+    let transport = WebSocketCdpTransport::connect(&connection)?;
+    let mut client = CdpClient::new(transport);
+
+    client.enable_page()?;
+    let _ = client.bring_page_to_front();
+    let navigation = client.navigate(&config.url)?;
+    append_ledger_event(
+        &config.run_dir,
+        "browser.navigation.completed",
+        "browser-smoke",
+        json!({ "url": config.url, "frame_id": navigation.frame_id, "loader_id": navigation.loader_id }),
+    )?;
+
+    std::thread::sleep(Duration::from_millis(300));
+    let _ = client.bring_page_to_front();
+    let screenshot = client.capture_screenshot_png()?;
+    let artifact_id_suffix = unix_millis()?;
+    let screenshot_rel_path = format!("evidence/browser-smoke-{artifact_id_suffix}.png");
+    let screenshot_path = config.run_dir.join(&screenshot_rel_path);
+    fs::write(&screenshot_path, screenshot)
+        .with_context(|| format!("failed to write screenshot {}", screenshot_path.display()))?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("browser-smoke-screenshot-{artifact_id_suffix}"),
+        "image/png",
+        &screenshot_rel_path,
+        json!({ "url": config.url }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "browser.capture.screenshot",
+        "browser-smoke",
+        json!({ "path": screenshot_rel_path }),
+    )?;
+
+    match client
+        .enable_performance()
+        .and_then(|_| client.performance_metrics())
+    {
+        Ok(metrics) => {
+            let metrics_rel_path =
+                format!("evidence/browser-smoke-metrics-{}.json", unix_millis()?);
+            let metrics_path = config.run_dir.join(&metrics_rel_path);
+            write_json(&metrics_path, &metrics)?;
+            let _ = add_evidence_artifact(
+                &config.run_dir,
+                &format!("browser-smoke-performance-{}", unix_millis()?),
+                "application/json",
+                &metrics_rel_path,
+                json!({ "url": config.url, "optional": true }),
+            );
+            append_ledger_event(
+                &config.run_dir,
+                "browser.capture.performance",
+                "browser-smoke",
+                json!({ "path": metrics_rel_path, "optional": true }),
+            )?;
+        }
+        Err(error) => {
+            append_ledger_event(
+                &config.run_dir,
+                "browser.capture.performance.skipped",
+                "browser-smoke",
+                json!({ "error": error.to_string(), "optional": true }),
+            )?;
+        }
+    }
+
+    Ok(BrowserSmokeResult { screenshot_path })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -898,6 +1079,30 @@ scenarios:
             .expect_err("navigation errorText fails");
 
         assert!(error.to_string().contains("net::ERR_CONNECTION_REFUSED"));
+    }
+
+    struct ScreenshotTransport;
+
+    impl CdpTransport for ScreenshotTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            _params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            match method {
+                "Page.captureScreenshot" => Ok(json!({ "data": "iVBORw0KGgo=" })),
+                _ => Ok(json!({})),
+            }
+        }
+    }
+
+    #[test]
+    fn cdp_client_decodes_screenshot_data() {
+        let mut client = CdpClient::new(ScreenshotTransport);
+
+        let bytes = client.capture_screenshot_png().expect("screenshot decodes");
+
+        assert_eq!(bytes, vec![137, 80, 78, 71, 13, 10, 26, 10]);
     }
 
     #[test]

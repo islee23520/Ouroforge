@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
-    read_ledger_events, Seed,
+    read_ledger_events, run_browser_smoke, BrowserSmokeConfig, Seed,
 };
 use std::path::PathBuf;
 
@@ -31,6 +31,10 @@ enum Commands {
         #[command(subcommand)]
         command: EvidenceCommand,
     },
+    Browser {
+        #[command(subcommand)]
+        command: BrowserCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -51,6 +55,17 @@ enum LedgerCommand {
     },
     List {
         run_dir: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum BrowserCommand {
+    Smoke {
+        run_dir: PathBuf,
+        #[arg(long)]
+        url: String,
+        #[arg(long, default_value = "http://127.0.0.1:9222")]
+        cdp: String,
     },
 }
 
@@ -124,6 +139,17 @@ fn main() -> Result<()> {
         } => {
             let artifacts = list_evidence_artifacts(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&artifacts)?);
+        }
+        Commands::Browser {
+            command: BrowserCommand::Smoke { run_dir, url, cdp },
+        } => {
+            let mut config = BrowserSmokeConfig::new(run_dir, url)?;
+            config.debugging_http_url = cdp;
+            let result = run_browser_smoke(&config)?;
+            println!(
+                "Browser smoke captured: {}",
+                result.screenshot_path.display()
+            );
         }
     }
 
