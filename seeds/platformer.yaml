@@ -16,8 +16,8 @@ scenarios:
           right: true
     assertions:
       - world_state:
-          path: tick
-          equals: 2
+          path: object.id
+          equals: probe-square
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
