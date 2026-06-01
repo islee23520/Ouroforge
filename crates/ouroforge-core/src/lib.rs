@@ -47,6 +47,7 @@ pub struct Scenario {
 pub enum ScenarioStep {
     Wait { wait: WaitStep },
     Input { input: InputStep },
+    Replay { replay: InputReplay },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -189,6 +190,9 @@ impl ScenarioStep {
                     ));
                 }
             }
+            ScenarioStep::Replay { replay } => replay.validate().with_context(|| {
+                format!("scenarios[{scenario_index}].steps[{step_index}].replay is invalid")
+            })?,
         }
         Ok(())
     }
@@ -1852,6 +1856,21 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 }
             }
         }
+        if let Some(paths) = result
+            .get("evidence")
+            .and_then(|evidence| evidence.get("input_replays"))
+            .and_then(|value| value.as_array())
+        {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                if !run_dir.join(path).is_file() {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
+                }
+            }
+        }
     }
 
     let status = if failures.is_empty() {
@@ -1975,10 +1994,6 @@ fn run_scenario<T: CdpTransport>(
         json!({ "scenario_id": scenario.id, "url": config.url }),
     )?;
 
-    for step in &scenario.steps {
-        execute_scenario_step(client, step)?;
-    }
-
     let suffix = unix_millis()?;
     let scenario_dir = format!("evidence/scenarios/{}", scenario.id);
     fs::create_dir_all(config.run_dir.join(&scenario_dir)).with_context(|| {
@@ -1987,6 +2002,34 @@ fn run_scenario<T: CdpTransport>(
             config.run_dir.join(&scenario_dir).display()
         )
     })?;
+
+    let mut replay_paths = Vec::new();
+    for step in &scenario.steps {
+        if let ScenarioStep::Replay { replay } = step {
+            let replay_path = write_scenario_json_artifact(
+                config,
+                scenario,
+                &scenario_dir,
+                "input-replay",
+                "input_replay",
+                unix_millis()?,
+                &json!(replay),
+            )?;
+            replay_paths.push(replay_path.clone());
+            append_ledger_event(
+                &config.run_dir,
+                "scenario.input_replay",
+                "scenario-runner",
+                json!({
+                    "scenario_id": scenario.id,
+                    "replay_id": replay.id,
+                    "events": replay.events.len(),
+                    "path": replay_path
+                }),
+            )?;
+        }
+        execute_scenario_step(client, step)?;
+    }
 
     let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
     let world_state_path = write_scenario_json_artifact(
@@ -2036,7 +2079,8 @@ fn run_scenario<T: CdpTransport>(
             "status": status,
             "evidence": {
                 "world_state": world_state_path,
-                "frame_stats": frame_stats_path
+                "frame_stats": frame_stats_path,
+                "input_replays": replay_paths.clone()
             },
             "assertions": assertions
         }),
@@ -2057,12 +2101,16 @@ fn run_scenario<T: CdpTransport>(
             "status": status,
             "world_state_path": world_state_path,
             "frame_stats_path": frame_stats_path,
+            "input_replay_paths": replay_paths.clone(),
             "result_path": result_path
         }),
     )?;
+    let mut evidence_paths = replay_paths;
+    evidence_paths.push(world_state_path);
+    evidence_paths.push(frame_stats_path);
     Ok(ScenarioExecutionResult {
         passed,
-        evidence_paths: vec![world_state_path, frame_stats_path],
+        evidence_paths,
         result_path,
     })
 }
@@ -2142,6 +2190,44 @@ fn execute_scenario_step<T: CdpTransport>(
                 serde_json::to_string(input).context("failed to serialize input step")?;
             client.evaluate_json(&format!("window.__OUROFORGE__.setInput({input_json})"))?;
         }
+        ScenarioStep::Replay { replay } => {
+            execute_input_replay(client, replay)?;
+        }
+    }
+    Ok(())
+}
+
+fn execute_input_replay<T: CdpTransport>(
+    client: &mut CdpClient<T>,
+    replay: &InputReplay,
+) -> Result<()> {
+    replay.validate()?;
+    let mut current_frame = 0;
+    let mut index = 0;
+    while index < replay.events.len() {
+        let frame = replay.events[index].frame;
+        if frame > current_frame {
+            client.evaluate_json(&format!(
+                "window.__OUROFORGE__.step({})",
+                frame - current_frame
+            ))?;
+            current_frame = frame;
+        }
+
+        let mut patch = InputStep::default();
+        while index < replay.events.len() && replay.events[index].frame == frame {
+            let event = &replay.events[index];
+            match event.key {
+                ReplayKey::Left => patch.left = Some(event.pressed),
+                ReplayKey::Right => patch.right = Some(event.pressed),
+                ReplayKey::Up => patch.up = Some(event.pressed),
+                ReplayKey::Down => patch.down = Some(event.pressed),
+            }
+            index += 1;
+        }
+        let input_json =
+            serde_json::to_string(&patch).context("failed to serialize replay input patch")?;
+        client.evaluate_json(&format!("window.__OUROFORGE__.setInput({input_json})"))?;
     }
     Ok(())
 }
@@ -3652,12 +3738,43 @@ scenarios:
             },
         )
         .expect("input executes");
+        execute_scenario_step(
+            &mut client,
+            &ScenarioStep::Replay {
+                replay: InputReplay {
+                    schema_version: "1".to_string(),
+                    id: "move-right".to_string(),
+                    events: vec![
+                        InputReplayEvent {
+                            frame: 0,
+                            key: ReplayKey::Right,
+                            pressed: true,
+                        },
+                        InputReplayEvent {
+                            frame: 4,
+                            key: ReplayKey::Right,
+                            pressed: false,
+                        },
+                    ],
+                },
+            },
+        )
+        .expect("replay executes");
 
         let transport = client.into_transport();
         assert_eq!(transport.calls[0], "window.__OUROFORGE__.step(3)");
         assert_eq!(
             transport.calls[1],
             "window.__OUROFORGE__.setInput({\"right\":true})"
+        );
+        assert_eq!(
+            transport.calls[2],
+            "window.__OUROFORGE__.setInput({\"right\":true})"
+        );
+        assert_eq!(transport.calls[3], "window.__OUROFORGE__.step(4)");
+        assert_eq!(
+            transport.calls[4],
+            "window.__OUROFORGE__.setInput({\"right\":false})"
         );
     }
 
