@@ -1,6 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use ouroforge_core::{create_run, Seed};
+use ouroforge_core::{
+    add_evidence_artifact, append_ledger_event, create_run, list_evidence_artifacts,
+    read_ledger_events, Seed,
+};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -20,11 +23,53 @@ enum Commands {
     Run {
         seed_path: PathBuf,
     },
+    Ledger {
+        #[command(subcommand)]
+        command: LedgerCommand,
+    },
+    Evidence {
+        #[command(subcommand)]
+        command: EvidenceCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
 enum SeedCommand {
     Validate { seed_path: PathBuf },
+}
+
+#[derive(Debug, Subcommand)]
+enum LedgerCommand {
+    Append {
+        run_dir: PathBuf,
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_name = "JSON")]
+        json: String,
+    },
+    List {
+        run_dir: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum EvidenceCommand {
+    Add {
+        run_dir: PathBuf,
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        kind: String,
+        #[arg(long, value_name = "PATH")]
+        path: String,
+        #[arg(long, value_name = "JSON", default_value = "{}")]
+        json: String,
+    },
+    List {
+        run_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -41,7 +86,50 @@ fn main() -> Result<()> {
             let artifacts = create_run(seed_path, "runs")?;
             println!("Run created: {}", artifacts.run_dir.display());
         }
+        Commands::Ledger {
+            command:
+                LedgerCommand::Append {
+                    run_dir,
+                    kind,
+                    actor,
+                    json,
+                },
+        } => {
+            let payload = parse_json_arg(&json)?;
+            let event = append_ledger_event(run_dir, &kind, &actor, payload)?;
+            println!("{}", serde_json::to_string_pretty(&event)?);
+        }
+        Commands::Ledger {
+            command: LedgerCommand::List { run_dir },
+        } => {
+            let events = read_ledger_events(run_dir)?;
+            println!("{}", serde_json::to_string_pretty(&events)?);
+        }
+        Commands::Evidence {
+            command:
+                EvidenceCommand::Add {
+                    run_dir,
+                    id,
+                    kind,
+                    path,
+                    json,
+                },
+        } => {
+            let metadata = parse_json_arg(&json)?;
+            let artifact = add_evidence_artifact(run_dir, &id, &kind, &path, metadata)?;
+            println!("{}", serde_json::to_string_pretty(&artifact)?);
+        }
+        Commands::Evidence {
+            command: EvidenceCommand::List { run_dir },
+        } => {
+            let artifacts = list_evidence_artifacts(run_dir)?;
+            println!("{}", serde_json::to_string_pretty(&artifacts)?);
+        }
     }
 
     Ok(())
+}
+
+fn parse_json_arg(input: &str) -> Result<serde_json::Value> {
+    serde_json::from_str(input).with_context(|| format!("failed to parse JSON argument: {input}"))
 }
