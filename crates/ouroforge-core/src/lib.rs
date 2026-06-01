@@ -2,9 +2,11 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tungstenite::client::IntoClientRequest;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -197,6 +199,337 @@ fn read_evidence_index(run_dir: impl AsRef<Path>) -> Result<EvidenceIndex> {
 
 fn write_evidence_index(run_dir: impl AsRef<Path>, index: &EvidenceIndex) -> Result<()> {
     write_json_atomic(&run_dir.as_ref().join("evidence/index.json"), &json!(index))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CdpConnectionConfig {
+    pub target_ws_url: String,
+    pub io_timeout: Duration,
+}
+
+impl CdpConnectionConfig {
+    pub fn new(target_ws_url: impl Into<String>) -> Result<Self> {
+        let target_ws_url = target_ws_url.into();
+        require_text("CDP target WebSocket URL", &target_ws_url)?;
+        Ok(Self {
+            target_ws_url,
+            io_timeout: default_cdp_io_timeout(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CdpTargetSelection {
+    pub target_id: Option<String>,
+}
+
+impl CdpTargetSelection {
+    pub fn first_page() -> Self {
+        Self::default()
+    }
+
+    pub fn target_id(target_id: impl Into<String>) -> Result<Self> {
+        let target_id = target_id.into();
+        require_text("CDP target id", &target_id)?;
+        Ok(Self {
+            target_id: Some(target_id),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CdpNavigateResult {
+    pub frame_id: Option<String>,
+    pub loader_id: Option<String>,
+}
+
+pub trait CdpTransport {
+    fn send_command(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value>;
+}
+
+pub struct CdpClient<T> {
+    transport: T,
+}
+
+impl<T: CdpTransport> CdpClient<T> {
+    pub fn new(transport: T) -> Self {
+        Self { transport }
+    }
+
+    pub fn navigate(&mut self, url: &str) -> Result<CdpNavigateResult> {
+        require_text("navigation URL", url)?;
+        let result = self
+            .transport
+            .send_command("Page.navigate", json!({ "url": url }))?;
+        if let Some(error_text) = result.get("errorText").and_then(|value| value.as_str()) {
+            return Err(anyhow!("CDP navigation failed: {error_text}"));
+        }
+        Ok(CdpNavigateResult {
+            frame_id: result
+                .get("frameId")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            loader_id: result
+                .get("loaderId")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+        })
+    }
+}
+
+pub struct WebSocketCdpTransport {
+    socket: tungstenite::WebSocket<std::net::TcpStream>,
+    next_id: u64,
+}
+
+impl WebSocketCdpTransport {
+    pub fn connect(config: &CdpConnectionConfig) -> Result<Self> {
+        let request = config
+            .target_ws_url
+            .as_str()
+            .into_client_request()
+            .context("failed to build CDP WebSocket request")?;
+        let endpoint = CdpWebSocketEndpoint::parse(&config.target_ws_url)?;
+        let stream = endpoint.connect(config.io_timeout)?;
+        let (mut socket, _) = tungstenite::client(request, stream)
+            .with_context(|| format!("failed to connect to CDP target {}", config.target_ws_url))?;
+        set_tcp_stream_timeouts(socket.get_mut(), config.io_timeout)?;
+        Ok(Self { socket, next_id: 1 })
+    }
+}
+
+impl CdpTransport for WebSocketCdpTransport {
+    fn send_command(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        require_text("CDP method", method)?;
+        let id = self.next_id;
+        self.next_id += 1;
+        let request = json!({
+            "id": id,
+            "method": method,
+            "params": params,
+        });
+        let request_body =
+            serde_json::to_string(&request).context("failed to serialize CDP request")?;
+        self.socket
+            .send(tungstenite::Message::Text(request_body))
+            .context("failed to send CDP request")?;
+
+        loop {
+            let message = self.socket.read().context("failed to read CDP response")?;
+            let tungstenite::Message::Text(body) = message else {
+                continue;
+            };
+            let response: serde_json::Value =
+                serde_json::from_str(&body).context("failed to parse CDP response")?;
+            if response.get("id").and_then(|value| value.as_u64()) != Some(id) {
+                continue;
+            }
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("CDP command {method} failed: {error}"));
+            }
+            return Ok(response.get("result").cloned().unwrap_or_else(|| json!({})));
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct CdpTargetInfo {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub target_type: String,
+    pub url: String,
+    #[serde(rename = "webSocketDebuggerUrl")]
+    pub web_socket_debugger_url: String,
+}
+
+pub fn read_cdp_targets(debugging_http_url: &str) -> Result<Vec<CdpTargetInfo>> {
+    require_text("CDP debugging HTTP URL", debugging_http_url)?;
+    let endpoint = CdpHttpEndpoint::parse(debugging_http_url)?;
+    let body = endpoint.get("/json/list")?;
+    parse_cdp_targets(&body)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CdpHttpEndpoint {
+    host: IpAddr,
+    port: u16,
+    timeout: Duration,
+}
+
+impl CdpHttpEndpoint {
+    fn parse(input: &str) -> Result<Self> {
+        let without_scheme = input
+            .trim()
+            .strip_prefix("http://")
+            .ok_or_else(|| anyhow!("CDP debugging URL must start with http://"))?
+            .trim_end_matches('/');
+        let (host, port) = parse_host_port("CDP debugging URL", without_scheme)?;
+        Ok(Self {
+            host,
+            port,
+            timeout: default_cdp_io_timeout(),
+        })
+    }
+
+    fn get(&self, path: &str) -> Result<String> {
+        let mut stream =
+            connect_with_timeout(self.host, self.port, self.timeout).with_context(|| {
+                format!(
+                    "failed to connect to CDP HTTP endpoint {}:{}",
+                    self.host, self.port
+                )
+            })?;
+        set_tcp_stream_timeouts(&stream, self.timeout)?;
+        write!(
+            stream,
+            "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            format_host_authority(self.host, self.port)
+        )
+        .context("failed to write CDP HTTP request")?;
+
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .context("failed to read CDP HTTP response")?;
+        let (headers, body) = response
+            .split_once("\r\n\r\n")
+            .ok_or_else(|| anyhow!("invalid CDP HTTP response"))?;
+        if !headers.starts_with("HTTP/1.1 200") && !headers.starts_with("HTTP/1.0 200") {
+            return Err(anyhow!("CDP HTTP request failed: {headers}"));
+        }
+        Ok(body.to_string())
+    }
+}
+
+pub fn select_page_target(
+    targets: &[CdpTargetInfo],
+    selection: &CdpTargetSelection,
+) -> Result<CdpConnectionConfig> {
+    let target = targets
+        .iter()
+        .find(|target| {
+            let id_matches = selection
+                .target_id
+                .as_ref()
+                .is_none_or(|target_id| target.id == *target_id);
+            id_matches && target.target_type == "page" && !target.web_socket_debugger_url.is_empty()
+        })
+        .ok_or_else(|| {
+            anyhow!("no matching page CDP target with a WebSocket debugger URL found")
+        })?;
+    CdpConnectionConfig::new(target.web_socket_debugger_url.clone())
+}
+
+pub fn first_page_target(targets: &[CdpTargetInfo]) -> Result<CdpConnectionConfig> {
+    select_page_target(targets, &CdpTargetSelection::first_page())
+}
+
+fn default_cdp_io_timeout() -> Duration {
+    Duration::from_secs(10)
+}
+
+fn set_tcp_stream_timeouts(stream: &std::net::TcpStream, timeout: Duration) -> Result<()> {
+    stream
+        .set_read_timeout(Some(timeout))
+        .context("failed to set CDP read timeout")?;
+    stream
+        .set_write_timeout(Some(timeout))
+        .context("failed to set CDP write timeout")
+}
+
+fn format_host_authority(host: IpAddr, port: u16) -> String {
+    match host {
+        IpAddr::V4(addr) => format!("{addr}:{port}"),
+        IpAddr::V6(addr) => format!("[{addr}]:{port}"),
+    }
+}
+
+fn connect_with_timeout(host: IpAddr, port: u16, timeout: Duration) -> Result<std::net::TcpStream> {
+    let addr = SocketAddr::new(host, port);
+    std::net::TcpStream::connect_timeout(&addr, timeout)
+        .with_context(|| format!("failed to connect to {addr} within {timeout:?}"))
+}
+
+fn parse_host_port(label: &str, authority: &str) -> Result<(IpAddr, u16)> {
+    if let Some(rest) = authority.strip_prefix('[') {
+        let (host, port_part) = rest
+            .split_once(']')
+            .ok_or_else(|| anyhow!("{label} has an unterminated IPv6 host"))?;
+        let port = port_part
+            .strip_prefix(':')
+            .ok_or_else(|| anyhow!("{label} must include host:port"))?;
+        return Ok((
+            parse_loopback_ip(label, host)?,
+            port.parse::<u16>()
+                .with_context(|| format!("invalid {label} port: {port}"))?,
+        ));
+    }
+
+    let (host, port) = authority
+        .rsplit_once(':')
+        .ok_or_else(|| anyhow!("{label} must include host:port"))?;
+    if host.contains(':') {
+        return Err(anyhow!("{label} IPv6 hosts must be bracketed"));
+    }
+    Ok((
+        parse_loopback_ip(label, host)?,
+        port.parse::<u16>()
+            .with_context(|| format!("invalid {label} port: {port}"))?,
+    ))
+}
+
+fn parse_loopback_ip(field: &str, value: &str) -> Result<IpAddr> {
+    require_text(field, value)?;
+    let ip = value
+        .parse::<IpAddr>()
+        .with_context(|| format!("{field} must be a numeric loopback IP address"))?;
+    if !ip.is_loopback() {
+        return Err(anyhow!("{field} must be a loopback IP address"));
+    }
+    Ok(ip)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CdpWebSocketEndpoint {
+    host: IpAddr,
+    port: u16,
+    _path: String,
+}
+
+impl CdpWebSocketEndpoint {
+    fn parse(input: &str) -> Result<Self> {
+        let without_scheme = input
+            .trim()
+            .strip_prefix("ws://")
+            .ok_or_else(|| anyhow!("CDP WebSocket URL must start with ws://"))?;
+        let (authority, path) = without_scheme
+            .split_once('/')
+            .unwrap_or((without_scheme, ""));
+        let (host, port) = parse_host_port("CDP WebSocket URL", authority)?;
+        Ok(Self {
+            host,
+            port,
+            _path: format!("/{path}"),
+        })
+    }
+
+    fn connect(&self, timeout: Duration) -> Result<std::net::TcpStream> {
+        let stream = connect_with_timeout(self.host, self.port, timeout)?;
+        set_tcp_stream_timeouts(&stream, timeout)?;
+        Ok(stream)
+    }
+}
+
+fn parse_cdp_targets(input: &str) -> Result<Vec<CdpTargetInfo>> {
+    serde_json::from_str(input).context("failed to parse CDP target list")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -507,6 +840,196 @@ scenarios:
         assert!(error.to_string().contains("failed to parse evidence index"));
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[derive(Default)]
+    struct MockCdpTransport {
+        calls: Vec<(String, serde_json::Value)>,
+    }
+
+    impl CdpTransport for MockCdpTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            self.calls.push((method.to_string(), params));
+            Ok(json!({ "frameId": "frame-1", "loaderId": "loader-1" }))
+        }
+    }
+
+    struct FailingNavigateTransport;
+
+    impl CdpTransport for FailingNavigateTransport {
+        fn send_command(
+            &mut self,
+            _method: &str,
+            _params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            Ok(json!({ "frameId": "frame-1", "errorText": "net::ERR_CONNECTION_REFUSED" }))
+        }
+    }
+
+    #[test]
+    fn cdp_client_navigates_through_transport_boundary() {
+        let transport = MockCdpTransport::default();
+        let mut client = CdpClient::new(transport);
+
+        let result = client
+            .navigate("http://localhost:8000")
+            .expect("navigation command succeeds");
+
+        assert_eq!(result.frame_id.as_deref(), Some("frame-1"));
+        assert_eq!(result.loader_id.as_deref(), Some("loader-1"));
+        assert_eq!(client.transport.calls.len(), 1);
+        assert_eq!(client.transport.calls[0].0, "Page.navigate");
+        assert_eq!(
+            client.transport.calls[0].1,
+            json!({ "url": "http://localhost:8000" })
+        );
+    }
+
+    #[test]
+    fn cdp_client_reports_navigation_error_text() {
+        let mut client = CdpClient::new(FailingNavigateTransport);
+
+        let error = client
+            .navigate("http://localhost:9")
+            .expect_err("navigation errorText fails");
+
+        assert!(error.to_string().contains("net::ERR_CONNECTION_REFUSED"));
+    }
+
+    #[test]
+    fn parses_cdp_websocket_endpoint() {
+        let endpoint = CdpWebSocketEndpoint::parse("ws://127.0.0.1:9222/devtools/page/page-1")
+            .expect("websocket endpoint parses");
+        assert_eq!(endpoint.host, "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(endpoint.port, 9222);
+    }
+
+    #[test]
+    fn formats_ipv6_host_authority_with_brackets() {
+        assert_eq!(
+            format_host_authority("::1".parse::<IpAddr>().unwrap(), 9222),
+            "[::1]:9222"
+        );
+        assert_eq!(
+            format_host_authority("127.0.0.1".parse::<IpAddr>().unwrap(), 9222),
+            "127.0.0.1:9222"
+        );
+    }
+
+    #[test]
+    fn parses_ipv6_cdp_endpoints() {
+        let http = CdpHttpEndpoint::parse("http://[::1]:9222/").expect("ipv6 http parses");
+        assert_eq!(http.host, "::1".parse::<IpAddr>().unwrap());
+        assert_eq!(http.port, 9222);
+
+        let websocket = CdpWebSocketEndpoint::parse("ws://[::1]:9222/devtools/page/page-1")
+            .expect("ipv6 websocket parses");
+        assert_eq!(websocket.host, "::1".parse::<IpAddr>().unwrap());
+        assert_eq!(websocket.port, 9222);
+    }
+
+    #[test]
+    fn parses_cdp_http_endpoint() {
+        let endpoint = CdpHttpEndpoint::parse("http://127.0.0.1:9222/").expect("endpoint parses");
+        assert_eq!(endpoint.host, "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(endpoint.port, 9222);
+    }
+
+    #[test]
+    fn rejects_hostname_cdp_endpoint() {
+        let error =
+            CdpHttpEndpoint::parse("http://localhost:9222").expect_err("hostname endpoint fails");
+        assert!(error
+            .to_string()
+            .contains("must be a numeric loopback IP address"));
+    }
+
+    #[test]
+    fn rejects_non_http_cdp_endpoint() {
+        let error =
+            CdpHttpEndpoint::parse("https://127.0.0.1:9222").expect_err("https endpoint fails");
+        assert!(error.to_string().contains("must start with http://"));
+    }
+
+    #[test]
+    fn parses_first_page_cdp_target() {
+        let targets = parse_cdp_targets(
+            r#"[
+              {
+                "id":"browser",
+                "type":"browser",
+                "url":"",
+                "webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/browser/abc"
+              },
+              {
+                "id":"page-1",
+                "type":"page",
+                "url":"about:blank",
+                "title":"New Tab",
+                "description":"",
+                "devtoolsFrontendUrl":"/devtools/inspector.html?ws=127.0.0.1:9222/devtools/page/page-1",
+                "webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/page/page-1"
+              }
+            ]"#,
+        )
+        .expect("targets parse");
+
+        let config = first_page_target(&targets).expect("page target selected");
+        assert_eq!(
+            config.target_ws_url,
+            "ws://127.0.0.1:9222/devtools/page/page-1"
+        );
+    }
+
+    #[test]
+    fn selects_configured_page_cdp_target() {
+        let targets = parse_cdp_targets(
+            r#"[
+              {
+                "id":"page-1",
+                "type":"page",
+                "url":"http://wrong.example",
+                "webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/page/page-1"
+              },
+              {
+                "id":"page-2",
+                "type":"page",
+                "url":"http://right.example",
+                "webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/page/page-2"
+              }
+            ]"#,
+        )
+        .expect("targets parse");
+        let selection = CdpTargetSelection::target_id("page-2").expect("selection parses");
+
+        let config = select_page_target(&targets, &selection).expect("configured target selected");
+
+        assert_eq!(
+            config.target_ws_url,
+            "ws://127.0.0.1:9222/devtools/page/page-2"
+        );
+    }
+
+    #[test]
+    fn rejects_missing_page_cdp_target() {
+        let targets = parse_cdp_targets(
+            r#"[
+              {
+                "id":"browser",
+                "type":"browser",
+                "url":"",
+                "webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/browser/abc"
+              }
+            ]"#,
+        )
+        .expect("targets parse");
+
+        let error = first_page_target(&targets).expect_err("missing page fails");
+        assert!(error.to_string().contains("no matching page CDP target"));
     }
 
     fn create_test_run(prefix: &str) -> (PathBuf, RunArtifacts) {
