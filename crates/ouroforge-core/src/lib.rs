@@ -350,6 +350,26 @@ impl<T: CdpTransport> CdpClient<T> {
         self.transport
             .send_command("Performance.getMetrics", json!({}))
     }
+
+    pub fn evaluate_json(&mut self, expression: &str) -> Result<serde_json::Value> {
+        require_text("CDP Runtime.evaluate expression", expression)?;
+        let result = self.transport.send_command(
+            "Runtime.evaluate",
+            json!({
+                "expression": expression,
+                "returnByValue": true,
+                "awaitPromise": false
+            }),
+        )?;
+        if let Some(exception) = result.get("exceptionDetails") {
+            return Err(anyhow!("CDP runtime evaluation failed: {exception}"));
+        }
+        Ok(result
+            .get("result")
+            .and_then(|remote_object| remote_object.get("value"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null))
+    }
 }
 
 pub struct WebSocketCdpTransport {
@@ -675,6 +695,13 @@ impl WorkerId {
             self.evidence_dir()
         )
     }
+
+    pub fn probe_json_path(&self, probe_name: &str, suffix: u128) -> String {
+        format!(
+            "{}/browser-probe-{probe_name}-{suffix}.json",
+            self.evidence_dir()
+        )
+    }
 }
 
 impl Default for WorkerId {
@@ -904,6 +931,95 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
     result
 }
 
+fn capture_runtime_probe<T: CdpTransport>(
+    config: &BrowserSmokeConfig,
+    client: &mut CdpClient<T>,
+) -> Result<()> {
+    let available = client.evaluate_json(
+        "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.getWorldState === 'function' && typeof window.__OUROFORGE__.getFrameStats === 'function')",
+    )?;
+    if available != json!(true) {
+        append_ledger_event(
+            &config.run_dir,
+            "browser.probe.skipped",
+            "browser-smoke",
+            json!({
+                "worker_id": config.worker_id.as_str(),
+                "url": config.url,
+                "reason": "window.__OUROFORGE__ probe API not found",
+                "optional": true
+            }),
+        )?;
+        return Ok(());
+    }
+
+    capture_runtime_probe_value(
+        config,
+        client,
+        "world-state",
+        "getWorldState",
+        "window.__OUROFORGE__.getWorldState()",
+    )?;
+    capture_runtime_probe_value(
+        config,
+        client,
+        "frame-stats",
+        "getFrameStats",
+        "window.__OUROFORGE__.getFrameStats()",
+    )?;
+    Ok(())
+}
+
+fn capture_runtime_probe_value<T: CdpTransport>(
+    config: &BrowserSmokeConfig,
+    client: &mut CdpClient<T>,
+    artifact_name: &str,
+    call_name: &str,
+    expression: &str,
+) -> Result<()> {
+    let value = client.evaluate_json(expression)?;
+    let suffix = unix_millis()?;
+    let rel_path = config.worker_id.probe_json_path(artifact_name, suffix);
+    fs::create_dir_all(config.run_dir.join(config.worker_id.evidence_dir())).with_context(
+        || {
+            format!(
+                "failed to create worker evidence directory {}",
+                config
+                    .run_dir
+                    .join(config.worker_id.evidence_dir())
+                    .display()
+            )
+        },
+    )?;
+    write_json(&config.run_dir.join(&rel_path), &value)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!(
+            "browser-probe-{artifact_name}-{}-{suffix}",
+            config.worker_id.as_str()
+        ),
+        "application/json",
+        &rel_path,
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "probe_call": call_name
+        }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "browser.probe.captured",
+        "browser-smoke",
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "probe_call": call_name,
+            "path": rel_path
+        }),
+    )?;
+    Ok(())
+}
+
 fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
     let connection = if let Some(target_ws_url) = &config.target_ws_url {
         CdpConnectionConfig::new(target_ws_url.clone())?
@@ -930,6 +1046,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     )?;
 
     std::thread::sleep(Duration::from_millis(300));
+    capture_runtime_probe(config, &mut client)?;
     let _ = client.bring_page_to_front();
     let screenshot = client.capture_screenshot_png()?;
     let artifact_id_suffix = unix_millis()?;
@@ -1465,6 +1582,83 @@ scenarios:
             .expect("config builds");
         let error = BrowserSmokePoolConfig::new(base, 0).expect_err("zero workers fail");
         assert!(error.to_string().contains("workers must be at least 1"));
+    }
+
+    struct RuntimeProbeTransport {
+        responses: std::collections::VecDeque<serde_json::Value>,
+    }
+
+    impl CdpTransport for RuntimeProbeTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            _params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            assert_eq!(method, "Runtime.evaluate");
+            self.responses
+                .pop_front()
+                .ok_or_else(|| anyhow!("missing runtime response"))
+        }
+    }
+
+    #[test]
+    fn captures_runtime_probe_json_as_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-runtime-probe-capture-test");
+        let config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8767")
+            .expect("config builds");
+        let mut client = CdpClient::new(RuntimeProbeTransport {
+            responses: std::collections::VecDeque::from(vec![
+                json!({ "result": { "value": true } }),
+                json!({ "result": { "value": { "tick": 7, "object": { "id": "probe-square" } } } }),
+                json!({ "result": { "value": { "tick": 7, "fixedDeltaMs": 16 } } }),
+            ]),
+        });
+
+        capture_runtime_probe(&config, &mut client).expect("probe captured");
+
+        let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
+        assert_eq!(artifacts_list.len(), 2);
+        assert!(artifacts_list
+            .iter()
+            .any(|artifact| artifact.path.contains("browser-probe-world-state")));
+        assert!(artifacts_list
+            .iter()
+            .any(|artifact| artifact.path.contains("browser-probe-frame-stats")));
+        assert!(artifacts_list.iter().all(|artifact| {
+            artifact.path.starts_with("evidence/workers/worker-1/")
+                && artifact.metadata["worker_id"] == "worker-1"
+        }));
+
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        let probe_events: Vec<_> = events
+            .iter()
+            .filter(|event| event["event"] == "browser.probe.captured")
+            .collect();
+        assert_eq!(probe_events.len(), 2);
+        assert!(probe_events.iter().any(|event| {
+            event["payload"]["probe_call"] == "getWorldState"
+                && event["payload"]["worker_id"] == "worker-1"
+        }));
+        assert!(probe_events.iter().any(|event| {
+            event["payload"]["probe_call"] == "getFrameStats"
+                && event["payload"]["worker_id"] == "worker-1"
+        }));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn cdp_client_reports_runtime_evaluation_exception() {
+        let mut client = CdpClient::new(RuntimeProbeTransport {
+            responses: std::collections::VecDeque::from(vec![json!({
+                "exceptionDetails": { "text": "boom" }
+            })]),
+        });
+
+        let error = client
+            .evaluate_json("window.__OUROFORGE__.getWorldState()")
+            .expect_err("exception fails");
+        assert!(error.to_string().contains("runtime evaluation failed"));
     }
 
     #[test]
