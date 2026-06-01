@@ -32,6 +32,10 @@ cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
 
 Record the generated run id and relevant artifact inspection commands in the PR.
 
+## Public-readiness changes
+
+For documentation or release-readiness PRs, include the relevant checklist from `docs/public-launch-checklist.md`. If the change affects the MVP demo path, verify from a fresh clone or clearly state why fresh-clone verification was not applicable.
+
 ## Scope rules
 
 Do not add these unless an issue explicitly authorizes them:

@@ -6,11 +6,7 @@ Ouroforge is a local, evidence-native MVP. It can run one platformer-style demo 
 
 ## Near-term public-readiness work
 
-- Finish license/security/docs/template/demo blockers from `docs/public-readiness-audit.md`.
-- Record fresh-clone smoke evidence.
-- Add demo screenshots or recordings.
-- Run and record dependency/security audit output.
-- Make a separate manual decision before any repository visibility change.
+The #18 readiness blockers are represented by stacked documentation/governance PRs. After they merge, maintainers should use `docs/public-launch-checklist.md` for a separate manual repository visibility decision. Public launch remains a governance action, not an automated code path.
 
 ## Product direction
 

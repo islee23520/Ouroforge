@@ -107,4 +107,4 @@ Ouroforge currently targets one local reproducible MVP demo. It does not provide
 - visual scripting;
 - broad engine compatibility guarantees.
 
-Public release requires resolving the blockers listed in `docs/public-readiness-audit.md` and making a separate manual visibility decision.
+Public release requires the evidence gates in `docs/public-readiness-audit.md` and `docs/public-launch-checklist.md`, followed by a separate manual visibility decision.
