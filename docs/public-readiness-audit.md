@@ -29,7 +29,7 @@ Ouroforge has a working local evidence-native MVP path, but it is **not ready fo
 | Security posture | Remediated by #46 | `SECURITY.md` documents reporting expectations and local Chrome/browser execution boundaries. | Replace temporary private reporting guidance with a dedicated public security contact before launch. |
 | Dependency posture | Needs hardening | Dependencies are small and pinned by `Cargo.lock`, but no public dependency policy/audit notes are documented. | Document dependency review and run a formal vulnerability audit before launch. |
 | Demo quality | Partial | MVP command can run locally and produce artifacts; UI examples are static and still require manual command/export steps. | Add demo walkthrough, screenshots/recordings, and known limitations. |
-| Issue templates | Blocked | No `.github/ISSUE_TEMPLATE` files are tracked. | Add bug/feature/security-adjacent templates with scope boundaries. |
+| Issue templates | Remediated by #48 | `.github/ISSUE_TEMPLATE` defines bug, scoped feature, and public-readiness templates with evidence and guardrail fields. | Keep templates aligned with support policy and SECURITY.md. |
 | Roadmap clarity | Remediated by #47 | `docs/roadmap.md` documents current status, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
 | Example reproducibility | Partial | `cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4` works locally with Chrome. | Document Chrome/`OUROFORGE_CHROME`, local server behavior, and expected artifacts. |
 | Secrets/private paths | Pass with caveat | No tracked `.openchrome/`, `.omc/`, or generated `runs/`; verification found only untracked local tool state. | Keep `.openchrome/`, `.omc/`, `runs/`, and generated dashboard data out of commits. |
@@ -68,7 +68,7 @@ Known environment requirement: local Chrome must be available at a standard path
 - [x] Expand `README.md` with accurate MVP positioning, prerequisites, quickstart, demo, and artifact inspection.
 - [x] Add architecture docs for artifact contracts and UI boundaries.
 - [x] Add roadmap/non-goals that explicitly avoid Godot-replacement claims.
-- [ ] Add `.github/ISSUE_TEMPLATE` files.
+- [x] Add `.github/ISSUE_TEMPLATE` files.
 - [ ] Add screenshots or demo recording references for runtime, dashboard, and cockpit.
 - [ ] Run a fresh-clone smoke test and record exact output.
 - [ ] Run dependency/security audit and record exact output.
