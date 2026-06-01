@@ -2,9 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, evaluate_run,
-    list_evidence_artifacts, list_mutation_proposals, read_ledger_events, run_browser_smoke,
-    run_browser_smoke_pool, run_scenarios, show_journal, update_journal, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed, WorkerId,
+    evolve_run, list_evidence_artifacts, list_mutation_proposals, read_ledger_events,
+    run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal, update_journal,
+    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed,
+    WorkerId,
 };
 use std::path::PathBuf;
 
@@ -42,6 +43,9 @@ enum Commands {
         command: ScenarioCommand,
     },
     Evaluate {
+        run_dir: PathBuf,
+    },
+    Evolve {
         run_dir: PathBuf,
     },
     Journal {
@@ -250,6 +254,10 @@ fn main() -> Result<()> {
         Commands::Evaluate { run_dir } => {
             let verdict = evaluate_run(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&verdict)?);
+        }
+        Commands::Evolve { run_dir } => {
+            let summary = evolve_run(run_dir)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Commands::Journal {
             command: JournalCommand::Update { run_dir },
