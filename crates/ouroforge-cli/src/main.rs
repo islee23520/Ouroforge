@@ -199,6 +199,13 @@ fn main() -> Result<()> {
             config.debugging_http_url = cdp;
             let summary = run_scenarios(&config)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+            if summary.has_failures() {
+                return Err(anyhow!(
+                    "scenario run failed for {} of {} scenario(s)",
+                    summary.failed,
+                    summary.scenarios
+                ));
+            }
         }
     }
 

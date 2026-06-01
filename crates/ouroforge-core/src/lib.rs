@@ -1284,7 +1284,16 @@ impl ScenarioRunConfig {
 pub struct ScenarioRunSummary {
     pub scenarios: usize,
     pub completed: usize,
+    pub passed: usize,
+    pub failed: usize,
     pub evidence_paths: Vec<String>,
+    pub result_paths: Vec<String>,
+}
+
+impl ScenarioRunSummary {
+    pub fn has_failures(&self) -> bool {
+        self.failed > 0
+    }
 }
 
 pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
@@ -1299,23 +1308,41 @@ pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
     std::thread::sleep(Duration::from_millis(300));
 
     let mut evidence_paths = Vec::new();
+    let mut result_paths = Vec::new();
+    let mut passed = 0;
+    let mut failed = 0;
     for scenario in &seed.scenarios {
-        let evidence_path = run_scenario(config, &mut client, scenario)?;
-        evidence_paths.push(evidence_path);
+        let result = run_scenario(config, &mut client, scenario)?;
+        evidence_paths.extend(result.evidence_paths);
+        result_paths.push(result.result_path);
+        if result.passed {
+            passed += 1;
+        } else {
+            failed += 1;
+        }
     }
 
     Ok(ScenarioRunSummary {
         scenarios: seed.scenarios.len(),
-        completed: evidence_paths.len(),
+        completed: result_paths.len(),
+        passed,
+        failed,
         evidence_paths,
+        result_paths,
     })
+}
+
+struct ScenarioExecutionResult {
+    passed: bool,
+    evidence_paths: Vec<String>,
+    result_path: String,
 }
 
 fn run_scenario<T: CdpTransport>(
     config: &ScenarioRunConfig,
     client: &mut CdpClient<T>,
     scenario: &Scenario,
-) -> Result<String> {
+) -> Result<ScenarioExecutionResult> {
     validate_path_component("scenario id", &scenario.id)?;
     append_ledger_event(
         &config.run_dir,
@@ -1328,7 +1355,6 @@ fn run_scenario<T: CdpTransport>(
         execute_scenario_step(client, step)?;
     }
 
-    let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
     let suffix = unix_millis()?;
     let scenario_dir = format!("evidence/scenarios/{}", scenario.id);
     fs::create_dir_all(config.run_dir.join(&scenario_dir)).with_context(|| {
@@ -1337,14 +1363,66 @@ fn run_scenario<T: CdpTransport>(
             config.run_dir.join(&scenario_dir).display()
         )
     })?;
-    let rel_path = format!("{scenario_dir}/world-state-{suffix}.json");
-    write_json(&config.run_dir.join(&rel_path), &world_state)?;
+
+    let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
+    let world_state_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "world-state",
+        "world_state",
+        suffix,
+        &world_state,
+    )?;
+    let frame_stats = client.evaluate_json("window.__OUROFORGE__.getFrameStats()")?;
+    let frame_stats_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "frame-stats",
+        "frame_stats",
+        unix_millis()?,
+        &frame_stats,
+    )?;
+
+    let assertions = evaluate_scenario_assertions(scenario, &world_state, &frame_stats);
+    for assertion in &assertions {
+        append_ledger_event(
+            &config.run_dir,
+            "scenario.assertion",
+            "scenario-runner",
+            json!({
+                "scenario_id": scenario.id,
+                "target": assertion["target"],
+                "path": assertion["path"],
+                "passed": assertion["passed"],
+                "evidence_path": if assertion["target"] == "world_state" { &world_state_path } else { &frame_stats_path }
+            }),
+        )?;
+    }
+    let passed = assertions
+        .iter()
+        .all(|assertion| assertion["passed"].as_bool() == Some(true));
+    let status = if passed { "passed" } else { "failed" };
+    let result_path = format!("{scenario_dir}/scenario-result-{}.json", unix_millis()?);
+    write_json(
+        &config.run_dir.join(&result_path),
+        &json!({
+            "scenario_id": scenario.id,
+            "status": status,
+            "evidence": {
+                "world_state": world_state_path,
+                "frame_stats": frame_stats_path
+            },
+            "assertions": assertions
+        }),
+    )?;
     add_evidence_artifact(
         &config.run_dir,
-        &format!("scenario-world-state-{}-{suffix}", scenario.id),
+        &format!("scenario-result-{}-{}", scenario.id, unix_millis()?),
         "application/json",
-        &rel_path,
-        json!({ "scenario_id": scenario.id, "url": config.url, "artifact": "world_state" }),
+        &result_path,
+        json!({ "scenario_id": scenario.id, "url": config.url, "artifact": "scenario_result", "status": status }),
     )?;
     append_ledger_event(
         &config.run_dir,
@@ -1352,10 +1430,79 @@ fn run_scenario<T: CdpTransport>(
         "scenario-runner",
         json!({
             "scenario_id": scenario.id,
-            "world_state_path": rel_path
+            "status": status,
+            "world_state_path": world_state_path,
+            "frame_stats_path": frame_stats_path,
+            "result_path": result_path
         }),
     )?;
+    Ok(ScenarioExecutionResult {
+        passed,
+        evidence_paths: vec![world_state_path, frame_stats_path],
+        result_path,
+    })
+}
+
+fn write_scenario_json_artifact(
+    config: &ScenarioRunConfig,
+    scenario: &Scenario,
+    scenario_dir: &str,
+    file_prefix: &str,
+    artifact_name: &str,
+    suffix: u128,
+    value: &serde_json::Value,
+) -> Result<String> {
+    let rel_path = format!("{scenario_dir}/{file_prefix}-{suffix}.json");
+    write_json(&config.run_dir.join(&rel_path), value)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("scenario-{artifact_name}-{}-{suffix}", scenario.id),
+        "application/json",
+        &rel_path,
+        json!({ "scenario_id": scenario.id, "url": config.url, "artifact": artifact_name }),
+    )?;
     Ok(rel_path)
+}
+
+fn evaluate_scenario_assertions(
+    scenario: &Scenario,
+    world_state: &serde_json::Value,
+    frame_stats: &serde_json::Value,
+) -> Vec<serde_json::Value> {
+    scenario
+        .assertions
+        .iter()
+        .map(|assertion| {
+            let (target, assertion) = match assertion {
+                ScenarioAssertion::WorldState { world_state } => ("world_state", world_state),
+                ScenarioAssertion::FrameStats { frame_stats } => ("frame_stats", frame_stats),
+            };
+            let source = if target == "world_state" {
+                world_state
+            } else {
+                frame_stats
+            };
+            let actual = read_json_path(source, &assertion.path)
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let passed = actual == assertion.equals;
+            json!({
+                "target": target,
+                "path": assertion.path,
+                "expected": assertion.equals,
+                "actual": actual,
+                "passed": passed
+            })
+        })
+        .collect()
+}
+
+fn read_json_path<'a>(value: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
+    let mut current = value;
+    for segment in path.split('.') {
+        current = current.get(segment)?;
+    }
+    Some(current)
 }
 
 fn execute_scenario_step<T: CdpTransport>(
@@ -2028,6 +2175,47 @@ scenarios:
             );
             Ok(json!({ "result": { "value": {} } }))
         }
+    }
+
+    #[test]
+    fn evaluates_scenario_assertions_against_captured_state() {
+        let scenario = Scenario {
+            id: "probe-smoke".to_string(),
+            description: "probe".to_string(),
+            steps: Vec::new(),
+            assertions: vec![
+                ScenarioAssertion::WorldState {
+                    world_state: JsonPathAssertion {
+                        path: "tick".to_string(),
+                        equals: json!(2),
+                    },
+                },
+                ScenarioAssertion::FrameStats {
+                    frame_stats: JsonPathAssertion {
+                        path: "fixedDeltaMs".to_string(),
+                        equals: json!(16),
+                    },
+                },
+                ScenarioAssertion::WorldState {
+                    world_state: JsonPathAssertion {
+                        path: "object.id".to_string(),
+                        equals: json!("missing"),
+                    },
+                },
+            ],
+        };
+
+        let assertions = evaluate_scenario_assertions(
+            &scenario,
+            &json!({ "tick": 2, "object": { "id": "probe-square" } }),
+            &json!({ "fixedDeltaMs": 16 }),
+        );
+
+        assert_eq!(assertions.len(), 3);
+        assert_eq!(assertions[0]["passed"], true);
+        assert_eq!(assertions[1]["passed"], true);
+        assert_eq!(assertions[2]["passed"], false);
+        assert_eq!(assertions[2]["actual"], "probe-square");
     }
 
     #[test]
