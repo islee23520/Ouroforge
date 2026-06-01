@@ -35,11 +35,11 @@ Only run seeds, runtime pages, and scene files that you trust. The MVP is intend
 
 ## Dependency posture
 
-Rust dependencies are locked by `Cargo.lock`. Before any public release, maintainers should run and record a dependency/security audit as part of the public-readiness checklist.
+Rust dependencies are locked by `Cargo.lock`. Public-readiness evidence in `docs/public-demo-evidence.md` records `cargo audit` output against the lockfile. Maintainers should re-run `cargo audit` immediately before any later visibility change or tagged release.
 
 ## Non-goals for the current MVP
 
 - No hosted service security model.
 - No authentication or authorization guarantees.
 - No sandbox guarantee for arbitrary user content.
-- No compatibility promise for public releases until the readiness blockers are resolved.
+- No compatibility promise for public releases until a separate stabilization issue explicitly creates one.

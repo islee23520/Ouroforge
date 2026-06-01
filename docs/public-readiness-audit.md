@@ -1,12 +1,12 @@
 # Public Open-Source Readiness Audit — Issue #18.1
 
-Date: 2026-06-01
-Branch: `issue-18-1-release-readiness-audit`
-Decision: **NO-GO for public open-source release today**
+Date: 2026-06-01; updated 2026-06-02
+Audit branch: `issue-18-1-release-readiness-audit`; hardening branch: `issue-18-2-public-readiness-hardening`
+Decision: **CONDITIONAL GO for manual public-visibility review after remediation PRs merge**
 
 ## Decision summary
 
-Ouroforge has a working local evidence-native MVP path, but it is **not ready for public open-source release** because public-facing governance, security, licensing, contribution, roadmap, and demo documentation are incomplete. The correct next step is private remediation, not repo visibility change or launch messaging.
+Ouroforge now has the documentation, governance, demo evidence, fresh-clone smoke path, and dependency audit records needed for a manual public-visibility review once the stacked remediation PRs merge. The correct next step is still a separate maintainer visibility decision, not automated publication or launch messaging.
 
 ## Evidence reviewed
 
@@ -52,13 +52,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 Known environment requirement: local Chrome must be available at a standard path or through `OUROFORGE_CHROME`.
 
-## No-go blockers
+## Resolved blockers
 
-1. **License and security policy missing.** Public users cannot know usage rights or report vulnerabilities safely.
-2. **README and demo instructions are insufficient.** A fresh public user cannot discover prerequisites, run the MVP, or inspect artifacts from the README alone.
-3. **Contribution and issue intake are undefined.** Public issue/PR flow would create ambiguity and scope drift.
-4. **Architecture/roadmap maturity boundaries are undocumented.** Without explicit positioning, the project risks being overstated as a mature engine or Godot replacement.
-5. **Demo media and screenshots are missing.** Public release would be difficult to evaluate without visual proof and limitations.
+1. **License and security policy** are covered by #46.
+2. **README and demo instructions** are covered by #47 and #49.
+3. **Contribution and issue intake** are covered by #47 and #48.
+4. **Architecture/roadmap maturity boundaries** are covered by #47.
+5. **Demo media, fresh-clone smoke, and dependency audit evidence** are covered by #49.
 
 ## Launch checklist if blockers are resolved later
 
@@ -73,7 +73,7 @@ Known environment requirement: local Chrome must be available at a standard path
 - [x] Run a fresh-clone smoke test and record exact output.
 - [x] Run dependency/security audit and record exact output.
 - [x] Confirm no generated local state or private paths are tracked.
-- [ ] Make a separate manual visibility decision; do not automate publication.
+- [ ] Make a separate manual visibility decision; do not automate publication. See `docs/public-launch-checklist.md`.
 
 ## Guardrail results
 
@@ -85,7 +85,7 @@ Known environment requirement: local Chrome must be available at a standard path
 
 ## Follow-up blocker issues
 
-Created private blockers:
+Remediation blockers created by #18.1 and addressed by stacked follow-up PRs:
 
 - #46 — Add OSS license and security policy before public release.
 - #47 — Harden README, architecture, contribution, and roadmap docs for public onboarding.
@@ -94,4 +94,4 @@ Created private blockers:
 
 ## Final recommendation
 
-**NO-GO.** Keep Ouroforge private until the blockers above are resolved and a fresh clone can follow public docs from zero context to a verified MVP run.
+**CONDITIONAL GO for manual public-visibility review after #52, #53, #54, #55, and the #18.2 PR merge.** The repository should not be published automatically. Maintainers should re-run the evidence gate in `docs/public-launch-checklist.md`, confirm no generated or private state is tracked, then make a separate manual visibility decision.
