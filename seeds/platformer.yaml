@@ -8,4 +8,16 @@ acceptance:
   - Running the seed creates the required file-based run artifacts.
 scenarios:
   - id: bootstrap-smoke
-    description: Create an initial run directory without browser, game loop, or scenario execution.
+    description: Validate the minimal runtime probe contract without executing it yet.
+    steps:
+      - wait:
+          frames: 2
+      - input:
+          right: true
+    assertions:
+      - world_state:
+          path: tick
+          equals: 2
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16

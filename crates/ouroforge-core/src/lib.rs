@@ -36,6 +36,50 @@ pub struct Constraints {
 pub struct Scenario {
     pub id: String,
     pub description: String,
+    #[serde(default)]
+    pub steps: Vec<ScenarioStep>,
+    #[serde(default)]
+    pub assertions: Vec<ScenarioAssertion>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ScenarioStep {
+    Wait { wait: WaitStep },
+    Input { input: InputStep },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WaitStep {
+    pub frames: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct InputStep {
+    #[serde(default)]
+    pub left: Option<bool>,
+    #[serde(default)]
+    pub right: Option<bool>,
+    #[serde(default)]
+    pub up: Option<bool>,
+    #[serde(default)]
+    pub down: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ScenarioAssertion {
+    WorldState { world_state: JsonPathAssertion },
+    FrameStats { frame_stats: JsonPathAssertion },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct JsonPathAssertion {
+    pub path: String,
+    pub equals: serde_json::Value,
 }
 
 impl Seed {
@@ -69,15 +113,97 @@ impl Seed {
             return Err(anyhow!("scenarios must contain at least one item"));
         }
         for (index, scenario) in self.scenarios.iter().enumerate() {
-            require_text(&format!("scenarios[{index}].id"), &scenario.id)?;
-            require_text(
-                &format!("scenarios[{index}].description"),
-                &scenario.description,
-            )?;
+            scenario.validate(index)?;
         }
 
         Ok(())
     }
+}
+
+impl Scenario {
+    fn validate(&self, index: usize) -> Result<()> {
+        require_text(&format!("scenarios[{index}].id"), &self.id)?;
+        require_text(
+            &format!("scenarios[{index}].description"),
+            &self.description,
+        )?;
+        for (step_index, step) in self.steps.iter().enumerate() {
+            step.validate(index, step_index)?;
+        }
+        for (assertion_index, assertion) in self.assertions.iter().enumerate() {
+            assertion.validate(index, assertion_index)?;
+        }
+        Ok(())
+    }
+}
+
+impl ScenarioStep {
+    fn validate(&self, scenario_index: usize, step_index: usize) -> Result<()> {
+        match self {
+            ScenarioStep::Wait { wait } => {
+                if wait.frames == 0 {
+                    return Err(anyhow!(
+                        "scenarios[{scenario_index}].steps[{step_index}].wait.frames must be greater than 0"
+                    ));
+                }
+            }
+            ScenarioStep::Input { input } => {
+                if input.left.is_none()
+                    && input.right.is_none()
+                    && input.up.is_none()
+                    && input.down.is_none()
+                {
+                    return Err(anyhow!(
+                        "scenarios[{scenario_index}].steps[{step_index}].input must set at least one direction"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ScenarioAssertion {
+    fn validate(&self, scenario_index: usize, assertion_index: usize) -> Result<()> {
+        let assertion = match self {
+            ScenarioAssertion::WorldState { world_state } => world_state,
+            ScenarioAssertion::FrameStats { frame_stats } => frame_stats,
+        };
+        assertion.validate(scenario_index, assertion_index)
+    }
+}
+
+impl JsonPathAssertion {
+    fn validate(&self, scenario_index: usize, assertion_index: usize) -> Result<()> {
+        require_text(
+            &format!("scenarios[{scenario_index}].assertions[{assertion_index}].path"),
+            &self.path,
+        )?;
+        validate_scenario_path(&self.path).with_context(|| {
+            format!("scenarios[{scenario_index}].assertions[{assertion_index}].path is invalid")
+        })?;
+        if self.equals.is_null() {
+            return Err(anyhow!(
+                "scenarios[{scenario_index}].assertions[{assertion_index}].equals must not be null"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_scenario_path(path: &str) -> Result<()> {
+    for segment in path.split('.') {
+        require_text("scenario assertion path segment", segment)?;
+        if !segment
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+        {
+            return Err(anyhow!(
+                "scenario assertion paths may only contain ASCII letters, numbers, '_', '-' and '.'"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn require_text(field: &str, value: &str) -> Result<()> {
@@ -1247,6 +1373,105 @@ scenarios:
         let seed = Seed::from_yaml_str(VALID_SEED).expect("valid seed parses");
         assert_eq!(seed.id, "platformer.v0");
         assert_eq!(seed.constraints.target, "file-harness");
+    }
+
+    #[test]
+    fn parses_valid_scenario_dsl() {
+        let valid = r#"
+id: platformer.v0
+title: Platformer Harness Seed
+goal: Prove the initial Ouroforge run artifact contract.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate the seed schema.
+scenarios:
+  - id: probe-smoke
+    description: Exercise the minimal probe DSL.
+    steps:
+      - wait:
+          frames: 2
+      - input:
+          right: true
+    assertions:
+      - world_state:
+          path: tick
+          equals: 2
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+"#;
+
+        let seed = Seed::from_yaml_str(valid).expect("scenario dsl parses");
+
+        assert_eq!(seed.scenarios[0].steps.len(), 2);
+        assert_eq!(seed.scenarios[0].assertions.len(), 2);
+    }
+
+    #[test]
+    fn rejects_scenario_missing_id() {
+        let invalid = r#"
+id: platformer.v0
+title: Platformer Harness Seed
+goal: Prove the initial Ouroforge run artifact contract.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate the seed schema.
+scenarios:
+  - id: ""
+    description: Missing scenario id.
+"#;
+
+        let error = Seed::from_yaml_str(invalid).expect_err("missing scenario id fails");
+        assert!(error.to_string().contains("scenarios[0].id is required"));
+    }
+
+    #[test]
+    fn rejects_invalid_scenario_step() {
+        let invalid = r#"
+id: platformer.v0
+title: Platformer Harness Seed
+goal: Prove the initial Ouroforge run artifact contract.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate the seed schema.
+scenarios:
+  - id: probe-smoke
+    description: Invalid wait step.
+    steps:
+      - wait:
+          frames: 0
+"#;
+
+        let error = Seed::from_yaml_str(invalid).expect_err("invalid step fails");
+        assert!(error
+            .to_string()
+            .contains("wait.frames must be greater than 0"));
+    }
+
+    #[test]
+    fn rejects_invalid_scenario_assertion() {
+        let invalid = r#"
+id: platformer.v0
+title: Platformer Harness Seed
+goal: Prove the initial Ouroforge run artifact contract.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate the seed schema.
+scenarios:
+  - id: probe-smoke
+    description: Invalid assertion.
+    assertions:
+      - world_state:
+          path: tick > 0
+          equals: true
+"#;
+
+        let error = Seed::from_yaml_str(invalid).expect_err("invalid assertion fails");
+        assert!(error.to_string().contains("path is invalid"));
     }
 
     #[test]
