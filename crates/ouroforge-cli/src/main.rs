@@ -25,6 +25,8 @@ enum Commands {
     },
     Run {
         seed_path: PathBuf,
+        #[arg(long, default_value_t = 1)]
+        workers: usize,
     },
     Ledger {
         #[command(subcommand)]
@@ -161,7 +163,10 @@ fn main() -> Result<()> {
             let seed = Seed::from_path(seed_path)?;
             println!("Seed valid: {}", seed.id);
         }
-        Commands::Run { seed_path } => {
+        Commands::Run {
+            seed_path,
+            workers: _,
+        } => {
             let artifacts = create_run(seed_path, "runs")?;
             println!("Run created: {}", artifacts.run_dir.display());
         }

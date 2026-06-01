@@ -1,0 +1,23 @@
+id: runtime-demo.v0
+title: Minimal 2D Runtime Demo
+goal: Verify that the minimal browser runtime responds to scenario input and produces evidence-backed gameplay state.
+constraints:
+  target: browser-runtime
+acceptance:
+  - Scenario execution moves the player entity through runtime input.
+  - Evaluator reports a passed verdict from scenario result evidence.
+scenarios:
+  - id: player-moves-right
+    description: Move the player right for four fixed-timestep frames.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 40
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
