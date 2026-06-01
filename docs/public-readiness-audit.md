@@ -22,15 +22,15 @@ Ouroforge has a working local evidence-native MVP path, but it is **not ready fo
 
 | Area | Status | Evidence | Required remediation |
 | --- | --- | --- | --- |
-| README | Blocked | README is only a title and one-line tagline. | Add accurate private-MVP positioning, prerequisites, setup, demo, artifact inspection, and maturity boundaries. |
+| README | Remediated by #47 | README now documents MVP status, prerequisites, quickstart, verification, repository map, generated state, and maturity boundaries. | Keep screenshots/demo references current after #49. |
 | License | Remediated by #46 | `LICENSE` adds MIT terms. | Confirm license choice before public visibility changes. |
-| Architecture docs | Blocked | No durable architecture doc is tracked. | Document Seed → Run → Ledger/Evidence → Evaluator → Journal → Mutation → UI boundaries. |
-| Contribution guide | Blocked | No `CONTRIBUTING.md` is tracked. | Add contribution workflow, test expectations, stacked PR guidance, and scope rules. |
+| Architecture docs | Remediated by #47 | `docs/architecture.md` documents Seed → Run → Ledger/Evidence → Evaluator → Journal → Mutation → UI boundaries. | Keep architecture docs aligned with future feature issues. |
+| Contribution guide | Remediated by #47 | `CONTRIBUTING.md` documents workflow, verification, generated-state rules, and scope boundaries. | Keep PR checklist current with future commands. |
 | Security posture | Remediated by #46 | `SECURITY.md` documents reporting expectations and local Chrome/browser execution boundaries. | Replace temporary private reporting guidance with a dedicated public security contact before launch. |
 | Dependency posture | Needs hardening | Dependencies are small and pinned by `Cargo.lock`, but no public dependency policy/audit notes are documented. | Document dependency review and run a formal vulnerability audit before launch. |
 | Demo quality | Partial | MVP command can run locally and produce artifacts; UI examples are static and still require manual command/export steps. | Add demo walkthrough, screenshots/recordings, and known limitations. |
 | Issue templates | Blocked | No `.github/ISSUE_TEMPLATE` files are tracked. | Add bug/feature/security-adjacent templates with scope boundaries. |
-| Roadmap clarity | Blocked | No public roadmap is tracked. | Add realistic roadmap and non-goals; avoid Godot-replacement claims. |
+| Roadmap clarity | Remediated by #47 | `docs/roadmap.md` documents current status, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
 | Example reproducibility | Partial | `cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4` works locally with Chrome. | Document Chrome/`OUROFORGE_CHROME`, local server behavior, and expected artifacts. |
 | Secrets/private paths | Pass with caveat | No tracked `.openchrome/`, `.omc/`, or generated `runs/`; verification found only untracked local tool state. | Keep `.openchrome/`, `.omc/`, `runs/`, and generated dashboard data out of commits. |
 
@@ -64,10 +64,10 @@ Known environment requirement: local Chrome must be available at a standard path
 
 - [x] Add `LICENSE` with chosen OSS license.
 - [x] Add `SECURITY.md` with vulnerability reporting and local execution caveats.
-- [ ] Add `CONTRIBUTING.md` with verification commands and scope rules.
-- [ ] Expand `README.md` with accurate MVP positioning, prerequisites, quickstart, demo, and artifact inspection.
-- [ ] Add architecture docs for artifact contracts and UI boundaries.
-- [ ] Add roadmap/non-goals that explicitly avoid Godot-replacement claims.
+- [x] Add `CONTRIBUTING.md` with verification commands and scope rules.
+- [x] Expand `README.md` with accurate MVP positioning, prerequisites, quickstart, demo, and artifact inspection.
+- [x] Add architecture docs for artifact contracts and UI boundaries.
+- [x] Add roadmap/non-goals that explicitly avoid Godot-replacement claims.
 - [ ] Add `.github/ISSUE_TEMPLATE` files.
 - [ ] Add screenshots or demo recording references for runtime, dashboard, and cockpit.
 - [ ] Run a fresh-clone smoke test and record exact output.
