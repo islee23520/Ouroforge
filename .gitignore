@@ -1,2 +1,5 @@
 /target/
 /runs/
+examples/evidence-dashboard/dashboard-data.json
+.openchrome/
+.omc/

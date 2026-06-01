@@ -56,6 +56,8 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`.
+
 ## Verification
 
 Recommended local verification before opening a PR:
@@ -81,7 +83,7 @@ For public-readiness smoke evidence, also run the MVP command with `--workers 4`
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
 - `examples/authoring-cockpit` — static authoring cockpit prototype over the minimal scene model.
-- `docs/` — architecture and public-readiness audit notes.
+- `docs/` — architecture, roadmap, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 

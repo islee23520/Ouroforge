@@ -27,11 +27,11 @@ Ouroforge has a working local evidence-native MVP path, but it is **not ready fo
 | Architecture docs | Remediated by #47 | `docs/architecture.md` documents Seed → Run → Ledger/Evidence → Evaluator → Journal → Mutation → UI boundaries. | Keep architecture docs aligned with future feature issues. |
 | Contribution guide | Remediated by #47 | `CONTRIBUTING.md` documents workflow, verification, generated-state rules, and scope boundaries. | Keep PR checklist current with future commands. |
 | Security posture | Remediated by #46 | `SECURITY.md` documents reporting expectations and local Chrome/browser execution boundaries. | Replace temporary private reporting guidance with a dedicated public security contact before launch. |
-| Dependency posture | Needs hardening | Dependencies are small and pinned by `Cargo.lock`, but no public dependency policy/audit notes are documented. | Document dependency review and run a formal vulnerability audit before launch. |
-| Demo quality | Partial | MVP command can run locally and produce artifacts; UI examples are static and still require manual command/export steps. | Add demo walkthrough, screenshots/recordings, and known limitations. |
+| Dependency posture | Remediated by #49 | `docs/public-demo-evidence.md` records `cargo audit` output against `Cargo.lock`. | Re-run audit before any later public release decision. |
+| Demo quality | Remediated by #49 | `docs/assets/demo/` contains runtime, evidence dashboard, and authoring cockpit screenshots; `docs/public-demo-evidence.md` documents capture commands and limitations. | Keep media current when UI behavior changes. |
 | Issue templates | Remediated by #48 | `.github/ISSUE_TEMPLATE` defines bug, scoped feature, and public-readiness templates with evidence and guardrail fields. | Keep templates aligned with support policy and SECURITY.md. |
 | Roadmap clarity | Remediated by #47 | `docs/roadmap.md` documents current status, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
-| Example reproducibility | Partial | `cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4` works locally with Chrome. | Document Chrome/`OUROFORGE_CHROME`, local server behavior, and expected artifacts. |
+| Example reproducibility | Remediated by #49 | `docs/public-demo-evidence.md` records Chrome/`OUROFORGE_CHROME`, generated artifacts, and fresh-clone smoke commands. | Re-run fresh-clone smoke before public visibility changes. |
 | Secrets/private paths | Pass with caveat | No tracked `.openchrome/`, `.omc/`, or generated `runs/`; verification found only untracked local tool state. | Keep `.openchrome/`, `.omc/`, `runs/`, and generated dashboard data out of commits. |
 
 ## Fresh-clone MVP smoke expectation
@@ -69,10 +69,10 @@ Known environment requirement: local Chrome must be available at a standard path
 - [x] Add architecture docs for artifact contracts and UI boundaries.
 - [x] Add roadmap/non-goals that explicitly avoid Godot-replacement claims.
 - [x] Add `.github/ISSUE_TEMPLATE` files.
-- [ ] Add screenshots or demo recording references for runtime, dashboard, and cockpit.
-- [ ] Run a fresh-clone smoke test and record exact output.
-- [ ] Run dependency/security audit and record exact output.
-- [ ] Confirm no generated local state or private paths are tracked.
+- [x] Add screenshots or demo recording references for runtime, dashboard, and cockpit.
+- [x] Run a fresh-clone smoke test and record exact output.
+- [x] Run dependency/security audit and record exact output.
+- [x] Confirm no generated local state or private paths are tracked.
 - [ ] Make a separate manual visibility decision; do not automate publication.
 
 ## Guardrail results
