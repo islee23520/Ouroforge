@@ -2302,6 +2302,8 @@ pub struct SceneSize {
 pub struct SceneCollider {
     #[serde(default = "aabb_collider_shape")]
     pub shape: String,
+    #[serde(default = "static_collider_body")]
+    pub body: String,
     #[serde(default)]
     pub offset: ScenePoint,
     pub size: SceneSize,
@@ -2322,6 +2324,10 @@ fn scene_schema_v1() -> String {
 
 fn aabb_collider_shape() -> String {
     "aabb".to_string()
+}
+
+fn static_collider_body() -> String {
+    "static".to_string()
 }
 
 fn empty_json_object() -> serde_json::Value {
@@ -2387,6 +2393,11 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
     if collider.shape != "aabb" {
         return Err(anyhow!(
             "scene entity {entity_id} collider shape must be aabb"
+        ));
+    }
+    if !matches!(collider.body.as_str(), "static" | "dynamic") {
+        return Err(anyhow!(
+            "scene entity {entity_id} collider body must be static or dynamic"
         ));
     }
     if collider.size.width <= 0 || collider.size.height <= 0 {
@@ -4006,6 +4017,7 @@ scenarios:
                         "controllable": true,
                         "collider": {
                             "shape": "aabb",
+                            "body": "dynamic",
                             "offset": { "x": 0, "y": 0 },
                             "size": { "width": 16, "height": 16 },
                             "sensor": false
@@ -4125,6 +4137,34 @@ scenarios:
         .expect("collider fixture parses");
         let rejected = validate_scene(&future_collider).expect_err("future collider rejected");
         assert!(rejected.to_string().contains("collider shape must be aabb"));
+
+        let future_body = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "collider": {
+                            "shape": "aabb",
+                            "body": "kinematic",
+                            "size": { "width": 16, "height": 16 }
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("collider body fixture parses");
+        let rejected = validate_scene(&future_body).expect_err("future body rejected");
+        assert!(rejected
+            .to_string()
+            .contains("collider body must be static or dynamic"));
     }
 
     #[test]

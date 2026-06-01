@@ -2,6 +2,7 @@
   const fixedDeltaMs = 16;
   const input = { left: false, right: false, up: false, down: false };
   const events = [];
+  const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -31,6 +32,7 @@
     bounds: clone(defaultScene.bounds),
     entities: clone(defaultScene.entities),
     metadata: clone(defaultScene.metadata),
+    collisions: [],
   };
 
   function clone(value) {
@@ -85,6 +87,7 @@
     if (components.collider) {
       normalized.components.collider = {
         shape: components.collider.shape || 'aabb',
+        body: components.collider.body || 'static',
         offset: point(components.collider.offset),
         size: size(components.collider.size, normalized.components.size),
         sensor: Boolean(components.collider.sensor),
@@ -124,6 +127,8 @@
       transform.y = Math.max(0, Math.min(world.bounds.height - size.height, transform.y + velocity.y));
     }
     world.tick += 1;
+    world.collisions = collision.detectAabbCollisions(world.entities, world.tick);
+    for (const event of world.collisions) record(event.type, event);
   }
 
   function renderCanvas() {
@@ -157,6 +162,7 @@
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
     world.metadata = clone(normalized.metadata);
+    world.collisions = [];
     world.tick = 0;
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,

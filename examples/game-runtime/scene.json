@@ -1,7 +1,10 @@
 {
   "schemaVersion": "1",
   "id": "foundation-scene",
-  "bounds": { "width": 320, "height": 180 },
+  "bounds": {
+    "width": 320,
+    "height": 180
+  },
   "metadata": {
     "title": "Runtime v1 foundation scene",
     "runtime": "small-game-capable-browser"
@@ -9,39 +12,84 @@
   "entities": [
     {
       "id": "player",
-      "sprite": { "color": "#5eead4" },
+      "sprite": {
+        "color": "#5eead4"
+      },
       "components": {
-        "transform": { "x": 32, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 16, "height": 16 },
+        "transform": {
+          "x": 32,
+          "y": 72
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
         "controllable": true,
         "collider": {
           "shape": "aabb",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "width": 16, "height": 16 },
-          "sensor": false
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 16
+          },
+          "sensor": false,
+          "body": "dynamic"
         }
       },
-      "tags": ["player", "controllable"],
-      "metadata": { "role": "avatar" }
+      "tags": [
+        "player",
+        "controllable"
+      ],
+      "metadata": {
+        "role": "avatar"
+      }
     },
     {
       "id": "goal",
-      "sprite": { "color": "#facc15" },
+      "sprite": {
+        "color": "#facc15"
+      },
       "components": {
-        "transform": { "x": 272, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 16, "height": 16 },
+        "transform": {
+          "x": 272,
+          "y": 72
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
         "controllable": false,
         "collider": {
           "shape": "aabb",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "width": 16, "height": 16 },
-          "sensor": true
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 16
+          },
+          "sensor": true,
+          "body": "static"
         }
       },
-      "tags": ["goal"],
-      "metadata": { "role": "objective" }
+      "tags": [
+        "goal"
+      ],
+      "metadata": {
+        "role": "objective"
+      }
     }
   ]
 }
