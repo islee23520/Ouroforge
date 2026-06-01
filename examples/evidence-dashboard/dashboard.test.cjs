@@ -17,4 +17,15 @@ assert.equal(dashboard.artifactHref(run.evidence[0], run), '../../runs/run-1/evi
 assert.match(dashboard.renderRunList([run], 'run-1'), /platformer\.v0/);
 assert.match(dashboard.renderRunDetail(run), /World state/);
 assert.match(dashboard.renderRunDetail(run), /mutation-1/);
+
+// Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
+const xssRun = {
+  summary: { id: '<img src=x onerror=alert(1)>', run_dir: 'runs/x', seed_id: 's', verdict_status: 'failed', evidence_count: 0, mutation_count: 0 },
+  evidence: [], screenshots: [], world_states: [], console_logs: [], mutations: [],
+  verdict: {}, journal: '<script>alert(1)</script>',
+};
+const xssDetail = dashboard.renderRunDetail(xssRun);
+assert.ok(!xssDetail.includes('<script>alert(1)</script>'), 'journal markup must be escaped');
+assert.match(xssDetail, /&lt;script&gt;/);
+assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'), 'run id markup must be escaped');
 console.log('dashboard smoke test passed');

@@ -19,7 +19,12 @@ const OuroforgeDashboard = (() => {
   }
 
   function escapeText(value) {
-    return String(value ?? '');
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function renderRunList(runs, selectedId) {
@@ -46,7 +51,7 @@ const OuroforgeDashboard = (() => {
 
   function renderArtifactLink(artifact, run) {
     return `<article class="artifact">
-      <a href="${artifactHref(artifact, run)}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
+      <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
       <div class="run-meta">${escapeText(artifact.kind)}</div>
       <div class="run-meta">${escapeText(artifact.path)}</div>
     </article>`;
@@ -54,14 +59,14 @@ const OuroforgeDashboard = (() => {
 
   function renderScreenshot(artifact, run) {
     return `<article class="artifact">
-      <a href="${artifactHref(artifact, run)}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
-      <img class="screenshot" src="${artifactHref(artifact, run)}" alt="${escapeText(artifact.id)}" />
+      <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
+      <img class="screenshot" src="${escapeText(artifactHref(artifact, run))}" alt="${escapeText(artifact.id)}" />
     </article>`;
   }
 
   function renderJsonArtifact(artifact, run) {
     return `<article class="artifact">
-      <a href="${artifactHref(artifact, run)}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
+      <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
       <pre>${escapeText(JSON.stringify(artifact.value, null, 2))}</pre>
     </article>`;
   }
