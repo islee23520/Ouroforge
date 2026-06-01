@@ -204,6 +204,9 @@ fn main() -> Result<()> {
             println!("Seed valid: {}", seed.id);
         }
         Commands::Run { seed_path, workers } => {
+            if workers == 0 {
+                return Err(anyhow!("--workers must be at least 1"));
+            }
             let artifacts = create_run(seed_path, "runs")?;
             println!("Run created: {}", artifacts.run_dir.display());
             if workers > 1 {
@@ -422,6 +425,9 @@ fn run_private_mvp(run_dir: &Path, workers: usize) -> Result<serde_json::Value> 
         monotonic_millis()?
     ));
 
+    // Resolve Chrome before starting the static server so a missing/invalid
+    // browser fails closed without leaking an orphaned `python3 -m http.server`.
+    let chrome_path = find_chrome()?;
     let mut server = Command::new("python3")
         .args([
             "-m",
@@ -436,8 +442,7 @@ fn run_private_mvp(run_dir: &Path, workers: usize) -> Result<serde_json::Value> 
         .stderr(Stdio::null())
         .spawn()
         .context("failed to start local runtime server")?;
-    let chrome_path = find_chrome()?;
-    let mut chrome = Command::new(&chrome_path)
+    let mut chrome = match Command::new(&chrome_path)
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--remote-debugging-address=127.0.0.1")
@@ -447,7 +452,17 @@ fn run_private_mvp(run_dir: &Path, workers: usize) -> Result<serde_json::Value> 
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .with_context(|| format!("failed to start Chrome at {}", chrome_path.display()))?;
+    {
+        Ok(child) => child,
+        Err(error) => {
+            // Tear down the already-started static server before surfacing the error.
+            terminate_child(&mut server);
+            return Err(anyhow::Error::new(error).context(format!(
+                "failed to start Chrome at {}",
+                chrome_path.display()
+            )));
+        }
+    };
 
     let result = (|| {
         let runtime_url = format!("http://127.0.0.1:{http_port}/");

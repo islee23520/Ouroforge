@@ -13,6 +13,15 @@ const OuroforgeCockpit = (() => {
   const DEFAULT_SCENE_PATH = 'examples/game-runtime/scene.json';
   const DEFAULT_DASHBOARD_DATA_PATH = '../evidence-dashboard/dashboard-data.json';
 
+  function escapeText(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function cloneScene(scene) {
     return JSON.parse(JSON.stringify(scene));
   }
@@ -22,7 +31,11 @@ const OuroforgeCockpit = (() => {
   }
 
   function coerceValue(raw, kind) {
-    if (kind === 'number') return Number(raw);
+    if (kind === 'number') {
+      // Treat a blank/cleared input as invalid instead of silently coercing to 0.
+      if (typeof raw === 'string' && raw.trim() === '') return NaN;
+      return Number(raw);
+    }
     if (kind === 'boolean') return raw === true || raw === 'true';
     return String(raw);
   }
@@ -76,7 +89,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderTree(scene, selectedId) {
-    return scene.entities.map((entity) => `<button class="tree-button ${entity.id === selectedId ? 'active' : ''}" data-entity-id="${entity.id}">${entity.id}<br><small>${entity.components.controllable ? 'controllable' : 'static'}</small></button>`).join('');
+    return scene.entities.map((entity) => `<button class="tree-button ${entity.id === selectedId ? 'active' : ''}" data-entity-id="${escapeText(entity.id)}">${escapeText(entity.id)}<br><small>${entity.components.controllable ? 'controllable' : 'static'}</small></button>`).join('');
   }
 
   function renderInspector(scene, entityId, scenePath = DEFAULT_SCENE_PATH) {
@@ -85,11 +98,11 @@ const OuroforgeCockpit = (() => {
     const fields = EDITABLE_FIELDS.map(([path, kind]) => {
       const value = getValue(entity, path);
       const input = kind === 'boolean'
-        ? `<select data-edit-path="${path}"><option value="true" ${value ? 'selected' : ''}>true</option><option value="false" ${!value ? 'selected' : ''}>false</option></select>`
-        : `<input data-edit-path="${path}" type="${kind === 'number' ? 'number' : 'text'}" value="${value}" />`;
-      return `<label>${path}${input}</label>`;
+        ? `<select data-edit-path="${escapeText(path)}"><option value="true" ${value ? 'selected' : ''}>true</option><option value="false" ${!value ? 'selected' : ''}>false</option></select>`
+        : `<input data-edit-path="${escapeText(path)}" type="${kind === 'number' ? 'number' : 'text'}" value="${escapeText(value)}" />`;
+      return `<label>${escapeText(path)}${input}</label>`;
     }).join('');
-    return `<div class="inspector"><div class="panel"><h2>${entity.id}</h2><div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${JSON.stringify(entity, null, 2)}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x)}</pre></div></div>`;
+    return `<div class="inspector"><div class="panel"><h2>${escapeText(entity.id)}</h2><div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${escapeText(JSON.stringify(entity, null, 2))}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${escapeText(cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x))}</pre></div></div>`;
   }
 
   function renderPreview(scenePath = '../game-runtime/index.html') {
@@ -104,8 +117,8 @@ const OuroforgeCockpit = (() => {
     if (!run) {
       return '<section class="panel"><h2>Evidence + Journal</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to populate this pane.</p></section>';
     }
-    const screenshots = (run.screenshots || []).slice(0, 4).map((artifact) => `<a href="${artifactHref(artifact, run)}" target="_blank" rel="noreferrer">${artifact.id}</a>`).join('<br>') || 'No screenshots recorded.';
-    return `<section class="panel"><h2>Evidence + Journal</h2><div class="field-grid"><div><strong>Run</strong><br>${run.summary.id}</div><div><strong>Verdict</strong><br>${run.summary.verdict_status}</div><div><strong>Evidence</strong><br>${run.evidence.length}</div><div><strong>Mutations</strong><br>${run.mutations.length}</div></div><h3>Screenshots</h3><p>${screenshots}</p><h3>Journal</h3><pre>${run.journal || 'No journal loaded.'}</pre></section>`;
+    const screenshots = (run.screenshots || []).slice(0, 4).map((artifact) => `<a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>`).join('<br>') || 'No screenshots recorded.';
+    return `<section class="panel"><h2>Evidence + Journal</h2><div class="field-grid"><div><strong>Run</strong><br>${escapeText(run.summary.id)}</div><div><strong>Verdict</strong><br>${escapeText(run.summary.verdict_status)}</div><div><strong>Evidence</strong><br>${run.evidence.length}</div><div><strong>Mutations</strong><br>${run.mutations.length}</div></div><h3>Screenshots</h3><p>${screenshots}</p><h3>Journal</h3><pre>${escapeText(run.journal || 'No journal loaded.')}</pre></section>`;
   }
 
   function renderIntegration(run) {
@@ -149,7 +162,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, applyEdit, artifactHref, cliCommand, dashboardExportCommand, getValue, init, latestRun, loadDashboardData, qaCommand, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, validateEdit };
+  return { EDITABLE_FIELDS, applyEdit, artifactHref, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, qaCommand, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

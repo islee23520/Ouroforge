@@ -227,6 +227,21 @@ fn require_text(field: &str, value: &str) -> Result<()> {
     }
 }
 
+/// Fail-closed validation for URLs that reach a browser navigation sink.
+///
+/// The local smoke/scenario paths only ever drive `http`/`https` targets, so we
+/// reject other schemes (for example `file:`, `chrome:`, `data:`) before the URL
+/// is handed to CDP `Page.navigate`, preventing capture of unintended local pages.
+fn require_http_url(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let lowered = value.trim().to_ascii_lowercase();
+    if lowered.starts_with("http://") || lowered.starts_with("https://") {
+        Ok(())
+    } else {
+        Err(anyhow!("{field} must use http:// or https://"))
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceArtifact {
@@ -886,7 +901,7 @@ pub struct BrowserSmokeConfig {
 impl BrowserSmokeConfig {
     pub fn new(run_dir: impl Into<PathBuf>, url: impl Into<String>) -> Result<Self> {
         let url = url.into();
-        require_text("browser smoke URL", &url)?;
+        require_http_url("browser smoke URL", &url)?;
         Ok(Self {
             run_dir: run_dir.into(),
             url,
@@ -1794,7 +1809,7 @@ pub struct ScenarioRunConfig {
 impl ScenarioRunConfig {
     pub fn new(run_dir: impl Into<PathBuf>, url: impl Into<String>) -> Result<Self> {
         let url = url.into();
-        require_text("scenario run URL", &url)?;
+        require_http_url("scenario run URL", &url)?;
         Ok(Self {
             run_dir: run_dir.into(),
             url,
@@ -2929,6 +2944,30 @@ scenarios:
             .expect("config builds");
         assert_eq!(config.worker_id.as_str(), "worker-1");
         assert_eq!(config.worker_id.evidence_dir(), "evidence/workers/worker-1");
+    }
+
+    #[test]
+    fn browser_smoke_config_rejects_non_http_url() {
+        for url in [
+            "file:///etc/passwd",
+            "chrome://settings",
+            "data:text/html,<h1>x",
+        ] {
+            let error = BrowserSmokeConfig::new("runs/run-test", url)
+                .expect_err("non-http smoke URL is rejected");
+            assert!(
+                error.to_string().contains("must use http:// or https://"),
+                "unexpected error for {url}: {error}"
+            );
+        }
+        assert!(BrowserSmokeConfig::new("runs/run-test", "https://example.test").is_ok());
+    }
+
+    #[test]
+    fn scenario_run_config_rejects_non_http_url() {
+        let error = ScenarioRunConfig::new("runs/run-test", "file:///tmp/x")
+            .expect_err("non-http scenario URL is rejected");
+        assert!(error.to_string().contains("must use http:// or https://"));
     }
 
     #[test]

@@ -19,5 +19,21 @@ assert.match(cockpit.renderPreview(), /iframe/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /# Journal/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
+
+// A cleared numeric input must be rejected, not silently coerced to 0.
+assert.throws(() => cockpit.applyEdit(scene, 'player', 'components.transform.x', ''), /Invalid numeric/);
+
+// Scene-derived and dashboard-derived content must be escaped before innerHTML insertion.
+const xssScene = {
+  entities: [{
+    id: '<img src=x onerror=alert(1)>',
+    sprite: { color: '#ffffff' },
+    components: { transform: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, size: { width: 1, height: 1 }, controllable: true },
+  }],
+};
+assert.ok(!cockpit.renderTree(xssScene, null).includes('<img src=x onerror'), 'tree entity id must be escaped');
+assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('<img src=x onerror'), 'inspector entity id must be escaped');
+const xssRun = { summary: { id: 'r', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>' };
+assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
 console.log('authoring cockpit smoke test passed');
 
