@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ouroforge Evidence Dashboard v0</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="shell-header">
+      <div>
+        <p class="eyebrow">Ouroforge</p>
+        <h1>Evidence Dashboard v0</h1>
+      </div>
+      <p class="read-only">Read-only local run inspection</p>
+    </header>
+    <main class="layout">
+      <aside class="run-list" aria-label="Run list">
+        <h2>Runs</h2>
+        <div id="run-list" class="run-list-items">Loading dashboard-data.json…</div>
+      </aside>
+      <section class="run-detail" aria-live="polite">
+        <div id="run-detail" class="empty-state">Select a run to inspect its evidence.</div>
+      </section>
+    </main>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

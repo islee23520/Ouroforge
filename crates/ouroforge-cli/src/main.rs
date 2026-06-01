@@ -2,10 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, create_mutation_proposal, create_run, evaluate_run,
-    evolve_run, list_evidence_artifacts, list_mutation_proposals, read_cdp_targets,
-    read_ledger_events, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
-    update_journal, BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput,
-    ScenarioRunConfig, Seed, WorkerId,
+    evolve_run, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    read_cdp_targets, read_dashboard_run, read_ledger_events, run_browser_smoke,
+    run_browser_smoke_pool, run_scenarios, show_journal, update_journal, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -60,6 +60,10 @@ enum Commands {
         #[command(subcommand)]
         command: MutationCommand,
     },
+    Dashboard {
+        #[command(subcommand)]
+        command: DashboardCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -95,6 +99,19 @@ enum BrowserCommand {
         worker_id: String,
         #[arg(long, default_value_t = 1)]
         workers: usize,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DashboardCommand {
+    Export {
+        #[arg(long, default_value = "runs")]
+        runs_root: PathBuf,
+        #[arg(
+            long,
+            default_value = "examples/evidence-dashboard/dashboard-data.json"
+        )]
+        output: PathBuf,
     },
 }
 
@@ -309,6 +326,31 @@ fn main() -> Result<()> {
         } => {
             let proposals = list_mutation_proposals(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&proposals)?);
+        }
+        Commands::Dashboard {
+            command: DashboardCommand::Export { runs_root, output },
+        } => {
+            let summaries = list_dashboard_runs(&runs_root)?;
+            let runs = summaries
+                .iter()
+                .map(|summary| read_dashboard_run(&summary.run_dir))
+                .collect::<Result<Vec<_>>>()?;
+            let payload = serde_json::json!({
+                "schema": "ouroforge-dashboard-v0",
+                "runs_root": runs_root,
+                "runs": runs
+            });
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!(
+                        "failed to create dashboard output directory {}",
+                        parent.display()
+                    )
+                })?;
+            }
+            std::fs::write(&output, serde_json::to_string_pretty(&payload)?)
+                .with_context(|| format!("failed to write dashboard data {}", output.display()))?;
+            println!("Dashboard data exported: {}", output.display());
         }
     }
 
