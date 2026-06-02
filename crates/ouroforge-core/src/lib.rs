@@ -8455,6 +8455,18 @@ scenarios:
     }
 
     #[test]
+    fn validates_renderer_tilemap_feature_regression_seed() {
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../seeds/engine-feature-renderer-tilemap.yaml"
+        ))
+        .expect("renderer/tilemap regression seed validates");
+        assert_eq!(seed.id, "engine-feature.renderer-tilemap");
+        assert_eq!(seed.scenarios.len(), 2);
+        assert_eq!(seed.scenarios[0].id, "renderer-layer-camera-regression");
+        assert_eq!(seed.scenarios[1].id, "tilemap-grid-layer-regression");
+    }
+
+    #[test]
     fn parses_valid_scenario_dsl() {
         let valid = r#"
 id: platformer.v0

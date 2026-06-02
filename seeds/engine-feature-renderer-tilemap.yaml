@@ -1,0 +1,79 @@
+id: engine-feature.renderer-tilemap
+title: Engine Feature Regression - Renderer and Tilemap
+goal: Isolate renderer/layer/camera and tilemap evidence so Engine Expansion v1 coverage is not hidden inside one integration demo.
+constraints:
+  target: game-runtime
+acceptance:
+  - Renderer version, camera, layers, and deterministic render order remain observable through world-state evidence.
+  - Tilemap version, grid, layers, collision layer, and deterministic layer ordering remain observable through world-state evidence.
+  - The seed remains deterministic and local-first; it adds no engine behavior beyond regression coverage.
+scenarios:
+  - id: renderer-layer-camera-regression
+    description: Assert renderer v1 camera/layer/render-order evidence after a bounded runtime tick.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: renderer.version
+          equals: '1'
+      - world_state:
+          path: renderer.camera.x
+          equals: 0
+      - world_state:
+          path: renderer.camera.y
+          equals: 0
+      - world_state:
+          path: renderer.layers.0.id
+          equals: background
+      - world_state:
+          path: renderer.layers.1.id
+          equals: actors
+      - world_state:
+          path: renderer.renderedEntities.0.entityId
+          equals: player
+      - world_state:
+          path: renderer.renderedEntities.1.entityId
+          equals: player-badge
+      - world_state:
+          path: renderer.renderedEntities.1.layer
+          equals: ui
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: tilemap-grid-layer-regression
+    description: Assert tilemap v1 grid, layer ordering, and collision-layer evidence without relying on visual output.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: tilemaps.version
+          equals: '1'
+      - world_state:
+          path: tilemaps.tilemaps.0.id
+          equals: platformer-ground
+      - world_state:
+          path: tilemaps.tilemaps.0.grid.width
+          equals: 16
+      - world_state:
+          path: tilemaps.tilemaps.0.grid.height
+          equals: 10
+      - world_state:
+          path: tilemaps.tilemaps.0.layers.0.id
+          equals: terrain
+      - world_state:
+          path: tilemaps.tilemaps.0.layers.1.id
+          equals: collision
+      - world_state:
+          path: tilemaps.tilemaps.0.layers.1.collisionLayer
+          equals: collision
+      - world_state:
+          path: tilemaps.layerOrder.0.layerId
+          equals: terrain
+      - world_state:
+          path: tilemaps.layerOrder.1.layerId
+          equals: collision
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
