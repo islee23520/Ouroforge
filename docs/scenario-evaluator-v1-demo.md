@@ -103,3 +103,14 @@ node examples/evidence-dashboard/dashboard.test.cjs
 SE8.1 post-merge verification exported dashboard data successfully and the Node
 syntax/smoke checks passed. The generated dashboard data file is intentionally
 ignored by git.
+
+
+## Input Replay Evidence v2 note
+
+Current scenario runs preserve legacy `input_replay` artifacts and also emit
+`scenario_input_replay` artifacts for supported direct/replay/replayRef input
+steps. These generated JSON artifacts remain under `runs/<run-id>/evidence/...`,
+are indexed in `evidence/index.json`, and are summarized by compare, journal,
+and dashboard read models. Do not commit generated run artifacts when refreshing
+this demo evidence; record run ids and representative artifact paths in docs or
+issue comments instead. See `docs/input-replay-evidence-v2.md`.
