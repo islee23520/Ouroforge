@@ -1,0 +1,31 @@
+id: runtime-v1.animation
+title: Runtime v1 Animation Seed
+goal: Advance a fixed-timestep sprite-frame animation and prove its state through runtime evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - The player scene entity declares a single sprite_frame animation mode.
+  - The browser runtime advances animation state by fixed simulation ticks.
+  - Scenario evidence proves the expected frame index after a fixed number of frames.
+scenarios:
+  - id: sprite-frame-progresses
+    description: Wait four runtime frames and assert the player's sprite-frame animation reached frame index 2.
+    steps:
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: entities.0.components.animation.mode
+          equals: sprite_frame
+      - world_state:
+          path: entities.0.components.animation.frameDuration
+          equals: 2
+      - world_state:
+          path: entities.0.components.animation.state.elapsedFrames
+          equals: 4
+      - world_state:
+          path: entities.0.components.animation.state.frameIndex
+          equals: 2
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16

@@ -42,6 +42,22 @@
           },
           "sensor": false,
           "body": "dynamic"
+        },
+        "animation": {
+          "mode": "sprite_frame",
+          "frameDuration": 2,
+          "loop": true,
+          "frames": [
+            {
+              "color": "#5eead4"
+            },
+            {
+              "color": "#2dd4bf"
+            },
+            {
+              "color": "#0f766e"
+            }
+          ]
         }
       },
       "tags": [
