@@ -707,6 +707,15 @@ impl<T: CdpTransport> CdpClient<T> {
         Ok(())
     }
 
+    pub fn add_script_to_evaluate_on_new_document(&mut self, source: &str) -> Result<()> {
+        require_text("CDP preload script", source)?;
+        self.transport.send_command(
+            "Page.addScriptToEvaluateOnNewDocument",
+            json!({ "source": source }),
+        )?;
+        Ok(())
+    }
+
     pub fn bring_page_to_front(&mut self) -> Result<()> {
         self.transport
             .send_command("Page.bringToFront", json!({}))?;
@@ -1102,6 +1111,10 @@ impl WorkerId {
         )
     }
 
+    pub fn console_log_path(&self, suffix: u128) -> String {
+        format!("{}/browser-console-{suffix}.json", self.evidence_dir())
+    }
+
     pub fn probe_json_path(&self, probe_name: &str, suffix: u128) -> String {
         format!(
             "{}/browser-probe-{probe_name}-{suffix}.json",
@@ -1426,6 +1439,83 @@ fn capture_runtime_probe_value<T: CdpTransport>(
     Ok(())
 }
 
+const CONSOLE_CAPTURE_SCRIPT: &str = r#"
+(() => {
+  if (window.__OUROFORGE_CONSOLE_INSTALLED__) return;
+  window.__OUROFORGE_CONSOLE_INSTALLED__ = true;
+  window.__OUROFORGE_CONSOLE__ = [];
+  const levels = ['debug', 'info', 'log', 'warn', 'error'];
+  for (const level of levels) {
+    const original = console[level] && console[level].bind(console);
+    console[level] = (...args) => {
+      try {
+        window.__OUROFORGE_CONSOLE__.push({
+          level,
+          text: args.map((arg) => {
+            if (typeof arg === 'string') return arg;
+            try { return JSON.stringify(arg); } catch (_) { return String(arg); }
+          }).join(' '),
+          argCount: args.length,
+          timestampMs: Math.round(performance.now())
+        });
+        if (window.__OUROFORGE_CONSOLE__.length > 100) window.__OUROFORGE_CONSOLE__.shift();
+      } catch (_) {}
+      if (original) original(...args);
+    };
+  }
+})();
+"#;
+
+fn install_console_capture<T: CdpTransport>(client: &mut CdpClient<T>) -> Result<()> {
+    client.add_script_to_evaluate_on_new_document(CONSOLE_CAPTURE_SCRIPT)
+}
+
+fn capture_console_log<T: CdpTransport>(
+    config: &BrowserSmokeConfig,
+    client: &mut CdpClient<T>,
+) -> Result<Option<String>> {
+    let logs = client.evaluate_json("window.__OUROFORGE_CONSOLE__ || []")?;
+    let suffix = unix_millis()?;
+    let rel_path = config.worker_id.console_log_path(suffix);
+    fs::create_dir_all(config.run_dir.join(config.worker_id.evidence_dir())).with_context(
+        || {
+            format!(
+                "failed to create worker evidence directory {}",
+                config
+                    .run_dir
+                    .join(config.worker_id.evidence_dir())
+                    .display()
+            )
+        },
+    )?;
+    write_json(&config.run_dir.join(&rel_path), &logs)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("browser-console-{}-{suffix}", config.worker_id.as_str()),
+        "application/json",
+        &rel_path,
+        json!({
+            "artifact": "console_log",
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "bounded": true,
+            "limit": 100
+        }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "browser.capture.console",
+        "browser-smoke",
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "path": rel_path,
+            "bounded": true,
+            "limit": 100
+        }),
+    )?;
+    Ok(Some(rel_path))
+}
+
 fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
     let connection = if let Some(target_ws_url) = &config.target_ws_url {
         CdpConnectionConfig::new(target_ws_url.clone())?
@@ -1437,6 +1527,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     let mut client = CdpClient::new(transport);
 
     client.enable_page()?;
+    let _ = install_console_capture(&mut client);
     let _ = client.bring_page_to_front();
     let navigation = client.navigate(&config.url)?;
     append_ledger_event(
@@ -1452,6 +1543,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     )?;
 
     std::thread::sleep(Duration::from_millis(300));
+    let _ = capture_console_log(config, &mut client);
     capture_runtime_probe(config, &mut client)?;
     let _ = client.bring_page_to_front();
     let screenshot = client.capture_screenshot_png()?;
@@ -1502,7 +1594,13 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
                 ),
                 "application/json",
                 &metrics_rel_path,
-                json!({ "worker_id": config.worker_id.as_str(), "url": config.url, "optional": true }),
+                json!({
+                    "artifact": "performance_metrics",
+                    "worker_id": config.worker_id.as_str(),
+                    "url": config.url,
+                    "optional": true,
+                    "bounded": true
+                }),
             );
             append_ledger_event(
                 &config.run_dir,
@@ -2099,6 +2197,7 @@ pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
     let mut client = CdpClient::new(transport);
 
     client.enable_page()?;
+    let _ = install_console_capture(&mut client);
     let _ = client.bring_page_to_front();
     client.navigate(&config.url)?;
     std::thread::sleep(Duration::from_millis(300));
@@ -2310,6 +2409,41 @@ fn run_scenario<T: CdpTransport>(
         unix_millis()?,
         &frame_stats,
     )?;
+    let mut auxiliary_paths = Vec::new();
+    if let Ok(console_logs) = client.evaluate_json("window.__OUROFORGE_CONSOLE__ || []") {
+        let console_path = write_scenario_json_artifact(
+            config,
+            scenario,
+            &scenario_dir,
+            "console-log",
+            "console_log",
+            unix_millis()?,
+            &json!({
+                "bounded": true,
+                "limit": 100,
+                "logs": console_logs
+            }),
+        )?;
+        auxiliary_paths.push(console_path);
+    }
+    if let Ok(performance_metrics) = client
+        .enable_performance()
+        .and_then(|_| client.performance_metrics())
+    {
+        let performance_path = write_scenario_json_artifact(
+            config,
+            scenario,
+            &scenario_dir,
+            "performance-metrics",
+            "performance_metrics",
+            unix_millis()?,
+            &json!({
+                "bounded": true,
+                "metrics": performance_metrics
+            }),
+        )?;
+        auxiliary_paths.push(performance_path);
+    }
 
     let assertions = evaluate_scenario_assertions(scenario, &world_state, &frame_stats);
     for assertion in &assertions {
@@ -2363,6 +2497,7 @@ fn run_scenario<T: CdpTransport>(
             "frame_stats_path": frame_stats_path,
             "input_replay_paths": replay_paths.clone(),
             "snapshot_paths": snapshot_paths.clone(),
+            "auxiliary_paths": auxiliary_paths.clone(),
             "result_path": result_path
         }),
     )?;
@@ -2370,6 +2505,7 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(snapshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(frame_stats_path);
+    evidence_paths.extend(auxiliary_paths);
     Ok(ScenarioExecutionResult {
         passed,
         evidence_paths,
@@ -3982,6 +4118,38 @@ scenarios:
             event["payload"]["probe_call"] == "getFrameStats"
                 && event["payload"]["worker_id"] == "worker-1"
         }));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn captures_console_log_json_as_bounded_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-console-capture-test");
+        let config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8767")
+            .expect("config builds");
+        let mut client = CdpClient::new(RuntimeProbeTransport {
+            responses: std::collections::VecDeque::from(vec![json!({
+                "result": {
+                    "value": [
+                        { "level": "log", "text": "ready", "argCount": 1, "timestampMs": 1 }
+                    ]
+                }
+            })]),
+        });
+
+        let path = capture_console_log(&config, &mut client)
+            .expect("console captured")
+            .expect("console path returned");
+        let value = read_json_value(artifacts.run_dir.join(&path)).expect("console JSON reads");
+        assert_eq!(value[0]["text"], "ready");
+
+        let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
+        let console_artifact = artifacts_list
+            .iter()
+            .find(|artifact| artifact.metadata["artifact"] == "console_log")
+            .expect("console artifact indexed");
+        assert_eq!(console_artifact.metadata["bounded"], true);
+        assert_eq!(console_artifact.metadata["limit"], 100);
 
         fs::remove_dir_all(root).ok();
     }
