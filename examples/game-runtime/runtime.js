@@ -146,6 +146,9 @@
         offset: point(components.collider.offset),
         size: size(components.collider.size, normalized.components.size),
         sensor: Boolean(components.collider.sensor),
+        trigger: Boolean(components.collider.trigger),
+        collisionGroup: typeof components.collider.collisionGroup === 'string' ? components.collider.collisionGroup : null,
+        collisionMask: Array.isArray(components.collider.collisionMask) ? components.collider.collisionMask.map(String) : [],
       };
     }
     return normalized;
@@ -189,15 +192,19 @@
   function stepOne() {
     applyInput();
     animation.advanceAnimations(world.entities, 1);
-    for (const entity of world.entities) {
-      const transform = entity.components.transform;
-      const velocity = entity.components.velocity;
-      const size = entity.components.size;
-      transform.x = Math.max(0, Math.min(world.bounds.width - size.width, transform.x + velocity.x));
-      transform.y = Math.max(0, Math.min(world.bounds.height - size.height, transform.y + velocity.y));
-    }
     world.tick += 1;
-    world.collisions = collision.detectAabbCollisions(world.entities, world.tick);
+    if (typeof collision.stepAabbPhysics === 'function') {
+      world.collisions = collision.stepAabbPhysics(world.entities, world.bounds, world.tick).events;
+    } else {
+      for (const entity of world.entities) {
+        const transform = entity.components.transform;
+        const velocity = entity.components.velocity;
+        const size = entity.components.size;
+        transform.x = Math.max(0, Math.min(world.bounds.width - size.width, transform.x + velocity.x));
+        transform.y = Math.max(0, Math.min(world.bounds.height - size.height, transform.y + velocity.y));
+      }
+      world.collisions = collision.detectAabbCollisions(world.entities, world.tick);
+    }
     for (const event of world.collisions) record(event.type, event);
   }
 
