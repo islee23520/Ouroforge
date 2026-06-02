@@ -17,8 +17,8 @@ storage model.
 | Tracked source-like project files | project manifests, scenes, scenario packs, seeds, docs | only commands explicitly scoped to edit that source-like file may write it; generated outputs must not target it | Rust CLI validation owns writes |
 | Generated run evidence | `runs/<run-id>/run.json`, `evidence/index.json`, screenshots, probe outputs, verdicts, journals | command-owned generated paths may overwrite within the run directory when rebuilding that artifact is documented | Rust runtime owns writes; browser reads exports only |
 | Transaction artifacts | scene edit transaction JSON and scene-only mutation transaction output | valid distinct generated paths are allowed; paths that equal or alias the target scene are forbidden | Rust CLI/core owns writes |
-| Dashboard exports | `examples/evidence-dashboard/dashboard-data.json`, `.omx/tmp/.../dashboard-data.json`, project `dashboard-data/` | generated export paths may be overwritten intentionally; they must remain ignored/local unless fixture-scoped | Rust CLI exports, browser reads |
-| Comparison outputs | generated comparison JSON under run or requested output directories | generated comparison paths may be overwritten inside generated output roots; source-like targets require future protected checks | Rust core owns writes |
+| Dashboard exports | `examples/evidence-dashboard/dashboard-data.json`, `.omx/tmp/.../dashboard-data.json`, project `dashboard-data/` | generated export paths may be overwritten intentionally; source-like targets are rejected | Rust CLI exports, browser reads |
+| Comparison outputs | generated comparison JSON under run or requested output directories | generated comparison paths may be overwritten inside generated output roots; source-like output directories are rejected | Rust core owns writes |
 | Local runtime/tool state | `.omx/`, `.openchrome/`, `.omc/`, `.claude/`, `target/` | local and ignored; never source evidence by default | local tools/runtime only |
 | Deterministic fixtures | small checked-in seeds, scenes, docs, explicit test fixtures | tracked only when an issue explicitly scopes fixture changes | review-owned source |
 
@@ -31,16 +31,16 @@ storage model.
 | `scene edit` without `--transaction-output` | target scene path | edits the trusted scene file by explicit command contract | allowed source-like write |
 | `scene edit --transaction-output` | operator-provided transaction artifact path | rejects exact/canonical/symlink/hard-link scene aliases before writing; valid generated paths work | protected by #286; preserve |
 | `mutation apply-scene --transaction-output` | operator-provided transaction artifact path | rejects exact/canonical/same-file target scene aliases before writing; then applies validated scene edit | protected by #286; preserve |
-| `dashboard export --output` | operator-provided dashboard JSON path, default ignored dashboard data path | creates parent directories and overwrites dashboard export JSON | high-risk if redirected to source-like files; candidate for EF1.3.2 protected check |
-| `compare ... --output-dir` / comparison writer | requested output directory, often generated run/mutation directory | writes generated comparison artifact | candidate for EF1.3.2 if output dir can collide with protected source-like roots |
+| `dashboard export --output` | operator-provided dashboard JSON path, default ignored dashboard data path | creates parent directories and overwrites dashboard export JSON only after generated-output/source-like guard passes | protected from source-like redirection by EF1.3.2 |
+| `compare ... --output-dir` / comparison writer | requested output directory, often generated run/mutation directory | writes generated comparison artifact only after generated-output/source-like guard passes | protected from source-like output directories by EF1.3.2 |
 | patch draft / sandbox writers | generated mutation/sandbox paths | write inert preview/sandbox artifacts without modifying trusted main worktree | generated preview; preserve blocked source-apply boundary |
 | project scaffold writer | requested new scaffold destination | creates tracked-style project files plus scaffold `.gitignore` | allowed because command contract creates source-like project tree |
 | project/manifest validation | read-only | no writes | no change |
 
-EF1.3.1 is an audit/control PR and does not change behavior. EF1.3.2 owns any
-minimal code needed for forbidden source collisions identified above. EF1.3.3
-owns `.gitignore`, scaffold `.gitignore`, README, and generated-state policy
-reconciliation if drift is found.
+EF1.3.1 was the audit/control PR. EF1.3.2 added focused generated-output
+source-like collision checks for dashboard exports and comparison output
+directories. EF1.3.3 reconciles `.gitignore`, scaffold `.gitignore`, README,
+and generated-state policy drift without adding generated artifacts as source.
 
 ## Protected Source-like Collision Rule
 

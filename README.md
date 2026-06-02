@@ -97,7 +97,7 @@ For Engine Expansion v1 integration evidence, validate and run `seeds/engine-exp
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
 - `examples/authoring-cockpit` — static Studio v3 authoring cockpit prototype over exported run/project evidence and the minimal scene model.
-- `docs/` — architecture, roadmap, manifest/scaffold/scenario-pack/project-run/project-comparison/project-mutation contracts, public-readiness audit, and demo evidence notes.
+- `docs/` — architecture, roadmap, manifest/scaffold/scenario-pack/project-run/project-comparison/project-mutation contracts, artifact write policy, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 
@@ -106,10 +106,13 @@ Do not commit generated or local runtime/tool state:
 - `runs/`
 - `target/`
 - `examples/evidence-dashboard/dashboard-data.json`
+- `dashboard-data/`
 - `.claude/`
 - `.openchrome/`
 - `.omc/`
 - `.omx/`
+
+See `docs/artifact-write-policy-v1.md` for the trusted artifact write categories and generated-output/source-like collision policy.
 
 ## Maturity boundaries
 

@@ -15052,6 +15052,22 @@ scenarios:
     }
 
     #[test]
+    fn generated_state_policy_allows_dashboard_data_and_local_tool_roots() {
+        for root in [
+            "runs/run-1/output.json",
+            "target/debug/output.json",
+            "dashboard-data/dashboard-data.json",
+            ".openchrome/session.json",
+            ".omc/state.json",
+            ".omx/tmp/output.json",
+            ".claude/local.json",
+        ] {
+            reject_generated_artifact_source_collision(Path::new(root), "generated state")
+                .unwrap_or_else(|error| panic!("{root} should be generated/local: {error:#}"));
+        }
+    }
+
+    #[test]
     fn artifact_write_policy_allows_generated_output_targets() {
         reject_generated_artifact_source_collision(
             Path::new("runs/run-1/dashboard-data.json"),
