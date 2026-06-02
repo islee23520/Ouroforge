@@ -31,3 +31,8 @@ owns local color frames plus a fixed `frameDuration`, and the browser runtime
 advances the current frame strictly by fixed simulation ticks. This keeps the
 state probe-observable without timelines, skeletal rigs, graphs, editor tooling,
 or asset import complexity.
+Audio v1 is evidence-first: scene entities may declare named `scene_loaded`
+audio events, and automated QA verifies the emitted event log in
+`getWorldState().audioEvents`. Speaker output and browser playback are not
+required for acceptance, and no mixer, DSP, timeline, streaming, or audio engine
+subsystem is introduced.

@@ -58,6 +58,14 @@
               "color": "#0f766e"
             }
           ]
+        },
+        "audio": {
+          "events": [
+            {
+              "name": "player_spawn",
+              "trigger": "scene_loaded"
+            }
+          ]
         }
       },
       "tags": [

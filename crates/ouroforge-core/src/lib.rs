@@ -2410,6 +2410,8 @@ pub struct SceneComponents {
     pub collider: Option<SceneCollider>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animation: Option<SceneAnimation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<SceneAudio>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -2455,6 +2457,21 @@ pub struct SceneAnimation {
 #[serde(deny_unknown_fields)]
 pub struct SceneAnimationFrame {
     pub color: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAudio {
+    pub events: Vec<SceneAudioEvent>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAudioEvent {
+    pub name: String,
+    pub trigger: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2533,6 +2550,9 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         if let Some(animation) = &entity.components.animation {
             validate_scene_animation(&entity.id, animation)?;
         }
+        if let Some(audio) = &entity.components.audio {
+            validate_scene_audio(&entity.id, audio)?;
+        }
         validate_scene_tags(&entity.id, &entity.tags)?;
         validate_scene_metadata(
             &format!("scene entity {} metadata", entity.id),
@@ -2581,6 +2601,36 @@ fn validate_scene_animation(entity_id: &str, animation: &SceneAnimation) -> Resu
         validate_scene_color(&frame.color).with_context(|| {
             format!("scene entity {entity_id} animation frame color is invalid")
         })?;
+    }
+    Ok(())
+}
+
+fn validate_scene_audio(entity_id: &str, audio: &SceneAudio) -> Result<()> {
+    if audio.events.is_empty() {
+        return Err(anyhow!(
+            "scene entity {entity_id} audio events must not be empty"
+        ));
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for event in &audio.events {
+        validate_path_component(
+            &format!("scene entity {entity_id} audio event name"),
+            &event.name,
+        )?;
+        if !names.insert(event.name.clone()) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} audio event: {}",
+                event.name
+            ));
+        }
+        if event.trigger != "scene_loaded" {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio trigger must be scene_loaded"
+            ));
+        }
+        if let Some(asset) = &event.asset {
+            validate_scene_local_asset_path("scene audio asset", asset)?;
+        }
     }
     Ok(())
 }
@@ -4233,6 +4283,15 @@ scenarios:
                                 { "color": "#5eead4" },
                                 { "color": "#2dd4bf" }
                             ]
+                        },
+                        "audio": {
+                            "events": [
+                                {
+                                    "name": "player_spawn",
+                                    "trigger": "scene_loaded",
+                                    "asset": "assets/audio/player_spawn.ogg"
+                                }
+                            ]
                         }
                     },
                     "tags": ["player", "spawn"],
@@ -4270,6 +4329,9 @@ scenarios:
         assert_eq!(animation.mode, "sprite_frame");
         assert_eq!(animation.frame_duration, 2);
         assert_eq!(animation.frames.len(), 2);
+        let audio = scene.entities[0].components.audio.as_ref().unwrap();
+        assert_eq!(audio.events[0].name, "player_spawn");
+        assert_eq!(audio.events[0].trigger, "scene_loaded");
     }
 
     #[test]
@@ -4489,6 +4551,67 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("animation frameDuration must be greater than 0"));
+
+        let future_audio_trigger = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "audio": {
+                            "events": [
+                                { "name": "jump", "trigger": "collision_enter" }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("audio trigger fixture parses");
+        let rejected =
+            validate_scene(&future_audio_trigger).expect_err("future audio trigger rejected");
+        assert!(rejected
+            .to_string()
+            .contains("audio trigger must be scene_loaded"));
+
+        let remote_audio_asset = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "audio": {
+                            "events": [
+                                {
+                                    "name": "jump",
+                                    "trigger": "scene_loaded",
+                                    "asset": "https://example.com/jump.ogg"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("remote audio asset fixture parses");
+        let rejected = validate_scene(&remote_audio_asset).expect_err("remote audio rejected");
+        assert!(rejected
+            .to_string()
+            .contains("must be a local static asset path"));
     }
 
     #[test]

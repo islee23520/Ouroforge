@@ -53,6 +53,7 @@
     entities: clone(defaultScene.entities),
     metadata: clone(defaultScene.metadata),
     collisions: [],
+    audioEvents: [],
   };
 
   function clone(value) {
@@ -104,6 +105,13 @@
       metadata: objectValue(entity.metadata),
     };
     if (typeof sprite.asset === 'string') normalized.sprite.asset = sprite.asset;
+    if (components.audio && Array.isArray(components.audio.events)) {
+      normalized.components.audio = {
+        events: components.audio.events
+          .filter((event) => event && event.trigger === 'scene_loaded' && typeof event.name === 'string')
+          .map((event) => ({ name: event.name, trigger: event.trigger, asset: event.asset })),
+      };
+    }
     const normalizedAnimation = animation.normalizeAnimation(components.animation);
     if (normalizedAnimation) normalized.components.animation = normalizedAnimation;
     if (components.collider) {
@@ -129,6 +137,26 @@
       metadata: objectValue(scene.metadata),
       entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
     };
+  }
+
+
+  function emitAudioEvents(trigger) {
+    for (const entity of world.entities) {
+      const audio = entity.components.audio;
+      const audioEvents = audio && Array.isArray(audio.events) ? audio.events : [];
+      for (const event of audioEvents) {
+        if (event.trigger !== trigger) continue;
+        const emitted = {
+          tick: world.tick,
+          name: event.name,
+          trigger,
+          entityId: entity.id,
+          asset: event.asset || null,
+        };
+        world.audioEvents.push(emitted);
+        record('runtime.audio.emitted', emitted);
+      }
+    }
   }
 
   function applyInput() {
@@ -192,6 +220,7 @@
     world.entities = clone(normalized.entities);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
+    world.audioEvents = [];
     world.tick = 0;
     const assetMetadata = assets.load(world.entities);
     record('runtime.scene.loaded', {
@@ -200,6 +229,7 @@
       entityCount: world.entities.length,
       assetCount: assetMetadata.length,
     });
+    emitAudioEvents('scene_loaded');
     renderDebug();
     return api.getWorldState();
   }

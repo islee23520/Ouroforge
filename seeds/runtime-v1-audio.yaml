@@ -1,0 +1,28 @@
+id: runtime-v1.audio
+title: Runtime v1 Audio Event Seed
+goal: Emit deterministic audio events and verify them through probe evidence without relying on speaker output.
+constraints:
+  target: game-runtime
+acceptance:
+  - The player scene entity declares a named scene_loaded audio event.
+  - Runtime emits the audio event into world-state evidence.
+  - Automated verification checks event evidence only and never depends on speaker output.
+scenarios:
+  - id: scene-loaded-audio-event
+    description: Load the runtime scene and assert the player_spawn audio event is present in probe state.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - world_state:
+          path: audioEvents.0.trigger
+          equals: scene_loaded
+      - world_state:
+          path: audioEvents.0.entityId
+          equals: player
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
