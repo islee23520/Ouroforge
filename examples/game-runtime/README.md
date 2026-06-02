@@ -16,3 +16,6 @@ exposes the normalized schema v1 scene for evidence capture.
 Runtime v1 collision detection is intentionally minimal: axis-aligned collider
 declarations marked `dynamic` or `static` produce deterministic collision events
 in `getEvents()` and the current `collisions` list in `getWorldState()`.
+Snapshot/restore is in-memory only: `snapshot()` returns a local snapshot ID and
+`restore(snapshotId)` restores cloned deterministic world, input, and event state
+for QA branching without browser storage or save-game semantics.

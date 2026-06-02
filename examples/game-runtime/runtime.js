@@ -3,6 +3,14 @@
   const input = { left: false, right: false, up: false, down: false };
   const events = [];
   const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
+  const snapshots = (window.OuroforgeSnapshots || {
+    createSnapshotRegistry: () => ({
+      capture: () => 'snapshot-unavailable',
+      restore: () => { throw new Error('snapshot registry unavailable'); },
+      metadata: () => null,
+      list: () => [],
+    }),
+  }).createSnapshotRegistry();
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -192,15 +200,18 @@
   }
 
   function snapshot() {
-    return clone({ world, input, events });
+    const snapshotId = snapshots.capture({ world, input, events }, world.tick);
+    record('runtime.snapshot.captured', { snapshotId, tick: world.tick });
+    renderDebug();
+    return { snapshotId, metadata: snapshots.metadata(snapshotId) };
   }
 
-  function restore(snapshotValue) {
-    if (!snapshotValue || typeof snapshotValue !== 'object') throw new Error('snapshot object is required');
+  function restore(snapshotId) {
+    const snapshotValue = snapshots.restore(snapshotId);
     Object.assign(world, clone(snapshotValue.world || world));
     Object.assign(input, clone(snapshotValue.input || input));
     events.splice(0, events.length, ...clone(snapshotValue.events || []));
-    record('runtime.restored');
+    record('runtime.snapshot.restored', { snapshotId, tick: world.tick });
     renderDebug();
     return api.getWorldState();
   }
@@ -209,6 +220,7 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      state.snapshots = snapshots.list();
       const currentPlayer = player();
       state.object = {
         id: currentPlayer.id,
