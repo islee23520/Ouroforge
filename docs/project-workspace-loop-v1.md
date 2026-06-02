@@ -198,3 +198,20 @@ Issue closure is allowed only after all fixed PR units are merged, post-merge
 verification passes on latest `main`, generated state remains untracked, #1 and
 #23 are checked, and the final issue comment records DoD/guardrail/drift audit
 evidence.
+
+## Roadmap governance handoff
+
+After Project Workspace Loop v1 implementation, the top-level governance state is:
+
+- #1 remains open as the broad vision and evidence-native implementation-roadmap
+  anchor. This milestone does not close or replace it.
+- #23 remains open and untouched as repo-memory/design context.
+- `docs/roadmap.md` records the completed milestone surfaces and conservative
+  non-goals after Project Workspace Loop v1.
+- Future work that would change native export, plugin runtime, hosted/cloud,
+  browser trusted writes, public launch, production editor, or Godot-replacement
+  boundaries requires a separate explicit governance issue before implementation.
+
+The implementation handoff for #253 should comment on #1 with the completed
+milestone summary and this decision. Closing or replacing #1 remains out of
+scope unless maintainers approve a separate replacement source of truth.
