@@ -2549,6 +2549,8 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
     result
 }
 
+const RUNTIME_PROBE_CONTRACT_NAME: &str = "ouroforge-runtime-probe";
+const RUNTIME_PROBE_CONTRACT_VERSION: &str = "v2";
 const RUNTIME_PROBE_MAX_ATTEMPTS: u32 = 20;
 const RUNTIME_PROBE_RETRY_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -2639,7 +2641,11 @@ fn capture_runtime_probe_value<T: CdpTransport>(
         json!({
             "worker_id": config.worker_id.as_str(),
             "url": config.url,
-            "probe_call": call_name
+            "probe_call": call_name,
+            "probe_contract": {
+                "name": RUNTIME_PROBE_CONTRACT_NAME,
+                "version": RUNTIME_PROBE_CONTRACT_VERSION
+            }
         }),
     )?;
     append_ledger_event(
@@ -2650,7 +2656,11 @@ fn capture_runtime_probe_value<T: CdpTransport>(
             "worker_id": config.worker_id.as_str(),
             "url": config.url,
             "probe_call": call_name,
-            "path": rel_path
+            "path": rel_path,
+            "probe_contract": {
+                "name": RUNTIME_PROBE_CONTRACT_NAME,
+                "version": RUNTIME_PROBE_CONTRACT_VERSION
+            }
         }),
     )?;
     Ok(())
@@ -12323,6 +12333,8 @@ scenarios:
         assert!(artifacts_list.iter().all(|artifact| {
             artifact.path.starts_with("evidence/workers/worker-1/")
                 && artifact.metadata["worker_id"] == "worker-1"
+                && artifact.metadata["probe_contract"]["name"] == RUNTIME_PROBE_CONTRACT_NAME
+                && artifact.metadata["probe_contract"]["version"] == RUNTIME_PROBE_CONTRACT_VERSION
         }));
 
         let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
@@ -12334,10 +12346,12 @@ scenarios:
         assert!(probe_events.iter().any(|event| {
             event["payload"]["probe_call"] == "getWorldState"
                 && event["payload"]["worker_id"] == "worker-1"
+                && event["payload"]["probe_contract"]["version"] == RUNTIME_PROBE_CONTRACT_VERSION
         }));
         assert!(probe_events.iter().any(|event| {
             event["payload"]["probe_call"] == "getFrameStats"
                 && event["payload"]["worker_id"] == "worker-1"
+                && event["payload"]["probe_contract"]["version"] == RUNTIME_PROBE_CONTRACT_VERSION
         }));
 
         fs::remove_dir_all(root).ok();
