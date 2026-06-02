@@ -1,6 +1,6 @@
-# Studio v2 Authoring Cockpit
+# Studio v3 Project Workspace Cockpit
 
-Static local browser UI for composing Authoring Loop v2 surfaces: scene edit command generation, transaction provenance, QA evidence inspection, journal viewing, semantic run comparison, scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
+Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -27,32 +27,39 @@ All other scene fields remain read-only in the cockpit and are rejected by the
 Rust `ouroforge scene edit` command.
 
 
-## Studio v2 demo surfaces
+## Studio v3 demo surfaces
 
 The cockpit composes completed local surfaces only:
 
+- project workspace manifest/scene/seed/scenario pack context from generated dashboard data;
+- project-bound run summary and generated-state status;
 - run/evidence browser from generated dashboard data;
 - journal viewer when journal data exists;
 - mutation review lifecycle state and manual command hints when artifacts exist;
-- scene-only mutation proposal/application lifecycle state when artifacts exist;
+- project-scoped scene-only mutation proposal/application lifecycle state when artifacts exist;
 - replay evidence surface when replay artifacts exist;
 - live preview controls through the existing runtime probe;
 - scene edit command generation for Rust-validated fields;
 - transaction-bound QA command generation;
 - semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist.
 
-Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, or mutation acceptance from the browser. Studio v2 verification evidence is recorded in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
+Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, command bridge, or mutation acceptance/application from the browser. Studio v3 verification evidence is recorded in `../../docs/studio-v3-project-workspace-cockpit.md`; Studio v2 evidence remains in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
 
 ## QA and evidence loop
 
-The cockpit includes a Run QA panel with local display-only commands:
+The cockpit includes Run QA and project workspace panels with local display-only commands:
 
 ```bash
-cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
-cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+cargo run -p ouroforge-cli -- project validate <project>/ouroforge.project.json
+cargo run -p ouroforge-cli -- run <project>/seeds/platformer.yaml \
+  --project <project>/ouroforge.project.json \
+  --scenario-pack <pack-id> \
+  --workers 4
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs \
+  --output examples/evidence-dashboard/dashboard-data.json
 ```
 
-After exporting dashboard data, refresh the cockpit to view the latest run evidence, authoring provenance, semantic comparison, scene-only mutation lifecycle, and journal panes. The browser still does not mutate files directly.
+After exporting dashboard data, refresh the cockpit to view project workspace context, latest project-bound run evidence, authoring provenance, semantic project comparison, project-scoped scene-only mutation lifecycle, and journal panes. The browser still does not execute commands or mutate files directly.
 
 ## Live preview controls
 
@@ -75,7 +82,7 @@ cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
 ```
 
 
-## Studio v2 command boundary
+## Studio v3 command boundary
 
 Engine Expansion v1 integration-demo inspection:
 
@@ -87,9 +94,9 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 ```
 
 Then open <http://127.0.0.1:8000/examples/authoring-cockpit/> to inspect the
-static scene/entity/component view, Engine Expansion state panel, and copyable
-Rust validation/reload/dashboard commands. The cockpit inspects the same
-`examples/game-runtime/scene.json` used by the integration seed; it does not run
-the seed, compare runs, persist edits, or write files from browser JavaScript.
+static scene/entity/component view, Engine Expansion state panel, project
+workspace panels, and copyable Rust validation/run/compare/mutation/dashboard
+commands. The cockpit inspects exported data; it does not run seeds, compare
+runs, persist edits, apply mutations, or write files from browser JavaScript.
 
-The authoring cockpit is a static, local preview surface. It may display copyable Rust CLI commands such as `cargo run -p ouroforge-cli -- scene validate`, `scene edit`, `scene reload-validate`, and dashboard export commands, but it must not execute them from browser JavaScript. Persistent scene changes remain routed through Rust validation in the CLI. Browser-owned persistence APIs such as localStorage, indexedDB, showSaveFilePicker, direct file writes, native shell calls, hosted backends, auth, database, plugin UI, and visual scripting are outside this demo boundary.
+The authoring cockpit is a static, local preview surface. It may display copyable Rust CLI commands such as `cargo run -p ouroforge-cli -- project validate`, `run --project`, `compare`, `scene validate`, `scene edit`, `scene reload-validate`, `mutation apply-scene --project`, and dashboard export commands, but it must not execute them from browser JavaScript. Persistent scene changes remain routed through Rust validation in the CLI. Browser-owned persistence APIs such as localStorage, indexedDB, showSaveFilePicker, direct file writes, native shell calls, hosted backends, auth, database, command bridges, auto-apply/auto-merge, plugin UI, and visual scripting are outside this demo boundary.
