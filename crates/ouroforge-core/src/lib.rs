@@ -2730,12 +2730,21 @@ fn run_id_from_run_dir(run_dir: &Path) -> String {
         .to_string()
 }
 
+fn browser_worker_effective_target_binding(config: &BrowserSmokeConfig) -> String {
+    if config.target_ws_url.is_some() {
+        "direct_websocket_url".to_string()
+    } else {
+        config.target_selection.label()
+    }
+}
+
 fn browser_worker_evidence_metadata(
     config: &BrowserSmokeConfig,
     artifact: &str,
     extra: serde_json::Value,
 ) -> serde_json::Value {
     let run_id = run_id_from_run_dir(&config.run_dir);
+    let target_binding = browser_worker_effective_target_binding(config);
     let mut metadata = json!({
         "artifact": artifact,
         "worker_id": config.worker_id.as_str(),
@@ -2745,7 +2754,9 @@ fn browser_worker_evidence_metadata(
         "evidence_dir": config.worker_id.evidence_dir(),
         "execution_boundary": "openchrome_cdp",
         "cdp_transport": "chrome_devtools_protocol",
-        "target_selection": config.target_selection.label(),
+        "target_binding": target_binding.clone(),
+        "target_selection": target_binding,
+        "configured_target_selection": config.target_selection.label(),
         "target_ws_url_bound": config.target_ws_url.is_some()
     });
     merge_json_object(&mut metadata, extra);
@@ -2779,6 +2790,7 @@ fn write_browser_worker_failure_artifact(
             )
         },
     )?;
+    let target_binding = browser_worker_effective_target_binding(config);
     let failure = json!({
         "artifact": "browser_worker_failure",
         "worker_id": config.worker_id.as_str(),
@@ -2790,7 +2802,9 @@ fn write_browser_worker_failure_artifact(
         "debugging_http_url": config.debugging_http_url,
         "execution_boundary": "openchrome_cdp",
         "cdp_transport": "chrome_devtools_protocol",
-        "target_selection": config.target_selection.label(),
+        "target_binding": target_binding.clone(),
+        "target_selection": target_binding,
+        "configured_target_selection": config.target_selection.label(),
         "target_ws_url_bound": config.target_ws_url.is_some(),
         "bounded": true
     });
@@ -13308,10 +13322,34 @@ scenarios:
         assert_eq!(metadata["evidence_dir"], "evidence/workers/worker-7");
         assert_eq!(metadata["execution_boundary"], "openchrome_cdp");
         assert_eq!(metadata["cdp_transport"], "chrome_devtools_protocol");
-        assert_eq!(metadata["target_selection"], "target_id:fixture-page");
+        assert_eq!(metadata["target_binding"], "direct_websocket_url");
+        assert_eq!(metadata["target_selection"], "direct_websocket_url");
+        assert_eq!(
+            metadata["configured_target_selection"],
+            "target_id:fixture-page"
+        );
         assert_eq!(metadata["target_ws_url_bound"], true);
         assert_eq!(metadata["bounded"], true);
         assert_eq!(metadata["limit"], 100);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn browser_worker_evidence_metadata_preserves_selected_target_without_direct_ws() {
+        let (root, artifacts) = create_test_run("browser-worker-evidence-target-selection-test");
+        let mut config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8765")
+            .expect("config builds");
+        config.target_selection = CdpTargetSelection::target_id("fixture-page").expect("target id");
+
+        let metadata = browser_worker_evidence_metadata(&config, "console_log", json!({}));
+
+        assert_eq!(metadata["target_binding"], "target_id:fixture-page");
+        assert_eq!(metadata["target_selection"], "target_id:fixture-page");
+        assert_eq!(
+            metadata["configured_target_selection"],
+            "target_id:fixture-page"
+        );
+        assert_eq!(metadata["target_ws_url_bound"], false);
         fs::remove_dir_all(root).ok();
     }
 
@@ -15466,6 +15504,43 @@ scenarios:
                 && event["payload"]["phase"] == "worker_run"
                 && event["payload"]["failure_path"] == failure.path
         }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn browser_worker_failure_metadata_records_direct_ws_binding() {
+        let (root, artifacts) = create_test_run("ouroforge-browser-worker-direct-ws-failure-test");
+        let mut config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8765")
+            .expect("config builds");
+        config.target_ws_url = Some("ws://127.0.0.1:9222/devtools/page/fixture".to_string());
+        config.target_selection = CdpTargetSelection::target_id("stale-page").expect("target id");
+
+        let failure_path =
+            write_browser_worker_failure_artifact(&config, "worker_run", "fixture error")
+                .expect("failure artifact written");
+        let failure_value =
+            read_json_value(artifacts.run_dir.join(failure_path)).expect("failure artifact reads");
+        assert_eq!(failure_value["target_binding"], "direct_websocket_url");
+        assert_eq!(failure_value["target_selection"], "direct_websocket_url");
+        assert_eq!(
+            failure_value["configured_target_selection"],
+            "target_id:stale-page"
+        );
+        assert_eq!(failure_value["target_ws_url_bound"], true);
+
+        let index = read_evidence_index(&artifacts.run_dir).expect("evidence index reads");
+        let failure = index
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.metadata["artifact"] == "browser_worker_failure")
+            .expect("failure artifact indexed");
+        assert_eq!(failure.metadata["target_binding"], "direct_websocket_url");
+        assert_eq!(failure.metadata["target_selection"], "direct_websocket_url");
+        assert_eq!(
+            failure.metadata["configured_target_selection"],
+            "target_id:stale-page"
+        );
+        assert_eq!(failure.metadata["target_ws_url_bound"], true);
         fs::remove_dir_all(root).ok();
     }
 
