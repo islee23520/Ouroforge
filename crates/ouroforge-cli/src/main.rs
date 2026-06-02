@@ -8,12 +8,12 @@ use ouroforge_core::{
     hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
     orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
-    read_scene, run_browser_smoke, run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path,
-    run_scenarios, show_journal, update_journal, validate_scene_reload,
-    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState, ProjectManifest,
-    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    WorkerId,
+    read_scene, reject_transaction_output_target_collision, run_browser_smoke,
+    run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    update_journal, validate_scene_reload, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewState, ProjectManifest, ProjectSceneMutationContext,
+    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -665,16 +665,7 @@ fn main() -> Result<()> {
                 value,
             };
             if let Some(output_path) = transaction_output {
-                let same_path = match (output_path.canonicalize(), scene_path.canonicalize()) {
-                    (Ok(a), Ok(b)) => a == b,
-                    _ => output_path == scene_path,
-                };
-                if same_path {
-                    return Err(anyhow!(
-                        "--transaction-output must not equal the scene path {}",
-                        scene_path.display()
-                    ));
-                }
+                reject_transaction_output_target_collision(&output_path, &scene_path)?;
                 let transaction = preview_scene_edit_transaction(&scene_path, edit.clone())?;
                 write_scene_edit_transaction_artifact(&output_path, &transaction)?;
                 if transaction.validation_result.status != "passed" {

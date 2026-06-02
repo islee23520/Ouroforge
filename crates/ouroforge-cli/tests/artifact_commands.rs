@@ -275,6 +275,149 @@ fn scene_edit_transaction_output_records_success_and_failure() {
 }
 
 #[test]
+fn scene_edit_transaction_output_rejects_exact_scene_path_without_writing() {
+    let temp = unique_temp_dir("ouroforge-cli-scene-transaction-exact-collision");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let scene_path = temp.join("scene.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+    let failure = run_cli_expect_failure(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "96",
+            "--transaction-output",
+            scene_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(
+        failure.contains("transaction output must not equal target scene path"),
+        "{failure}"
+    );
+    assert_eq!(
+        fs::read_to_string(&scene_path).expect("scene after reads"),
+        before_contents,
+        "exact output rejection must not corrupt the trusted scene"
+    );
+    serde_json::from_str::<serde_json::Value>(&before_contents).expect("scene remains parseable");
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn scene_edit_transaction_output_rejects_hard_link_scene_alias_without_writing() {
+    let temp = unique_temp_dir("ouroforge-cli-scene-transaction-hardlink-collision");
+    fs::create_dir_all(temp.join("transactions")).expect("temp dirs exist");
+    let scene_path = temp.join("scene.json");
+    let hard_link_path = temp.join("transactions/scene-hardlink.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    fs::hard_link(&scene_path, &hard_link_path).expect("hard link to scene can be created");
+    let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+    let failure = run_cli_expect_failure(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "96",
+            "--transaction-output",
+            hard_link_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(
+        failure.contains("transaction output must not equal target scene path"),
+        "{failure}"
+    );
+    assert_eq!(
+        fs::read_to_string(&scene_path).expect("scene after reads"),
+        before_contents,
+        "hard-link output rejection must not corrupt the trusted scene"
+    );
+    assert_eq!(
+        fs::read_to_string(&hard_link_path).expect("hard link after reads"),
+        before_contents,
+        "rejection must happen before writing the transaction artifact"
+    );
+    serde_json::from_str::<serde_json::Value>(&before_contents).expect("scene remains parseable");
+    fs::remove_dir_all(temp).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn scene_edit_transaction_output_rejects_symlink_scene_alias_without_writing() {
+    use std::os::unix::fs::symlink;
+
+    let temp = unique_temp_dir("ouroforge-cli-scene-transaction-symlink-collision");
+    fs::create_dir_all(temp.join("transactions")).expect("temp dirs exist");
+    let scene_path = temp.join("scene.json");
+    let symlink_path = temp.join("transactions/scene-symlink.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    symlink(&scene_path, &symlink_path).expect("symlink to scene can be created");
+    let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+    let failure = run_cli_expect_failure(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "96",
+            "--transaction-output",
+            symlink_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(
+        failure.contains("transaction output must not equal target scene path"),
+        "{failure}"
+    );
+    assert_eq!(
+        fs::read_to_string(&scene_path).expect("scene after reads"),
+        before_contents,
+        "symlink output rejection must not corrupt the trusted scene"
+    );
+    assert_eq!(
+        fs::read_to_string(&symlink_path).expect("symlink after reads"),
+        before_contents,
+        "rejection must happen before writing the transaction artifact"
+    );
+    serde_json::from_str::<serde_json::Value>(&before_contents).expect("scene remains parseable");
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn run_command_binds_validated_project_metadata_and_preflights_invalid_projects() {
     let temp = unique_temp_dir("ouroforge-cli-project-run-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
