@@ -14,6 +14,21 @@ Then open <http://127.0.0.1:8000/examples/evidence-dashboard/>. The UI only
 reads `dashboard-data.json` and links to artifact paths; it does not edit,
 delete, upload, or index run artifacts outside the generated export.
 
+
+Engine Expansion v1 playable-template inspection:
+
+```bash
+cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+LATEST_RUN=$(ls -td runs/run-* | head -1)
+cargo run -p ouroforge-cli -- compare "$LATEST_RUN" "$LATEST_RUN"
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+```
+
+Refresh the dashboard after export to inspect the platformer template run, its
+2 scenario results, linked world-state/fixture evidence, verdict, journal, and
+read-only comparison artifact. Generated `runs/` and `dashboard-data.json`
+remain local inspection state and must not be committed.
+
 Runtime v1 demo inspection:
 
 ```bash

@@ -44,6 +44,7 @@ Inspect a run:
 cargo run -p ouroforge-cli -- evidence list runs/<run-id>
 cargo run -p ouroforge-cli -- journal show runs/<run-id>
 cargo run -p ouroforge-cli -- mutation list runs/<run-id>
+cargo run -p ouroforge-cli -- compare runs/<run-id> runs/<run-id>
 ```
 
 Export dashboard data and serve the static UI:
@@ -59,7 +60,7 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
-Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`. Studio v1 composition evidence is recorded in `docs/studio-v1-demo.md`.
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. The Engine Expansion v1 playable template is `examples/game-runtime/scene.json` plus `seeds/platformer.yaml`; run it with `--workers 4`, export the dashboard data, and compare the generated run to itself when checking dashboard/compare compatibility. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`. Studio v1 composition evidence is recorded in `docs/studio-v1-demo.md`.
 
 ## Verification
 
@@ -75,7 +76,7 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. The dashboard comparison panel is read-only: it displays existing comparison artifacts and evidence links without computing browser-side comparisons, mutating runs, accepting mutations, or generating AI summaries. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
+For Engine Expansion v1 template evidence, run `cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4`, export dashboard data, run `cargo run -p ouroforge-cli -- compare runs/<run-id> runs/<run-id>`, and record the generated run id plus comparison artifact. For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. The dashboard comparison panel is read-only: it displays existing comparison artifacts and evidence links without computing browser-side comparisons, mutating runs, accepting mutations, or generating AI summaries. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
 
 ## Repository map
 

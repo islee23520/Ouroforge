@@ -179,8 +179,10 @@ out of bounds.
 ### #167 — Playable Game Template v1
 
 Adds a playable template proving the completed Engine Expansion v1 runtime path.
-It must not be used to hide missing feature implementation, public launch work,
-production claims, or compatibility promises.
+The template is inspected through `seeds/platformer.yaml`, generated `runs/` evidence,
+dashboard export, and the read-only compare command. It must not be used to hide
+missing feature implementation, public launch work, production claims, or
+compatibility promises.
 
 ### #168 — Native Export Design Gate
 

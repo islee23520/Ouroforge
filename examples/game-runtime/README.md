@@ -60,7 +60,11 @@ Run and inspect it with:
 ```bash
 cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene.json
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+LATEST_RUN=$(ls -td runs/run-* | head -1)
+cargo run -p ouroforge-cli -- compare "$LATEST_RUN" "$LATEST_RUN"
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 ```
+
+The template seed has two scenarios: `bootstrap-smoke` checks renderer/tilemap/assets/animation/audio/composition/default observability, and `objective-contact` checks goal trigger plus wall contact evidence. Dashboard and compare surfaces are inspect-only: they read generated artifacts and do not mutate runs, execute browser-side comparisons, or infer semantic game quality.
 
 Known gaps are deliberate: one screen only, no enemy AI, no campaign, no native export, no plugin system, no marketplace assets, no multiplayer, no monetization/publishing workflow, and no production/public-launch claim. Generated `runs/` evidence remains local and untracked.
