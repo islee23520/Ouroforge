@@ -28,3 +28,8 @@ screenshots, Runtime v1 scenario evidence, and mutation artifacts when present.
 Journal Viewer v1 renders journal sections as escaped text and links referenced
 evidence, verdict, and mutation ids from the generated dashboard data. It does
 not edit journals, execute markdown, or generate AI summaries.
+
+Mutation Review UI v1 renders mutation lifecycle artifacts and manual review
+command hints as escaped, copyable text. It does not apply patches, write
+accepted/rejected decisions, run Git operations, or call GitHub from the
+browser.

@@ -1,6 +1,10 @@
 const OuroforgeDashboard = (() => {
   function statusClass(status) {
-    return `status status-${String(status || 'unknown').toLowerCase()}`;
+    const safeStatus = String(status || 'unknown')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'unknown';
+    return `status status-${safeStatus}`;
   }
 
   function artifactHref(artifact, run) {
@@ -157,6 +161,38 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderMutationLifecycle(run) {
+    const lifecycle = run?.mutation_lifecycle;
+    if (!lifecycle) {
+      return `<section class="panel"><h3>Mutation Review</h3><p class="empty-state">No mutation lifecycle read model is available. Export dashboard data with the latest Rust CLI.</p></section>`;
+    }
+    const stages = Array.isArray(lifecycle.stages) ? lifecycle.stages : [];
+    const stageCards = stages.length ? stages.map((stage) => `<article class="lifecycle-card">
+      <div class="journal-entry-header">
+        <h4>${escapeText(stage.label || stage.id)}</h4>
+        <span class="${statusClass(stage.state)}">${escapeText(stage.state || 'missing')}</span>
+      </div>
+      <div class="run-meta">${escapeText(stage.artifact_path || 'No artifact path')}</div>
+      <div class="run-meta">${escapeText(stage.record_count ?? 0)} record(s)</div>
+      ${stage.read_error ? `<div class="artifact-warning">${escapeText(stage.read_error)}</div>` : ''}
+      ${renderRefLinks('Evidence refs', stage.evidence_refs, run)}
+      ${Array.isArray(stage.records) && stage.records.length ? `<pre>${escapeText(JSON.stringify(stage.records, null, 2))}</pre>` : '<p class="empty-state compact">No lifecycle records for this stage.</p>'}
+    </article>`).join('') : '<p class="empty-state">No mutation lifecycle stages are available.</p>';
+    const hints = Array.isArray(lifecycle.command_hints) && lifecycle.command_hints.length
+      ? `<div class="command-list">${lifecycle.command_hints.map((hint) => `<code>${escapeText(hint)}</code>`).join('')}</div>`
+      : '<p class="empty-state compact">No manual review command hints are available until patch drafts exist.</p>';
+    return `<section class="panel">
+      <h3>Mutation Review</h3>
+      <p class="run-meta">Inspect-only. Browser UI does not apply patches, write review decisions, run Git, or call GitHub.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Lifecycle state</div><div class="card-value"><span class="${statusClass(lifecycle.terminal_state)}">${escapeText(lifecycle.terminal_state || 'missing')}</span></div></div>
+        <div class="card"><div class="card-label">Stages</div><div class="card-value">${escapeText(stages.length)}</div></div>
+      </div>
+      <section class="panel"><h4>Manual review command hints</h4>${hints}</section>
+      <div class="lifecycle-grid">${stageCards}</div>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
@@ -177,6 +213,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderJournalViewer(run)}
+      ${renderMutationLifecycle(run)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
       ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
       ${renderArtifacts('Frame/performance metrics', artifacts(run.frame_metrics, run.performance_metrics), run, renderJsonArtifact)}
@@ -214,7 +251,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, init, renderCategorySummary, renderJournalViewer, renderRunDetail, renderRunList, runRelativeHref, statusClass, summarizeRun };
+  return { artifactHref, init, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderRunDetail, renderRunList, runRelativeHref, statusClass, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

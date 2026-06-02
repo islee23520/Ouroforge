@@ -38,6 +38,10 @@ h1,h2,h3,h4 { margin:0; }
 .journal-entry-list { display:grid; gap:.75rem; margin-top:1rem; }
 .journal-entry { border:1px solid #334155; border-radius:.75rem; padding:.75rem; background:#111827; }
 .journal-entry-header { display:flex; justify-content:space-between; gap:.75rem; align-items:center; flex-wrap:wrap; }
+.lifecycle-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(18rem,1fr)); gap:.75rem; margin-top:1rem; }
+.lifecycle-card { border:1px solid #334155; border-radius:.75rem; padding:.75rem; background:#111827; overflow-wrap:anywhere; }
+.command-list { display:grid; gap:.5rem; margin-top:.75rem; }
+.command-list code { display:block; white-space:pre-wrap; border:1px solid #3b4658; border-radius:.75rem; padding:.75rem; background:#0b1020; color:#dbeafe; }
 .ref-group { margin-top:.75rem; }
 .ref-list { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.35rem; }
 .ref-chip { display:inline-block; border:1px solid #3b4658; border-radius:999px; padding:.2rem .5rem; background:#0f172a; color:#8bd3ff; font-size:.8rem; overflow-wrap:anywhere; }
