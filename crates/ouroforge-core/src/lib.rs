@@ -2663,6 +2663,205 @@ suggested_change:
     )
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PatchSandboxState {
+    Planned,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchSandboxLayout {
+    pub sandbox_id: String,
+    pub patch_draft_id: String,
+    pub lifecycle_state: PatchSandboxState,
+    pub sandbox_root: String,
+    pub worktree_path: String,
+    pub evidence_path: String,
+    pub plan_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchSandboxPlan {
+    pub schema_version: String,
+    pub run_id: String,
+    pub layout: PatchSandboxLayout,
+    pub verification_commands: Vec<String>,
+}
+
+impl PatchSandboxPlan {
+    pub fn validate(&self, run_dir: impl AsRef<Path>) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!("patch sandbox schema_version must be \"1\""));
+        }
+        require_text("patch sandbox run_id", &self.run_id)?;
+        self.layout.validate(run_dir)?;
+        if self.verification_commands.is_empty() {
+            return Err(anyhow!(
+                "patch sandbox plan requires at least one verification command"
+            ));
+        }
+        for command in &self.verification_commands {
+            require_text("patch sandbox verification command", command)?;
+        }
+        Ok(())
+    }
+}
+
+impl PatchSandboxLayout {
+    pub fn validate(&self, run_dir: impl AsRef<Path>) -> Result<()> {
+        require_text("patch sandbox sandbox_id", &self.sandbox_id)?;
+        validate_sandbox_id(&self.sandbox_id)?;
+        require_text("patch sandbox patch_draft_id", &self.patch_draft_id)?;
+        let expected_root = format!("sandbox/{}", self.sandbox_id);
+        let expected_worktree = format!("{expected_root}/worktree");
+        let expected_evidence = format!("{expected_root}/evidence");
+        let expected_plan = format!("{expected_root}/plan.json");
+        if self.sandbox_root != expected_root {
+            return Err(anyhow!("patch sandbox root does not match sandbox id"));
+        }
+        if self.worktree_path != expected_worktree {
+            return Err(anyhow!("patch sandbox worktree path is invalid"));
+        }
+        if self.evidence_path != expected_evidence {
+            return Err(anyhow!("patch sandbox evidence path is invalid"));
+        }
+        if self.plan_path != expected_plan {
+            return Err(anyhow!("patch sandbox plan path is invalid"));
+        }
+        for relative in [
+            &self.sandbox_root,
+            &self.worktree_path,
+            &self.evidence_path,
+            &self.plan_path,
+        ] {
+            validate_run_relative_sandbox_path(relative)?;
+            ensure_path_inside(run_dir.as_ref(), &run_dir.as_ref().join(relative))?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_sandbox_id(sandbox_id: &str) -> Result<()> {
+    require_text("patch sandbox sandbox_id", sandbox_id)?;
+    if !sandbox_id
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+    {
+        return Err(anyhow!(
+            "patch sandbox sandbox_id may contain only ASCII letters, digits, and '-'"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_run_relative_sandbox_path(relative_path: &str) -> Result<()> {
+    require_text("patch sandbox path", relative_path)?;
+    let path = Path::new(relative_path);
+    if path.is_absolute() {
+        return Err(anyhow!("patch sandbox path must be relative"));
+    }
+    let mut components = path.components();
+    if components.next() != Some(Component::Normal(std::ffi::OsStr::new("sandbox"))) {
+        return Err(anyhow!("patch sandbox path must stay under sandbox/"));
+    }
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return Err(anyhow!("patch sandbox path must not escape the run"));
+    }
+    Ok(())
+}
+
+fn ensure_path_inside(root: &Path, candidate: &Path) -> Result<()> {
+    let root = root
+        .canonicalize()
+        .with_context(|| format!("failed to canonicalize root {}", root.display()))?;
+    let parent = candidate.parent().unwrap_or(candidate);
+    let existing_parent = first_existing_ancestor(parent)
+        .ok_or_else(|| anyhow!("no existing parent for {}", candidate.display()))?;
+    let canonical_parent = existing_parent
+        .canonicalize()
+        .with_context(|| format!("failed to canonicalize {}", existing_parent.display()))?;
+    if !canonical_parent.starts_with(&root) {
+        return Err(anyhow!("path is outside sandbox root"));
+    }
+    Ok(())
+}
+
+fn first_existing_ancestor(path: &Path) -> Option<&Path> {
+    let mut current = Some(path);
+    while let Some(candidate) = current {
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        current = candidate.parent();
+    }
+    None
+}
+
+pub fn plan_patch_sandbox(
+    run_dir: impl AsRef<Path>,
+    patch_draft_id: &str,
+) -> Result<PatchSandboxPlan> {
+    let run_dir = run_dir.as_ref();
+    require_text("patch sandbox patch_draft_id", patch_draft_id)?;
+    validate_sandbox_id(patch_draft_id)?;
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let run_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    if !drafts.drafts.iter().any(|draft| draft.id == patch_draft_id) {
+        return Err(anyhow!(
+            "patch draft id not found for sandbox: {}",
+            patch_draft_id
+        ));
+    }
+    let layout = PatchSandboxLayout {
+        sandbox_id: patch_draft_id.to_string(),
+        patch_draft_id: patch_draft_id.to_string(),
+        lifecycle_state: PatchSandboxState::Planned,
+        sandbox_root: format!("sandbox/{patch_draft_id}"),
+        worktree_path: format!("sandbox/{patch_draft_id}/worktree"),
+        evidence_path: format!("sandbox/{patch_draft_id}/evidence"),
+        plan_path: format!("sandbox/{patch_draft_id}/plan.json"),
+    };
+    let plan = PatchSandboxPlan {
+        schema_version: "1".to_string(),
+        run_id,
+        layout,
+        verification_commands: vec!["cargo fmt --check".to_string(), "cargo test".to_string()],
+    };
+    plan.validate(run_dir)?;
+    Ok(plan)
+}
+
+pub fn create_patch_sandbox_layout(
+    run_dir: impl AsRef<Path>,
+    patch_draft_id: &str,
+) -> Result<PatchSandboxPlan> {
+    let run_dir = run_dir.as_ref();
+    let plan = plan_patch_sandbox(run_dir, patch_draft_id)?;
+    let root = run_dir.join(&plan.layout.sandbox_root);
+    let worktree = run_dir.join(&plan.layout.worktree_path);
+    let evidence = run_dir.join(&plan.layout.evidence_path);
+    ensure_path_inside(run_dir, &root)?;
+    fs::create_dir_all(&worktree).context("failed to create patch sandbox worktree")?;
+    fs::create_dir_all(&evidence).context("failed to create patch sandbox evidence")?;
+    let plan_path = run_dir.join(&plan.layout.plan_path);
+    write_json_atomic(&plan_path, &json!(plan))?;
+    Ok(plan)
+}
+
 pub fn create_mutation_proposal(
     run_dir: impl AsRef<Path>,
     input: MutationProposalInput,
@@ -6682,6 +6881,87 @@ scenarios:
 
         let target_after = fs::read_to_string(&target).expect("target reads");
         assert_eq!(target_after, "original seed content\n");
+        fs::remove_dir_all(root).ok();
+    }
+
+    fn create_sandbox_fixture(prefix: &str) -> (PathBuf, RunArtifacts, PatchDraftArtifact) {
+        let (root, artifacts, _) = create_draft_generation_fixture(prefix);
+        let drafts = generate_patch_drafts(&artifacts.run_dir).expect("draft generates");
+        (root, artifacts, drafts)
+    }
+
+    #[test]
+    fn plans_patch_sandbox_layout_under_run_sandbox_root() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-sandbox-plan-test");
+
+        let plan =
+            plan_patch_sandbox(&artifacts.run_dir, &drafts.drafts[0].id).expect("plan builds");
+
+        assert_eq!(plan.layout.sandbox_root, "sandbox/patch-draft-1");
+        assert_eq!(plan.layout.worktree_path, "sandbox/patch-draft-1/worktree");
+        assert_eq!(plan.layout.evidence_path, "sandbox/patch-draft-1/evidence");
+        assert_eq!(plan.layout.plan_path, "sandbox/patch-draft-1/plan.json");
+        plan.validate(&artifacts.run_dir).expect("plan validates");
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn creates_patch_sandbox_layout_without_applying_patch() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-sandbox-create-test");
+
+        let plan = create_patch_sandbox_layout(&artifacts.run_dir, &drafts.drafts[0].id)
+            .expect("sandbox layout creates");
+
+        assert!(artifacts.run_dir.join(&plan.layout.worktree_path).is_dir());
+        assert!(artifacts.run_dir.join(&plan.layout.evidence_path).is_dir());
+        assert!(artifacts.run_dir.join(&plan.layout.plan_path).is_file());
+        assert!(!artifacts
+            .run_dir
+            .join(&plan.layout.worktree_path)
+            .join("seeds/platformer.yaml")
+            .exists());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_patch_sandbox_ids_that_escape_paths() {
+        let (root, artifacts, _) = create_sandbox_fixture("ouroforge-sandbox-bad-id-test");
+
+        let error = plan_patch_sandbox(&artifacts.run_dir, "../patch-draft-1")
+            .expect_err("escaping sandbox id fails");
+
+        assert!(error.to_string().contains("may contain only ASCII"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_patch_sandbox_layout_outside_sandbox_root() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-sandbox-bad-layout-test");
+        let mut plan =
+            plan_patch_sandbox(&artifacts.run_dir, &drafts.drafts[0].id).expect("plan builds");
+        plan.layout.worktree_path = "../worktree".to_string();
+
+        let error = plan
+            .validate(&artifacts.run_dir)
+            .expect_err("bad worktree path fails");
+
+        assert!(error.to_string().contains("worktree path is invalid"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_sandbox_layout_does_not_modify_primary_target_file() {
+        let (root, artifacts, drafts) =
+            create_sandbox_fixture("ouroforge-sandbox-primary-unchanged-test");
+        let target = root.join("seeds/platformer.yaml");
+        fs::create_dir_all(target.parent().expect("target parent")).expect("parent exists");
+        fs::write(&target, "primary working tree content\n").expect("target written");
+
+        create_patch_sandbox_layout(&artifacts.run_dir, &drafts.drafts[0].id)
+            .expect("sandbox layout creates");
+
+        let target_after = fs::read_to_string(&target).expect("target reads");
+        assert_eq!(target_after, "primary working tree content\n");
         fs::remove_dir_all(root).ok();
     }
 
