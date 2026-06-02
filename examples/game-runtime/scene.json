@@ -14,7 +14,9 @@
       "id": "player",
       "sprite": {
         "color": "#5eead4",
-        "asset": "assets/sprites/player.svg"
+        "asset": "assets/sprites/player.svg",
+        "layer": "actors",
+        "order": 0
       },
       "components": {
         "transform": {
@@ -80,7 +82,9 @@
       "id": "goal",
       "sprite": {
         "color": "#facc15",
-        "asset": "assets/sprites/goal.svg"
+        "asset": "assets/sprites/goal.svg",
+        "layer": "actors",
+        "order": 10
       },
       "components": {
         "transform": {
@@ -117,5 +121,37 @@
         "role": "objective"
       }
     }
-  ]
+  ],
+  "renderer": {
+    "version": "1",
+    "camera": {
+      "x": 0,
+      "y": 0
+    },
+    "viewport": {
+      "width": 320,
+      "height": 180
+    },
+    "background": "#172532",
+    "layers": [
+      {
+        "id": "background",
+        "order": -10
+      },
+      {
+        "id": "actors",
+        "order": 0
+      },
+      {
+        "id": "debug",
+        "order": 10,
+        "visible": true
+      }
+    ],
+    "debug": {
+      "showBounds": false,
+      "showCamera": false,
+      "showEntityIds": false
+    }
+  }
 }

@@ -23,6 +23,17 @@
     advanceAnimations: () => {},
     activeSpriteFrame: () => null,
   };
+  const renderer = window.OuroforgeRenderer || {
+    normalizeRenderer: (_renderer, bounds) => ({
+      version: '1',
+      camera: { x: 0, y: 0 },
+      viewport: bounds || { width: 320, height: 180 },
+      background: '#172532',
+      layers: [{ id: 'default', order: 0, visible: true }],
+      debug: { showBounds: false, showCamera: false, showEntityIds: false },
+    }),
+    drawRuntime: () => [],
+  };
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -55,6 +66,7 @@
     collisions: [],
     audioEvents: [],
   };
+  let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -94,6 +106,9 @@
       id: String(entity.id || `entity-${index}`),
       sprite: {
         color: typeof sprite.color === 'string' ? sprite.color : '#f2f6f8',
+        layer: typeof sprite.layer === 'string' ? sprite.layer : 'default',
+        order: Number.isFinite(sprite.order) ? sprite.order : 0,
+        visible: sprite.visible !== false,
       },
       components: {
         transform: point(components.transform),
@@ -130,10 +145,12 @@
     const sourceEntities = Array.isArray(scene.entities) && scene.entities.length > 0
       ? scene.entities
       : defaultScene.entities;
+    const bounds = size(scene.bounds, defaultScene.bounds);
     return {
       schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
       id: String(scene.id || 'unnamed-scene'),
-      bounds: size(scene.bounds, defaultScene.bounds),
+      bounds,
+      renderer: renderer.normalizeRenderer(scene.renderer, bounds),
       metadata: objectValue(scene.metadata),
       entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
     };
@@ -186,24 +203,7 @@
     const canvas = document.getElementById('game');
     if (!canvas) return;
     const context = canvas.getContext('2d');
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#172532';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    for (const entity of world.entities) {
-      const transform = entity.components.transform;
-      const size = entity.components.size;
-      const activeFrame = animation.activeSpriteFrame(entity.components.animation);
-      const image = entity.sprite?.asset ? assets.imageFor(entity.sprite.asset) : null;
-      if (image) {
-        context.drawImage(image, transform.x, transform.y, size.width, size.height);
-      } else {
-        context.fillStyle = activeFrame?.color || entity.sprite?.color || '#f2f6f8';
-        context.fillRect(transform.x, transform.y, size.width, size.height);
-      }
-    }
-    context.fillStyle = '#f2f6f8';
-    context.font = '10px ui-monospace, monospace';
-    context.fillText(`scene=${world.sceneId} tick=${world.tick}`, 8, 14);
+    renderer.drawRuntime({ canvas, context, world, renderer: rendererState, assets, animation });
   }
 
   function renderDebug() {
@@ -218,6 +218,7 @@
     world.sceneId = normalized.id;
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
+    rendererState = clone(normalized.renderer);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
     world.audioEvents = [];
