@@ -984,6 +984,151 @@ fn project_manifest_paths_overlap(left: &str, right: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('/'))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectScaffoldFile {
+    pub path: &'static str,
+    pub contents: &'static str,
+}
+
+pub fn minimal_2d_project_scaffold_files() -> Vec<ProjectScaffoldFile> {
+    vec![
+        ProjectScaffoldFile {
+            path: "ouroforge.project.json",
+            contents: MINIMAL_2D_PROJECT_MANIFEST,
+        },
+        ProjectScaffoldFile {
+            path: "scenes/main.scene.json",
+            contents: MINIMAL_2D_PROJECT_SCENE,
+        },
+        ProjectScaffoldFile {
+            path: "seeds/platformer.yaml",
+            contents: MINIMAL_2D_PROJECT_SEED,
+        },
+        ProjectScaffoldFile {
+            path: "scenarios/smoke.scenario-pack.json",
+            contents: MINIMAL_2D_PROJECT_SCENARIO_PACK,
+        },
+        ProjectScaffoldFile {
+            path: "assets/README.md",
+            contents: MINIMAL_2D_PROJECT_ASSETS_README,
+        },
+        ProjectScaffoldFile {
+            path: "README.md",
+            contents: MINIMAL_2D_PROJECT_README,
+        },
+        ProjectScaffoldFile {
+            path: ".gitignore",
+            contents: MINIMAL_2D_PROJECT_GITIGNORE,
+        },
+    ]
+}
+
+pub fn validate_project_scaffold_destination_path(path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    require_text("project scaffold destination", &path.to_string_lossy())?;
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                return Err(anyhow!(
+                    "project scaffold destination must not contain '..' path traversal"
+                ))
+            }
+            Component::Normal(value) => {
+                if value.to_str().is_none() {
+                    return Err(anyhow!("project scaffold destination must be valid UTF-8"));
+                }
+            }
+            Component::CurDir | Component::RootDir | Component::Prefix(_) => {}
+        }
+    }
+    Ok(())
+}
+
+const MINIMAL_2D_PROJECT_MANIFEST: &str = r#"{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "minimal_2d", "name": "Minimal 2D Ouroforge Project" },
+  "scenes": [{ "id": "main", "path": "scenes/main.scene.json" }],
+  "seeds": [{ "id": "platformer", "path": "seeds/platformer.yaml" }],
+  "scenarioPacks": [{ "id": "smoke", "path": "scenarios/smoke.scenario-pack.json" }],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs", "target", "dashboard-data"] }
+}
+"#;
+
+const MINIMAL_2D_PROJECT_SCENE: &str = r##"{
+  "schemaVersion": "1",
+  "id": "minimal-2d-main",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 32, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "goal",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 272, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": false
+      },
+      "tags": ["goal"]
+    }
+  ]
+}
+"##;
+
+const MINIMAL_2D_PROJECT_SEED: &str = r#"id: minimal-2d.platformer
+title: Minimal 2D Project Smoke
+goal: Validate the generated minimal local game workspace.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate the scaffolded seed and scene references.
+scenarios:
+  - id: smoke
+    description: Starter scaffold smoke scenario.
+    assertions:
+      - world_state:
+          path: tick
+          exists: true
+"#;
+
+const MINIMAL_2D_PROJECT_SCENARIO_PACK: &str = r#"{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "smoke",
+  "description": "Starter scenario pack placeholder for project-level QA.",
+  "seed": "seeds/platformer.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarios": ["smoke"]
+}
+"#;
+
+const MINIMAL_2D_PROJECT_ASSETS_README: &str = "# Assets\n\nPlace project-local source assets here. Generated run output belongs in `runs/` and must stay untracked.\n";
+
+const MINIMAL_2D_PROJECT_README: &str = r#"# Minimal 2D Ouroforge Project
+
+Validate this project after scaffolding:
+
+```bash
+cargo run -p ouroforge-cli -- project validate ouroforge.project.json
+cargo run -p ouroforge-cli -- seed validate seeds/platformer.yaml
+```
+
+Generated artifacts such as `runs/`, `target/`, and dashboard exports are local state and should not be committed.
+"#;
+
+const MINIMAL_2D_PROJECT_GITIGNORE: &str = "# Ouroforge generated/local state\nruns/\ntarget/\ndashboard-data/\n.openchrome/\n.omc/\n.omx/\n.claude/\n";
+
 const ASSET_MANIFEST_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -13852,6 +13997,77 @@ scenarios:
                 .expect("tilemap layer order serializes"),
             r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
         );
+    }
+
+    #[test]
+    fn project_scaffold_minimal_2d_file_tree_is_deterministic_and_validatable() {
+        let files = minimal_2d_project_scaffold_files();
+        let paths = files.iter().map(|file| file.path).collect::<Vec<_>>();
+        assert_eq!(
+            paths,
+            vec![
+                "ouroforge.project.json",
+                "scenes/main.scene.json",
+                "seeds/platformer.yaml",
+                "scenarios/smoke.scenario-pack.json",
+                "assets/README.md",
+                "README.md",
+                ".gitignore",
+            ]
+        );
+        for file in &files {
+            validate_project_manifest_path("scaffold file path", file.path)
+                .or_else(|error| {
+                    if file.path == ".gitignore" {
+                        Ok(())
+                    } else {
+                        Err(error)
+                    }
+                })
+                .expect("scaffold path is bounded");
+            assert!(file.contents.ends_with('\n'));
+        }
+
+        let manifest = files
+            .iter()
+            .find(|file| file.path == "ouroforge.project.json")
+            .expect("manifest file");
+        let manifest = ProjectManifest::from_json_str(manifest.contents)
+            .expect("scaffold manifest schema validates");
+        assert_eq!(manifest.project.id, "minimal_2d");
+        assert_eq!(manifest.scenes[0].path, "scenes/main.scene.json");
+
+        let seed = files
+            .iter()
+            .find(|file| file.path == "seeds/platformer.yaml")
+            .expect("seed file");
+        Seed::from_yaml_str(seed.contents).expect("scaffold seed validates");
+
+        let scene = files
+            .iter()
+            .find(|file| file.path == "scenes/main.scene.json")
+            .expect("scene file");
+        let scene: SceneDocument = serde_json::from_str(scene.contents).expect("scene parses");
+        validate_scene(&scene).expect("scaffold scene validates");
+
+        let scenario_pack = files
+            .iter()
+            .find(|file| file.path == "scenarios/smoke.scenario-pack.json")
+            .expect("scenario pack file");
+        let scenario_pack: serde_json::Value =
+            serde_json::from_str(scenario_pack.contents).expect("scenario pack parses");
+        assert_eq!(scenario_pack["schemaVersion"], "scenario-pack-v1");
+    }
+
+    #[test]
+    fn project_scaffold_destination_rejects_traversal_but_allows_tmp_absolute_paths() {
+        validate_project_scaffold_destination_path(".omx/tmp/project-scaffold-smoke")
+            .expect("local smoke destination allowed");
+        validate_project_scaffold_destination_path(std::env::temp_dir().join("ouroforge-scaffold"))
+            .expect("absolute temp destination allowed");
+        let rejected = validate_project_scaffold_destination_path("../outside")
+            .expect_err("parent traversal rejected");
+        assert!(rejected.to_string().contains("path traversal"));
     }
 
     #[test]
