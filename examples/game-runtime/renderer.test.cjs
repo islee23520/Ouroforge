@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { normalizeRenderer, renderOrder, drawRuntime } = require('./renderer.js');
+const { normalizeRenderer, renderOrder, debugState, drawRuntime } = require('./renderer.js');
 
 function createContext() {
   const calls = [];
@@ -62,6 +62,20 @@ assert.deepEqual(ordered, [
   { entityId: 'player', layer: 'actors', layerOrder: 0, spriteOrder: 5 },
   { entityId: 'zebra', layer: 'actors', layerOrder: 0, spriteOrder: 5 },
 ]);
+
+assert.deepEqual(debugState(renderer, entities), {
+  version: '1',
+  camera: { x: 8, y: 4 },
+  viewport: { width: 160, height: 90 },
+  background: '#101827',
+  layers: [
+    { id: 'background', order: -10, visible: true },
+    { id: 'actors', order: 0, visible: true },
+    { id: 'debug', order: 10, visible: false },
+  ],
+  debug: { showBounds: false, showCamera: false, showEntityIds: true },
+  renderedEntities: ordered,
+});
 
 const context = createContext();
 const drawOrder = drawRuntime({

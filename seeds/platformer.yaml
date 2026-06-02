@@ -21,3 +21,12 @@ scenarios:
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
+      - world_state:
+          path: renderer.version
+          equals: '1'
+      - world_state:
+          path: renderer.camera.x
+          equals: 0
+      - world_state:
+          path: renderer.renderedEntities.0.entityId
+          equals: player

@@ -274,6 +274,7 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      state.renderer = renderer.debugState(rendererState, world.entities);
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();
       const currentPlayer = player();

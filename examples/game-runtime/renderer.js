@@ -80,6 +80,20 @@
       ));
   }
 
+  function debugState(renderer = normalizeRenderer(), entities = []) {
+    const activeRenderer = normalizeRenderer(renderer);
+    return {
+      version: activeRenderer.version,
+      camera: clone(activeRenderer.camera),
+      viewport: clone(activeRenderer.viewport),
+      background: activeRenderer.background,
+      layers: activeRenderer.layers.map((layer) => clone(layer)),
+      debug: clone(activeRenderer.debug),
+      renderedEntities: renderOrder(entities, activeRenderer)
+        .map(({ entityId, layer, layerOrder, spriteOrder }) => ({ entityId, layer, layerOrder, spriteOrder })),
+    };
+  }
+
   function drawRuntime({ canvas, context, world, renderer, assets, animation }) {
     if (!canvas || !context || !world) return [];
     const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: canvas.width, height: canvas.height });
@@ -118,7 +132,7 @@
     return ordered.map(({ entityId, layer, layerOrder, spriteOrder }) => ({ entityId, layer, layerOrder, spriteOrder }));
   }
 
-  const api = Object.freeze({ normalizeRenderer, renderOrder, drawRuntime, clone });
+  const api = Object.freeze({ normalizeRenderer, renderOrder, debugState, drawRuntime, clone });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeRenderer = api;
 })(typeof window !== 'undefined' ? window : globalThis);
