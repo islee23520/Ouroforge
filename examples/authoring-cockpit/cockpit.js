@@ -456,6 +456,12 @@ const OuroforgeCockpit = (() => {
   }
 
 
+
+  function fidelityStatusClass(status) {
+    const token = String(status || 'unknown').toLowerCase();
+    return ['present', 'partial', 'missing', 'malformed', 'legacy', 'unknown'].includes(token) ? token : 'unknown';
+  }
+
   function evidenceFidelity(run) {
     const fidelity = run?.evidence_fidelity || run?.summary?.evidence_fidelity || null;
     return fidelity && typeof fidelity === 'object' ? fidelity : null;
@@ -469,7 +475,8 @@ const OuroforgeCockpit = (() => {
     const warnings = Array.isArray(item.warnings) ? item.warnings : [];
     const refs = Array.isArray(item.evidence_refs) ? item.evidence_refs : [];
     const state = item.status || 'unknown';
-    return `<article class="fidelity-card ${escapeText(state)}"><h3>${escapeText(item.label || fallbackLabel)}</h3>
+    const stateClass = fidelityStatusClass(state);
+    return `<article class="fidelity-card ${stateClass}"><h3>${escapeText(item.label || fallbackLabel)}</h3>
       <p><strong>Status:</strong> ${escapeText(state)}</p>
       <p>${escapeText(item.summary || 'No summary recorded.')}</p>
       <div class="field-grid compact">
@@ -784,7 +791,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
