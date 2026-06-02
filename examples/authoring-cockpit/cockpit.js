@@ -221,16 +221,115 @@ const OuroforgeCockpit = (() => {
     return `<section class="panel"><h2>Run QA</h2><p class="hint">Run the evidence-native QA command, then export dashboard data to refresh evidence and journal panes.</p><button id="run-qa-button" class="primary" type="button">Show QA command</button><pre id="qa-command">${qaCommand()}</pre><pre>${dashboardExportCommand()}</pre></section>`;
   }
 
-  function renderEvidencePane(run) {
+  function renderRefLinks(refs = [], run) {
+    if (!Array.isArray(refs) || !refs.length) return '<p class="empty compact">No evidence refs recorded.</p>';
+    return `<div class="link-list">${refs.map((ref) => {
+      const href = String(ref).startsWith('runs/') ? `../../${ref}` : `../../${run?.summary?.run_dir || ''}/${ref}`;
+      return `<a href="${escapeText(href)}" target="_blank" rel="noreferrer">${escapeText(ref)}</a>`;
+    }).join('')}</div>`;
+  }
+
+  function surfaceState(present, label = 'available') {
+    return present ? `<span class="status-ok">${label}</span>` : '<span class="status-idle">gap / unavailable</span>';
+  }
+
+  function studioSurfaceSummary(run) {
+    const hasRun = Boolean(run);
+    return [
+      { id: 'run-browser', label: 'Run/evidence browser', present: hasRun && Array.isArray(run.evidence), detail: hasRun ? `${run.evidence.length} evidence artifact(s)` : 'dashboard data not loaded' },
+      { id: 'journal-viewer', label: 'Journal viewer', present: Boolean(run?.journal_view?.exists || run?.journal), detail: run?.journal_view?.summary || 'journal artifact unavailable' },
+      { id: 'mutation-review', label: 'Mutation review state', present: Boolean(run?.mutation_lifecycle), detail: run?.mutation_lifecycle?.terminal_state || 'no lifecycle read model' },
+      { id: 'replay-controls', label: 'Replay controls', present: Boolean(run?.replay?.present), detail: `${(run?.replay?.sequences || []).length} sequence(s)` },
+      { id: 'live-preview', label: 'Live preview controls', present: true, detail: 'ephemeral probe controls' },
+      { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
+      { id: 'run-comparison', label: 'Run comparison', present: Boolean(run?.comparison?.present), detail: `${(run?.comparison?.artifacts || []).length} comparison artifact(s)` },
+    ];
+  }
+
+  function renderStudioNavigation(run) {
+    const items = studioSurfaceSummary(run);
+    return `<nav class="studio-nav" aria-label="Studio v1 surfaces">
+      <h2>Studio v1 demo surfaces</h2>
+      <p class="hint">Static local composition only. Browser UI inspects artifacts and generates Rust commands; it does not write files directly or claim production editor maturity.</p>
+      <div class="surface-grid">${items.map((item) => `<a class="surface-card" href="#${escapeText(item.id)}">
+        <strong>${escapeText(item.label)}</strong><br>${surfaceState(item.present)}<br><small>${escapeText(item.detail)}</small>
+      </a>`).join('')}</div>
+    </nav>`;
+  }
+
+  function renderEvidenceBrowser(run) {
     if (!run) {
-      return '<section class="panel"><h2>Evidence + Journal</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to populate this pane.</p></section>';
+      return '<section id="run-browser" class="panel"><h2>Run/evidence browser</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to populate this pane.</p></section>';
     }
-    const screenshots = (run.screenshots || []).slice(0, 4).map((artifact) => `<a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>`).join('<br>') || 'No screenshots recorded.';
-    return `<section class="panel"><h2>Evidence + Journal</h2><div class="field-grid"><div><strong>Run</strong><br>${escapeText(run.summary.id)}</div><div><strong>Verdict</strong><br>${escapeText(run.summary.verdict_status)}</div><div><strong>Evidence</strong><br>${run.evidence.length}</div><div><strong>Mutations</strong><br>${run.mutations.length}</div></div><h3>Screenshots</h3><p>${screenshots}</p><h3>Journal</h3><pre>${escapeText(run.journal || 'No journal loaded.')}</pre></section>`;
+    const evidence = Array.isArray(run.evidence) ? run.evidence : [];
+    const evidenceLinks = evidence.slice(0, 8).map((artifact) => `<a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id || artifact.path)}</a>`).join('<br>') || 'No evidence artifacts recorded.';
+    return `<section id="run-browser" class="panel"><h2>Run/evidence browser</h2>
+      <div class="field-grid"><div><strong>Run</strong><br>${escapeText(run.summary?.id)}</div><div><strong>Verdict</strong><br>${escapeText(run.summary?.verdict_status)}</div><div><strong>Scenario</strong><br>${escapeText(run.summary?.scenario_status || 'unknown')}</div><div><strong>Evidence</strong><br>${escapeText(evidence.length)}</div></div>
+      <p class="hint"><a href="../evidence-dashboard/">Open full evidence dashboard</a> for complete artifact inspection.</p>
+      <h3>Evidence links</h3><p>${evidenceLinks}</p>
+    </section>`;
+  }
+
+  function renderJournalSurface(run) {
+    const journal = run?.journal_view;
+    if (!run || (!journal?.exists && !run.journal)) {
+      return '<section id="journal-viewer" class="panel"><h2>Journal viewer</h2><p class="empty">No journal artifact is available in the loaded dashboard data.</p></section>';
+    }
+    return `<section id="journal-viewer" class="panel"><h2>Journal viewer</h2>
+      <p class="hint">Read-only run journal preview from generated dashboard data.</p>
+      <div class="field-grid"><div><strong>Path</strong><br>${escapeText(journal?.path || 'journal.md')}</div><div><strong>Entries</strong><br>${escapeText((journal?.entries || []).length)}</div></div>
+      <h3>Evidence refs</h3>${renderRefLinks(journal?.evidence_refs || [], run)}
+      <pre>${escapeText(journal?.summary || run.journal || 'No journal summary loaded.')}</pre>
+    </section>`;
+  }
+
+  function renderMutationReviewSurface(run) {
+    const lifecycle = run?.mutation_lifecycle;
+    if (!lifecycle) {
+      return '<section id="mutation-review" class="panel"><h2>Mutation review state</h2><p class="empty">No mutation lifecycle read model is available for this run.</p></section>';
+    }
+    const stages = (lifecycle.stages || []).map((stage) => `<div class="surface-row"><strong>${escapeText(stage.label || stage.id)}</strong> ${surfaceState(stage.state !== 'missing', stage.state || 'missing')}<br><small>${escapeText(stage.artifact_path || 'No artifact path')}</small></div>`).join('') || '<p class="empty compact">No mutation stages recorded.</p>';
+    const hints = (lifecycle.command_hints || []).map((hint) => `<code>${escapeText(hint)}</code>`).join('') || '<p class="empty compact">No manual review command hints are available.</p>';
+    return `<section id="mutation-review" class="panel"><h2>Mutation review state</h2>
+      <p class="hint">Inspect-only. The cockpit does not accept/reject mutations or apply patches.</p>
+      <div><strong>Terminal state:</strong> ${escapeText(lifecycle.terminal_state || 'missing')}</div>
+      <div class="surface-list">${stages}</div>
+      <h3>Command hints</h3><div class="command-list">${hints}</div>
+    </section>`;
+  }
+
+  function renderReplaySurface(run) {
+    const replay = run?.replay;
+    if (!replay?.present) {
+      return `<section id="replay-controls" class="panel"><h2>Replay controls</h2><p class="empty">${escapeText(replay?.empty_state || 'No replay evidence is available for this run.')}</p></section>`;
+    }
+    const sequences = (replay.sequences || []).map((sequence) => `<div class="surface-row"><strong>${escapeText(sequence.id)}</strong><br><small>${escapeText(sequence.event_count || 0)} event(s), frames ${(sequence.frames || []).map(escapeText).join(', ') || 'none'}</small>${renderRefLinks(sequence.evidence_refs, run)}</div>`).join('');
+    return `<section id="replay-controls" class="panel"><h2>Replay controls</h2><p class="hint">Replay is displayed from generated evidence. Use the full evidence dashboard for frame stepping; cockpit composition remains read-only.</p>${sequences}</section>`;
+  }
+
+  function renderComparisonSurface(run) {
+    const comparison = run?.comparison;
+    if (!comparison?.present) {
+      return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="empty">${escapeText(comparison?.empty_state || 'No run comparison artifacts are available for this run.')}</p></section>`;
+    }
+    const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
+    return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="hint">Displays existing comparison artifacts only; no browser-side comparison algorithm runs here.</p>${artifacts}</section>`;
+  }
+
+  function renderStudioGaps() {
+    return `<section class="panel"><h2>Known demo gaps</h2><ul>
+      <li>No production editor, native shell, hosted studio, collaboration, plugin marketplace, or visual scripting.</li>
+      <li>Generated dashboard data and run artifacts stay uncommitted local state.</li>
+      <li>Scene persistence remains Rust-command-only through validated CLI commands.</li>
+    </ul></section>`;
+  }
+
+  function renderEvidencePane(run) {
+    return `${renderEvidenceBrowser(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
-    return `${renderPreview()}${renderPreviewControls(previewState)}${renderQaPanel()}${renderEvidencePane(run)}`;
+    return `${renderStudioNavigation(run)}<section id="live-preview">${renderPreview()}${renderPreviewControls(previewState)}</section><section id="scene-editing">${renderQaPanel()}</section>${renderEvidencePane(run)}${renderStudioGaps()}`;
   }
 
   async function loadDashboardData(path = DEFAULT_DASHBOARD_DATA_PATH) {
@@ -292,7 +391,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderTree, resolvePreviewProbe, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderComparisonSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

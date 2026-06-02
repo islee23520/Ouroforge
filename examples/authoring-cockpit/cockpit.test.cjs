@@ -33,16 +33,43 @@ assert.equal(
   "cargo run -p ouroforge-cli -- scene edit examples/game-runtime/scene.json --entity player --path components.transform.x --value '48'"
 );
 
-const run = { summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed' }, evidence: [{ id: 'evidence-1' }], mutations: [], screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }], journal: '# Journal' };
+const run = {
+  summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed', scenario_status: 'passed' },
+  evidence: [{ id: 'evidence-1', path: 'evidence/indexed.json' }],
+  mutations: [{ id: 'mutation-1' }],
+  screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }],
+  journal: '# Journal',
+  journal_view: { exists: true, path: 'journal.md', summary: 'journal summary', entries: [{ id: 'entry-1' }], evidence_refs: ['evidence/indexed.json'] },
+  mutation_lifecycle: { terminal_state: 'pending_review', command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'], stages: [{ id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json' }] },
+  replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
+  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'] }] },
+};
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
 assert.match(cockpit.dashboardExportCommand(), /dashboard export/);
 assert.equal(cockpit.latestRun([{ summary: { id: 'old', created_at_unix_ms: 1 } }, { summary: { id: 'new', created_at_unix_ms: 2 } }]).summary.id, 'new');
 assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
-assert.match(cockpit.renderEvidencePane(run), /# Journal/);
+assert.match(cockpit.renderEvidencePane(run), /journal summary/);
+assert.match(cockpit.renderStudioNavigation(run), /Studio v1 demo surfaces/);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 7);
+assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
+assert.match(cockpit.renderJournalSurface(run), /journal summary/);
+assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
+assert.match(cockpit.renderReplaySurface(run), /replay-1/);
+assert.match(cockpit.renderComparisonSurface(run), /before/);
+assert.match(cockpit.renderComparisonSurface(run), /after/);
+assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
+assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
 assert.match(cockpit.renderIntegration(run), /Pause/);
 assert.match(cockpit.renderIntegration(run), /Step 1 frame/);
+assert.match(cockpit.renderIntegration(run), /Run\/evidence browser/);
+assert.match(cockpit.renderIntegration(run), /Journal viewer/);
+assert.match(cockpit.renderIntegration(run), /Mutation review state/);
+assert.match(cockpit.renderIntegration(run), /Replay controls/);
+assert.match(cockpit.renderIntegration(run), /Run comparison/);
+assert.match(cockpit.renderIntegration(run), /Scene editing commands/);
+assert.match(cockpit.renderIntegration(run), /does not write files directly/);
 assert.match(cockpit.renderPreviewControls({ ok: false, error: 'probe missing' }), /probe missing/);
 
 let paused = false;
@@ -91,7 +118,7 @@ const xssScene = {
 };
 assert.ok(!cockpit.renderTree(xssScene, null).includes('<img src=x onerror'), 'tree entity id must be escaped');
 assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('<img src=x onerror'), 'inspector entity id must be escaped');
-const xssRun = { summary: { id: 'r', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>' };
+const xssRun = { summary: { id: 'r', run_dir: 'runs/x', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>', replay: { present: false, empty_state: '<script>alert(1)</script>' }, comparison: { present: false, empty_state: '<script>alert(1)</script>' } };
 assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker/.test(cockpitSource), 'cockpit browser code must not include direct persistence APIs');
