@@ -190,6 +190,144 @@ pub struct InputReplayEvent {
     pub pressed: bool,
 }
 
+const SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION: &str = "ouroforge.scenario-input-replay.v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioInputReplayArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "workerId", default, skip_serializing_if = "Option::is_none")]
+    pub worker_id: Option<String>,
+    #[serde(rename = "stepIndex")]
+    pub step_index: usize,
+    pub action: ScenarioInputReplayAction,
+    pub frame: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tick: Option<u64>,
+    pub input: InputStep,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe: Option<ScenarioInputReplayProbeCorrelation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<ScenarioInputReplayResultCorrelation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioInputReplayAction {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<ReplayKey>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressed: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioInputReplayProbeCorrelation {
+    #[serde(rename = "contractVersion")]
+    pub contract_version: String,
+    #[serde(
+        rename = "worldStatePath",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub world_state_path: Option<String>,
+    #[serde(
+        rename = "frameStatsPath",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub frame_stats_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioInputReplayResultCorrelation {
+    #[serde(rename = "scenarioResultPath")]
+    pub scenario_result_path: String,
+    #[serde(
+        rename = "verdictPath",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub verdict_path: Option<String>,
+}
+
+impl ScenarioInputReplayArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "scenario input replay artifact schemaVersion must be {}",
+                SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION
+            ));
+        }
+        validate_path_component("scenario input replay scenarioId", &self.scenario_id)?;
+        if let Some(worker_id) = &self.worker_id {
+            validate_path_component("scenario input replay workerId", worker_id)?;
+        }
+        require_text("scenario input replay action kind", &self.action.kind)?;
+        if self.frame > MAX_INPUT_REPLAY_FRAME {
+            return Err(anyhow!(
+                "scenario input replay frame must be <= {}",
+                MAX_INPUT_REPLAY_FRAME
+            ));
+        }
+        if self.input.left.is_none()
+            && self.input.right.is_none()
+            && self.input.up.is_none()
+            && self.input.down.is_none()
+        {
+            return Err(anyhow!(
+                "scenario input replay input must set at least one direction"
+            ));
+        }
+        if let Some(probe) = &self.probe {
+            if probe.contract_version != RUNTIME_PROBE_CONTRACT_VERSION {
+                return Err(anyhow!(
+                    "scenario input replay probe contractVersion must be {}",
+                    RUNTIME_PROBE_CONTRACT_VERSION
+                ));
+            }
+            if let Some(path) = &probe.world_state_path {
+                validate_evidence_artifact_path(path)
+                    .with_context(|| "scenario input replay worldStatePath is invalid")?;
+            }
+            if let Some(path) = &probe.frame_stats_path {
+                validate_evidence_artifact_path(path)
+                    .with_context(|| "scenario input replay frameStatsPath is invalid")?;
+            }
+        }
+        if let Some(result) = &self.result {
+            validate_relative_artifact_path(
+                "scenario input replay scenarioResultPath",
+                &result.scenario_result_path,
+            )?;
+            if let Some(path) = &result.verdict_path {
+                validate_relative_artifact_path("scenario input replay verdictPath", path)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_relative_artifact_path(label: &str, path: &str) -> Result<()> {
+    require_text(label, path)?;
+    let path = Path::new(path);
+    if path.is_absolute() {
+        return Err(anyhow!("{label} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(anyhow!("{label} must not escape its artifact root")),
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum ReplayKey {
@@ -11790,6 +11928,122 @@ scenarios:
         assert!(escaping.to_string().contains("replayRef is invalid"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn input_replay_artifact_schema_accepts_valid_correlation_fields() {
+        let artifact = ScenarioInputReplayArtifact {
+            schema_version: SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION.to_string(),
+            scenario_id: "replay-smoke".to_string(),
+            worker_id: Some("worker-1".to_string()),
+            step_index: 2,
+            action: ScenarioInputReplayAction {
+                kind: "input".to_string(),
+                key: Some(ReplayKey::Right),
+                pressed: Some(true),
+            },
+            frame: 4,
+            tick: Some(4),
+            input: InputStep {
+                right: Some(true),
+                ..InputStep::default()
+            },
+            probe: Some(ScenarioInputReplayProbeCorrelation {
+                contract_version: RUNTIME_PROBE_CONTRACT_VERSION.to_string(),
+                world_state_path: Some(
+                    "evidence/scenarios/replay-smoke/world-state-1.json".to_string(),
+                ),
+                frame_stats_path: Some(
+                    "evidence/scenarios/replay-smoke/frame-stats-1.json".to_string(),
+                ),
+            }),
+            result: Some(ScenarioInputReplayResultCorrelation {
+                scenario_result_path: "evidence/scenarios/replay-smoke/scenario-result-1.json"
+                    .to_string(),
+                verdict_path: Some("verdict.json".to_string()),
+            }),
+        };
+
+        artifact.validate().expect("valid replay artifact");
+        let value = serde_json::to_value(&artifact).expect("serializes");
+        assert_eq!(
+            value["schemaVersion"],
+            SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION
+        );
+        assert_eq!(value["scenarioId"], "replay-smoke");
+        assert_eq!(value["workerId"], "worker-1");
+        assert_eq!(
+            value["probe"]["contractVersion"],
+            RUNTIME_PROBE_CONTRACT_VERSION
+        );
+        let parsed: ScenarioInputReplayArtifact =
+            serde_json::from_value(value).expect("round-trips");
+        assert_eq!(parsed, artifact);
+    }
+
+    #[test]
+    fn input_replay_artifact_schema_rejects_invalid_contract_fields() {
+        let mut artifact = ScenarioInputReplayArtifact {
+            schema_version: SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION.to_string(),
+            scenario_id: "replay-smoke".to_string(),
+            worker_id: Some("worker-1".to_string()),
+            step_index: 0,
+            action: ScenarioInputReplayAction {
+                kind: "input".to_string(),
+                key: None,
+                pressed: None,
+            },
+            frame: 0,
+            tick: None,
+            input: InputStep {
+                left: Some(true),
+                ..InputStep::default()
+            },
+            probe: None,
+            result: None,
+        };
+
+        artifact.schema_version = "wrong".to_string();
+        assert!(artifact
+            .validate()
+            .expect_err("schema version rejected")
+            .to_string()
+            .contains("schemaVersion"));
+        artifact.schema_version = SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION.to_string();
+        artifact.worker_id = Some("../worker".to_string());
+        assert!(artifact
+            .validate()
+            .expect_err("unsafe worker rejected")
+            .to_string()
+            .contains("workerId"));
+        artifact.worker_id = Some("worker-1".to_string());
+        artifact.frame = MAX_INPUT_REPLAY_FRAME + 1;
+        assert!(artifact
+            .validate()
+            .expect_err("frame bound rejected")
+            .to_string()
+            .contains("frame"));
+        artifact.frame = 0;
+        artifact.probe = Some(ScenarioInputReplayProbeCorrelation {
+            contract_version: "v1".to_string(),
+            world_state_path: None,
+            frame_stats_path: None,
+        });
+        assert!(artifact
+            .validate()
+            .expect_err("probe contract rejected")
+            .to_string()
+            .contains("contractVersion"));
+        artifact.probe = Some(ScenarioInputReplayProbeCorrelation {
+            contract_version: RUNTIME_PROBE_CONTRACT_VERSION.to_string(),
+            world_state_path: Some("../world.json".to_string()),
+            frame_stats_path: None,
+        });
+        assert!(artifact
+            .validate()
+            .expect_err("unsafe evidence path rejected")
+            .to_string()
+            .contains("worldStatePath"));
     }
 
     #[test]
