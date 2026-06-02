@@ -178,7 +178,8 @@ evaluation remain design references only.
   dashboard/cockpit read-only evidence, and closure gates are documented in
   `docs/project-mutation-loop-v1.md`.
 - #252 surfaces project workspace state in Studio v3 without browser writes or
-  command execution.
+  command execution. Integration evidence is documented in
+  `docs/studio-v3-project-workspace-cockpit.md`.
 - #253 refreshes roadmap/#1 governance after the milestone, preserving #23.
 
 ## PR expectations
