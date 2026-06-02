@@ -170,8 +170,47 @@ assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped scene mut
 assert.match(cockpit.renderMutationReviewSurface(run), /Proposal rationale/);
 assert.match(cockpit.renderMutationReviewSurface(run), /scenario_assertion_failure/);
 assert.match(cockpit.renderMutationReviewSurface(run), /player reaches the goal/);
+assert.match(cockpit.renderProposalRationaleSurface(run), /verdict refs verdict\.json/);
 assert.match(cockpit.renderProposalRationaleSurface({ mutations: [{ id: '<script>', rationale: { failure_classification: '<img>', evidence_artifact_ids: ['<svg>'], expected_effect: '<b>', confidence: '<i>', reasoning_summary: '<p>', allowed_mutation_type: '<bad>' } }] }), /&lt;script&gt;/);
 assert.match(cockpit.renderProposalRationaleSurface({ mutations: [{ id: 'missing' }] }), /No proposal rationale recorded/);
+const directMutationWithoutRationale = { id: 'proposal-with-staged-rationale', status: 'proposed', target: 'seeds/platformer.yaml' };
+const stagedRationaleSurface = cockpit.renderProposalRationaleSurface({
+  mutations: [directMutationWithoutRationale],
+  mutation_lifecycle: {
+    stages: [
+      {
+        id: 'proposed',
+        records: [
+          {
+            id: 'proposal-with-staged-rationale',
+            rationale: {
+              failure_classification: 'staged_failure_classification',
+              evidence_artifact_ids: ['staged-verdict'],
+              expected_effect: 'staged rationale fills the direct mutation',
+              confidence: 'high',
+              reasoning_summary: 'direct summary omitted rationale',
+              allowed_mutation_type: 'data_only',
+            },
+          },
+          {
+            id: 'staged-only-proposal',
+            rationale: {
+              failure_classification: 'staged_only_failure',
+              evidence_artifact_ids: ['staged-only-verdict'],
+              expected_effect: 'staged-only proposal still renders',
+              confidence: 'medium',
+              reasoning_summary: 'appended after direct proposals',
+              allowed_mutation_type: 'data_only',
+            },
+          },
+        ],
+      },
+    ],
+  },
+});
+assert.match(stagedRationaleSurface, /staged rationale fills the direct mutation/);
+assert.ok(stagedRationaleSurface.indexOf('proposal-with-staged-rationale') < stagedRationaleSurface.indexOf('staged-only-proposal'));
+assert.equal(directMutationWithoutRationale.rationale, undefined);
 assert.match(cockpit.renderMutationReviewSurface(run), /scene-application-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /minimal_2d/);
 assert.match(cockpit.renderMutationReviewSurface(run), /examples\/project\/ouroforge\.project\.json/);

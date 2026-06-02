@@ -638,14 +638,50 @@ const OuroforgeCockpit = (() => {
     const scenarioRefs = Array.isArray(rationale.scenario_result_refs) && rationale.scenario_result_refs.length
       ? `<br><small>scenario refs ${rationale.scenario_result_refs.map((ref) => escapeText(ref)).join(', ')}</small>`
       : '';
-    return `<div class="surface-row"><strong>${escapeText(rationale.failure_classification || 'missing rationale')}</strong> ${surfaceState(Boolean(rationale.evidence_artifact_ids?.length), rationale.allowed_mutation_type || 'missing')}<br><small>${escapeText(rationale.expected_effect || 'No expected effect recorded')}</small><br><small>evidence ids ${evidenceIds}</small>${scenarioRefs}<br><small>confidence ${escapeText(rationale.confidence || 'missing')} · ${escapeText(rationale.reasoning_summary || 'No reasoning summary recorded')}</small></div>`;
+    const verdictRefs = Array.isArray(rationale.verdict_refs) && rationale.verdict_refs.length
+      ? `<br><small>verdict refs ${rationale.verdict_refs.map((ref) => escapeText(ref)).join(', ')}</small>`
+      : '';
+    return `<div class="surface-row"><strong>${escapeText(rationale.failure_classification || 'missing rationale')}</strong> ${surfaceState(Boolean(rationale.evidence_artifact_ids?.length), rationale.allowed_mutation_type || 'missing')}<br><small>${escapeText(rationale.expected_effect || 'No expected effect recorded')}</small><br><small>evidence ids ${evidenceIds}</small>${scenarioRefs}${verdictRefs}<br><small>confidence ${escapeText(rationale.confidence || 'missing')} · ${escapeText(rationale.reasoning_summary || 'No reasoning summary recorded')}</small></div>`;
+  }
+
+  function proposalRecordId(proposal) {
+    return proposal?.id || proposal?.proposalId || proposal?.proposal_id || null;
+  }
+
+  function hasProposalRationale(proposal) {
+    return proposal?.rationale && typeof proposal.rationale === 'object';
+  }
+
+  function mergeProposalRationaleRecords(direct, staged) {
+    const stagedById = new Map();
+    staged.forEach((proposal) => {
+      const id = proposalRecordId(proposal);
+      if (id && !stagedById.has(id)) stagedById.set(id, proposal);
+    });
+    const seen = new Set();
+    const merged = direct.map((proposal) => {
+      const id = proposalRecordId(proposal);
+      const stagedProposal = id ? stagedById.get(id) : null;
+      if (id) seen.add(id);
+      if (!stagedProposal) return { ...proposal };
+      return {
+        ...stagedProposal,
+        ...proposal,
+        rationale: hasProposalRationale(proposal) ? proposal.rationale : stagedProposal.rationale,
+      };
+    });
+    staged.forEach((proposal) => {
+      const id = proposalRecordId(proposal);
+      if (!id || !seen.has(id)) merged.push({ ...proposal });
+    });
+    return merged;
   }
 
   function renderProposalRationaleSurface(run) {
     const direct = Array.isArray(run?.mutations) ? run.mutations : [];
     const proposed = mutationStage(run?.mutation_lifecycle, 'proposed');
     const staged = Array.isArray(proposed?.records) ? proposed.records : [];
-    const proposals = direct.length ? direct : staged;
+    const proposals = mergeProposalRationaleRecords(direct, staged);
     const rows = proposals.map((proposal) => `<div class="surface-row"><strong>${escapeText(proposal.id || 'unknown proposal')}</strong><br>${renderProposalRationale(proposal)}</div>`).join('') || '<p class="empty compact">No proposal rationale records loaded.</p>';
     return `<div class="proposal-rationale"><h3>Proposal rationale</h3><p class="hint">Read-only evidence-linked rationale. The cockpit does not accept, apply, promote, rerun, or execute proposal actions.</p>${rows}</div>`;
   }
