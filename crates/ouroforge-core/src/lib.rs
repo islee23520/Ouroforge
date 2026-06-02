@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
@@ -4376,8 +4376,84 @@ pub struct RunComparison {
     pub before: RunComparisonSnapshot,
     pub after: RunComparisonSnapshot,
     pub deltas: serde_json::Value,
+    pub semantic: RunSemanticDiff,
     pub evidence_refs: Vec<String>,
     pub unsupported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticDiff {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub reasons: Vec<RunSemanticReason>,
+    pub scenarios: Vec<RunSemanticScenarioDiff>,
+    #[serde(rename = "worldState")]
+    pub world_state: RunSemanticWorldStateDiff,
+    pub events: RunSemanticEventDiff,
+    pub performance: RunSemanticPerformanceDiff,
+    pub evidence: RunSemanticEvidenceDiff,
+    #[serde(rename = "transactionProvenance")]
+    pub transaction_provenance: RunSemanticTransactionDiff,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticReason {
+    pub kind: String,
+    pub severity: String,
+    pub summary: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticScenarioDiff {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub before: String,
+    pub after: String,
+    pub classification: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticWorldStateDiff {
+    pub changed: Vec<RunSemanticValueDiff>,
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticValueDiff {
+    pub path: String,
+    pub before: serde_json::Value,
+    pub after: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticEventDiff {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticPerformanceDiff {
+    pub changed: Vec<RunSemanticValueDiff>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticEvidenceDiff {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticTransactionDiff {
+    pub before: Option<RunTransactionProvenance>,
+    pub after: Option<RunTransactionProvenance>,
+    pub changed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -4392,15 +4468,30 @@ pub struct RunComparisonSnapshot {
     pub mutation_proposals: usize,
 }
 
+#[derive(Debug, Clone)]
+struct RunComparisonDetails {
+    snapshot: RunComparisonSnapshot,
+    scenario_statuses: BTreeMap<String, String>,
+    world_state: BTreeMap<String, serde_json::Value>,
+    events: BTreeSet<String>,
+    performance: BTreeMap<String, serde_json::Value>,
+    evidence_keys: BTreeSet<String>,
+    transaction_provenance: Option<RunTransactionProvenance>,
+    warnings: Vec<String>,
+}
+
 pub fn compare_runs(
     before_run_dir: impl AsRef<Path>,
     after_run_dir: impl AsRef<Path>,
 ) -> Result<RunComparison> {
     let before_run_dir = before_run_dir.as_ref();
     let after_run_dir = after_run_dir.as_ref();
-    let before = load_run_comparison_snapshot(before_run_dir, "before")?;
-    let after = load_run_comparison_snapshot(after_run_dir, "after")?;
+    let before_details = load_run_comparison_details(before_run_dir, "before")?;
+    let after_details = load_run_comparison_details(after_run_dir, "after")?;
+    let before = before_details.snapshot.clone();
+    let after = after_details.snapshot.clone();
     let classification = classify_run_comparison(&before, &after).to_string();
+    let semantic = build_run_semantic_diff(&before_details, &after_details, &classification);
     let evidence_refs = vec![
         before_run_dir.join("run.json").display().to_string(),
         before_run_dir.join("verdict.json").display().to_string(),
@@ -4427,6 +4518,7 @@ pub fn compare_runs(
             "evidence_artifacts": after.evidence_artifacts as i64 - before.evidence_artifacts as i64,
             "mutation_proposals": after.mutation_proposals as i64 - before.mutation_proposals as i64
         }),
+        semantic,
         before,
         after,
         evidence_refs,
@@ -4435,6 +4527,64 @@ pub fn compare_runs(
                 .to_string(),
         ],
     })
+}
+
+fn build_run_semantic_diff(
+    before: &RunComparisonDetails,
+    after: &RunComparisonDetails,
+    classification: &str,
+) -> RunSemanticDiff {
+    let scenarios = semantic_scenario_diffs(before, after);
+    let world_state = semantic_map_diff(&before.world_state, &after.world_state, 24);
+    let events = semantic_set_diff(&before.events, &after.events);
+    let mut performance_warnings = Vec::new();
+    let performance = RunSemanticPerformanceDiff {
+        changed: semantic_value_diffs(&before.performance, &after.performance, 24),
+        warnings: {
+            if before.performance.is_empty() || after.performance.is_empty() {
+                performance_warnings.push(
+                    "performance diff is partial because one side has no performance artifacts"
+                        .to_string(),
+                );
+            }
+            performance_warnings
+        },
+    };
+    let evidence = semantic_evidence_set_diff(&before.evidence_keys, &after.evidence_keys);
+    let transaction_provenance = RunSemanticTransactionDiff {
+        before: before.transaction_provenance.clone(),
+        after: after.transaction_provenance.clone(),
+        changed: before.transaction_provenance != after.transaction_provenance,
+    };
+    let mut warnings = before
+        .warnings
+        .iter()
+        .chain(after.warnings.iter())
+        .cloned()
+        .collect::<Vec<_>>();
+    warnings.sort();
+    warnings.dedup();
+    let reasons = semantic_reasons(
+        classification,
+        &scenarios,
+        &world_state,
+        &events,
+        &performance,
+        &evidence,
+        &transaction_provenance,
+        &warnings,
+    );
+    RunSemanticDiff {
+        schema_version: "run-semantic-diff-v1".to_string(),
+        reasons,
+        scenarios,
+        world_state,
+        events,
+        performance,
+        evidence,
+        transaction_provenance,
+        warnings,
+    }
 }
 
 pub fn write_run_comparison_artifact(
@@ -4460,7 +4610,7 @@ pub fn write_run_comparison_artifact(
     Ok(path)
 }
 
-fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunComparisonSnapshot> {
+fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunComparisonDetails> {
     let run_path = run_dir.join("run.json");
     let verdict_path = run_dir.join("verdict.json");
     let evidence_path = run_dir.join("evidence/index.json");
@@ -4475,12 +4625,26 @@ fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunCompar
     let run = read_json_value(&run_path)?;
     let verdict = read_json_value(&verdict_path)?;
     let evidence = read_evidence_index(run_dir)?;
+    let transaction_provenance = run
+        .get("transaction_provenance")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok());
     let mut failed_scenarios = 0usize;
     let mut assertion_failures = 0usize;
     let mut scenario_results = 0usize;
     let mut performance_artifacts = 0usize;
     let mut mutation_proposals = 0usize;
+    let mut scenario_statuses = BTreeMap::new();
+    let mut world_state = BTreeMap::new();
+    let mut events = BTreeSet::new();
+    let mut performance = BTreeMap::new();
+    let mut evidence_keys = BTreeSet::new();
+    let mut warnings = Vec::new();
     for artifact in &evidence.artifacts {
+        evidence_keys.insert(format!(
+            "{}|{}|{}",
+            artifact.id, artifact.kind, artifact.path
+        ));
         match artifact
             .metadata
             .get("artifact")
@@ -4488,7 +4652,24 @@ fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunCompar
         {
             Some("scenario_result") => {
                 scenario_results += 1;
-                let result = read_json_value(run_dir.join(&artifact.path))?;
+                let Ok(result) = read_json_value(run_dir.join(&artifact.path)) else {
+                    warnings.push(format!(
+                        "{label} scenario_result artifact could not be read: {}",
+                        artifact.path
+                    ));
+                    continue;
+                };
+                let scenario_id = result
+                    .get("scenario_id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(&artifact.id)
+                    .to_string();
+                let status = result
+                    .get("status")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                scenario_statuses.insert(scenario_id, status.clone());
                 if result.get("status").and_then(|value| value.as_str()) != Some("passed") {
                     failed_scenarios += 1;
                 }
@@ -4506,12 +4687,52 @@ fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunCompar
                     })
                     .unwrap_or(0);
             }
-            Some("performance_metrics") => performance_artifacts += 1,
+            Some("world_state") => match read_json_value(run_dir.join(&artifact.path)) {
+                Ok(value) => collect_semantic_scalars("world", &value, &mut world_state, 64),
+                Err(_) => warnings.push(format!(
+                    "{label} world_state artifact could not be read: {}",
+                    artifact.path
+                )),
+            },
+            Some("console_log") => match read_json_value(run_dir.join(&artifact.path)) {
+                Ok(value) => collect_semantic_events("console", &value, &mut events, 64),
+                Err(_) => warnings.push(format!(
+                    "{label} console_log artifact could not be read: {}",
+                    artifact.path
+                )),
+            },
+            Some("performance_metrics") => {
+                performance_artifacts += 1;
+                match read_json_value(run_dir.join(&artifact.path)) {
+                    Ok(value) => collect_semantic_scalars(
+                        &format!("performance/{}", artifact.id),
+                        &value,
+                        &mut performance,
+                        32,
+                    ),
+                    Err(_) => warnings.push(format!(
+                        "{label} performance_metrics artifact could not be read: {}",
+                        artifact.path
+                    )),
+                }
+            }
+            Some("frame_stats") => match read_json_value(run_dir.join(&artifact.path)) {
+                Ok(value) => collect_semantic_scalars(
+                    &format!("frame_stats/{}", artifact.id),
+                    &value,
+                    &mut performance,
+                    32,
+                ),
+                Err(_) => warnings.push(format!(
+                    "{label} frame_stats artifact could not be read: {}",
+                    artifact.path
+                )),
+            },
             Some("mutation_proposal") => mutation_proposals += 1,
             _ => {}
         }
     }
-    Ok(RunComparisonSnapshot {
+    let snapshot = RunComparisonSnapshot {
         run_id: run
             .get("id")
             .and_then(|value| value.as_str())
@@ -4528,7 +4749,296 @@ fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunCompar
         performance_artifacts,
         evidence_artifacts: evidence.artifacts.len(),
         mutation_proposals,
+    };
+    Ok(RunComparisonDetails {
+        snapshot,
+        scenario_statuses,
+        world_state,
+        events,
+        performance,
+        evidence_keys,
+        transaction_provenance,
+        warnings,
     })
+}
+
+fn collect_semantic_scalars(
+    prefix: &str,
+    value: &serde_json::Value,
+    out: &mut BTreeMap<String, serde_json::Value>,
+    limit: usize,
+) {
+    if out.len() >= limit {
+        return;
+    }
+    match value {
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {
+            out.insert(prefix.to_string(), value.clone());
+        }
+        serde_json::Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                if out.len() >= limit {
+                    break;
+                }
+                collect_semantic_scalars(&format!("{prefix}/{index}"), item, out, limit);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for (key, item) in map {
+                if out.len() >= limit {
+                    break;
+                }
+                collect_semantic_scalars(&format!("{prefix}/{key}"), item, out, limit);
+            }
+        }
+    }
+}
+
+fn collect_semantic_events(
+    prefix: &str,
+    value: &serde_json::Value,
+    out: &mut BTreeSet<String>,
+    limit: usize,
+) {
+    if out.len() >= limit {
+        return;
+    }
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_semantic_events(prefix, item, out, limit);
+                if out.len() >= limit {
+                    break;
+                }
+            }
+        }
+        serde_json::Value::Object(map) => {
+            if let Some(text) = map
+                .get("text")
+                .or_else(|| map.get("name"))
+                .or_else(|| map.get("type"))
+                .and_then(|value| value.as_str())
+            {
+                let level = map
+                    .get("level")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("event");
+                out.insert(format!("{prefix}:{level}:{text}"));
+            }
+            for item in map.values() {
+                if out.len() >= limit {
+                    break;
+                }
+                collect_semantic_events(prefix, item, out, limit);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn semantic_scenario_diffs(
+    before: &RunComparisonDetails,
+    after: &RunComparisonDetails,
+) -> Vec<RunSemanticScenarioDiff> {
+    before
+        .scenario_statuses
+        .keys()
+        .chain(after.scenario_statuses.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|scenario_id| {
+            let before_status = before
+                .scenario_statuses
+                .get(&scenario_id)
+                .cloned()
+                .unwrap_or_else(|| "missing".to_string());
+            let after_status = after
+                .scenario_statuses
+                .get(&scenario_id)
+                .cloned()
+                .unwrap_or_else(|| "missing".to_string());
+            if before_status == after_status {
+                return None;
+            }
+            Some(RunSemanticScenarioDiff {
+                scenario_id,
+                classification: scenario_status_diff_classification(&before_status, &after_status)
+                    .to_string(),
+                before: before_status,
+                after: after_status,
+                evidence_refs: Vec::new(),
+            })
+        })
+        .collect()
+}
+
+fn scenario_status_diff_classification(before: &str, after: &str) -> &'static str {
+    match (before, after) {
+        (before, "passed") if before != "passed" => "improved",
+        ("passed", after) if after != "passed" => "regressed",
+        _ => "changed",
+    }
+}
+
+fn semantic_map_diff(
+    before: &BTreeMap<String, serde_json::Value>,
+    after: &BTreeMap<String, serde_json::Value>,
+    limit: usize,
+) -> RunSemanticWorldStateDiff {
+    let before_keys = before.keys().cloned().collect::<BTreeSet<_>>();
+    let after_keys = after.keys().cloned().collect::<BTreeSet<_>>();
+    RunSemanticWorldStateDiff {
+        changed: semantic_value_diffs(before, after, limit),
+        added: after_keys
+            .difference(&before_keys)
+            .take(limit)
+            .cloned()
+            .collect(),
+        removed: before_keys
+            .difference(&after_keys)
+            .take(limit)
+            .cloned()
+            .collect(),
+    }
+}
+
+fn semantic_value_diffs(
+    before: &BTreeMap<String, serde_json::Value>,
+    after: &BTreeMap<String, serde_json::Value>,
+    limit: usize,
+) -> Vec<RunSemanticValueDiff> {
+    before
+        .keys()
+        .filter(|key| after.contains_key(*key))
+        .filter_map(|key| {
+            let before_value = before.get(key)?;
+            let after_value = after.get(key)?;
+            (before_value != after_value).then(|| RunSemanticValueDiff {
+                path: key.clone(),
+                before: before_value.clone(),
+                after: after_value.clone(),
+            })
+        })
+        .take(limit)
+        .collect()
+}
+
+fn semantic_set_diff(before: &BTreeSet<String>, after: &BTreeSet<String>) -> RunSemanticEventDiff {
+    RunSemanticEventDiff {
+        added: after.difference(before).take(64).cloned().collect(),
+        removed: before.difference(after).take(64).cloned().collect(),
+    }
+}
+
+fn semantic_evidence_set_diff(
+    before: &BTreeSet<String>,
+    after: &BTreeSet<String>,
+) -> RunSemanticEvidenceDiff {
+    RunSemanticEvidenceDiff {
+        added: after.difference(before).take(64).cloned().collect(),
+        removed: before.difference(after).take(64).cloned().collect(),
+    }
+}
+
+fn semantic_reasons(
+    classification: &str,
+    scenarios: &[RunSemanticScenarioDiff],
+    world_state: &RunSemanticWorldStateDiff,
+    events: &RunSemanticEventDiff,
+    performance: &RunSemanticPerformanceDiff,
+    evidence: &RunSemanticEvidenceDiff,
+    transaction: &RunSemanticTransactionDiff,
+    warnings: &[String],
+) -> Vec<RunSemanticReason> {
+    let mut reasons = Vec::new();
+    for scenario in scenarios {
+        reasons.push(RunSemanticReason {
+            kind: "scenario_verdict".to_string(),
+            severity: scenario.classification.clone(),
+            summary: format!(
+                "scenario {} changed from {} to {}",
+                scenario.scenario_id, scenario.before, scenario.after
+            ),
+            evidence_refs: scenario.evidence_refs.clone(),
+        });
+    }
+    if !world_state.changed.is_empty()
+        || !world_state.added.is_empty()
+        || !world_state.removed.is_empty()
+    {
+        reasons.push(RunSemanticReason {
+            kind: "world_state".to_string(),
+            severity: "changed".to_string(),
+            summary: format!(
+                "{} world-state values changed, {} added, {} removed",
+                world_state.changed.len(),
+                world_state.added.len(),
+                world_state.removed.len()
+            ),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if !events.added.is_empty() || !events.removed.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "events".to_string(),
+            severity: "changed".to_string(),
+            summary: format!(
+                "{} events added, {} removed",
+                events.added.len(),
+                events.removed.len()
+            ),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if !performance.changed.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "performance".to_string(),
+            severity: "changed".to_string(),
+            summary: format!("{} performance values changed", performance.changed.len()),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if !evidence.added.is_empty() || !evidence.removed.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "evidence_artifacts".to_string(),
+            severity: "changed".to_string(),
+            summary: format!(
+                "{} evidence artifacts added, {} removed",
+                evidence.added.len(),
+                evidence.removed.len()
+            ),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if transaction.changed {
+        reasons.push(RunSemanticReason {
+            kind: "transaction_provenance".to_string(),
+            severity: "changed".to_string(),
+            summary: "scene edit transaction provenance changed".to_string(),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if !warnings.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "warnings".to_string(),
+            severity: "warning".to_string(),
+            summary: format!("{} semantic diff warning(s)", warnings.len()),
+            evidence_refs: Vec::new(),
+        });
+    }
+    if reasons.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "classification".to_string(),
+            severity: classification.to_string(),
+            summary: format!("comparison classification is {classification}"),
+            evidence_refs: Vec::new(),
+        });
+    }
+    reasons
 }
 
 fn classify_run_comparison(
@@ -10949,6 +11459,14 @@ scenarios:
         assert!(artifact_path.is_file());
         let comparison = read_json_value(&artifact_path).expect("comparison reads");
         assert_eq!(comparison["classification"], "no_change");
+        assert_eq!(
+            comparison["semantic"]["schemaVersion"],
+            "run-semantic-diff-v1"
+        );
+        assert_eq!(
+            comparison["semantic"]["reasons"][0]["summary"],
+            "comparison classification is no_change"
+        );
         assert_eq!(comparison["before"]["verdict_status"], "passed");
         assert_eq!(comparison["after"]["verdict_status"], "passed");
         assert_eq!(
@@ -10973,6 +11491,225 @@ scenarios:
         assert_eq!(comparison.before.verdict_status, "passed");
         assert_eq!(comparison.after.verdict_status, "failed");
         assert_eq!(comparison.after.failed_scenarios, 1);
+        assert!(comparison
+            .semantic
+            .scenarios
+            .iter()
+            .any(
+                |diff| diff.classification == "regressed" && diff.scenario_id == "bootstrap-smoke"
+            ));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "scenario_verdict" && reason.severity == "regressed"));
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compares_run_improvements_with_semantic_reasons() {
+        let (before_root, before) = create_test_run("ouroforge-compare-improvement-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-improvement-after-test");
+        write_scenario_result_fixture(&before.run_dir, "failed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.classification, "improved");
+        assert!(comparison
+            .semantic
+            .scenarios
+            .iter()
+            .any(|diff| diff.classification == "improved"));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.summary.contains("changed from failed to passed")));
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compares_mixed_world_state_event_and_performance_semantics() {
+        let (before_root, before) = create_test_run("ouroforge-compare-mixed-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-mixed-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        fs::write(
+            before
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/world-state.json"),
+            r#"{"player":{"x":1},"flag":"old"}"#,
+        )
+        .expect("before world state written");
+        fs::write(
+            after
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/world-state.json"),
+            r#"{"player":{"x":4},"flag":"new"}"#,
+        )
+        .expect("after world state written");
+        fs::write(
+            before
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/frame-stats.json"),
+            r#"{"fps":60,"frame":1}"#,
+        )
+        .expect("before frame stats written");
+        fs::write(
+            after
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/frame-stats.json"),
+            r#"{"fps":55,"frame":1}"#,
+        )
+        .expect("after frame stats written");
+        fs::write(
+            before
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/console-log.json"),
+            r#"[{"level":"info","text":"ready"}]"#,
+        )
+        .expect("before console written");
+        fs::write(
+            after
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/console-log.json"),
+            r#"[{"level":"info","text":"ready"},{"level":"warn","text":"changed"}]"#,
+        )
+        .expect("after console written");
+        add_evidence_artifact(
+            &before.run_dir,
+            "fixture-console-log",
+            "application/json",
+            "evidence/scenarios/bootstrap-smoke/console-log.json",
+            json!({ "artifact": "console_log", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("before console indexed");
+        add_evidence_artifact(
+            &after.run_dir,
+            "fixture-console-log",
+            "application/json",
+            "evidence/scenarios/bootstrap-smoke/console-log.json",
+            json!({ "artifact": "console_log", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("after console indexed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.classification, "no_change");
+        assert!(comparison
+            .semantic
+            .world_state
+            .changed
+            .iter()
+            .any(|diff| diff.path == "world/player/x"));
+        assert!(comparison
+            .semantic
+            .events
+            .added
+            .iter()
+            .any(|event| event.contains("warn:changed")));
+        assert!(comparison
+            .semantic
+            .performance
+            .changed
+            .iter()
+            .any(|diff| diff.path.contains("frame_stats")));
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compare_runs_warns_for_missing_optional_semantic_artifacts() {
+        let (before_root, before) = create_test_run("ouroforge-compare-warning-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-warning-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        fs::remove_file(
+            after
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/world-state.json"),
+        )
+        .expect("after world-state fixture removed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert!(comparison
+            .semantic
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("after world_state artifact could not be read")));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "warnings"));
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compare_runs_links_transaction_provenance_semantics() {
+        let (before_root, before) = create_test_run("ouroforge-compare-tx-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-tx-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        for (artifacts, transaction_id, hash) in [
+            (&before, "scene-edit-before", "before-hash"),
+            (&after, "scene-edit-after", "after-hash"),
+        ] {
+            let run_path = artifacts.run_dir.join("run.json");
+            let mut run_json: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(&run_path).expect("run json reads"))
+                    .expect("run json parses");
+            run_json["transaction_provenance"] = json!({
+                "transactionId": transaction_id,
+                "transactionArtifactPath": format!("transactions/{transaction_id}.json"),
+                "scenePath": "examples/game-runtime/scene.json",
+                "beforeSceneHash": {
+                    "algorithm": "fnv1a64-canonical-json-v1",
+                    "value": hash
+                },
+                "afterSceneHash": {
+                    "algorithm": "fnv1a64-canonical-json-v1",
+                    "value": hash
+                }
+            });
+            fs::write(
+                run_path,
+                serde_json::to_string_pretty(&run_json).expect("run serializes"),
+            )
+            .expect("run updated");
+        }
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert!(comparison.semantic.transaction_provenance.changed);
+        assert_eq!(
+            comparison
+                .semantic
+                .transaction_provenance
+                .after
+                .as_ref()
+                .expect("after provenance")
+                .transaction_id,
+            "scene-edit-after"
+        );
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "transaction_provenance"));
         fs::remove_dir_all(before_root).ok();
         fs::remove_dir_all(after_root).ok();
     }
