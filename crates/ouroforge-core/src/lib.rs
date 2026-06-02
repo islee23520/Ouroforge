@@ -5896,6 +5896,7 @@ pub struct RunDashboardReadModel {
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
+    pub replay: RunDashboardReplay,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
 }
@@ -5941,6 +5942,39 @@ pub struct RunDashboardMutationLifecycleStage {
     pub evidence_refs: Vec<String>,
     pub records: Vec<serde_json::Value>,
     pub read_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReplay {
+    pub present: bool,
+    pub empty_state: String,
+    pub sequences: Vec<RunDashboardReplaySequence>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReplaySequence {
+    pub id: String,
+    pub source: String,
+    pub scenario_id: Option<String>,
+    pub replay_path: String,
+    pub event_count: usize,
+    pub frames: Vec<u64>,
+    pub first_frame: Option<u64>,
+    pub last_frame: Option<u64>,
+    pub evidence_refs: Vec<String>,
+    pub checkpoints: Vec<RunDashboardReplayCheckpoint>,
+    pub read_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReplayCheckpoint {
+    pub id: String,
+    pub label: String,
+    pub frame: Option<u64>,
+    pub tick: Option<u64>,
+    pub world_state_path: Option<String>,
+    pub frame_stats_path: Option<String>,
+    pub world_state: Option<serde_json::Value>,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -5997,6 +6031,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
+    let replay = read_dashboard_replay(run_dir, &evidence)?;
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -6023,6 +6058,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results,
         mutation_artifacts,
         mutation_lifecycle,
+        replay,
         evidence_categories,
         mutations,
     })
@@ -6211,6 +6247,207 @@ fn dashboard_artifact_is_scenario_result(artifact: &EvidenceArtifact) -> bool {
         == Some("scenario_result")
         || artifact.id.contains("scenario-result")
         || artifact.path.contains("scenario-result")
+}
+
+fn dashboard_artifact_is_input_replay(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("input_replay")
+        || artifact.id.contains("input-replay")
+        || artifact.path.contains("input-replay")
+}
+
+fn read_dashboard_replay(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardReplay> {
+    let replay_artifacts =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_input_replay)?;
+    if replay_artifacts.is_empty() {
+        return Ok(RunDashboardReplay {
+            present: false,
+            empty_state: "No replay evidence artifacts were found for this run.".to_string(),
+            sequences: Vec::new(),
+        });
+    }
+    let scenario_results =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_scenario_result)?;
+    let mut sequences = Vec::new();
+    for artifact in replay_artifacts {
+        let scenario_id = dashboard_artifact_scenario_id(&artifact);
+        let replay_value = artifact
+            .value
+            .as_ref()
+            .and_then(dashboard_replay_payload_value);
+        let frames = replay_value.map_or_else(Vec::new, dashboard_replay_frames);
+        let replay_id = replay_value
+            .and_then(|value| json_string(value, "id"))
+            .unwrap_or_else(|| artifact.id.clone());
+        let event_count = replay_value
+            .and_then(|value| value.get("events"))
+            .and_then(|value| value.as_array())
+            .map_or(0, Vec::len);
+        let source = dashboard_replay_source(&artifact);
+        let evidence_refs = std::iter::once(artifact.path.clone())
+            .chain(
+                scenario_results
+                    .iter()
+                    .filter(|result| {
+                        dashboard_artifact_matches_scenario(result, scenario_id.as_deref())
+                    })
+                    .map(|result| result.path.clone()),
+            )
+            .collect::<Vec<_>>();
+        sequences.push(RunDashboardReplaySequence {
+            id: replay_id,
+            source,
+            scenario_id: scenario_id.clone(),
+            replay_path: artifact.path.clone(),
+            event_count,
+            first_frame: frames.first().copied(),
+            last_frame: frames.last().copied(),
+            frames,
+            evidence_refs,
+            checkpoints: dashboard_replay_checkpoints(
+                run_dir,
+                scenario_id.as_deref(),
+                &scenario_results,
+            ),
+            read_error: artifact.read_error.clone(),
+        });
+    }
+    Ok(RunDashboardReplay {
+        present: true,
+        empty_state: String::new(),
+        sequences,
+    })
+}
+
+fn dashboard_replay_payload_value(value: &serde_json::Value) -> Option<&serde_json::Value> {
+    value.get("replay").unwrap_or(value).as_object()?;
+    Some(value.get("replay").unwrap_or(value))
+}
+
+fn dashboard_replay_frames(replay: &serde_json::Value) -> Vec<u64> {
+    let mut frames = replay
+        .get("events")
+        .and_then(|value| value.as_array())
+        .map(|events| {
+            events
+                .iter()
+                .filter_map(|event| event.get("frame").and_then(|value| value.as_u64()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    frames.sort_unstable();
+    frames.dedup();
+    frames
+}
+
+fn dashboard_replay_source(artifact: &RunDashboardArtifact) -> String {
+    artifact
+        .metadata
+        .get("source")
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .or_else(|| {
+            artifact
+                .value
+                .as_ref()
+                .and_then(|value| value.get("reference"))
+                .map(|_| "replayRef".to_string())
+        })
+        .unwrap_or_else(|| "inline".to_string())
+}
+
+fn dashboard_artifact_scenario_id(artifact: &RunDashboardArtifact) -> Option<String> {
+    artifact
+        .metadata
+        .get("scenario_id")
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .or_else(|| dashboard_scenario_id_from_path(&artifact.path))
+}
+
+fn dashboard_scenario_id_from_path(path: &str) -> Option<String> {
+    let mut parts = path.split('/');
+    while let Some(part) = parts.next() {
+        if part == "scenarios" {
+            return parts.next().map(str::to_string);
+        }
+    }
+    None
+}
+
+fn dashboard_artifact_matches_scenario(
+    artifact: &RunDashboardArtifact,
+    scenario_id: Option<&str>,
+) -> bool {
+    match scenario_id {
+        Some(expected) => dashboard_artifact_scenario_id(artifact).as_deref() == Some(expected),
+        None => true,
+    }
+}
+
+fn dashboard_replay_checkpoints(
+    run_dir: &Path,
+    scenario_id: Option<&str>,
+    scenario_results: &[RunDashboardArtifact],
+) -> Vec<RunDashboardReplayCheckpoint> {
+    scenario_results
+        .iter()
+        .filter(|result| dashboard_artifact_matches_scenario(result, scenario_id))
+        .filter_map(|result| {
+            let value = result.value.as_ref()?;
+            let evidence = value.get("evidence")?;
+            let world_state_path = evidence
+                .get("world_state")
+                .and_then(|value| value.as_str())
+                .map(str::to_string);
+            let frame_stats_path = evidence
+                .get("frame_stats")
+                .and_then(|value| value.as_str())
+                .map(str::to_string);
+            let world_state = world_state_path
+                .as_ref()
+                .and_then(|path| read_json_value(run_dir.join(path)).ok());
+            let frame_stats = frame_stats_path
+                .as_ref()
+                .and_then(|path| read_json_value(run_dir.join(path)).ok());
+            let tick = world_state
+                .as_ref()
+                .and_then(|value| value.get("tick"))
+                .and_then(|value| value.as_u64())
+                .or_else(|| {
+                    frame_stats
+                        .as_ref()
+                        .and_then(|value| value.get("tick"))
+                        .and_then(|value| value.as_u64())
+                });
+            let frame = frame_stats
+                .as_ref()
+                .and_then(|value| value.get("frame"))
+                .and_then(|value| value.as_u64())
+                .or(tick);
+            let checkpoint_id = format!(
+                "{}-checkpoint",
+                json_string(value, "scenario_id")
+                    .or_else(|| dashboard_artifact_scenario_id(result))
+                    .unwrap_or_else(|| result.id.clone())
+            );
+            Some(RunDashboardReplayCheckpoint {
+                id: checkpoint_id,
+                label: "Post-replay world state".to_string(),
+                frame,
+                tick,
+                world_state_path,
+                frame_stats_path,
+                world_state,
+            })
+        })
+        .collect()
 }
 
 fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboardArtifact>> {
@@ -10312,6 +10549,136 @@ scenarios:
             .evidence_categories
             .iter()
             .any(|category| category.id == "mutation_artifacts" && category.count == 1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_replay_read_model_tracks_present_replay_evidence() {
+        let (root, artifacts) = create_test_run("dashboard-replay-read-model");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"passed\",\"metadata\":{\"scenario_results\":1}}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/scenarios/replay-smoke"))
+            .expect("scenario evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/replay-smoke/input-replay.json"),
+            serde_json::to_string_pretty(&json!({
+                "reference": {
+                    "id": "move-right",
+                    "path": "replays/move-right.yaml"
+                },
+                "replay": {
+                    "schemaVersion": "input-replay-v1",
+                    "id": "move-right",
+                    "events": [
+                        { "frame": 0, "key": "right", "pressed": true },
+                        { "frame": 4, "key": "right", "pressed": false }
+                    ]
+                }
+            }))
+            .expect("replay JSON serializes"),
+        )
+        .expect("input replay evidence written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/replay-smoke/world-state.json"),
+            "{\"tick\":4,\"entities\":[{\"id\":\"player\",\"components\":{\"transform\":{\"x\":40,\"y\":72}}}]}\n",
+        )
+        .expect("world state evidence written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/replay-smoke/frame-stats.json"),
+            "{\"tick\":4,\"fixedDeltaMs\":16}\n",
+        )
+        .expect("frame stats evidence written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/replay-smoke/scenario-result.json"),
+            serde_json::to_string_pretty(&json!({
+                "scenario_id": "replay-smoke",
+                "status": "passed",
+                "evidence": {
+                    "input_replays": ["evidence/scenarios/replay-smoke/input-replay.json"],
+                    "world_state": "evidence/scenarios/replay-smoke/world-state.json",
+                    "frame_stats": "evidence/scenarios/replay-smoke/frame-stats.json"
+                }
+            }))
+            .expect("scenario result JSON serializes"),
+        )
+        .expect("scenario result written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-input-replay",
+            "application/json",
+            "evidence/scenarios/replay-smoke/input-replay.json",
+            json!({ "artifact": "input_replay", "scenario_id": "replay-smoke", "source": "replayRef" }),
+        )
+        .expect("input replay indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-scenario-result",
+            "application/json",
+            "evidence/scenarios/replay-smoke/scenario-result.json",
+            json!({ "artifact": "scenario_result", "scenario_id": "replay-smoke" }),
+        )
+        .expect("scenario result indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.replay.present);
+        assert_eq!(model.replay.empty_state, "");
+        assert_eq!(model.replay.sequences.len(), 1);
+        let sequence = &model.replay.sequences[0];
+        assert_eq!(sequence.id, "move-right");
+        assert_eq!(sequence.source, "replayRef");
+        assert_eq!(sequence.scenario_id.as_deref(), Some("replay-smoke"));
+        assert_eq!(sequence.event_count, 2);
+        assert_eq!(sequence.frames, vec![0, 4]);
+        assert_eq!(sequence.first_frame, Some(0));
+        assert_eq!(sequence.last_frame, Some(4));
+        assert_eq!(
+            sequence.evidence_refs,
+            vec![
+                "evidence/scenarios/replay-smoke/input-replay.json".to_string(),
+                "evidence/scenarios/replay-smoke/scenario-result.json".to_string()
+            ]
+        );
+        assert_eq!(sequence.checkpoints.len(), 1);
+        let checkpoint = &sequence.checkpoints[0];
+        assert_eq!(checkpoint.frame, Some(4));
+        assert_eq!(checkpoint.tick, Some(4));
+        assert_eq!(
+            checkpoint.world_state_path.as_deref(),
+            Some("evidence/scenarios/replay-smoke/world-state.json")
+        );
+        assert_eq!(
+            checkpoint
+                .world_state
+                .as_ref()
+                .expect("world state is loaded")["entities"][0]["components"]["transform"]["x"],
+            json!(40)
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_replay_read_model_handles_missing_replay_evidence() {
+        let (root, artifacts) = create_test_run("dashboard-replay-empty-read-model");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(!model.replay.present);
+        assert!(model.replay.sequences.is_empty());
+        assert!(model
+            .replay
+            .empty_state
+            .contains("No replay evidence artifacts"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
