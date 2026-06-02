@@ -6,9 +6,9 @@ use ouroforge_core::{
     evolve_run, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
     orchestrate_evolve_rerun_from_path, read_cdp_targets, read_dashboard_run, read_ledger_events,
     read_scene, run_browser_smoke, run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path,
-    run_scenarios, show_journal, update_journal, write_run_comparison_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState, ScenarioRunConfig,
-    SceneEdit, Seed, WorkerId,
+    run_scenarios, show_journal, update_journal, validate_scene_reload,
+    write_run_comparison_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -121,6 +121,9 @@ enum SceneCommand {
         scene_path: PathBuf,
     },
     Show {
+        scene_path: PathBuf,
+    },
+    ReloadValidate {
         scene_path: PathBuf,
     },
     Edit {
@@ -459,6 +462,14 @@ fn main() -> Result<()> {
                     manifest.assets.len()
                 );
             }
+        }
+        Commands::Scene {
+            command: SceneCommand::ReloadValidate { scene_path },
+        } => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&validate_scene_reload(scene_path)?)?
+            );
         }
         Commands::Scene {
             command: SceneCommand::Show { scene_path },

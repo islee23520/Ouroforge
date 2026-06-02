@@ -5669,6 +5669,33 @@ pub struct SceneDocument {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct SceneReloadValidationReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    #[serde(rename = "entityCount")]
+    pub entity_count: usize,
+    #[serde(rename = "assetManifest")]
+    pub asset_manifest: Option<SceneReloadAssetManifestReport>,
+    #[serde(rename = "resetState")]
+    pub reset_state: Vec<String>,
+    #[serde(rename = "preservedState")]
+    pub preserved_state: Vec<String>,
+    #[serde(rename = "unsupported")]
+    pub unsupported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneReloadAssetManifestReport {
+    pub id: String,
+    #[serde(rename = "assetCount")]
+    pub asset_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SceneBounds {
     pub width: i64,
     pub height: i64,
@@ -6004,6 +6031,45 @@ pub fn read_scene(scene_path: impl AsRef<Path>) -> Result<SceneDocument> {
         .with_context(|| format!("failed to parse scene {}", scene_path.display()))?;
     validate_scene(&scene)?;
     Ok(scene)
+}
+
+pub fn validate_scene_reload(scene_path: impl AsRef<Path>) -> Result<SceneReloadValidationReport> {
+    let scene = read_scene(scene_path)?;
+    Ok(SceneReloadValidationReport {
+        schema_version: "ouroforge.scene-reload.v0".to_string(),
+        scene_id: scene.id.clone(),
+        entity_count: scene.entities.len(),
+        asset_manifest: scene.asset_manifest.as_ref().map(|manifest| {
+            SceneReloadAssetManifestReport {
+                id: manifest.id.clone(),
+                asset_count: manifest.assets.len(),
+            }
+        }),
+        reset_state: vec![
+            "tick".to_string(),
+            "entities".to_string(),
+            "collisions".to_string(),
+            "collisionEvents".to_string(),
+            "audioEvents".to_string(),
+            "snapshots".to_string(),
+            "renderer".to_string(),
+            "tilemaps".to_string(),
+            "assetManifest".to_string(),
+        ],
+        preserved_state: vec![
+            "runtime API".to_string(),
+            "fixedDeltaMs".to_string(),
+            "bounded event history".to_string(),
+        ],
+        unsupported: vec![
+            "source code reload".to_string(),
+            "live code HMR".to_string(),
+            "filesystem watchers".to_string(),
+            "direct browser file writes".to_string(),
+            "editor persistence".to_string(),
+            "native shell".to_string(),
+        ],
+    })
 }
 
 pub fn edit_scene(scene_path: impl AsRef<Path>, edit: SceneEdit) -> Result<SceneDocument> {
@@ -11302,6 +11368,88 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("must be a local static asset path"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_reload_validation_reports_contract_boundary() {
+        let root = unique_temp_dir("scene-reload-valid");
+        fs::create_dir_all(root.join("assets/sprites")).expect("asset dirs created");
+        fs::write(root.join("assets/sprites/player.svg"), "<svg></svg>").expect("asset written");
+        let scene_path = root.join("scene.json");
+        fs::write(
+            &scene_path,
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "id": "reload-scene",
+                "bounds": { "width": 320, "height": 180 },
+                "assetManifest": {
+                    "schemaVersion": "1",
+                    "id": "reload-assets",
+                    "assets": [{ "id": "player-sprite", "kind": "sprite", "path": "assets/sprites/player.svg" }]
+                },
+                "entities": [{
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "asset": "player-sprite" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }]
+            }))
+            .expect("scene serializes"),
+        )
+        .expect("scene written");
+
+        let report = validate_scene_reload(&scene_path).expect("reload payload validates");
+        assert_eq!(report.schema_version, "ouroforge.scene-reload.v0");
+        assert_eq!(report.scene_id, "reload-scene");
+        assert_eq!(report.entity_count, 1);
+        assert_eq!(
+            report.asset_manifest,
+            Some(SceneReloadAssetManifestReport {
+                id: "reload-assets".to_string(),
+                asset_count: 1
+            })
+        );
+        assert!(report.reset_state.contains(&"entities".to_string()));
+        assert!(report.preserved_state.contains(&"fixedDeltaMs".to_string()));
+        assert!(report.unsupported.contains(&"live code HMR".to_string()));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_reload_validation_rejects_invalid_scene_without_report() {
+        let root = unique_temp_dir("scene-reload-invalid");
+        fs::create_dir_all(&root).expect("reload invalid fixture dir created");
+        let scene_path = root.join("scene.json");
+        fs::write(
+            &scene_path,
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "id": "reload-invalid",
+                "bounds": { "width": 320, "height": 180 },
+                "entities": [{
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": -1, "height": 16 },
+                        "controllable": true
+                    }
+                }]
+            }))
+            .expect("scene serializes"),
+        )
+        .expect("scene written");
+
+        let rejected = validate_scene_reload(&scene_path).expect_err("invalid reload rejected");
+        assert!(rejected.to_string().contains("size must be positive"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
