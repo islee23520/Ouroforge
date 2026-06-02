@@ -18,6 +18,11 @@
       imageFor: () => null,
     }),
   }).createAssetTracker();
+  const animation = window.OuroforgeAnimation || {
+    normalizeAnimation: () => null,
+    advanceAnimations: () => {},
+    activeSpriteFrame: () => null,
+  };
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -99,6 +104,8 @@
       metadata: objectValue(entity.metadata),
     };
     if (typeof sprite.asset === 'string') normalized.sprite.asset = sprite.asset;
+    const normalizedAnimation = animation.normalizeAnimation(components.animation);
+    if (normalizedAnimation) normalized.components.animation = normalizedAnimation;
     if (components.collider) {
       normalized.components.collider = {
         shape: components.collider.shape || 'aabb',
@@ -134,6 +141,7 @@
 
   function stepOne() {
     applyInput();
+    animation.advanceAnimations(world.entities, 1);
     for (const entity of world.entities) {
       const transform = entity.components.transform;
       const velocity = entity.components.velocity;
@@ -156,11 +164,12 @@
     for (const entity of world.entities) {
       const transform = entity.components.transform;
       const size = entity.components.size;
+      const activeFrame = animation.activeSpriteFrame(entity.components.animation);
       const image = entity.sprite?.asset ? assets.imageFor(entity.sprite.asset) : null;
       if (image) {
         context.drawImage(image, transform.x, transform.y, size.width, size.height);
       } else {
-        context.fillStyle = entity.sprite?.color || '#f2f6f8';
+        context.fillStyle = activeFrame?.color || entity.sprite?.color || '#f2f6f8';
         context.fillRect(transform.x, transform.y, size.width, size.height);
       }
     }

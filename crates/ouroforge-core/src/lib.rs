@@ -2408,6 +2408,8 @@ pub struct SceneComponents {
     pub controllable: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collider: Option<SceneCollider>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animation: Option<SceneAnimation>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -2438,6 +2440,23 @@ pub struct SceneCollider {
     pub sensor: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAnimation {
+    pub mode: String,
+    #[serde(rename = "frameDuration")]
+    pub frame_duration: u32,
+    #[serde(default = "default_animation_loop")]
+    pub r#loop: bool,
+    pub frames: Vec<SceneAnimationFrame>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAnimationFrame {
+    pub color: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneEdit {
     pub entity_id: String,
@@ -2455,6 +2474,10 @@ fn aabb_collider_shape() -> String {
 
 fn static_collider_body() -> String {
     "static".to_string()
+}
+
+fn default_animation_loop() -> bool {
+    true
 }
 
 fn empty_json_object() -> serde_json::Value {
@@ -2507,6 +2530,9 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         if let Some(collider) = &entity.components.collider {
             validate_scene_collider(&entity.id, collider)?;
         }
+        if let Some(animation) = &entity.components.animation {
+            validate_scene_animation(&entity.id, animation)?;
+        }
         validate_scene_tags(&entity.id, &entity.tags)?;
         validate_scene_metadata(
             &format!("scene entity {} metadata", entity.id),
@@ -2531,6 +2557,30 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
         return Err(anyhow!(
             "scene entity {entity_id} collider size must be positive"
         ));
+    }
+    Ok(())
+}
+
+fn validate_scene_animation(entity_id: &str, animation: &SceneAnimation) -> Result<()> {
+    if animation.mode != "sprite_frame" {
+        return Err(anyhow!(
+            "scene entity {entity_id} animation mode must be sprite_frame"
+        ));
+    }
+    if animation.frame_duration == 0 {
+        return Err(anyhow!(
+            "scene entity {entity_id} animation frameDuration must be greater than 0"
+        ));
+    }
+    if animation.frames.is_empty() {
+        return Err(anyhow!(
+            "scene entity {entity_id} animation frames must not be empty"
+        ));
+    }
+    for frame in &animation.frames {
+        validate_scene_color(&frame.color).with_context(|| {
+            format!("scene entity {entity_id} animation frame color is invalid")
+        })?;
     }
     Ok(())
 }
@@ -4174,6 +4224,15 @@ scenarios:
                             "offset": { "x": 0, "y": 0 },
                             "size": { "width": 16, "height": 16 },
                             "sensor": false
+                        },
+                        "animation": {
+                            "mode": "sprite_frame",
+                            "frameDuration": 2,
+                            "loop": true,
+                            "frames": [
+                                { "color": "#5eead4" },
+                                { "color": "#2dd4bf" }
+                            ]
                         }
                     },
                     "tags": ["player", "spawn"],
@@ -4207,6 +4266,10 @@ scenarios:
                 .shape,
             "aabb"
         );
+        let animation = scene.entities[0].components.animation.as_ref().unwrap();
+        assert_eq!(animation.mode, "sprite_frame");
+        assert_eq!(animation.frame_duration, 2);
+        assert_eq!(animation.frames.len(), 2);
     }
 
     #[test]
@@ -4368,6 +4431,64 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("collider body must be static or dynamic"));
+
+        let future_animation_mode = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "animation": {
+                            "mode": "timeline",
+                            "frameDuration": 2,
+                            "frames": [{ "color": "#5eead4" }]
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("animation mode fixture parses");
+        let rejected =
+            validate_scene(&future_animation_mode).expect_err("future animation mode rejected");
+        assert!(rejected
+            .to_string()
+            .contains("animation mode must be sprite_frame"));
+
+        let empty_animation_frames = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "animation": {
+                            "mode": "sprite_frame",
+                            "frameDuration": 0,
+                            "frames": []
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("empty animation fixture parses");
+        let rejected =
+            validate_scene(&empty_animation_frames).expect_err("invalid animation rejected");
+        assert!(rejected
+            .to_string()
+            .contains("animation frameDuration must be greater than 0"));
     }
 
     #[test]

@@ -26,3 +26,8 @@ The browser runtime loads those image paths directly from the same local static
 server and exposes deterministic asset metadata through
 `window.__OUROFORGE__.getWorldState().assets`. This is not a bundler, import
 pipeline, cache, marketplace, or editor asset browser.
+Animation v1 chooses a single minimal `sprite_frame` mode: each animated entity
+owns local color frames plus a fixed `frameDuration`, and the browser runtime
+advances the current frame strictly by fixed simulation ticks. This keeps the
+state probe-observable without timelines, skeletal rigs, graphs, editor tooling,
+or asset import complexity.
