@@ -4,9 +4,9 @@ goal: Advance a fixed-timestep sprite-frame animation and prove its state throug
 constraints:
   target: game-runtime
 acceptance:
-  - The player scene entity declares a single sprite_frame animation mode.
+  - The player scene entity declares a sprite_frame animation mode with a named clip.
   - The browser runtime advances animation state by fixed simulation ticks.
-  - Scenario evidence proves the expected frame index after a fixed number of frames.
+  - Scenario evidence proves the current clip, frame index, and manifest-backed frame ref after a fixed number of frames.
 scenarios:
   - id: sprite-frame-progresses
     description: Wait four runtime frames and assert the player's sprite-frame animation reached frame index 2.
@@ -20,6 +20,18 @@ scenarios:
       - world_state:
           path: entities.0.components.animation.frameDuration
           equals: 2
+      - world_state:
+          path: entities.0.components.animation.currentClip
+          equals: idle
+      - world_state:
+          path: entities.0.components.animation.clips.0.id
+          equals: idle
+      - world_state:
+          path: entities.0.components.animation.clips.0.frames.2.asset
+          equals: player-sprite
+      - world_state:
+          path: entities.0.components.animation.state.currentClip
+          equals: idle
       - world_state:
           path: entities.0.components.animation.state.elapsedFrames
           equals: 4

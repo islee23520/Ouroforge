@@ -33,11 +33,14 @@ static server and exposes bounded manifest plus asset metadata through
 `window.__OUROFORGE__.getWorldState().assetManifest` and `.assets`. Generated
 run state stays under `runs/` and must remain untracked. This is not a bundler,
 import pipeline, cache, marketplace, hot-reload system, or editor asset browser.
-Animation v1 chooses a single minimal `sprite_frame` mode: each animated entity
-owns local color frames plus a fixed `frameDuration`, and the browser runtime
-advances the current frame strictly by fixed simulation ticks. This keeps the
-state probe-observable without timelines, skeletal rigs, graphs, editor tooling,
-or asset import complexity.
+Animation v1 chooses a bounded `sprite_frame` mode: each animated entity owns
+named clips, fixed per-clip `frameDuration`, loop policy, and optional
+manifest-backed frame asset IDs. The browser runtime advances the current frame
+strictly by fixed simulation ticks and exposes `currentClip`, `elapsedFrames`,
+and `frameIndex` through `window.__OUROFORGE__.getWorldState()`. This keeps
+animation replay-deterministic and probe-observable without timelines, skeletal
+rigs, blend trees, graphs, editor tooling, wall-clock playback, or asset import
+complexity.
 Audio v1 is evidence-first: scene entities may declare named `scene_loaded`
 audio events, and automated QA verifies the emitted event log in
 `getWorldState().audioEvents`. Speaker output and browser playback are not
