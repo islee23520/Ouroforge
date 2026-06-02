@@ -243,6 +243,21 @@ const OuroforgeDashboard = (() => {
     const evidenceAdded = Array.isArray(semantic.evidence?.added) ? semantic.evidence.added.length : 0;
     const evidenceRemoved = Array.isArray(semantic.evidence?.removed) ? semantic.evidence.removed.length : 0;
     const transactionChanged = semantic.transactionProvenance?.changed === true ? 'changed' : 'unchanged';
+    const project = semantic.project && typeof semantic.project === 'object' ? semantic.project : null;
+    const projectChanges = Array.isArray(project?.changes) ? project.changes : [];
+    const projectWarnings = Array.isArray(project?.warnings) ? project.warnings : [];
+    const projectSummary = project
+      ? `<section class="panel"><h5>Project context diff</h5>
+          <p class="run-meta">Read-only. Project comparison is loaded from Rust-authored comparison JSON.</p>
+          <div class="cards">
+            <div class="card"><div class="card-label">Relation</div><div class="card-value">${escapeText(project.relation || 'unknown')}</div></div>
+            <div class="card"><div class="card-label">Changed</div><div class="card-value">${escapeText(project.changed === true ? 'true' : 'false')}</div></div>
+            <div class="card"><div class="card-label">Project changes</div><div class="card-value">${escapeText(projectChanges.length)}</div></div>
+          </div>
+          ${projectChanges.length ? `<ul>${projectChanges.map((change) => `<li><span class="status">${escapeText(change.kind || 'project')}</span> ${escapeText(change.summary || '')}: ${escapeText(change.before ?? 'none')} → ${escapeText(change.after ?? 'none')}</li>`).join('')}</ul>` : '<p class="empty-state compact">No project context changes recorded.</p>'}
+          ${projectWarnings.length ? `<div class="artifact-warning">Project warnings: ${escapeText(projectWarnings.join(' · '))}</div>` : ''}
+        </section>`
+      : '<section class="panel"><h5>Project context diff</h5><p class="empty-state compact">No project comparison fields are available for this artifact.</p></section>';
     const warningList = warnings.length
       ? `<div class="artifact-warning">Semantic warnings: ${escapeText(warnings.join(' · '))}</div>`
       : '';
@@ -255,10 +270,12 @@ const OuroforgeDashboard = (() => {
         <div class="card"><div class="card-label">Events +/-</div><div class="card-value">${escapeText(`${eventAdded}/${eventRemoved}`)}</div></div>
         <div class="card"><div class="card-label">Performance changes</div><div class="card-value">${escapeText(perfChanged)}</div></div>
         <div class="card"><div class="card-label">Evidence +/-</div><div class="card-value">${escapeText(`${evidenceAdded}/${evidenceRemoved}`)}</div></div>
+        <div class="card"><div class="card-label">Project</div><div class="card-value">${escapeText(project?.relation || 'unavailable')}</div></div>
         <div class="card"><div class="card-label">Transaction</div><div class="card-value">${escapeText(transactionChanged)}</div></div>
       </div>
       <h6>Top semantic reasons</h6>
       ${reasonList}
+      ${projectSummary}
       ${warningList}
     </section>`;
   }

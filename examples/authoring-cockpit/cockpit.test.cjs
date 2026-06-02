@@ -60,7 +60,7 @@ const run = {
     ],
   },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
-  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
+  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, project: { relation: 'same_project', changed: true, changes: [{ kind: 'scene_hash', summary: 'scene hash changed for scenes/main.scene.json', before: 'before-scene', after: 'after-scene' }], warnings: ['project fixture warning'] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
   engine_summaries: {
     present: true,
     source_world_state: 'evidence/world.json',
@@ -116,9 +116,15 @@ assert.match(cockpit.renderComparisonSurface(run), /before/);
 assert.match(cockpit.renderComparisonSurface(run), /after/);
 assert.match(cockpit.renderComparisonSurface(run), /Semantic evidence diff/);
 assert.match(cockpit.renderComparisonSurface(run), /scene edit transaction provenance changed/);
+assert.match(cockpit.renderComparisonSurface(run), /Project context diff/);
+assert.match(cockpit.renderComparisonSurface(run), /same_project/);
+assert.match(cockpit.renderComparisonSurface(run), /scene hash changed for scenes\/main\.scene\.json/);
+assert.match(cockpit.renderComparisonSurface(run), /project fixture warning/);
 assert.match(cockpit.renderComparisonSurface(run), /fixture warning/);
 assert.match(cockpit.renderSemanticComparisonSummary({}), /No semantic comparison summary/);
 assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
+assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);
+assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { project: '<bad>' } } }), /No project comparison fields/);
 assert.match(cockpit.renderSemanticComparisonSummary({ semantic: { reasons: [{ kind: '<script>', severity: '<img>', summary: '<bad>' }], warnings: ['<warn>'] } }), /&lt;bad&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /foundation-scene/);

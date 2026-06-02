@@ -106,6 +106,12 @@ const run = {
           events: { added: ['console:warn:changed'], removed: [] },
           performance: { changed: [{ path: 'frame_stats/fps', before: 60, after: 55 }], warnings: [] },
           evidence: { added: ['artifact|application/json|evidence/new.json'], removed: [] },
+          project: {
+            relation: 'same_project',
+            changed: true,
+            changes: [{ kind: 'scene_hash', summary: 'scene hash changed for scenes/main.scene.json', before: 'before-scene', after: 'after-scene' }],
+            warnings: ['project fixture warning'],
+          },
           transactionProvenance: { changed: true },
           warnings: ['after world_state artifact could not be read: evidence/missing.json'],
         },
@@ -231,6 +237,10 @@ assert.match(detail, /Read-only\. Displays existing comparison artifacts only/);
 assert.match(detail, /Semantic evidence diff/);
 assert.match(detail, /scenario smoke changed from failed to passed/);
 assert.match(detail, /run-semantic-diff-v1/);
+assert.match(detail, /Project context diff/);
+assert.match(detail, /same_project/);
+assert.match(detail, /scene hash changed for scenes\/main\.scene\.json/);
+assert.match(detail, /project fixture warning/);
 assert.match(detail, /Semantic warnings/);
 assert.match(detail, /before-run/);
 assert.match(detail, /after-run/);
@@ -278,6 +288,8 @@ assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_st
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
+assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);
+assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: '<bad>' } } }), /No project comparison fields/);
 assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
 assert.match(dashboard.renderProjectContext({}), /No project workspace metadata/);
 assert.match(dashboard.renderProjectContext(run), /Scenario pack/);

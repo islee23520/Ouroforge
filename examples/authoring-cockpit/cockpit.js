@@ -463,20 +463,38 @@ const OuroforgeCockpit = (() => {
     }
     const reasons = Array.isArray(semantic.reasons) ? semantic.reasons : [];
     const warnings = Array.isArray(semantic.warnings) ? semantic.warnings : [];
+    const project = semantic.project && typeof semantic.project === 'object' ? semantic.project : null;
+    const projectChanges = Array.isArray(project?.changes) ? project.changes : [];
+    const projectWarnings = Array.isArray(project?.warnings) ? project.warnings : [];
     const reasonItems = reasons.length
       ? reasons.slice(0, 5).map((reason) => `<li><span class="status-ok">${escapeText(reason.severity || 'changed')}</span> ${escapeText(reason.kind || 'reason')}: ${escapeText(reason.summary || '')}</li>`).join('')
       : '<li>No semantic reasons recorded.</li>';
     const warningBlock = warnings.length
       ? `<div class="error">Warnings: ${escapeText(warnings.join(' · '))}</div>`
       : '';
+    const projectList = projectChanges.length
+      ? `<ul>${projectChanges.map((change) => `<li><strong>${escapeText(change.kind || 'project')}</strong>: ${escapeText(change.summary || '')} (${escapeText(change.before ?? 'none')} → ${escapeText(change.after ?? 'none')})</li>`).join('')}</ul>`
+      : '<p class="empty compact">No project context changes recorded.</p>';
+    const projectBlock = project
+      ? `<div class="semantic-project"><strong>Project context diff</strong>
+        <div class="field-grid compact">
+          <div><strong>Relation</strong><br>${escapeText(project.relation || 'unknown')}</div>
+          <div><strong>Changed</strong><br>${escapeText(project.changed === true ? 'true' : 'false')}</div>
+          <div><strong>Changes</strong><br>${escapeText(projectChanges.length)}</div>
+        </div>
+        ${projectList}
+        ${projectWarnings.length ? `<div class="error">Project warnings: ${escapeText(projectWarnings.join(' · '))}</div>` : ''}
+      </div>`
+      : '<p class="empty compact">No project comparison fields are available for this artifact.</p>';
     return `<div class="semantic-summary"><strong>Semantic evidence diff</strong>
       <div class="field-grid">
         <div><strong>Schema</strong><br>${escapeText(semantic.schemaVersion || 'legacy')}</div>
         <div><strong>Scenario diffs</strong><br>${escapeText((semantic.scenarios || []).length)}</div>
         <div><strong>World changes</strong><br>${escapeText((semantic.worldState?.changed || []).length)}</div>
+        <div><strong>Project</strong><br>${escapeText(project?.relation || 'unavailable')}</div>
         <div><strong>Transaction</strong><br>${escapeText(semantic.transactionProvenance?.changed ? 'changed' : 'unchanged')}</div>
       </div>
-      <ul>${reasonItems}</ul>${warningBlock}
+      <ul>${reasonItems}</ul>${projectBlock}${warningBlock}
     </div>`;
   }
 
