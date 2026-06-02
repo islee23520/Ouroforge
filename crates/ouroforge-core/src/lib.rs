@@ -6833,6 +6833,7 @@ pub struct RunDashboardReadModel {
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub replay: RunDashboardReplay,
     pub comparison: RunDashboardComparison,
+    pub engine_summaries: RunDashboardEngineSummaries,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
 }
@@ -6935,6 +6936,22 @@ pub struct RunDashboardComparisonArtifact {
     pub value: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardEngineSummaries {
+    pub present: bool,
+    pub empty_state: String,
+    pub source_world_state: Option<String>,
+    pub scene: serde_json::Value,
+    pub renderer: serde_json::Value,
+    pub tilemaps: serde_json::Value,
+    pub assets: serde_json::Value,
+    pub animation: serde_json::Value,
+    pub audio: serde_json::Value,
+    pub physics: serde_json::Value,
+    pub reload: serde_json::Value,
+    pub composition: serde_json::Value,
+}
+
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
     let runs_root = runs_root.as_ref();
     if !runs_root.exists() {
@@ -6991,6 +7008,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let replay = read_dashboard_replay(run_dir, &evidence)?;
     let comparison = read_dashboard_comparison(run_dir);
+    let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -7019,6 +7037,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         mutation_lifecycle,
         replay,
         comparison,
+        engine_summaries,
         evidence_categories,
         mutations,
     })
@@ -7408,6 +7427,115 @@ fn dashboard_replay_checkpoints(
             })
         })
         .collect()
+}
+
+fn dashboard_array_len(value: Option<&serde_json::Value>) -> usize {
+    value
+        .and_then(|candidate| candidate.as_array())
+        .map_or(0, Vec::len)
+}
+
+fn dashboard_entities_with_component(world_state: &serde_json::Value, component: &str) -> usize {
+    world_state
+        .get("entities")
+        .and_then(|entities| entities.as_array())
+        .map(|entities| {
+            entities
+                .iter()
+                .filter(|entity| {
+                    entity
+                        .get("components")
+                        .and_then(|components| components.get(component))
+                        .is_some()
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+fn read_dashboard_engine_summaries(
+    world_states: &[RunDashboardArtifact],
+) -> RunDashboardEngineSummaries {
+    let source = world_states.iter().find(|artifact| {
+        artifact.exists && artifact.read_error.is_none() && artifact.value.is_some()
+    });
+    let Some(artifact) = source else {
+        return RunDashboardEngineSummaries {
+            present: false,
+            empty_state:
+                "No readable world-state artifacts are available for Engine Expansion summaries."
+                    .to_string(),
+            source_world_state: None,
+            scene: json!({}),
+            renderer: json!({}),
+            tilemaps: json!({}),
+            assets: json!({}),
+            animation: json!({}),
+            audio: json!({}),
+            physics: json!({}),
+            reload: json!({}),
+            composition: json!({}),
+        };
+    };
+    let world_state = artifact.value.as_ref().expect("checked world-state value");
+    let entities = dashboard_array_len(world_state.get("entities"));
+    RunDashboardEngineSummaries {
+        present: true,
+        empty_state: String::new(),
+        source_world_state: Some(artifact.path.clone()),
+        scene: json!({
+            "sceneId": world_state.get("sceneId").cloned().unwrap_or(json!(null)),
+            "schemaVersion": world_state.get("schemaVersion").cloned().unwrap_or(json!(null)),
+            "entityCount": entities,
+            "tick": world_state.get("tick").cloned().unwrap_or(json!(null))
+        }),
+        renderer: json!({
+            "present": world_state.get("renderer").is_some(),
+            "version": world_state.pointer("/renderer/version").cloned().unwrap_or(json!(null)),
+            "renderedEntities": dashboard_array_len(world_state.pointer("/renderer/renderedEntities")),
+            "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null))
+        }),
+        tilemaps: json!({
+            "present": world_state.get("tilemaps").is_some(),
+            "tilemapCount": dashboard_array_len(world_state.pointer("/tilemaps/tilemaps")),
+            "layerCount": dashboard_array_len(world_state.pointer("/tilemaps/layerOrder"))
+        }),
+        assets: json!({
+            "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
+            "assetCount": dashboard_array_len(world_state.get("assets")),
+            "manifestAssetCount": world_state.pointer("/assetManifest/assetCount").cloned().unwrap_or(json!(null))
+        }),
+        animation: json!({
+            "animatedEntityCount": dashboard_entities_with_component(world_state, "animation")
+        }),
+        audio: json!({
+            "audioEventCount": dashboard_array_len(world_state.get("audioEvents")),
+            "audioEntityCount": dashboard_entities_with_component(world_state, "audio")
+        }),
+        physics: json!({
+            "collisionCount": dashboard_array_len(world_state.get("collisions")),
+            "collisionEventCount": dashboard_array_len(world_state.get("collisionEvents")),
+            "colliderEntityCount": dashboard_entities_with_component(world_state, "collider")
+        }),
+        reload: json!({
+            "reloadCount": dashboard_array_len(world_state.get("reloads")),
+            "lastStatus": world_state.get("reloads")
+                .and_then(|reloads| reloads.as_array())
+                .and_then(|reloads| reloads.last())
+                .and_then(|reload| reload.get("status"))
+                .cloned()
+                .unwrap_or(json!(null))
+        }),
+        composition: json!({
+            "present": world_state.get("composition").is_some(),
+            "entityCount": dashboard_array_len(world_state.pointer("/composition/entities")),
+            "parentedEntityCount": world_state
+                .pointer("/composition/entities")
+                .and_then(|entities| entities.as_array())
+                .map(|entities| entities.iter().filter(|entity| entity.get("parent").is_some_and(|parent| !parent.is_null())).count())
+                .unwrap_or(0)
+        }),
+    }
 }
 
 fn read_dashboard_comparison(run_dir: &Path) -> RunDashboardComparison {
@@ -12691,6 +12819,107 @@ scenarios:
             .iter()
             .any(|category| category.id == "mutation_artifacts" && category.count == 1));
 
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_extract_engine_expansion_state() {
+        let (root, artifacts) = create_test_run("dashboard-engine-summaries");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"passed\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts.run_dir.join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "sceneId": "foundation-scene",
+                "tick": 4,
+                "entities": [{
+                    "id": "player",
+                    "components": {
+                        "transform": { "x": 40, "y": 72 },
+                        "collider": { "body": "dynamic" },
+                        "animation": { "currentClip": "idle" },
+                        "audio": { "events": [] }
+                    }
+                }],
+                "renderer": { "version": "1", "camera": { "x": 0, "y": 0 }, "renderedEntities": [{ "entityId": "player" }] },
+                "tilemaps": { "tilemaps": [{ "id": "platformer-ground" }], "layerOrder": [{ "layerId": "background" }] },
+                "assetManifest": { "id": "runtime-v1-assets", "assetCount": 3 },
+                "assets": [{ "id": "player-sprite", "status": "loaded" }],
+                "audioEvents": [{ "name": "player_spawn" }],
+                "collisions": [{ "pairId": "goal:player" }],
+                "collisionEvents": [{ "type": "runtime.collision.trigger" }],
+                "reloads": [{ "status": "succeeded" }],
+                "composition": { "entities": [{ "entityId": "player", "parent": null }] }
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.engine_summaries.present);
+        assert_eq!(
+            model.engine_summaries.source_world_state.as_deref(),
+            Some("evidence/workers/worker-1/world-state.json")
+        );
+        assert_eq!(
+            model.engine_summaries.scene["sceneId"],
+            json!("foundation-scene")
+        );
+        assert_eq!(
+            model.engine_summaries.renderer["renderedEntities"],
+            json!(1)
+        );
+        assert_eq!(model.engine_summaries.tilemaps["tilemapCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.assets["manifestId"],
+            json!("runtime-v1-assets")
+        );
+        assert_eq!(
+            model.engine_summaries.animation["animatedEntityCount"],
+            json!(1)
+        );
+        assert_eq!(model.engine_summaries.audio["audioEventCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.physics["collisionEventCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.reload["lastStatus"],
+            json!("succeeded")
+        );
+        assert_eq!(model.engine_summaries.composition["entityCount"], json!(1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_handle_missing_world_state() {
+        let (root, artifacts) = create_test_run("dashboard-engine-summaries-empty");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"pending\"}\n",
+        )
+        .expect("verdict written");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(!model.engine_summaries.present);
+        assert!(model
+            .engine_summaries
+            .empty_state
+            .contains("No readable world-state artifacts"));
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
