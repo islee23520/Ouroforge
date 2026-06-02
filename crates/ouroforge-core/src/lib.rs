@@ -5859,6 +5859,28 @@ pub struct SceneAnimation {
     pub frame_duration: u32,
     #[serde(default = "default_animation_loop")]
     pub r#loop: bool,
+    #[serde(default)]
+    pub frames: Vec<SceneAnimationFrame>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub clips: Vec<SceneAnimationClip>,
+    #[serde(
+        default,
+        rename = "currentClip",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub current_clip: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<SceneAnimationState>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAnimationClip {
+    pub id: String,
+    #[serde(rename = "frameDuration")]
+    pub frame_duration: u32,
+    #[serde(default = "default_animation_loop")]
+    pub r#loop: bool,
     pub frames: Vec<SceneAnimationFrame>,
 }
 
@@ -5866,6 +5888,23 @@ pub struct SceneAnimation {
 #[serde(deny_unknown_fields)]
 pub struct SceneAnimationFrame {
     pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAnimationState {
+    #[serde(
+        default,
+        rename = "currentClip",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub current_clip: Option<String>,
+    #[serde(default, rename = "elapsedFrames")]
+    pub elapsed_frames: u32,
+    #[serde(default, rename = "frameIndex")]
+    pub frame_index: usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -6009,7 +6048,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             validate_scene_collider(&entity.id, collider)?;
         }
         if let Some(animation) = &entity.components.animation {
-            validate_scene_animation(&entity.id, animation)?;
+            validate_scene_animation(&entity.id, animation, scene.asset_manifest.as_ref())?;
         }
         if let Some(audio) = &entity.components.audio {
             validate_scene_audio(&entity.id, audio, scene.asset_manifest.as_ref())?;
@@ -6274,7 +6313,11 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
     Ok(())
 }
 
-fn validate_scene_animation(entity_id: &str, animation: &SceneAnimation) -> Result<()> {
+fn validate_scene_animation(
+    entity_id: &str,
+    animation: &SceneAnimation,
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
     if animation.mode != "sprite_frame" {
         return Err(anyhow!(
             "scene entity {entity_id} animation mode must be sprite_frame"
@@ -6285,15 +6328,93 @@ fn validate_scene_animation(entity_id: &str, animation: &SceneAnimation) -> Resu
             "scene entity {entity_id} animation frameDuration must be greater than 0"
         ));
     }
-    if animation.frames.is_empty() {
+    if animation.frames.is_empty() && animation.clips.is_empty() {
         return Err(anyhow!(
-            "scene entity {entity_id} animation frames must not be empty"
+            "scene entity {entity_id} animation frames or clips must not be empty"
         ));
     }
     for frame in &animation.frames {
-        validate_scene_color(&frame.color).with_context(|| {
-            format!("scene entity {entity_id} animation frame color is invalid")
-        })?;
+        validate_scene_animation_frame(entity_id, "default", frame, manifest)?;
+    }
+
+    let mut clip_ids = std::collections::BTreeSet::new();
+    for clip in &animation.clips {
+        validate_path_component(
+            &format!("scene entity {entity_id} animation clip id"),
+            &clip.id,
+        )?;
+        if !clip_ids.insert(clip.id.clone()) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} animation clip id: {}",
+                clip.id
+            ));
+        }
+        if clip.frame_duration == 0 {
+            return Err(anyhow!(
+                "scene entity {entity_id} animation clip {} frameDuration must be greater than 0",
+                clip.id
+            ));
+        }
+        if clip.frames.is_empty() {
+            return Err(anyhow!(
+                "scene entity {entity_id} animation clip {} frames must not be empty",
+                clip.id
+            ));
+        }
+        for frame in &clip.frames {
+            validate_scene_animation_frame(entity_id, &clip.id, frame, manifest)?;
+        }
+    }
+    if let Some(current_clip) = &animation.current_clip {
+        validate_path_component(
+            &format!("scene entity {entity_id} animation currentClip"),
+            current_clip,
+        )?;
+        if !animation.clips.is_empty() && !clip_ids.contains(current_clip) {
+            return Err(anyhow!(
+                "scene entity {entity_id} animation currentClip references unknown clip: {current_clip}"
+            ));
+        }
+    }
+    if let Some(state) = &animation.state {
+        if let Some(current_clip) = &state.current_clip {
+            validate_path_component(
+                &format!("scene entity {entity_id} animation state currentClip"),
+                current_clip,
+            )?;
+            if !animation.clips.is_empty() && !clip_ids.contains(current_clip) {
+                return Err(anyhow!(
+                    "scene entity {entity_id} animation state currentClip references unknown clip: {current_clip}"
+                ));
+            }
+        }
+        let frame_count = animation
+            .current_clip
+            .as_ref()
+            .and_then(|clip_id| animation.clips.iter().find(|clip| clip.id == *clip_id))
+            .or_else(|| animation.clips.first())
+            .map(|clip| clip.frames.len())
+            .unwrap_or(animation.frames.len());
+        if frame_count > 0 && state.frame_index >= frame_count {
+            return Err(anyhow!(
+                "scene entity {entity_id} animation state frameIndex must be within current frame list"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_animation_frame(
+    entity_id: &str,
+    clip_id: &str,
+    frame: &SceneAnimationFrame,
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
+    validate_scene_color(&frame.color).with_context(|| {
+        format!("scene entity {entity_id} animation clip {clip_id} frame color is invalid")
+    })?;
+    if let Some(asset) = &frame.asset {
+        validate_scene_asset_ref("scene animation frame asset", asset, manifest)?;
     }
     Ok(())
 }
@@ -11133,6 +11254,100 @@ scenarios:
             .contains("must be a local static asset path"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_animation_v1_accepts_named_clips_and_manifest_frame_refs() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "animation-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "assetManifest": {
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    { "id": "player-idle-1", "kind": "sprite", "path": "assets/sprites/player.svg" },
+                    { "id": "player-idle-2", "kind": "sprite", "path": "assets/sprites/goal.svg" }
+                ]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "asset": "player-idle-1" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "animation": {
+                        "mode": "sprite_frame",
+                        "frameDuration": 2,
+                        "currentClip": "idle",
+                        "clips": [{
+                            "id": "idle",
+                            "frameDuration": 2,
+                            "loop": true,
+                            "frames": [
+                                { "color": "#5eead4", "asset": "player-idle-1" },
+                                { "color": "#2dd4bf", "asset": "player-idle-2" }
+                            ]
+                        }],
+                        "state": { "currentClip": "idle", "elapsedFrames": 0, "frameIndex": 0 }
+                    }
+                }
+            }]
+        }))
+        .expect("animation scene parses");
+        validate_scene(&scene).expect("named animation clips validate");
+        let animation = scene.entities[0]
+            .components
+            .animation
+            .as_ref()
+            .expect("animation present");
+        assert_eq!(animation.current_clip.as_deref(), Some("idle"));
+        assert_eq!(
+            animation.clips[0].frames[1].asset.as_deref(),
+            Some("player-idle-2")
+        );
+
+        let mut unknown_clip = scene.clone();
+        unknown_clip.entities[0]
+            .components
+            .animation
+            .as_mut()
+            .expect("animation")
+            .current_clip = Some("run".to_string());
+        let rejected = validate_scene(&unknown_clip).expect_err("unknown clip rejected");
+        assert!(rejected
+            .to_string()
+            .contains("currentClip references unknown clip"));
+
+        let mut unknown_frame_ref = scene.clone();
+        unknown_frame_ref.entities[0]
+            .components
+            .animation
+            .as_mut()
+            .expect("animation")
+            .clips[0]
+            .frames[0]
+            .asset = Some("missing-frame".to_string());
+        let rejected =
+            validate_scene(&unknown_frame_ref).expect_err("unknown frame asset rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown asset manifest id"));
+
+        let mut bad_duration = scene.clone();
+        bad_duration.entities[0]
+            .components
+            .animation
+            .as_mut()
+            .expect("animation")
+            .clips[0]
+            .frame_duration = 0;
+        let rejected = validate_scene(&bad_duration).expect_err("zero clip duration rejected");
+        assert!(rejected
+            .to_string()
+            .contains("frameDuration must be greater than 0"));
     }
 
     #[test]
