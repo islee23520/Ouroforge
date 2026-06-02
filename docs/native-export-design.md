@@ -1,13 +1,69 @@
 # Native Export Design Gate
 
-Status: **EE12.1 feasibility audit draft; ADR decision pending in EE12.2**
+Status: **ADR complete — NO-GO for native export implementation now**
 
 Issue: #168 — Engine Expansion v1 Native Export Design Gate
 
-This document is the canonical native-export design artifact. EE12.1 audits
-feasibility only. It does not approve native export, create implementation
-issues, add build systems, scaffold Tauri/Electron/native shells, or change the
-browser-first evidence loop.
+This document is the canonical native-export design artifact. It records the
+feasibility audit and final EE12.2 architecture decision. The decision is
+**NO-GO for native export implementation now**. It does not approve native
+export, create implementation issues, add build systems, scaffold
+Tauri/Electron/native shells, or change the browser-first evidence loop.
+
+
+## ADR decision
+
+Decision: **NO-GO for native export implementation now**
+
+Rationale:
+
+1. The completed #167 platformer template is already inspectable through the
+   browser-first loop: workers=4 run evidence, scenario verdicts, dashboard
+   export, and read-only compare artifacts.
+2. Native export would add platform-specific behavior that current scenario and
+   artifact contracts do not verify.
+3. The strongest current need is inspectability, not distribution; inspectability
+   is already served by local static runtime, dashboard export, and compare.
+4. Tauri/Electron/custom native runtime options would introduce shell/process,
+   packaging, IPC/security, signing, updater, and CI concerns before the engine
+   has evidence-backed demand for them.
+5. A GO decision now would risk weakening the browser-worker QA source of truth
+   and expanding Engine Expansion v1 beyond its browser-first proof scope.
+
+Selected alternative: **defer native export and keep browser-first local workflow
+as canonical**. Static hosting/archive experiments may be reconsidered later only
+as separate design work; they are not authorized by #168.
+
+Consequences:
+
+- No native export implementation issues are created from #168.
+- No Tauri, Electron, custom native runtime, mobile/desktop packaging, installer,
+  signing, notarization, updater, server/cloud deployment, or platform-specific
+  build config is authorized.
+- Future work must continue to prove behavior through Seed -> Run -> Evidence ->
+  Evaluation -> Journal/Compare before any exported runtime is considered.
+- Browser-first worker runs remain the authoritative QA path.
+
+## Revisit criteria
+
+A future issue may reopen native export only if all of the following are true:
+
+1. There is an evidence-backed user/reviewer need that cannot be served by the
+   current local browser/static-server/dashboard workflow.
+2. The proposed export target is narrow (for example one desktop inspection shell
+   or one static archive format), not a broad desktop/mobile pipeline.
+3. A Rust-validated export artifact contract exists before shell/build code.
+4. The exported artifact can be traced to a Seed, run manifest, scenario verdict,
+   evidence index, journal, and comparison artifact.
+5. CI or documented verification can prove parity with browser-worker QA.
+6. Security boundaries for local files, IPC/message passing, generated evidence,
+   and update/deployment behavior are documented.
+7. The proposal explicitly preserves the no-cloud/no-auth/no-marketplace/no-plugin
+   and no-public-compatibility-claim boundaries unless a later issue authorizes
+   otherwise.
+
+If those criteria are met, a future design issue may propose a GO decision and
+only then create follow-up implementation issues.
 
 ## Current browser-first architecture
 
@@ -83,8 +139,8 @@ explicit contracts for:
   boundaries;
 - user-visible claims about compatibility, support, or production readiness.
 
-None of these gaps should be solved inside #168. They are design inputs for the
-ADR decision in EE12.2.
+None of these gaps should be solved inside #168. They informed the EE12.2
+NO-GO decision and define the type of evidence a future design gate would need.
 
 ## Alternatives considered for the audit
 
@@ -122,7 +178,7 @@ Those models are relevant only as comparison inputs, not as selected implementat
 
 ## No-code / no-scaffold audit
 
-EE12.1 intentionally changes documentation only. It adds no:
+#168 intentionally changes documentation only. It adds no:
 
 - native export implementation;
 - Tauri, Electron, Wry, WebView2, WKWebView, Android, iOS, desktop, or mobile
@@ -132,16 +188,8 @@ EE12.1 intentionally changes documentation only. It adds no:
 - server, database, cloud, auth, telemetry, marketplace, or plugin mechanism;
 - generated `runs/` or dashboard artifacts.
 
-## ADR inputs for EE12.2
+## Implementation issue policy
 
-EE12.2 should make an explicit GO/NO-GO decision using this audit. The decision
-should answer:
-
-- Is native export justified now by evidence-backed user needs?
-- Which alternative is selected or rejected?
-- What Rust artifact contracts remain canonical?
-- If GO, what exact follow-up issues are required before any implementation?
-- If NO-GO, what concrete revisit criteria would change the decision?
-
-Until EE12.2 is merged, this document records feasibility findings only and does
-not authorize implementation.
+Because the ADR is **NO-GO now**, #168 creates no follow-up implementation
+issues. Future implementation issues are allowed only after a later design gate
+meets the revisit criteria and records an explicit GO.
