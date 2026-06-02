@@ -23,6 +23,14 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output example
 
 After exporting dashboard data, refresh the cockpit to view the latest run evidence and journal pane. The browser still does not mutate files directly.
 
+## Live preview controls
+
+The cockpit embeds the existing browser runtime and uses its
+`window.__OUROFORGE__` probe API for local pause, resume, step, and
+reset/reload controls. The controls show frame stats and world-state excerpts
+from the probe. Preview state is ephemeral browser memory only: it is not saved,
+does not write scene files, and does not replace the runtime probe API.
+
 ## Runtime v1 demo compatibility
 
 The cockpit remains compatible with the Runtime v1 demo scene for inspection and

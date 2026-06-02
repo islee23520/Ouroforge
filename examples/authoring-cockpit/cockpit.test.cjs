@@ -19,10 +19,15 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /# Journal/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
+assert.match(cockpit.renderIntegration(run), /Pause/);
+assert.match(cockpit.renderIntegration(run), /Step 1 frame/);
+assert.match(cockpit.renderPreviewControls({ ok: false, error: 'probe missing' }), /probe missing/);
 
 let paused = false;
 let tick = 0;
+let reloads = 0;
 const probeWindow = {
+  location: { reload: () => { reloads += 1; } },
   __OUROFORGE__: {
     getWorldState: () => ({ tick, paused, entities: [{ id: 'player' }] }),
     getFrameStats: () => ({ tick, fixedDeltaMs: 16 }),
@@ -39,10 +44,17 @@ assert.equal(probeRead.frameStats.tick, 0);
 assert.equal(cockpit.callPreviewProbe(probeWindow, 'pause').worldState.paused, true);
 assert.equal(cockpit.callPreviewProbe(probeWindow, 'resume').worldState.paused, false);
 assert.equal(cockpit.callPreviewProbe(probeWindow, 'step', 2).frameStats.tick, 2);
+const previewStateMarkup = cockpit.renderPreviewControls(cockpit.readPreviewProbe(probeWindow));
+assert.match(previewStateMarkup, /probe ready/);
+assert.match(previewStateMarkup, /Current tick/);
+assert.match(previewStateMarkup, /&quot;tick&quot;: 2/);
+assert.equal(cockpit.reloadPreview(probeWindow).ok, true);
+assert.equal(reloads, 1);
 assert.match(cockpit.resolvePreviewProbe(null).error, /window is unavailable/);
 assert.match(cockpit.resolvePreviewProbe({}, ['pause']).error, /probe is unavailable/);
 assert.match(cockpit.resolvePreviewProbe({ __OUROFORGE__: {} }, ['pause']).error, /missing method/);
 assert.match(cockpit.callPreviewProbe({ __OUROFORGE__: { getWorldState: () => { throw new Error('boom'); }, getFrameStats: () => ({}) } }, 'getFrameStats').error, /read failed/);
+assert.match(cockpit.reloadPreview({}).error, /reload is unavailable/);
 
 // A cleared numeric input must be rejected, not silently coerced to 0.
 assert.throws(() => cockpit.applyEdit(scene, 'player', 'components.transform.x', ''), /Invalid numeric/);

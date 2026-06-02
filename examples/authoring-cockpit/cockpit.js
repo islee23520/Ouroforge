@@ -155,6 +155,43 @@ const OuroforgeCockpit = (() => {
     }
   }
 
+  function reloadPreview(source) {
+    const runtimeWindow = previewWindow(source);
+    if (!runtimeWindow) return unavailablePreviewProbe('runtime preview window is unavailable');
+    if (!runtimeWindow.location || typeof runtimeWindow.location.reload !== 'function') {
+      return unavailablePreviewProbe('runtime preview reload is unavailable');
+    }
+    runtimeWindow.location.reload();
+    return { ok: true, method: 'reset', message: 'runtime preview reload requested' };
+  }
+
+  function renderPreviewControls(state = null) {
+    const status = state
+      ? state.ok ? '<span class="status-ok">probe ready</span>' : `<span class="status-error">${escapeText(state.error || 'probe unavailable')}</span>`
+      : '<span class="status-idle">waiting for probe action</span>';
+    const frameStats = state?.frameStats
+      ? `<pre>${escapeText(JSON.stringify(state.frameStats, null, 2))}</pre>`
+      : '<p class="empty compact">No frame stats loaded yet.</p>';
+    const worldState = state?.worldState
+      ? `<pre>${escapeText(JSON.stringify(state.worldState, null, 2))}</pre>`
+      : '<p class="empty compact">No world state loaded yet.</p>';
+    return `<div class="preview-controls">
+      <p class="hint">Ephemeral local controls. Uses <code>window.__OUROFORGE__</code>; does not write scene files or persist preview state.</p>
+      <div class="control-row">
+        <button class="secondary" type="button" data-preview-action="pause">Pause</button>
+        <button class="secondary" type="button" data-preview-action="resume">Resume</button>
+        <button class="secondary" type="button" data-preview-action="step">Step 1 frame</button>
+        <button class="secondary" type="button" data-preview-action="reset">Reset / reload</button>
+      </div>
+      <div class="field-grid">
+        <div><strong>Probe status</strong><br>${status}</div>
+        <div><strong>Current tick</strong><br>${escapeText(state?.frameStats?.tick ?? state?.worldState?.tick ?? 'unknown')}</div>
+      </div>
+      <h3>Frame stats</h3>${frameStats}
+      <h3>World state</h3>${worldState}
+    </div>`;
+  }
+
   function renderQaPanel() {
     return `<section class="panel"><h2>Run QA</h2><p class="hint">Run the evidence-native QA command, then export dashboard data to refresh evidence and journal panes.</p><button id="run-qa-button" class="primary" type="button">Show QA command</button><pre id="qa-command">${qaCommand()}</pre><pre>${dashboardExportCommand()}</pre></section>`;
   }
@@ -167,8 +204,8 @@ const OuroforgeCockpit = (() => {
     return `<section class="panel"><h2>Evidence + Journal</h2><div class="field-grid"><div><strong>Run</strong><br>${escapeText(run.summary.id)}</div><div><strong>Verdict</strong><br>${escapeText(run.summary.verdict_status)}</div><div><strong>Evidence</strong><br>${run.evidence.length}</div><div><strong>Mutations</strong><br>${run.mutations.length}</div></div><h3>Screenshots</h3><p>${screenshots}</p><h3>Journal</h3><pre>${escapeText(run.journal || 'No journal loaded.')}</pre></section>`;
   }
 
-  function renderIntegration(run) {
-    return `${renderPreview()}${renderQaPanel()}${renderEvidencePane(run)}`;
+  function renderIntegration(run, previewState = null) {
+    return `${renderPreview()}${renderPreviewControls(previewState)}${renderQaPanel()}${renderEvidencePane(run)}`;
   }
 
   async function loadDashboardData(path = DEFAULT_DASHBOARD_DATA_PATH) {
@@ -184,6 +221,7 @@ const OuroforgeCockpit = (() => {
     let scene = await fetch('../game-runtime/scene.json').then((response) => response.json());
     let selectedId = scene.entities[0]?.id;
     let latest = null;
+    let previewState = null;
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
@@ -193,13 +231,25 @@ const OuroforgeCockpit = (() => {
     const paint = () => {
       treeEl.innerHTML = renderTree(scene, selectedId);
       inspectorEl.innerHTML = renderInspector(scene, selectedId);
-      integrationEl.innerHTML = renderIntegration(latest);
+      integrationEl.innerHTML = renderIntegration(latest, previewState);
       treeEl.querySelectorAll('[data-entity-id]').forEach((button) => button.addEventListener('click', () => { selectedId = button.dataset.entityId; paint(); }));
       inspectorEl.querySelectorAll('[data-edit-path]').forEach((input) => input.addEventListener('change', () => {
         const path = input.dataset.editPath;
         scene = applyEdit(scene, selectedId, path, input.value);
         const entity = scene.entities.find((candidate) => candidate.id === selectedId);
         document.getElementById('edit-command').textContent = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
+      }));
+      integrationEl.querySelectorAll('[data-preview-action]').forEach((button) => button.addEventListener('click', () => {
+        const previewFrame = document.getElementById('runtime-preview');
+        const action = button.dataset.previewAction;
+        if (action === 'reset') {
+          previewState = reloadPreview(previewFrame);
+        } else if (action === 'step') {
+          previewState = callPreviewProbe(previewFrame, 'step', 1);
+        } else {
+          previewState = callPreviewProbe(previewFrame, action);
+        }
+        paint();
       }));
       document.getElementById('run-qa-button')?.addEventListener('click', () => {
         document.getElementById('qa-command').textContent = `${qaCommand()}\n${dashboardExportCommand()}`;
@@ -208,7 +258,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, resolvePreviewProbe, validateEdit };
+  return { EDITABLE_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderPreviewControls, renderQaPanel, renderTree, resolvePreviewProbe, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
