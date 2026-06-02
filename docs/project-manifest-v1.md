@@ -4,7 +4,8 @@ Project Manifest v1 is the Rust-trusted local workspace contract for Project
 Workspace Loop v1. It lets Ouroforge identify a small game project and validate
 which scene, Seed, scenario pack, asset, run, and generated-state paths belong
 to that project before project-scoped run, compare, mutation, or Studio behavior
-is added.
+is added. Project Run v1 now consumes this manifest for validated run
+metadata binding; see `docs/project-run-v1.md`.
 
 The manifest file is named exactly `ouroforge.project.json`.
 
@@ -107,8 +108,9 @@ workspace boundary:
   project manifest. Project-scoped commands may later use manifest `seeds[]` to
   select authorized Seed files.
 - **Run/Evidence**: current runs still work under the repository-level `runs/`
-  default. Project run binding in #249 may use `runsRoot` and manifest
-  provenance, but this manifest issue does not change run metadata.
+  default. Project Run v1 can bind `run <seed> --project <root-or-manifest>`
+  to manifest provenance, scene hashes, scenario pack context, journal output,
+  and dashboard export. See `docs/project-run-v1.md`.
 - **Scenario packs**: the manifest can reference pack files and `project validate`
   resolves them through Scenario Pack v1 validation. The pack schema and current
   execution boundary are documented in `docs/scenario-pack-v1.md`.
@@ -151,7 +153,7 @@ Project Manifest v1 does not authorize:
 
 - `project init` or project scaffold behavior;
 - scenario pack execution;
-- project run metadata binding;
+- additional project run metadata binding beyond Project Run v1;
 - project comparison changes;
 - Studio v3 UI changes;
 - native export;

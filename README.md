@@ -18,6 +18,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Validate a local project workspace manifest with `project validate`.
 - Scaffold a tiny local project workspace with `project init --template minimal-2d`.
 - Validate project scenario packs through `project validate`.
+- Run project-declared Seeds with additive project metadata using `run <seed> --project <root-or-manifest> --scenario-pack <id>`.
 
 ## Prerequisites
 
@@ -36,13 +37,14 @@ cargo test
 cargo run -p ouroforge-cli -- seed validate seeds/platformer.yaml
 cargo run -p ouroforge-cli -- project validate examples/project-workspace-fixtures/valid
 cargo run -p ouroforge-cli -- project init .omx/tmp/project-scaffold-smoke --template minimal-2d
+cargo run -p ouroforge-cli -- run .omx/tmp/project-scaffold-smoke/seeds/platformer.yaml --project .omx/tmp/project-scaffold-smoke --scenario-pack smoke --workers 1
 rm -rf .omx/tmp/project-scaffold-smoke
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
 cargo run -p ouroforge-cli -- seed validate seeds/runtime-v1-demo.yaml
 cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
 ```
 
-The run command prints a run directory such as `runs/run-...`. Generated run artifacts are intentionally ignored by git.
+The run command prints a run directory such as `runs/run-...`. Project-bound runs add optional project context to `run.json`, ledger, journal, and dashboard export; legacy runs without `--project` remain compatible. Generated run artifacts are intentionally ignored by git.
 
 Inspect a run:
 
@@ -93,7 +95,7 @@ For Engine Expansion v1 integration evidence, validate and run `seeds/engine-exp
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
 - `examples/authoring-cockpit` — static authoring cockpit prototype over the minimal scene model.
-- `docs/` — architecture, roadmap, manifest contract, public-readiness audit, and demo evidence notes.
+- `docs/` — architecture, roadmap, manifest/project-run contracts, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 
@@ -102,6 +104,7 @@ Do not commit generated or local runtime/tool state:
 - `runs/`
 - `target/`
 - `examples/evidence-dashboard/dashboard-data.json`
+- `.claude/`
 - `.openchrome/`
 - `.omc/`
 - `.omx/`

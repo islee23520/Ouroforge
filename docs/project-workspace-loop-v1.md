@@ -136,7 +136,7 @@ exact artifact or assertion that proves its contract.
 ## Rust-trusted / browser-read-only boundary
 
 Rust CLI/code owns trusted reads, writes, validation, scaffold generation,
-manifest resolution, run binding, comparison artifacts, scene-only mutation
+manifest resolution, run binding, journal/dashboard project-context export, comparison artifacts, scene-only mutation
 application, and rollback metadata. Browser examples may read exported JSON and
 display copyable command strings. Browser JavaScript must not directly write
 trusted files, execute local commands, or become a command bridge.
@@ -170,7 +170,8 @@ evaluation remain design references only.
   semantics. The schema, examples, and execution boundary are documented in
   `docs/scenario-pack-v1.md`.
 - #249 binds runs to project manifest, scene, seed, scenario pack, and optional
-  transaction provenance.
+  transaction provenance. The command contract and metadata fields are documented
+  in `docs/project-run-v1.md`.
 - #250 extends semantic comparison with project-level context.
 - #251 makes scene-only mutation application project-aware and limited to
   manifest-authorized scenes.

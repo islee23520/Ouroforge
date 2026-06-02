@@ -15,6 +15,23 @@ reads `dashboard-data.json` and links to artifact paths; it does not edit,
 delete, upload, or index run artifacts outside the generated export.
 
 
+
+Project-bound run inspection:
+
+```bash
+cargo run -p ouroforge-cli -- project init .omx/tmp/project-dashboard-smoke --template minimal-2d
+cargo run -p ouroforge-cli -- run .omx/tmp/project-dashboard-smoke/seeds/platformer.yaml --project .omx/tmp/project-dashboard-smoke --scenario-pack smoke --workers 1
+LATEST_RUN=$(ls -td runs/run-* | head -1)
+cargo run -p ouroforge-cli -- journal update "$LATEST_RUN"
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+rm -rf .omx/tmp/project-dashboard-smoke
+```
+
+Refresh the dashboard after export to inspect the read-only Project Context
+panel. The browser displays Rust-exported project metadata only; it does not
+validate project manifests, write files, execute commands, or infer trusted
+project state.
+
 Engine Expansion v1 playable-template inspection:
 
 ```bash
