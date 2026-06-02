@@ -619,7 +619,7 @@ fn reserve_loopback_port() -> Result<u16> {
 }
 
 fn wait_for_cdp(cdp_url: &str) -> Result<()> {
-    for _ in 0..100 {
+    for _ in 0..300 {
         if read_cdp_targets(cdp_url).is_ok() {
             return Ok(());
         }

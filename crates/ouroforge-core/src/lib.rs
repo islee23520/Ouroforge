@@ -5376,10 +5376,27 @@ fn read_json_path<'a>(value: &'a serde_json::Value, path: &str) -> Option<&'a se
     Some(current)
 }
 
+fn wait_for_runtime_step_api<T: CdpTransport>(client: &mut CdpClient<T>) -> Result<()> {
+    let expression = "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.step === 'function' && typeof window.__OUROFORGE__.setInput === 'function')";
+    let mut last_value = serde_json::Value::Null;
+    for _ in 0..30 {
+        last_value = client.evaluate_json(expression)?;
+        if last_value == json!(true) {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    Err(anyhow!(
+        "window.__OUROFORGE__ step/input API not ready for scenario step; last readiness value: {}",
+        last_value
+    ))
+}
+
 fn execute_scenario_step<T: CdpTransport>(
     client: &mut CdpClient<T>,
     step: &ScenarioStep,
 ) -> Result<()> {
+    wait_for_runtime_step_api(client)?;
     match step {
         ScenarioStep::Wait { wait } => {
             client.evaluate_json(&format!("window.__OUROFORGE__.step({})", wait.frames))?;
@@ -5418,6 +5435,7 @@ fn execute_input_replay<T: CdpTransport>(
     while index < replay.events.len() {
         let frame = replay.events[index].frame;
         if frame > current_frame {
+            wait_for_runtime_step_api(client)?;
             client.evaluate_json(&format!(
                 "window.__OUROFORGE__.step({})",
                 frame - current_frame
@@ -5438,6 +5456,7 @@ fn execute_input_replay<T: CdpTransport>(
         }
         let input_json =
             serde_json::to_string(&patch).context("failed to serialize replay input patch")?;
+        wait_for_runtime_step_api(client)?;
         client.evaluate_json(&format!("window.__OUROFORGE__.setInput({input_json})"))?;
     }
     Ok(())
@@ -8703,13 +8722,17 @@ scenarios:
             params: serde_json::Value,
         ) -> Result<serde_json::Value> {
             assert_eq!(method, "Runtime.evaluate");
-            self.calls.push(
-                params["expression"]
-                    .as_str()
-                    .expect("expression is present")
-                    .to_string(),
-            );
-            Ok(json!({ "result": { "value": {} } }))
+            let expression = params["expression"]
+                .as_str()
+                .expect("expression is present")
+                .to_string();
+            self.calls.push(expression.clone());
+            let value = if expression.contains("typeof window.__OUROFORGE__.step") {
+                json!(true)
+            } else {
+                json!({})
+            };
+            Ok(json!({ "result": { "value": value } }))
         }
     }
 
@@ -10107,18 +10130,25 @@ scenarios:
         .expect("replay executes");
 
         let transport = client.into_transport();
-        assert_eq!(transport.calls[0], "window.__OUROFORGE__.step(3)");
+        let readiness = "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.step === 'function' && typeof window.__OUROFORGE__.setInput === 'function')";
+        assert_eq!(transport.calls[0], readiness);
+        assert_eq!(transport.calls[1], "window.__OUROFORGE__.step(3)");
+        assert_eq!(transport.calls[2], readiness);
         assert_eq!(
-            transport.calls[1],
+            transport.calls[3],
             "window.__OUROFORGE__.setInput({\"right\":true})"
         );
+        assert_eq!(transport.calls[4], readiness);
+        assert_eq!(transport.calls[5], readiness);
         assert_eq!(
-            transport.calls[2],
+            transport.calls[6],
             "window.__OUROFORGE__.setInput({\"right\":true})"
         );
-        assert_eq!(transport.calls[3], "window.__OUROFORGE__.step(4)");
+        assert_eq!(transport.calls[7], readiness);
+        assert_eq!(transport.calls[8], "window.__OUROFORGE__.step(4)");
+        assert_eq!(transport.calls[9], readiness);
         assert_eq!(
-            transport.calls[4],
+            transport.calls[10],
             "window.__OUROFORGE__.setInput({\"right\":false})"
         );
     }
