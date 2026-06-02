@@ -163,15 +163,70 @@ pub enum ReplayKey {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum ScenarioAssertion {
-    WorldState { world_state: JsonPathAssertion },
-    FrameStats { frame_stats: JsonPathAssertion },
+    WorldState {
+        world_state: JsonPathAssertion,
+    },
+    FrameStats {
+        frame_stats: JsonPathAssertion,
+    },
+    RuntimeEvents {
+        runtime_events: JsonPathAssertion,
+    },
+    PerformanceMetrics {
+        performance_metrics: JsonPathAssertion,
+    },
+    ConsoleErrors {
+        console_errors: JsonPathAssertion,
+    },
+    CollisionEvidence {
+        collision_evidence: JsonPathAssertion,
+    },
+    AudioEvidence {
+        audio_evidence: JsonPathAssertion,
+    },
+    AnimationEvidence {
+        animation_evidence: JsonPathAssertion,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct JsonPathAssertion {
     pub path: String,
-    pub equals: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equals: Option<serde_json::Value>,
+    #[serde(default, rename = "notEquals", skip_serializing_if = "Option::is_none")]
+    pub not_equals: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exists: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contains: Option<serde_json::Value>,
+    #[serde(
+        default,
+        rename = "greaterThan",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub greater_than: Option<serde_json::Value>,
+    #[serde(default, rename = "lessThan", skip_serializing_if = "Option::is_none")]
+    pub less_than: Option<serde_json::Value>,
+    #[serde(
+        default,
+        rename = "countEquals",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub count_equals: Option<u64>,
+    #[serde(
+        default,
+        rename = "countGreaterThan",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub count_greater_than: Option<u64>,
+    #[serde(
+        default,
+        rename = "countLessThan",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub count_less_than: Option<u64>,
 }
 
 impl Seed {
@@ -472,6 +527,14 @@ impl ScenarioAssertion {
         let assertion = match self {
             ScenarioAssertion::WorldState { world_state } => world_state,
             ScenarioAssertion::FrameStats { frame_stats } => frame_stats,
+            ScenarioAssertion::RuntimeEvents { runtime_events } => runtime_events,
+            ScenarioAssertion::PerformanceMetrics {
+                performance_metrics,
+            } => performance_metrics,
+            ScenarioAssertion::ConsoleErrors { console_errors } => console_errors,
+            ScenarioAssertion::CollisionEvidence { collision_evidence } => collision_evidence,
+            ScenarioAssertion::AudioEvidence { audio_evidence } => audio_evidence,
+            ScenarioAssertion::AnimationEvidence { animation_evidence } => animation_evidence,
         };
         assertion.validate(scenario_index, assertion_index)
     }
@@ -486,10 +549,45 @@ impl JsonPathAssertion {
         validate_scenario_path(&self.path).with_context(|| {
             format!("scenarios[{scenario_index}].assertions[{assertion_index}].path is invalid")
         })?;
-        if self.equals.is_null() {
+        let operator_count = [
+            self.equals.is_some(),
+            self.not_equals.is_some(),
+            self.exists.is_some(),
+            self.contains.is_some(),
+            self.greater_than.is_some(),
+            self.less_than.is_some(),
+            self.count_equals.is_some(),
+            self.count_greater_than.is_some(),
+            self.count_less_than.is_some(),
+        ]
+        .into_iter()
+        .filter(|present| *present)
+        .count();
+        if operator_count != 1 {
             return Err(anyhow!(
-                "scenarios[{scenario_index}].assertions[{assertion_index}].equals must not be null"
+                "scenarios[{scenario_index}].assertions[{assertion_index}] must define exactly one bounded assertion operator"
             ));
+        }
+        for (operator, value) in [
+            ("equals", &self.equals),
+            ("notEquals", &self.not_equals),
+            ("contains", &self.contains),
+        ] {
+            if value.as_ref().is_some_and(serde_json::Value::is_null) {
+                return Err(anyhow!(
+                    "scenarios[{scenario_index}].assertions[{assertion_index}].{operator} must not be null"
+                ));
+            }
+        }
+        for (operator, value) in [
+            ("greaterThan", &self.greater_than),
+            ("lessThan", &self.less_than),
+        ] {
+            if value.as_ref().is_some_and(|value| !value.is_number()) {
+                return Err(anyhow!(
+                    "scenarios[{scenario_index}].assertions[{assertion_index}].{operator} must be numeric"
+                ));
+            }
         }
         Ok(())
     }
@@ -2842,19 +2940,42 @@ fn evaluate_scenario_assertions(
             let (target, assertion) = match assertion {
                 ScenarioAssertion::WorldState { world_state } => ("world_state", world_state),
                 ScenarioAssertion::FrameStats { frame_stats } => ("frame_stats", frame_stats),
+                ScenarioAssertion::RuntimeEvents { runtime_events } => {
+                    ("runtime_events", runtime_events)
+                }
+                ScenarioAssertion::PerformanceMetrics {
+                    performance_metrics,
+                } => ("performance_metrics", performance_metrics),
+                ScenarioAssertion::ConsoleErrors { console_errors } => {
+                    ("console_errors", console_errors)
+                }
+                ScenarioAssertion::CollisionEvidence { collision_evidence } => {
+                    ("collision_evidence", collision_evidence)
+                }
+                ScenarioAssertion::AudioEvidence { audio_evidence } => {
+                    ("audio_evidence", audio_evidence)
+                }
+                ScenarioAssertion::AnimationEvidence { animation_evidence } => {
+                    ("animation_evidence", animation_evidence)
+                }
             };
-            let source = if target == "world_state" {
-                world_state
-            } else {
-                frame_stats
+            let null_source = serde_json::Value::Null;
+            let source = match target {
+                "world_state" => world_state,
+                "frame_stats" => frame_stats,
+                _ => &null_source,
             };
             let actual = read_json_path(source, &assertion.path)
                 .cloned()
                 .unwrap_or(serde_json::Value::Null);
-            let passed = actual == assertion.equals;
+            let passed = assertion
+                .equals
+                .as_ref()
+                .is_some_and(|expected| &actual == expected);
             json!({
                 "target": target,
                 "path": assertion.path,
+                "operator": if assertion.equals.is_some() { "equals" } else { "unsupported_until_evaluation_pr" },
                 "expected": assertion.equals,
                 "actual": actual,
                 "passed": passed
@@ -3997,6 +4118,95 @@ scenarios:
     }
 
     #[test]
+    fn parses_bounded_richer_assertion_schema() {
+        let valid = r#"
+id: assertion-model.v1
+title: Assertion Model Fixture
+goal: Validate bounded assertion schema.
+constraints:
+  target: file-harness
+acceptance:
+  - Validate richer assertions.
+scenarios:
+  - id: assertion-smoke
+    description: Valid richer assertions.
+    assertions:
+      - world_state:
+          path: player.health
+          greaterThan: 0
+      - runtime_events:
+          path: events
+          countGreaterThan: 0
+      - frame_stats:
+          path: fixedDeltaMs
+          lessThan: 33
+      - performance_metrics:
+          path: ScriptDuration
+          exists: true
+      - console_errors:
+          path: logs
+          countEquals: 0
+      - collision_evidence:
+          path: pairs
+          contains: goal:player
+      - audio_evidence:
+          path: events.0.kind
+          notEquals: missing
+      - animation_evidence:
+          path: tracks.idle
+          equals: true
+"#;
+
+        let seed = Seed::from_yaml_str(valid).expect("richer assertion schema parses");
+
+        assert_eq!(seed.scenarios[0].assertions.len(), 8);
+    }
+
+    #[test]
+    fn rejects_unbounded_or_ambiguous_assertion_schema() {
+        let arbitrary_expression = r#"
+id: assertion-model.v1
+title: Assertion Model Fixture
+goal: Reject arbitrary assertion schema.
+constraints:
+  target: file-harness
+acceptance:
+  - Reject arbitrary assertions.
+scenarios:
+  - id: assertion-smoke
+    description: Invalid expression assertion.
+    assertions:
+      - world_state:
+          path: player.health
+          expression: player.health > 0
+"#;
+        let error = Seed::from_yaml_str(arbitrary_expression).expect_err("expression field fails");
+        assert!(error.to_string().contains("failed to parse Seed YAML"));
+
+        let multiple_operators = r#"
+id: assertion-model.v1
+title: Assertion Model Fixture
+goal: Reject ambiguous assertion schema.
+constraints:
+  target: file-harness
+acceptance:
+  - Reject ambiguous assertions.
+scenarios:
+  - id: assertion-smoke
+    description: Invalid multi-operator assertion.
+    assertions:
+      - world_state:
+          path: player.health
+          equals: 1
+          greaterThan: 0
+"#;
+        let error = Seed::from_yaml_str(multiple_operators).expect_err("multiple operators fail");
+        assert!(error
+            .to_string()
+            .contains("must define exactly one bounded assertion operator"));
+    }
+
+    #[test]
     fn rejects_seed_missing_required_target() {
         let invalid = r#"
 id: platformer.v0
@@ -4785,28 +4995,16 @@ scenarios:
             steps: Vec::new(),
             assertions: vec![
                 ScenarioAssertion::WorldState {
-                    world_state: JsonPathAssertion {
-                        path: "tick".to_string(),
-                        equals: json!(2),
-                    },
+                    world_state: json_path_equals("tick", json!(2)),
                 },
                 ScenarioAssertion::FrameStats {
-                    frame_stats: JsonPathAssertion {
-                        path: "fixedDeltaMs".to_string(),
-                        equals: json!(16),
-                    },
+                    frame_stats: json_path_equals("fixedDeltaMs", json!(16)),
                 },
                 ScenarioAssertion::WorldState {
-                    world_state: JsonPathAssertion {
-                        path: "object.id".to_string(),
-                        equals: json!("missing"),
-                    },
+                    world_state: json_path_equals("object.id", json!("missing")),
                 },
                 ScenarioAssertion::WorldState {
-                    world_state: JsonPathAssertion {
-                        path: "collisions.0.pairId".to_string(),
-                        equals: json!("goal:player"),
-                    },
+                    world_state: json_path_equals("collisions.0.pairId", json!("goal:player")),
                 },
             ],
         };
@@ -5663,6 +5861,21 @@ scenarios:
         seed.push_str("evaluator:\n");
         seed.push_str(evaluator_yaml);
         fs::write(run_dir.join("seed.snapshot.yaml"), seed).expect("seed snapshot updated");
+    }
+
+    fn json_path_equals(path: &str, expected: serde_json::Value) -> JsonPathAssertion {
+        JsonPathAssertion {
+            path: path.to_string(),
+            equals: Some(expected),
+            not_equals: None,
+            exists: None,
+            contains: None,
+            greater_than: None,
+            less_than: None,
+            count_equals: None,
+            count_greater_than: None,
+            count_less_than: None,
+        }
     }
 
     fn create_test_run(prefix: &str) -> (PathBuf, RunArtifacts) {
