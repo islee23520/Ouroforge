@@ -1956,6 +1956,7 @@ pub struct EvolveSummary {
     pub proposals_created: usize,
     pub proposal_ids: Vec<String>,
     pub classification_ids: Vec<String>,
+    pub patch_draft_ids: Vec<String>,
     pub reason: String,
 }
 
@@ -1975,6 +1976,7 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
             proposals_created: 0,
             proposal_ids: Vec::new(),
             classification_ids: Vec::new(),
+            patch_draft_ids: Vec::new(),
             reason: format!("verdict status is {verdict_status}; evolve v0 only proposes mutations for failed runs"),
         };
         append_ledger_event(
@@ -2018,12 +2020,19 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         .iter()
         .map(|classification| classification.id.clone())
         .collect::<Vec<_>>();
+    let patch_draft_artifact = generate_patch_drafts(run_dir)?;
+    let patch_draft_ids = patch_draft_artifact
+        .drafts
+        .iter()
+        .map(|draft| draft.id.clone())
+        .collect::<Vec<_>>();
 
     let summary = EvolveSummary {
         status: "proposed".to_string(),
         proposals_created: proposal_ids.len(),
         proposal_ids,
         classification_ids,
+        patch_draft_ids,
         reason: "failed verdict produced deterministic placeholder mutation proposal".to_string(),
     };
     append_ledger_event(
@@ -2034,7 +2043,8 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
             "status": summary.status,
             "proposals_created": summary.proposals_created,
             "proposal_ids": summary.proposal_ids,
-            "classification_ids": summary.classification_ids
+            "classification_ids": summary.classification_ids,
+            "patch_draft_ids": summary.patch_draft_ids
         }),
     )?;
     Ok(summary)
@@ -2539,6 +2549,118 @@ pub fn write_patch_draft_artifact(
     let path = dir.join("patch-drafts.json");
     write_json_atomic(&path, &json!(artifact))?;
     Ok(path)
+}
+
+pub fn generate_patch_drafts(run_dir: impl AsRef<Path>) -> Result<PatchDraftArtifact> {
+    let run_dir = run_dir.as_ref();
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let run_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    let proposals = read_mutation_proposals(run_dir)?.proposals;
+    if proposals.is_empty() {
+        return Err(anyhow!(
+            "patch draft generation requires a mutation proposal"
+        ));
+    }
+    let classifications = read_mutation_classification_artifact(run_dir)?;
+    let mut drafts = Vec::new();
+    for (index, proposal) in proposals.iter().enumerate() {
+        validate_patch_draft_target_path(&proposal.target)
+            .with_context(|| format!("unsupported mutation proposal target for {}", proposal.id))?;
+        let classification = classifications
+            .classifications
+            .iter()
+            .find(|classification| {
+                classification.proposal_id.as_deref() == Some(proposal.id.as_str())
+            })
+            .or_else(|| classifications.classifications.get(index))
+            .ok_or_else(|| {
+                anyhow!(
+                    "patch draft generation requires classification for proposal {}",
+                    proposal.id
+                )
+            })?;
+        let mut evidence_refs = classification.evidence_refs.clone();
+        push_unique_ref(&mut evidence_refs, &proposal.evidence_id);
+        let draft = PatchDraft {
+            id: format!("patch-draft-{}", index + 1),
+            proposal_id: proposal.id.clone(),
+            classification_id: classification.id.clone(),
+            lifecycle_state: PatchDraftState::Drafted,
+            target_path: proposal.target.clone(),
+            rationale: format!(
+                "Draft derived from proposal {} and classification {} ({:?}).",
+                proposal.id, classification.id, classification.category
+            ),
+            evidence_refs,
+            draft_text: render_patch_draft_text(proposal, classification),
+        };
+        draft.validate()?;
+        drafts.push(draft);
+    }
+
+    let artifact = PatchDraftArtifact {
+        schema_version: "1".to_string(),
+        run_id,
+        drafts,
+    };
+    let path = write_patch_draft_artifact(run_dir, &artifact)?;
+    append_ledger_event(
+        run_dir,
+        "mutation.drafted",
+        "evolve-cli",
+        json!({
+            "path": path
+                .strip_prefix(run_dir)
+                .ok()
+                .and_then(|path| path.to_str())
+                .unwrap_or("mutation/patch-drafts.json"),
+            "patch_draft_ids": artifact
+                .drafts
+                .iter()
+                .map(|draft| draft.id.clone())
+                .collect::<Vec<_>>()
+        }),
+    )?;
+    Ok(artifact)
+}
+
+fn render_patch_draft_text(
+    proposal: &MutationProposal,
+    classification: &MutationClassification,
+) -> String {
+    let evidence_refs = classification.evidence_refs.join(", ");
+    format!(
+        "\
+# Ouroforge patch draft v1
+# This is an inspectable draft artifact only. It has not been applied.
+proposal_id: {proposal_id}
+classification_id: {classification_id}
+category: {category:?}
+target: {target}
+path: {path}
+evidence_refs: {evidence_refs}
+reason: {reason}
+
+suggested_change:
+  from: {from}
+  to: {to}
+",
+        proposal_id = proposal.id,
+        classification_id = classification.id,
+        category = classification.category,
+        target = proposal.target,
+        path = proposal.path,
+        evidence_refs = evidence_refs,
+        reason = proposal.reason,
+        from = proposal.from,
+        to = proposal.to
+    )
 }
 
 pub fn create_mutation_proposal(
@@ -6404,6 +6526,159 @@ scenarios:
         let artifact = valid_patch_draft_artifact();
 
         write_patch_draft_artifact(&artifacts.run_dir, &artifact).expect("draft writes");
+
+        let target_after = fs::read_to_string(&target).expect("target reads");
+        assert_eq!(target_after, "original seed content\n");
+        fs::remove_dir_all(root).ok();
+    }
+
+    fn create_draft_generation_fixture(prefix: &str) -> (PathBuf, RunArtifacts, MutationProposal) {
+        let (root, artifacts) = create_test_run(prefix);
+        fs::write(artifacts.run_dir.join("evidence/source.json"), "{}\n")
+            .expect("evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "evidence-1",
+            "application/json",
+            "evidence/source.json",
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("evidence indexed");
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "draft from evidence-linked proposal".to_string(),
+                evidence_id: "evidence-1".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.0.assertions".to_string(),
+                from: "old assertion".to_string(),
+                to: "new assertion".to_string(),
+            },
+        )
+        .expect("proposal writes");
+        write_mutation_classification_artifact(
+            &artifacts.run_dir,
+            &MutationClassificationArtifact {
+                schema_version: "1".to_string(),
+                run_id: "run-draft-generation".to_string(),
+                classifications: vec![MutationClassification {
+                    id: "classification-1".to_string(),
+                    proposal_id: Some(proposal.id.clone()),
+                    category: MutationClassificationCategory::ScenarioAssertionFailure,
+                    lifecycle_state: MutationClassificationState::Classified,
+                    reason: "scenario assertion failure".to_string(),
+                    evidence_refs: vec!["evidence/source.json".to_string()],
+                    verdict_ref: "verdict.json".to_string(),
+                    journal_ref: "journal.md".to_string(),
+                    scenario_result_refs: vec!["evidence/source.json".to_string()],
+                }],
+            },
+        )
+        .expect("classification writes");
+        (root, artifacts, proposal)
+    }
+
+    #[test]
+    fn generates_patch_draft_from_proposal_and_classification() {
+        let (root, artifacts, proposal) =
+            create_draft_generation_fixture("ouroforge-patch-draft-generate-test");
+
+        let artifact = generate_patch_drafts(&artifacts.run_dir).expect("draft generates");
+
+        assert_eq!(artifact.drafts.len(), 1);
+        let draft = &artifact.drafts[0];
+        assert_eq!(draft.id, "patch-draft-1");
+        assert_eq!(draft.proposal_id, proposal.id);
+        assert_eq!(draft.classification_id, "classification-1");
+        assert_eq!(draft.target_path, "seeds/platformer.yaml");
+        assert!(draft
+            .evidence_refs
+            .contains(&"evidence/source.json".to_string()));
+        assert!(draft.evidence_refs.contains(&"evidence-1".to_string()));
+        assert!(draft
+            .draft_text
+            .contains("This is an inspectable draft artifact only"));
+        assert!(artifacts
+            .run_dir
+            .join("mutation/patch-drafts.json")
+            .is_file());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_draft_generation_is_deterministic_for_same_inputs() {
+        let (root, artifacts, _) =
+            create_draft_generation_fixture("ouroforge-patch-draft-deterministic-test");
+
+        let first = generate_patch_drafts(&artifacts.run_dir).expect("first draft generates");
+        let second = generate_patch_drafts(&artifacts.run_dir).expect("second draft generates");
+
+        assert_eq!(first, second);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_draft_generation_requires_classification_artifact() {
+        let (root, artifacts) = create_test_run("ouroforge-patch-draft-missing-class-test");
+        fs::write(artifacts.run_dir.join("evidence/source.json"), "{}\n")
+            .expect("evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "evidence-1",
+            "application/json",
+            "evidence/source.json",
+            json!({}),
+        )
+        .expect("evidence indexed");
+        create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "missing classification should fail".to_string(),
+                evidence_id: "evidence-1".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.0.assertions".to_string(),
+                from: "old".to_string(),
+                to: "new".to_string(),
+            },
+        )
+        .expect("proposal writes");
+
+        let error =
+            generate_patch_drafts(&artifacts.run_dir).expect_err("missing classification fails");
+
+        assert!(error
+            .to_string()
+            .contains("failed to read mutation classifications"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_draft_generation_rejects_unsafe_proposal_target() {
+        let (root, artifacts, proposal) =
+            create_draft_generation_fixture("ouroforge-patch-draft-unsafe-target-test");
+        let mut proposals = read_mutation_proposals(&artifacts.run_dir).expect("proposals read");
+        proposals.proposals[0].target = "../secrets.yaml".to_string();
+        write_mutation_proposals(&artifacts.run_dir, &proposals).expect("proposal rewrite");
+
+        let error =
+            generate_patch_drafts(&artifacts.run_dir).expect_err("unsafe proposal target fails");
+
+        assert!(error.to_string().contains(&format!(
+            "unsupported mutation proposal target for {}",
+            proposal.id
+        )));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_draft_generation_does_not_modify_target_file() {
+        let (root, artifacts, _) =
+            create_draft_generation_fixture("ouroforge-patch-draft-generate-no-mutate-test");
+        let target = root.join("seeds/platformer.yaml");
+        fs::create_dir_all(target.parent().expect("target parent")).expect("parent exists");
+        fs::write(&target, "original seed content\n").expect("target written");
+
+        generate_patch_drafts(&artifacts.run_dir).expect("draft generates");
 
         let target_after = fs::read_to_string(&target).expect("target reads");
         assert_eq!(target_after, "original seed content\n");
