@@ -94,13 +94,16 @@
     };
   }
 
-  function drawRuntime({ canvas, context, world, renderer, assets, animation }) {
+  function drawRuntime({ canvas, context, world, renderer, assets, animation, tilemap }) {
     if (!canvas || !context || !world) return [];
     const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: canvas.width, height: canvas.height });
     const ordered = renderOrder(world.entities || [], activeRenderer);
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = activeRenderer.background;
     context.fillRect(0, 0, canvas.width, canvas.height);
+    if (tilemap && typeof tilemap.drawTilemaps === 'function') {
+      tilemap.drawTilemaps({ context, renderer: activeRenderer, tilemaps: world.tilemaps || [], assets });
+    }
     for (const item of ordered) {
       const entity = item.entity;
       const components = entity.components || {};

@@ -23,6 +23,11 @@
     advanceAnimations: () => {},
     activeSpriteFrame: () => null,
   };
+  const tilemap = window.OuroforgeTilemap || {
+    normalizeTilemaps: () => [],
+    debugState: () => ({ version: '1', tilemaps: [], layerOrder: [] }),
+    drawTilemaps: () => [],
+  };
   const renderer = window.OuroforgeRenderer || {
     normalizeRenderer: (_renderer, bounds) => ({
       version: '1',
@@ -65,6 +70,7 @@
     metadata: clone(defaultScene.metadata),
     collisions: [],
     audioEvents: [],
+    tilemaps: [],
   };
   let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
 
@@ -151,6 +157,7 @@
       id: String(scene.id || 'unnamed-scene'),
       bounds,
       renderer: renderer.normalizeRenderer(scene.renderer, bounds),
+      tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
       metadata: objectValue(scene.metadata),
       entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
     };
@@ -203,7 +210,7 @@
     const canvas = document.getElementById('game');
     if (!canvas) return;
     const context = canvas.getContext('2d');
-    renderer.drawRuntime({ canvas, context, world, renderer: rendererState, assets, animation });
+    renderer.drawRuntime({ canvas, context, world, renderer: rendererState, assets, animation, tilemap });
   }
 
   function renderDebug() {
@@ -218,6 +225,7 @@
     world.sceneId = normalized.id;
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
+    world.tilemaps = clone(normalized.tilemaps);
     rendererState = clone(normalized.renderer);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
@@ -275,6 +283,7 @@
       const state = clone(world);
       state.input = clone(input);
       state.renderer = renderer.debugState(rendererState, world.entities);
+      state.tilemaps = tilemap.debugState(world.tilemaps);
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();
       const currentPlayer = player();
