@@ -5895,6 +5895,7 @@ pub struct RunDashboardReadModel {
     pub performance_metrics: Vec<RunDashboardArtifact>,
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
+    pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
 }
@@ -5921,6 +5922,25 @@ pub struct RunDashboardJournalEntry {
     pub evidence_refs: Vec<String>,
     pub verdict_refs: Vec<String>,
     pub mutation_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardMutationLifecycle {
+    pub terminal_state: String,
+    pub stages: Vec<RunDashboardMutationLifecycleStage>,
+    pub command_hints: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardMutationLifecycleStage {
+    pub id: String,
+    pub label: String,
+    pub state: String,
+    pub artifact_path: Option<String>,
+    pub record_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub records: Vec<serde_json::Value>,
+    pub read_error: Option<String>,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -5976,6 +5996,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let scenario_results =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
+    let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -6001,6 +6022,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         performance_metrics,
         scenario_results,
         mutation_artifacts,
+        mutation_lifecycle,
         evidence_categories,
         mutations,
     })
@@ -6547,6 +6569,289 @@ fn slug_for_id(value: &str) -> String {
         }
     }
     slug.trim_matches('-').to_string()
+}
+
+fn read_dashboard_mutation_lifecycle(
+    run_dir: &Path,
+    proposals: &[MutationProposal],
+) -> RunDashboardMutationLifecycle {
+    let stages = vec![
+        dashboard_lifecycle_stage_from_records(
+            "proposed",
+            "Proposed",
+            if proposals.is_empty() {
+                "missing"
+            } else {
+                "proposed"
+            },
+            Some("mutation/proposals.json"),
+            proposals.iter().map(|proposal| json!(proposal)).collect(),
+            proposals
+                .iter()
+                .map(|proposal| proposal.evidence_id.clone())
+                .collect(),
+            None,
+        ),
+        dashboard_lifecycle_stage_from_json_file(
+            run_dir,
+            "classified",
+            "Classified",
+            "classified",
+            "mutation/classifications.json",
+            "classifications",
+        ),
+        dashboard_lifecycle_stage_from_json_file(
+            run_dir,
+            "drafted",
+            "Drafted",
+            "drafted",
+            "mutation/patch-drafts.json",
+            "drafts",
+        ),
+        dashboard_sandbox_stage(run_dir),
+        dashboard_comparison_stage(run_dir),
+        dashboard_lifecycle_stage_from_json_file(
+            run_dir,
+            "reviewed",
+            "Manual review",
+            "pending_review",
+            "mutation/review-decisions.json",
+            "decisions",
+        ),
+    ];
+    let terminal_state = dashboard_lifecycle_terminal_state(&stages);
+    let command_hints = dashboard_mutation_command_hints(run_dir, &stages);
+    RunDashboardMutationLifecycle {
+        terminal_state,
+        stages,
+        command_hints,
+    }
+}
+
+fn dashboard_lifecycle_stage_from_json_file(
+    run_dir: &Path,
+    id: &str,
+    label: &str,
+    present_state: &str,
+    artifact_path: &str,
+    array_field: &str,
+) -> RunDashboardMutationLifecycleStage {
+    let path = run_dir.join(artifact_path);
+    if !path.is_file() {
+        return dashboard_lifecycle_stage_from_records(
+            id,
+            label,
+            "missing",
+            Some(artifact_path),
+            Vec::new(),
+            Vec::new(),
+            None,
+        );
+    }
+    match read_json_value(&path) {
+        Ok(value) => {
+            let records = value
+                .get(array_field)
+                .and_then(|value| value.as_array())
+                .cloned()
+                .unwrap_or_else(|| vec![value]);
+            let state = if id == "reviewed" {
+                dashboard_review_state(&records)
+            } else {
+                present_state.to_string()
+            };
+            let evidence_refs = collect_json_evidence_refs(&records);
+            dashboard_lifecycle_stage_from_records(
+                id,
+                label,
+                &state,
+                Some(artifact_path),
+                records,
+                evidence_refs,
+                None,
+            )
+        }
+        Err(error) => dashboard_lifecycle_stage_from_records(
+            id,
+            label,
+            "malformed",
+            Some(artifact_path),
+            Vec::new(),
+            Vec::new(),
+            Some(error.to_string()),
+        ),
+    }
+}
+
+fn dashboard_lifecycle_stage_from_records(
+    id: &str,
+    label: &str,
+    state: &str,
+    artifact_path: Option<&str>,
+    records: Vec<serde_json::Value>,
+    evidence_refs: Vec<String>,
+    read_error: Option<String>,
+) -> RunDashboardMutationLifecycleStage {
+    RunDashboardMutationLifecycleStage {
+        id: id.to_string(),
+        label: label.to_string(),
+        state: state.to_string(),
+        artifact_path: artifact_path.map(str::to_string),
+        record_count: records.len(),
+        evidence_refs,
+        records,
+        read_error,
+    }
+}
+
+fn dashboard_sandbox_stage(run_dir: &Path) -> RunDashboardMutationLifecycleStage {
+    let mut records = Vec::new();
+    let sandbox_root = run_dir.join("sandbox");
+    if let Ok(drafts) = fs::read_dir(&sandbox_root) {
+        for draft in drafts.flatten() {
+            let result_path = draft.path().join("evidence/result.json");
+            if result_path.is_file() {
+                if let Ok(value) = read_json_value(&result_path) {
+                    records.push(value);
+                }
+            }
+        }
+    }
+    let evidence_refs = collect_json_evidence_refs(&records);
+    dashboard_lifecycle_stage_from_records(
+        "sandboxed",
+        "Sandboxed",
+        if records.is_empty() {
+            "missing"
+        } else {
+            "sandboxed"
+        },
+        Some("sandbox/*/evidence/result.json"),
+        records,
+        evidence_refs,
+        None,
+    )
+}
+
+fn dashboard_comparison_stage(run_dir: &Path) -> RunDashboardMutationLifecycleStage {
+    let mut records = Vec::new();
+    for path in dashboard_comparison_artifact_paths(run_dir) {
+        if let Ok(value) = read_json_value(run_dir.join(&path)) {
+            records.push(value);
+        }
+    }
+    let evidence_refs = collect_json_evidence_refs(&records);
+    dashboard_lifecycle_stage_from_records(
+        "compared",
+        "Compared",
+        if records.is_empty() {
+            "missing"
+        } else {
+            "compared"
+        },
+        Some("mutation/rerun-orchestration.json"),
+        records,
+        evidence_refs,
+        None,
+    )
+}
+
+fn dashboard_comparison_artifact_paths(run_dir: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    if run_dir.join("mutation/rerun-orchestration.json").is_file() {
+        paths.push("mutation/rerun-orchestration.json".to_string());
+    }
+    if let Ok(entries) = fs::read_dir(run_dir.join("mutation")) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            if name.starts_with("run-comparison-") && name.ends_with(".json") {
+                paths.push(format!("mutation/{name}"));
+            }
+        }
+    }
+    paths.sort();
+    paths
+}
+
+fn dashboard_review_state(records: &[serde_json::Value]) -> String {
+    let mut has_pending = false;
+    for record in records {
+        match record.get("state").and_then(|value| value.as_str()) {
+            Some("accepted") => return "accepted".to_string(),
+            Some("rejected") => return "rejected".to_string(),
+            Some("pending_review") => has_pending = true,
+            _ => {}
+        }
+    }
+    if has_pending || !records.is_empty() {
+        "pending_review".to_string()
+    } else {
+        "missing".to_string()
+    }
+}
+
+fn dashboard_lifecycle_terminal_state(stages: &[RunDashboardMutationLifecycleStage]) -> String {
+    stages
+        .iter()
+        .rev()
+        .find(|stage| stage.state != "missing")
+        .map(|stage| stage.state.clone())
+        .unwrap_or_else(|| "missing".to_string())
+}
+
+fn dashboard_mutation_command_hints(
+    run_dir: &Path,
+    stages: &[RunDashboardMutationLifecycleStage],
+) -> Vec<String> {
+    let has_draft = stages
+        .iter()
+        .any(|stage| stage.id == "drafted" && stage.state != "missing");
+    if !has_draft {
+        return Vec::new();
+    }
+    let run_path = run_dir.to_string_lossy();
+    vec![
+        format!(
+            "cargo run -p ouroforge-cli -- mutation review {run_path} --accept --reason \"manual evidence review accepted\""
+        ),
+        format!(
+            "cargo run -p ouroforge-cli -- mutation review {run_path} --reject --reason \"manual evidence review rejected\""
+        ),
+    ]
+}
+
+fn collect_json_evidence_refs(values: &[serde_json::Value]) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for value in values {
+        collect_json_evidence_refs_inner(value, &mut refs);
+    }
+    refs.into_iter().collect()
+}
+
+fn collect_json_evidence_refs_inner(value: &serde_json::Value, refs: &mut BTreeSet<String>) {
+    match value {
+        serde_json::Value::String(text)
+            if text.starts_with("evidence/")
+                || text.starts_with("mutation/")
+                || text.starts_with("sandbox/") =>
+        {
+            refs.insert(text.clone());
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_json_evidence_refs_inner(item, refs);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for value in map.values() {
+                collect_json_evidence_refs_inner(value, refs);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn read_json_value(path: impl AsRef<Path>) -> Result<serde_json::Value> {
@@ -10175,6 +10480,168 @@ scenarios:
         assert!(model.journal_view.read_error.is_some());
         assert!(model.journal_view.entries.is_empty());
         assert!(model.journal.is_empty());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_mutation_lifecycle_read_model_tracks_partial_and_reviewed_states() {
+        let (root, artifacts) = create_test_run("dashboard-mutation-lifecycle-read-model");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"failed\",\"summary\":\"fixture failure\",\"failures\":[{\"kind\":\"assertion_failed\"}]}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            "{\"object\":{\"x\":40}}\n",
+        )
+        .expect("world state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world state indexed");
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "fixture failure".to_string(),
+                evidence_id: "fixture-world-state".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.bootstrap-smoke.assertions".to_string(),
+                from: "x == -1".to_string(),
+                to: "x == 40".to_string(),
+            },
+        )
+        .expect("mutation proposal created");
+        let classification = MutationClassification {
+            id: "classification-1".to_string(),
+            proposal_id: Some(proposal.id.clone()),
+            category: MutationClassificationCategory::ScenarioAssertionFailure,
+            lifecycle_state: MutationClassificationState::Classified,
+            reason: "linked scenario failure".to_string(),
+            evidence_refs: vec!["evidence/workers/worker-1/world-state.json".to_string()],
+            verdict_ref: "verdict.json".to_string(),
+            journal_ref: "journal.md".to_string(),
+            scenario_result_refs: Vec::new(),
+        };
+        write_mutation_classification_artifact(
+            &artifacts.run_dir,
+            &MutationClassificationArtifact {
+                schema_version: "1".to_string(),
+                run_id: artifacts
+                    .run_dir
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+                classifications: vec![classification],
+            },
+        )
+        .expect("classification written");
+        let drafts = generate_patch_drafts(&artifacts.run_dir).expect("draft generated");
+        fs::create_dir_all(artifacts.run_dir.join("sandbox/patch-draft-1/evidence"))
+            .expect("sandbox evidence dir");
+        write_json(
+            &artifacts
+                .run_dir
+                .join("sandbox/patch-draft-1/evidence/result.json"),
+            &json!({
+                "schema_version": "1",
+                "patch_draft_id": "patch-draft-1",
+                "lifecycle_state": "applied",
+                "evidence_path": "sandbox/patch-draft-1/evidence/result.json"
+            }),
+        )
+        .expect("sandbox result written");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir exists");
+        write_json(
+            &artifacts.run_dir.join("mutation/rerun-orchestration.json"),
+            &json!({
+                "patch_draft_id": "patch-draft-1",
+                "comparison_artifact_path": "mutation/run-comparison-before--after.json",
+                "evolve_evidence_path": "mutation/rerun-orchestration.json"
+            }),
+        )
+        .expect("rerun orchestration written");
+        write_json(
+            &artifacts
+                .run_dir
+                .join("mutation/run-comparison-before--after.json"),
+            &json!({
+                "classification": "improved",
+                "evidence_refs": ["evidence/workers/worker-1/world-state.json"]
+            }),
+        )
+        .expect("comparison written");
+        append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Accepted,
+                reason: "manual review accepted".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect("review accepted");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        let lifecycle = &model.mutation_lifecycle;
+        assert_eq!(lifecycle.terminal_state, "accepted");
+        assert!(lifecycle
+            .command_hints
+            .iter()
+            .any(|hint| hint.contains("--accept")));
+        assert!(lifecycle
+            .command_hints
+            .iter()
+            .any(|hint| hint.contains("--reject")));
+        for stage in [
+            "proposed",
+            "classified",
+            "drafted",
+            "sandboxed",
+            "compared",
+            "reviewed",
+        ] {
+            assert!(
+                lifecycle
+                    .stages
+                    .iter()
+                    .any(|item| item.id == stage && item.state != "missing"),
+                "missing lifecycle stage {stage}"
+            );
+        }
+        assert!(lifecycle
+            .stages
+            .iter()
+            .any(|stage| stage.id == "reviewed" && stage.state == "accepted"));
+        assert!(lifecycle.stages.iter().any(|stage| stage
+            .evidence_refs
+            .contains(&"mutation/rerun-orchestration.json".to_string())));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_mutation_lifecycle_read_model_handles_empty_state() {
+        let (root, artifacts) = create_test_run("dashboard-mutation-empty-read-model");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(model.mutation_lifecycle.terminal_state, "missing");
+        assert!(model.mutation_lifecycle.command_hints.is_empty());
+        assert!(model
+            .mutation_lifecycle
+            .stages
+            .iter()
+            .all(|stage| stage.state == "missing"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
