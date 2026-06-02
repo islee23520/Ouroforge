@@ -6,6 +6,17 @@ const run = {
     id: 'run-1',
     run_dir: 'runs/run-1',
     seed_id: 'platformer.v0',
+    project: {
+      id: 'minimal_2d',
+      name: 'Minimal 2D Ouroforge Project',
+      projectRoot: '.',
+      manifestPath: 'ouroforge.project.json',
+      manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' },
+      seedPath: 'seeds/platformer.yaml',
+      scenes: [{ id: 'main', path: 'scenes/main.scene.json', hash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'scenehash' } }],
+      scenarioPack: { id: 'smoke', path: 'scenarios/smoke.scenario-pack.json', scenarioIds: ['scaffold-smoke'] },
+      transactionId: 'scene-edit-abc123',
+    },
     run_status: 'created',
     verdict_status: 'failed',
     scenario_status: 'passed',
@@ -22,6 +33,17 @@ const run = {
     ],
   },
   evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
+  project: {
+    id: 'minimal_2d',
+    name: 'Minimal 2D Ouroforge Project',
+    projectRoot: '.',
+    manifestPath: 'ouroforge.project.json',
+    manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' },
+    seedPath: 'seeds/platformer.yaml',
+    scenes: [{ id: 'main', path: 'scenes/main.scene.json', hash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'scenehash' } }],
+    scenarioPack: { id: 'smoke', path: 'scenarios/smoke.scenario-pack.json', scenarioIds: ['scaffold-smoke'] },
+    transactionId: 'scene-edit-abc123',
+  },
   screenshots: [{ id: 'shot-1', kind: 'image/png', path: 'evidence/shot.png', metadata: {}, exists: true }],
   world_states: [{ id: 'world-1', kind: 'application/json', path: 'evidence/world.json', value: { object: { x: 40 } }, metadata: {} }],
   frame_metrics: [{ id: 'frame-1', kind: 'application/json', path: 'evidence/frame.json', value: { frame: 1 }, metadata: {} }],
@@ -183,6 +205,7 @@ assert.equal(dashboard.statusClass('passed'), 'status status-passed');
 assert.equal(dashboard.artifactHref(run.evidence[0], run), '../../runs/run-1/evidence/a.json');
 const runList = dashboard.renderRunList([run], 'run-1');
 assert.match(runList, /platformer\.v0/);
+assert.match(runList, /project minimal_2d/);
 assert.match(runList, /4 workers/);
 assert.match(runList, /scenario passed/);
 const detail = dashboard.renderRunDetail(run);
@@ -194,6 +217,11 @@ assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
 assert.match(detail, /Replay Controls/);
+assert.match(detail, /Project Context/);
+assert.match(detail, /Minimal 2D Ouroforge Project/);
+assert.match(detail, /manifesthash/);
+assert.match(detail, /scenes\/main\.scene\.json/);
+assert.match(detail, /scenehash/);
 assert.match(detail, /Scene Edit Transaction/);
 assert.match(detail, /scene-edit-abc123/);
 assert.match(detail, /beforehash/);
@@ -251,6 +279,8 @@ assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
 assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
+assert.match(dashboard.renderProjectContext({}), /No project workspace metadata/);
+assert.match(dashboard.renderProjectContext(run), /Scenario pack/);
 assert.equal(dashboard.comparisonRefHref('runs/before-run/verdict.json', run), '../../runs/before-run/verdict.json');
 assert.equal(dashboard.comparisonRefHref('evidence/world.json', run), '../../runs/run-1/evidence/world.json');
 assert.match(dashboard.renderRunList([], null), /No runs found/);

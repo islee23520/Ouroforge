@@ -4877,6 +4877,48 @@ fn render_journal(
     }
     out.push('\n');
 
+    if run.get("project").is_some() {
+        out.push_str("## Project Context\n\n");
+        match read_dashboard_project_context(run) {
+            Some(project) => {
+                out.push_str(&format!("- Project: `{}` — {}\n", project.id, project.name));
+                out.push_str(&format!("- Project root: `{}`\n", project.project_root));
+                out.push_str(&format!("- Manifest: `{}`\n", project.manifest_path));
+                out.push_str(&format!(
+                    "- Manifest hash: `{}:{}`\n",
+                    project.manifest_hash.algorithm, project.manifest_hash.value
+                ));
+                out.push_str(&format!("- Seed path: `{}`\n", project.seed_path));
+                if let Some(pack) = &project.scenario_pack {
+                    out.push_str(&format!(
+                        "- Scenario pack: `{}` (`{}`) — {} scenario(s)\n",
+                        pack.id,
+                        pack.path,
+                        pack.scenario_ids.len()
+                    ));
+                }
+                if let Some(transaction_id) = &project.transaction_id {
+                    out.push_str(&format!("- Linked transaction: `{transaction_id}`\n"));
+                }
+                if project.scenes.is_empty() {
+                    out.push_str("- Scenes: none recorded\n");
+                } else {
+                    out.push_str("- Scenes:\n");
+                    for scene in &project.scenes {
+                        out.push_str(&format!(
+                            "  - `{}` (`{}:{}`)\n",
+                            scene.path, scene.hash.algorithm, scene.hash.value
+                        ));
+                    }
+                }
+            }
+            None => {
+                out.push_str("- Project metadata is present but malformed; dashboard export keeps it unavailable instead of inferring context.\n");
+            }
+        }
+        out.push('\n');
+    }
+
     if let Some(provenance) = run.get("transaction_provenance") {
         out.push_str("## Scene Edit Transaction\n\n");
         if let Some(id) = provenance
@@ -8777,6 +8819,7 @@ pub struct RunDashboardSummary {
     pub run_dir: PathBuf,
     pub seed_id: String,
     pub seed_title: String,
+    pub project: Option<ProjectRunMetadata>,
     pub run_status: String,
     pub verdict_status: String,
     pub scenario_status: String,
@@ -8812,6 +8855,7 @@ pub struct RunDashboardArtifact {
 pub struct RunDashboardReadModel {
     pub summary: RunDashboardSummary,
     pub run: serde_json::Value,
+    pub project: Option<ProjectRunMetadata>,
     pub verdict: serde_json::Value,
     pub journal: String,
     pub journal_view: RunDashboardJournal,
@@ -9005,6 +9049,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let replay = read_dashboard_replay(run_dir, &evidence)?;
     let comparison = read_dashboard_comparison(run_dir);
     let transaction_provenance = read_dashboard_transaction_provenance(&run);
+    let project = read_dashboard_project_context(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
@@ -9019,6 +9064,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     Ok(RunDashboardReadModel {
         summary,
         run,
+        project,
         verdict,
         journal,
         journal_view,
@@ -9084,6 +9130,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         run_dir: run_dir.to_path_buf(),
         seed_id: json_string(&run, "seed_id").unwrap_or_else(|| "unknown-seed".to_string()),
         seed_title: json_string(&run, "seed_title").unwrap_or_else(|| "Untitled Seed".to_string()),
+        project: read_dashboard_project_context(&run),
         run_status: json_string(&run, "status").unwrap_or_else(|| "unknown".to_string()),
         verdict_status: json_string(&verdict, "status").unwrap_or_else(|| "unknown".to_string()),
         scenario_status: dashboard_scenario_status(&verdict),
@@ -9461,6 +9508,12 @@ fn read_dashboard_transaction_provenance(
     run: &serde_json::Value,
 ) -> Option<RunTransactionProvenance> {
     run.get("transaction_provenance")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+}
+
+fn read_dashboard_project_context(run: &serde_json::Value) -> Option<ProjectRunMetadata> {
+    run.get("project")
         .cloned()
         .and_then(|value| serde_json::from_value(value).ok())
 }
@@ -12938,6 +12991,60 @@ scenarios:
     }
 
     #[test]
+    fn journal_renders_project_context_without_inference() {
+        let seed = Seed::from_yaml_str(VALID_SEED).expect("seed parses");
+        let evidence = EvidenceIndex { artifacts: vec![] };
+        let ledger = vec![];
+        let project = json!({
+            "id": "minimal_2d",
+            "name": "Minimal 2D Ouroforge Project",
+            "projectRoot": ".",
+            "manifestPath": "ouroforge.project.json",
+            "manifestHash": { "algorithm": "fnv1a64-file-v1", "value": "manifesthash" },
+            "seedPath": "seeds/platformer.yaml",
+            "scenes": [{
+                "id": "main",
+                "path": "scenes/main.scene.json",
+                "hash": { "algorithm": "fnv1a64-canonical-json-v1", "value": "scenehash" }
+            }],
+            "scenarioPack": {
+                "id": "smoke",
+                "path": "scenarios/smoke.scenario-pack.json",
+                "scenarioIds": ["scaffold-smoke"]
+            },
+            "transactionId": "scene-edit-fixture"
+        });
+
+        let journal = render_journal(
+            &seed,
+            &evidence,
+            &ledger,
+            &json!({ "status": "pending", "summary": "pending summary", "failures": [] }),
+            &[],
+            &json!({ "project": project }),
+        );
+
+        assert!(journal.contains("## Project Context"));
+        assert!(journal.contains("Project: `minimal_2d`"));
+        assert!(journal.contains("Manifest hash: `fnv1a64-file-v1:manifesthash`"));
+        assert!(journal.contains("Scenario pack: `smoke`"));
+        assert!(journal.contains("Linked transaction: `scene-edit-fixture`"));
+        assert!(
+            journal.contains("`scenes/main.scene.json` (`fnv1a64-canonical-json-v1:scenehash`)")
+        );
+
+        let malformed = render_journal(
+            &seed,
+            &evidence,
+            &ledger,
+            &json!({ "status": "pending", "summary": "pending summary", "failures": [] }),
+            &[],
+            &json!({ "project": { "id": 7 } }),
+        );
+        assert!(malformed.contains("Project metadata is present but malformed"));
+    }
+
+    #[test]
     fn evaluator_marks_run_pending_without_scenario_results() {
         let (root, artifacts) = create_test_run("ouroforge-eval-pending-test");
 
@@ -16012,6 +16119,87 @@ scenarios:
         );
         assert_eq!(provenance.before_scene_hash.value, "before-fixture");
         assert_eq!(provenance.after_scene_hash.value, "after-fixture");
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_read_model_exposes_project_context_when_present() {
+        let (root, artifacts) = create_test_run("dashboard-project-context");
+        let mut run_json: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(artifacts.run_dir.join("run.json")).expect("run json reads"),
+        )
+        .expect("run json parses");
+        run_json["project"] = json!({
+            "id": "minimal_2d",
+            "name": "Minimal 2D Ouroforge Project",
+            "projectRoot": ".",
+            "manifestPath": "ouroforge.project.json",
+            "manifestHash": { "algorithm": "fnv1a64-file-v1", "value": "manifesthash" },
+            "seedPath": "seeds/platformer.yaml",
+            "scenes": [{
+                "id": "main",
+                "path": "scenes/main.scene.json",
+                "hash": { "algorithm": "fnv1a64-canonical-json-v1", "value": "scenehash" }
+            }],
+            "scenarioPack": {
+                "id": "smoke",
+                "path": "scenarios/smoke.scenario-pack.json",
+                "scenarioIds": ["scaffold-smoke"]
+            },
+            "transactionId": "scene-edit-fixture"
+        });
+        fs::write(
+            artifacts.run_dir.join("run.json"),
+            serde_json::to_string_pretty(&run_json).expect("run json serializes"),
+        )
+        .expect("run json updated");
+
+        let runs = list_dashboard_runs(root.join("runs")).expect("dashboard runs listed");
+        let summary_project = runs[0].project.as_ref().expect("summary project exposed");
+        assert_eq!(summary_project.id, "minimal_2d");
+        assert_eq!(summary_project.seed_path, "seeds/platformer.yaml");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        let project = model.project.as_ref().expect("project context exposed");
+        assert_eq!(project.id, "minimal_2d");
+        assert_eq!(project.name, "Minimal 2D Ouroforge Project");
+        assert_eq!(project.manifest_hash.value, "manifesthash");
+        assert_eq!(project.scenes[0].hash.value, "scenehash");
+        assert_eq!(project.scenario_pack.as_ref().unwrap().id, "smoke");
+        assert_eq!(
+            project.transaction_id.as_deref(),
+            Some("scene-edit-fixture")
+        );
+        assert_eq!(
+            model.summary.project.as_ref().expect("summary project").id,
+            "minimal_2d"
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_read_model_ignores_missing_and_malformed_project_context() {
+        let (root, artifacts) = create_test_run("dashboard-project-context-malformed");
+        let legacy = read_dashboard_run(&artifacts.run_dir).expect("legacy run reads");
+        assert!(legacy.project.is_none());
+        assert!(legacy.summary.project.is_none());
+
+        let mut run_json: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(artifacts.run_dir.join("run.json")).expect("run json reads"),
+        )
+        .expect("run json parses");
+        run_json["project"] = json!({ "id": 7, "name": false });
+        fs::write(
+            artifacts.run_dir.join("run.json"),
+            serde_json::to_string_pretty(&run_json).expect("run json serializes"),
+        )
+        .expect("run json updated");
+
+        let malformed = read_dashboard_run(&artifacts.run_dir).expect("malformed project ignored");
+        assert!(malformed.project.is_none());
+        assert!(malformed.summary.project.is_none());
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

@@ -19,9 +19,12 @@ const OuroforgeDashboard = (() => {
 
   function summarizeRun(run) {
     const summary = run.summary || {};
+    const project = run.project || summary.project || null;
     return {
       id: summary.id,
       seed: summary.seed_id,
+      projectId: project && project.id ? project.id : null,
+      projectName: project && project.name ? project.name : null,
       runStatus: summary.run_status || 'unknown',
       verdict: summary.verdict_status || 'unknown',
       scenario: summary.scenario_status || 'unknown',
@@ -47,9 +50,10 @@ const OuroforgeDashboard = (() => {
     return runs.map((run) => {
       const summary = summarizeRun(run);
       const active = summary.id === selectedId ? ' active' : '';
+      const projectMeta = summary.projectId ? ` · project ${summary.projectId}` : '';
       return `<button class="run-button${active}" data-run-id="${escapeText(summary.id)}">
         <div class="run-id">${escapeText(summary.id)}</div>
-        <div class="run-meta">${escapeText(summary.seed)} · ${summary.evidenceCount} evidence · ${summary.mutationCount} mutations · ${summary.workerCount} workers</div>
+        <div class="run-meta">${escapeText(summary.seed)}${escapeText(projectMeta)} · ${summary.evidenceCount} evidence · ${summary.mutationCount} mutations · ${summary.workerCount} workers</div>
         <div class="run-status-row">
           <span class="${statusClass(summary.runStatus)}">run ${escapeText(summary.runStatus)}</span>
           <span class="${statusClass(summary.verdict)}">verdict ${escapeText(summary.verdict)}</span>
@@ -190,6 +194,34 @@ const OuroforgeDashboard = (() => {
       <div class="refs">${refs.map((ref) => String(ref).startsWith('runs/')
         ? `<a href="${escapeText(comparisonRefHref(ref, run))}">${escapeText(ref)}</a>`
         : `<span>${escapeText(ref)}</span>`).join('')}</div>
+    </section>`;
+  }
+
+  function renderProjectContext(run) {
+    const project = run?.project || run?.summary?.project;
+    if (!project) {
+      return '<section class="panel"><h2>Project Context</h2><p class="empty">No project workspace metadata is recorded for this run.</p></section>';
+    }
+    const scenes = Array.isArray(project.scenes) ? project.scenes : [];
+    const sceneRows = scenes.length
+      ? `<ul>${scenes.map((scene) => `<li><code>${escapeText(scene.path || scene.id || 'unknown-scene')}</code> <span class="run-meta">${escapeText(scene.hash?.algorithm || 'hash')} ${escapeText(scene.hash?.value || '')}</span></li>`).join('')}</ul>`
+      : '<p class="empty-state compact">No scene hashes were recorded.</p>';
+    const pack = project.scenarioPack || project.scenario_pack || null;
+    const packLine = pack
+      ? `<dt>Scenario pack</dt><dd>${escapeText(pack.id)} (${escapeText(pack.path || 'no path')}) · ${escapeText(Array.isArray(pack.scenarioIds) ? pack.scenarioIds.length : 0)} scenario(s)</dd>`
+      : '<dt>Scenario pack</dt><dd>none</dd>';
+    return `<section class="panel"><h2>Project Context</h2>
+      <p class="hint">Read-only. Project metadata was validated and written by the Rust CLI before run evidence was generated.</p>
+      <dl>
+        <dt>Project</dt><dd>${escapeText(project.id)} — ${escapeText(project.name)}</dd>
+        <dt>Project root</dt><dd>${escapeText(project.projectRoot)}</dd>
+        <dt>Manifest</dt><dd>${escapeText(project.manifestPath)}</dd>
+        <dt>Manifest hash</dt><dd>${escapeText(project.manifestHash?.algorithm)}:${escapeText(project.manifestHash?.value)}</dd>
+        <dt>Seed path</dt><dd>${escapeText(project.seedPath)}</dd>
+        ${packLine}
+        <dt>Linked transaction</dt><dd>${escapeText(project.transactionId || 'none')}</dd>
+      </dl>
+      <section class="panel"><h3>Scene hashes</h3>${sceneRows}</section>
     </section>`;
   }
 
@@ -459,6 +491,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
+      ${renderProjectContext(run)}
       ${renderTransactionProvenance(run)}
       ${renderReplayControls(run, replayState)}
       ${renderRunComparison(run)}
@@ -523,7 +556,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
