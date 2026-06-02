@@ -238,8 +238,30 @@ Evidence Fidelity & Trust Boundary Hardening v1 does not authorize:
 - #291 records reproducible command context for reruns and audits through `docs/reproducible-run-command-context-v1.md`.
 - #292 exposes the hardened evidence chain in Studio through `docs/studio-evidence-fidelity-surfaces.md` without browser writes or
   command execution.
-- #293 refreshes roadmap and #1 governance after the milestone without closing
-  #1 or #23 by accident.
+- #293 refreshes roadmap and #1 governance after the milestone while keeping
+  #1 and #23 as open governance anchors unless a separate explicit replacement
+  decision exists.
+
+## Governance Handoff after #293
+
+#293 EF1.9.2 records the Evidence Fidelity & Trust Boundary Hardening v1
+handoff back to the roadmap anchors:
+
+- #1 remains the broad vision and implementation-roadmap anchor.
+- #23 remains open as repo-memory/design context.
+- A #1 governance comment records the completed evidence-fidelity milestone,
+  conservative carry-forward guardrails, and next milestone candidates.
+- No product behavior, repository visibility change, release automation, browser
+  trusted write path, command bridge, or public-launch action is authorized by
+  this handoff.
+- Generated `runs/`, `.omx/`, `.openchrome/`, `target/`, and dashboard export
+  artifacts remain untracked local state.
+
+The next milestone candidates stay in dependency order: Agentic Review &
+Regression Promotion v1, Agentic Loop Orchestration v1, Engine Expressiveness v2,
+Source Mutation Design Gate v1, Asset Pipeline v1, Visual Authoring v1, Source
+Mutation Preview v1, Public Alpha Readiness v1, and Public Alpha Launch
+Governance v1.
 
 ## Implementation Discipline
 
