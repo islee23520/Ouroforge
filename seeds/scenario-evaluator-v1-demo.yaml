@@ -1,0 +1,80 @@
+id: scenario-evaluator-v1.demo
+title: Scenario/Evaluator v1 Evidence-Native Demo Seed
+goal: Demonstrate completed Scenario/Evaluator v1 capabilities through a multi-scenario evidence-linked QA run.
+constraints:
+  target: game-runtime
+acceptance:
+  - Replay binding drives deterministic runtime behavior.
+  - Console, performance, CDP trace, visual checkpoint, and scenario-result evidence are emitted.
+  - Rich assertions explain pass conditions through evidence references.
+  - Multi-scenario suite execution preserves document order and per-scenario evidence.
+scenarios:
+  - id: qa-initial-observability
+    description: Capture initial runtime evidence and validate richer assertion targets before gameplay input.
+    steps:
+      - visualCheckpoint:
+          id: initial-load
+          baseline:
+            id: scenario-evaluator-v1-initial
+            width: 800
+            height: 600
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: object.x
+          equals: 32
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+      - runtime_events:
+          path: stepCount
+          equals: 1
+      - console_errors:
+          path: logs
+          countEquals: 0
+      - performance_metrics:
+          path: ScriptDuration
+          exists: true
+
+  - id: qa-replay-goal-contact
+    description: Use replayRef to move the player into the goal and verify evidence-linked gameplay state.
+    steps:
+      - replayRef:
+          id: scenario-replay-move-right
+          path: replays/scenario-replay-move-right.yaml
+      - visualCheckpoint:
+          id: post-replay-goal-contact
+          baseline:
+            id: scenario-evaluator-v1-goal-contact
+            width: 800
+            height: 600
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: object.x
+          equals: 272
+      - collision_evidence:
+          path: 0.pairId
+          equals: goal:player
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - world_state:
+          path: entities.0.components.animation.state.elapsedFrames
+          equals: 120
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+      - runtime_events:
+          path: inputReplays
+          countEquals: 1
+      - console_errors:
+          path: logs
+          countEquals: 0
+      - performance_metrics:
+          path: ScriptDuration
+          exists: true
