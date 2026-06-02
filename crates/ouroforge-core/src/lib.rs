@@ -3956,6 +3956,46 @@ pub enum MutationReviewState {
     PendingReview,
     Accepted,
     Rejected,
+    Deferred,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationReviewReviewerType {
+    Human,
+    Agent,
+    System,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct MutationReviewExpectedHashes {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal_index_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch_draft_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_index_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationReviewGuardrailChecklist {
+    pub proposal_is_record_only: bool,
+    pub accepted_does_not_apply: bool,
+    pub browser_read_only: bool,
+    pub evidence_refs_checked: bool,
+}
+
+impl Default for MutationReviewGuardrailChecklist {
+    fn default() -> Self {
+        Self {
+            proposal_is_record_only: true,
+            accepted_does_not_apply: true,
+            browser_read_only: true,
+            evidence_refs_checked: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -3963,10 +4003,20 @@ pub enum MutationReviewState {
 pub struct MutationReviewDecision {
     pub id: String,
     pub patch_draft_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal_id: Option<String>,
     pub state: MutationReviewState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_status: Option<MutationReviewState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_type: Option<MutationReviewReviewerType>,
     pub reason: String,
     pub evidence_refs: Vec<String>,
     pub reviewer: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_hashes: Option<MutationReviewExpectedHashes>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guardrail_checklist: Option<MutationReviewGuardrailChecklist>,
     pub decided_at_unix_ms: u128,
 }
 
@@ -3981,10 +4031,14 @@ pub struct MutationReviewArtifact {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutationReviewDecisionInput {
     pub patch_draft_id: String,
+    pub proposal_id: Option<String>,
     pub state: MutationReviewState,
+    pub reviewer_type: Option<MutationReviewReviewerType>,
     pub reason: String,
     pub evidence_refs: Vec<String>,
     pub reviewer: String,
+    pub expected_hashes: Option<MutationReviewExpectedHashes>,
+    pub guardrail_checklist: Option<MutationReviewGuardrailChecklist>,
 }
 
 impl PatchDraftArtifact {
@@ -4033,15 +4087,21 @@ impl MutationReviewArtifact {
             return Err(anyhow!("mutation review schema_version must be \"1\""));
         }
         require_text("mutation review run_id", &self.run_id)?;
-        let drafts = read_patch_draft_artifact(run_dir)?;
+        let drafts = read_patch_draft_artifact(run_dir.as_ref())?;
         let draft_ids = drafts
             .drafts
             .iter()
             .map(|draft| draft.id.as_str())
             .collect::<std::collections::HashSet<_>>();
+        let proposals = read_mutation_proposals(run_dir.as_ref())?;
+        let proposal_ids = proposals
+            .proposals
+            .iter()
+            .map(|proposal| proposal.id.as_str())
+            .collect::<std::collections::HashSet<_>>();
         let mut decision_ids = std::collections::HashSet::new();
         for decision in &self.decisions {
-            decision.validate(&draft_ids)?;
+            decision.validate(&draft_ids, &proposal_ids)?;
             if !decision_ids.insert(decision.id.as_str()) {
                 return Err(anyhow!(
                     "duplicate mutation review decision id: {}",
@@ -4054,7 +4114,11 @@ impl MutationReviewArtifact {
 }
 
 impl MutationReviewDecision {
-    fn validate(&self, draft_ids: &std::collections::HashSet<&str>) -> Result<()> {
+    fn validate(
+        &self,
+        draft_ids: &std::collections::HashSet<&str>,
+        proposal_ids: &std::collections::HashSet<&str>,
+    ) -> Result<()> {
         require_text("mutation review decision id", &self.id)?;
         validate_path_component("mutation review decision id", &self.id)?;
         require_text("mutation review patch_draft_id", &self.patch_draft_id)?;
@@ -4064,12 +4128,28 @@ impl MutationReviewDecision {
                 self.patch_draft_id
             ));
         }
+        if let Some(proposal_id) = &self.proposal_id {
+            require_text("mutation review proposal_id", proposal_id)?;
+            if !proposal_ids.contains(proposal_id.as_str()) {
+                return Err(anyhow!(
+                    "mutation review proposal id not found: {}",
+                    proposal_id
+                ));
+            }
+        }
+        if let Some(status) = &self.decision_status {
+            if status != &self.state {
+                return Err(anyhow!("mutation review decision_status must match state"));
+            }
+        }
         match self.state {
-            MutationReviewState::Accepted | MutationReviewState::Rejected => {
+            MutationReviewState::Accepted
+            | MutationReviewState::Rejected
+            | MutationReviewState::Deferred => {
                 require_text("mutation review reason", &self.reason)?;
                 if self.evidence_refs.is_empty() {
                     return Err(anyhow!(
-                        "mutation review accept/reject requires evidence or comparison ref"
+                        "mutation review decision requires evidence or comparison ref"
                     ));
                 }
             }
@@ -4079,6 +4159,48 @@ impl MutationReviewDecision {
             validate_mutation_review_ref(evidence_ref)?;
         }
         require_text("mutation review reviewer", &self.reviewer)?;
+        if let Some(expected_hashes) = &self.expected_hashes {
+            expected_hashes.validate()?;
+        }
+        if let Some(checklist) = &self.guardrail_checklist {
+            checklist.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl MutationReviewExpectedHashes {
+    fn validate(&self) -> Result<()> {
+        for hash in [
+            self.proposal_index_hash.as_deref(),
+            self.patch_draft_hash.as_deref(),
+            self.evidence_index_hash.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            require_text("mutation review expected hash", hash)?;
+            if hash.contains('/') || hash.contains('\\') || hash.contains("..") {
+                return Err(anyhow!(
+                    "mutation review expected hash must be a scalar digest"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationReviewGuardrailChecklist {
+    fn validate(&self) -> Result<()> {
+        if !self.proposal_is_record_only
+            || !self.accepted_does_not_apply
+            || !self.browser_read_only
+            || !self.evidence_refs_checked
+        {
+            return Err(anyhow!(
+                "mutation review guardrail checklist must pass before recording a decision"
+            ));
+        }
         Ok(())
     }
 }
@@ -4129,22 +4251,49 @@ pub fn append_mutation_review_decision(
     let run_dir = run_dir.as_ref();
     let mut artifact = read_mutation_review_artifact(run_dir)?;
     let next_index = artifact.decisions.len() + 1;
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    let draft = drafts
+        .drafts
+        .iter()
+        .find(|draft| draft.id == input.patch_draft_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "mutation review patch draft id not found: {}",
+                input.patch_draft_id
+            )
+        })?;
+    let proposal_id = input
+        .proposal_id
+        .or_else(|| Some(draft.proposal_id.clone()));
+    let state = input.state;
     let decision = MutationReviewDecision {
         id: format!("review-decision-{next_index}"),
         patch_draft_id: input.patch_draft_id,
-        state: input.state,
+        proposal_id,
+        state: state.clone(),
+        decision_status: Some(state),
+        reviewer_type: input
+            .reviewer_type
+            .or(Some(MutationReviewReviewerType::Human)),
         reason: input.reason,
         evidence_refs: input.evidence_refs,
         reviewer: input.reviewer,
+        expected_hashes: input.expected_hashes,
+        guardrail_checklist: input.guardrail_checklist.or(Some(Default::default())),
         decided_at_unix_ms: unix_millis()?,
     };
-    let drafts = read_patch_draft_artifact(run_dir)?;
     let draft_ids = drafts
         .drafts
         .iter()
         .map(|draft| draft.id.as_str())
         .collect::<std::collections::HashSet<_>>();
-    decision.validate(&draft_ids)?;
+    let proposals = read_mutation_proposals(run_dir)?;
+    let proposal_ids = proposals
+        .proposals
+        .iter()
+        .map(|proposal| proposal.id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    decision.validate(&draft_ids, &proposal_ids)?;
     artifact.decisions.push(decision.clone());
     write_mutation_review_artifact(run_dir, &artifact)?;
     append_ledger_event(
@@ -4154,7 +4303,10 @@ pub fn append_mutation_review_decision(
         json!({
             "decision_id": decision.id,
             "patch_draft_id": decision.patch_draft_id,
+            "proposal_id": decision.proposal_id,
             "state": decision.state,
+            "decision_status": decision.decision_status,
+            "reviewer_type": decision.reviewer_type,
             "evidence_refs": decision.evidence_refs,
             "reviewer": decision.reviewer,
         }),
@@ -4186,10 +4338,14 @@ pub fn append_mutation_review_decision_from_path(
         run_dir,
         MutationReviewDecisionInput {
             patch_draft_id,
+            proposal_id: None,
             state,
+            reviewer_type: Some(MutationReviewReviewerType::Human),
             reason,
             evidence_refs,
             reviewer,
+            expected_hashes: None,
+            guardrail_checklist: Some(Default::default()),
         },
     )
 }
@@ -15544,10 +15700,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: "comparison evidence improved the failed scenario".to_string(),
                 evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect("accepted decision appends");
@@ -15555,10 +15715,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Rejected,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: "manual review found the draft too broad".to_string(),
                 evidence_refs: vec!["sandbox/patch-draft-1/evidence/result.json".to_string()],
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect("rejected decision appends");
@@ -15569,6 +15733,25 @@ scenarios:
         assert_eq!(rejected.id, "review-decision-2");
         assert_eq!(artifact.decisions.len(), 2);
         assert_eq!(artifact.decisions[0].state, MutationReviewState::Accepted);
+        assert_eq!(
+            artifact.decisions[0].decision_status,
+            Some(MutationReviewState::Accepted)
+        );
+        assert_eq!(
+            artifact.decisions[0].proposal_id,
+            Some(drafts.drafts[0].proposal_id.clone())
+        );
+        assert_eq!(
+            artifact.decisions[0].reviewer_type,
+            Some(MutationReviewReviewerType::Human)
+        );
+        assert!(
+            artifact.decisions[0]
+                .guardrail_checklist
+                .as_ref()
+                .expect("guardrail checklist present")
+                .accepted_does_not_apply
+        );
         assert_eq!(artifact.decisions[1].state, MutationReviewState::Rejected);
         assert!(artifacts
             .run_dir
@@ -15585,10 +15768,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: " ".to_string(),
                 evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect_err("missing reason fails");
@@ -15596,10 +15783,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Rejected,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: "not enough evidence".to_string(),
                 evidence_refs: Vec::new(),
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect_err("missing evidence fails");
@@ -15624,10 +15815,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: "accepted for audit only".to_string(),
                 evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect("decision appends");
@@ -15636,6 +15831,87 @@ scenarios:
             fs::read_to_string(&target).expect("target reads"),
             "primary source remains unchanged\n"
         );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn review_decision_v1_records_deferred_and_rejects_bad_metadata() {
+        let (root, artifacts, drafts) =
+            create_sandbox_fixture("ouroforge-review-v1-validation-test");
+
+        let deferred = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: Some(drafts.drafts[0].proposal_id.clone()),
+                state: MutationReviewState::Deferred,
+                reviewer_type: Some(MutationReviewReviewerType::Agent),
+                reason: "needs another evidence comparison before acceptance".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "agent-reviewer".to_string(),
+                expected_hashes: Some(MutationReviewExpectedHashes {
+                    proposal_index_hash: Some("proposal-index-hash".to_string()),
+                    patch_draft_hash: Some("patch-draft-hash".to_string()),
+                    evidence_index_hash: Some("evidence-index-hash".to_string()),
+                }),
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect("deferred decision appends");
+
+        assert_eq!(deferred.state, MutationReviewState::Deferred);
+        assert_eq!(
+            deferred.decision_status,
+            Some(MutationReviewState::Deferred)
+        );
+        assert_eq!(
+            deferred.proposal_id,
+            Some(drafts.drafts[0].proposal_id.clone())
+        );
+        assert_eq!(
+            deferred.reviewer_type,
+            Some(MutationReviewReviewerType::Agent)
+        );
+
+        let bad_proposal = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: Some("missing-proposal".to_string()),
+                state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "bad proposal id should fail".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect_err("missing proposal id fails");
+        assert!(bad_proposal.to_string().contains("proposal id not found"));
+
+        let bad_guardrail = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
+                state: MutationReviewState::Rejected,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "guardrail checklist must pass".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(MutationReviewGuardrailChecklist {
+                    proposal_is_record_only: true,
+                    accepted_does_not_apply: false,
+                    browser_read_only: true,
+                    evidence_refs_checked: true,
+                }),
+            },
+        )
+        .expect_err("failed guardrail checklist rejects decision");
+        assert!(bad_guardrail.to_string().contains("guardrail checklist"));
+
         fs::remove_dir_all(root).ok();
     }
 
@@ -21010,10 +21286,14 @@ scenarios:
             &artifacts.run_dir,
             MutationReviewDecisionInput {
                 patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: None,
                 state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
                 reason: "manual review accepted".to_string(),
                 evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
                 reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
             },
         )
         .expect("review accepted");
