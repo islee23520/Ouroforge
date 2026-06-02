@@ -2683,6 +2683,55 @@ pub fn append_mutation_review_decision(
     Ok(decision)
 }
 
+pub fn append_mutation_review_decision_from_path(
+    run_or_draft_path: impl AsRef<Path>,
+    state: MutationReviewState,
+    reason: String,
+    evidence_refs: Vec<String>,
+    reviewer: String,
+) -> Result<MutationReviewDecision> {
+    let run_dir = resolve_patch_sandbox_run_dir(run_or_draft_path.as_ref())?;
+    let drafts = read_patch_draft_artifact(&run_dir)?;
+    let patch_draft_id = drafts
+        .drafts
+        .first()
+        .ok_or_else(|| anyhow!("mutation review requires at least one patch draft"))?
+        .id
+        .clone();
+    let evidence_refs = if evidence_refs.is_empty() {
+        default_mutation_review_evidence_refs(&run_dir, &patch_draft_id)?
+    } else {
+        evidence_refs
+    };
+    append_mutation_review_decision(
+        run_dir,
+        MutationReviewDecisionInput {
+            patch_draft_id,
+            state,
+            reason,
+            evidence_refs,
+            reviewer,
+        },
+    )
+}
+
+fn default_mutation_review_evidence_refs(
+    run_dir: &Path,
+    patch_draft_id: &str,
+) -> Result<Vec<String>> {
+    let comparison = run_dir.join("mutation/rerun-orchestration.json");
+    if comparison.is_file() {
+        return Ok(vec!["mutation/rerun-orchestration.json".to_string()]);
+    }
+    let sandbox_result = format!("sandbox/{patch_draft_id}/evidence/result.json");
+    if run_dir.join(&sandbox_result).is_file() {
+        return Ok(vec![sandbox_result]);
+    }
+    Err(anyhow!(
+        "mutation review requires evidence or comparison ref; run evolve compare first or pass --evidence"
+    ))
+}
+
 fn validate_mutation_review_ref(reference: &str) -> Result<()> {
     require_text("mutation review evidence ref", reference)?;
     let path = Path::new(reference);
@@ -7686,6 +7735,32 @@ scenarios:
         assert_eq!(
             fs::read_to_string(&target).expect("target reads"),
             "primary source remains unchanged\n"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_review_from_path_uses_comparison_evidence_by_default() {
+        let (root, artifacts, _drafts) =
+            create_sandbox_fixture("ouroforge-review-default-evidence-test");
+        fs::write(
+            artifacts.run_dir.join("mutation/rerun-orchestration.json"),
+            "{}\n",
+        )
+        .expect("comparison evidence written");
+
+        let decision = append_mutation_review_decision_from_path(
+            &artifacts.run_dir,
+            MutationReviewState::Accepted,
+            "manual reviewer accepts based on rerun comparison".to_string(),
+            Vec::new(),
+            "test-reviewer".to_string(),
+        )
+        .expect("decision appends with default evidence");
+
+        assert_eq!(
+            decision.evidence_refs,
+            vec!["mutation/rerun-orchestration.json".to_string()]
         );
         fs::remove_dir_all(root).ok();
     }
