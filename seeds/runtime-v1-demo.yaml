@@ -1,0 +1,59 @@
+id: runtime-v1.demo
+title: Runtime v1 Playable Demo Seed
+goal: Compose completed Runtime v1 capabilities into one small playable browser scenario with evidence-native verification.
+constraints:
+  target: game-runtime
+acceptance:
+  - The scenario uses scene schema v1 runtime data.
+  - Deterministic replay moves the player into the goal collider.
+  - Snapshot and restore preserve the collision-state branch.
+  - Local assets, sprite-frame animation, and audio event evidence remain observable.
+  - Run output produces browser worker evidence, scenario verdict, journal, and mutation path artifacts.
+scenarios:
+  - id: runtime-v1-composed-demo
+    description: Move the animated asset-backed player into the goal, snapshot/restore the branch, and verify collision/audio/asset evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: demo-move-to-goal
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 120
+              key: right
+              pressed: false
+      - snapshot:
+          id: goal-contact
+      - wait:
+          frames: 2
+      - restore:
+          id: goal-contact
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: object.x
+          equals: 272
+      - world_state:
+          path: collisions.0.pairId
+          equals: goal:player
+      - world_state:
+          path: snapshots.0.snapshotId
+          equals: snapshot-0001
+      - world_state:
+          path: assets.0.status
+          equals: loaded
+      - world_state:
+          path: entities.0.components.animation.state.elapsedFrames
+          equals: 120
+      - world_state:
+          path: entities.0.components.animation.state.frameIndex
+          equals: 0
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
