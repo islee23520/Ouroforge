@@ -8698,7 +8698,9 @@ pub fn reject_generated_artifact_source_collision(
     output_path: &Path,
     artifact_label: &str,
 ) -> Result<()> {
-    if is_generated_artifact_path(output_path) || !is_source_like_artifact_path(output_path) {
+    if !is_source_like_artifact_path(output_path)
+        || is_documented_generated_artifact_path(output_path)
+    {
         return Ok(());
     }
     Err(anyhow!(
@@ -8707,17 +8709,25 @@ pub fn reject_generated_artifact_source_collision(
     ))
 }
 
-fn is_generated_artifact_path(path: &Path) -> bool {
-    path.components().any(|component| {
-        let value = component.as_os_str().to_string_lossy();
+fn is_documented_generated_artifact_path(path: &Path) -> bool {
+    if path
+        .components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+    let first_normal_component = path.components().find_map(|component| match component {
+        std::path::Component::Normal(value) => Some(value.to_string_lossy()),
+        _ => None,
+    });
+    first_normal_component.is_some_and(|value| {
         matches!(
             value.as_ref(),
             "runs" | "target" | "dashboard-data" | ".omx" | ".openchrome" | ".omc" | ".claude"
         )
-    }) || path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name == "dashboard-data.json")
+    }) || path.ends_with(Path::new(
+        "examples/evidence-dashboard/dashboard-data.json",
+    ))
 }
 
 fn is_source_like_artifact_path(path: &Path) -> bool {
@@ -8791,13 +8801,65 @@ fn same_existing_file(left: &Path, right: &Path) -> bool {
 
 #[cfg(windows)]
 fn same_existing_file(left: &Path, right: &Path) -> bool {
-    use std::os::windows::fs::MetadataExt;
+    use std::ffi::c_void;
+    use std::mem::MaybeUninit;
+    use std::os::windows::io::AsRawHandle;
 
-    let (Ok(left), Ok(right)) = (std::fs::metadata(left), std::fs::metadata(right)) else {
+    #[allow(non_snake_case)]
+    #[repr(C)]
+    struct FileTime {
+        dwLowDateTime: u32,
+        dwHighDateTime: u32,
+    }
+
+    #[allow(non_snake_case)]
+    #[repr(C)]
+    struct ByHandleFileInformation {
+        dwFileAttributes: u32,
+        ftCreationTime: FileTime,
+        ftLastAccessTime: FileTime,
+        ftLastWriteTime: FileTime,
+        dwVolumeSerialNumber: u32,
+        nFileSizeHigh: u32,
+        nFileSizeLow: u32,
+        nNumberOfLinks: u32,
+        nFileIndexHigh: u32,
+        nFileIndexLow: u32,
+    }
+
+    #[derive(PartialEq, Eq)]
+    struct FileIdentity {
+        volume: u32,
+        index_high: u32,
+        index_low: u32,
+    }
+
+    extern "system" {
+        fn GetFileInformationByHandle(
+            hFile: *mut c_void,
+            lpFileInformation: *mut ByHandleFileInformation,
+        ) -> i32;
+    }
+
+    fn identity(path: &Path) -> Option<FileIdentity> {
+        let file = File::open(path).ok()?;
+        let mut info = MaybeUninit::<ByHandleFileInformation>::uninit();
+        let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) };
+        if ok == 0 {
+            return None;
+        }
+        let info = unsafe { info.assume_init() };
+        Some(FileIdentity {
+            volume: info.dwVolumeSerialNumber,
+            index_high: info.nFileIndexHigh,
+            index_low: info.nFileIndexLow,
+        })
+    }
+
+    let (Some(left), Some(right)) = (identity(left), identity(right)) else {
         return false;
     };
-    left.volume_serial_number() == right.volume_serial_number()
-        && left.file_index() == right.file_index()
+    left == right
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -16247,6 +16309,16 @@ scenarios:
         .expect_err("scene output target is rejected");
         reject_generated_artifact_source_collision(Path::new("docs/report.json"), "comparison")
             .expect_err("docs output target is rejected");
+        reject_generated_artifact_source_collision(
+            Path::new("docs/runs/report.json"),
+            "comparison",
+        )
+        .expect_err("docs runs output target is rejected");
+        reject_generated_artifact_source_collision(
+            Path::new("scenes/dashboard-data.json"),
+            "dashboard export",
+        )
+        .expect_err("scene dashboard-data output target is rejected");
         reject_generated_artifact_source_collision(Path::new("Cargo.toml"), "dashboard export")
             .expect_err("Cargo.toml output target is rejected");
     }
