@@ -6,6 +6,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -2667,6 +2668,9 @@ suggested_change:
 #[serde(rename_all = "snake_case")]
 pub enum PatchSandboxState {
     Planned,
+    Applied,
+    Verified,
+    Failed,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -2688,6 +2692,34 @@ pub struct PatchSandboxPlan {
     pub run_id: String,
     pub layout: PatchSandboxLayout,
     pub verification_commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchSandboxVerificationOutput {
+    pub command: String,
+    pub status: i32,
+    pub stdout_path: String,
+    pub stderr_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchSandboxApplicationResult {
+    pub schema_version: String,
+    pub run_id: String,
+    pub sandbox_id: String,
+    pub patch_draft_id: String,
+    pub lifecycle_state: PatchSandboxState,
+    pub sandbox_root: String,
+    pub worktree_path: String,
+    pub evidence_path: String,
+    pub applied_target_path: String,
+    pub applied_draft_path: String,
+    pub result_path: String,
+    pub verification: Vec<PatchSandboxVerificationOutput>,
+    pub primary_git_status_before: String,
+    pub primary_git_status_after: String,
 }
 
 impl PatchSandboxPlan {
@@ -2860,6 +2892,245 @@ pub fn create_patch_sandbox_layout(
     let plan_path = run_dir.join(&plan.layout.plan_path);
     write_json_atomic(&plan_path, &json!(plan))?;
     Ok(plan)
+}
+
+pub fn apply_patch_sandbox_from_path(
+    run_or_draft_path: impl AsRef<Path>,
+) -> Result<PatchSandboxApplicationResult> {
+    let run_dir = resolve_patch_sandbox_run_dir(run_or_draft_path.as_ref())?;
+    let drafts = read_patch_draft_artifact(&run_dir)?;
+    let patch_draft_id = drafts
+        .drafts
+        .first()
+        .ok_or_else(|| anyhow!("patch sandbox requires at least one patch draft"))?
+        .id
+        .clone();
+    let repo_root = git_repo_root()?;
+    apply_patch_sandbox(&run_dir, &patch_draft_id, &repo_root, true)
+}
+
+pub fn apply_patch_sandbox(
+    run_dir: impl AsRef<Path>,
+    patch_draft_id: &str,
+    repo_root: impl AsRef<Path>,
+    run_verification: bool,
+) -> Result<PatchSandboxApplicationResult> {
+    let run_dir = run_dir.as_ref();
+    let repo_root = repo_root.as_ref();
+    let primary_git_status_before = git_status_short(repo_root)?;
+    let plan = create_patch_sandbox_layout(run_dir, patch_draft_id)?;
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    let draft = drafts
+        .drafts
+        .iter()
+        .find(|draft| draft.id == patch_draft_id)
+        .ok_or_else(|| anyhow!("patch draft id not found for sandbox: {patch_draft_id}"))?;
+
+    let worktree = run_dir.join(&plan.layout.worktree_path);
+    let evidence = run_dir.join(&plan.layout.evidence_path);
+    copy_repo_tracked_files(repo_root, &worktree)?;
+
+    let applied_target = worktree.join(&draft.target_path);
+    ensure_path_inside(&worktree, &applied_target)?;
+    if !applied_target.exists() {
+        return Err(anyhow!(
+            "patch sandbox target does not exist in sandbox worktree: {}",
+            draft.target_path
+        ));
+    }
+    fs::write(&applied_target, &draft.draft_text).with_context(|| {
+        format!(
+            "failed to apply patch draft {} to sandbox target {}",
+            draft.id,
+            applied_target.display()
+        )
+    })?;
+
+    let applied_draft_path = evidence.join("applied-draft.txt");
+    fs::write(&applied_draft_path, &draft.draft_text)
+        .with_context(|| format!("failed to write {}", applied_draft_path.display()))?;
+
+    let mut verification = Vec::new();
+    if run_verification {
+        for (index, command) in plan.verification_commands.iter().enumerate() {
+            verification.push(run_sandbox_verification_command(
+                &worktree,
+                &evidence,
+                index + 1,
+                command,
+            )?);
+        }
+    }
+
+    let primary_git_status_after = git_status_short(repo_root)?;
+    let lifecycle_state = if verification.iter().all(|output| output.status == 0) {
+        PatchSandboxState::Verified
+    } else {
+        PatchSandboxState::Failed
+    };
+    let result = PatchSandboxApplicationResult {
+        schema_version: "1".to_string(),
+        run_id: plan.run_id,
+        sandbox_id: plan.layout.sandbox_id,
+        patch_draft_id: draft.id.clone(),
+        lifecycle_state,
+        sandbox_root: plan.layout.sandbox_root,
+        worktree_path: plan.layout.worktree_path,
+        evidence_path: plan.layout.evidence_path,
+        applied_target_path: run_relative_path(run_dir, &applied_target)?,
+        applied_draft_path: run_relative_path(run_dir, &applied_draft_path)?,
+        result_path: format!("sandbox/{patch_draft_id}/evidence/result.json"),
+        verification,
+        primary_git_status_before,
+        primary_git_status_after,
+    };
+    let result_path = run_dir.join(&result.result_path);
+    write_json_atomic(&result_path, &json!(result))?;
+    if result.primary_git_status_before != result.primary_git_status_after {
+        return Err(anyhow!(
+            "primary repo git status changed during sandbox application"
+        ));
+    }
+    if result.lifecycle_state == PatchSandboxState::Failed {
+        return Err(anyhow!(
+            "patch sandbox verification failed; result written to {}",
+            result_path.display()
+        ));
+    }
+    append_ledger_event(
+        run_dir,
+        "mutation.sandboxed",
+        "evolve-cli",
+        json!({
+            "patch_draft_id": result.patch_draft_id,
+            "sandbox_root": result.sandbox_root,
+            "result_path": result.result_path,
+        }),
+    )?;
+    Ok(result)
+}
+
+fn resolve_patch_sandbox_run_dir(path: &Path) -> Result<PathBuf> {
+    if path.is_dir() {
+        return Ok(path.to_path_buf());
+    }
+    if path.file_name().and_then(|name| name.to_str()) == Some("patch-drafts.json") {
+        return path
+            .parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .ok_or_else(|| anyhow!("patch draft path must be under <run>/mutation/"));
+    }
+    Err(anyhow!(
+        "evolve sandbox expects a run directory or <run>/mutation/patch-drafts.json"
+    ))
+}
+
+fn git_repo_root() -> Result<PathBuf> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .context("failed to locate git repository root")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "failed to locate git repository root: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(PathBuf::from(String::from_utf8(output.stdout)?.trim()))
+}
+
+fn git_status_short(repo_root: &Path) -> Result<String> {
+    let output = Command::new("git")
+        .args(["status", "--short", "--untracked-files=no"])
+        .current_dir(repo_root)
+        .output()
+        .context("failed to inspect primary git status")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "failed to inspect primary git status: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8(output.stdout)?)
+}
+
+fn copy_repo_tracked_files(repo_root: &Path, worktree: &Path) -> Result<()> {
+    let output = Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(repo_root)
+        .output()
+        .context("failed to list tracked repository files")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "failed to list tracked repository files: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    for raw in output.stdout.split(|byte| *byte == 0) {
+        if raw.is_empty() {
+            continue;
+        }
+        let relative = std::str::from_utf8(raw).context("tracked path is not valid UTF-8")?;
+        let source = repo_root.join(relative);
+        let target = worktree.join(relative);
+        ensure_path_inside(worktree, &target)?;
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+        fs::copy(&source, &target).with_context(|| {
+            format!(
+                "failed to copy tracked file {} to sandbox {}",
+                source.display(),
+                target.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn run_sandbox_verification_command(
+    worktree: &Path,
+    evidence: &Path,
+    index: usize,
+    command: &str,
+) -> Result<PatchSandboxVerificationOutput> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .current_dir(worktree)
+        .output()
+        .with_context(|| format!("failed to run sandbox verification command `{command}`"))?;
+    let stdout_path = evidence.join(format!("verification-{index}-stdout.txt"));
+    let stderr_path = evidence.join(format!("verification-{index}-stderr.txt"));
+    fs::write(&stdout_path, &output.stdout)
+        .with_context(|| format!("failed to write {}", stdout_path.display()))?;
+    fs::write(&stderr_path, &output.stderr)
+        .with_context(|| format!("failed to write {}", stderr_path.display()))?;
+    Ok(PatchSandboxVerificationOutput {
+        command: command.to_string(),
+        status: output.status.code().unwrap_or(-1),
+        stdout_path: run_relative_path_from_sandbox_worktree(worktree, &stdout_path)?,
+        stderr_path: run_relative_path_from_sandbox_worktree(worktree, &stderr_path)?,
+    })
+}
+
+fn run_relative_path(run_dir: &Path, path: &Path) -> Result<String> {
+    path.strip_prefix(run_dir)
+        .with_context(|| format!("{} is outside run directory", path.display()))?
+        .to_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("run-relative path is not valid UTF-8"))
+}
+
+fn run_relative_path_from_sandbox_worktree(worktree: &Path, path: &Path) -> Result<String> {
+    let run_dir = worktree
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .ok_or_else(|| anyhow!("sandbox worktree is not under a run directory"))?;
+    run_relative_path(run_dir, path)
 }
 
 pub fn create_mutation_proposal(
@@ -6962,6 +7233,50 @@ scenarios:
 
         let target_after = fs::read_to_string(&target).expect("target reads");
         assert_eq!(target_after, "primary working tree content\n");
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn applies_patch_draft_in_sandbox_and_captures_result() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-sandbox-apply-test");
+        let repo_root = git_repo_root().expect("repo root resolves");
+        let primary_target = repo_root.join(&drafts.drafts[0].target_path);
+        let primary_before = fs::read_to_string(&primary_target).expect("primary target reads");
+        let status_before = git_status_short(&repo_root).expect("status before reads");
+
+        let result =
+            apply_patch_sandbox(&artifacts.run_dir, &drafts.drafts[0].id, &repo_root, false)
+                .expect("sandbox apply succeeds");
+
+        let sandbox_target = artifacts.run_dir.join(&result.applied_target_path);
+        let sandbox_after = fs::read_to_string(&sandbox_target).expect("sandbox target reads");
+        let primary_after = fs::read_to_string(&primary_target).expect("primary target reads");
+        let status_after = git_status_short(&repo_root).expect("status after reads");
+
+        assert_eq!(result.lifecycle_state, PatchSandboxState::Verified);
+        assert_eq!(result.verification.len(), 0);
+        assert!(artifacts.run_dir.join(&result.result_path).is_file());
+        assert!(sandbox_after.contains("Ouroforge patch draft v1"));
+        assert_eq!(primary_before, primary_after);
+        assert_eq!(status_before, status_after);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn patch_sandbox_reports_missing_target_clearly() {
+        let (root, artifacts, mut drafts) =
+            create_sandbox_fixture("ouroforge-sandbox-missing-target-test");
+        drafts.drafts[0].target_path = "missing/sandbox-target.yaml".to_string();
+        write_patch_draft_artifact(&artifacts.run_dir, &drafts).expect("draft rewrites");
+        let repo_root = git_repo_root().expect("repo root resolves");
+
+        let error =
+            apply_patch_sandbox(&artifacts.run_dir, &drafts.drafts[0].id, &repo_root, false)
+                .expect_err("missing target fails");
+
+        assert!(error
+            .to_string()
+            .contains("patch sandbox target does not exist"));
         fs::remove_dir_all(root).ok();
     }
 
