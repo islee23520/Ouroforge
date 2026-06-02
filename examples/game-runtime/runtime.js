@@ -72,6 +72,7 @@
     entities: clone(defaultScene.entities),
     metadata: clone(defaultScene.metadata),
     collisions: [],
+    collisionEvents: [],
     audioEvents: [],
     tilemaps: [],
     assetManifest: null,
@@ -205,7 +206,11 @@
       }
       world.collisions = collision.detectAabbCollisions(world.entities, world.tick);
     }
-    for (const event of world.collisions) record(event.type, event);
+    for (const event of world.collisions) {
+      world.collisionEvents.push(event);
+      if (world.collisionEvents.length > 64) world.collisionEvents.shift();
+      record(event.type, event);
+    }
   }
 
   function renderCanvas() {
@@ -232,6 +237,7 @@
     rendererState = clone(normalized.renderer);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
+    world.collisionEvents = [];
     world.audioEvents = [];
     world.tick = 0;
     const assetMetadata = assets.load(world, world.assetManifest);

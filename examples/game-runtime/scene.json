@@ -137,6 +137,51 @@
       "metadata": {
         "role": "objective"
       }
+    },
+    {
+      "id": "wall",
+      "sprite": {
+        "color": "#64748b",
+        "layer": "actors",
+        "order": 20
+      },
+      "components": {
+        "transform": {
+          "x": 304,
+          "y": 72
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "controllable": false,
+        "collider": {
+          "shape": "aabb",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 16
+          },
+          "sensor": false,
+          "trigger": false,
+          "body": "static",
+          "collisionGroup": "world"
+        }
+      },
+      "tags": [
+        "wall",
+        "solid"
+      ],
+      "metadata": {
+        "role": "physics-contact-fixture"
+      }
     }
   ],
   "renderer": {

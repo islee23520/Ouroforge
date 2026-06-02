@@ -1,0 +1,80 @@
+id: runtime-v2.physics
+title: Runtime v2 Physics Seed
+goal: Prove deterministic contact and trigger physics events are observable through bounded runtime evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Trigger zones emit deterministic runtime.collision.trigger events in world-state evidence.
+  - Static contact resolution emits deterministic runtime.collision.contact events with normals.
+  - Collision event history is bounded and exposed through runtime probe state.
+scenarios:
+  - id: trigger-goal-zone
+    description: Move the player into the goal trigger and assert trigger event evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: physics-trigger-right
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 120
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: collisions.0.type
+          equals: runtime.collision.trigger
+      - world_state:
+          path: collisions.0.pairId
+          equals: goal:player
+      - world_state:
+          path: collisions.0.trigger
+          equals: true
+      - world_state:
+          path: collisions.0.normal.x
+          equals: 0
+      - world_state:
+          path: collisionEvents.0.type
+          equals: runtime.collision.trigger
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: contact-wall-normal
+    description: Move the player through the trigger and into a solid wall, then assert contact normal evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: physics-contact-right
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 150
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 288
+      - world_state:
+          path: collisions.0.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisions.0.pairId
+          equals: player:wall
+      - world_state:
+          path: collisions.0.normal.x
+          equals: -1
+      - world_state:
+          path: collisions.0.staticEntityId
+          equals: wall
+      - world_state:
+          path: collisionEvents.0.type
+          equals: runtime.collision.trigger
+      - world_state:
+          path: collisionEvents.15.type
+          equals: runtime.collision.contact
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
