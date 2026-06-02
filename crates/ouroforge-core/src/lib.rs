@@ -6083,6 +6083,56 @@ pub fn write_scene_edit_transaction_artifact(
     write_json(path, &json!(transaction))
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunTransactionProvenance {
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "transactionArtifactPath")]
+    pub transaction_artifact_path: String,
+    #[serde(rename = "scenePath")]
+    pub scene_path: String,
+    #[serde(rename = "beforeSceneHash")]
+    pub before_scene_hash: SceneHash,
+    #[serde(rename = "afterSceneHash")]
+    pub after_scene_hash: SceneHash,
+}
+
+pub fn read_scene_edit_transaction_artifact(
+    path: impl AsRef<Path>,
+) -> Result<SceneEditTransaction> {
+    let path = path.as_ref();
+    let value = read_json_value(path)?;
+    serde_json::from_value(value)
+        .with_context(|| format!("failed to parse scene edit transaction {}", path.display()))
+}
+
+pub fn run_transaction_provenance_from_artifact(
+    path: impl AsRef<Path>,
+) -> Result<RunTransactionProvenance> {
+    let path = path.as_ref();
+    let transaction = read_scene_edit_transaction_artifact(path)?;
+    if transaction.validation_result.status != "passed" {
+        return Err(anyhow!(
+            "run transaction provenance requires a passed transaction: {}",
+            transaction.id
+        ));
+    }
+    let after_scene_hash = transaction.after_scene_hash.clone().ok_or_else(|| {
+        anyhow!(
+            "run transaction provenance requires afterSceneHash for transaction: {}",
+            transaction.id
+        )
+    })?;
+    Ok(RunTransactionProvenance {
+        transaction_id: transaction.id,
+        transaction_artifact_path: path.to_string_lossy().to_string(),
+        scene_path: transaction.scene_path,
+        before_scene_hash: transaction.before_scene_hash,
+        after_scene_hash,
+    })
+}
+
 pub fn preview_scene_edit_transaction(
     scene_path: impl AsRef<Path>,
     edit: SceneEdit,
@@ -9139,6 +9189,68 @@ scenarios:
 
         let error = Seed::from_yaml_str(invalid).expect_err("unknown fields fail");
         assert!(error.to_string().contains("failed to parse Seed YAML"));
+    }
+
+    #[test]
+    fn run_transaction_provenance_reads_passed_transaction_artifact() {
+        let temp = unique_temp_dir("ouroforge-run-provenance-model-test");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        let transaction = preview_scene_edit_transaction(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+        )
+        .expect("transaction previews");
+        let transaction_path = temp.join("transaction.json");
+        write_scene_edit_transaction_artifact(&transaction_path, &transaction)
+            .expect("transaction written");
+        let provenance =
+            run_transaction_provenance_from_artifact(&transaction_path).expect("provenance reads");
+        assert_eq!(provenance.transaction_id, transaction.id);
+        assert_eq!(provenance.scene_path, scene_path.to_string_lossy());
+        assert_eq!(provenance.before_scene_hash, transaction.before_scene_hash);
+        assert_eq!(
+            provenance.after_scene_hash,
+            transaction.after_scene_hash.expect("after hash exists")
+        );
+        fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn run_transaction_provenance_rejects_failed_transaction_artifact() {
+        let temp = unique_temp_dir("ouroforge-run-provenance-failed-test");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        let transaction = preview_scene_edit_transaction(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.size.width".to_string(),
+                value: json!(0),
+            },
+        )
+        .expect("transaction previews");
+        let transaction_path = temp.join("failed-transaction.json");
+        write_scene_edit_transaction_artifact(&transaction_path, &transaction)
+            .expect("transaction written");
+        let error = run_transaction_provenance_from_artifact(&transaction_path)
+            .expect_err("failed transaction rejected");
+        assert!(error.to_string().contains("requires a passed transaction"));
+        fs::remove_dir_all(temp).ok();
     }
 
     #[test]
