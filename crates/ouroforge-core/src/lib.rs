@@ -8023,6 +8023,26 @@ pub fn validate_scene_only_mutation_operation(
     })
 }
 
+fn reject_scene_mutation_transaction_output_collision(
+    transaction_output: &Path,
+    target_scene_path: &Path,
+) -> Result<()> {
+    let same_path = match (
+        transaction_output.canonicalize(),
+        target_scene_path.canonicalize(),
+    ) {
+        (Ok(output), Ok(target)) => output == target,
+        _ => transaction_output == target_scene_path,
+    };
+    if same_path {
+        return Err(anyhow!(
+            "scene-only mutation transaction output must not equal target scene path {}",
+            target_scene_path.display()
+        ));
+    }
+    Ok(())
+}
+
 pub fn apply_scene_only_mutation_operation(
     run_dir: impl AsRef<Path>,
     operation: &SceneOnlyMutationOperation,
@@ -8073,6 +8093,10 @@ pub fn apply_scene_only_mutation_operation(
             before_scene_hash.value
         ));
     }
+    reject_scene_mutation_transaction_output_collision(
+        transaction_output,
+        Path::new(&operation.target_scene_path),
+    )?;
     let transaction =
         preview_scene_edit_transaction(&operation.target_scene_path, operation.edit.clone())?;
     write_scene_edit_transaction_artifact(transaction_output, &transaction)?;
@@ -14920,6 +14944,44 @@ scenarios:
             applied.records[0]["rollback"]["restoreHash"]["value"],
             project_context.scene_hash.value
         );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scene_only_mutation_application_rejects_transaction_output_scene_collision() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-output-collision");
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        };
+
+        let error =
+            apply_scene_only_mutation_operation(&artifacts.run_dir, &operation, &scene_path)
+                .expect_err("transaction output matching scene path is rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{error:#}"
+        );
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after reads"),
+            before_contents,
+            "same-path transaction output rejection must not corrupt the trusted scene"
+        );
+        assert!(read_scene(&scene_path).is_ok(), "scene remains parseable");
         fs::remove_dir_all(root).ok();
     }
 
