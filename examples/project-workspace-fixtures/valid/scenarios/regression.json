@@ -1,5 +1,49 @@
 {
   "schemaVersion": "scenario-pack-v1",
   "id": "regression",
-  "description": "Manifest reference fixture only."
+  "description": "Project workspace regression scenario pack fixture.",
+  "seed": "seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    {
+      "id": "smoke",
+      "description": "Smoke and feature sanity contracts.",
+      "scenarios": [
+        {
+          "id": "project-smoke",
+          "description": "World state smoke assertion.",
+          "assertions": [
+            { "world_state": { "path": "tick", "exists": true } }
+          ]
+        },
+        {
+          "id": "feature-sanity",
+          "description": "Frame stat sanity assertion.",
+          "assertions": [
+            { "frame_stats": { "path": "fixedDeltaMs", "greaterThan": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "movement-contact-performance-reload",
+      "description": "Movement/contact/performance/reload category placeholders using existing bounded assertions.",
+      "scenarios": [
+        {
+          "id": "movement-contact",
+          "description": "Movement/contact evidence category placeholder.",
+          "assertions": [
+            { "runtime_events": { "path": "events", "exists": true } }
+          ]
+        },
+        {
+          "id": "performance-reload",
+          "description": "Performance and reload sanity placeholder.",
+          "assertions": [
+            { "performance_metrics": { "path": "ScriptDuration", "exists": true } }
+          ]
+        }
+      ]
+    }
+  ]
 }

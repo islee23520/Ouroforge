@@ -427,6 +427,107 @@ impl PerformanceEvaluatorConfig {
     }
 }
 
+const SCENARIO_PACK_SCHEMA_VERSION: &str = "scenario-pack-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioPack {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub id: String,
+    pub description: String,
+    pub seed: String,
+    pub scenes: Vec<String>,
+    #[serde(rename = "scenarioGroups")]
+    pub scenario_groups: Vec<ScenarioPackGroup>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioPackGroup {
+    pub id: String,
+    pub description: String,
+    pub scenarios: Vec<Scenario>,
+}
+
+impl ScenarioPack {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let pack: ScenarioPack =
+            serde_json::from_str(input).context("failed to parse Scenario Pack JSON")?;
+        pack.validate()?;
+        Ok(pack)
+    }
+
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let input = fs::read_to_string(path)
+            .with_context(|| format!("failed to read scenario pack {}", path.display()))?;
+        Self::from_json_str(&input)
+            .with_context(|| format!("failed to parse scenario pack {}", path.display()))
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SCENARIO_PACK_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "scenario pack schemaVersion must be {SCENARIO_PACK_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("scenario pack id", &self.id)?;
+        require_text("scenario pack description", &self.description)?;
+        validate_project_manifest_path("scenario pack seed", &self.seed)?;
+        if self.scenes.is_empty() {
+            return Err(anyhow!("scenario pack scenes must not be empty"));
+        }
+        validate_project_path_list("scenario pack scenes", &self.scenes)?;
+        if self.scenario_groups.is_empty() {
+            return Err(anyhow!("scenario pack scenarioGroups must not be empty"));
+        }
+        let mut group_ids = BTreeSet::new();
+        let mut scenario_ids = BTreeSet::new();
+        for (group_index, group) in self.scenario_groups.iter().enumerate() {
+            group.validate(group_index, &mut scenario_ids)?;
+            if !group_ids.insert(group.id.clone()) {
+                return Err(anyhow!("duplicate scenario pack group id: {}", group.id));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn ordered_scenario_ids(&self) -> Vec<String> {
+        self.scenario_groups
+            .iter()
+            .flat_map(|group| group.scenarios.iter())
+            .map(|scenario| scenario.id.clone())
+            .collect()
+    }
+}
+
+impl ScenarioPackGroup {
+    fn validate(&self, group_index: usize, scenario_ids: &mut BTreeSet<String>) -> Result<()> {
+        validate_path_component("scenario pack group id", &self.id)?;
+        require_text("scenario pack group description", &self.description)?;
+        if self.scenarios.is_empty() {
+            return Err(anyhow!(
+                "scenario pack scenarioGroups[{group_index}].scenarios must not be empty"
+            ));
+        }
+        for (scenario_index, scenario) in self.scenarios.iter().enumerate() {
+            scenario.validate(scenario_index).with_context(|| {
+                format!(
+                    "scenario pack scenarioGroups[{group_index}].scenarios[{scenario_index}] is invalid"
+                )
+            })?;
+            if !scenario_ids.insert(scenario.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate scenario pack scenario id: {}",
+                    scenario.id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Scenario {
     fn validate(&self, index: usize) -> Result<()> {
         require_text(&format!("scenarios[{index}].id"), &self.id)?;
@@ -1161,7 +1262,21 @@ const MINIMAL_2D_PROJECT_SCENARIO_PACK: &str = r#"{
   "description": "Starter scenario pack placeholder for project-level QA.",
   "seed": "seeds/platformer.yaml",
   "scenes": ["scenes/main.scene.json"],
-  "scenarios": ["smoke"]
+  "scenarioGroups": [
+    {
+      "id": "smoke",
+      "description": "Starter scaffold smoke contracts.",
+      "scenarios": [
+        {
+          "id": "scaffold-smoke",
+          "description": "Validate that starter runtime evidence can be asserted.",
+          "assertions": [
+            { "world_state": { "path": "tick", "exists": true } }
+          ]
+        }
+      ]
+    }
+  ]
 }
 "#;
 
@@ -14049,6 +14164,47 @@ scenarios:
                 .expect("tilemap layer order serializes"),
             r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
         );
+    }
+
+    #[test]
+    fn scenario_pack_v1_validates_fixture_order_and_supported_assertions() {
+        let pack = ScenarioPack::from_json_str(include_str!(
+            "../../../examples/project-workspace-fixtures/valid/scenarios/regression.json"
+        ))
+        .expect("valid scenario pack fixture validates");
+        assert_eq!(pack.id, "regression");
+        assert_eq!(
+            pack.ordered_scenario_ids(),
+            vec![
+                "project-smoke".to_string(),
+                "feature-sanity".to_string(),
+                "movement-contact".to_string(),
+                "performance-reload".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn scenario_pack_v1_rejects_duplicates_unsafe_paths_and_unsupported_fields() {
+        let duplicate = ScenarioPack::from_json_str(include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/scenario-pack-duplicate-id.json"
+        ))
+        .expect_err("duplicate scenario id rejected");
+        assert!(duplicate
+            .to_string()
+            .contains("duplicate scenario pack scenario id"));
+
+        let unsafe_path = ScenarioPack::from_json_str(include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/scenario-pack-unsafe-path.json"
+        ))
+        .expect_err("unsafe path rejected");
+        assert!(unsafe_path.to_string().contains("project root"));
+
+        let unsupported = ScenarioPack::from_json_str(include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/scenario-pack-unsupported-field.json"
+        ))
+        .expect_err("unsupported field rejected");
+        assert!(format!("{unsupported:#}").contains("unknown field"));
     }
 
     #[test]

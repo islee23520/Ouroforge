@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "duplicate",
+  "description": "Duplicate scenario id fixture.",
+  "seed": "seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    { "id": "a", "description": "A", "scenarios": [{ "id": "same", "description": "one" }] },
+    { "id": "b", "description": "B", "scenarios": [{ "id": "same", "description": "two" }] }
+  ]
+}

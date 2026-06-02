@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "unsafe",
+  "description": "Unsafe seed path fixture.",
+  "seed": "../seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    { "id": "smoke", "description": "Smoke", "scenarios": [{ "id": "ok", "description": "Ok" }] }
+  ]
+}
