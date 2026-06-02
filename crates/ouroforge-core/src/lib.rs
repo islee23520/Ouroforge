@@ -5913,6 +5913,7 @@ pub struct RunDashboardReadModel {
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub replay: RunDashboardReplay,
+    pub comparison: RunDashboardComparison,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
 }
@@ -5993,6 +5994,28 @@ pub struct RunDashboardReplayCheckpoint {
     pub world_state: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardComparison {
+    pub present: bool,
+    pub empty_state: String,
+    pub artifacts: Vec<RunDashboardComparisonArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardComparisonArtifact {
+    pub id: String,
+    pub path: String,
+    pub exists: bool,
+    pub read_error: Option<String>,
+    pub before_run_id: Option<String>,
+    pub after_run_id: Option<String>,
+    pub classification: Option<String>,
+    pub deltas: serde_json::Value,
+    pub evidence_refs: Vec<String>,
+    pub unsupported: Vec<String>,
+    pub value: Option<serde_json::Value>,
+}
+
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
     let runs_root = runs_root.as_ref();
     if !runs_root.exists() {
@@ -6048,6 +6071,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let replay = read_dashboard_replay(run_dir, &evidence)?;
+    let comparison = read_dashboard_comparison(run_dir);
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -6075,6 +6099,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         mutation_artifacts,
         mutation_lifecycle,
         replay,
+        comparison,
         evidence_categories,
         mutations,
     })
@@ -6464,6 +6489,117 @@ fn dashboard_replay_checkpoints(
             })
         })
         .collect()
+}
+
+fn read_dashboard_comparison(run_dir: &Path) -> RunDashboardComparison {
+    let paths = dashboard_run_comparison_artifact_paths(run_dir);
+    if paths.is_empty() {
+        return RunDashboardComparison {
+            present: false,
+            empty_state: "No run comparison artifacts were found for this run.".to_string(),
+            artifacts: Vec::new(),
+        };
+    }
+    let artifacts = paths
+        .into_iter()
+        .map(|path| dashboard_comparison_artifact(run_dir, path))
+        .collect::<Vec<_>>();
+    RunDashboardComparison {
+        present: true,
+        empty_state: String::new(),
+        artifacts,
+    }
+}
+
+fn dashboard_run_comparison_artifact_paths(run_dir: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    for dir in ["mutation", "comparisons"] {
+        if let Ok(entries) = fs::read_dir(run_dir.join(dir)) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                    continue;
+                };
+                if name.starts_with("run-comparison-") && name.ends_with(".json") {
+                    paths.push(format!("{dir}/{name}"));
+                }
+            }
+        }
+    }
+    paths.sort();
+    paths
+}
+
+fn dashboard_comparison_artifact(run_dir: &Path, path: String) -> RunDashboardComparisonArtifact {
+    let id = Path::new(&path)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("run-comparison")
+        .to_string();
+    let absolute_path = run_dir.join(&path);
+    if !absolute_path.is_file() {
+        return RunDashboardComparisonArtifact {
+            id,
+            path: path.clone(),
+            exists: false,
+            read_error: Some(format!("missing comparison artifact file: {path}")),
+            before_run_id: None,
+            after_run_id: None,
+            classification: None,
+            deltas: serde_json::Value::Null,
+            evidence_refs: Vec::new(),
+            unsupported: Vec::new(),
+            value: None,
+        };
+    }
+    match read_json_value(&absolute_path) {
+        Ok(value) => RunDashboardComparisonArtifact {
+            id,
+            path,
+            exists: true,
+            read_error: None,
+            before_run_id: json_string(&value, "before_run_id"),
+            after_run_id: json_string(&value, "after_run_id"),
+            classification: json_string(&value, "classification"),
+            deltas: value
+                .get("deltas")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+            evidence_refs: value
+                .get("evidence_refs")
+                .and_then(|refs| refs.as_array())
+                .map(|refs| {
+                    refs.iter()
+                        .filter_map(|value| value.as_str().map(str::to_string))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            unsupported: value
+                .get("unsupported")
+                .and_then(|items| items.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|value| value.as_str().map(str::to_string))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            value: Some(value),
+        },
+        Err(error) => RunDashboardComparisonArtifact {
+            id,
+            path,
+            exists: true,
+            read_error: Some(error.to_string()),
+            before_run_id: None,
+            after_run_id: None,
+            classification: None,
+            deltas: serde_json::Value::Null,
+            evidence_refs: Vec::new(),
+            unsupported: Vec::new(),
+            value: None,
+        },
+    }
 }
 
 fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboardArtifact>> {
@@ -10776,6 +10912,96 @@ scenarios:
             .replay
             .empty_state
             .contains("No replay evidence artifacts"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_comparison_read_model_tracks_present_and_malformed_artifacts() {
+        let (root, artifacts) = create_test_run("dashboard-comparison-read-model");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir exists");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("mutation/run-comparison-before--after.json"),
+            serde_json::to_string_pretty(&json!({
+                "before_run_id": "before",
+                "after_run_id": "after",
+                "classification": "improved",
+                "before": { "run_id": "before", "verdict_status": "failed" },
+                "after": { "run_id": "after", "verdict_status": "passed" },
+                "deltas": {
+                    "scenario_results": 0,
+                    "failed_scenarios": -1,
+                    "assertion_failures": -2,
+                    "performance_artifacts": 1,
+                    "evidence_artifacts": 3
+                },
+                "evidence_refs": [
+                    "runs/before/verdict.json",
+                    "runs/after/verdict.json"
+                ],
+                "unsupported": [
+                    "semantic gameplay quality is not inferred"
+                ]
+            }))
+            .expect("comparison JSON serializes"),
+        )
+        .expect("comparison written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("mutation/run-comparison-bad--after.json"),
+            "{bad-json",
+        )
+        .expect("malformed comparison written");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.comparison.present);
+        assert_eq!(model.comparison.artifacts.len(), 2);
+        let comparison = model
+            .comparison
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.path == "mutation/run-comparison-before--after.json")
+            .expect("valid comparison present");
+        assert_eq!(comparison.before_run_id.as_deref(), Some("before"));
+        assert_eq!(comparison.after_run_id.as_deref(), Some("after"));
+        assert_eq!(comparison.classification.as_deref(), Some("improved"));
+        assert_eq!(comparison.deltas["failed_scenarios"], json!(-1));
+        assert_eq!(
+            comparison.evidence_refs,
+            vec![
+                "runs/before/verdict.json".to_string(),
+                "runs/after/verdict.json".to_string()
+            ]
+        );
+        assert_eq!(
+            comparison.unsupported,
+            vec!["semantic gameplay quality is not inferred".to_string()]
+        );
+        let malformed = model
+            .comparison
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.path == "mutation/run-comparison-bad--after.json")
+            .expect("malformed comparison present");
+        assert!(malformed.read_error.is_some());
+        assert!(malformed.value.is_none());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_comparison_read_model_handles_missing_artifacts() {
+        let (root, artifacts) = create_test_run("dashboard-comparison-empty-read-model");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(!model.comparison.present);
+        assert!(model.comparison.artifacts.is_empty());
+        assert!(model
+            .comparison
+            .empty_state
+            .contains("No run comparison artifacts"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
