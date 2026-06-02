@@ -81,3 +81,16 @@ assert.equal(turret.components.size.width, 10);
 assert.equal(turret.components.size.height, 12);
 assert.equal(turret.components.controllable, false);
 assert.equal(state.componentDefaults.size.width, 10);
+
+
+assert.equal(state.composition.version, '1');
+const turretProbe = state.composition.entities.find((entity) => entity.entityId === 'turret');
+const muzzleProbe = state.composition.entities.find((entity) => entity.entityId === 'muzzle');
+assert.equal(turretProbe.parent, 'ship');
+assert.equal(turretProbe.localTransform.x, 8);
+assert.equal(turretProbe.localTransform.y, -4);
+assert.equal(turretProbe.worldTransform.x, 108);
+assert.equal(turretProbe.worldTransform.y, 46);
+assert.equal(muzzleProbe.parent, 'turret');
+assert.equal(muzzleProbe.worldTransform.x, 111);
+assert.equal(muzzleProbe.worldTransform.y, 47);

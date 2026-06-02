@@ -384,12 +384,26 @@
     return api.getWorldState();
   }
 
+
+  function compositionDebugState(entities) {
+    return {
+      version: '1',
+      entities: entities.map((entity) => ({
+        entityId: entity.id,
+        parent: entity.parent,
+        localTransform: clone(entity.components.localTransform || entity.components.transform),
+        worldTransform: clone(entity.components.transform),
+      })),
+    };
+  }
+
   const api = Object.freeze({
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.tilemaps = tilemap.debugState(world.tilemaps);
+      state.composition = compositionDebugState(world.entities);
       state.assetManifest = assets.manifestSummary ? assets.manifestSummary() : null;
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();
