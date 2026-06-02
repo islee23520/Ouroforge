@@ -7800,11 +7800,28 @@ pub struct SceneOnlyMutationOperation {
     pub proposal_id: String,
     #[serde(rename = "targetScenePath")]
     pub target_scene_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectSceneMutationContext>,
     pub edit: SceneEdit,
     #[serde(rename = "expectedBeforeSceneHash")]
     pub expected_before_scene_hash: SceneHash,
     #[serde(rename = "validationRequired")]
     pub validation_required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSceneMutationContext {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "manifestPath")]
+    pub manifest_path: String,
+    #[serde(rename = "manifestHash")]
+    pub manifest_hash: ProjectArtifactHash,
+    #[serde(rename = "scenePath")]
+    pub scene_path: String,
+    #[serde(rename = "sceneHash")]
+    pub scene_hash: SceneHash,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -7818,6 +7835,8 @@ pub struct SceneOnlyMutationValidation {
     pub before_scene_hash: SceneHash,
     #[serde(rename = "allowedPath")]
     pub allowed_path: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectSceneMutationContext>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -7830,12 +7849,16 @@ pub struct SceneOnlyMutationApplicationRecord {
     pub transaction_id: String,
     #[serde(rename = "targetScenePath")]
     pub target_scene_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectSceneMutationContext>,
     #[serde(rename = "transactionArtifactPath")]
     pub transaction_artifact_path: String,
     #[serde(rename = "beforeSceneHash")]
     pub before_scene_hash: SceneHash,
     #[serde(rename = "afterSceneHash")]
     pub after_scene_hash: SceneHash,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback: Option<SceneEditRollbackMetadata>,
     pub status: String,
     #[serde(rename = "createdAtUnixMs")]
     pub created_at_unix_ms: u128,
@@ -7845,6 +7868,93 @@ pub struct SceneOnlyMutationApplicationRecord {
 #[serde(deny_unknown_fields)]
 pub struct SceneOnlyMutationApplicationIndex {
     pub applications: Vec<SceneOnlyMutationApplicationRecord>,
+}
+
+fn validate_project_scene_mutation_context(
+    operation: &SceneOnlyMutationOperation,
+    before_scene_hash: &SceneHash,
+) -> Result<Option<ProjectSceneMutationContext>> {
+    let Some(project) = &operation.project else {
+        return Ok(None);
+    };
+    require_text("scene-only mutation project projectId", &project.project_id)?;
+    require_text(
+        "scene-only mutation project manifestPath",
+        &project.manifest_path,
+    )?;
+    validate_project_manifest_path("scene-only mutation project scenePath", &project.scene_path)?;
+    let manifest_path = Path::new(&project.manifest_path);
+    let manifest = ProjectManifest::from_path(manifest_path).with_context(|| {
+        format!(
+            "scene-only mutation project manifest failed validation: {}",
+            manifest_path.display()
+        )
+    })?;
+    if manifest.project.id != project.project_id {
+        return Err(anyhow!(
+            "scene-only mutation project id mismatch; expected {}, found {}",
+            project.project_id,
+            manifest.project.id
+        ));
+    }
+    let manifest_hash = hash_project_manifest_file(manifest_path)?;
+    if manifest_hash != project.manifest_hash {
+        return Err(anyhow!(
+            "scene-only mutation project manifest hash mismatch; expected {}, found {}",
+            project.manifest_hash.value,
+            manifest_hash.value
+        ));
+    }
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let declared_scene = manifest
+        .scenes
+        .iter()
+        .find(|scene| scene.path == project.scene_path)
+        .ok_or_else(|| {
+            anyhow!(
+                "scene-only mutation target scene {} is not declared in project manifest scenes",
+                project.scene_path
+            )
+        })?;
+    let declared_scene_path = project_root.join(&declared_scene.path);
+    let declared_scene_canonical = declared_scene_path.canonicalize().with_context(|| {
+        format!(
+            "failed to resolve project scene {}",
+            declared_scene_path.display()
+        )
+    })?;
+    let target_scene_path = Path::new(&operation.target_scene_path);
+    let target_scene_canonical = target_scene_path.canonicalize().with_context(|| {
+        format!(
+            "failed to resolve scene-only mutation targetScenePath {}",
+            target_scene_path.display()
+        )
+    })?;
+    if target_scene_canonical != declared_scene_canonical {
+        return Err(anyhow!(
+            "scene-only mutation targetScenePath {} is not the manifest-authorized project scene {}",
+            operation.target_scene_path,
+            project.scene_path
+        ));
+    }
+    if &project.scene_hash != before_scene_hash {
+        return Err(anyhow!(
+            "scene-only mutation project scene hash mismatch; expected {}, found {}",
+            project.scene_hash.value,
+            before_scene_hash.value
+        ));
+    }
+    if &operation.expected_before_scene_hash != before_scene_hash {
+        return Err(anyhow!(
+            "scene-only mutation before hash mismatch; expected {}, found {}",
+            operation.expected_before_scene_hash.value,
+            before_scene_hash.value
+        ));
+    }
+    Ok(Some(project.clone()))
 }
 
 pub fn validate_scene_only_mutation_operation(
@@ -7892,6 +8002,7 @@ pub fn validate_scene_only_mutation_operation(
     }
     let scene = read_scene(&operation.target_scene_path)?;
     let before_scene_hash = hash_scene_document(&scene)?;
+    let project = validate_project_scene_mutation_context(operation, &before_scene_hash)?;
     if before_scene_hash != operation.expected_before_scene_hash {
         return Err(anyhow!(
             "scene-only mutation before hash mismatch; expected {}, found {}",
@@ -7908,6 +8019,7 @@ pub fn validate_scene_only_mutation_operation(
         target_scene_path: operation.target_scene_path.clone(),
         before_scene_hash,
         allowed_path: true,
+        project,
     })
 }
 
@@ -7953,6 +8065,7 @@ pub fn apply_scene_only_mutation_operation(
     }
     let scene = read_scene(&operation.target_scene_path)?;
     let before_scene_hash = hash_scene_document(&scene)?;
+    let project = validate_project_scene_mutation_context(operation, &before_scene_hash)?;
     if before_scene_hash != operation.expected_before_scene_hash {
         return Err(anyhow!(
             "scene-only mutation before hash mismatch; expected {}, found {}",
@@ -7992,7 +8105,8 @@ pub fn apply_scene_only_mutation_operation(
             "transaction_artifact_path": transaction_output.to_string_lossy(),
             "target_scene_path": operation.target_scene_path,
             "before_scene_hash": transaction.before_scene_hash,
-            "after_scene_hash": after_scene_hash
+            "after_scene_hash": after_scene_hash,
+            "project": project
         }),
     )?;
     Ok(transaction)
@@ -8015,9 +8129,11 @@ fn append_scene_only_mutation_application(
         proposal_id: operation.proposal_id.clone(),
         transaction_id: transaction.id.clone(),
         target_scene_path: operation.target_scene_path.clone(),
+        project: operation.project.clone(),
         transaction_artifact_path: transaction_output.to_string_lossy().to_string(),
         before_scene_hash: transaction.before_scene_hash.clone(),
         after_scene_hash: after_scene_hash.clone(),
+        rollback: Some(transaction.rollback.clone()),
         status: "applied".to_string(),
         created_at_unix_ms: unix_millis()?,
     };
@@ -14488,6 +14604,7 @@ scenarios:
             schema_version: "scene-only-mutation-v1".to_string(),
             proposal_id: proposal.id,
             target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
             edit: SceneEdit {
                 entity_id: "player".to_string(),
                 path: "components.transform.x".to_string(),
@@ -14519,6 +14636,7 @@ scenarios:
             schema_version: "scene-only-mutation-v1".to_string(),
             proposal_id: proposal.id.clone(),
             target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
             edit: SceneEdit {
                 entity_id: "player".to_string(),
                 path: "metadata.debug.mode".to_string(),
@@ -14570,6 +14688,7 @@ scenarios:
             schema_version: "scene-only-mutation-v1".to_string(),
             proposal_id: proposal.id,
             target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
             edit: SceneEdit {
                 entity_id: "player".to_string(),
                 path: "components.size.width".to_string(),
@@ -14591,6 +14710,178 @@ scenarios:
     }
 
     #[test]
+    fn project_scene_mutation_operation_validates_manifest_authorized_scene() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("project-scene-mutation-valid");
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: Some(project_context.clone()),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash.clone(),
+            validation_required: true,
+        };
+
+        let validation = validate_scene_only_mutation_operation(&artifacts.run_dir, &operation)
+            .expect("project scene mutation validates");
+
+        assert_eq!(validation.status, "passed");
+        assert_eq!(validation.before_scene_hash, before_hash);
+        assert_eq!(
+            validation.project.expect("project validation recorded"),
+            project_context
+        );
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after reads"),
+            before_contents,
+            "project-scoped validation must not write trusted scene state"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn project_scene_mutation_operation_rejects_stale_manifest_and_scene_hashes() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("project-scene-mutation-stale");
+        let base_operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: Some(project_context.clone()),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash.clone(),
+            validation_required: true,
+        };
+
+        let mut stale_manifest_context = project_context.clone();
+        stale_manifest_context.manifest_hash.value = "0000000000000000".to_string();
+        let stale_manifest = SceneOnlyMutationOperation {
+            project: Some(stale_manifest_context),
+            ..base_operation.clone()
+        };
+        let stale_manifest_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &stale_manifest)
+                .expect_err("stale manifest hash rejected");
+        assert!(
+            stale_manifest_error
+                .to_string()
+                .contains("manifest hash mismatch"),
+            "{stale_manifest_error:#}"
+        );
+
+        let mut stale_scene_context = project_context;
+        stale_scene_context.scene_hash.value = "0000000000000000".to_string();
+        let stale_scene = SceneOnlyMutationOperation {
+            project: Some(stale_scene_context),
+            ..base_operation
+        };
+        let stale_scene_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &stale_scene)
+                .expect_err("stale project scene hash rejected");
+        assert!(
+            stale_scene_error
+                .to_string()
+                .contains("scene hash mismatch"),
+            "{stale_scene_error:#}"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn project_scene_mutation_operation_rejects_forbidden_and_unsafe_project_paths() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("project-scene-mutation-forbidden");
+        let outside_scene_path = root.join("outside.scene.json");
+        fs::write(
+            &outside_scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("outside scene written");
+        let outside_scene_hash =
+            hash_scene_document(&read_scene(&outside_scene_path).expect("outside scene reads"))
+                .expect("outside scene hashes");
+        let outside_target = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id.clone(),
+            target_scene_path: outside_scene_path.to_string_lossy().to_string(),
+            project: Some(ProjectSceneMutationContext {
+                scene_hash: outside_scene_hash.clone(),
+                ..project_context.clone()
+            }),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: outside_scene_hash,
+            validation_required: true,
+        };
+        let outside_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &outside_target)
+                .expect_err("target outside manifest scene rejected");
+        assert!(
+            outside_error
+                .to_string()
+                .contains("manifest-authorized project scene"),
+            "{outside_error:#}"
+        );
+
+        let undeclared_scene = SceneOnlyMutationOperation {
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: Some(ProjectSceneMutationContext {
+                scene_path: "scenes/other.scene.json".to_string(),
+                ..project_context.clone()
+            }),
+            expected_before_scene_hash: before_hash.clone(),
+            ..outside_target.clone()
+        };
+        let undeclared_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &undeclared_scene)
+                .expect_err("undeclared project scene rejected");
+        assert!(
+            undeclared_error
+                .to_string()
+                .contains("not declared in project manifest scenes"),
+            "{undeclared_error:#}"
+        );
+
+        let unsafe_context = serde_json::from_value::<SceneOnlyMutationOperation>(json!({
+            "schemaVersion": "scene-only-mutation-v1",
+            "proposalId": proposal.id,
+            "targetScenePath": scene_path.to_string_lossy().to_string(),
+            "project": {
+                "projectId": project_context.project_id,
+                "manifestPath": project_context.manifest_path,
+                "manifestHash": project_context.manifest_hash,
+                "scenePath": "../outside.scene.json",
+                "sceneHash": project_context.scene_hash
+            },
+            "edit": { "entityId": "player", "path": "components.transform.x", "value": 48 },
+            "expectedBeforeSceneHash": before_hash,
+            "validationRequired": true
+        }))
+        .expect("unsafe path deserializes before validation");
+        let unsafe_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &unsafe_context)
+                .expect_err("unsafe project scene path rejected");
+        assert!(
+            unsafe_error.to_string().contains("project root"),
+            "{unsafe_error:#}"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn scene_only_mutation_application_writes_transaction_and_fails_safely() {
         let (root, artifacts, proposal, scene_path, before_hash) =
             create_scene_only_mutation_fixture("scene-only-mutation-apply");
@@ -14599,6 +14890,7 @@ scenarios:
             schema_version: "scene-only-mutation-v1".to_string(),
             proposal_id: proposal.id.clone(),
             target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
             edit: SceneEdit {
                 entity_id: "player".to_string(),
                 path: "components.transform.x".to_string(),
@@ -17554,6 +17846,63 @@ scenarios:
         let scene = read_scene(&scene_path).expect("scene reads");
         let before_hash = hash_scene_document(&scene).expect("scene hashes");
         (root, artifacts, proposal, scene_path, before_hash)
+    }
+
+    fn create_project_scene_only_mutation_fixture(
+        prefix: &str,
+    ) -> (
+        PathBuf,
+        RunArtifacts,
+        MutationProposal,
+        PathBuf,
+        SceneHash,
+        ProjectSceneMutationContext,
+    ) {
+        let root = unique_temp_dir(prefix);
+        let project_root = root.join("project");
+        create_minimal_2d_project_scaffold(&project_root).expect("project scaffolded");
+        let scene_path = project_root.join("scenes/main.scene.json");
+        let seed_path = project_root.join("seeds/platformer.yaml");
+        let artifacts = create_run(&seed_path, root.join("runs")).expect("run artifacts created");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "project-scene-only-mutation-evidence",
+            "application/json",
+            "evidence/project-scene-only-mutation.json",
+            json!({ "source": "project-scene-only-mutation-test" }),
+        )
+        .expect("evidence indexed");
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "project scene-only mutation fixture".to_string(),
+                evidence_id: "project-scene-only-mutation-evidence".to_string(),
+                target: scene_path.to_string_lossy().to_string(),
+                path: "components.transform.x".to_string(),
+                from: "32".to_string(),
+                to: "48".to_string(),
+            },
+        )
+        .expect("proposal created");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let scene_hash = hash_scene_document(&scene).expect("scene hashes");
+        let manifest_path = project_root.join(PROJECT_MANIFEST_FILE_NAME);
+        let manifest_hash = hash_project_manifest_file(&manifest_path).expect("manifest hashes");
+        let project_context = ProjectSceneMutationContext {
+            project_id: "minimal_2d".to_string(),
+            manifest_path: manifest_path.to_string_lossy().to_string(),
+            manifest_hash,
+            scene_path: "scenes/main.scene.json".to_string(),
+            scene_hash: scene_hash.clone(),
+        };
+        (
+            root,
+            artifacts,
+            proposal,
+            scene_path,
+            scene_hash,
+            project_context,
+        )
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
