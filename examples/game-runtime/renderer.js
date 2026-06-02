@@ -114,8 +114,10 @@
       const activeFrame = animation && typeof animation.activeSpriteFrame === 'function'
         ? animation.activeSpriteFrame(components.animation)
         : null;
-      const image = entity.sprite && entity.sprite.asset && assets && typeof assets.imageFor === 'function'
-        ? assets.imageFor(entity.sprite.asset)
+      const frameAsset = activeFrame && typeof activeFrame.asset === 'string' ? activeFrame.asset : null;
+      const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
+      const image = assets && typeof assets.imageFor === 'function'
+        ? assets.imageFor(frameAsset || spriteAsset)
         : null;
       if (image) {
         context.drawImage(image, x, y, entitySize.width, entitySize.height);

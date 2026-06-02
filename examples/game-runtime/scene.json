@@ -48,18 +48,33 @@
         "animation": {
           "mode": "sprite_frame",
           "frameDuration": 2,
-          "loop": true,
-          "frames": [
+          "currentClip": "idle",
+          "clips": [
             {
-              "color": "#5eead4"
-            },
-            {
-              "color": "#2dd4bf"
-            },
-            {
-              "color": "#0f766e"
+              "id": "idle",
+              "frameDuration": 2,
+              "loop": true,
+              "frames": [
+                {
+                  "color": "#5eead4",
+                  "asset": "player-sprite"
+                },
+                {
+                  "color": "#2dd4bf",
+                  "asset": "player-sprite"
+                },
+                {
+                  "color": "#0f766e",
+                  "asset": "player-sprite"
+                }
+              ]
             }
-          ]
+          ],
+          "state": {
+            "currentClip": "idle",
+            "elapsedFrames": 0,
+            "frameIndex": 0
+          }
         },
         "audio": {
           "events": [
