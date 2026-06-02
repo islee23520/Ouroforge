@@ -365,6 +365,7 @@ fn main() -> Result<()> {
             let comparison = std::fs::read_to_string(&path)
                 .with_context(|| format!("failed to read comparison {}", path.display()))?;
             println!("Comparison written: {}", path.display());
+            print_semantic_compare_summary(&comparison)?;
             println!("{comparison}");
         }
         Commands::Journal {
@@ -708,6 +709,48 @@ fn find_chrome() -> Result<PathBuf> {
 fn terminate_child(child: &mut Child) {
     let _ = child.kill();
     let _ = child.wait();
+}
+
+fn print_semantic_compare_summary(comparison_json: &str) -> Result<()> {
+    let comparison: serde_json::Value =
+        serde_json::from_str(comparison_json).context("failed to parse comparison JSON")?;
+    let reasons = comparison
+        .pointer("/semantic/reasons")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    println!("Semantic reasons:");
+    if reasons.is_empty() {
+        println!("- none");
+    } else {
+        for reason in reasons {
+            let kind = reason
+                .get("kind")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown");
+            let severity = reason
+                .get("severity")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown");
+            let summary = reason
+                .get("summary")
+                .and_then(|value| value.as_str())
+                .unwrap_or("no summary");
+            println!("- [{severity}] {kind}: {summary}");
+        }
+    }
+    let warnings = comparison
+        .pointer("/semantic/warnings")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if !warnings.is_empty() {
+        println!("Semantic warnings:");
+        for warning in warnings {
+            println!("- {}", warning.as_str().unwrap_or("unknown warning"));
+        }
+    }
+    Ok(())
 }
 
 fn monotonic_millis() -> Result<u128> {

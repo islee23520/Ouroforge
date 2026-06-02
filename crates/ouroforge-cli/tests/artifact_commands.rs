@@ -245,6 +245,99 @@ fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
     fs::remove_dir_all(temp).ok();
 }
 
+#[test]
+fn compare_command_prints_semantic_reasons_and_writes_artifact() {
+    let temp = unique_temp_dir("ouroforge-cli-semantic-compare-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let seed_path = temp.join("seed.yaml");
+    fs::write(&seed_path, VALID_SEED).expect("seed written");
+
+    let before_output = run_cli(&temp, &["run", seed_path.to_str().unwrap()]);
+    let before_dir = temp.join(
+        before_output
+            .trim()
+            .strip_prefix("Run created: ")
+            .expect("before run created"),
+    );
+    let after_output = run_cli(&temp, &["run", seed_path.to_str().unwrap()]);
+    let after_dir = temp.join(
+        after_output
+            .trim()
+            .strip_prefix("Run created: ")
+            .expect("after run created"),
+    );
+    write_cli_scenario_result(&before_dir, "failed");
+    write_cli_scenario_result(&after_dir, "passed");
+    run_cli(&temp, &["evaluate", before_dir.to_str().unwrap()]);
+    run_cli(&temp, &["evaluate", after_dir.to_str().unwrap()]);
+
+    let output_dir = temp.join("comparisons");
+    let compare = run_cli(
+        &temp,
+        &[
+            "compare",
+            before_dir.to_str().unwrap(),
+            after_dir.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+        ],
+    );
+
+    assert!(compare.contains("Comparison written: "));
+    assert!(compare.contains("Semantic reasons:"));
+    assert!(compare.contains("[improved] scenario_verdict"));
+    assert!(compare.contains("changed from failed to passed"));
+    assert!(compare.contains(r#""semantic""#));
+    let comparison_artifact = fs::read_dir(&output_dir)
+        .expect("comparison output dir")
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("run-comparison-")
+        })
+        .expect("comparison artifact written");
+    let artifact_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(comparison_artifact).expect("artifact reads"))
+            .expect("artifact parses");
+    assert_eq!(
+        artifact_json["semantic"]["schemaVersion"],
+        "run-semantic-diff-v1"
+    );
+    assert_eq!(artifact_json["classification"], "improved");
+
+    fs::remove_dir_all(temp).ok();
+}
+
+fn write_cli_scenario_result(run_dir: &Path, status: &str) {
+    let scenario_dir = run_dir.join("evidence/scenarios/smoke");
+    fs::create_dir_all(&scenario_dir).expect("scenario dir");
+    fs::write(
+        scenario_dir.join("scenario-result.json"),
+        format!("{{\"scenario_id\":\"smoke\",\"status\":\"{status}\",\"assertions\":[]}}"),
+    )
+    .expect("scenario result written");
+    let output = run_cli(
+        run_dir.parent().unwrap().parent().unwrap_or(run_dir),
+        &[
+            "evidence",
+            "add",
+            run_dir.to_str().unwrap(),
+            "--id",
+            "scenario-result-smoke",
+            "--kind",
+            "application/json",
+            "--path",
+            "evidence/scenarios/smoke/scenario-result.json",
+            "--json",
+            r#"{"artifact":"scenario_result","scenario_id":"smoke"}"#,
+        ],
+    );
+    assert!(output.contains("scenario-result-smoke"));
+}
+
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
         .current_dir(current_dir)
