@@ -1,7 +1,7 @@
 # Public Open-Source Readiness Audit — Issue #18.1
 
 Date: 2026-06-01; updated 2026-06-02
-Audit branch: `issue-18-1-release-readiness-audit`; hardening branch: `issue-18-2-public-readiness-hardening`
+Audit branch: `issue-18-1-release-readiness-audit`; hardening branch: `issue-18-2-public-readiness-hardening`; Authoring Loop v2 refresh branch: `al2-8-1-public-readiness-evidence`
 Decision: **CONDITIONAL GO for manual public-visibility review after remediation PRs merge**
 
 ## Decision summary
@@ -14,8 +14,8 @@ Ouroforge now has the documentation, governance, demo evidence, fresh-clone smok
 - `README.md`.
 - Workspace/package manifests and lockfile.
 - Runtime and UI examples under `examples/`.
-- Existing Seeds under `seeds/`.
-- Cargo verification and MVP run commands.
+- Existing Seeds under `seeds/`, including `seeds/platformer.yaml` and `seeds/engine-expansion-v1-demo.yaml`.
+- Cargo verification, MVP run, and Engine Expansion v1 demo run commands.
 - Local generated runtime/tool state status.
 
 ## Readiness checklist
@@ -27,8 +27,8 @@ Ouroforge now has the documentation, governance, demo evidence, fresh-clone smok
 | Architecture docs | Remediated by #47 | `docs/architecture.md` documents Seed → Run → Ledger/Evidence → Evaluator → Journal → Mutation → UI boundaries. | Keep architecture docs aligned with future feature issues. |
 | Contribution guide | Remediated by #47 | `CONTRIBUTING.md` documents workflow, verification, generated-state rules, and scope boundaries. | Keep PR checklist current with future commands. |
 | Security posture | Remediated by #46 | `SECURITY.md` documents reporting expectations and local Chrome/browser execution boundaries. | Replace temporary private reporting guidance with a dedicated public security contact before launch. |
-| Dependency posture | Remediated by #49 | `docs/public-demo-evidence.md` records `cargo audit` output against `Cargo.lock`. | Re-run audit before any later public release decision. |
-| Demo quality | Remediated by #49 | `docs/assets/demo/` contains runtime, evidence dashboard, and authoring cockpit screenshots; `docs/public-demo-evidence.md` documents capture commands and limitations. | Keep media current when UI behavior changes. |
+| Dependency posture | Refreshed by #217 AL2.8.1 | `docs/public-demo-evidence.md` records current `cargo audit` output against `Cargo.lock`: 1102 advisories loaded, 66 crate dependencies scanned, no vulnerabilities reported. | Re-run audit before any later public release decision. |
+| Demo quality | Refreshed by #217 AL2.8.1 | `docs/assets/demo/` contains runtime, evidence dashboard, and authoring cockpit screenshots; `docs/public-demo-evidence.md` now records Platformer and Engine Expansion v1 smoke run ids and limitations. | Review media drift in AL2.8.2 before changing screenshots. |
 | Issue templates | Remediated by #48 | `.github/ISSUE_TEMPLATE` defines bug, scoped feature, and public-readiness templates with evidence and guardrail fields. | Keep templates aligned with support policy and SECURITY.md. |
 | Roadmap clarity | Remediated by #47 | `docs/roadmap.md` documents current status, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
 | Example reproducibility | Remediated by #49 | `docs/public-demo-evidence.md` records Chrome/`OUROFORGE_CHROME`, generated artifacts, and fresh-clone smoke commands. | Re-run fresh-clone smoke before public visibility changes. |
@@ -42,6 +42,7 @@ A fresh clone of the stacked branch should be able to run:
 cargo fmt --check
 cargo test
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+cargo run -p ouroforge-cli -- run seeds/engine-expansion-v1-demo.yaml --workers 4
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 node --check examples/evidence-dashboard/dashboard.js
 node examples/evidence-dashboard/dashboard.test.cjs
@@ -50,7 +51,7 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Known environment requirement: local Chrome must be available at a standard path or through `OUROFORGE_CHROME`.
+Known environment requirement: local Chrome must be available at a standard path or through `OUROFORGE_CHROME`. Current clean-worktree refresh passed with Platformer run `runs/run-1780406739942-16401`, Engine Expansion run `runs/run-1780406747216-16614`, dashboard/cockpit Node checks, clippy, and `cargo audit`.
 
 ## Resolved blockers
 
@@ -70,8 +71,8 @@ Known environment requirement: local Chrome must be available at a standard path
 - [x] Add roadmap/non-goals that explicitly avoid Godot-replacement claims.
 - [x] Add `.github/ISSUE_TEMPLATE` files.
 - [x] Add screenshots or demo recording references for runtime, dashboard, and cockpit.
-- [x] Run a fresh-clone smoke test and record exact output.
-- [x] Run dependency/security audit and record exact output.
+- [x] Run a fresh-clone or clean-worktree smoke test and record exact output. #217 AL2.8.1 records Platformer and Engine Expansion v1 run ids.
+- [x] Run dependency/security audit and record exact output. #217 AL2.8.1 records current `cargo audit` output.
 - [x] Confirm no generated local state or private paths are tracked.
 - [ ] Make a separate manual visibility decision; do not automate publication. See `docs/public-launch-checklist.md`.
 

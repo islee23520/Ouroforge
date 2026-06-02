@@ -1,7 +1,7 @@
 # Public demo media and smoke evidence
 
 Date: 2026-06-02
-Branch: `issue-49-demo-fresh-clone-evidence`
+Branch: `issue-49-demo-fresh-clone-evidence`; refreshed on `al2-8-1-public-readiness-evidence`
 Status: pre-release MVP evidence for public-readiness review; this is not a launch announcement.
 
 ## Demo media
@@ -18,6 +18,7 @@ Capture commands used locally:
 
 ```bash
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+cargo run -p ouroforge-cli -- run seeds/engine-expansion-v1-demo.yaml --workers 4
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 python3 -m http.server 8765 --bind 127.0.0.1 --directory .
 
@@ -58,17 +59,23 @@ The MVP smoke path generates local state that must stay out of git:
 
 These artifacts are evidence for a local run, not source files.
 
-## Fresh-clone smoke evidence
+## Fresh-clone / clean-worktree smoke evidence
 
-Fresh-clone verification for this branch was run from `/tmp/ouroforge-fresh-49` after pushing the branch.
+Original fresh-clone verification for issue #49 was run from `/tmp/ouroforge-fresh-49` after pushing that branch. Authoring Loop v2 public-readiness refresh was re-run from a clean latest-`main` worktree on 2026-06-02. This refresh adds the Engine Expansion v1 demo smoke path required after the current milestone.
 
 ```text
+gh issue view 217 --repo shaun0927/Ouroforge
+# passed: #217 OPEN, Public Readiness Refresh after Engine Expansion v1
+gh issue view 1 --repo shaun0927/Ouroforge
+# passed: #1 OPEN, Define Ouroforge final goal and evidence-native implementation roadmap
 cargo fmt --check
 # passed
 cargo test
-# passed: ouroforge-cli test 1/1; ouroforge-core tests 49/49; doc-tests 0/0
+# passed: ouroforge-cli integration tests 5/5; ouroforge-core tests 143/143; doc-tests 0/0
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
-# passed: status "passed"; run directory runs/run-1780329066179-52042; browser_smoke succeeded 4/4; scenarios passed 1/1
+# passed: status "passed"; run directory runs/run-1780406739942-16401; browser_smoke succeeded 4/4; scenarios passed 2/2
+cargo run -p ouroforge-cli -- run seeds/engine-expansion-v1-demo.yaml --workers 4
+# passed: status "passed"; run directory runs/run-1780406747216-16614; browser_smoke succeeded 4/4; scenarios passed 2/2
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 # passed: Dashboard data exported
 node --check examples/evidence-dashboard/dashboard.js
@@ -87,14 +94,14 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ```text
 cargo audit
-# passed in fresh clone: Loaded 1100 security advisories; scanned Cargo.lock for vulnerabilities (66 crate dependencies); exit code 0; no vulnerabilities reported.
+# passed: Loaded 1102 security advisories; scanned Cargo.lock for vulnerabilities (66 crate dependencies); exit code 0; no vulnerabilities reported.
 ```
 
-`cargo audit` was installed locally with `cargo install cargo-audit --locked`; this did not add a repository dependency.
+`cargo audit` was available locally; this did not add a repository dependency.
 
 ## Known limitations
 
 - Demo media are screenshots, not a polished launch trailer.
 - Public visibility remains a separate manual decision.
 - The dashboard screenshot depends on locally exported `dashboard-data.json`; that generated file is intentionally not committed.
-- The cockpit is a static prototype that displays Rust-validated commands; it does not directly write files from the browser.
+- The cockpit is a static prototype that displays Rust-validated commands, transaction provenance, semantic comparison summaries, and scene-only mutation lifecycle state; it does not directly write files or execute commands from the browser.
