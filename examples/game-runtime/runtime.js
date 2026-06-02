@@ -71,6 +71,7 @@
     collisions: [],
     audioEvents: [],
     tilemaps: [],
+    assetManifest: null,
   };
   let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
 
@@ -158,6 +159,7 @@
       bounds,
       renderer: renderer.normalizeRenderer(scene.renderer, bounds),
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
+      assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       metadata: objectValue(scene.metadata),
       entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
     };
@@ -226,17 +228,19 @@
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
     world.tilemaps = clone(normalized.tilemaps);
+    world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     rendererState = clone(normalized.renderer);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
     world.audioEvents = [];
     world.tick = 0;
-    const assetMetadata = assets.load(world.entities);
+    const assetMetadata = assets.load(world, world.assetManifest);
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,
       sceneId: world.sceneId,
       entityCount: world.entities.length,
       assetCount: assetMetadata.length,
+      assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
     });
     emitAudioEvents('scene_loaded');
     renderDebug();
@@ -284,6 +288,7 @@
       state.input = clone(input);
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.tilemaps = tilemap.debugState(world.tilemaps);
+      state.assetManifest = assets.manifestSummary ? assets.manifestSummary() : null;
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();
       const currentPlayer = player();

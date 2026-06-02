@@ -14,7 +14,7 @@
       "id": "player",
       "sprite": {
         "color": "#5eead4",
-        "asset": "assets/sprites/player.svg",
+        "asset": "player-sprite",
         "layer": "actors",
         "order": 0
       },
@@ -82,7 +82,7 @@
       "id": "goal",
       "sprite": {
         "color": "#facc15",
-        "asset": "assets/sprites/goal.svg",
+        "asset": "goal-sprite",
         "layer": "actors",
         "order": 10
       },
@@ -452,5 +452,24 @@
         "purpose": "minimal static tilemap fixture for Engine Expansion v1"
       }
     }
-  ]
+  ],
+  "assetManifest": {
+    "schemaVersion": "1",
+    "id": "runtime-v1-assets",
+    "assets": [
+      {
+        "id": "goal-sprite",
+        "kind": "sprite",
+        "path": "assets/sprites/goal.svg"
+      },
+      {
+        "id": "player-sprite",
+        "kind": "sprite",
+        "path": "assets/sprites/player.svg"
+      }
+    ],
+    "metadata": {
+      "purpose": "validated local runtime sprite assets"
+    }
+  }
 }

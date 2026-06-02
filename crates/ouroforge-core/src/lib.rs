@@ -5656,6 +5656,12 @@ pub struct SceneDocument {
     pub renderer: Option<SceneRenderer>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tilemaps: Vec<SceneTilemap>,
+    #[serde(
+        default,
+        rename = "assetManifest",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub asset_manifest: Option<AssetManifest>,
     pub entities: Vec<SceneEntity>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -5963,7 +5969,12 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     if let Some(renderer) = &scene.renderer {
         validate_scene_renderer(scene, renderer)?;
     }
-    validate_scene_tilemaps(&scene.tilemaps)?;
+    if let Some(manifest) = &scene.asset_manifest {
+        manifest
+            .validate()
+            .context("scene assetManifest is invalid")?;
+    }
+    validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     let mut ids = std::collections::BTreeSet::new();
     for entity in &scene.entities {
@@ -5973,7 +5984,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         }
         validate_scene_color(&entity.sprite.color)?;
         if let Some(asset) = &entity.sprite.asset {
-            validate_scene_local_asset_path("scene sprite asset", asset)?;
+            validate_scene_asset_ref("scene sprite asset", asset, scene.asset_manifest.as_ref())?;
         }
         if let Some(layer) = &entity.sprite.layer {
             validate_path_component(&format!("scene entity {} sprite layer", entity.id), layer)?;
@@ -6001,7 +6012,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             validate_scene_animation(&entity.id, animation)?;
         }
         if let Some(audio) = &entity.components.audio {
-            validate_scene_audio(&entity.id, audio)?;
+            validate_scene_audio(&entity.id, audio, scene.asset_manifest.as_ref())?;
         }
         validate_scene_tags(&entity.id, &entity.tags)?;
         validate_scene_metadata(
@@ -6012,7 +6023,10 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     Ok(())
 }
 
-fn validate_scene_tilemaps(tilemaps: &[SceneTilemap]) -> Result<()> {
+fn validate_scene_tilemaps(
+    tilemaps: &[SceneTilemap],
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
     let mut tilemap_ids = std::collections::BTreeSet::new();
     for tilemap in tilemaps {
         validate_path_component("scene tilemap id", &tilemap.id)?;
@@ -6053,7 +6067,7 @@ fn validate_scene_tilemaps(tilemaps: &[SceneTilemap]) -> Result<()> {
                 )
             })?;
             if let Some(asset) = &tile.asset {
-                validate_scene_local_asset_path("scene tilemap tile asset", asset)?;
+                validate_scene_asset_ref("scene tilemap tile asset", asset, manifest)?;
             }
         }
         if tile_ids.is_empty() {
@@ -6222,6 +6236,25 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
     entries
 }
 
+fn validate_scene_asset_ref(
+    field: &str,
+    value: &str,
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
+    if let Some(manifest) = manifest {
+        validate_path_component(field, value)?;
+        if manifest.assets.iter().any(|asset| asset.id == value) {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "{field} references unknown asset manifest id: {value}"
+            ))
+        }
+    } else {
+        validate_scene_local_asset_path(field, value)
+    }
+}
+
 fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<()> {
     if collider.shape != "aabb" {
         return Err(anyhow!(
@@ -6265,7 +6298,11 @@ fn validate_scene_animation(entity_id: &str, animation: &SceneAnimation) -> Resu
     Ok(())
 }
 
-fn validate_scene_audio(entity_id: &str, audio: &SceneAudio) -> Result<()> {
+fn validate_scene_audio(
+    entity_id: &str,
+    audio: &SceneAudio,
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
     if audio.events.is_empty() {
         return Err(anyhow!(
             "scene entity {entity_id} audio events must not be empty"
@@ -6289,7 +6326,7 @@ fn validate_scene_audio(entity_id: &str, audio: &SceneAudio) -> Result<()> {
             ));
         }
         if let Some(asset) = &event.asset {
-            validate_scene_local_asset_path("scene audio asset", asset)?;
+            validate_scene_asset_ref("scene audio asset", asset, manifest)?;
         }
     }
     Ok(())
@@ -11096,6 +11133,63 @@ scenarios:
             .contains("must be a local static asset path"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_asset_manifest_refs_gate_scene_asset_fields() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "manifest-backed-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "assetManifest": {
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    { "id": "player-sprite", "kind": "sprite", "path": "assets/sprites/player.svg" },
+                    { "id": "goal-tile", "kind": "image", "path": "assets/sprites/goal.svg" },
+                    { "id": "spawn-sound", "kind": "audio", "path": "assets/audio/spawn.ogg" }
+                ]
+            },
+            "tilemaps": [{
+                "id": "asset-map",
+                "tileSize": { "width": 16, "height": 16 },
+                "grid": { "width": 1, "height": 1 },
+                "tiles": [{ "id": "goal", "color": "#facc15", "asset": "goal-tile" }],
+                "layers": [{ "id": "ground", "data": ["goal"] }]
+            }],
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "asset": "player-sprite" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "audio": { "events": [{ "name": "spawn", "trigger": "scene_loaded", "asset": "spawn-sound" }] }
+                }
+            }]
+        }))
+        .expect("manifest scene parses");
+        validate_scene(&scene).expect("manifest IDs are accepted");
+
+        let mut unknown_sprite = scene.clone();
+        unknown_sprite.entities[0].sprite.asset = Some("assets/sprites/player.svg".to_string());
+        let rejected =
+            validate_scene(&unknown_sprite).expect_err("direct path rejected in manifest mode");
+        assert!(
+            rejected
+                .to_string()
+                .contains("references unknown asset manifest id")
+                || rejected.to_string().contains("may only contain ASCII"),
+            "unexpected rejection: {rejected}"
+        );
+
+        let mut unknown_tile = scene.clone();
+        unknown_tile.tilemaps[0].tiles[0].asset = Some("missing-tile".to_string());
+        let rejected = validate_scene(&unknown_tile).expect_err("unknown tile asset rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown asset manifest id"));
     }
 
     #[test]
