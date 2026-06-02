@@ -41,8 +41,11 @@ and `frameIndex` through `window.__OUROFORGE__.getWorldState()`. This keeps
 animation replay-deterministic and probe-observable without timelines, skeletal
 rigs, blend trees, graphs, editor tooling, wall-clock playback, or asset import
 complexity.
-Audio v1 is evidence-first: scene entities may declare named `scene_loaded`
-audio events, and automated QA verifies the emitted event log in
-`getWorldState().audioEvents`. Speaker output and browser playback are not
-required for acceptance, and no mixer, DSP, timeline, streaming, or audio engine
-subsystem is introduced.
+Audio v1 is evidence-first and headless-safe: scene entities may declare named
+`scene_loaded` audio intent events with manifest-backed asset IDs and `play` or
+`stop` actions. The browser runtime records bounded intent entries in
+`getWorldState().audioEvents` with `playback: "intent"` and `muted: true` by
+default. Automated QA verifies those event records only; speaker output,
+browser audio device access, and audible playback are not required for
+acceptance. No mixer, DSP, spatial audio, timeline, streaming, native backend,
+or audio editor subsystem is introduced.

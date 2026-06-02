@@ -4,9 +4,9 @@ goal: Emit deterministic audio events and verify them through probe evidence wit
 constraints:
   target: game-runtime
 acceptance:
-  - The player scene entity declares a named scene_loaded audio event.
-  - Runtime emits the audio event into world-state evidence.
-  - Automated verification checks event evidence only and never depends on speaker output.
+  - The player scene entity declares a named scene_loaded audio play intent with a manifest asset ref.
+  - Runtime emits the audio intent into bounded world-state evidence.
+  - Automated verification checks event intent evidence only and never depends on speaker output.
 scenarios:
   - id: scene-loaded-audio-event
     description: Load the runtime scene and assert the player_spawn audio event is present in probe state.
@@ -21,8 +21,20 @@ scenarios:
           path: audioEvents.0.trigger
           equals: scene_loaded
       - world_state:
+          path: audioEvents.0.action
+          equals: play
+      - world_state:
           path: audioEvents.0.entityId
           equals: player
+      - world_state:
+          path: audioEvents.0.asset
+          equals: player-spawn-audio
+      - world_state:
+          path: audioEvents.0.muted
+          equals: true
+      - world_state:
+          path: audioEvents.0.playback
+          equals: intent
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
