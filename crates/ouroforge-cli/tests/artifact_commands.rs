@@ -425,6 +425,12 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     );
     let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
     assert!(ledger.contains("mutation.scene_applied"));
+    let applications: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("mutation/scene-applications.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(applications["applications"][0]["proposalId"], proposal_id);
+    assert_eq!(applications["applications"][0]["status"], "applied");
 
     let updated_hash_probe = temp.join("transactions/hash-after.json");
     run_cli(

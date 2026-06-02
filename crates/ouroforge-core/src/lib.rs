@@ -6664,6 +6664,33 @@ pub struct SceneOnlyMutationValidation {
     pub allowed_path: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneOnlyMutationApplicationRecord {
+    pub id: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "targetScenePath")]
+    pub target_scene_path: String,
+    #[serde(rename = "transactionArtifactPath")]
+    pub transaction_artifact_path: String,
+    #[serde(rename = "beforeSceneHash")]
+    pub before_scene_hash: SceneHash,
+    #[serde(rename = "afterSceneHash")]
+    pub after_scene_hash: SceneHash,
+    pub status: String,
+    #[serde(rename = "createdAtUnixMs")]
+    pub created_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct SceneOnlyMutationApplicationIndex {
+    pub applications: Vec<SceneOnlyMutationApplicationRecord>,
+}
+
 pub fn validate_scene_only_mutation_operation(
     run_dir: impl AsRef<Path>,
     operation: &SceneOnlyMutationOperation,
@@ -6787,20 +6814,89 @@ pub fn apply_scene_only_mutation_operation(
         ));
     }
     edit_scene(&operation.target_scene_path, operation.edit.clone())?;
+    let after_scene_hash = transaction
+        .after_scene_hash
+        .clone()
+        .ok_or_else(|| anyhow!("passed scene-only transaction missing afterSceneHash"))?;
+    let application = append_scene_only_mutation_application(
+        run_dir,
+        operation,
+        &transaction,
+        transaction_output,
+        &after_scene_hash,
+    )?;
     append_ledger_event(
         run_dir,
         "mutation.scene_applied",
         "mutation-cli",
         json!({
             "proposal_id": operation.proposal_id,
+            "application_id": application.id,
             "transaction_id": transaction.id,
             "transaction_artifact_path": transaction_output.to_string_lossy(),
             "target_scene_path": operation.target_scene_path,
             "before_scene_hash": transaction.before_scene_hash,
-            "after_scene_hash": transaction.after_scene_hash
+            "after_scene_hash": after_scene_hash
         }),
     )?;
     Ok(transaction)
+}
+
+fn append_scene_only_mutation_application(
+    run_dir: &Path,
+    operation: &SceneOnlyMutationOperation,
+    transaction: &SceneEditTransaction,
+    transaction_output: &Path,
+    after_scene_hash: &SceneHash,
+) -> Result<SceneOnlyMutationApplicationRecord> {
+    let mut index = read_scene_only_mutation_applications(run_dir)?;
+    let record = SceneOnlyMutationApplicationRecord {
+        id: format!(
+            "scene-application-{}-{}",
+            unix_millis()?,
+            index.applications.len() + 1
+        ),
+        proposal_id: operation.proposal_id.clone(),
+        transaction_id: transaction.id.clone(),
+        target_scene_path: operation.target_scene_path.clone(),
+        transaction_artifact_path: transaction_output.to_string_lossy().to_string(),
+        before_scene_hash: transaction.before_scene_hash.clone(),
+        after_scene_hash: after_scene_hash.clone(),
+        status: "applied".to_string(),
+        created_at_unix_ms: unix_millis()?,
+    };
+    index.applications.push(record.clone());
+    write_scene_only_mutation_applications(run_dir, &index)?;
+    Ok(record)
+}
+
+fn read_scene_only_mutation_applications(
+    run_dir: impl AsRef<Path>,
+) -> Result<SceneOnlyMutationApplicationIndex> {
+    let path = run_dir.as_ref().join("mutation/scene-applications.json");
+    if !path.is_file() {
+        return Ok(SceneOnlyMutationApplicationIndex::default());
+    }
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read scene applications {}", path.display()))?;
+    serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse scene applications {}", path.display()))
+}
+
+fn write_scene_only_mutation_applications(
+    run_dir: impl AsRef<Path>,
+    index: &SceneOnlyMutationApplicationIndex,
+) -> Result<()> {
+    let path = run_dir.as_ref().join("mutation/scene-applications.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create scene application directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json(&path, &json!(index))
 }
 
 pub fn read_scene_edit_transaction_artifact(
@@ -8632,6 +8728,10 @@ fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboar
             "mutation/rerun-orchestration.json",
         ),
         (
+            "mutation-scene-applications",
+            "mutation/scene-applications.json",
+        ),
+        (
             "mutation-review-decisions",
             "mutation/review-decisions.json",
         ),
@@ -9019,6 +9119,14 @@ fn read_dashboard_mutation_lifecycle(
         ),
         dashboard_sandbox_stage(run_dir),
         dashboard_comparison_stage(run_dir),
+        dashboard_lifecycle_stage_from_json_file(
+            run_dir,
+            "scene_applied",
+            "Applied scene mutation",
+            "applied",
+            "mutation/scene-applications.json",
+            "applications",
+        ),
         dashboard_lifecycle_stage_from_json_file(
             run_dir,
             "reviewed",
@@ -12692,6 +12800,30 @@ scenarios:
         assert!(ledger
             .iter()
             .any(|event| event["event"] == "mutation.scene_applied"));
+        let applications =
+            read_json_value(artifacts.run_dir.join("mutation/scene-applications.json"))
+                .expect("scene applications artifact reads");
+        assert_eq!(applications["applications"][0]["proposalId"], proposal.id);
+        assert_eq!(
+            applications["applications"][0]["transactionId"],
+            transaction.id
+        );
+        assert_eq!(applications["applications"][0]["status"], "applied");
+        let lifecycle = read_dashboard_run(&artifacts.run_dir)
+            .expect("dashboard reads")
+            .mutation_lifecycle;
+        let scene_applied = lifecycle
+            .stages
+            .iter()
+            .find(|stage| stage.id == "scene_applied")
+            .expect("scene applied lifecycle stage exists");
+        assert_eq!(scene_applied.state, "applied");
+        assert_eq!(scene_applied.record_count, 1);
+        assert!(read_dashboard_run(&artifacts.run_dir)
+            .expect("dashboard reads")
+            .mutation_artifacts
+            .iter()
+            .any(|artifact| artifact.id == "mutation-scene-applications"));
 
         let failed_path = root.join("transactions/failure.json");
         let failing_operation = SceneOnlyMutationOperation {
