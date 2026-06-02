@@ -5849,6 +5849,20 @@ pub struct SceneCollider {
     pub size: SceneSize,
     #[serde(default)]
     pub sensor: bool,
+    #[serde(default)]
+    pub trigger: bool,
+    #[serde(
+        default,
+        rename = "collisionGroup",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub collision_group: Option<String>,
+    #[serde(
+        default,
+        rename = "collisionMask",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub collision_mask: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -6306,15 +6320,33 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
             "scene entity {entity_id} collider shape must be aabb"
         ));
     }
-    if !matches!(collider.body.as_str(), "static" | "dynamic") {
+    if !matches!(collider.body.as_str(), "static" | "dynamic" | "kinematic") {
         return Err(anyhow!(
-            "scene entity {entity_id} collider body must be static or dynamic"
+            "scene entity {entity_id} collider body must be static, dynamic, or kinematic"
         ));
     }
     if collider.size.width <= 0 || collider.size.height <= 0 {
         return Err(anyhow!(
             "scene entity {entity_id} collider size must be positive"
         ));
+    }
+    if let Some(group) = &collider.collision_group {
+        validate_path_component(
+            &format!("scene entity {entity_id} collider collisionGroup"),
+            group,
+        )?;
+    }
+    let mut masks = std::collections::BTreeSet::new();
+    for mask in &collider.collision_mask {
+        validate_path_component(
+            &format!("scene entity {entity_id} collider collisionMask"),
+            mask,
+        )?;
+        if !masks.insert(mask) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} collider collisionMask: {mask}"
+            ));
+        }
     }
     Ok(())
 }
@@ -11275,6 +11307,101 @@ scenarios:
     }
 
     #[test]
+    fn scene_physics_v2_accepts_kinematic_triggers_and_collision_masks() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "physics-v2-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 1, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "collider": {
+                            "shape": "aabb",
+                            "body": "kinematic",
+                            "offset": { "x": 0, "y": 0 },
+                            "size": { "width": 16, "height": 16 },
+                            "trigger": true,
+                            "collisionGroup": "actors",
+                            "collisionMask": ["world", "triggers"]
+                        }
+                    }
+                },
+                {
+                    "id": "goal",
+                    "sprite": { "color": "#facc15" },
+                    "components": {
+                        "transform": { "x": 32, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false,
+                        "collider": {
+                            "shape": "aabb",
+                            "body": "static",
+                            "size": { "width": 16, "height": 16 },
+                            "sensor": true,
+                            "collisionGroup": "triggers"
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("physics scene parses");
+        validate_scene(&scene).expect("physics v2 collider schema validates");
+        let collider = scene.entities[0]
+            .components
+            .collider
+            .as_ref()
+            .expect("collider present");
+        assert_eq!(collider.body, "kinematic");
+        assert!(collider.trigger);
+        assert_eq!(collider.collision_group.as_deref(), Some("actors"));
+        assert_eq!(
+            collider.collision_mask,
+            vec!["world".to_string(), "triggers".to_string()]
+        );
+
+        let mut invalid_body = scene.clone();
+        invalid_body.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .body = "rigid".to_string();
+        let rejected = validate_scene(&invalid_body).expect_err("invalid body rejected");
+        assert!(rejected
+            .to_string()
+            .contains("collider body must be static, dynamic, or kinematic"));
+
+        let mut duplicate_mask = scene.clone();
+        duplicate_mask.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .collision_mask = vec!["world".to_string(), "world".to_string()];
+        let rejected = validate_scene(&duplicate_mask).expect_err("duplicate mask rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate scene entity player collider collisionMask"));
+
+        let mut unsafe_group = scene.clone();
+        unsafe_group.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .collision_group = Some("../world".to_string());
+        let rejected = validate_scene(&unsafe_group).expect_err("unsafe group rejected");
+        assert!(rejected.to_string().contains("may only contain ASCII"));
+    }
+
+    #[test]
     fn scene_audio_v1_validates_intent_events_and_manifest_refs() {
         let scene: SceneDocument = serde_json::from_value(json!({
             "schemaVersion": "1",
@@ -11935,7 +12062,7 @@ scenarios:
         let rejected = validate_scene(&future_collider).expect_err("future collider rejected");
         assert!(rejected.to_string().contains("collider shape must be aabb"));
 
-        let future_body = serde_json::from_value::<SceneDocument>(json!({
+        let kinematic_body = serde_json::from_value::<SceneDocument>(json!({
             "schemaVersion": "1",
             "id": "runtime-v1-scene",
             "bounds": { "width": 320, "height": 180 },
@@ -11958,10 +12085,7 @@ scenarios:
             ]
         }))
         .expect("collider body fixture parses");
-        let rejected = validate_scene(&future_body).expect_err("future body rejected");
-        assert!(rejected
-            .to_string()
-            .contains("collider body must be static or dynamic"));
+        validate_scene(&kinematic_body).expect("kinematic body accepted for physics v2");
 
         let future_animation_mode = serde_json::from_value::<SceneDocument>(json!({
             "schemaVersion": "1",
