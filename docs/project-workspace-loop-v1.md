@@ -164,7 +164,8 @@ evaluation remain design references only.
 - #246 defines and validates the local project manifest as the Rust-trusted
   workspace contract.
 - #247 creates a bounded local scaffold command for a minimal project without an
-  external template system.
+  external template system. The command and generated file tree are documented
+  in `docs/project-scaffold-v1.md`.
 - #248 adds project-level scenario packs while preserving existing Scenario DSL
   semantics.
 - #249 binds runs to project manifest, scene, seed, scenario pack, and optional

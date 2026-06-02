@@ -16,6 +16,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Inspect/edit the minimal game-runtime scene through Rust-validated scene edit commands and a static authoring cockpit prototype.
 - Inspect existing before/after run comparison artifacts in the read-only evidence dashboard.
 - Validate a local project workspace manifest with `project validate`.
+- Scaffold a tiny local project workspace with `project init --template minimal-2d`.
 
 ## Prerequisites
 
@@ -33,6 +34,8 @@ cargo fmt --check
 cargo test
 cargo run -p ouroforge-cli -- seed validate seeds/platformer.yaml
 cargo run -p ouroforge-cli -- project validate examples/project-workspace-fixtures/valid
+cargo run -p ouroforge-cli -- project init .omx/tmp/project-scaffold-smoke --template minimal-2d
+rm -rf .omx/tmp/project-scaffold-smoke
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
 cargo run -p ouroforge-cli -- seed validate seeds/runtime-v1-demo.yaml
 cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
