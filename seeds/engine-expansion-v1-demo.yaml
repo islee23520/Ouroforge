@@ -1,0 +1,129 @@
+id: engine-expansion-v1.integration
+title: Engine Expansion v1 Integration Demo Seed
+goal: Prove the completed Engine Expansion v1 browser-first runtime/template stack through bounded scenario evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Seed validation reports the Engine Expansion v1 integration demo as valid.
+  - Running the seed with workers creates browser evidence, scenario results, verdict, and journal artifacts.
+  - Scenario assertions observe renderer, tilemap, asset manifest, animation, audio intent, physics/collision v2, hot reload boundary state, and scene composition evidence.
+  - The demo remains one-screen/local/static and adds no native export, plugin system, distributed QA, server, database, cloud, auth, production, public-launch, or Godot replacement claim.
+scenarios:
+  - id: feature-surface-smoke
+    description: Move the player right for four fixed-timestep frames and assert all completed Engine Expansion v1 runtime surfaces are observable.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: object.x
+          equals: 40
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+      - world_state:
+          path: renderer.version
+          equals: '1'
+      - world_state:
+          path: renderer.renderedEntities.0.entityId
+          equals: player
+      - world_state:
+          path: renderer.renderedEntities.1.entityId
+          equals: player-badge
+      - world_state:
+          path: tilemaps.version
+          equals: '1'
+      - world_state:
+          path: tilemaps.tilemaps.0.id
+          equals: platformer-ground
+      - world_state:
+          path: tilemaps.tilemaps.0.layers.1.collisionLayer
+          equals: collision
+      - world_state:
+          path: assetManifest.enabled
+          equals: true
+      - world_state:
+          path: assetManifest.assetCount
+          equals: 3
+      - world_state:
+          path: assets.0.status
+          equals: loaded
+      - world_state:
+          path: entities.0.components.animation.mode
+          equals: sprite_frame
+      - world_state:
+          path: entities.0.components.animation.state.frameIndex
+          equals: 2
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - world_state:
+          path: audioEvents.0.playback
+          equals: intent
+      - world_state:
+          path: reloads
+          countEquals: 0
+      - world_state:
+          path: componentDefaults.controllable
+          equals: false
+      - world_state:
+          path: composition.version
+          equals: '1'
+      - world_state:
+          path: composition.entities.1.entityId
+          equals: player-badge
+      - world_state:
+          path: composition.entities.1.parent
+          equals: player
+      - world_state:
+          path: composition.entities.1.worldTransform.x
+          equals: 38
+  - id: objective-contact-integration
+    description: Move the player into the goal trigger and wall contact to verify objective and physics/collision v2 evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: engine-expansion-v1-objective-contact
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 150
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 288
+      - world_state:
+          path: collisions.0.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisions.0.pairId
+          equals: player:wall
+      - world_state:
+          path: collisions.0.normal.x
+          equals: -1
+      - world_state:
+          path: collisionEvents.0.type
+          equals: runtime.collision.trigger
+      - world_state:
+          path: collisionEvents.0.pairId
+          equals: goal:player
+      - world_state:
+          path: collisionEvents.15.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisionEvents.15.staticEntityId
+          equals: wall
+      - world_state:
+          path: composition.entities.1.parent
+          equals: player
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
