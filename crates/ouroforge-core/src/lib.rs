@@ -593,6 +593,188 @@ fn validate_replay_reference_path(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+const ASSET_MANIFEST_SCHEMA_VERSION: &str = "1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetManifest {
+    #[serde(rename = "schemaVersion")]
+    #[serde(default = "asset_manifest_schema_v1")]
+    pub schema_version: String,
+    pub id: String,
+    pub assets: Vec<AssetManifestEntry>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetManifestEntry {
+    pub id: String,
+    pub kind: AssetManifestKind,
+    pub path: String,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AssetManifestKind {
+    Image,
+    Sprite,
+    Audio,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ResolvedAssetManifestEntry {
+    pub id: String,
+    pub kind: AssetManifestKind,
+    pub path: String,
+}
+
+fn asset_manifest_schema_v1() -> String {
+    ASSET_MANIFEST_SCHEMA_VERSION.to_string()
+}
+
+impl AssetManifest {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let manifest: AssetManifest =
+            serde_json::from_str(input).context("failed to parse Asset Manifest JSON")?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let input = fs::read_to_string(path)
+            .with_context(|| format!("failed to read asset manifest {}", path.display()))?;
+        let manifest = Self::from_json_str(&input)
+            .with_context(|| format!("failed to parse asset manifest {}", path.display()))?;
+        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        manifest
+            .validate_files(base_dir)
+            .with_context(|| format!("asset manifest {} references invalid files", manifest.id))?;
+        Ok(manifest)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != ASSET_MANIFEST_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "asset manifest schemaVersion must be {ASSET_MANIFEST_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("asset manifest id", &self.id)?;
+        validate_scene_metadata("asset manifest metadata", &self.metadata)?;
+        if self.assets.is_empty() {
+            return Err(anyhow!("asset manifest assets must not be empty"));
+        }
+
+        let mut ids = BTreeSet::new();
+        let mut paths = BTreeSet::new();
+        for asset in &self.assets {
+            asset.validate()?;
+            if !ids.insert(asset.id.clone()) {
+                return Err(anyhow!("duplicate asset manifest asset id: {}", asset.id));
+            }
+            if !paths.insert(asset.path.clone()) {
+                return Err(anyhow!(
+                    "duplicate asset manifest asset path: {}",
+                    asset.path
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn validate_files(&self, base_dir: &Path) -> Result<()> {
+        self.validate()?;
+        let base = base_dir.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve asset manifest base {}",
+                base_dir.display()
+            )
+        })?;
+        for asset in &self.assets {
+            let path = base_dir.join(&asset.path);
+            if !path.is_file() {
+                return Err(anyhow!(
+                    "asset manifest asset {} missing file: {}",
+                    asset.id,
+                    asset.path
+                ));
+            }
+            let resolved = path.canonicalize().with_context(|| {
+                format!(
+                    "failed to resolve asset manifest asset {} path {}",
+                    asset.id, asset.path
+                )
+            })?;
+            if !resolved.starts_with(&base) {
+                return Err(anyhow!(
+                    "asset manifest asset {} must stay inside the manifest asset tree",
+                    asset.id
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn resolved_assets(&self) -> Vec<ResolvedAssetManifestEntry> {
+        let mut assets = self
+            .assets
+            .iter()
+            .map(|asset| ResolvedAssetManifestEntry {
+                id: asset.id.clone(),
+                kind: asset.kind,
+                path: asset.path.clone(),
+            })
+            .collect::<Vec<_>>();
+        assets.sort_by(|left, right| {
+            (left.id.as_str(), left.kind, left.path.as_str()).cmp(&(
+                right.id.as_str(),
+                right.kind,
+                right.path.as_str(),
+            ))
+        });
+        assets
+    }
+}
+
+impl AssetManifestEntry {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("asset manifest asset id", &self.id)?;
+        validate_asset_manifest_path("asset manifest asset path", &self.path, self.kind)?;
+        validate_scene_metadata(
+            &format!("asset manifest asset {} metadata", self.id),
+            &self.metadata,
+        )
+    }
+}
+
+fn validate_asset_manifest_path(field: &str, value: &str, kind: AssetManifestKind) -> Result<()> {
+    validate_scene_local_asset_path(field, value)?;
+    let extension = Path::new(value)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let supported = match kind {
+        AssetManifestKind::Image | AssetManifestKind::Sprite => {
+            matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "svg" | "webp")
+        }
+        AssetManifestKind::Audio => matches!(extension.as_str(), "ogg" | "mp3" | "wav"),
+    };
+    if supported {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "{field} has unsupported extension for asset kind {:?}",
+            kind
+        ))
+    }
+}
+
 impl ScenarioAssertion {
     fn validate(&self, scenario_index: usize, assertion_index: usize) -> Result<()> {
         let assertion = match self {
@@ -10782,6 +10964,138 @@ scenarios:
                 .expect("tilemap layer order serializes"),
             r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
         );
+    }
+
+    #[test]
+    fn asset_manifest_v1_accepts_local_assets_and_deterministic_resolution() {
+        let root = unique_temp_dir("asset-manifest-v1-valid");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("assets/images")).expect("images dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio dir");
+        fs::write(root.join("assets/sprites/player.svg"), b"<svg></svg>").expect("sprite");
+        fs::write(root.join("assets/images/goal.png"), test_png_bytes(1, 1)).expect("image");
+        fs::write(root.join("assets/audio/spawn.ogg"), b"ogg fixture").expect("audio");
+
+        let manifest_path = root.join("assets.manifest.json");
+        fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    {
+                        "id": "spawn-sound",
+                        "kind": "audio",
+                        "path": "assets/audio/spawn.ogg",
+                        "metadata": { "purpose": "audio fixture" }
+                    },
+                    {
+                        "id": "player-sprite",
+                        "kind": "sprite",
+                        "path": "assets/sprites/player.svg"
+                    },
+                    {
+                        "id": "goal-image",
+                        "kind": "image",
+                        "path": "assets/images/goal.png"
+                    }
+                ],
+                "metadata": { "scene": "runtime" }
+            }))
+            .expect("manifest serializes"),
+        )
+        .expect("manifest written");
+
+        let manifest = AssetManifest::from_path(&manifest_path).expect("manifest validates");
+        assert_eq!(manifest.schema_version, "1");
+        assert_eq!(manifest.assets.len(), 3);
+        let resolved = manifest.resolved_assets();
+        assert_eq!(
+            resolved
+                .iter()
+                .map(|asset| asset.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["goal-image", "player-sprite", "spawn-sound"]
+        );
+        assert_eq!(
+            serde_json::to_string(&resolved).expect("resolved assets serialize"),
+            r#"[{"id":"goal-image","kind":"image","path":"assets/images/goal.png"},{"id":"player-sprite","kind":"sprite","path":"assets/sprites/player.svg"},{"id":"spawn-sound","kind":"audio","path":"assets/audio/spawn.ogg"}]"#
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn asset_manifest_v1_rejects_invalid_entries_and_paths() {
+        let root = unique_temp_dir("asset-manifest-v1-invalid");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::write(root.join("assets/sprites/player.svg"), b"<svg></svg>").expect("sprite");
+        let valid_manifest = || -> AssetManifest {
+            serde_json::from_value(json!({
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    { "id": "player-sprite", "kind": "sprite", "path": "assets/sprites/player.svg" }
+                ]
+            }))
+            .expect("manifest parses")
+        };
+
+        let mut duplicate_id = valid_manifest();
+        duplicate_id.assets.push(AssetManifestEntry {
+            id: "player-sprite".to_string(),
+            kind: AssetManifestKind::Image,
+            path: "assets/sprites/player-copy.svg".to_string(),
+            metadata: json!({}),
+        });
+        let rejected = duplicate_id.validate().expect_err("duplicate id rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate asset manifest asset id"));
+
+        let mut duplicate_path = valid_manifest();
+        duplicate_path.assets.push(AssetManifestEntry {
+            id: "player-sprite-copy".to_string(),
+            kind: AssetManifestKind::Sprite,
+            path: "assets/sprites/player.svg".to_string(),
+            metadata: json!({}),
+        });
+        let rejected = duplicate_path
+            .validate()
+            .expect_err("duplicate path rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate asset manifest asset path"));
+
+        let mut unsafe_path = valid_manifest();
+        unsafe_path.assets[0].path = "assets/../outside.svg".to_string();
+        let rejected = unsafe_path.validate().expect_err("unsafe path rejected");
+        assert!(rejected
+            .to_string()
+            .contains("must stay inside the local scene asset tree"));
+
+        let mut unsupported_type = valid_manifest();
+        unsupported_type.assets[0].path = "assets/sprites/player.txt".to_string();
+        let rejected = unsupported_type
+            .validate()
+            .expect_err("unsupported type rejected");
+        assert!(rejected.to_string().contains("unsupported extension"));
+
+        let mut missing_file = valid_manifest();
+        missing_file.assets[0].path = "assets/sprites/missing.svg".to_string();
+        let rejected = missing_file
+            .validate_files(&root)
+            .expect_err("missing file rejected");
+        assert!(rejected.to_string().contains("missing file"));
+
+        let mut remote_url = valid_manifest();
+        remote_url.assets[0].path = "https://example.com/player.svg".to_string();
+        let rejected = remote_url.validate().expect_err("remote URL rejected");
+        assert!(rejected
+            .to_string()
+            .contains("must be a local static asset path"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
