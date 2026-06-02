@@ -48,6 +48,8 @@ pub enum ScenarioStep {
     Wait { wait: WaitStep },
     Input { input: InputStep },
     Replay { replay: InputReplay },
+    Snapshot { snapshot: SnapshotStep },
+    Restore { restore: RestoreStep },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -67,6 +69,18 @@ pub struct InputStep {
     pub up: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SnapshotStep {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RestoreStep {
+    pub id: String,
 }
 
 const INPUT_REPLAY_SCHEMA_VERSION: &str = "1";
@@ -193,6 +207,18 @@ impl ScenarioStep {
             ScenarioStep::Replay { replay } => replay.validate().with_context(|| {
                 format!("scenarios[{scenario_index}].steps[{step_index}].replay is invalid")
             })?,
+            ScenarioStep::Snapshot { snapshot } => {
+                validate_path_component("snapshot step id", &snapshot.id).with_context(|| {
+                    format!(
+                        "scenarios[{scenario_index}].steps[{step_index}].snapshot.id is invalid"
+                    )
+                })?;
+            }
+            ScenarioStep::Restore { restore } => {
+                validate_path_component("restore step id", &restore.id).with_context(|| {
+                    format!("scenarios[{scenario_index}].steps[{step_index}].restore.id is invalid")
+                })?;
+            }
         }
         Ok(())
     }
@@ -1871,6 +1897,21 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 }
             }
         }
+        if let Some(paths) = result
+            .get("evidence")
+            .and_then(|evidence| evidence.get("snapshots"))
+            .and_then(|value| value.as_array())
+        {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                if !run_dir.join(path).is_file() {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
+                }
+            }
+        }
     }
 
     let status = if failures.is_empty() {
@@ -2004,31 +2045,106 @@ fn run_scenario<T: CdpTransport>(
     })?;
 
     let mut replay_paths = Vec::new();
+    let mut snapshot_paths = Vec::new();
+    let mut snapshot_ids = std::collections::BTreeMap::new();
     for step in &scenario.steps {
-        if let ScenarioStep::Replay { replay } = step {
-            let replay_path = write_scenario_json_artifact(
-                config,
-                scenario,
-                &scenario_dir,
-                "input-replay",
-                "input_replay",
-                unix_millis()?,
-                &json!(replay),
-            )?;
-            replay_paths.push(replay_path.clone());
-            append_ledger_event(
-                &config.run_dir,
-                "scenario.input_replay",
-                "scenario-runner",
-                json!({
-                    "scenario_id": scenario.id,
-                    "replay_id": replay.id,
-                    "events": replay.events.len(),
-                    "path": replay_path
-                }),
-            )?;
+        match step {
+            ScenarioStep::Replay { replay } => {
+                let replay_path = write_scenario_json_artifact(
+                    config,
+                    scenario,
+                    &scenario_dir,
+                    "input-replay",
+                    "input_replay",
+                    unix_millis()?,
+                    &json!(replay),
+                )?;
+                replay_paths.push(replay_path.clone());
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.input_replay",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "replay_id": replay.id,
+                        "events": replay.events.len(),
+                        "path": replay_path
+                    }),
+                )?;
+                execute_scenario_step(client, step)?;
+            }
+            ScenarioStep::Snapshot { snapshot } => {
+                let snapshot_result = client.evaluate_json("window.__OUROFORGE__.snapshot()")?;
+                let snapshot_id = snapshot_result
+                    .get("snapshotId")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| anyhow!("snapshot probe did not return snapshotId"))?
+                    .to_string();
+                snapshot_ids.insert(snapshot.id.clone(), snapshot_id.clone());
+                let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
+                let snapshot_path = write_scenario_json_artifact(
+                    config,
+                    scenario,
+                    &scenario_dir,
+                    &format!("snapshot-{}", snapshot.id),
+                    "snapshot",
+                    unix_millis()?,
+                    &json!({
+                        "step_id": snapshot.id,
+                        "snapshot_id": snapshot_id,
+                        "snapshot": snapshot_result,
+                        "world_state": world_state
+                    }),
+                )?;
+                snapshot_paths.push(snapshot_path.clone());
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.snapshot",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "step_id": snapshot.id,
+                        "snapshot_id": snapshot_id,
+                        "path": snapshot_path
+                    }),
+                )?;
+            }
+            ScenarioStep::Restore { restore } => {
+                let snapshot_id = snapshot_ids
+                    .get(&restore.id)
+                    .ok_or_else(|| anyhow!("snapshot id not found for restore: {}", restore.id))?;
+                let snapshot_json = serde_json::to_string(snapshot_id)
+                    .context("failed to serialize snapshot id")?;
+                let restored_world_state = client
+                    .evaluate_json(&format!("window.__OUROFORGE__.restore({snapshot_json})"))?;
+                let restore_path = write_scenario_json_artifact(
+                    config,
+                    scenario,
+                    &scenario_dir,
+                    &format!("restore-{}", restore.id),
+                    "snapshot_restore",
+                    unix_millis()?,
+                    &json!({
+                        "step_id": restore.id,
+                        "snapshot_id": snapshot_id,
+                        "world_state": restored_world_state
+                    }),
+                )?;
+                snapshot_paths.push(restore_path.clone());
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.restore",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "step_id": restore.id,
+                        "snapshot_id": snapshot_id,
+                        "path": restore_path
+                    }),
+                )?;
+            }
+            _ => execute_scenario_step(client, step)?,
         }
-        execute_scenario_step(client, step)?;
     }
 
     let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
@@ -2080,7 +2196,8 @@ fn run_scenario<T: CdpTransport>(
             "evidence": {
                 "world_state": world_state_path,
                 "frame_stats": frame_stats_path,
-                "input_replays": replay_paths.clone()
+                "input_replays": replay_paths.clone(),
+                "snapshots": snapshot_paths.clone()
             },
             "assertions": assertions
         }),
@@ -2102,10 +2219,12 @@ fn run_scenario<T: CdpTransport>(
             "world_state_path": world_state_path,
             "frame_stats_path": frame_stats_path,
             "input_replay_paths": replay_paths.clone(),
+            "snapshot_paths": snapshot_paths.clone(),
             "result_path": result_path
         }),
     )?;
     let mut evidence_paths = replay_paths;
+    evidence_paths.extend(snapshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(frame_stats_path);
     Ok(ScenarioExecutionResult {
@@ -2195,6 +2314,11 @@ fn execute_scenario_step<T: CdpTransport>(
         }
         ScenarioStep::Replay { replay } => {
             execute_input_replay(client, replay)?;
+        }
+        ScenarioStep::Snapshot { .. } | ScenarioStep::Restore { .. } => {
+            return Err(anyhow!(
+                "snapshot/restore steps require scenario evidence context"
+            ));
         }
     }
     Ok(())
