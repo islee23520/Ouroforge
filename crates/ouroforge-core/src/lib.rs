@@ -2722,6 +2722,41 @@ pub struct PatchSandboxApplicationResult {
     pub primary_git_status_after: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvolveRunReference {
+    pub run_id: String,
+    pub run_path: String,
+    pub verdict_path: String,
+    pub evidence_index_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvolveSandboxRunReference {
+    pub run_id: String,
+    pub sandbox_root: String,
+    pub sandbox_result_path: String,
+    pub applied_target_path: String,
+    pub verification_evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvolveRerunOrchestration {
+    pub schema_version: String,
+    pub source_run_id: String,
+    pub patch_draft_id: String,
+    pub mutation_proposal_id: String,
+    pub mutation_classification_id: String,
+    pub before: EvolveRunReference,
+    pub after: EvolveSandboxRunReference,
+    pub comparison_artifact_path: Option<String>,
+    pub evolve_evidence_path: String,
+    pub primary_git_status_before: String,
+    pub primary_git_status_after: String,
+}
+
 impl PatchSandboxPlan {
     pub fn validate(&self, run_dir: impl AsRef<Path>) -> Result<()> {
         if self.schema_version != "1" {
@@ -2909,6 +2944,81 @@ pub fn apply_patch_sandbox_from_path(
     apply_patch_sandbox(&run_dir, &patch_draft_id, &repo_root, true)
 }
 
+pub fn orchestrate_evolve_rerun_from_path(
+    run_or_draft_path: impl AsRef<Path>,
+) -> Result<EvolveRerunOrchestration> {
+    let run_dir = resolve_patch_sandbox_run_dir(run_or_draft_path.as_ref())?;
+    let drafts = read_patch_draft_artifact(&run_dir)?;
+    let patch_draft_id = drafts
+        .drafts
+        .first()
+        .ok_or_else(|| anyhow!("evolve rerun comparison requires at least one patch draft"))?
+        .id
+        .clone();
+    let repo_root = git_repo_root()?;
+    orchestrate_evolve_rerun(&run_dir, &patch_draft_id, &repo_root, true)
+}
+
+pub fn orchestrate_evolve_rerun(
+    run_dir: impl AsRef<Path>,
+    patch_draft_id: &str,
+    repo_root: impl AsRef<Path>,
+    run_verification: bool,
+) -> Result<EvolveRerunOrchestration> {
+    let run_dir = run_dir.as_ref();
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    let draft = drafts
+        .drafts
+        .iter()
+        .find(|draft| draft.id == patch_draft_id)
+        .ok_or_else(|| {
+            anyhow!("patch draft id not found for rerun comparison: {patch_draft_id}")
+        })?;
+    let sandbox = apply_patch_sandbox(run_dir, patch_draft_id, repo_root, run_verification)?;
+    let before = evolve_run_reference(run_dir)?;
+    let after_run_id = format!("{}--sandbox-{}", before.run_id, patch_draft_id);
+    let verification_evidence_refs = sandbox
+        .verification
+        .iter()
+        .flat_map(|output| [output.stdout_path.clone(), output.stderr_path.clone()])
+        .collect::<Vec<_>>();
+    let evolve_evidence_path = "mutation/rerun-orchestration.json".to_string();
+    let result = EvolveRerunOrchestration {
+        schema_version: "1".to_string(),
+        source_run_id: before.run_id.clone(),
+        patch_draft_id: draft.id.clone(),
+        mutation_proposal_id: draft.proposal_id.clone(),
+        mutation_classification_id: draft.classification_id.clone(),
+        before,
+        after: EvolveSandboxRunReference {
+            run_id: after_run_id,
+            sandbox_root: sandbox.sandbox_root,
+            sandbox_result_path: sandbox.result_path,
+            applied_target_path: sandbox.applied_target_path,
+            verification_evidence_refs,
+        },
+        comparison_artifact_path: None,
+        evolve_evidence_path,
+        primary_git_status_before: sandbox.primary_git_status_before,
+        primary_git_status_after: sandbox.primary_git_status_after,
+    };
+    let evidence_path = run_dir.join(&result.evolve_evidence_path);
+    write_json_atomic(&evidence_path, &json!(result))?;
+    append_ledger_event(
+        run_dir,
+        "mutation.rerun_orchestrated",
+        "evolve-cli",
+        json!({
+            "patch_draft_id": result.patch_draft_id,
+            "before_run_id": result.before.run_id,
+            "after_run_id": result.after.run_id,
+            "evolve_evidence_path": result.evolve_evidence_path,
+            "comparison_artifact_path": result.comparison_artifact_path,
+        }),
+    )?;
+    Ok(result)
+}
+
 pub fn apply_patch_sandbox(
     run_dir: impl AsRef<Path>,
     patch_draft_id: &str,
@@ -3008,6 +3118,30 @@ pub fn apply_patch_sandbox(
         }),
     )?;
     Ok(result)
+}
+
+fn evolve_run_reference(run_dir: &Path) -> Result<EvolveRunReference> {
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let run_id = run
+        .get("id")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("evolve rerun baseline run.json missing id"))?
+        .to_string();
+    for relative in ["run.json", "verdict.json", "evidence/index.json"] {
+        let path = run_dir.join(relative);
+        if !path.is_file() {
+            return Err(anyhow!(
+                "evolve rerun baseline is missing required artifact {}",
+                path.display()
+            ));
+        }
+    }
+    Ok(EvolveRunReference {
+        run_id,
+        run_path: "run.json".to_string(),
+        verdict_path: "verdict.json".to_string(),
+        evidence_index_path: "evidence/index.json".to_string(),
+    })
 }
 
 fn resolve_patch_sandbox_run_dir(path: &Path) -> Result<PathBuf> {
@@ -7277,6 +7411,52 @@ scenarios:
         assert!(error
             .to_string()
             .contains("patch sandbox target does not exist"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evolves_rerun_orchestration_records_before_after_refs() {
+        let (root, artifacts, drafts) =
+            create_sandbox_fixture("ouroforge-rerun-orchestration-test");
+        let repo_root = git_repo_root().expect("repo root resolves");
+        let status_before = git_status_short(&repo_root).expect("status before reads");
+
+        let result =
+            orchestrate_evolve_rerun(&artifacts.run_dir, &drafts.drafts[0].id, &repo_root, false)
+                .expect("rerun orchestration succeeds");
+
+        let status_after = git_status_short(&repo_root).expect("status after reads");
+        assert_eq!(result.patch_draft_id, "patch-draft-1");
+        assert_eq!(result.mutation_proposal_id, drafts.drafts[0].proposal_id);
+        assert_eq!(
+            result.mutation_classification_id,
+            drafts.drafts[0].classification_id
+        );
+        assert_eq!(result.before.run_path, "run.json");
+        assert!(result.after.run_id.ends_with("--sandbox-patch-draft-1"));
+        assert_eq!(result.comparison_artifact_path, None);
+        assert!(artifacts
+            .run_dir
+            .join(&result.evolve_evidence_path)
+            .is_file());
+        assert_eq!(status_before, status_after);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evolve_rerun_orchestration_fails_for_missing_baseline_artifacts() {
+        let (root, artifacts, drafts) =
+            create_sandbox_fixture("ouroforge-rerun-missing-baseline-test");
+        fs::remove_file(artifacts.run_dir.join("verdict.json")).expect("verdict removed");
+        let repo_root = git_repo_root().expect("repo root resolves");
+
+        let error =
+            orchestrate_evolve_rerun(&artifacts.run_dir, &drafts.drafts[0].id, &repo_root, false)
+                .expect_err("missing baseline fails");
+
+        assert!(error
+            .to_string()
+            .contains("evolve rerun baseline is missing required artifact"));
         fs::remove_dir_all(root).ok();
     }
 
