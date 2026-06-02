@@ -5990,7 +5990,8 @@ fn default_audio_action() -> String {
     "play".to_string()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SceneEdit {
     pub entity_id: String,
     pub path: String,
@@ -6010,6 +6011,141 @@ pub const SUPPORTED_SCENE_EDIT_PATHS: &[&str] = &[
 
 pub fn supported_scene_edit_paths() -> &'static [&'static str] {
     SUPPORTED_SCENE_EDIT_PATHS
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneHash {
+    pub algorithm: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneEditRollbackMetadata {
+    #[serde(rename = "scenePath")]
+    pub scene_path: String,
+    #[serde(rename = "restoreHash")]
+    pub restore_hash: SceneHash,
+    pub strategy: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneEditValidationResult {
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneEditTransaction {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub id: String,
+    #[serde(rename = "scenePath")]
+    pub scene_path: String,
+    pub edit: SceneEdit,
+    #[serde(rename = "beforeSceneHash")]
+    pub before_scene_hash: SceneHash,
+    #[serde(rename = "afterSceneHash", skip_serializing_if = "Option::is_none")]
+    pub after_scene_hash: Option<SceneHash>,
+    #[serde(rename = "validationResult")]
+    pub validation_result: SceneEditValidationResult,
+    pub rollback: SceneEditRollbackMetadata,
+}
+
+pub fn hash_scene_document(scene: &SceneDocument) -> Result<SceneHash> {
+    let value = canonical_json_value(json!(scene));
+    let bytes = serde_json::to_vec(&value).context("failed to serialize canonical scene JSON")?;
+    Ok(SceneHash {
+        algorithm: "fnv1a64-canonical-json-v1".to_string(),
+        value: format!("{:016x}", fnv1a64(&bytes)),
+    })
+}
+
+pub fn preview_scene_edit_transaction(
+    scene_path: impl AsRef<Path>,
+    edit: SceneEdit,
+) -> Result<SceneEditTransaction> {
+    let scene_path = scene_path.as_ref();
+    validate_path_component("scene edit entity", &edit.entity_id)?;
+    require_text("scene edit path", &edit.path)?;
+    let before = read_scene(scene_path)?;
+    let before_hash = hash_scene_document(&before)?;
+    let mut after = before.clone();
+    let validation_error = apply_scene_edit(&mut after, edit.clone())
+        .and_then(|_| validate_scene(&after))
+        .err()
+        .map(|error| error.to_string());
+    let after_hash = if validation_error.is_none() {
+        Some(hash_scene_document(&after)?)
+    } else {
+        None
+    };
+    let transaction_seed = json!({
+        "scenePath": scene_path.to_string_lossy(),
+        "edit": edit,
+        "beforeSceneHash": before_hash,
+        "afterSceneHash": after_hash
+    });
+    let transaction_id = format!(
+        "scene-edit-{}",
+        fnv1a64(&serde_json::to_vec(&canonical_json_value(
+            transaction_seed
+        ))?)
+    );
+    Ok(SceneEditTransaction {
+        schema_version: "ouroforge.scene-edit-transaction.v1".to_string(),
+        id: transaction_id,
+        scene_path: scene_path.to_string_lossy().to_string(),
+        edit,
+        before_scene_hash: before_hash.clone(),
+        after_scene_hash: after_hash,
+        validation_result: match validation_error {
+            Some(error) => SceneEditValidationResult {
+                status: "failed".to_string(),
+                errors: vec![error],
+            },
+            None => SceneEditValidationResult {
+                status: "passed".to_string(),
+                errors: Vec::new(),
+            },
+        },
+        rollback: SceneEditRollbackMetadata {
+            scene_path: scene_path.to_string_lossy().to_string(),
+            restore_hash: before_hash,
+            strategy: "restore scene file content matching beforeSceneHash".to_string(),
+        },
+    })
+}
+
+fn canonical_json_value(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.into_iter().map(canonical_json_value).collect())
+        }
+        serde_json::Value::Object(map) => {
+            let mut sorted = serde_json::Map::new();
+            let mut entries = map.into_iter().collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            for (key, value) in entries {
+                sorted.insert(key, canonical_json_value(value));
+            }
+            serde_json::Value::Object(sorted)
+        }
+        other => other,
+    }
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 fn scene_schema_v1() -> String {
@@ -11189,6 +11325,101 @@ scenarios:
             config.target_ws_url,
             "ws://127.0.0.1:9222/devtools/page/page-1"
         );
+    }
+
+    #[test]
+    fn scene_hash_is_deterministic_for_canonical_scene_json() {
+        let temp = unique_temp_dir("ouroforge-scene-hash-test");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        let scene = read_scene(&scene_path).expect("scene parses");
+        let first = hash_scene_document(&scene).expect("hash created");
+        let second = hash_scene_document(&scene).expect("hash repeats");
+        assert_eq!(first, second);
+        assert_eq!(first.algorithm, "fnv1a64-canonical-json-v1");
+        assert_eq!(first.value.len(), 16);
+        fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn scene_edit_transaction_records_success_and_rollback_metadata() {
+        let temp = unique_temp_dir("ouroforge-scene-transaction-success-test");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        let transaction = preview_scene_edit_transaction(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+        )
+        .expect("transaction previews");
+        assert_eq!(
+            transaction.schema_version,
+            "ouroforge.scene-edit-transaction.v1"
+        );
+        assert_eq!(transaction.validation_result.status, "passed");
+        assert!(transaction.validation_result.errors.is_empty());
+        assert!(transaction.after_scene_hash.is_some());
+        assert_ne!(
+            transaction.before_scene_hash,
+            transaction
+                .after_scene_hash
+                .clone()
+                .expect("after hash exists")
+        );
+        assert_eq!(
+            transaction.rollback.restore_hash,
+            transaction.before_scene_hash
+        );
+        assert!(transaction.rollback.strategy.contains("beforeSceneHash"));
+        let persisted = read_scene(&scene_path).expect("scene still parses");
+        assert_eq!(
+            persisted.entities[0].components.transform.x, 32,
+            "preview must not write"
+        );
+        fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn scene_edit_transaction_records_failed_validation_without_after_hash() {
+        let temp = unique_temp_dir("ouroforge-scene-transaction-failure-test");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        let transaction = preview_scene_edit_transaction(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.size.width".to_string(),
+                value: json!(0),
+            },
+        )
+        .expect("failed validation still records transaction");
+        assert_eq!(transaction.validation_result.status, "failed");
+        assert!(transaction.after_scene_hash.is_none());
+        assert!(transaction.validation_result.errors[0].contains("size must be positive"));
+        let persisted = read_scene(&scene_path).expect("scene still parses");
+        assert_eq!(
+            persisted.entities[0].components.size.width, 16,
+            "failed preview must not write"
+        );
+        fs::remove_dir_all(temp).ok();
     }
 
     #[test]
