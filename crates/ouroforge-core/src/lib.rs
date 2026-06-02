@@ -23,12 +23,37 @@ pub struct Seed {
     pub constraints: Constraints,
     pub acceptance: Vec<String>,
     pub scenarios: Vec<Scenario>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluator: Option<EvaluatorConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Constraints {
     pub target: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub console: Option<ConsoleEvaluatorConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance: Option<PerformanceEvaluatorConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ConsoleEvaluatorConfig {
+    #[serde(rename = "failOnLevels")]
+    pub fail_on_levels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceEvaluatorConfig {
+    #[serde(rename = "maxMetrics")]
+    pub max_metrics: std::collections::BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -179,6 +204,10 @@ impl Seed {
             require_text(&format!("acceptance[{index}]"), item)?;
         }
 
+        if let Some(evaluator) = &self.evaluator {
+            evaluator.validate()?;
+        }
+
         if self.scenarios.is_empty() {
             return Err(anyhow!("scenarios must contain at least one item"));
         }
@@ -215,6 +244,53 @@ impl Seed {
                 _ => None,
             })
             .collect()
+    }
+}
+
+impl EvaluatorConfig {
+    fn validate(&self) -> Result<()> {
+        if let Some(console) = &self.console {
+            console.validate()?;
+        }
+        if let Some(performance) = &self.performance {
+            performance.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl ConsoleEvaluatorConfig {
+    fn validate(&self) -> Result<()> {
+        if self.fail_on_levels.is_empty() {
+            return Err(anyhow!("evaluator.console.failOnLevels must not be empty"));
+        }
+        for level in &self.fail_on_levels {
+            if !matches!(level.as_str(), "debug" | "info" | "log" | "warn" | "error") {
+                return Err(anyhow!(
+                    "evaluator.console.failOnLevels entries must be debug, info, log, warn, or error"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl PerformanceEvaluatorConfig {
+    fn validate(&self) -> Result<()> {
+        if self.max_metrics.is_empty() {
+            return Err(anyhow!(
+                "evaluator.performance.maxMetrics must not be empty"
+            ));
+        }
+        for (metric, threshold) in &self.max_metrics {
+            require_text("evaluator.performance metric name", metric)?;
+            if *threshold == 0 {
+                return Err(anyhow!(
+                    "evaluator.performance.maxMetrics thresholds must be greater than 0"
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1115,6 +1191,13 @@ impl WorkerId {
         format!("{}/browser-console-{suffix}.json", self.evidence_dir())
     }
 
+    pub fn cdp_trace_summary_path(&self, suffix: u128) -> String {
+        format!(
+            "{}/browser-cdp-trace-summary-{suffix}.json",
+            self.evidence_dir()
+        )
+    }
+
     pub fn probe_json_path(&self, probe_name: &str, suffix: u128) -> String {
         format!(
             "{}/browser-probe-{probe_name}-{suffix}.json",
@@ -1516,6 +1599,72 @@ fn capture_console_log<T: CdpTransport>(
     Ok(Some(rel_path))
 }
 
+fn count_cdp_metrics(metrics: &serde_json::Value) -> usize {
+    metrics
+        .get("metrics")
+        .or_else(|| metrics.get("Metrics"))
+        .and_then(|value| value.as_array())
+        .map_or(0, Vec::len)
+}
+
+fn write_worker_cdp_trace_summary(
+    config: &BrowserSmokeConfig,
+    navigation: &CdpNavigateResult,
+    performance_metric_count: Option<usize>,
+) -> Result<String> {
+    let suffix = unix_millis()?;
+    let rel_path = config.worker_id.cdp_trace_summary_path(suffix);
+    let mut events = vec![json!({
+        "name": "Page.navigate",
+        "frameIdPresent": navigation.frame_id.is_some(),
+        "loaderIdPresent": navigation.loader_id.is_some()
+    })];
+    if let Some(metric_count) = performance_metric_count {
+        events.push(json!({
+            "name": "Performance.getMetrics",
+            "metricCount": metric_count
+        }));
+    }
+    write_json(
+        &config.run_dir.join(&rel_path),
+        &json!({
+            "bounded": true,
+            "limit": 32,
+            "source": "cdp-summary",
+            "workerId": config.worker_id.as_str(),
+            "events": events
+        }),
+    )?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!(
+            "browser-cdp-trace-summary-{}-{suffix}",
+            config.worker_id.as_str()
+        ),
+        "application/json",
+        &rel_path,
+        json!({
+            "artifact": "cdp_trace_summary",
+            "worker_id": config.worker_id.as_str(),
+            "url": config.url,
+            "bounded": true,
+            "limit": 32
+        }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "browser.capture.cdp_trace_summary",
+        "browser-smoke",
+        json!({
+            "worker_id": config.worker_id.as_str(),
+            "path": rel_path,
+            "bounded": true,
+            "limit": 32
+        }),
+    )?;
+    Ok(rel_path)
+}
+
 fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResult> {
     let connection = if let Some(target_ws_url) = &config.target_ws_url {
         CdpConnectionConfig::new(target_ws_url.clone())?
@@ -1577,11 +1726,13 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         json!({ "worker_id": config.worker_id.as_str(), "path": screenshot_rel_path }),
     )?;
 
+    let mut performance_metric_count = None;
     match client
         .enable_performance()
         .and_then(|_| client.performance_metrics())
     {
         Ok(metrics) => {
+            performance_metric_count = Some(count_cdp_metrics(&metrics));
             let metrics_rel_path = config.worker_id.performance_metrics_path(unix_millis()?);
             let metrics_path = config.run_dir.join(&metrics_rel_path);
             write_json(&metrics_path, &metrics)?;
@@ -1626,6 +1777,8 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
             )?;
         }
     }
+
+    let _ = write_worker_cdp_trace_summary(config, &navigation, performance_metric_count);
 
     Ok(BrowserSmokeResult { screenshot_path })
 }
@@ -2006,6 +2159,9 @@ pub struct EvaluationVerdict {
 pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     let run_dir = run_dir.as_ref();
     let evidence = read_evidence_index(run_dir)?;
+    let evaluator_config = Seed::from_path(run_dir.join("seed.snapshot.yaml"))
+        .ok()
+        .and_then(|seed| seed.evaluator);
     let mut failures = Vec::new();
     let mut evidence_refs = Vec::new();
     let mut scenario_results = Vec::new();
@@ -2107,21 +2263,33 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 }
             }
         }
-        if let Some(paths) = result
-            .get("evidence")
-            .and_then(|evidence| evidence.get("snapshots"))
-            .and_then(|value| value.as_array())
-        {
-            for path in paths.iter().filter_map(|value| value.as_str()) {
-                if !run_dir.join(path).is_file() {
-                    failures.push(json!({
-                        "kind": "missing_scenario_evidence",
-                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                        "path": path
-                    }));
+        for evidence_list in [
+            "snapshots",
+            "console_logs",
+            "performance_metrics",
+            "cdp_trace_summaries",
+        ] {
+            if let Some(paths) = result
+                .get("evidence")
+                .and_then(|evidence| evidence.get(evidence_list))
+                .and_then(|value| value.as_array())
+            {
+                for path in paths.iter().filter_map(|value| value.as_str()) {
+                    if !run_dir.join(path).is_file() {
+                        failures.push(json!({
+                            "kind": "missing_scenario_evidence",
+                            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                            "path": path,
+                            "evidence_list": evidence_list
+                        }));
+                    }
                 }
             }
         }
+    }
+
+    if let Some(config) = &evaluator_config {
+        apply_explicit_evaluator_checks(run_dir, &evidence, config, &mut failures)?;
     }
 
     let status = if failures.is_empty() {
@@ -2153,6 +2321,101 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     };
     write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
     Ok(verdict)
+}
+
+fn apply_explicit_evaluator_checks(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    config: &EvaluatorConfig,
+    failures: &mut Vec<serde_json::Value>,
+) -> Result<()> {
+    if let Some(console) = &config.console {
+        for artifact in evidence.artifacts.iter().filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("console_log")
+        }) {
+            let value = read_json_value(run_dir.join(&artifact.path))?;
+            for entry in console_entries(&value) {
+                let level = entry
+                    .get("level")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
+                if console
+                    .fail_on_levels
+                    .iter()
+                    .any(|expected| expected == level)
+                {
+                    failures.push(json!({
+                        "kind": "console_level_matched",
+                        "level": level,
+                        "path": artifact.path,
+                        "text": entry.get("text").cloned().unwrap_or(serde_json::Value::Null)
+                    }));
+                }
+            }
+        }
+    }
+
+    if let Some(performance) = &config.performance {
+        for artifact in evidence.artifacts.iter().filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("performance_metrics")
+        }) {
+            let value = read_json_value(run_dir.join(&artifact.path))?;
+            for (metric, threshold) in &performance.max_metrics {
+                if let Some(actual) = performance_metric_value(&value, metric) {
+                    if actual > *threshold as f64 {
+                        failures.push(json!({
+                            "kind": "performance_threshold_exceeded",
+                            "metric": metric,
+                            "threshold": threshold,
+                            "actual": actual,
+                            "path": artifact.path
+                        }));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn console_entries(value: &serde_json::Value) -> Vec<&serde_json::Value> {
+    value
+        .as_array()
+        .or_else(|| value.get("logs").and_then(|logs| logs.as_array()))
+        .map(|entries| entries.iter().collect())
+        .unwrap_or_default()
+}
+
+fn performance_metric_value(value: &serde_json::Value, metric_name: &str) -> Option<f64> {
+    let metrics = value
+        .get("metrics")
+        .or_else(|| value.get("Metrics"))
+        .unwrap_or(value);
+    let metrics = metrics
+        .get("metrics")
+        .or_else(|| metrics.get("Metrics"))
+        .unwrap_or(metrics);
+    metrics.as_array()?.iter().find_map(|metric| {
+        let name = metric
+            .get("name")
+            .or_else(|| metric.get("Name"))
+            .and_then(|value| value.as_str())?;
+        if name != metric_name {
+            return None;
+        }
+        metric
+            .get("value")
+            .or_else(|| metric.get("Value"))
+            .and_then(|value| value.as_f64())
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2409,7 +2672,9 @@ fn run_scenario<T: CdpTransport>(
         unix_millis()?,
         &frame_stats,
     )?;
-    let mut auxiliary_paths = Vec::new();
+    let mut console_paths = Vec::new();
+    let mut performance_paths = Vec::new();
+    let mut trace_paths = Vec::new();
     if let Ok(console_logs) = client.evaluate_json("window.__OUROFORGE_CONSOLE__ || []") {
         let console_path = write_scenario_json_artifact(
             config,
@@ -2424,12 +2689,14 @@ fn run_scenario<T: CdpTransport>(
                 "logs": console_logs
             }),
         )?;
-        auxiliary_paths.push(console_path);
+        console_paths.push(console_path);
     }
+    let mut scenario_performance_metric_count = None;
     if let Ok(performance_metrics) = client
         .enable_performance()
         .and_then(|_| client.performance_metrics())
     {
+        scenario_performance_metric_count = Some(count_cdp_metrics(&performance_metrics));
         let performance_path = write_scenario_json_artifact(
             config,
             scenario,
@@ -2442,8 +2709,30 @@ fn run_scenario<T: CdpTransport>(
                 "metrics": performance_metrics
             }),
         )?;
-        auxiliary_paths.push(performance_path);
+        performance_paths.push(performance_path);
     }
+    let trace_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "cdp-trace-summary",
+        "cdp_trace_summary",
+        unix_millis()?,
+        &json!({
+            "bounded": true,
+            "limit": 32,
+            "source": "scenario-cdp-summary",
+            "scenarioId": scenario.id,
+            "events": [
+                { "name": "Scenario.steps", "count": scenario.steps.len() },
+                { "name": "Scenario.assertions", "count": scenario.assertions.len() },
+                { "name": "Runtime.getWorldState", "captured": true },
+                { "name": "Runtime.getFrameStats", "captured": true },
+                { "name": "Performance.getMetrics", "metricCount": scenario_performance_metric_count.unwrap_or(0) }
+            ]
+        }),
+    )?;
+    trace_paths.push(trace_path);
 
     let assertions = evaluate_scenario_assertions(scenario, &world_state, &frame_stats);
     for assertion in &assertions {
@@ -2474,7 +2763,10 @@ fn run_scenario<T: CdpTransport>(
                 "world_state": world_state_path,
                 "frame_stats": frame_stats_path,
                 "input_replays": replay_paths.clone(),
-                "snapshots": snapshot_paths.clone()
+                "snapshots": snapshot_paths.clone(),
+                "console_logs": console_paths.clone(),
+                "performance_metrics": performance_paths.clone(),
+                "cdp_trace_summaries": trace_paths.clone()
             },
             "assertions": assertions
         }),
@@ -2497,7 +2789,9 @@ fn run_scenario<T: CdpTransport>(
             "frame_stats_path": frame_stats_path,
             "input_replay_paths": replay_paths.clone(),
             "snapshot_paths": snapshot_paths.clone(),
-            "auxiliary_paths": auxiliary_paths.clone(),
+            "console_log_paths": console_paths.clone(),
+            "performance_metric_paths": performance_paths.clone(),
+            "cdp_trace_summary_paths": trace_paths.clone(),
             "result_path": result_path
         }),
     )?;
@@ -2505,7 +2799,9 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(snapshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(frame_stats_path);
-    evidence_paths.extend(auxiliary_paths);
+    evidence_paths.extend(console_paths);
+    evidence_paths.extend(performance_paths);
+    evidence_paths.extend(trace_paths);
     Ok(ScenarioExecutionResult {
         passed,
         evidence_paths,
@@ -4408,6 +4704,80 @@ scenarios:
     }
 
     #[test]
+    fn evaluator_fails_on_configured_console_level() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-console-threshold-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        append_evaluator_config(
+            &artifacts.run_dir,
+            r#"
+  console:
+    failOnLevels:
+      - error
+"#,
+        );
+        let console_path = "evidence/scenarios/bootstrap-smoke/console-log.json";
+        fs::write(
+            artifacts.run_dir.join(console_path),
+            r#"{"logs":[{"level":"error","text":"boom"}]}"#,
+        )
+        .expect("console log written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-console-log",
+            "application/json",
+            console_path,
+            json!({ "artifact": "console_log", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("console artifact indexed");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "console_level_matched"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_fails_on_configured_performance_threshold() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-performance-threshold-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        append_evaluator_config(
+            &artifacts.run_dir,
+            r#"
+  performance:
+    maxMetrics:
+      ScriptDuration: 1
+"#,
+        );
+        let performance_path = "evidence/scenarios/bootstrap-smoke/performance-metrics.json";
+        fs::write(
+            artifacts.run_dir.join(performance_path),
+            r#"{"metrics":{"metrics":[{"name":"ScriptDuration","value":2.5}]}}"#,
+        )
+        .expect("performance metrics written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-performance-metrics",
+            "application/json",
+            performance_path,
+            json!({ "artifact": "performance_metrics", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("performance artifact indexed");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "performance_threshold_exceeded"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn evaluates_scenario_assertions_against_captured_state() {
         let scenario = Scenario {
             id: "probe-smoke".to_string(),
@@ -5285,6 +5655,14 @@ scenarios:
             )
             .expect("artifact indexed");
         }
+    }
+
+    fn append_evaluator_config(run_dir: &Path, evaluator_yaml: &str) {
+        let mut seed =
+            fs::read_to_string(run_dir.join("seed.snapshot.yaml")).expect("seed snapshot reads");
+        seed.push_str("evaluator:\n");
+        seed.push_str(evaluator_yaml);
+        fs::write(run_dir.join("seed.snapshot.yaml"), seed).expect("seed snapshot updated");
     }
 
     fn create_test_run(prefix: &str) -> (PathBuf, RunArtifacts) {
