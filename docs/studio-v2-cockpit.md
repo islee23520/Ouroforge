@@ -30,7 +30,7 @@ A safe local authoring loop remains explicitly manual:
 4. Export dashboard data with `ouroforge-cli dashboard export`.
 5. Compare runs with `ouroforge-cli compare`.
 6. For scene-only mutations, apply only validated scene operations through
-   `ouroforge-cli mutation apply-scene` and review results manually.
+   `ouroforge-cli mutation apply-scene --project <manifest>` and review results manually.
 
 ## Guardrails
 

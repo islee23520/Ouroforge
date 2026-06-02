@@ -114,8 +114,9 @@ workspace boundary:
 - **Scenario packs**: the manifest can reference pack files and `project validate`
   resolves them through Scenario Pack v1 validation. The pack schema and current
   execution boundary are documented in `docs/scenario-pack-v1.md`.
-- **Mutation**: scene-only mutation can later be limited to manifest-authorized
-  scene paths. This manifest issue does not apply mutations.
+- **Mutation**: scene-only mutation can be limited to manifest-authorized
+  scene paths through `mutation apply-scene --project`. The project mutation
+  contract is documented in `docs/project-mutation-loop-v1.md`.
 - **Studio**: browser-facing Studio surfaces may display manifest-derived state
   later, but browser JavaScript must not become a trusted writer or command
   bridge.

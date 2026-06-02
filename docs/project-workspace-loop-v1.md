@@ -174,7 +174,9 @@ evaluation remain design references only.
   in `docs/project-run-v1.md`.
 - #250 extends semantic comparison with project-level context. The field contract and limitations are documented in `docs/project-comparison-v1.md`.
 - #251 makes scene-only mutation application project-aware and limited to
-  manifest-authorized scenes.
+  manifest-authorized scenes. The command contract, rollback metadata,
+  dashboard/cockpit read-only evidence, and closure gates are documented in
+  `docs/project-mutation-loop-v1.md`.
 - #252 surfaces project workspace state in Studio v3 without browser writes or
   command execution.
 - #253 refreshes roadmap/#1 governance after the milestone, preserving #23.

@@ -13,6 +13,7 @@ Scene-only mutation application is the safe Evolve Loop v2 bridge from mutation 
 - Records successful applications in `mutation/scene-applications.json` and the ledger as `mutation.scene_applied`.
 - Does not auto-accept, auto-merge, or write mutation review decisions.
 - Browser/dashboard surfaces remain read-only.
+- Project-scoped application is documented in `docs/project-mutation-loop-v1.md` and requires manifest authorization when `--project` is used.
 
 ## Operation shape
 
@@ -38,6 +39,12 @@ Scene-only mutation application is the safe Evolve Loop v2 bridge from mutation 
 
 ```bash
 cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
+  --operation <operation.json> \
+  --transaction-output <transaction.json>
+
+# Project-scoped variant:
+cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
+  --project <project-root-or-ouroforge.project.json> \
   --operation <operation.json> \
   --transaction-output <transaction.json>
 ```
