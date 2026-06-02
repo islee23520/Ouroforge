@@ -71,3 +71,8 @@ playable demo with:
 ```bash
 cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
 ```
+
+
+## Studio v2 command boundary
+
+The authoring cockpit is a static, local preview surface. It may display copyable Rust CLI commands such as `cargo run -p ouroforge-cli -- scene validate`, `scene edit`, `scene reload-validate`, and dashboard export commands, but it must not execute them from browser JavaScript. Persistent scene changes remain routed through Rust validation in the CLI. Browser-owned persistence APIs such as localStorage, indexedDB, showSaveFilePicker, direct file writes, native shell calls, hosted backends, auth, database, plugin UI, and visual scripting are outside this demo boundary.

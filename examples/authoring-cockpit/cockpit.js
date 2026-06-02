@@ -103,6 +103,18 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
   }
 
+  function sceneValidateCommand(scenePath = DEFAULT_SCENE_PATH) {
+    return `cargo run -p ouroforge-cli -- scene validate ${scenePath}`;
+  }
+
+  function sceneReloadValidateCommand(scenePath = DEFAULT_SCENE_PATH) {
+    return `cargo run -p ouroforge-cli -- scene reload-validate ${scenePath}`;
+  }
+
+  function runtimeReloadPayloadCommand(scenePath = DEFAULT_SCENE_PATH) {
+    return `# display-only payload shape for window.__OUROFORGE__.reload after Rust validation\n${sceneReloadValidateCommand(scenePath)}`;
+  }
+
   function artifactHref(artifact, run) {
     const runDir = run?.summary?.run_dir || '';
     return `../../${runDir}/${artifact.path}`;
@@ -217,8 +229,20 @@ const OuroforgeCockpit = (() => {
     </div>`;
   }
 
+  function renderCommandGenerationPanel(scenePath = DEFAULT_SCENE_PATH) {
+    return `<section class="panel"><h2>Validation command generation</h2>
+      <p class="hint">Display-only. Copy these Rust CLI commands into a terminal when you want validation-gated persistence; the browser never executes commands or writes files.</p>
+      <div class="command-list">
+        <code>${escapeText(sceneValidateCommand(scenePath))}</code>
+        <code>${escapeText(sceneReloadValidateCommand(scenePath))}</code>
+        <code>${escapeText(cliCommand(scenePath, 'player', 'components.transform.x', 48))}</code>
+        <code>${escapeText(runtimeReloadPayloadCommand(scenePath))}</code>
+      </div>
+    </section>`;
+  }
+
   function renderQaPanel() {
-    return `<section class="panel"><h2>Run QA</h2><p class="hint">Run the evidence-native QA command, then export dashboard data to refresh evidence and journal panes.</p><button id="run-qa-button" class="primary" type="button">Show QA command</button><pre id="qa-command">${qaCommand()}</pre><pre>${dashboardExportCommand()}</pre></section>`;
+    return `<section class="panel"><h2>Run QA</h2><p class="hint">Run the evidence-native QA command, then export dashboard data to refresh evidence and journal panes. Commands are display-only and are not executed by the browser.</p><button id="run-qa-button" class="primary" type="button">Show QA command</button><pre id="qa-command">${qaCommand()}</pre><pre>${dashboardExportCommand()}</pre></section>${renderCommandGenerationPanel()}`;
   }
 
   function renderRefLinks(refs = [], run) {
@@ -421,7 +445,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

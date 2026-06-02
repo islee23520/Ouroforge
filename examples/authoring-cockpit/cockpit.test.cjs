@@ -59,6 +59,11 @@ const run = {
 };
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
 assert.match(cockpit.dashboardExportCommand(), /dashboard export/);
+assert.equal(cockpit.sceneValidateCommand('examples/game-runtime/scene.json'), 'cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene.json');
+assert.equal(cockpit.sceneReloadValidateCommand('examples/game-runtime/scene.json'), 'cargo run -p ouroforge-cli -- scene reload-validate examples/game-runtime/scene.json');
+assert.match(cockpit.runtimeReloadPayloadCommand('examples/game-runtime/scene.json'), /display-only payload shape/);
+assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /browser never executes commands/);
+assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /scene reload-validate/);
 assert.equal(cockpit.latestRun([{ summary: { id: 'old', created_at_unix_ms: 1 } }, { summary: { id: 'new', created_at_unix_ms: 2 } }]).summary.id, 'new');
 assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
@@ -87,6 +92,8 @@ assert.match(cockpit.renderIntegration(run), /Replay controls/);
 assert.match(cockpit.renderIntegration(run), /Run comparison/);
 assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
 assert.match(cockpit.renderIntegration(run), /Scene editing commands/);
+assert.match(cockpit.renderIntegration(run), /Validation command generation/);
+assert.match(cockpit.renderIntegration(run), /display-only/);
 assert.match(cockpit.renderIntegration(run), /does not write files directly/);
 assert.match(cockpit.renderPreviewControls({ ok: false, error: 'probe missing' }), /probe missing/);
 
@@ -139,5 +146,5 @@ assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('
 const xssRun = { summary: { id: 'r', run_dir: 'runs/x', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>', replay: { present: false, empty_state: '<script>alert(1)</script>' }, comparison: { present: false, empty_state: '<script>alert(1)</script>' } };
 assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
-assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker/.test(cockpitSource), 'cockpit browser code must not include direct persistence APIs');
+assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
