@@ -5451,6 +5451,8 @@ pub struct SceneDocument {
     pub schema_version: String,
     pub id: String,
     pub bounds: SceneBounds,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub renderer: Option<SceneRenderer>,
     pub entities: Vec<SceneEntity>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -5461,6 +5463,54 @@ pub struct SceneDocument {
 pub struct SceneBounds {
     pub width: i64,
     pub height: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderer {
+    #[serde(default = "scene_renderer_v1")]
+    pub version: String,
+    #[serde(default)]
+    pub camera: ScenePoint,
+    pub viewport: SceneSize,
+    #[serde(default = "default_renderer_background")]
+    pub background: String,
+    pub layers: Vec<SceneRenderLayer>,
+    #[serde(default)]
+    pub debug: SceneRendererDebug,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderLayer {
+    pub id: String,
+    #[serde(default)]
+    pub order: i64,
+    #[serde(default = "default_layer_visible")]
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRendererDebug {
+    #[serde(default, rename = "showBounds")]
+    pub show_bounds: bool,
+    #[serde(default, rename = "showCamera")]
+    pub show_camera: bool,
+    #[serde(default, rename = "showEntityIds")]
+    pub show_entity_ids: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderOrderEntry {
+    #[serde(rename = "entityId")]
+    pub entity_id: String,
+    pub layer: String,
+    #[serde(rename = "layerOrder")]
+    pub layer_order: i64,
+    #[serde(rename = "spriteOrder")]
+    pub sprite_order: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -5481,6 +5531,12 @@ pub struct SceneSprite {
     pub color: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<i64>,
+    #[serde(default = "default_layer_visible")]
+    pub visible: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -5584,6 +5640,18 @@ fn scene_schema_v1() -> String {
     "1".to_string()
 }
 
+fn scene_renderer_v1() -> String {
+    "1".to_string()
+}
+
+fn default_renderer_background() -> String {
+    "#172532".to_string()
+}
+
+fn default_layer_visible() -> bool {
+    true
+}
+
 fn aabb_collider_shape() -> String {
     "aabb".to_string()
 }
@@ -5629,6 +5697,9 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     if scene.bounds.width <= 0 || scene.bounds.height <= 0 {
         return Err(anyhow!("scene bounds must be positive"));
     }
+    if let Some(renderer) = &scene.renderer {
+        validate_scene_renderer(scene, renderer)?;
+    }
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     let mut ids = std::collections::BTreeSet::new();
     for entity in &scene.entities {
@@ -5639,6 +5710,22 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         validate_scene_color(&entity.sprite.color)?;
         if let Some(asset) = &entity.sprite.asset {
             validate_scene_local_asset_path("scene sprite asset", asset)?;
+        }
+        if let Some(layer) = &entity.sprite.layer {
+            validate_path_component(&format!("scene entity {} sprite layer", entity.id), layer)?;
+            if let Some(renderer) = &scene.renderer {
+                if !renderer
+                    .layers
+                    .iter()
+                    .any(|candidate| candidate.id == *layer)
+                {
+                    return Err(anyhow!(
+                        "scene entity {} sprite layer references unknown renderer layer: {}",
+                        entity.id,
+                        layer
+                    ));
+                }
+            }
         }
         if entity.components.size.width <= 0 || entity.components.size.height <= 0 {
             return Err(anyhow!("scene entity {} size must be positive", entity.id));
@@ -5659,6 +5746,77 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+fn validate_scene_renderer(scene: &SceneDocument, renderer: &SceneRenderer) -> Result<()> {
+    if renderer.version != "1" {
+        return Err(anyhow!("scene renderer version must be 1"));
+    }
+    if renderer.viewport.width <= 0 || renderer.viewport.height <= 0 {
+        return Err(anyhow!("scene renderer viewport must be positive"));
+    }
+    if renderer.viewport.width > scene.bounds.width
+        || renderer.viewport.height > scene.bounds.height
+    {
+        return Err(anyhow!(
+            "scene renderer viewport must fit inside scene bounds"
+        ));
+    }
+    validate_scene_color(&renderer.background)
+        .context("scene renderer background color is invalid")?;
+    if renderer.layers.is_empty() {
+        return Err(anyhow!("scene renderer layers must not be empty"));
+    }
+    let mut layer_ids = std::collections::BTreeSet::new();
+    for layer in &renderer.layers {
+        validate_path_component("scene renderer layer id", &layer.id)?;
+        if !layer_ids.insert(layer.id.clone()) {
+            return Err(anyhow!("duplicate scene renderer layer id: {}", layer.id));
+        }
+    }
+    Ok(())
+}
+
+pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
+    let layer_order = scene
+        .renderer
+        .as_ref()
+        .map(|renderer| {
+            renderer
+                .layers
+                .iter()
+                .map(|layer| (layer.id.as_str(), layer.order))
+                .collect::<std::collections::BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+
+    let mut entries = scene
+        .entities
+        .iter()
+        .filter(|entity| entity.sprite.visible)
+        .map(|entity| {
+            let layer = entity
+                .sprite
+                .layer
+                .clone()
+                .unwrap_or_else(|| "default".to_string());
+            let layer_order = layer_order.get(layer.as_str()).copied().unwrap_or(0);
+            SceneRenderOrderEntry {
+                entity_id: entity.id.clone(),
+                layer,
+                layer_order,
+                sprite_order: entity.sprite.order.unwrap_or(0),
+            }
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        (left.layer_order, left.sprite_order, left.entity_id.as_str()).cmp(&(
+            right.layer_order,
+            right.sprite_order,
+            right.entity_id.as_str(),
+        ))
+    });
+    entries
 }
 
 fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<()> {
@@ -10323,7 +10481,214 @@ scenarios:
     }
 
     #[test]
+    fn scene_renderer_v1_accepts_camera_layers_and_deterministic_order() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "renderer-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 8, "y": 12 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "background", "order": -10 },
+                    { "id": "actors", "order": 0 },
+                    { "id": "hud", "order": 10, "visible": true }
+                ],
+                "debug": {
+                    "showBounds": true,
+                    "showCamera": true,
+                    "showEntityIds": false
+                }
+            },
+            "entities": [
+                {
+                    "id": "zebra",
+                    "sprite": {
+                        "color": "#facc15",
+                        "layer": "actors",
+                        "order": 5
+                    },
+                    "components": {
+                        "transform": { "x": 72, "y": 32 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    }
+                },
+                {
+                    "id": "player",
+                    "sprite": {
+                        "color": "#5eead4",
+                        "asset": "assets/sprites/player.svg",
+                        "layer": "actors",
+                        "order": 5
+                    },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                },
+                {
+                    "id": "sky",
+                    "sprite": {
+                        "color": "#0f172a",
+                        "layer": "background",
+                        "order": 0
+                    },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 320, "height": 180 },
+                        "controllable": false
+                    }
+                },
+                {
+                    "id": "hidden-debug",
+                    "sprite": {
+                        "color": "#ffffff",
+                        "layer": "hud",
+                        "order": 0,
+                        "visible": false
+                    },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 8, "height": 8 },
+                        "controllable": false
+                    }
+                }
+            ]
+        }))
+        .expect("renderer scene parses");
+
+        validate_scene(&scene).expect("renderer v1 validates");
+        let renderer = scene.renderer.as_ref().expect("renderer present");
+        assert_eq!(renderer.version, "1");
+        assert_eq!(renderer.camera, ScenePoint { x: 8, y: 12 });
+        assert_eq!(renderer.viewport.width, 160);
+        assert!(renderer.debug.show_bounds);
+
+        let order = scene_render_order(&scene);
+        assert_eq!(
+            order
+                .iter()
+                .map(|entry| entry.entity_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["sky", "player", "zebra"]
+        );
+        assert_eq!(
+            serde_json::to_string(&order).expect("render order serializes"),
+            r#"[{"entityId":"sky","layer":"background","layerOrder":-10,"spriteOrder":0},{"entityId":"player","layer":"actors","layerOrder":0,"spriteOrder":5},{"entityId":"zebra","layer":"actors","layerOrder":0,"spriteOrder":5}]"#
+        );
+    }
+
+    #[test]
     fn scene_schema_v1_rejects_invalid_entities_and_paths() {
+        let duplicate_layer = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "renderer-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 0, "y": 0 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "actors", "order": 0 },
+                    { "id": "actors", "order": 1 }
+                ],
+                "debug": {}
+            },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "layer": "actors" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("duplicate layer fixture parses");
+        let rejected = validate_scene(&duplicate_layer).expect_err("duplicate layers rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate scene renderer layer id"));
+
+        let unknown_layer = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "renderer-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 0, "y": 0 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "actors", "order": 0 }
+                ],
+                "debug": {}
+            },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "layer": "missing" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("unknown layer fixture parses");
+        let rejected = validate_scene(&unknown_layer).expect_err("unknown layer rejected");
+        assert!(rejected
+            .to_string()
+            .contains("sprite layer references unknown renderer layer"));
+
+        let oversized_viewport = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "renderer-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 0, "y": 0 },
+                "viewport": { "width": 640, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "actors", "order": 0 }
+                ],
+                "debug": {}
+            },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "layer": "actors" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("oversized viewport fixture parses");
+        let rejected =
+            validate_scene(&oversized_viewport).expect_err("oversized viewport rejected");
+        assert!(rejected
+            .to_string()
+            .contains("viewport must fit inside scene bounds"));
+
         let duplicate = serde_json::from_value::<SceneDocument>(json!({
             "schemaVersion": "1",
             "id": "runtime-v1-scene",
