@@ -193,7 +193,111 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function replaySequences(run) {
+    return Array.isArray(run?.replay?.sequences) ? run.replay.sequences : [];
+  }
+
+  function replayFrames(sequence) {
+    const frames = Array.isArray(sequence?.frames) ? sequence.frames : [];
+    const checkpointFrames = Array.isArray(sequence?.checkpoints)
+      ? sequence.checkpoints
+          .map((checkpoint) => checkpoint.frame ?? checkpoint.tick)
+          .filter((frame) => Number.isFinite(Number(frame)))
+      : [];
+    return [...new Set([...frames, ...checkpointFrames].map((frame) => Number(frame)))].sort((a, b) => a - b);
+  }
+
+  function createReplayState(run) {
+    const sequences = replaySequences(run);
+    return { sequenceIndex: sequences.length ? 0 : -1, frameIndex: 0 };
+  }
+
+  function currentReplayView(run, state = createReplayState(run)) {
+    const sequences = replaySequences(run);
+    const sequence = sequences[state.sequenceIndex] || null;
+    if (!sequence) return { sequence: null, frames: [], frame: null, checkpoint: null, atEnd: true };
+    const frames = replayFrames(sequence);
+    const safeFrameIndex = Math.max(0, Math.min(state.frameIndex ?? 0, Math.max(frames.length - 1, 0)));
+    const frame = frames.length ? frames[safeFrameIndex] : null;
+    const checkpoints = Array.isArray(sequence.checkpoints) ? sequence.checkpoints : [];
+    const checkpoint = checkpoints.find((item) => Number(item.frame ?? item.tick) === frame) || checkpoints[0] || null;
+    return {
+      sequence,
+      frames,
+      frame,
+      checkpoint,
+      atEnd: !frames.length || safeFrameIndex >= frames.length - 1,
+    };
+  }
+
+  function stepReplayForward(run, state = createReplayState(run)) {
+    const view = currentReplayView(run, state);
+    return {
+      sequenceIndex: state.sequenceIndex ?? 0,
+      frameIndex: view.atEnd ? (state.frameIndex ?? 0) : (state.frameIndex ?? 0) + 1,
+    };
+  }
+
+  function resetReplay(run) {
+    return createReplayState(run);
+  }
+
+  function jumpReplayToCheckpoint(run, state = createReplayState(run), checkpointIndex = 0) {
+    const sequence = replaySequences(run)[state.sequenceIndex] || null;
+    if (!sequence) return createReplayState(run);
+    const frames = replayFrames(sequence);
+    const checkpoint = (Array.isArray(sequence.checkpoints) ? sequence.checkpoints : [])[checkpointIndex];
+    const targetFrame = Number(checkpoint?.frame ?? checkpoint?.tick ?? frames[0] ?? 0);
+    const frameIndex = Math.max(0, frames.indexOf(targetFrame));
+    return { sequenceIndex: state.sequenceIndex ?? 0, frameIndex };
+  }
+
+  function renderReplayControls(run, state = createReplayState(run)) {
+    const replay = run?.replay;
+    const sequences = replaySequences(run);
+    if (!replay || !replay.present || !sequences.length) {
+      return `<section class="panel"><h3>Replay Controls</h3><p class="empty-state">${escapeText(replay?.empty_state || 'No replay evidence is available for this run.')}</p></section>`;
+    }
+    const view = currentReplayView(run, state);
+    const sequence = view.sequence;
+    const checkpoints = Array.isArray(sequence.checkpoints) ? sequence.checkpoints : [];
+    const checkpointButtons = checkpoints.length
+      ? checkpoints.map((checkpoint, index) => `<button class="control-button" data-replay-jump="${escapeText(index)}">Jump to ${escapeText(checkpoint.label || checkpoint.id || `checkpoint ${index + 1}`)} (${escapeText(checkpoint.frame ?? checkpoint.tick ?? 'unknown')})</button>`).join('')
+      : '<p class="empty-state compact">No replay checkpoints are available.</p>';
+    const worldState = view.checkpoint?.world_state
+      ? `<pre>${escapeText(JSON.stringify(view.checkpoint.world_state, null, 2))}</pre>`
+      : '<p class="empty-state compact">No world-state snapshot is linked to the current replay frame.</p>';
+    return `<section class="panel">
+      <h3>Replay Controls</h3>
+      <p class="run-meta">Inspect-only. Controls are local/in-memory and do not edit replay inputs, record inputs, or mutate run artifacts.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Sequence</div><div class="card-value">${escapeText(sequence.id)}</div></div>
+        <div class="card"><div class="card-label">Source</div><div class="card-value">${escapeText(sequence.source || 'unknown')}</div></div>
+        <div class="card"><div class="card-label">Current frame</div><div class="card-value">${escapeText(view.frame ?? 'unknown')}</div></div>
+        <div class="card"><div class="card-label">Current tick</div><div class="card-value">${escapeText(view.checkpoint?.tick ?? view.frame ?? 'unknown')}</div></div>
+      </div>
+      <div class="control-row">
+        <button class="control-button" data-replay-step="forward"${view.atEnd ? ' disabled' : ''}>Step forward</button>
+        <button class="control-button" data-replay-reset="true">Reset</button>
+        ${checkpointButtons}
+      </div>
+      <section class="panel"><h4>Replay evidence</h4>
+        <div class="run-meta">${escapeText(sequence.event_count ?? 0)} event(s) · frames ${escapeText((view.frames || []).join(', ') || 'none')}</div>
+        ${renderRefLinks('Evidence refs', sequence.evidence_refs, run)}
+        ${sequence.read_error ? `<div class="artifact-warning">${escapeText(sequence.read_error)}</div>` : ''}
+      </section>
+      <section class="panel"><h4>Current world-state snapshot</h4>
+        <div class="run-meta">${escapeText(view.checkpoint?.world_state_path || 'No world-state artifact path')}</div>
+        ${worldState}
+      </section>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
+    return renderRunDetailWithState(run, createReplayState(run));
+  }
+
+  function renderRunDetailWithState(run, replayState) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
     const summary = summarizeRun(run);
@@ -214,6 +318,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
+      ${renderReplayControls(run, replayState)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
       ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
       ${renderArtifacts('Frame/performance metrics', artifacts(run.frame_metrics, run.performance_metrics), run, renderJsonArtifact)}
@@ -234,12 +339,36 @@ const OuroforgeDashboard = (() => {
       if (!Array.isArray(data.runs)) throw new Error('malformed dashboard-data.json: runs must be an array');
       const runs = data.runs || [];
       let selected = runs[0] || null;
+      const replayStates = new Map();
+      const replayStateFor = (run) => {
+        const id = run?.summary?.id || 'unknown-run';
+        if (!replayStates.has(id)) replayStates.set(id, createReplayState(run));
+        return replayStates.get(id);
+      };
       const paint = () => {
         listEl.innerHTML = renderRunList(runs, selected && selected.summary.id);
-        detailEl.innerHTML = renderRunDetail(selected);
+        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected));
         listEl.querySelectorAll('[data-run-id]').forEach((button) => {
           button.addEventListener('click', () => {
             selected = runs.find((run) => run.summary.id === button.dataset.runId) || null;
+            paint();
+          });
+        });
+        detailEl.querySelectorAll('[data-replay-step]').forEach((button) => {
+          button.addEventListener('click', () => {
+            replayStates.set(selected.summary.id, stepReplayForward(selected, replayStateFor(selected)));
+            paint();
+          });
+        });
+        detailEl.querySelectorAll('[data-replay-reset]').forEach((button) => {
+          button.addEventListener('click', () => {
+            replayStates.set(selected.summary.id, resetReplay(selected));
+            paint();
+          });
+        });
+        detailEl.querySelectorAll('[data-replay-jump]').forEach((button) => {
+          button.addEventListener('click', () => {
+            replayStates.set(selected.summary.id, jumpReplayToCheckpoint(selected, replayStateFor(selected), Number(button.dataset.replayJump)));
             paint();
           });
         });
@@ -251,7 +380,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, init, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderRunDetail, renderRunList, runRelativeHref, statusClass, summarizeRun };
+  return { artifactHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunDetail, renderRunDetailWithState, renderRunList, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

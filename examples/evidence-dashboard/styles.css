@@ -42,6 +42,10 @@ h1,h2,h3,h4 { margin:0; }
 .lifecycle-card { border:1px solid #334155; border-radius:.75rem; padding:.75rem; background:#111827; overflow-wrap:anywhere; }
 .command-list { display:grid; gap:.5rem; margin-top:.75rem; }
 .command-list code { display:block; white-space:pre-wrap; border:1px solid #3b4658; border-radius:.75rem; padding:.75rem; background:#0b1020; color:#dbeafe; }
+.control-row { display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0; }
+.control-button { border:1px solid #3b4658; border-radius:999px; padding:.45rem .75rem; background:#1d2a38; color:#edf1f7; cursor:pointer; }
+.control-button:hover:not(:disabled) { border-color:#69c0ff; background:#24364a; }
+.control-button:disabled { color:#64748b; cursor:not-allowed; background:#111827; }
 .ref-group { margin-top:.75rem; }
 .ref-list { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.35rem; }
 .ref-chip { display:inline-block; border:1px solid #3b4658; border-radius:999px; padding:.2rem .5rem; background:#0f172a; color:#8bd3ff; font-size:.8rem; overflow-wrap:anywhere; }

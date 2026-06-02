@@ -46,6 +46,46 @@ const run = {
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ state: 'accepted' }] },
     ],
   },
+  replay: {
+    present: true,
+    empty_state: '',
+    sequences: [
+      {
+        id: 'move-right-four-frames',
+        source: 'inline',
+        scenario_id: 'replay-smoke',
+        replay_path: 'evidence/scenarios/replay-smoke/input-replay.json',
+        event_count: 2,
+        frames: [0, 4],
+        first_frame: 0,
+        last_frame: 4,
+        evidence_refs: [
+          'evidence/scenarios/replay-smoke/input-replay.json',
+          'evidence/scenarios/replay-smoke/scenario-result.json',
+        ],
+        checkpoints: [
+          {
+            id: 'initial',
+            label: 'Initial state',
+            frame: 0,
+            tick: 0,
+            world_state_path: 'evidence/scenarios/replay-smoke/world-state-initial.json',
+            frame_stats_path: 'evidence/scenarios/replay-smoke/frame-stats-initial.json',
+            world_state: { tick: 0, entities: [{ id: 'player', components: { transform: { x: 32, y: 72 } } }] },
+          },
+          {
+            id: 'post-replay',
+            label: 'Post-replay world state',
+            frame: 4,
+            tick: 4,
+            world_state_path: 'evidence/scenarios/replay-smoke/world-state.json',
+            frame_stats_path: 'evidence/scenarios/replay-smoke/frame-stats.json',
+            world_state: { tick: 4, entities: [{ id: 'player', components: { transform: { x: 40, y: 72 } } }] },
+          },
+        ],
+      },
+    ],
+  },
   journal_view: {
     path: 'journal.md',
     exists: true,
@@ -93,6 +133,14 @@ assert.match(detail, /Scenario results/);
 assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
+assert.match(detail, /Replay Controls/);
+assert.match(detail, /Inspect-only\. Controls are local\/in-memory/);
+assert.match(detail, /Current frame/);
+assert.match(detail, /Initial state/);
+assert.match(detail, /Post-replay world state/);
+assert.match(detail, /Step forward/);
+assert.match(detail, /Reset/);
+assert.match(detail, /evidence\/scenarios\/replay-smoke\/input-replay\.json/);
 assert.match(detail, /Inspect-only/);
 assert.match(detail, /Proposed/);
 assert.match(detail, /Classified/);
@@ -118,13 +166,30 @@ assert.match(detail, /bad json/);
 assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /Frame\/performance metrics/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
+assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunList([], null), /No runs found/);
+
+let replayState = dashboard.createReplayState(run);
+let replayView = dashboard.currentReplayView(run, replayState);
+assert.equal(replayView.frame, 0);
+assert.equal(replayView.checkpoint.world_state.entities[0].components.transform.x, 32);
+replayState = dashboard.stepReplayForward(run, replayState);
+replayView = dashboard.currentReplayView(run, replayState);
+assert.equal(replayView.frame, 4);
+assert.equal(replayView.checkpoint.tick, 4);
+assert.equal(replayView.checkpoint.world_state.entities[0].components.transform.x, 40);
+replayState = dashboard.resetReplay(run);
+assert.equal(dashboard.currentReplayView(run, replayState).frame, 0);
+replayState = dashboard.jumpReplayToCheckpoint(run, replayState, 1);
+assert.equal(dashboard.currentReplayView(run, replayState).frame, 4);
+assert.match(dashboard.renderReplayControls(run, replayState), /Current tick/);
 
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {
   summary: { id: '<img src=x onerror=alert(1)>', run_dir: 'runs/x', seed_id: 's', run_status: 'created', verdict_status: 'failed', scenario_status: 'pending', evidence_count: 0, mutation_count: 0, worker_count: 0 },
   evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [], console_logs: [], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
+  replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
   verdict: {}, journal: '<script>alert(1)</script>',
 };

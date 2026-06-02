@@ -33,3 +33,9 @@ Mutation Review UI v1 renders mutation lifecycle artifacts and manual review
 command hints as escaped, copyable text. It does not apply patches, write
 accepted/rejected decisions, run Git operations, or call GitHub from the
 browser.
+
+Replay Controls v1 renders deterministic replay evidence with local,
+in-memory step/reset/jump controls. It displays the current frame/tick,
+evidence links, and linked world-state snapshots from the generated export.
+It does not edit replay inputs, record new inputs, persist browser-side replay
+state, or mutate run artifacts.
