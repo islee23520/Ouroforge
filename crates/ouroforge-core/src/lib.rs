@@ -137,7 +137,6 @@ const MAX_INPUT_REPLAY_FRAME: u32 = 100_000;
 #[serde(deny_unknown_fields)]
 pub struct InputReplay {
     #[serde(rename = "schemaVersion")]
-    #[serde(default = "input_replay_schema_v1")]
     pub schema_version: String,
     pub id: String,
     pub events: Vec<InputReplayEvent>,
@@ -487,10 +486,6 @@ impl InputReplay {
         }
         Ok(())
     }
-}
-
-fn input_replay_schema_v1() -> String {
-    INPUT_REPLAY_SCHEMA_VERSION.to_string()
 }
 
 fn validate_replay_reference_path(field: &str, value: &str) -> Result<()> {
@@ -1774,7 +1769,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     let mut client = CdpClient::new(transport);
 
     client.enable_page()?;
-    let _ = install_console_capture(&mut client);
+    install_console_capture(&mut client)?;
     let _ = client.bring_page_to_front();
     let navigation = client.navigate(&config.url)?;
     append_ledger_event(
@@ -1790,7 +1785,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
     )?;
 
     std::thread::sleep(Duration::from_millis(300));
-    let _ = capture_console_log(config, &mut client);
+    capture_console_log(config, &mut client)?;
     capture_runtime_probe(config, &mut client)?;
     let _ = client.bring_page_to_front();
     let screenshot = client.capture_screenshot_png()?;
@@ -1876,7 +1871,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         }
     }
 
-    let _ = write_worker_cdp_trace_summary(config, &navigation, performance_metric_count);
+    write_worker_cdp_trace_summary(config, &navigation, performance_metric_count)?;
 
     Ok(BrowserSmokeResult { screenshot_path })
 }
@@ -2558,7 +2553,7 @@ pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
     let mut client = CdpClient::new(transport);
 
     client.enable_page()?;
-    let _ = install_console_capture(&mut client);
+    install_console_capture(&mut client)?;
     let _ = client.bring_page_to_front();
     client.navigate(&config.url)?;
     std::thread::sleep(Duration::from_millis(300));
@@ -4049,6 +4044,21 @@ events:
         )
         .expect_err("malformed replay rejected");
         assert!(malformed.to_string().contains("failed to parse"));
+    }
+
+    #[test]
+    fn rejects_input_replay_missing_schema_version() {
+        let missing = InputReplay::from_yaml_str(
+            r#"
+id: move-right
+events:
+  - frame: 0
+    key: right
+    pressed: true
+"#,
+        )
+        .expect_err("replay missing schemaVersion rejected");
+        assert!(missing.to_string().contains("failed to parse"));
     }
 
     #[test]
