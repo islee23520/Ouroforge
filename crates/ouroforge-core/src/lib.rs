@@ -3364,12 +3364,133 @@ pub struct MutationProposal {
     pub status: String,
     pub verdict_status: String,
     pub created_at_unix_ms: u128,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<MutationProposalRationale>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MutationProposalIndex {
     pub proposals: Vec<MutationProposal>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationProposalRationale {
+    pub schema_version: String,
+    pub failure_classification: String,
+    pub evidence_artifact_ids: Vec<String>,
+    #[serde(default)]
+    pub scenario_result_refs: Vec<String>,
+    #[serde(default)]
+    pub verdict_refs: Vec<String>,
+    pub expected_effect: String,
+    pub confidence: MutationProposalRationaleConfidence,
+    pub reasoning_summary: String,
+    pub allowed_mutation_type: MutationProposalAllowedMutationType,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationProposalRationaleConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationProposalAllowedMutationType {
+    SceneOnly,
+    ProjectSceneOnly,
+    DataOnly,
+}
+
+impl MutationProposalIndex {
+    pub fn validate(&self) -> Result<()> {
+        let mut ids = BTreeSet::new();
+        for proposal in &self.proposals {
+            proposal.validate()?;
+            if !ids.insert(proposal.id.as_str()) {
+                return Err(anyhow!("duplicate mutation proposal id: {}", proposal.id));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationProposal {
+    pub fn validate(&self) -> Result<()> {
+        require_text("mutation proposal id", &self.id)?;
+        require_text("mutation proposal reason", &self.reason)?;
+        require_text("mutation proposal evidence_id", &self.evidence_id)?;
+        require_text("mutation proposal target", &self.target)?;
+        require_text("mutation proposal path", &self.path)?;
+        require_text("mutation proposal from", &self.from)?;
+        require_text("mutation proposal to", &self.to)?;
+        require_text("mutation proposal confidence", &self.confidence)?;
+        require_text("mutation proposal status", &self.status)?;
+        require_text("mutation proposal verdict_status", &self.verdict_status)?;
+        if let Some(rationale) = &self.rationale {
+            rationale
+                .validate(&self.evidence_id)
+                .with_context(|| format!("invalid rationale for mutation proposal {}", self.id))?;
+        }
+        Ok(())
+    }
+}
+
+impl MutationProposalRationale {
+    pub fn validate(&self, proposal_evidence_id: &str) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!(
+                "mutation proposal rationale schema_version must be \"1\""
+            ));
+        }
+        require_text(
+            "mutation proposal rationale failure_classification",
+            &self.failure_classification,
+        )?;
+        require_text(
+            "mutation proposal rationale expected_effect",
+            &self.expected_effect,
+        )?;
+        require_text(
+            "mutation proposal rationale reasoning_summary",
+            &self.reasoning_summary,
+        )?;
+        if self.evidence_artifact_ids.is_empty() {
+            return Err(anyhow!(
+                "mutation proposal rationale requires at least one evidence_artifact_id"
+            ));
+        }
+        for evidence_id in &self.evidence_artifact_ids {
+            require_text(
+                "mutation proposal rationale evidence_artifact_id",
+                evidence_id,
+            )?;
+        }
+        if !self
+            .evidence_artifact_ids
+            .iter()
+            .any(|evidence_id| evidence_id == proposal_evidence_id)
+        {
+            return Err(anyhow!(
+                "mutation proposal rationale evidence_artifact_ids must include proposal evidence_id {}",
+                proposal_evidence_id
+            ));
+        }
+        for scenario_ref in &self.scenario_result_refs {
+            require_text(
+                "mutation proposal rationale scenario_result_ref",
+                scenario_ref,
+            )?;
+        }
+        for verdict_ref in &self.verdict_refs {
+            require_text("mutation proposal rationale verdict_ref", verdict_ref)?;
+        }
+        Ok(())
+    }
 }
 
 pub struct MutationProposalInput {
@@ -5084,6 +5205,7 @@ pub fn create_mutation_proposal(
         status: "proposed".to_string(),
         verdict_status,
         created_at_unix_ms,
+        rationale: None,
     };
     index.proposals.push(proposal.clone());
     write_mutation_proposals(run_dir, &index)?;
@@ -5113,14 +5235,19 @@ fn read_mutation_proposals(run_dir: impl AsRef<Path>) -> Result<MutationProposal
     }
     let input = fs::read_to_string(&path)
         .with_context(|| format!("failed to read mutation proposals {}", path.display()))?;
-    serde_json::from_str(&input)
-        .with_context(|| format!("failed to parse mutation proposals {}", path.display()))
+    let index: MutationProposalIndex = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse mutation proposals {}", path.display()))?;
+    index
+        .validate()
+        .with_context(|| format!("failed to validate mutation proposals {}", path.display()))?;
+    Ok(index)
 }
 
 fn write_mutation_proposals(
     run_dir: impl AsRef<Path>,
     index: &MutationProposalIndex,
 ) -> Result<()> {
+    index.validate()?;
     let dir = run_dir.as_ref().join("mutation");
     fs::create_dir_all(&dir).context("failed to create mutation directory")?;
     write_json_atomic(&dir.join("proposals.json"), &json!(index))
@@ -14199,6 +14326,147 @@ scenarios:
         let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
         assert_eq!(proposals.len(), 1);
         assert_eq!(proposals[0].evidence_id, "evidence-1");
+        assert!(proposals[0].rationale.is_none());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn reads_valid_mutation_proposal_rationale_v2() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-valid-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": ["failure-evidence"],
+                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                        "verdict_refs": ["verdict.json"],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "scene_only"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposal reads");
+
+        assert_eq!(proposals.len(), 1);
+        let rationale = proposals[0]
+            .rationale
+            .as_ref()
+            .expect("rationale is present");
+        assert_eq!(
+            rationale.allowed_mutation_type,
+            MutationProposalAllowedMutationType::SceneOnly
+        );
+        assert_eq!(
+            rationale.confidence,
+            MutationProposalRationaleConfidence::Medium
+        );
+        assert_eq!(rationale.evidence_artifact_ids, vec!["failure-evidence"]);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_proposal_rationale_rejects_missing_evidence_links() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-missing-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": [],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "scene_only"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let error = list_mutation_proposals(&artifacts.run_dir)
+            .expect_err("missing rationale evidence links fail");
+
+        assert!(error
+            .to_string()
+            .contains("failed to validate mutation proposals"));
+        assert!(format!("{error:#}")
+            .contains("mutation proposal rationale requires at least one evidence_artifact_id"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_proposal_rationale_rejects_malformed_allowed_type() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-malformed-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": ["failure-evidence"],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "source_patch"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let error =
+            list_mutation_proposals(&artifacts.run_dir).expect_err("malformed allowed type fails");
+
+        assert!(error
+            .to_string()
+            .contains("failed to parse mutation proposals"));
         fs::remove_dir_all(root).ok();
     }
 
