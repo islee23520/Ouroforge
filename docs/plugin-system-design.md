@@ -1,14 +1,79 @@
 # Plugin System Design Gate
 
-Status: **EE13.1 risk and boundary audit draft; ADR decision pending in EE13.2**
+Status: **ADR complete — NO-GO for plugin system implementation now**
 
 Issue: #169 — Engine Expansion v1 Plugin System Design Gate
 
-This document is the canonical plugin-system design artifact. EE13.1 audits
-risk, boundaries, and non-plugin alternatives only. It does not approve a plugin
+This document is the canonical plugin-system design artifact. It records the
+risk/boundary audit and final EE13.2 architecture decision. The decision is
+**NO-GO for plugin system implementation now**. It does not approve a plugin
 system, create implementation issues, add dynamic loading, add a plugin manager
 UI, add a marketplace, add a script sandbox, or permit arbitrary source
 mutation.
+
+
+## ADR decision
+
+Decision: **NO-GO for plugin system implementation now**
+
+Rationale:
+
+1. Current Engine Expansion v1 evidence proves local browser runtime, template,
+   dashboard, compare, and design-gate inspectability, not repeated unmet needs
+   requiring third-party extension execution.
+2. The plausible needs identified in the audit are presentation, templates, or
+   advisory checks; those are safer as issue-specific built-in features, static
+   configuration, or documentation until demand repeats.
+3. A plugin runtime would introduce dynamic loading, permission, sandbox,
+   compatibility, marketplace, and trust concerns before the repository has an
+   allowlisted extension contract.
+4. Artifact authority and mutation authority are core safety boundaries. A plugin
+   system now would risk weakening Rust-owned Seed/Run/Ledger/Evidence/Verdict/
+   Journal/Compare/Mutation semantics.
+5. A GO decision now would expand Engine Expansion v1 into platform/ecosystem
+   work and undermine the no-marketplace/no-plugin guardrail.
+
+Selected alternative: **defer plugin system and keep issue-specific built-in
+features/static configuration/documentation as the default extension path**.
+Read-only dashboard extension points or CLI advisory checks may be reconsidered
+later only as separate design work; they are not authorized by #169.
+
+Consequences:
+
+- No plugin implementation issues are created from #169.
+- No plugin runtime, dynamic loading, plugin manager UI, marketplace/registry,
+  package manager, script sandbox, arbitrary source mutation, server/cloud/auth,
+  or third-party compatibility promise is authorized.
+- Rust artifact contracts remain canonical and must be understandable without a
+  plugin installed.
+- Future extension-like work should be implemented as explicitly scoped built-in
+  features unless a later design gate records GO for a narrower extension model.
+
+## Revisit criteria
+
+A future issue may reopen plugin-system design only if all of the following are
+true:
+
+1. At least two repeated, evidence-backed extension needs cannot be handled by
+   issue-specific built-ins, static config, or docs.
+2. The proposed extension model is narrow and allowlisted (for example read-only
+   dashboard artifact renderers), not a broad plugin runtime.
+3. Rust validates a manifest and every output artifact before any extension code
+   can affect trusted state.
+4. Seed, Run, Ledger, Evidence, Verdict, Journal, Compare, Mutation, and Scene
+   schema authority remain Rust-owned or are changed only by a later explicit
+   charter issue.
+5. Extension output remains readable/auditable without the extension installed.
+6. Permissions are explicit, deny-by-default, local-only, and exclude network,
+   cloud, auth, marketplace, source writes, and mutation acceptance unless later
+   authorized.
+7. Verification can prove that browser UI code cannot bypass Rust validation or
+   mutate trusted project state directly.
+8. The proposal includes support/versioning boundaries that avoid public
+   compatibility, production-readiness, or marketplace claims.
+
+If those criteria are met, a future design issue may propose a GO decision and
+only then create follow-up implementation issues.
 
 ## Current evidence-native authority model
 
@@ -147,7 +212,7 @@ A future GO would require, before implementation:
 
 ## No-code / no-scaffold audit
 
-EE13.1 intentionally changes documentation only. It adds no:
+#169 intentionally changes documentation only. It adds no:
 
 - plugin runtime;
 - dynamic loading;
@@ -160,16 +225,8 @@ EE13.1 intentionally changes documentation only. It adds no:
 - server, database, cloud, auth, or telemetry;
 - generated `runs/` or dashboard artifacts.
 
-## ADR inputs for EE13.2
+## Implementation issue policy
 
-EE13.2 should make an explicit GO/NO-GO decision using this audit. The decision
-should answer:
-
-- Is a plugin system justified now by evidence-backed unmet needs?
-- Which alternative is selected or rejected?
-- What artifact and mutation domains remain Rust-owned?
-- If GO, what exact follow-up issues are required before any implementation?
-- If NO-GO, what concrete revisit criteria would change the decision?
-
-Until EE13.2 is merged, this document records risk/boundary findings only and
-does not authorize implementation.
+Because the ADR is **NO-GO now**, #169 creates no follow-up implementation
+issues. Future implementation issues are allowed only after a later design gate
+meets the revisit criteria and records an explicit GO.
