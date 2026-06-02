@@ -2332,6 +2332,7 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     let mut failures = Vec::new();
     let mut evidence_refs = Vec::new();
     let mut scenario_results = Vec::new();
+    let mut suite_summaries = 0usize;
 
     for artifact in &evidence.artifacts {
         let artifact_path = run_dir.join(&artifact.path);
@@ -2361,6 +2362,14 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
             })?;
             scenario_results.push((artifact.path.clone(), result));
         }
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("suite_summary")
+        {
+            suite_summaries += 1;
+        }
     }
 
     if scenario_results.is_empty() {
@@ -2384,7 +2393,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
             evidence_refs,
             metadata: json!({
                 "evaluator": "ouroforge-evaluator-v0",
-                "scenario_results": 0
+                "scenario_results": 0,
+                "suite_summaries": suite_summaries
             }),
         };
         write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
@@ -2517,7 +2527,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
         evidence_refs,
         metadata: json!({
             "evaluator": "ouroforge-evaluator-v0",
-            "scenario_results": scenario_results.len()
+            "scenario_results": scenario_results.len(),
+            "suite_summaries": suite_summaries
         }),
     };
     write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
@@ -2645,6 +2656,7 @@ pub struct ScenarioRunSummary {
     pub passed: usize,
     pub failed: usize,
     pub scenario_order: Vec<String>,
+    pub suite_summary_path: String,
     pub evidence_paths: Vec<String>,
     pub result_paths: Vec<String>,
 }
@@ -2678,19 +2690,54 @@ fn run_scenarios_with_client<T: CdpTransport>(
     let mut evidence_paths = Vec::new();
     let mut result_paths = Vec::new();
     let mut scenario_order = Vec::new();
+    let mut scenario_summaries = Vec::new();
     let mut passed = 0;
     let mut failed = 0;
     for scenario in &seed.scenarios {
         scenario_order.push(scenario.id.clone());
         let result = run_scenario(config, client, scenario)?;
         evidence_paths.extend(result.evidence_paths);
-        result_paths.push(result.result_path);
+        result_paths.push(result.result_path.clone());
         if result.passed {
             passed += 1;
         } else {
             failed += 1;
         }
+        scenario_summaries.push(json!({
+            "scenario_id": scenario.id,
+            "status": if result.passed { "passed" } else { "failed" },
+            "result_path": result.result_path
+        }));
     }
+    let suite_summary_path = format!("evidence/suite-summary-{}.json", unix_millis()?);
+    write_json(
+        &config.run_dir.join(&suite_summary_path),
+        &json!({
+            "artifact": "suite_summary",
+            "status": if failed == 0 { "passed" } else { "failed" },
+            "scenarios": seed.scenarios.len(),
+            "completed": result_paths.len(),
+            "passed": passed,
+            "failed": failed,
+            "scenario_order": scenario_order.clone(),
+            "scenario_results": scenario_summaries,
+            "result_paths": result_paths.clone(),
+            "evidence_paths": evidence_paths.clone()
+        }),
+    )?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("suite-summary-{}", unix_millis()?),
+        "application/json",
+        &suite_summary_path,
+        json!({
+            "artifact": "suite_summary",
+            "scenarios": seed.scenarios.len(),
+            "passed": passed,
+            "failed": failed
+        }),
+    )?;
+    evidence_paths.push(suite_summary_path.clone());
 
     Ok(ScenarioRunSummary {
         scenarios: seed.scenarios.len(),
@@ -2698,6 +2745,7 @@ fn run_scenarios_with_client<T: CdpTransport>(
         passed,
         failed,
         scenario_order,
+        suite_summary_path,
         evidence_paths,
         result_paths,
     })
@@ -5925,6 +5973,21 @@ scenarios:
         assert_eq!(summary.passed, 1);
         assert_eq!(summary.failed, 1);
         assert_eq!(summary.result_paths.len(), 2);
+        assert!(artifacts
+            .run_dir
+            .join(&summary.suite_summary_path)
+            .is_file());
+        let suite_summary = read_json_value(artifacts.run_dir.join(&summary.suite_summary_path))
+            .expect("suite summary reads");
+        assert_eq!(suite_summary["status"], "failed");
+        assert_eq!(
+            suite_summary["scenario_order"],
+            json!(["first-pass", "second-fail"])
+        );
+        assert_eq!(
+            suite_summary["scenario_results"].as_array().unwrap().len(),
+            2
+        );
         assert!(summary
             .result_paths
             .iter()
