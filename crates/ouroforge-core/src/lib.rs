@@ -8034,13 +8034,39 @@ fn reject_scene_mutation_transaction_output_collision(
         (Ok(output), Ok(target)) => output == target,
         _ => transaction_output == target_scene_path,
     };
-    if same_path {
+    if same_path || same_existing_file(transaction_output, target_scene_path) {
         return Err(anyhow!(
             "scene-only mutation transaction output must not equal target scene path {}",
             target_scene_path.display()
         ));
     }
     Ok(())
+}
+
+#[cfg(unix)]
+fn same_existing_file(left: &Path, right: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+
+    let (Ok(left), Ok(right)) = (std::fs::metadata(left), std::fs::metadata(right)) else {
+        return false;
+    };
+    left.dev() == right.dev() && left.ino() == right.ino()
+}
+
+#[cfg(windows)]
+fn same_existing_file(left: &Path, right: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    let (Ok(left), Ok(right)) = (std::fs::metadata(left), std::fs::metadata(right)) else {
+        return false;
+    };
+    left.volume_serial_number() == right.volume_serial_number()
+        && left.file_index() == right.file_index()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn same_existing_file(_left: &Path, _right: &Path) -> bool {
+    false
 }
 
 pub fn apply_scene_only_mutation_operation(
@@ -14980,6 +15006,47 @@ scenarios:
             fs::read_to_string(&scene_path).expect("scene after reads"),
             before_contents,
             "same-path transaction output rejection must not corrupt the trusted scene"
+        );
+        assert!(read_scene(&scene_path).is_ok(), "scene remains parseable");
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scene_only_mutation_application_rejects_hard_link_transaction_output_collision() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-hardlink-collision");
+        let hard_link_path = root.join("transactions/scene-hardlink.json");
+        fs::create_dir_all(hard_link_path.parent().expect("hard link parent")).expect("dir");
+        fs::hard_link(&scene_path, &hard_link_path).expect("hard link to scene can be created");
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        };
+
+        let error =
+            apply_scene_only_mutation_operation(&artifacts.run_dir, &operation, &hard_link_path)
+                .expect_err("transaction output hard link to scene path is rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{error:#}"
+        );
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after reads"),
+            before_contents,
+            "hard-link transaction output rejection must not corrupt the trusted scene"
         );
         assert!(read_scene(&scene_path).is_ok(), "scene remains parseable");
         fs::remove_dir_all(root).ok();
