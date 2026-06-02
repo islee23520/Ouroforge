@@ -75,6 +75,7 @@
     collisions: [],
     collisionEvents: [],
     audioEvents: [],
+    reloads: [],
     tilemaps: [],
     assetManifest: null,
   };
@@ -256,26 +257,45 @@
   }
 
 
+
+  function recordReloadOutcome(outcome) {
+    const entry = {
+      tick: world.tick,
+      sceneId: world.sceneId,
+      ...clone(outcome),
+    };
+    world.reloads.push(entry);
+    if (world.reloads.length > 16) world.reloads.shift();
+    record(`runtime.reload.${entry.status}`, entry);
+    return entry;
+  }
+
+  function failReload(reason) {
+    recordReloadOutcome({ status: 'failed', reason });
+    throw new Error(reason);
+  }
+
   function reload(payload = {}) {
     if (!payload || typeof payload !== 'object' || payload.schemaVersion !== 'ouroforge.scene-reload.v0') {
-      throw new Error('reload payload schemaVersion must be ouroforge.scene-reload.v0');
+      failReload('reload payload schemaVersion must be ouroforge.scene-reload.v0');
     }
     if (!payload.scene || typeof payload.scene !== 'object' || Array.isArray(payload.scene)) {
-      throw new Error('reload payload scene is required');
+      failReload('reload payload scene is required');
     }
     const scene = clone(payload.scene);
     if (payload.assetManifest && typeof payload.assetManifest === 'object' && !Array.isArray(payload.assetManifest)) {
       scene.assetManifest = clone(payload.assetManifest);
     }
-    const state = loadScene(scene);
-    record('runtime.reload.succeeded', {
+    loadScene(scene);
+    recordReloadOutcome({
+      status: 'succeeded',
       schemaVersion: payload.schemaVersion,
       sceneId: world.sceneId,
       entityCount: world.entities.length,
       assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
     });
     renderDebug();
-    return state;
+    return api.getWorldState();
   }
 
   function setInput(nextInput = {}) {

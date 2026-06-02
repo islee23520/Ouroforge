@@ -100,9 +100,21 @@ assert.equal(state.snapshots.length, 0);
 assert.equal(state.assetManifest.id, 'after-assets');
 assert.equal(state.assetManifest.assetCount, 1);
 assert.equal(state.assets[0].id, 'after-sprite');
+assert.equal(state.reloads.length, 1);
+assert.equal(state.reloads[0].status, 'succeeded');
+assert.equal(state.reloads[0].sceneId, 'reload-after');
 assert.equal(api.getFrameStats().fixedDeltaMs, 16);
 
+const beforeInvalid = api.getWorldState();
 assert.throws(
   () => api.reload({ schemaVersion: 'wrong', scene: reloadedScene }),
   /reload payload schemaVersion must be ouroforge\.scene-reload\.v0/,
 );
+const afterInvalid = api.getWorldState();
+assert.equal(afterInvalid.sceneId, beforeInvalid.sceneId);
+assert.equal(afterInvalid.tick, beforeInvalid.tick);
+assert.equal(afterInvalid.entities[0].id, beforeInvalid.entities[0].id);
+assert.equal(afterInvalid.entities[0].components.transform.x, beforeInvalid.entities[0].components.transform.x);
+assert.equal(afterInvalid.reloads.length, 2);
+assert.equal(afterInvalid.reloads[1].status, 'failed');
+assert.match(afterInvalid.reloads[1].reason, /schemaVersion/);
