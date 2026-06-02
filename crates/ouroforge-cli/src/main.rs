@@ -4,14 +4,16 @@ use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
     apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_project_metadata,
     bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
-    create_run, edit_scene, evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
-    list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    create_run, edit_scene, evaluate_run, evolve_run, hash_project_manifest_file,
+    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
     read_scene, run_browser_smoke, run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path,
     run_scenarios, show_journal, update_journal, validate_scene_reload,
     write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
     BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState, ProjectManifest,
-    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
+    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -202,6 +204,8 @@ enum MutationCommand {
     },
     ApplyScene {
         run_dir: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project: Option<PathBuf>,
         #[arg(long, value_name = "PATH")]
         operation: PathBuf,
         #[arg(long, value_name = "PATH")]
@@ -516,14 +520,21 @@ fn main() -> Result<()> {
             command:
                 MutationCommand::ApplyScene {
                     run_dir,
+                    project,
                     operation,
                     transaction_output,
                 },
         } => {
             let input = std::fs::read_to_string(&operation)
                 .with_context(|| format!("failed to read operation {}", operation.display()))?;
-            let operation_model: SceneOnlyMutationOperation = serde_json::from_str(&input)
+            let mut operation_model: SceneOnlyMutationOperation = serde_json::from_str(&input)
                 .with_context(|| format!("failed to parse operation {}", operation.display()))?;
+            if let Some(project_path) = project {
+                operation_model = bind_project_context_to_scene_mutation_operation(
+                    operation_model,
+                    &project_path,
+                )?;
+            }
             let transaction = apply_scene_only_mutation_operation(
                 &run_dir,
                 &operation_model,
@@ -691,6 +702,64 @@ fn resolve_project_manifest_path(project_root_or_manifest: &Path) -> PathBuf {
     } else {
         project_root_or_manifest.to_path_buf()
     }
+}
+
+fn bind_project_context_to_scene_mutation_operation(
+    mut operation: SceneOnlyMutationOperation,
+    project_root_or_manifest: &Path,
+) -> Result<SceneOnlyMutationOperation> {
+    let manifest_path = resolve_project_manifest_path(project_root_or_manifest);
+    let manifest = ProjectManifest::from_path(&manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let target_scene_path = Path::new(&operation.target_scene_path);
+    let target_scene_canonical = target_scene_path.canonicalize().with_context(|| {
+        format!(
+            "failed to resolve scene-only mutation targetScenePath {}",
+            target_scene_path.display()
+        )
+    })?;
+    let mut matched_scene_path = None;
+    for scene_ref in &manifest.scenes {
+        let candidate = project_root.join(&scene_ref.path);
+        let candidate_canonical = candidate.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve project scene {} from manifest {}",
+                scene_ref.path,
+                manifest_path.display()
+            )
+        })?;
+        if candidate_canonical == target_scene_canonical {
+            matched_scene_path = Some(scene_ref.path.clone());
+            break;
+        }
+    }
+    let scene_path = matched_scene_path.ok_or_else(|| {
+        anyhow!(
+            "scene-only mutation targetScenePath {} is not declared in project manifest scenes",
+            operation.target_scene_path
+        )
+    })?;
+    let scene_hash = hash_scene_document(&read_scene(&operation.target_scene_path)?)?;
+    let context = ProjectSceneMutationContext {
+        project_id: manifest.project.id.clone(),
+        manifest_path: manifest_path.to_string_lossy().to_string(),
+        manifest_hash: hash_project_manifest_file(&manifest_path)?,
+        scene_path,
+        scene_hash,
+    };
+    if let Some(existing) = &operation.project {
+        if existing != &context {
+            return Err(anyhow!(
+                "scene-only mutation --project context does not match operation project context"
+            ));
+        }
+    } else {
+        operation.project = Some(context);
+    }
+    Ok(operation)
 }
 
 fn try_handle_evolve_sandbox_command() -> Result<bool> {

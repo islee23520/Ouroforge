@@ -862,6 +862,263 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     fs::remove_dir_all(temp).ok();
 }
 
+#[test]
+fn mutation_apply_scene_project_flag_records_context_and_rejects_project_drift() {
+    let temp = unique_temp_dir("ouroforge-cli-project-mutation-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let project_dir = temp.join("project");
+    run_cli(
+        &temp,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    let manifest_path = project_dir.join("ouroforge.project.json");
+    let scene_path = project_dir.join("scenes/main.scene.json");
+    let seed_path = project_dir.join("seeds/platformer.yaml");
+    let run_output = run_cli(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            manifest_path.to_str().unwrap(),
+        ],
+    );
+    let run_dir = run_dir_from_output(&temp, &run_output);
+    run_cli(
+        &temp,
+        &[
+            "evidence",
+            "add",
+            run_dir.to_str().unwrap(),
+            "--id",
+            "project-mutation-evidence",
+            "--kind",
+            "application/json",
+            "--path",
+            "evidence/project-mutation.json",
+            "--json",
+            r#"{"source":"project-mutation-cli-test"}"#,
+        ],
+    );
+    let proposal_json = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "create",
+            run_dir.to_str().unwrap(),
+            "--reason",
+            "project-scoped mutation",
+            "--evidence",
+            "project-mutation-evidence",
+            "--target",
+            scene_path.to_str().unwrap(),
+            "--path",
+            "components.transform.x",
+            "--from",
+            "32",
+            "--to",
+            "48",
+        ],
+    );
+    let proposal: serde_json::Value = serde_json::from_str(&proposal_json).unwrap();
+    let proposal_id = proposal["id"].as_str().unwrap();
+    let hash_probe_path = temp.join("transactions/project-hash-probe.json");
+    run_cli(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "32",
+            "--transaction-output",
+            hash_probe_path.to_str().unwrap(),
+        ],
+    );
+    let hash_probe: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&hash_probe_path).unwrap()).unwrap();
+    let before_hash = hash_probe["beforeSceneHash"].clone();
+
+    let operation_path = temp.join("operations/project-success.json");
+    write_operation(
+        &operation_path,
+        serde_json::json!({
+            "schemaVersion": "scene-only-mutation-v1",
+            "proposalId": proposal_id,
+            "targetScenePath": scene_path.to_string_lossy().to_string(),
+            "edit": { "entityId": "player", "path": "components.transform.x", "value": 48 },
+            "expectedBeforeSceneHash": before_hash,
+            "validationRequired": true
+        }),
+    );
+    let transaction_path = temp.join("transactions/project-apply.json");
+    let apply_output = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "apply-scene",
+            run_dir.to_str().unwrap(),
+            "--project",
+            manifest_path.to_str().unwrap(),
+            "--operation",
+            operation_path.to_str().unwrap(),
+            "--transaction-output",
+            transaction_path.to_str().unwrap(),
+        ],
+    );
+    assert!(apply_output.contains("Scene-only mutation applied: scene-edit-"));
+    let applications: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("mutation/scene-applications.json")).unwrap(),
+    )
+    .unwrap();
+    let application = &applications["applications"][0];
+    assert_eq!(application["proposalId"], proposal_id);
+    assert_eq!(application["project"]["projectId"], "minimal_2d");
+    assert_eq!(
+        application["project"]["scenePath"],
+        "scenes/main.scene.json"
+    );
+    assert_eq!(
+        application["project"]["manifestPath"],
+        manifest_path.to_string_lossy().to_string()
+    );
+    assert!(application["rollback"]["strategy"]
+        .as_str()
+        .unwrap()
+        .contains("beforeSceneHash"));
+    let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
+    assert!(ledger.contains(r#""project""#));
+    assert!(ledger.contains(r#""scenePath": "scenes/main.scene.json""#));
+
+    let updated_hash_probe = temp.join("transactions/project-hash-after.json");
+    run_cli(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "48",
+            "--transaction-output",
+            updated_hash_probe.to_str().unwrap(),
+        ],
+    );
+    let updated_hash: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&updated_hash_probe).unwrap()).unwrap();
+    let current_hash = updated_hash["beforeSceneHash"].clone();
+
+    let mut stale_project = application["project"].clone();
+    stale_project["manifestHash"]["value"] = serde_json::json!("0000000000000000");
+    stale_project["sceneHash"] = current_hash.clone();
+    let stale_operation_path = temp.join("operations/project-stale-manifest.json");
+    write_operation(
+        &stale_operation_path,
+        serde_json::json!({
+            "schemaVersion": "scene-only-mutation-v1",
+            "proposalId": proposal_id,
+            "targetScenePath": scene_path.to_string_lossy().to_string(),
+            "project": stale_project,
+            "edit": { "entityId": "player", "path": "components.transform.x", "value": 64 },
+            "expectedBeforeSceneHash": current_hash,
+            "validationRequired": true
+        }),
+    );
+    let stale_transaction = temp.join("transactions/project-stale.json");
+    let stale = run_cli_expect_failure(
+        &temp,
+        &[
+            "mutation",
+            "apply-scene",
+            run_dir.to_str().unwrap(),
+            "--project",
+            manifest_path.to_str().unwrap(),
+            "--operation",
+            stale_operation_path.to_str().unwrap(),
+            "--transaction-output",
+            stale_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(stale.contains("--project context does not match"));
+    assert!(!stale_transaction.exists());
+
+    let outside_scene = temp.join("outside.scene.json");
+    fs::write(
+        &outside_scene,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("outside scene written");
+    let outside_hash_probe = temp.join("transactions/outside-hash.json");
+    run_cli(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            outside_scene.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "32",
+            "--transaction-output",
+            outside_hash_probe.to_str().unwrap(),
+        ],
+    );
+    let outside_hash: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&outside_hash_probe).unwrap()).unwrap();
+    let outside_operation_path = temp.join("operations/project-outside-target.json");
+    write_operation(
+        &outside_operation_path,
+        serde_json::json!({
+            "schemaVersion": "scene-only-mutation-v1",
+            "proposalId": proposal_id,
+            "targetScenePath": outside_scene.to_string_lossy().to_string(),
+            "edit": { "entityId": "player", "path": "components.transform.x", "value": 99 },
+            "expectedBeforeSceneHash": outside_hash["beforeSceneHash"].clone(),
+            "validationRequired": true
+        }),
+    );
+    let outside_transaction = temp.join("transactions/project-outside.json");
+    let outside = run_cli_expect_failure(
+        &temp,
+        &[
+            "mutation",
+            "apply-scene",
+            run_dir.to_str().unwrap(),
+            "--project",
+            manifest_path.to_str().unwrap(),
+            "--operation",
+            outside_operation_path.to_str().unwrap(),
+            "--transaction-output",
+            outside_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(outside.contains("not declared in project manifest scenes"));
+    assert!(!outside_transaction.exists());
+    let preserved_scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    assert_eq!(
+        preserved_scene.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(48))
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
 fn write_operation(path: &Path, value: serde_json::Value) {
     fs::create_dir_all(path.parent().unwrap()).expect("operation dir");
     fs::write(path, serde_json::to_string_pretty(&value).unwrap()).expect("operation written");
