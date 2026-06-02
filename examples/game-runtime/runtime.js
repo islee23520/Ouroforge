@@ -112,7 +112,7 @@
     return value && typeof value === 'object' && !Array.isArray(value) ? clone(value) : {};
   }
 
-  function normalizeEntity(entity = {}, index = 0) {
+  function normalizeEntity(entity = {}, index = 0, componentDefaults = {}) {
     const components = entity.components || {};
     const sprite = entity.sprite || {};
     const normalized = {
@@ -124,11 +124,12 @@
         visible: sprite.visible !== false,
       },
       components: {
-        transform: point(components.transform),
-        velocity: point(components.velocity),
-        size: size(components.size),
-        controllable: Boolean(components.controllable),
+        transform: point(components.transform, componentDefaults.transform || { x: 0, y: 0 }),
+        velocity: point(components.velocity, componentDefaults.velocity || { x: 0, y: 0 }),
+        size: size(components.size, componentDefaults.size || { width: 16, height: 16 }),
+        controllable: Object.prototype.hasOwnProperty.call(components, 'controllable') ? Boolean(components.controllable) : Boolean(componentDefaults.controllable),
       },
+      parent: typeof entity.parent === 'string' ? entity.parent : null,
       tags: Array.isArray(entity.tags) ? entity.tags.map(String) : [],
       metadata: objectValue(entity.metadata),
     };
@@ -157,11 +158,59 @@
     return normalized;
   }
 
+
+  function normalizeComponentDefaults(defaults = {}) {
+    return {
+      transform: point(defaults.transform),
+      velocity: point(defaults.velocity),
+      size: size(defaults.size),
+      controllable: Boolean(defaults.controllable),
+    };
+  }
+
+  function resolveComposition(entities) {
+    const byId = new Map(entities.map((entity) => [entity.id, entity]));
+    const resolving = new Set();
+    const resolved = new Set();
+
+    function resolveEntity(entity) {
+      if (resolved.has(entity.id)) return entity.components.transform;
+      if (resolving.has(entity.id)) return entity.components.transform;
+      resolving.add(entity.id);
+      const localTransform = clone(entity.components.transform);
+      let worldTransform = clone(localTransform);
+      if (entity.parent && byId.has(entity.parent)) {
+        const parent = byId.get(entity.parent);
+        const parentTransform = resolveEntity(parent);
+        worldTransform = {
+          x: parentTransform.x + localTransform.x,
+          y: parentTransform.y + localTransform.y,
+        };
+      }
+      entity.components.localTransform = localTransform;
+      entity.components.transform = worldTransform;
+      entity.composition = {
+        parent: entity.parent,
+        localTransform,
+        worldTransform: clone(worldTransform),
+      };
+      resolving.delete(entity.id);
+      resolved.add(entity.id);
+      return entity.components.transform;
+    }
+
+    for (const entity of entities.slice().sort((left, right) => left.id.localeCompare(right.id))) {
+      resolveEntity(entity);
+    }
+    return entities;
+  }
+
   function normalizeScene(scene = {}) {
     const sourceEntities = Array.isArray(scene.entities) && scene.entities.length > 0
       ? scene.entities
       : defaultScene.entities;
     const bounds = size(scene.bounds, defaultScene.bounds);
+    const componentDefaults = normalizeComponentDefaults(scene.componentDefaults);
     return {
       schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
       id: String(scene.id || 'unnamed-scene'),
@@ -170,7 +219,8 @@
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       metadata: objectValue(scene.metadata),
-      entities: sourceEntities.map((entity, index) => normalizeEntity(entity, index)),
+      componentDefaults,
+      entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
     };
   }
 
@@ -235,6 +285,7 @@
     world.sceneId = normalized.id;
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
+    world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     rendererState = clone(normalized.renderer);
