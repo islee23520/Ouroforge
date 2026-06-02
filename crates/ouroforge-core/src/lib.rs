@@ -5662,6 +5662,12 @@ pub struct SceneDocument {
         skip_serializing_if = "Option::is_none"
     )]
     pub asset_manifest: Option<AssetManifest>,
+    #[serde(
+        default,
+        rename = "componentDefaults",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub component_defaults: Option<SceneComponentDefaults>,
     pub entities: Vec<SceneEntity>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -5813,6 +5819,8 @@ pub struct SceneTilemapLayerOrderEntry {
 #[serde(deny_unknown_fields)]
 pub struct SceneEntity {
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
     pub sprite: SceneSprite,
     pub components: SceneComponents,
     #[serde(default)]
@@ -5833,6 +5841,19 @@ pub struct SceneSprite {
     pub order: Option<i64>,
     #[serde(default = "default_layer_visible")]
     pub visible: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneComponentDefaults {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<ScenePoint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub velocity: Option<ScenePoint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<SceneSize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controllable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -6101,9 +6122,19 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     }
     validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
+    if scene.entities.is_empty() {
+        return Err(anyhow!("scene entities must not be empty"));
+    }
+    if let Some(defaults) = &scene.component_defaults {
+        validate_scene_component_defaults(defaults)?;
+    }
+    validate_scene_composition(scene)?;
     let mut ids = std::collections::BTreeSet::new();
     for entity in &scene.entities {
         validate_path_component("scene entity id", &entity.id)?;
+        if let Some(parent) = &entity.parent {
+            validate_path_component(&format!("scene entity {} parent", entity.id), parent)?;
+        }
         if !ids.insert(entity.id.clone()) {
             return Err(anyhow!("duplicate scene entity id: {}", entity.id));
         }
@@ -6144,6 +6175,59 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             &format!("scene entity {} metadata", entity.id),
             &entity.metadata,
         )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_component_defaults(defaults: &SceneComponentDefaults) -> Result<()> {
+    if let Some(size) = &defaults.size {
+        if size.width <= 0 || size.height <= 0 {
+            return Err(anyhow!("scene componentDefaults size must be positive"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_composition(scene: &SceneDocument) -> Result<()> {
+    let ids = scene
+        .entities
+        .iter()
+        .map(|entity| entity.id.as_str())
+        .collect::<BTreeSet<_>>();
+    for entity in &scene.entities {
+        let Some(parent) = &entity.parent else {
+            continue;
+        };
+        if parent == &entity.id {
+            return Err(anyhow!(
+                "scene entity {} parent must not reference itself",
+                entity.id
+            ));
+        }
+        if !ids.contains(parent.as_str()) {
+            return Err(anyhow!(
+                "scene entity {} references missing parent: {}",
+                entity.id,
+                parent
+            ));
+        }
+    }
+    for entity in &scene.entities {
+        let mut seen = BTreeSet::new();
+        let mut current = entity.parent.as_deref();
+        while let Some(parent_id) = current {
+            if !seen.insert(parent_id) {
+                return Err(anyhow!(
+                    "scene composition cycle detected at entity {}",
+                    entity.id
+                ));
+            }
+            current = scene
+                .entities
+                .iter()
+                .find(|candidate| candidate.id == parent_id)
+                .and_then(|parent| parent.parent.as_deref());
+        }
     }
     Ok(())
 }
@@ -11370,6 +11454,77 @@ scenarios:
             .contains("must be a local static asset path"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_composition_v2_validates_parent_refs_and_defaults() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "composition-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "componentDefaults": {
+                "velocity": { "x": 0, "y": 0 },
+                "size": { "width": 16, "height": 16 },
+                "controllable": false
+            },
+            "entities": [
+                {
+                    "id": "ship",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 100, "y": 50 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 32, "height": 16 },
+                        "controllable": true
+                    }
+                },
+                {
+                    "id": "turret",
+                    "parent": "ship",
+                    "sprite": { "color": "#facc15" },
+                    "components": {
+                        "transform": { "x": 8, "y": -4 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 8, "height": 8 },
+                        "controllable": false
+                    }
+                }
+            ]
+        }))
+        .expect("composition scene parses");
+        validate_scene(&scene).expect("composition validates");
+        assert_eq!(scene.entities[1].parent.as_deref(), Some("ship"));
+        assert_eq!(
+            scene.component_defaults.as_ref().unwrap().controllable,
+            Some(false)
+        );
+
+        let mut missing_parent = scene.clone();
+        missing_parent.entities[1].parent = Some("missing".to_string());
+        let rejected = validate_scene(&missing_parent).expect_err("missing parent rejected");
+        assert!(rejected.to_string().contains("references missing parent"));
+
+        let mut self_parent = scene.clone();
+        self_parent.entities[0].parent = Some("ship".to_string());
+        let rejected = validate_scene(&self_parent).expect_err("self parent rejected");
+        assert!(rejected
+            .to_string()
+            .contains("parent must not reference itself"));
+
+        let mut cycle = scene.clone();
+        cycle.entities[0].parent = Some("turret".to_string());
+        let rejected = validate_scene(&cycle).expect_err("cycle rejected");
+        assert!(rejected.to_string().contains("composition cycle detected"));
+
+        let mut invalid_defaults = scene.clone();
+        invalid_defaults.component_defaults.as_mut().unwrap().size = Some(SceneSize {
+            width: 0,
+            height: 16,
+        });
+        let rejected = validate_scene(&invalid_defaults).expect_err("invalid defaults rejected");
+        assert!(rejected
+            .to_string()
+            .contains("componentDefaults size must be positive"));
     }
 
     #[test]
