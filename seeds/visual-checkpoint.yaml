@@ -1,0 +1,21 @@
+id: visual-checkpoint.v1
+title: Visual Checkpoint Fixture
+goal: Capture advisory screenshot evidence at a named visual checkpoint.
+constraints:
+  target: game-runtime
+acceptance:
+  - Running the seed stores linked visual checkpoint screenshot evidence.
+  - Visual checkpoint evidence remains advisory without a threshold.
+scenarios:
+  - id: visual-smoke
+    description: Capture a named screenshot checkpoint after the runtime loads.
+    steps:
+      - visualCheckpoint:
+          id: after-load
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 32
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16

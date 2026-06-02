@@ -89,6 +89,10 @@ pub enum ScenarioStep {
     Restore {
         restore: RestoreStep,
     },
+    VisualCheckpoint {
+        #[serde(rename = "visualCheckpoint")]
+        visual_checkpoint: VisualCheckpointStep,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -119,6 +123,12 @@ pub struct SnapshotStep {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RestoreStep {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualCheckpointStep {
     pub id: String,
 }
 
@@ -403,6 +413,14 @@ impl ScenarioStep {
                 validate_path_component("restore step id", &restore.id).with_context(|| {
                     format!("scenarios[{scenario_index}].steps[{step_index}].restore.id is invalid")
                 })?;
+            }
+            ScenarioStep::VisualCheckpoint { visual_checkpoint } => {
+                validate_path_component("visual checkpoint id", &visual_checkpoint.id)
+                    .with_context(|| {
+                        format!(
+                            "scenarios[{scenario_index}].steps[{step_index}].visualCheckpoint.id is invalid"
+                        )
+                    })?;
             }
         }
         Ok(())
@@ -2373,6 +2391,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
         }
         for evidence_list in [
             "snapshots",
+            "visual_checkpoints",
+            "visual_checkpoint_screenshots",
             "console_logs",
             "performance_metrics",
             "cdp_trace_summaries",
@@ -2628,6 +2648,8 @@ fn run_scenario<T: CdpTransport>(
 
     let mut replay_paths = Vec::new();
     let mut snapshot_paths = Vec::new();
+    let mut visual_checkpoint_paths = Vec::new();
+    let mut visual_checkpoint_screenshot_paths = Vec::new();
     let mut snapshot_ids = std::collections::BTreeMap::new();
     for step in &scenario.steps {
         match step {
@@ -2753,6 +2775,29 @@ fn run_scenario<T: CdpTransport>(
                         "step_id": restore.id,
                         "snapshot_id": snapshot_id,
                         "path": restore_path
+                    }),
+                )?;
+            }
+            ScenarioStep::VisualCheckpoint { visual_checkpoint } => {
+                let capture = capture_visual_checkpoint(
+                    config,
+                    scenario,
+                    &scenario_dir,
+                    visual_checkpoint,
+                    client,
+                )?;
+                visual_checkpoint_paths.push(capture.metadata_path.clone());
+                visual_checkpoint_screenshot_paths.push(capture.screenshot_path.clone());
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.visual_checkpoint",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "checkpoint_id": visual_checkpoint.id,
+                        "screenshot_path": capture.screenshot_path,
+                        "metadata_path": capture.metadata_path,
+                        "advisory": true
                     }),
                 )?;
             }
@@ -2942,6 +2987,8 @@ fn run_scenario<T: CdpTransport>(
                 "frame_stats": frame_stats_path,
                 "input_replays": replay_paths.clone(),
                 "snapshots": snapshot_paths.clone(),
+                "visual_checkpoints": visual_checkpoint_paths.clone(),
+                "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
                 "console_logs": console_paths.clone(),
                 "performance_metrics": performance_paths.clone(),
                 "cdp_trace_summaries": trace_paths.clone()
@@ -2967,6 +3014,8 @@ fn run_scenario<T: CdpTransport>(
             "frame_stats_path": frame_stats_path,
             "input_replay_paths": replay_paths.clone(),
             "snapshot_paths": snapshot_paths.clone(),
+            "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
+            "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
             "console_log_paths": console_paths.clone(),
             "performance_metric_paths": performance_paths.clone(),
             "cdp_trace_summary_paths": trace_paths.clone(),
@@ -2975,6 +3024,8 @@ fn run_scenario<T: CdpTransport>(
     )?;
     let mut evidence_paths = replay_paths;
     evidence_paths.extend(snapshot_paths);
+    evidence_paths.extend(visual_checkpoint_paths);
+    evidence_paths.extend(visual_checkpoint_screenshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(frame_stats_path);
     evidence_paths.extend(console_paths);
@@ -3023,6 +3074,69 @@ struct ScenarioAssertionSources<'a> {
     collision_evidence: AssertionSource<'a>,
     audio_evidence: AssertionSource<'a>,
     animation_evidence: AssertionSource<'a>,
+}
+
+struct VisualCheckpointCapture {
+    screenshot_path: String,
+    metadata_path: String,
+}
+
+fn capture_visual_checkpoint<T: CdpTransport>(
+    config: &ScenarioRunConfig,
+    scenario: &Scenario,
+    scenario_dir: &str,
+    checkpoint: &VisualCheckpointStep,
+    client: &mut CdpClient<T>,
+) -> Result<VisualCheckpointCapture> {
+    let suffix = unix_millis()?;
+    let screenshot = client.capture_screenshot_png()?;
+    let screenshot_path = format!(
+        "{scenario_dir}/visual-checkpoint-{}-{suffix}.png",
+        checkpoint.id
+    );
+    let full_screenshot_path = config.run_dir.join(&screenshot_path);
+    fs::write(&full_screenshot_path, screenshot).with_context(|| {
+        format!(
+            "failed to write visual checkpoint screenshot {}",
+            full_screenshot_path.display()
+        )
+    })?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!(
+            "scenario-visual-checkpoint-screenshot-{}-{}-{suffix}",
+            scenario.id, checkpoint.id
+        ),
+        "image/png",
+        &screenshot_path,
+        json!({
+            "scenario_id": scenario.id,
+            "checkpoint_id": checkpoint.id,
+            "url": config.url,
+            "artifact": "visual_checkpoint_screenshot",
+            "advisory": true
+        }),
+    )?;
+
+    let metadata_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        scenario_dir,
+        &format!("visual-checkpoint-{}", checkpoint.id),
+        "visual_checkpoint",
+        suffix,
+        &json!({
+            "checkpoint_id": checkpoint.id,
+            "screenshot_path": screenshot_path,
+            "advisory": true,
+            "comparison": null,
+            "baseline": null
+        }),
+    )?;
+    Ok(VisualCheckpointCapture {
+        screenshot_path,
+        metadata_path,
+    })
 }
 
 fn evaluate_scenario_assertions(
@@ -3251,9 +3365,11 @@ fn execute_scenario_step<T: CdpTransport>(
                 "replayRef execution is implemented by scenario evidence context"
             ));
         }
-        ScenarioStep::Snapshot { .. } | ScenarioStep::Restore { .. } => {
+        ScenarioStep::Snapshot { .. }
+        | ScenarioStep::Restore { .. }
+        | ScenarioStep::VisualCheckpoint { .. } => {
             return Err(anyhow!(
-                "snapshot/restore steps require scenario evidence context"
+                "snapshot/restore/visual checkpoint steps require scenario evidence context"
             ));
         }
     }
@@ -4457,6 +4573,34 @@ scenarios:
     }
 
     #[test]
+    fn parses_visual_checkpoint_step_schema() {
+        let valid = r#"
+id: visual-hooks.v1
+title: Visual Hooks Fixture
+goal: Validate visual checkpoint step schema.
+constraints:
+  target: file-harness
+acceptance:
+  - Capture named visual checkpoints.
+scenarios:
+  - id: visual-smoke
+    description: Visual checkpoint fixture.
+    steps:
+      - visualCheckpoint:
+          id: after-load
+"#;
+
+        let seed = Seed::from_yaml_str(valid).expect("visual checkpoint seed parses");
+
+        assert!(matches!(
+            &seed.scenarios[0].steps[0],
+            ScenarioStep::VisualCheckpoint {
+                visual_checkpoint
+            } if visual_checkpoint.id == "after-load"
+        ));
+    }
+
+    #[test]
     fn rejects_seed_missing_required_target() {
         let invalid = r#"
 id: platformer.v0
@@ -5469,6 +5613,51 @@ scenarios:
         let bytes = client.capture_screenshot_png().expect("screenshot decodes");
 
         assert_eq!(bytes, vec![137, 80, 78, 71, 13, 10, 26, 10]);
+    }
+
+    #[test]
+    fn captures_visual_checkpoint_screenshot_as_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-visual-checkpoint-test");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8080")
+            .expect("scenario config");
+        let scenario = Scenario {
+            id: "visual-smoke".to_string(),
+            description: "visual".to_string(),
+            steps: Vec::new(),
+            assertions: Vec::new(),
+        };
+        let scenario_dir = "evidence/scenarios/visual-smoke";
+        fs::create_dir_all(artifacts.run_dir.join(scenario_dir)).expect("scenario dir");
+        let mut client = CdpClient::new(ScreenshotTransport);
+
+        let capture = capture_visual_checkpoint(
+            &config,
+            &scenario,
+            scenario_dir,
+            &VisualCheckpointStep {
+                id: "after-load".to_string(),
+            },
+            &mut client,
+        )
+        .expect("visual checkpoint captured");
+
+        assert!(artifacts.run_dir.join(&capture.screenshot_path).is_file());
+        assert!(artifacts.run_dir.join(&capture.metadata_path).is_file());
+        let metadata =
+            read_json_value(artifacts.run_dir.join(&capture.metadata_path)).expect("metadata");
+        assert_eq!(metadata["checkpoint_id"], "after-load");
+        assert_eq!(metadata["screenshot_path"], capture.screenshot_path);
+        assert_eq!(metadata["advisory"], true);
+        let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
+        assert!(artifacts_list.iter().any(|artifact| {
+            artifact.metadata["artifact"] == "visual_checkpoint_screenshot"
+                && artifact.kind == "image/png"
+        }));
+        assert!(artifacts_list
+            .iter()
+            .any(|artifact| artifact.metadata["artifact"] == "visual_checkpoint"));
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
