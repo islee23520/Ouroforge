@@ -2,7 +2,7 @@
 
 Ouroforge is an evidence-native game engine experiment built around local Ouroboros-style loops: Seed → Run → Evidence → Evaluation → Journal → Mutation proposal.
 
-> Status: pre-release private MVP moving toward public open-source readiness. Ouroforge is not a Godot replacement, does not promise compatibility, and should be treated as an inspectable local prototype.
+> Status: pre-release private MVP moving toward public open-source readiness. Ouroforge is not a Godot replacement, does not promise compatibility, and should be treated as an inspectable local prototype. Current roadmap docs record completed Evidence Fidelity & Trust Boundary hardening while preserving a local-first, Rust-trusted, browser-read-only boundary.
 
 ## What works today
 
@@ -20,7 +20,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Validate project scenario packs through `project validate`.
 - Run project-declared Seeds with additive project metadata using `run <seed> --project <root-or-manifest> --scenario-pack <id>`.
 - Apply scene-only mutations through Rust validation when authorized by project manifest context.
-- Inspect Project Workspace Loop v1 state in the static Studio v3 cockpit without browser writes or command execution.
+- Inspect Project Workspace Loop v1 and Evidence Fidelity state in the static Studio cockpit without browser writes or command execution.
 
 ## Prerequisites
 
@@ -97,7 +97,7 @@ For Engine Expansion v1 integration evidence, validate and run `seeds/engine-exp
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
 - `examples/authoring-cockpit` — static Studio v3 authoring cockpit prototype over exported run/project evidence and the minimal scene model.
-- `docs/` — architecture, roadmap, manifest/scaffold/scenario-pack/project-run/project-comparison/project-mutation contracts, artifact write policy, public-readiness audit, and demo evidence notes.
+- `docs/` — architecture, roadmap, evidence-fidelity/trust-boundary contracts, manifest/scaffold/scenario-pack/project-run/project-comparison/project-mutation contracts, artifact write policy, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 

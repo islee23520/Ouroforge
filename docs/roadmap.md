@@ -3,7 +3,9 @@
 ## Current status
 
 Ouroforge is a local, evidence-native MVP. It now supports a small project
-workspace loop in addition to the original run-centered demo:
+workspace loop in addition to the original run-centered demo, with hardened
+run evidence fidelity around transactions, runtime probes, replay artifacts,
+Openchrome/CDP observations, and reproducible command context:
 
 ```text
 project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> journal/mutation review -> Studio inspection
@@ -11,7 +13,8 @@ project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> comp
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
 read exported JSON and show copyable commands; they do not execute commands,
-write trusted files, accept mutations, or act as a production editor.
+write trusted files, accept mutations, or act as a production editor. Browser
+and CDP observations are evidence inputs, not trusted authority.
 
 ## Completed evidence-native milestones
 
@@ -32,6 +35,13 @@ The current implementation has completed these documented milestone surfaces:
   `docs/scenario-pack-v1.md`, `docs/project-run-v1.md`,
   `docs/project-comparison-v1.md`, `docs/project-mutation-loop-v1.md`,
   `docs/studio-v3-project-workspace-cockpit.md`)
+- Evidence Fidelity & Trust Boundary Hardening v1
+  (`docs/evidence-fidelity-trust-boundary-v1.md`,
+  `docs/runtime-probe-contract-v2.md`,
+  `docs/input-replay-evidence-v2.md`,
+  `docs/openchrome-cdp-evidence-fidelity-v2.md`,
+  `docs/reproducible-run-command-context-v1.md`,
+  `docs/studio-evidence-fidelity-surfaces.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -39,9 +49,16 @@ scopes a tiny deterministic fixture as tracked source-like data.
 
 ## Near-term governance and public-readiness work
 
-Project Workspace Loop v1 issue #253 is the current roadmap/#1 governance
-refresh. Its purpose is to keep top-level docs and #1 aligned with the completed
-local-first evidence loop while preserving conservative public wording.
+Evidence Fidelity & Trust Boundary Hardening v1 issue #293 is the current
+roadmap/#1 governance refresh. Its purpose is to keep top-level docs and #1
+aligned with the completed evidence-fidelity hardening milestone while
+preserving conservative public wording.
+
+After #293, the next milestone candidates should stay inside the same
+local-first, Rust-trusted, browser-read-only boundary. Suitable candidates are
+agentic review/regression promotion, loop orchestration hardening, or playable
+authoring expressiveness only when each is backed by fixed PR units, regression
+coverage, generated-state audits, and explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -64,6 +81,10 @@ code path.
   tests.
 - Keep authoring actions connected to QA evidence, semantic comparison,
   journals, rollback metadata, and explicit mutation review.
+- Treat evidence fidelity as a first-class contract: every run-facing surface
+  should distinguish Rust-trusted artifacts from browser/CDP observations and
+  should expose missing or malformed evidence as warnings instead of inferred
+  passes.
 
 ## Active anchors
 
