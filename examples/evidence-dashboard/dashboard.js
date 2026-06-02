@@ -8,6 +8,11 @@ const OuroforgeDashboard = (() => {
     return `../../${runDir}/${artifact.path}`;
   }
 
+  function runRelativeHref(path, run) {
+    const runDir = run?.summary?.run_dir || run?.summary?.runDir || '';
+    return `../../${runDir}/${path}`;
+  }
+
   function summarizeRun(run) {
     const summary = run.summary || {};
     return {
@@ -108,6 +113,50 @@ const OuroforgeDashboard = (() => {
     return `<div class="category-grid">${cards}</div>`;
   }
 
+  function renderRefLinks(title, refs, run, kind = 'artifact') {
+    if (!Array.isArray(refs) || !refs.length) return '';
+    const links = refs.map((ref) => {
+      const href = kind === 'mutation' ? null : runRelativeHref(ref, run);
+      return href
+        ? `<a class="ref-chip" href="${escapeText(href)}" target="_blank" rel="noreferrer">${escapeText(ref)}</a>`
+        : `<span class="ref-chip">${escapeText(ref)}</span>`;
+    }).join('');
+    return `<div class="ref-group"><div class="card-label">${escapeText(title)}</div><div class="ref-list">${links}</div></div>`;
+  }
+
+  function renderJournalViewer(run) {
+    const journal = run?.journal_view;
+    if (!journal) {
+      return `<section class="panel"><h3>Journal Viewer</h3><p class="empty-state">No journal read model is available. Export dashboard data with the latest Rust CLI.</p></section>`;
+    }
+    if (!journal.exists) {
+      return `<section class="panel"><h3>Journal Viewer</h3><p class="empty-state">${escapeText(journal.read_error || 'Journal artifact is missing.')}</p></section>`;
+    }
+    const entries = Array.isArray(journal.entries) ? journal.entries : [];
+    const body = entries.length ? entries.map((entry) => `<article class="journal-entry">
+      <div class="journal-entry-header">
+        <h4>${escapeText(entry.heading)}</h4>
+        <span class="status">${escapeText(entry.category || 'summary')}</span>
+      </div>
+      <pre>${escapeText(entry.body || '')}</pre>
+      ${renderRefLinks('Evidence refs', entry.evidence_refs, run)}
+      ${renderRefLinks('Verdict refs', entry.verdict_refs, run)}
+      ${renderRefLinks('Mutation refs', entry.mutation_refs, run, 'mutation')}
+    </article>`).join('') : '<p class="empty-state">Journal exists but has no entries.</p>';
+    return `<section class="panel">
+      <h3>Journal Viewer</h3>
+      <div class="cards">
+        <div class="card"><div class="card-label">Journal path</div><div class="card-value">${escapeText(journal.path)}</div></div>
+        <div class="card"><div class="card-label">Entries</div><div class="card-value">${escapeText(entries.length)}</div></div>
+      </div>
+      <section class="panel"><h4>Journal summary</h4><p>${escapeText(journal.summary)}</p></section>
+      ${renderRefLinks('All evidence refs', journal.evidence_refs, run)}
+      ${renderRefLinks('All verdict refs', journal.verdict_refs, run)}
+      ${renderRefLinks('All mutation refs', journal.mutation_refs, run, 'mutation')}
+      <div class="journal-entry-list">${body}</div>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
@@ -127,7 +176,7 @@ const OuroforgeDashboard = (() => {
       </div>
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
-      <section class="panel"><h3>Journal</h3><pre>${escapeText(run.journal)}</pre></section>
+      ${renderJournalViewer(run)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
       ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
       ${renderArtifacts('Frame/performance metrics', artifacts(run.frame_metrics, run.performance_metrics), run, renderJsonArtifact)}
@@ -165,7 +214,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, init, renderCategorySummary, renderRunDetail, renderRunList, statusClass, summarizeRun };
+  return { artifactHref, init, renderCategorySummary, renderJournalViewer, renderRunDetail, renderRunList, runRelativeHref, statusClass, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -24,3 +24,7 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output example
 Refresh the dashboard after export to inspect run status, seed, verdict,
 scenario status, worker count, evidence categories, artifact links, journals,
 screenshots, Runtime v1 scenario evidence, and mutation artifacts when present.
+
+Journal Viewer v1 renders journal sections as escaped text and links referenced
+evidence, verdict, and mutation ids from the generated dashboard data. It does
+not edit journals, execute markdown, or generate AI summaries.
