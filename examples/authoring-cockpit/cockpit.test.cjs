@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const cockpit = require('./cockpit.js');
 const scene = require('../game-runtime/scene.json');
 
@@ -9,7 +10,28 @@ assert.equal(cockpit.getValue(recolored.entities[0], 'sprite.color'), '#ffffff')
 assert.throws(() => cockpit.applyEdit(scene, 'player', 'components.size.width', '0'), /Invalid numeric/);
 assert.match(cockpit.renderTree(scene, 'player'), /player/);
 assert.match(cockpit.renderInspector(scene, 'player'), /components\.transform\.x/);
+assert.match(cockpit.renderInspector(scene, 'player'), /Read-only \/ unsupported fields/);
+assert.match(cockpit.renderInspector(scene, 'player'), /components\.animation/);
+assert.match(cockpit.renderInspector(scene, 'player', 'examples/game-runtime/scene.json', 'Invalid numeric value for components.size.width'), /id="edit-error"/);
+assert.match(cockpit.renderInspector(scene, 'player', 'examples/game-runtime/scene.json', 'Invalid numeric value for components.size.width'), /Invalid numeric value/);
+assert.deepEqual(cockpit.EDITABLE_FIELDS.map(([path]) => path), [
+  'sprite.color',
+  'components.transform.x',
+  'components.transform.y',
+  'components.velocity.x',
+  'components.velocity.y',
+  'components.size.width',
+  'components.size.height',
+  'components.controllable',
+]);
+assert.ok(cockpit.READ_ONLY_FIELDS.includes('components.collider'));
+assert.throws(() => cockpit.applyEdit(scene, 'player', 'components.collider', '{}'), /Unsupported edit path/);
+assert.equal(cockpit.applyEdit(scene, 'player', 'components.controllable', 'false').entities[0].components.controllable, false);
 assert.match(cockpit.cliCommand('examples/game-runtime/scene.json', 'player', 'sprite.color', '#ffffff'), /ouroforge-cli -- scene edit/);
+assert.equal(
+  cockpit.cliCommand('examples/game-runtime/scene.json', 'player', 'components.transform.x', 48),
+  "cargo run -p ouroforge-cli -- scene edit examples/game-runtime/scene.json --entity player --path components.transform.x --value '48'"
+);
 
 const run = { summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed' }, evidence: [{ id: 'evidence-1' }], mutations: [], screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }], journal: '# Journal' };
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
@@ -71,4 +93,6 @@ assert.ok(!cockpit.renderTree(xssScene, null).includes('<img src=x onerror'), 't
 assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('<img src=x onerror'), 'inspector entity id must be escaped');
 const xssRun = { summary: { id: 'r', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>' };
 assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
+const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
+assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker/.test(cockpitSource), 'cockpit browser code must not include direct persistence APIs');
 console.log('authoring cockpit smoke test passed');

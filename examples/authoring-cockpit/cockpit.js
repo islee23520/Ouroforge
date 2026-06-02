@@ -12,6 +12,17 @@ const OuroforgeCockpit = (() => {
 
   const DEFAULT_SCENE_PATH = 'examples/game-runtime/scene.json';
   const DEFAULT_DASHBOARD_DATA_PATH = '../evidence-dashboard/dashboard-data.json';
+  const READ_ONLY_FIELDS = [
+    'schemaVersion',
+    'id',
+    'bounds',
+    'sprite.asset',
+    'components.collider',
+    'components.animation',
+    'components.audio',
+    'tags',
+    'metadata',
+  ];
 
   function escapeText(value) {
     return String(value ?? '')
@@ -71,6 +82,19 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- scene edit ${scenePath} --entity ${entityId} --path ${path} --value '${JSON.stringify(value)}'`;
   }
 
+  function readOnlyFieldValue(entity, path) {
+    if (path === 'schemaVersion' || path === 'id' || path === 'bounds') return 'scene-level read-only';
+    return getValue(entity, path);
+  }
+
+  function renderReadOnlyFields(entity) {
+    const rows = READ_ONLY_FIELDS.map((path) => {
+      const value = readOnlyFieldValue(entity, path);
+      return `<div><strong>${escapeText(path)}</strong><pre>${escapeText(JSON.stringify(value ?? null, null, 2))}</pre></div>`;
+    }).join('');
+    return `<section class="panel"><h3>Read-only / unsupported fields</h3><p class="hint">These fields are visible for context only. Persistence is limited to the supported Rust scene edit paths.</p><div class="field-grid">${rows}</div></section>`;
+  }
+
   function qaCommand(seedPath = 'seeds/platformer.yaml', workers = 4) {
     return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers}`;
   }
@@ -92,7 +116,7 @@ const OuroforgeCockpit = (() => {
     return scene.entities.map((entity) => `<button class="tree-button ${entity.id === selectedId ? 'active' : ''}" data-entity-id="${escapeText(entity.id)}">${escapeText(entity.id)}<br><small>${entity.components.controllable ? 'controllable' : 'static'}</small></button>`).join('');
   }
 
-  function renderInspector(scene, entityId, scenePath = DEFAULT_SCENE_PATH) {
+  function renderInspector(scene, entityId, scenePath = DEFAULT_SCENE_PATH, editError = null) {
     const entity = scene.entities.find((candidate) => candidate.id === entityId);
     if (!entity) return '<div class="empty">Select an entity to inspect supported properties.</div>';
     const fields = EDITABLE_FIELDS.map(([path, kind]) => {
@@ -102,7 +126,8 @@ const OuroforgeCockpit = (() => {
         : `<input data-edit-path="${escapeText(path)}" type="${kind === 'number' ? 'number' : 'text'}" value="${escapeText(value)}" />`;
       return `<label>${escapeText(path)}${input}</label>`;
     }).join('');
-    return `<div class="inspector"><div class="panel"><h2>${escapeText(entity.id)}</h2><div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${escapeText(JSON.stringify(entity, null, 2))}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${escapeText(cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x))}</pre></div></div>`;
+    const error = editError ? `<div class="error" id="edit-error">${escapeText(editError)}</div>` : '<div class="hint" id="edit-error">No validation errors.</div>';
+    return `<div class="inspector"><div class="panel"><h2>${escapeText(entity.id)}</h2><p class="hint">Supported fields update browser memory only. Use the generated Rust command to persist through validation.</p>${error}<div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${escapeText(JSON.stringify(entity, null, 2))}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${escapeText(cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x))}</pre></div>${renderReadOnlyFields(entity)}</div>`;
   }
 
   function renderPreview(scenePath = '../game-runtime/index.html') {
@@ -222,6 +247,7 @@ const OuroforgeCockpit = (() => {
     let selectedId = scene.entities[0]?.id;
     let latest = null;
     let previewState = null;
+    let editError = null;
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
@@ -230,14 +256,22 @@ const OuroforgeCockpit = (() => {
     }
     const paint = () => {
       treeEl.innerHTML = renderTree(scene, selectedId);
-      inspectorEl.innerHTML = renderInspector(scene, selectedId);
+      inspectorEl.innerHTML = renderInspector(scene, selectedId, DEFAULT_SCENE_PATH, editError);
       integrationEl.innerHTML = renderIntegration(latest, previewState);
       treeEl.querySelectorAll('[data-entity-id]').forEach((button) => button.addEventListener('click', () => { selectedId = button.dataset.entityId; paint(); }));
       inspectorEl.querySelectorAll('[data-edit-path]').forEach((input) => input.addEventListener('change', () => {
         const path = input.dataset.editPath;
-        scene = applyEdit(scene, selectedId, path, input.value);
-        const entity = scene.entities.find((candidate) => candidate.id === selectedId);
-        document.getElementById('edit-command').textContent = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
+        try {
+          scene = applyEdit(scene, selectedId, path, input.value);
+          editError = null;
+          const entity = scene.entities.find((candidate) => candidate.id === selectedId);
+          document.getElementById('edit-command').textContent = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
+          document.getElementById('edit-error').textContent = 'No validation errors.';
+          document.getElementById('edit-error').className = 'hint';
+        } catch (error) {
+          editError = error.message;
+          paint();
+        }
       }));
       integrationEl.querySelectorAll('[data-preview-action]').forEach((button) => button.addEventListener('click', () => {
         const previewFrame = document.getElementById('runtime-preview');
@@ -258,7 +292,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderPreviewControls, renderQaPanel, renderTree, resolvePreviewProbe, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderTree, resolvePreviewProbe, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
