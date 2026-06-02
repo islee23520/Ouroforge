@@ -1,0 +1,37 @@
+id: runtime-v1.snapshot
+title: Runtime v1 Snapshot Restore Seed
+goal: Capture a runtime snapshot, mutate state through replay, restore it, and prove restored world state through evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Snapshot captures deterministic entity/component state before mutation.
+  - Restore returns the player to the captured position after replay movement.
+  - Scenario result links snapshot and restored world-state evidence.
+scenarios:
+  - id: snapshot-restore-branch
+    description: Capture player start, move right, restore, and assert the player returned to the captured branch.
+    steps:
+      - snapshot:
+          id: start
+      - replay:
+          schemaVersion: "1"
+          id: move-right-after-snapshot
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 4
+              key: right
+              pressed: false
+      - restore:
+          id: start
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 32
+      - world_state:
+          path: snapshots.0.snapshotId
+          equals: snapshot-0001
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
