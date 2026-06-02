@@ -99,8 +99,9 @@ data rather than local run output.
 
 ## Manifest boundary
 
-Project Manifest v1 is the root of trust for workspace resolution. It should
-identify:
+Project Manifest v1 is the root of trust for workspace resolution. The concrete
+field contract, examples, CLI validation command, and non-goals are documented
+in `docs/project-manifest-v1.md`. It should identify:
 
 - project id and name;
 - schema version;
