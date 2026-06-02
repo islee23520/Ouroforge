@@ -8467,6 +8467,19 @@ scenarios:
     }
 
     #[test]
+    fn validates_asset_animation_audio_feature_regression_seed() {
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../seeds/engine-feature-asset-animation-audio.yaml"
+        ))
+        .expect("asset/animation/audio regression seed validates");
+        assert_eq!(seed.id, "engine-feature.asset-animation-audio");
+        assert_eq!(seed.scenarios.len(), 3);
+        assert_eq!(seed.scenarios[0].id, "asset-manifest-regression");
+        assert_eq!(seed.scenarios[1].id, "animation-frame-regression");
+        assert_eq!(seed.scenarios[2].id, "audio-intent-regression");
+    }
+
+    #[test]
     fn parses_valid_scenario_dsl() {
         let valid = r#"
 id: platformer.v0

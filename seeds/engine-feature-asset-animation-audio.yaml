@@ -1,0 +1,100 @@
+id: engine-feature.asset-animation-audio
+title: Engine Feature Regression - Asset, Animation, and Audio Intent
+goal: Isolate asset loading, sprite-frame animation, and audio intent evidence for Engine Expansion v1 regression coverage.
+constraints:
+  target: game-runtime
+acceptance:
+  - Local asset manifest metadata and loaded asset state remain observable.
+  - Sprite-frame animation advances deterministically under fixed ticks.
+  - Audio checks use bounded intent evidence only and never require speaker playback.
+scenarios:
+  - id: asset-manifest-regression
+    description: Assert committed local assets are exposed through deterministic manifest and loaded-asset evidence.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: assetManifest.enabled
+          equals: true
+      - world_state:
+          path: assetManifest.id
+          equals: runtime-v1-assets
+      - world_state:
+          path: assetManifest.assetCount
+          equals: 3
+      - world_state:
+          path: assetManifest.errors
+          equals: []
+      - world_state:
+          path: assets.0.id
+          equals: goal-sprite
+      - world_state:
+          path: assets.0.status
+          equals: loaded
+      - world_state:
+          path: assets.1.id
+          equals: player-sprite
+      - world_state:
+          path: assets.1.status
+          equals: loaded
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: animation-frame-regression
+    description: Advance fixed runtime frames and assert sprite-frame animation state without visual judgment.
+    steps:
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: entities.0.components.animation.mode
+          equals: sprite_frame
+      - world_state:
+          path: entities.0.components.animation.frameDuration
+          equals: 2
+      - world_state:
+          path: entities.0.components.animation.currentClip
+          equals: idle
+      - world_state:
+          path: entities.0.components.animation.clips.0.frames.2.asset
+          equals: player-sprite
+      - world_state:
+          path: entities.0.components.animation.state.elapsedFrames
+          equals: 4
+      - world_state:
+          path: entities.0.components.animation.state.frameIndex
+          equals: 2
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: audio-intent-regression
+    description: Assert scene-loaded audio intent evidence without relying on real audio playback.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - world_state:
+          path: audioEvents.0.trigger
+          equals: scene_loaded
+      - world_state:
+          path: audioEvents.0.action
+          equals: play
+      - world_state:
+          path: audioEvents.0.entityId
+          equals: player
+      - world_state:
+          path: audioEvents.0.asset
+          equals: player-spawn-audio
+      - world_state:
+          path: audioEvents.0.muted
+          equals: true
+      - world_state:
+          path: audioEvents.0.playback
+          equals: intent
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16

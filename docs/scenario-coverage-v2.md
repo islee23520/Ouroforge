@@ -8,8 +8,11 @@ Scenario Coverage v2 separates Engine Expansion v1 regression coverage into smal
 | --- | --- | --- | --- |
 | Renderer/layer/camera | `seeds/engine-feature-renderer-tilemap.yaml` / `renderer-layer-camera-regression` | `world_state.renderer.*`, render order, `frame_stats.fixedDeltaMs` | Deterministic data assertions only; no screenshot golden suite. |
 | Tilemap | `seeds/engine-feature-renderer-tilemap.yaml` / `tilemap-grid-layer-regression` | `world_state.tilemaps.*`, layer order, collision layer metadata | Reuses completed Engine Expansion v1 runtime state. |
+| Asset loading | `seeds/engine-feature-asset-animation-audio.yaml` / `asset-manifest-regression` | `world_state.assetManifest.*`, `world_state.assets.*` | Checks manifest and loaded state only; no network or server. |
+| Animation | `seeds/engine-feature-asset-animation-audio.yaml` / `animation-frame-regression` | `world_state.entities.*.components.animation.*` | Fixed-frame assertions; no visual AI judgment. |
+| Audio event | `seeds/engine-feature-asset-animation-audio.yaml` / `audio-intent-regression` | `world_state.audioEvents.*` | Intent evidence only; no real playback assertion. |
 
-Later PRs in #213 extend this map for asset loading, animation, audio events, physics/collision, hot reload, and scene composition.
+Later PRs in #213 extend this map for physics/collision, hot reload, and scene composition.
 
 ## Guardrails
 
