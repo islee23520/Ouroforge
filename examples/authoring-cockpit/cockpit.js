@@ -106,7 +106,53 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderPreview(scenePath = '../game-runtime/index.html') {
-    return `<section class="panel"><h2>Live browser preview</h2><iframe class="preview" title="Game runtime preview" src="${scenePath}"></iframe></section>`;
+    return `<section class="panel"><h2>Live browser preview</h2><iframe id="runtime-preview" class="preview" title="Game runtime preview" src="${scenePath}"></iframe></section>`;
+  }
+
+  function previewWindow(source) {
+    if (!source) return null;
+    return source.contentWindow || source;
+  }
+
+  function unavailablePreviewProbe(reason) {
+    return { ok: false, reason, error: reason };
+  }
+
+  function resolvePreviewProbe(source, requiredMethods = []) {
+    const runtimeWindow = previewWindow(source);
+    if (!runtimeWindow) return unavailablePreviewProbe('runtime preview window is unavailable');
+    const probe = runtimeWindow.__OUROFORGE__;
+    if (!probe) return unavailablePreviewProbe('window.__OUROFORGE__ probe is unavailable');
+    const missing = requiredMethods.filter((method) => typeof probe[method] !== 'function');
+    if (missing.length) return unavailablePreviewProbe(`window.__OUROFORGE__ is missing method(s): ${missing.join(', ')}`);
+    return { ok: true, probe, window: runtimeWindow };
+  }
+
+  function readPreviewProbe(source) {
+    const resolved = resolvePreviewProbe(source, ['getWorldState', 'getFrameStats']);
+    if (!resolved.ok) return resolved;
+    try {
+      return {
+        ok: true,
+        worldState: resolved.probe.getWorldState(),
+        frameStats: resolved.probe.getFrameStats(),
+      };
+    } catch (error) {
+      return unavailablePreviewProbe(`runtime probe read failed: ${error.message}`);
+    }
+  }
+
+  function callPreviewProbe(source, method, ...args) {
+    const resolved = resolvePreviewProbe(source, [method, 'getWorldState', 'getFrameStats']);
+    if (!resolved.ok) return resolved;
+    try {
+      const result = resolved.probe[method](...args);
+      const state = readPreviewProbe(source);
+      if (!state.ok) return state;
+      return { ok: true, method, result, worldState: state.worldState, frameStats: state.frameStats };
+    } catch (error) {
+      return unavailablePreviewProbe(`runtime probe ${method} failed: ${error.message}`);
+    }
   }
 
   function renderQaPanel() {
@@ -162,7 +208,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, applyEdit, artifactHref, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, qaCommand, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, validateEdit };
+  return { EDITABLE_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, renderEvidencePane, renderInspector, renderIntegration, renderPreview, renderQaPanel, renderTree, resolvePreviewProbe, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
