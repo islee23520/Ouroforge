@@ -3,10 +3,11 @@ use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, apply_patch_sandbox_from_path,
     create_mutation_proposal, create_run, edit_scene, evaluate_run, evolve_run,
-    list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals, read_cdp_targets,
-    read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke, run_browser_smoke_pool,
-    run_scenarios, show_journal, update_journal, write_run_comparison_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
+    list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    orchestrate_evolve_rerun_from_path, read_cdp_targets, read_dashboard_run, read_ledger_events,
+    read_scene, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
+    update_journal, write_run_comparison_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -434,6 +435,11 @@ fn try_handle_evolve_sandbox_command() -> Result<bool> {
     let args = std::env::args_os().collect::<Vec<_>>();
     if args.len() == 4 && args[1] == "evolve" && args[2] == "sandbox" {
         let result = apply_patch_sandbox_from_path(PathBuf::from(&args[3]))?;
+        println!("{}", serde_json::to_string_pretty(&result)?);
+        return Ok(true);
+    }
+    if args.len() == 4 && args[1] == "evolve" && args[2] == "compare" {
+        let result = orchestrate_evolve_rerun_from_path(PathBuf::from(&args[3]))?;
         println!("{}", serde_json::to_string_pretty(&result)?);
         return Ok(true);
     }
