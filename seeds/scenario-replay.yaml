@@ -1,0 +1,26 @@
+id: scenario-evaluator-v1.replay-binding
+title: Scenario Replay Binding Seed
+goal: Bind a deterministic input replay fixture to scenario execution and evidence-linked verdict output.
+constraints:
+  target: game-runtime
+acceptance:
+  - Scenario references a replay fixture through replayRef.
+  - Replay input is persisted as immutable run-local evidence.
+  - Scenario result and verdict link replay evidence to observed world state.
+scenarios:
+  - id: replay-ref-goal-contact
+    description: Execute a replayRef fixture that moves the player into the goal collider.
+    steps:
+      - replayRef:
+          id: scenario-replay-move-right
+          path: replays/scenario-replay-move-right.yaml
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 272
+      - world_state:
+          path: collisions.0.pairId
+          equals: goal:player
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16

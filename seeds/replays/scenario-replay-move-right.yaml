@@ -1,0 +1,9 @@
+schemaVersion: "1"
+id: scenario-replay-move-right
+events:
+  - frame: 0
+    key: right
+    pressed: true
+  - frame: 120
+    key: right
+    pressed: false

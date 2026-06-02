@@ -205,6 +205,17 @@ impl Seed {
         }
         Ok(())
     }
+
+    fn replay_references(&self) -> Vec<&ReplayReference> {
+        self.scenarios
+            .iter()
+            .flat_map(|scenario| scenario.steps.iter())
+            .filter_map(|step| match step {
+                ScenarioStep::ReplayRef { replay_ref } => Some(replay_ref),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 impl Scenario {
@@ -2169,10 +2180,41 @@ fn run_scenario<T: CdpTransport>(
                         "scenario_id": scenario.id,
                         "replay_id": replay.id,
                         "events": replay.events.len(),
-                        "path": replay_path
+                        "path": replay_path,
+                        "source": "inline"
                     }),
                 )?;
                 execute_scenario_step(client, step)?;
+            }
+            ScenarioStep::ReplayRef { replay_ref } => {
+                let replay = replay_ref.load_from_base(&config.run_dir)?;
+                let replay_path = write_scenario_json_artifact(
+                    config,
+                    scenario,
+                    &scenario_dir,
+                    "input-replay",
+                    "input_replay",
+                    unix_millis()?,
+                    &json!({
+                        "reference": replay_ref,
+                        "replay": replay
+                    }),
+                )?;
+                replay_paths.push(replay_path.clone());
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.input_replay",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "replay_id": replay.id,
+                        "events": replay.events.len(),
+                        "path": replay_path,
+                        "source": "replayRef",
+                        "reference_path": replay_ref.path
+                    }),
+                )?;
+                execute_input_replay(client, &replay)?;
             }
             ScenarioStep::Snapshot { snapshot } => {
                 let snapshot_result = client.evaluate_json("window.__OUROFORGE__.snapshot()")?;
@@ -3067,7 +3109,8 @@ pub fn create_run(
     let runs_root = runs_root.as_ref();
     let seed_yaml = fs::read_to_string(seed_path)
         .with_context(|| format!("failed to read Seed file {}", seed_path.display()))?;
-    let seed = Seed::from_yaml_str(&seed_yaml)?;
+    let seed = Seed::from_path(seed_path)?;
+    let seed_base_dir = seed_path.parent().unwrap_or_else(|| Path::new("."));
 
     fs::create_dir_all(runs_root)
         .with_context(|| format!("failed to create runs root {}", runs_root.display()))?;
@@ -3091,6 +3134,7 @@ pub fn create_run(
     )?;
     fs::write(run_dir.join("seed.snapshot.yaml"), seed_yaml)
         .context("failed to write seed snapshot")?;
+    copy_replay_references_to_run(&seed, seed_base_dir, &run_dir)?;
     write_ledger_created(&run_dir.join("ledger.jsonl"), created_at_unix_ms)?;
     fs::write(run_dir.join("journal.md"), initial_journal()).context("failed to write journal")?;
     write_json(
@@ -3105,6 +3149,30 @@ pub fn create_run(
     )?;
 
     Ok(RunArtifacts { run_dir })
+}
+
+fn copy_replay_references_to_run(seed: &Seed, seed_base_dir: &Path, run_dir: &Path) -> Result<()> {
+    let mut copied = std::collections::BTreeSet::new();
+    for replay_ref in seed.replay_references() {
+        if !copied.insert(replay_ref.path.clone()) {
+            continue;
+        }
+        let source = seed_base_dir.join(&replay_ref.path);
+        let target = run_dir.join(&replay_ref.path);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("failed to create replay directory {}", parent.display())
+            })?;
+        }
+        fs::copy(&source, &target).with_context(|| {
+            format!(
+                "failed to copy replay reference {} to {}",
+                source.display(),
+                target.display()
+            )
+        })?;
+    }
+    Ok(())
 }
 
 fn unix_millis() -> Result<u128> {
