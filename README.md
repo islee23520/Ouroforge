@@ -31,6 +31,8 @@ cargo fmt --check
 cargo test
 cargo run -p ouroforge-cli -- seed validate seeds/platformer.yaml
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+cargo run -p ouroforge-cli -- seed validate seeds/runtime-v1-demo.yaml
+cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
 ```
 
 The run command prints a run directory such as `runs/run-...`. Generated run artifacts are intentionally ignored by git.
@@ -56,7 +58,7 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
-Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`.
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`.
 
 ## Verification
 
@@ -72,7 +74,7 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
+For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
 
 ## Repository map
 

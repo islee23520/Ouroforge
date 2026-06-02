@@ -22,3 +22,15 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output example
 ```
 
 After exporting dashboard data, refresh the cockpit to view the latest run evidence and journal pane. The browser still does not mutate files directly.
+
+## Runtime v1 demo compatibility
+
+The cockpit remains compatible with the Runtime v1 demo scene for inspection and
+for the existing Rust-validated scalar scene edits. It does not add animation,
+audio, asset-browser, or timeline editing in #67; those fields remain visible in
+the scene data but are not directly editable from the static cockpit. Run the
+playable demo with:
+
+```bash
+cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
+```
