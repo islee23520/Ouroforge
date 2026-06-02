@@ -49,3 +49,18 @@ default. Automated QA verifies those event records only; speaker output,
 browser audio device access, and audible playback are not required for
 acceptance. No mixer, DSP, spatial audio, timeline, streaming, native backend,
 or audio editor subsystem is introduced.
+
+
+## Engine Expansion v1 playable template
+
+`scene.json` is the one-screen playable template used by `seeds/platformer.yaml`. It intentionally combines completed Engine Expansion v1 features without adding new engine behavior: renderer layers/camera, tilemap collision layers, manifest-backed sprite/audio assets, sprite-frame animation, headless-safe audio intents, bounded AABB physics/contact evidence, reload probe state, and scene composition (`player-badge` is parented to `player`).
+
+Run and inspect it with:
+
+```bash
+cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene.json
+cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+```
+
+Known gaps are deliberate: one screen only, no enemy AI, no campaign, no native export, no plugin system, no marketplace assets, no multiplayer, no monetization/publishing workflow, and no production/public-launch claim. Generated `runs/` evidence remains local and untracked.

@@ -7,7 +7,9 @@
   },
   "metadata": {
     "title": "Runtime v1 foundation scene",
-    "runtime": "small-game-capable-browser"
+    "runtime": "small-game-capable-browser",
+    "template": "engine-expansion-v1-one-screen-platformer",
+    "templateScope": "one-screen evidence-native proof; not a complete game"
   },
   "entities": [
     {
@@ -93,6 +95,37 @@
       ],
       "metadata": {
         "role": "avatar"
+      }
+    },
+    {
+      "id": "player-badge",
+      "parent": "player",
+      "sprite": {
+        "color": "#ffffff",
+        "layer": "actors",
+        "order": 1
+      },
+      "components": {
+        "transform": {
+          "x": 6,
+          "y": -6
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 4,
+          "height": 4
+        },
+        "controllable": false
+      },
+      "tags": [
+        "composition-child",
+        "template-marker"
+      ],
+      "metadata": {
+        "role": "composition marker for playable template"
       }
     },
     {
@@ -538,5 +571,16 @@
     "metadata": {
       "purpose": "validated local runtime sprite assets"
     }
+  },
+  "componentDefaults": {
+    "velocity": {
+      "x": 0,
+      "y": 0
+    },
+    "size": {
+      "width": 16,
+      "height": 16
+    },
+    "controllable": false
   }
 }
