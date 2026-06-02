@@ -15,7 +15,9 @@ Related control documents:
 - `docs/scenario-evaluator-v1.md` for deterministic scenario, verdict, suite,
   and before/after comparison boundaries;
 - `docs/scenario-evaluator-v1-demo.md` for the completed Scenario/Evaluator v1
-  evidence demo that Evolve Loop v1 may consume.
+  evidence demo that Evolve Loop v1 may consume;
+- `docs/evolve-loop-v1-demo.md` for the completed Evolve Loop v1 integration
+  demo commands, evidence map, and manual review boundary.
 
 ## 1. Purpose and relation to #1 final goal
 
