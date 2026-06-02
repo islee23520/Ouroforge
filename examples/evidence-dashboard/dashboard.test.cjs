@@ -69,7 +69,7 @@ const run = {
   cdp_trace_summaries: [{ id: 'cdp-1', kind: 'application/json', path: 'evidence/cdp.json', value: null, read_error: 'bad json', metadata: { artifact: 'cdp_trace_summary', worker_id: '<script>worker</script>', worker_session_id: 'run-1:<script>worker</script>', run_id: 'run-1', execution_boundary: 'openchrome_cdp', cdp_transport: 'chrome_devtools_protocol', bounded: true, limit: 32 } }],
   scenario_results: [{ id: 'scenario-1', kind: 'application/json', path: 'evidence/scenario.json', value: { status: 'passed' }, metadata: {} }],
   mutation_artifacts: [{ id: 'mutation-proposals', kind: 'application/json', path: 'mutation/proposals.json', value: { proposals: [] }, metadata: {} }],
-  mutations: [{ id: 'mutation-1', evidence_id: 'artifact-1', status: 'proposed' }],
+  mutations: [{ id: 'mutation-1', evidence_id: 'artifact-1', status: 'proposed', target: 'seeds/platformer.yaml', rationale: { schema_version: '1', failure_classification: 'scenario_assertion_failure', evidence_artifact_ids: ['artifact-1'], scenario_result_refs: ['evidence/scenario.json'], verdict_refs: ['verdict.json'], expected_effect: 'player reaches the goal', confidence: 'medium', reasoning_summary: 'scenario assertion failed', allowed_mutation_type: 'data_only' } }],
   mutation_lifecycle: {
     terminal_state: 'accepted',
     command_hints: [
@@ -77,7 +77,7 @@ const run = {
       'cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual evidence review rejected"',
     ],
     stages: [
-      { id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json', record_count: 1, evidence_refs: ['artifact-1'], records: [{ id: 'mutation-1' }] },
+      { id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json', record_count: 1, evidence_refs: ['artifact-1'], records: [{ id: 'mutation-1', rationale: { failure_classification: 'legacy_stage_rationale', evidence_artifact_ids: ['artifact-1'], expected_effect: 'stage fallback visible', confidence: 'low', reasoning_summary: 'stage record rationale', allowed_mutation_type: 'data_only' } }] },
       { id: 'classified', label: 'Classified', state: 'classified', artifact_path: 'mutation/classifications.json', record_count: 1, evidence_refs: ['evidence/world.json'], records: [{ id: 'classification-1' }] },
       { id: 'drafted', label: 'Drafted', state: 'drafted', artifact_path: 'mutation/patch-drafts.json', record_count: 1, evidence_refs: ['evidence/world.json'], records: [{ id: 'patch-draft-1' }] },
       { id: 'sandboxed', label: 'Sandboxed', state: 'sandboxed', artifact_path: 'sandbox/*/evidence/result.json', record_count: 1, evidence_refs: ['sandbox/patch-draft-1/evidence/result.json'], records: [{ patch_draft_id: 'patch-draft-1' }] },
@@ -311,6 +311,12 @@ assert.match(detail, /mutation-1/);
 assert.ok(!detail.includes('<script>alert(1)</script>'), 'journal entry markup must be escaped');
 assert.match(detail, /&lt;script&gt;/);
 assert.match(detail, /mutation\/proposals\.json/);
+assert.match(detail, /Proposal rationale/);
+assert.match(detail, /scenario_assertion_failure/);
+assert.match(detail, /player reaches the goal/);
+assert.match(detail, /data_only/);
+assert.match(dashboard.renderProposalRationaleList({ mutations: [{ id: '<script>', status: '<bad>', evidence_id: '<img>', target: '<svg>', rationale: { failure_classification: '<script>', evidence_artifact_ids: ['<img>'], expected_effect: '<b>effect</b>', confidence: '<i>', reasoning_summary: '<svg>', allowed_mutation_type: '<bad>' } }] }), /&lt;script&gt;/);
+assert.match(dashboard.renderProposalRationaleList({ mutations: [{ id: 'missing-rationale', status: 'proposed' }] }), /No proposal rationale recorded/);
 assert.match(detail, /1 missing/);
 assert.match(detail, /1 malformed/);
 assert.match(detail, /bad json/);

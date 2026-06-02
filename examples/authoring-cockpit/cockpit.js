@@ -627,6 +627,29 @@ const OuroforgeCockpit = (() => {
     </div>`;
   }
 
+  function renderProposalRationale(proposal) {
+    const rationale = proposal?.rationale;
+    if (!rationale || typeof rationale !== 'object') {
+      return '<p class="empty compact">No proposal rationale recorded.</p>';
+    }
+    const evidenceIds = Array.isArray(rationale.evidence_artifact_ids) && rationale.evidence_artifact_ids.length
+      ? rationale.evidence_artifact_ids.map((id) => `<code>${escapeText(id)}</code>`).join('')
+      : '<span class="warn">missing evidence ids</span>';
+    const scenarioRefs = Array.isArray(rationale.scenario_result_refs) && rationale.scenario_result_refs.length
+      ? `<br><small>scenario refs ${rationale.scenario_result_refs.map((ref) => escapeText(ref)).join(', ')}</small>`
+      : '';
+    return `<div class="surface-row"><strong>${escapeText(rationale.failure_classification || 'missing rationale')}</strong> ${surfaceState(Boolean(rationale.evidence_artifact_ids?.length), rationale.allowed_mutation_type || 'missing')}<br><small>${escapeText(rationale.expected_effect || 'No expected effect recorded')}</small><br><small>evidence ids ${evidenceIds}</small>${scenarioRefs}<br><small>confidence ${escapeText(rationale.confidence || 'missing')} · ${escapeText(rationale.reasoning_summary || 'No reasoning summary recorded')}</small></div>`;
+  }
+
+  function renderProposalRationaleSurface(run) {
+    const direct = Array.isArray(run?.mutations) ? run.mutations : [];
+    const proposed = mutationStage(run?.mutation_lifecycle, 'proposed');
+    const staged = Array.isArray(proposed?.records) ? proposed.records : [];
+    const proposals = direct.length ? direct : staged;
+    const rows = proposals.map((proposal) => `<div class="surface-row"><strong>${escapeText(proposal.id || 'unknown proposal')}</strong><br>${renderProposalRationale(proposal)}</div>`).join('') || '<p class="empty compact">No proposal rationale records loaded.</p>';
+    return `<div class="proposal-rationale"><h3>Proposal rationale</h3><p class="hint">Read-only evidence-linked rationale. The cockpit does not accept, apply, promote, rerun, or execute proposal actions.</p>${rows}</div>`;
+  }
+
   function renderMutationReviewSurface(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -638,6 +661,7 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Inspect-only. The cockpit does not accept/reject mutations or apply patches.</p>
       <div><strong>Terminal state:</strong> ${escapeText(lifecycle.terminal_state || 'missing')}</div>
       <div class="surface-list">${stages}</div>
+      ${renderProposalRationaleSurface(run)}
       ${renderSceneMutationLifecycleSurface(run)}
       <h3>Command hints</h3><div class="command-list">${hints}</div>
     </section>`;
@@ -791,7 +815,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

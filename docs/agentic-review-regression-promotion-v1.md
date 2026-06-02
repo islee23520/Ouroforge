@@ -241,7 +241,7 @@ Agentic Review & Regression Promotion v1 does not authorize:
 
 ## Follow-up Issue Roles
 
-- #295 improves mutation proposals so rationale, evidence refs, expected impact,
+- #295 improves mutation proposals through `docs/mutation-proposal-quality-v2.md` so rationale, evidence refs, expected impact,
   and review hints are explicit before review decisions are recorded.
 - #296 defines the review decision ledger for accept/reject/defer records without
   applying changes by itself.

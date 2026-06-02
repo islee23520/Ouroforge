@@ -71,7 +71,7 @@ const run = {
     scenarioPack: { id: 'smoke', path: 'scenarios/smoke.scenario-pack.json', scenarioIds: ['scaffold-smoke'] },
   },
   evidence: [{ id: 'evidence-1', path: 'evidence/indexed.json' }],
-  mutations: [{ id: 'mutation-1' }],
+  mutations: [{ id: 'mutation-1', status: 'proposed', evidence_id: 'verdict-1', target: 'seeds/platformer.yaml', rationale: { schema_version: '1', failure_classification: 'scenario_assertion_failure', evidence_artifact_ids: ['verdict-1'], scenario_result_refs: ['evidence/scenario.json'], verdict_refs: ['verdict.json'], expected_effect: 'player reaches the goal', confidence: 'medium', reasoning_summary: 'scenario assertion failed', allowed_mutation_type: 'data_only' } }],
   screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }],
   journal: '# Journal',
   journal_view: { exists: true, path: 'journal.md', summary: 'journal summary', entries: [{ id: 'entry-1' }], evidence_refs: ['evidence/indexed.json'] },
@@ -165,6 +165,11 @@ assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped scene mutation lifecycle/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Proposal rationale/);
+assert.match(cockpit.renderMutationReviewSurface(run), /scenario_assertion_failure/);
+assert.match(cockpit.renderMutationReviewSurface(run), /player reaches the goal/);
+assert.match(cockpit.renderProposalRationaleSurface({ mutations: [{ id: '<script>', rationale: { failure_classification: '<img>', evidence_artifact_ids: ['<svg>'], expected_effect: '<b>', confidence: '<i>', reasoning_summary: '<p>', allowed_mutation_type: '<bad>' } }] }), /&lt;script&gt;/);
+assert.match(cockpit.renderProposalRationaleSurface({ mutations: [{ id: 'missing' }] }), /No proposal rationale recorded/);
 assert.match(cockpit.renderMutationReviewSurface(run), /scene-application-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /minimal_2d/);
 assert.match(cockpit.renderMutationReviewSurface(run), /examples\/project\/ouroforge\.project\.json/);

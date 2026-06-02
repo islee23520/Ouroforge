@@ -11117,8 +11117,13 @@ fn read_dashboard_replay(
         });
     }
     Ok(RunDashboardReplay {
-        present: sequences.iter().any(|sequence| sequence.read_error.is_none()),
-        empty_state: if sequences.iter().any(|sequence| sequence.read_error.is_none()) {
+        present: sequences
+            .iter()
+            .any(|sequence| sequence.read_error.is_none()),
+        empty_state: if sequences
+            .iter()
+            .any(|sequence| sequence.read_error.is_none())
+        {
             String::new()
         } else {
             "Replay evidence artifacts were indexed, but no readable replay files are available."
@@ -11696,8 +11701,14 @@ fn dashboard_evidence_fidelity(
     };
 
     let cdp_counts = [
-        ("worker screenshots", dashboard_readable_artifact_count(inputs.screenshots)),
-        ("console logs", dashboard_readable_artifact_count(inputs.console_logs)),
+        (
+            "worker screenshots",
+            dashboard_readable_artifact_count(inputs.screenshots),
+        ),
+        (
+            "console logs",
+            dashboard_readable_artifact_count(inputs.console_logs),
+        ),
         (
             "performance metrics",
             dashboard_readable_artifact_count(inputs.performance_metrics),
@@ -20160,8 +20171,7 @@ scenarios:
             artifacts
                 .run_dir
                 .join("evidence/workers/worker-1/world-state.json"),
-            serde_json::to_string_pretty(&json!({ "tick": 1 }))
-                .expect("world state serializes"),
+            serde_json::to_string_pretty(&json!({ "tick": 1 })).expect("world state serializes"),
         )
         .expect("world state written");
         fs::write(

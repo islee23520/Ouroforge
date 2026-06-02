@@ -428,6 +428,48 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderProposalRationale(proposal) {
+    const rationale = proposal?.rationale;
+    if (!rationale || typeof rationale !== 'object') {
+      return '<p class="empty-state compact">No proposal rationale recorded.</p>';
+    }
+    const evidenceIds = Array.isArray(rationale.evidence_artifact_ids) && rationale.evidence_artifact_ids.length
+      ? rationale.evidence_artifact_ids.map((id) => `<code>${escapeText(id)}</code>`).join('')
+      : '<span class="artifact-warning">missing evidence ids</span>';
+    const scenarioRefs = Array.isArray(rationale.scenario_result_refs) && rationale.scenario_result_refs.length
+      ? `<dt>Scenario refs</dt><dd>${rationale.scenario_result_refs.map((ref) => `<code>${escapeText(ref)}</code>`).join('')}</dd>`
+      : '';
+    const verdictRefs = Array.isArray(rationale.verdict_refs) && rationale.verdict_refs.length
+      ? `<dt>Verdict refs</dt><dd>${rationale.verdict_refs.map((ref) => `<code>${escapeText(ref)}</code>`).join('')}</dd>`
+      : '';
+    return `<dl class="project-mutation-context">
+      <dt>Failure classification</dt><dd>${escapeText(rationale.failure_classification || 'missing')}</dd>
+      <dt>Expected effect</dt><dd>${escapeText(rationale.expected_effect || 'missing')}</dd>
+      <dt>Evidence artifact ids</dt><dd>${evidenceIds}</dd>
+      ${scenarioRefs}
+      ${verdictRefs}
+      <dt>Allowed mutation</dt><dd>${escapeText(rationale.allowed_mutation_type || 'missing')}</dd>
+      <dt>Confidence</dt><dd>${escapeText(rationale.confidence || 'missing')}</dd>
+      <dt>Reasoning</dt><dd>${escapeText(rationale.reasoning_summary || 'missing')}</dd>
+    </dl>`;
+  }
+
+  function renderProposalRationaleList(run) {
+    const direct = Array.isArray(run?.mutations) ? run.mutations : [];
+    const proposedStage = (run?.mutation_lifecycle?.stages || []).find((stage) => stage.id === 'proposed');
+    const staged = Array.isArray(proposedStage?.records) ? proposedStage.records : [];
+    const proposals = direct.length ? direct : staged;
+    if (!proposals.length) {
+      return '<section class="panel"><h4>Proposal rationale</h4><p class="empty-state compact">No mutation proposals recorded.</p></section>';
+    }
+    const cards = proposals.map((proposal) => `<article class="lifecycle-card">
+      <div class="journal-entry-header"><h4>${escapeText(proposal.id || 'unknown proposal')}</h4><span class="${statusClass(proposal.status || 'missing')}">${escapeText(proposal.status || 'missing')}</span></div>
+      <div class="run-meta">Evidence ${escapeText(proposal.evidence_id || 'unavailable')} · target ${escapeText(proposal.target || 'unavailable')}</div>
+      ${renderProposalRationale(proposal)}
+    </article>`).join('');
+    return `<section class="panel"><h4>Proposal rationale</h4><p class="run-meta">Read-only proposal quality metadata. The dashboard does not apply, accept, reject, promote, or execute mutations.</p><div class="lifecycle-grid">${cards}</div></section>`;
+  }
+
   function renderMutationLifecycle(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -462,6 +504,7 @@ const OuroforgeDashboard = (() => {
         <div class="card"><div class="card-label">Stages</div><div class="card-value">${escapeText(stages.length)}</div></div>
       </div>
       <section class="panel"><h4>Manual review command hints</h4>${hints}</section>
+      ${renderProposalRationaleList(run)}
       <div class="lifecycle-grid">${stageCards}</div>
     </section>`;
   }
@@ -676,7 +719,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
