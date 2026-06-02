@@ -4262,9 +4262,20 @@ pub fn append_mutation_review_decision(
                 input.patch_draft_id
             )
         })?;
-    let proposal_id = input
-        .proposal_id
-        .or_else(|| Some(draft.proposal_id.clone()));
+    let proposal_id = match input.proposal_id {
+        Some(proposal_id) => {
+            if proposal_id.as_str() != draft.proposal_id.as_str() {
+                return Err(anyhow!(
+                    "mutation review proposal_id {} does not match patch draft {} proposal_id {}",
+                    proposal_id,
+                    draft.id,
+                    draft.proposal_id
+                ));
+            }
+            Some(proposal_id)
+        }
+        None => Some(draft.proposal_id.clone()),
+    };
     let state = input.state;
     let decision = MutationReviewDecision {
         id: format!("review-decision-{next_index}"),
@@ -16001,6 +16012,46 @@ scenarios:
         .expect_err("failed guardrail checklist rejects decision");
         assert!(bad_guardrail.to_string().contains("guardrail checklist"));
 
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_review_rejects_proposal_id_mismatched_to_patch_draft() {
+        let (root, artifacts, drafts) =
+            create_sandbox_fixture("ouroforge-review-proposal-linkage-test");
+        let mut proposals = read_mutation_proposals(&artifacts.run_dir).expect("proposals read");
+        let mut other_proposal = proposals.proposals[0].clone();
+        other_proposal.id = "mutation-other-proposal".to_string();
+        proposals.proposals.push(other_proposal);
+        write_mutation_proposals(&artifacts.run_dir, &proposals).expect("proposals rewrite");
+
+        let error = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                proposal_id: Some("mutation-other-proposal".to_string()),
+                state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "mismatched proposal id should not corrupt review linkage".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect_err("mismatched proposal id fails");
+
+        assert!(error
+            .to_string()
+            .contains("does not match patch draft"));
+        let artifact =
+            read_mutation_review_artifact(&artifacts.run_dir).expect("review artifact reads");
+        assert!(artifact.decisions.is_empty());
+        let ledger = read_ledger(&artifacts.run_dir).expect("ledger reads");
+        assert!(!ledger
+            .events
+            .iter()
+            .any(|event| event.kind == "mutation.review_decision"));
         fs::remove_dir_all(root).ok();
     }
 
