@@ -65,6 +65,7 @@ const run = {
       { id: 'drafted', label: 'Drafted', state: 'drafted', artifact_path: 'mutation/patch-drafts.json', record_count: 1, evidence_refs: ['evidence/world.json'], records: [{ id: 'patch-draft-1' }] },
       { id: 'sandboxed', label: 'Sandboxed', state: 'sandboxed', artifact_path: 'sandbox/*/evidence/result.json', record_count: 1, evidence_refs: ['sandbox/patch-draft-1/evidence/result.json'], records: [{ patch_draft_id: 'patch-draft-1' }] },
       { id: 'compared', label: 'Compared', state: 'compared', artifact_path: 'mutation/rerun-orchestration.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ comparison_artifact_path: 'mutation/run-comparison-before--after.json' }] },
+      { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, evidence_refs: [], records: [{ id: 'scene-application-1', proposalId: 'mutation-1', transactionId: 'scene-edit-abc123', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'ouroforge.project.json', manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' }, scenePath: 'scenes/main.scene.json', sceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' } }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' }, strategy: 'restore beforeSceneHash' }, status: 'applied' }] },
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ state: 'accepted' }] },
     ],
   },
@@ -265,6 +266,12 @@ assert.match(detail, /Classified/);
 assert.match(detail, /Drafted/);
 assert.match(detail, /Sandboxed/);
 assert.match(detail, /Compared/);
+assert.match(detail, /Applied scene mutation/);
+assert.match(detail, /Project-scoped scene mutation/);
+assert.match(detail, /minimal_2d/);
+assert.match(detail, /manifesthash/);
+assert.match(detail, /scenes\/main\.scene\.json/);
+assert.match(detail, /Rollback/);
 assert.match(detail, /Manual review/);
 assert.match(detail, /accepted/);
 assert.match(detail, /mutation\/review-decisions\.json/);
@@ -284,6 +291,7 @@ assert.match(detail, /bad json/);
 assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /Frame\/performance metrics/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
+assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);

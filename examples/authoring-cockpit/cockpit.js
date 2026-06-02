@@ -114,8 +114,9 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
   }
 
-  function sceneMutationApplyCommand(runDir = 'runs/run-1', operationPath = 'mutation/scene-operation.json', transactionPath = 'mutation/scene-transaction.json') {
-    return `cargo run -p ouroforge-cli -- mutation apply-scene ${runDir} --operation ${operationPath} --transaction-output ${transactionPath}`;
+  function sceneMutationApplyCommand(runDir = 'runs/run-1', operationPath = 'mutation/scene-operation.json', transactionPath = 'mutation/scene-transaction.json', projectPath = null) {
+    const projectFlag = projectPath ? ` --project ${projectPath}` : '';
+    return `cargo run -p ouroforge-cli -- mutation apply-scene ${runDir}${projectFlag} --operation ${operationPath} --transaction-output ${transactionPath}`;
   }
 
   function sceneValidateCommand(scenePath = DEFAULT_SCENE_PATH) {
@@ -406,19 +407,31 @@ const OuroforgeCockpit = (() => {
     const firstApplication = appliedRecords[0] || {};
     const targetScenePath = firstApplication.targetScenePath || DEFAULT_SCENE_PATH;
     const transactionPath = firstApplication.transactionArtifactPath || 'mutation/scene-transaction.json';
+    const projectPath = firstApplication.project?.manifestPath || null;
     const proposedRows = proposedRecords.slice(0, 3).map((record) => {
       const id = record.id || record.proposalId || 'unknown proposal';
       const evidence = record.evidence_id || record.evidenceId || record.evidence || 'no evidence id';
       return `<li>${escapeText(id)} · ${escapeText(evidence)}</li>`;
     }).join('') || '<li>No scene-safe proposal records loaded.</li>';
-    const applicationRows = appliedRecords.slice(0, 3).map((record) => `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small></div>`).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
-    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath);
+    const applicationRows = appliedRecords.slice(0, 3).map((record) => {
+      const project = record.project || {};
+      const rollback = record.rollback || {};
+      const projectLine = record.project
+        ? `<br><small>project ${escapeText(project.projectId || 'unknown')} · manifest ${escapeText(project.manifestPath || 'unknown')} · scene ${escapeText(project.scenePath || record.targetScenePath || 'unknown')}</small>`
+        : '<br><small>legacy/no project mutation context recorded</small>';
+      const rollbackLine = record.rollback
+        ? `<br><small>rollback ${escapeText(rollback.scenePath || 'unknown')} → ${escapeText(rollback.restoreHash?.value || 'unknown')}</small>`
+        : '';
+      return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
+    }).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
+    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath);
     return `<div class="scene-mutation-lifecycle"><h3>Scene-only mutation lifecycle</h3>
       <p class="hint">Scene-only mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, or merge anything.</p>
       <div class="field-grid">
         <div><strong>Proposal stage</strong><br>${surfaceState(Boolean(proposed && proposed.state !== 'missing'), proposed?.state || 'missing')}<br><small>${escapeText(proposed?.record_count || 0)} record(s)</small></div>
         <div><strong>Scene application stage</strong><br>${surfaceState(Boolean(applied && applied.state !== 'missing'), applied?.state || 'missing')}<br><small>${escapeText(applied?.record_count || 0)} record(s)</small></div>
         <div><strong>Target scene</strong><br>${escapeText(targetScenePath)}</div>
+        <div><strong>Project manifest</strong><br>${escapeText(projectPath || 'legacy/no project context')}</div>
       </div>
       <h4>Proposal context</h4><ul>${proposedRows}</ul>
       <h4>Application records</h4>${applicationRows}

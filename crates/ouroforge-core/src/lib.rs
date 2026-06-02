@@ -14882,6 +14882,48 @@ scenarios:
     }
 
     #[test]
+    fn project_scene_mutation_application_surfaces_project_context_in_dashboard_lifecycle() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("project-scene-mutation-dashboard");
+        let transaction_path = root.join("transactions/project-apply.json");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id.clone(),
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: Some(project_context.clone()),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        };
+
+        apply_scene_only_mutation_operation(&artifacts.run_dir, &operation, &transaction_path)
+            .expect("project scene mutation applies");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard read model loads");
+        let applied = model
+            .mutation_lifecycle
+            .stages
+            .iter()
+            .find(|stage| stage.id == "scene_applied")
+            .expect("scene applied stage present");
+        assert_eq!(applied.state, "applied");
+        assert_eq!(applied.records[0]["project"]["projectId"], "minimal_2d");
+        assert_eq!(
+            applied.records[0]["project"]["scenePath"],
+            "scenes/main.scene.json"
+        );
+        assert_eq!(
+            applied.records[0]["rollback"]["restoreHash"]["value"],
+            project_context.scene_hash.value
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn scene_only_mutation_application_writes_transaction_and_fails_safely() {
         let (root, artifacts, proposal, scene_path, before_hash) =
             create_scene_only_mutation_fixture("scene-only-mutation-apply");

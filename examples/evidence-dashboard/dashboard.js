@@ -357,7 +357,11 @@ const OuroforgeDashboard = (() => {
       return `<section class="panel"><h3>Mutation Review</h3><p class="empty-state">No mutation lifecycle read model is available. Export dashboard data with the latest Rust CLI.</p></section>`;
     }
     const stages = Array.isArray(lifecycle.stages) ? lifecycle.stages : [];
-    const stageCards = stages.length ? stages.map((stage) => `<article class="lifecycle-card">
+    const stageCards = stages.length ? stages.map((stage) => {
+      const projectMutationContext = stage.id === 'scene_applied' && Array.isArray(stage.records)
+        ? stage.records.map(renderProjectMutationRecord).join('')
+        : '';
+      return `<article class="lifecycle-card">
       <div class="journal-entry-header">
         <h4>${escapeText(stage.label || stage.id)}</h4>
         <span class="${statusClass(stage.state)}">${escapeText(stage.state || 'missing')}</span>
@@ -366,8 +370,10 @@ const OuroforgeDashboard = (() => {
       <div class="run-meta">${escapeText(stage.record_count ?? 0)} record(s)</div>
       ${stage.read_error ? `<div class="artifact-warning">${escapeText(stage.read_error)}</div>` : ''}
       ${renderRefLinks('Evidence refs', stage.evidence_refs, run)}
+      ${projectMutationContext}
       ${Array.isArray(stage.records) && stage.records.length ? `<pre>${escapeText(JSON.stringify(stage.records, null, 2))}</pre>` : '<p class="empty-state compact">No lifecycle records for this stage.</p>'}
-    </article>`).join('') : '<p class="empty-state">No mutation lifecycle stages are available.</p>';
+    </article>`;
+    }).join('') : '<p class="empty-state">No mutation lifecycle stages are available.</p>';
     const hints = Array.isArray(lifecycle.command_hints) && lifecycle.command_hints.length
       ? `<div class="command-list">${lifecycle.command_hints.map((hint) => `<code>${escapeText(hint)}</code>`).join('')}</div>`
       : '<p class="empty-state compact">No manual review command hints are available until patch drafts exist.</p>';
@@ -381,6 +387,24 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h4>Manual review command hints</h4>${hints}</section>
       <div class="lifecycle-grid">${stageCards}</div>
     </section>`;
+  }
+
+  function renderProjectMutationRecord(record) {
+    if (!record || typeof record !== 'object') return '';
+    const project = record.project && typeof record.project === 'object' ? record.project : null;
+    const rollback = record.rollback && typeof record.rollback === 'object' ? record.rollback : null;
+    if (!project && !rollback) return '';
+    return `<div class="project-mutation-context">
+      <strong>Project-scoped scene mutation</strong>
+      <dl>
+        <dt>Project</dt><dd>${escapeText(project?.projectId || 'legacy/no project context')}</dd>
+        <dt>Manifest</dt><dd>${escapeText(project?.manifestPath || 'unavailable')}</dd>
+        <dt>Manifest hash</dt><dd>${escapeText(project?.manifestHash?.algorithm || '')}:${escapeText(project?.manifestHash?.value || 'unavailable')}</dd>
+        <dt>Scene</dt><dd>${escapeText(project?.scenePath || record.targetScenePath || 'unavailable')}</dd>
+        <dt>Scene hash</dt><dd>${escapeText(project?.sceneHash?.algorithm || '')}:${escapeText(project?.sceneHash?.value || 'unavailable')}</dd>
+        <dt>Rollback</dt><dd>${escapeText(rollback?.scenePath || 'unavailable')} → ${escapeText(rollback?.restoreHash?.value || 'unavailable')}</dd>
+      </dl>
+    </div>`;
   }
 
   function replaySequences(run) {
