@@ -3005,6 +3005,27 @@ pub struct EvolveRerunOrchestration {
     pub primary_git_status_after: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvolveDemoLifecycleSummary {
+    pub schema_version: String,
+    pub run_id: String,
+    pub status: String,
+    pub classification_artifact_path: String,
+    pub classification_ids: Vec<String>,
+    pub patch_draft_artifact_path: String,
+    pub patch_draft_ids: Vec<String>,
+    pub sandbox_result_path: String,
+    pub rerun_evidence_path: String,
+    pub comparison_artifact_path: String,
+    pub manual_review_state: MutationReviewState,
+    pub review_decision_artifact_path: Option<String>,
+    pub lifecycle_summary_path: String,
+    pub primary_git_status_before: String,
+    pub primary_git_status_after: String,
+    pub omitted_features: Vec<String>,
+}
+
 impl PatchSandboxPlan {
     pub fn validate(&self, run_dir: impl AsRef<Path>) -> Result<()> {
         if self.schema_version != "1" {
@@ -3205,6 +3226,104 @@ pub fn orchestrate_evolve_rerun_from_path(
         .clone();
     let repo_root = git_repo_root()?;
     orchestrate_evolve_rerun(&run_dir, &patch_draft_id, &repo_root, true)
+}
+
+pub fn run_evolve_demo_lifecycle_from_path(
+    run_or_demo_path: impl AsRef<Path>,
+) -> Result<EvolveDemoLifecycleSummary> {
+    let run_dir = run_or_demo_path.as_ref();
+    if !run_dir.is_dir() {
+        return Err(anyhow!(
+            "evolve demo expects a run directory produced by the demo seed"
+        ));
+    }
+    let repo_root = git_repo_root()?;
+    run_evolve_demo_lifecycle(run_dir, &repo_root, true)
+}
+
+pub fn run_evolve_demo_lifecycle(
+    run_dir: impl AsRef<Path>,
+    repo_root: impl AsRef<Path>,
+    run_verification: bool,
+) -> Result<EvolveDemoLifecycleSummary> {
+    let run_dir = run_dir.as_ref();
+    if !run_dir.join("mutation/patch-drafts.json").is_file() {
+        evolve_run(run_dir)?;
+    }
+    let classifications = read_mutation_classification_artifact(run_dir)?;
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    let patch_draft_id = drafts
+        .drafts
+        .first()
+        .ok_or_else(|| anyhow!("evolve demo requires at least one patch draft"))?
+        .id
+        .clone();
+    let rerun = orchestrate_evolve_rerun(run_dir, &patch_draft_id, repo_root, run_verification)?;
+    let reviews = read_mutation_review_artifact(run_dir)?;
+    let manual_review_state = reviews
+        .decisions
+        .last()
+        .map(|decision| decision.state.clone())
+        .unwrap_or(MutationReviewState::PendingReview);
+    let lifecycle_summary_path = "mutation/evolve-v1-demo-summary.json".to_string();
+    let review_decision_artifact_path = if reviews.decisions.is_empty() {
+        None
+    } else {
+        Some("mutation/review-decisions.json".to_string())
+    };
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let run_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    let summary = EvolveDemoLifecycleSummary {
+        schema_version: "1".to_string(),
+        run_id,
+        status: "lifecycle_evidence_ready".to_string(),
+        classification_artifact_path: "mutation/classifications.json".to_string(),
+        classification_ids: classifications
+            .classifications
+            .iter()
+            .map(|classification| classification.id.clone())
+            .collect(),
+        patch_draft_artifact_path: "mutation/patch-drafts.json".to_string(),
+        patch_draft_ids: drafts.drafts.iter().map(|draft| draft.id.clone()).collect(),
+        sandbox_result_path: rerun.after.sandbox_result_path,
+        rerun_evidence_path: rerun.evolve_evidence_path,
+        comparison_artifact_path: rerun
+            .comparison_artifact_path
+            .ok_or_else(|| anyhow!("evolve demo requires comparison artifact"))?,
+        manual_review_state,
+        review_decision_artifact_path,
+        lifecycle_summary_path,
+        primary_git_status_before: rerun.primary_git_status_before,
+        primary_git_status_after: rerun.primary_git_status_after,
+        omitted_features: vec![
+            "Manual review remains a separate explicit mutation review command.".to_string(),
+            "No patch is applied or merged into the primary working tree.".to_string(),
+        ],
+    };
+    write_json_atomic(
+        &run_dir.join(&summary.lifecycle_summary_path),
+        &json!(summary),
+    )?;
+    append_ledger_event(
+        run_dir,
+        "evolve.demo_lifecycle",
+        "evolve-cli",
+        json!({
+            "lifecycle_summary_path": summary.lifecycle_summary_path,
+            "classification_artifact_path": summary.classification_artifact_path,
+            "patch_draft_artifact_path": summary.patch_draft_artifact_path,
+            "sandbox_result_path": summary.sandbox_result_path,
+            "comparison_artifact_path": summary.comparison_artifact_path,
+            "manual_review_state": summary.manual_review_state,
+        }),
+    )?;
+    Ok(summary)
 }
 
 pub fn orchestrate_evolve_rerun(
@@ -7941,6 +8060,42 @@ scenarios:
         assert!(error
             .to_string()
             .contains("evolve rerun baseline is missing required artifact"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evolve_demo_lifecycle_links_completed_evidence() {
+        let (root, artifacts, _drafts) = create_sandbox_fixture("ouroforge-demo-lifecycle-test");
+        let repo_root = git_repo_root().expect("repo root resolves");
+
+        let summary =
+            run_evolve_demo_lifecycle(&artifacts.run_dir, &repo_root, false).expect("demo runs");
+
+        assert_eq!(summary.status, "lifecycle_evidence_ready");
+        assert_eq!(
+            summary.manual_review_state,
+            MutationReviewState::PendingReview
+        );
+        assert_eq!(
+            summary.classification_artifact_path,
+            "mutation/classifications.json"
+        );
+        assert_eq!(
+            summary.patch_draft_artifact_path,
+            "mutation/patch-drafts.json"
+        );
+        assert!(summary.sandbox_result_path.starts_with("sandbox/"));
+        assert!(summary
+            .comparison_artifact_path
+            .starts_with("mutation/run-comparison-"));
+        assert!(artifacts
+            .run_dir
+            .join(&summary.lifecycle_summary_path)
+            .is_file());
+        assert_eq!(
+            summary.primary_git_status_before,
+            summary.primary_git_status_after
+        );
         fs::remove_dir_all(root).ok();
     }
 
