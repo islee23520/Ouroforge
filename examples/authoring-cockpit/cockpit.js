@@ -106,6 +106,15 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers}`;
   }
 
+  function projectRunCommand(seedPath = 'seeds/platformer.yaml', projectPath = 'ouroforge.project.json', workers = 4, scenarioPackId = null) {
+    const scenarioPack = scenarioPackId ? ` --scenario-pack ${scenarioPackId}` : '';
+    return `cargo run -p ouroforge-cli -- run ${seedPath} --project ${projectPath} --workers ${workers}${scenarioPack}`;
+  }
+
+  function compareRunsCommand(beforeRun = 'runs/before', afterRun = 'runs/after', outputDir = `${afterRun}/comparisons`) {
+    return `cargo run -p ouroforge-cli -- compare ${beforeRun} ${afterRun} --output-dir ${outputDir}`;
+  }
+
   function projectValidateCommand(projectPath = 'ouroforge.project.json') {
     return `cargo run -p ouroforge-cli -- project validate ${projectPath}`;
   }
@@ -287,6 +296,7 @@ const OuroforgeCockpit = (() => {
     const project = projectContext(run);
     return [
       { id: 'project-workspace', label: 'Project workspace', present: Boolean(project), detail: project?.id || 'project metadata unavailable' },
+      { id: 'project-run', label: 'Project run summary', present: Boolean(project && run?.summary), detail: run?.summary?.id || 'project-bound run unavailable' },
       { id: 'run-browser', label: 'Run/evidence browser', present: hasRun && Array.isArray(run.evidence), detail: hasRun ? `${run.evidence.length} evidence artifact(s)` : 'dashboard data not loaded' },
       { id: 'journal-viewer', label: 'Journal viewer', present: Boolean(run?.journal_view?.exists || run?.journal), detail: run?.journal_view?.summary || 'journal artifact unavailable' },
       { id: 'mutation-review', label: 'Mutation review state', present: Boolean(run?.mutation_lifecycle), detail: run?.mutation_lifecycle?.terminal_state || 'no lifecycle read model' },
@@ -381,6 +391,37 @@ const OuroforgeCockpit = (() => {
       <div class="command-list">
         <code>${escapeText(projectValidateCommand(manifestPath))}</code>
         <code>${escapeText(seedValidateCommand(seedPath))}</code>
+        <code>${escapeText(dashboardExportCommand())}</code>
+      </div>
+    </section>`;
+  }
+
+  function renderProjectRunSurface(run) {
+    if (!run) {
+      return '<section id="project-run" class="panel"><h2>Project run summary</h2><p class="empty">No dashboard-data.json run is loaded yet. Run project QA and export dashboard data to inspect latest project-bound run state.</p></section>';
+    }
+    const project = projectContext(run);
+    if (!project) {
+      return '<section id="project-run" class="panel"><h2>Project run summary</h2><p class="empty">No project-bound run metadata is available for this run.</p></section>';
+    }
+    const summary = run.summary || {};
+    const pack = project.scenarioPack || project.scenario_pack || null;
+    const manifestPath = project.manifestPath || 'ouroforge.project.json';
+    const seedPath = project.seedPath || 'seeds/platformer.yaml';
+    const runDir = summary.run_dir || (summary.id ? `runs/${summary.id}` : 'runs/run-latest');
+    return `<section id="project-run" class="panel"><h2>Project run summary</h2>
+      <p class="hint">Latest project-bound run context from exported dashboard data. Generated run state is local evidence and should remain untracked.</p>
+      <div class="field-grid">
+        <div><strong>Run</strong><br>${escapeText(summary.id || 'unknown')}</div>
+        <div><strong>Run dir</strong><br>${escapeText(runDir)}</div>
+        <div><strong>Verdict</strong><br>${escapeText(summary.verdict_status || 'unknown')}</div>
+        <div><strong>Scenario</strong><br>${escapeText(summary.scenario_status || 'unknown')}</div>
+        <div><strong>Evidence</strong><br>${escapeText(summary.evidence_count ?? (run.evidence || []).length)}</div>
+        <div><strong>Generated-state status</strong><br>local/untracked expected</div>
+      </div>
+      <h3>Display-only project run commands</h3>
+      <div class="command-list">
+        <code>${escapeText(projectRunCommand(seedPath, manifestPath, 4, pack?.id || null))}</code>
         <code>${escapeText(dashboardExportCommand())}</code>
       </div>
     </section>`;
@@ -546,7 +587,7 @@ const OuroforgeCockpit = (() => {
       ? `<ul>${projectChanges.map((change) => `<li><strong>${escapeText(change.kind || 'project')}</strong>: ${escapeText(change.summary || '')} (${escapeText(change.before ?? 'none')} → ${escapeText(change.after ?? 'none')})</li>`).join('')}</ul>`
       : '<p class="empty compact">No project context changes recorded.</p>';
     const projectBlock = project
-      ? `<div class="semantic-project"><strong>Project context diff</strong>
+      ? `<div class="semantic-project"><strong>Project comparison summary</strong>
         <div class="field-grid compact">
           <div><strong>Relation</strong><br>${escapeText(project.relation || 'unknown')}</div>
           <div><strong>Changed</strong><br>${escapeText(project.changed === true ? 'true' : 'false')}</div>
@@ -574,7 +615,10 @@ const OuroforgeCockpit = (() => {
       return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="empty">${escapeText(comparison?.empty_state || 'No run comparison artifacts are available for this run.')}</p></section>`;
     }
     const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderSemanticComparisonSummary(artifact)}${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
-    return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="hint">Displays existing comparison artifacts only; no browser-side comparison algorithm runs here.</p>${artifacts}</section>`;
+    const first = (comparison.artifacts || [])[0] || {};
+    const beforeRun = first.before_run_id ? `runs/${first.before_run_id}` : 'runs/before';
+    const afterRun = first.after_run_id ? `runs/${first.after_run_id}` : run?.summary?.run_dir || 'runs/after';
+    return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="hint">Displays existing comparison artifacts only; no browser-side comparison algorithm runs here.</p>${artifacts}<h3>Display-only compare command</h3><div class="command-list"><code>${escapeText(compareRunsCommand(beforeRun, afterRun, `${afterRun}/comparisons`))}</code></div></section>`;
   }
 
   function renderStudioGaps() {
@@ -586,7 +630,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -662,7 +706,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
