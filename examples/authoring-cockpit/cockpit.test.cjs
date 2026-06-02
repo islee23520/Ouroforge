@@ -53,7 +53,7 @@ const run = {
   },
   mutation_lifecycle: { terminal_state: 'pending_review', command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'], stages: [{ id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json' }] },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
-  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'] }] },
+  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
   engine_summaries: {
     present: true,
     source_world_state: 'evidence/world.json',
@@ -97,6 +97,12 @@ assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/ru
 assert.match(cockpit.renderReplaySurface(run), /replay-1/);
 assert.match(cockpit.renderComparisonSurface(run), /before/);
 assert.match(cockpit.renderComparisonSurface(run), /after/);
+assert.match(cockpit.renderComparisonSurface(run), /Semantic evidence diff/);
+assert.match(cockpit.renderComparisonSurface(run), /scene edit transaction provenance changed/);
+assert.match(cockpit.renderComparisonSurface(run), /fixture warning/);
+assert.match(cockpit.renderSemanticComparisonSummary({}), /No semantic comparison summary/);
+assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
+assert.match(cockpit.renderSemanticComparisonSummary({ semantic: { reasons: [{ kind: '<script>', severity: '<img>', summary: '<bad>' }], warnings: ['<warn>'] } }), /&lt;bad&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /foundation-scene/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /runtime-v1-assets/);

@@ -406,12 +406,36 @@ const OuroforgeCockpit = (() => {
     return `<section id="replay-controls" class="panel"><h2>Replay controls</h2><p class="hint">Replay is displayed from generated evidence. Use the full evidence dashboard for frame stepping; cockpit composition remains read-only.</p>${sequences}</section>`;
   }
 
+  function renderSemanticComparisonSummary(artifact) {
+    const semantic = artifact?.semantic || artifact?.value?.semantic;
+    if (!semantic || typeof semantic !== 'object') {
+      return '<p class="empty compact">No semantic comparison summary is available for this artifact.</p>';
+    }
+    const reasons = Array.isArray(semantic.reasons) ? semantic.reasons : [];
+    const warnings = Array.isArray(semantic.warnings) ? semantic.warnings : [];
+    const reasonItems = reasons.length
+      ? reasons.slice(0, 5).map((reason) => `<li><span class="status-ok">${escapeText(reason.severity || 'changed')}</span> ${escapeText(reason.kind || 'reason')}: ${escapeText(reason.summary || '')}</li>`).join('')
+      : '<li>No semantic reasons recorded.</li>';
+    const warningBlock = warnings.length
+      ? `<div class="error">Warnings: ${escapeText(warnings.join(' · '))}</div>`
+      : '';
+    return `<div class="semantic-summary"><strong>Semantic evidence diff</strong>
+      <div class="field-grid">
+        <div><strong>Schema</strong><br>${escapeText(semantic.schemaVersion || 'legacy')}</div>
+        <div><strong>Scenario diffs</strong><br>${escapeText((semantic.scenarios || []).length)}</div>
+        <div><strong>World changes</strong><br>${escapeText((semantic.worldState?.changed || []).length)}</div>
+        <div><strong>Transaction</strong><br>${escapeText(semantic.transactionProvenance?.changed ? 'changed' : 'unchanged')}</div>
+      </div>
+      <ul>${reasonItems}</ul>${warningBlock}
+    </div>`;
+  }
+
   function renderComparisonSurface(run) {
     const comparison = run?.comparison;
     if (!comparison?.present) {
       return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="empty">${escapeText(comparison?.empty_state || 'No run comparison artifacts are available for this run.')}</p></section>`;
     }
-    const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
+    const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderSemanticComparisonSummary(artifact)}${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
     return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="hint">Displays existing comparison artifacts only; no browser-side comparison algorithm runs here.</p>${artifacts}</section>`;
   }
 
@@ -490,7 +514,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
