@@ -8023,6 +8023,52 @@ pub fn validate_scene_only_mutation_operation(
     })
 }
 
+pub fn reject_generated_artifact_source_collision(
+    output_path: &Path,
+    artifact_label: &str,
+) -> Result<()> {
+    if is_generated_artifact_path(output_path) || !is_source_like_artifact_path(output_path) {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "{artifact_label} output must not target source-like path {}",
+        output_path.display()
+    ))
+}
+
+fn is_generated_artifact_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        let value = component.as_os_str().to_string_lossy();
+        matches!(
+            value.as_ref(),
+            "runs" | "target" | "dashboard-data" | ".omx" | ".openchrome" | ".omc" | ".claude"
+        )
+    }) || path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "dashboard-data.json")
+}
+
+fn is_source_like_artifact_path(path: &Path) -> bool {
+    let has_source_component = path.components().any(|component| {
+        let value = component.as_os_str().to_string_lossy();
+        matches!(
+            value.as_ref(),
+            "assets" | "crates" | "docs" | "examples" | "scenes" | "seeds" | "src" | "tests"
+        )
+    });
+    let source_file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            matches!(
+                name,
+                "Cargo.toml" | "Cargo.lock" | "README.md" | "AGENTS.md" | ".gitignore"
+            )
+        });
+    has_source_component || source_file_name
+}
+
 pub fn reject_transaction_output_target_collision(
     transaction_output: &Path,
     target_scene_path: &Path,
@@ -14990,6 +15036,38 @@ scenarios:
             project_context.scene_hash.value
         );
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn artifact_write_policy_rejects_source_like_generated_output_targets() {
+        reject_generated_artifact_source_collision(
+            Path::new("scenes/main.scene.json"),
+            "dashboard export",
+        )
+        .expect_err("scene output target is rejected");
+        reject_generated_artifact_source_collision(Path::new("docs/report.json"), "comparison")
+            .expect_err("docs output target is rejected");
+        reject_generated_artifact_source_collision(Path::new("Cargo.toml"), "dashboard export")
+            .expect_err("Cargo.toml output target is rejected");
+    }
+
+    #[test]
+    fn artifact_write_policy_allows_generated_output_targets() {
+        reject_generated_artifact_source_collision(
+            Path::new("runs/run-1/dashboard-data.json"),
+            "dashboard export",
+        )
+        .expect("runs output is generated");
+        reject_generated_artifact_source_collision(
+            Path::new(".omx/tmp/dashboard-data.json"),
+            "dashboard export",
+        )
+        .expect("omx temp output is generated");
+        reject_generated_artifact_source_collision(
+            Path::new("examples/evidence-dashboard/dashboard-data.json"),
+            "dashboard export",
+        )
+        .expect("ignored dashboard-data export remains allowed");
     }
 
     #[test]

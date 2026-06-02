@@ -144,6 +144,72 @@ fn project_init_creates_valid_minimal_workspace_and_rejects_unsafe_destinations(
 }
 
 #[test]
+fn artifact_write_dashboard_export_rejects_project_scene_output_without_writing() {
+    let temp = unique_temp_dir("ouroforge-cli-artifact-write-dashboard-scene");
+    fs::create_dir_all(temp.join("scenes")).expect("project dirs exist");
+    fs::create_dir_all(temp.join("runs")).expect("runs dir exists");
+    let scene_path = temp.join("scenes/main.scene.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+    let failure = run_cli_expect_failure(
+        &temp,
+        &[
+            "dashboard",
+            "export",
+            "--runs-root",
+            temp.join("runs").to_str().unwrap(),
+            "--output",
+            scene_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(
+        failure.contains("dashboard export output must not target source-like path"),
+        "{failure}"
+    );
+    assert_eq!(
+        fs::read_to_string(&scene_path).expect("scene after reads"),
+        before_contents,
+        "dashboard export rejection must not clobber the trusted scene"
+    );
+    serde_json::from_str::<serde_json::Value>(&before_contents).expect("scene remains parseable");
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn artifact_write_dashboard_export_allows_generated_dashboard_data_overwrite() {
+    let temp = unique_temp_dir("ouroforge-cli-artifact-write-dashboard-generated");
+    fs::create_dir_all(temp.join("runs")).expect("runs dir exists");
+    let output = temp.join("dashboard-data/dashboard-data.json");
+    fs::create_dir_all(output.parent().expect("output parent")).expect("output dir exists");
+    fs::write(&output, "old generated dashboard data").expect("existing generated output");
+
+    let exported = run_cli(
+        &temp,
+        &[
+            "dashboard",
+            "export",
+            "--runs-root",
+            temp.join("runs").to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ],
+    );
+
+    assert!(exported.contains("Dashboard data exported"));
+    let payload: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&output).expect("dashboard output reads"))
+            .expect("dashboard output is json");
+    assert_eq!(payload["schema"], "ouroforge-dashboard-v1");
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn ledger_and_evidence_commands_operate_on_run_artifacts() {
     let temp = unique_temp_dir("ouroforge-cli-artifacts-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

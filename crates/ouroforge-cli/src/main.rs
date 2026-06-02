@@ -8,12 +8,13 @@ use ouroforge_core::{
     hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
     orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
-    read_scene, reject_transaction_output_target_collision, run_browser_smoke,
-    run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_run_comparison_artifact,
-    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewState, ProjectManifest, ProjectSceneMutationContext,
-    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
+    read_scene, reject_generated_artifact_source_collision,
+    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
+    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
+    validate_scene_reload, write_run_comparison_artifact, write_scene_edit_transaction_artifact,
+    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState,
+    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -466,6 +467,7 @@ fn main() -> Result<()> {
             after_run_dir,
             output_dir,
         } => {
+            reject_generated_artifact_source_collision(&output_dir, "comparison")?;
             let path = write_run_comparison_artifact(before_run_dir, after_run_dir, output_dir)?;
             let comparison = std::fs::read_to_string(&path)
                 .with_context(|| format!("failed to read comparison {}", path.display()))?;
@@ -584,6 +586,7 @@ fn main() -> Result<()> {
         Commands::Dashboard {
             command: DashboardCommand::Export { runs_root, output },
         } => {
+            reject_generated_artifact_source_collision(&output, "dashboard export")?;
             let summaries = list_dashboard_runs(&runs_root)?;
             let runs = summaries
                 .iter()
