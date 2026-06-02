@@ -7105,6 +7105,7 @@ pub struct RunDashboardReadModel {
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub replay: RunDashboardReplay,
     pub comparison: RunDashboardComparison,
+    pub transaction_provenance: Option<RunTransactionProvenance>,
     pub engine_summaries: RunDashboardEngineSummaries,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
@@ -7280,6 +7281,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let replay = read_dashboard_replay(run_dir, &evidence)?;
     let comparison = read_dashboard_comparison(run_dir);
+    let transaction_provenance = read_dashboard_transaction_provenance(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
@@ -7309,6 +7311,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         mutation_lifecycle,
         replay,
         comparison,
+        transaction_provenance,
         engine_summaries,
         evidence_categories,
         mutations,
@@ -7723,6 +7726,14 @@ fn dashboard_entities_with_component(world_state: &serde_json::Value, component:
                 .count()
         })
         .unwrap_or(0)
+}
+
+fn read_dashboard_transaction_provenance(
+    run: &serde_json::Value,
+) -> Option<RunTransactionProvenance> {
+    run.get("transaction_provenance")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
 }
 
 fn read_dashboard_engine_summaries(
@@ -13256,6 +13267,7 @@ scenarios:
         assert_eq!(model.scenario_results.len(), 1);
         assert_eq!(model.mutation_artifacts.len(), 1);
         assert_eq!(model.mutations.len(), 1);
+        assert!(model.transaction_provenance.is_none());
         let world_state = model.world_states[0]
             .value
             .as_ref()
@@ -13286,6 +13298,47 @@ scenarios:
             .evidence_categories
             .iter()
             .any(|category| category.id == "mutation_artifacts" && category.count == 1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_read_model_exposes_transaction_provenance_when_present() {
+        let (root, artifacts) = create_test_run("dashboard-transaction-provenance");
+        let mut run_json: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(artifacts.run_dir.join("run.json")).expect("run json reads"),
+        )
+        .expect("run json parses");
+        run_json["transaction_provenance"] = json!({
+            "transactionId": "scene-edit-fixture",
+            "transactionArtifactPath": "transactions/scene-edit-fixture.json",
+            "scenePath": "examples/game-runtime/scene.json",
+            "beforeSceneHash": {
+                "algorithm": "fnv1a64-canonical-json-v1",
+                "value": "before-fixture"
+            },
+            "afterSceneHash": {
+                "algorithm": "fnv1a64-canonical-json-v1",
+                "value": "after-fixture"
+            }
+        });
+        fs::write(
+            artifacts.run_dir.join("run.json"),
+            serde_json::to_string_pretty(&run_json).expect("run json serializes"),
+        )
+        .expect("run json updated");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        let provenance = model
+            .transaction_provenance
+            .expect("transaction provenance exposed");
+        assert_eq!(provenance.transaction_id, "scene-edit-fixture");
+        assert_eq!(
+            provenance.transaction_artifact_path,
+            "transactions/scene-edit-fixture.json"
+        );
+        assert_eq!(provenance.before_scene_hash.value, "before-fixture");
+        assert_eq!(provenance.after_scene_hash.value, "after-fixture");
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

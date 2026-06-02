@@ -158,6 +158,24 @@ const OuroforgeDashboard = (() => {
     </article>`).join('')}</div>`;
   }
 
+  function renderTransactionProvenance(run) {
+    const provenance = run.transaction_provenance;
+    if (!provenance) {
+      return '<section class="panel"><h2>Scene Edit Transaction</h2><p class="empty">No scene edit transaction provenance is recorded for this run.</p></section>';
+    }
+    const refs = [provenance.transactionArtifactPath, provenance.scenePath].filter(Boolean);
+    return `<section class="panel"><h2>Scene Edit Transaction</h2>
+      <p class="hint">Read-only. Provenance was written by the Rust CLI run binding.</p>
+      <dl>
+        <dt>Transaction</dt><dd>${escapeText(provenance.transactionId)}</dd>
+        <dt>Scene</dt><dd>${escapeText(provenance.scenePath)}</dd>
+        <dt>Before hash</dt><dd>${escapeText(provenance.beforeSceneHash && provenance.beforeSceneHash.value)}</dd>
+        <dt>After hash</dt><dd>${escapeText(provenance.afterSceneHash && provenance.afterSceneHash.value)}</dd>
+      </dl>
+      <div class="refs">${refs.map((ref) => `<a href="${escapeText(comparisonRefHref(ref, run))}">${escapeText(ref)}</a>`).join('')}</div>
+    </section>`;
+  }
+
   function renderRunComparison(run) {
     const comparison = run?.comparison;
     if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
@@ -385,6 +403,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
+      ${renderTransactionProvenance(run)}
       ${renderReplayControls(run, replayState)}
       ${renderRunComparison(run)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
@@ -448,7 +467,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

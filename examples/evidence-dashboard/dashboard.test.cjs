@@ -46,6 +46,13 @@ const run = {
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ state: 'accepted' }] },
     ],
   },
+  transaction_provenance: {
+    transactionId: 'scene-edit-abc123',
+    transactionArtifactPath: 'transactions/scene-edit.json',
+    scenePath: 'examples/game-runtime/scene.json',
+    beforeSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' },
+    afterSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash' },
+  },
   comparison: {
     present: true,
     empty_state: '',
@@ -169,6 +176,10 @@ assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
 assert.match(detail, /Replay Controls/);
+assert.match(detail, /Scene Edit Transaction/);
+assert.match(detail, /scene-edit-abc123/);
+assert.match(detail, /beforehash/);
+assert.match(detail, /afterhash/);
 assert.match(detail, /Run Comparison/);
 assert.match(detail, /Read-only\. Displays existing comparison artifacts only/);
 assert.match(detail, /before-run/);
@@ -215,6 +226,7 @@ assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'jour
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
+assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
 assert.equal(dashboard.comparisonRefHref('runs/before-run/verdict.json', run), '../../runs/before-run/verdict.json');
 assert.equal(dashboard.comparisonRefHref('evidence/world.json', run), '../../runs/run-1/evidence/world.json');
 assert.match(dashboard.renderRunList([], null), /No runs found/);
