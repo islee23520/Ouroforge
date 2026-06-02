@@ -10406,6 +10406,8 @@ pub struct ProjectRunMetadata {
     pub scenes: Vec<ProjectRunSceneMetadata>,
     #[serde(rename = "scenarioPack", skip_serializing_if = "Option::is_none")]
     pub scenario_pack: Option<ProjectRunScenarioPackMetadata>,
+    #[serde(rename = "transactionId", skip_serializing_if = "Option::is_none")]
+    pub transaction_id: Option<String>,
 }
 
 pub fn hash_project_manifest_file(path: impl AsRef<Path>) -> Result<ProjectArtifactHash> {
@@ -10482,6 +10484,7 @@ pub fn project_run_metadata_from_manifest(
         seed_path: relative_seed_path,
         scenes,
         scenario_pack,
+        transaction_id: None,
     })
 }
 
@@ -10507,7 +10510,8 @@ pub fn bind_run_project_metadata(
             "manifest_hash": metadata.manifest_hash,
             "seed_path": metadata.seed_path,
             "scene_paths": metadata.scenes.iter().map(|scene| scene.path.clone()).collect::<Vec<_>>(),
-            "scenario_pack_id": metadata.scenario_pack.as_ref().map(|pack| pack.id.clone())
+            "scenario_pack_id": metadata.scenario_pack.as_ref().map(|pack| pack.id.clone()),
+            "transaction_id": metadata.transaction_id
         }),
     )?;
     Ok(metadata)

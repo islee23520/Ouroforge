@@ -2,16 +2,16 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
-    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation,
+    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_project_metadata,
     bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
     create_run, edit_scene, evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
     list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
-    read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke,
-    run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_run_comparison_artifact,
-    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewState, ProjectManifest, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, WorkerId,
+    project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
+    read_scene, run_browser_smoke, run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path,
+    run_scenarios, show_journal, update_journal, validate_scene_reload,
+    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState, ProjectManifest,
+    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -41,6 +41,10 @@ enum Commands {
         workers: usize,
         #[arg(long, value_name = "PATH")]
         transaction: Option<PathBuf>,
+        #[arg(long, value_name = "PATH")]
+        project: Option<PathBuf>,
+        #[arg(long, value_name = "ID")]
+        scenario_pack: Option<String>,
     },
     Ledger {
         #[command(subcommand)]
@@ -311,17 +315,34 @@ fn main() -> Result<()> {
             seed_path,
             workers,
             transaction,
+            project,
+            scenario_pack,
         } => {
             if workers == 0 {
                 return Err(anyhow!("--workers must be at least 1"));
             }
-            let artifacts = create_run(seed_path, "runs")?;
+            let project_metadata = if let Some(project_path) = project {
+                let manifest_path = resolve_project_manifest_path(&project_path);
+                Some(project_run_metadata_from_manifest(
+                    &manifest_path,
+                    &seed_path,
+                    scenario_pack.as_deref(),
+                )?)
+            } else {
+                if scenario_pack.is_some() {
+                    return Err(anyhow!("--scenario-pack requires --project"));
+                }
+                None
+            };
+            let artifacts = create_run(&seed_path, "runs")?;
+            let mut transaction_id = None;
             if let Some(transaction_path) = transaction {
                 // A stale/malformed transaction (or scene-hash mismatch) must not
                 // leave an orphaned run behind for `ledger list`/dashboard exports
                 // to pick up, so remove the freshly created run on bind failure.
                 match bind_run_transaction_provenance(&artifacts.run_dir, transaction_path) {
                     Ok(provenance) => {
+                        transaction_id = Some(provenance.transaction_id.clone());
                         println!("Run transaction bound: {}", provenance.transaction_id);
                     }
                     Err(error) => {
@@ -329,6 +350,12 @@ fn main() -> Result<()> {
                         return Err(error);
                     }
                 }
+            }
+            if let Some(mut metadata) = project_metadata {
+                metadata.transaction_id = transaction_id;
+                let project_id = metadata.id.clone();
+                bind_run_project_metadata(&artifacts.run_dir, metadata)?;
+                println!("Run project bound: {project_id}");
             }
             println!("Run created: {}", artifacts.run_dir.display());
             if workers > 1 {

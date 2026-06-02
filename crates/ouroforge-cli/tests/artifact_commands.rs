@@ -275,6 +275,99 @@ fn scene_edit_transaction_output_records_success_and_failure() {
 }
 
 #[test]
+fn run_command_binds_validated_project_metadata_and_preflights_invalid_projects() {
+    let temp = unique_temp_dir("ouroforge-cli-project-run-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let project_dir = temp.join("project");
+    run_cli(
+        &temp,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    let seed_path = project_dir.join("seeds/platformer.yaml");
+    let run_output = run_cli(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    assert!(run_output.contains("Run project bound: minimal_2d"));
+    let run_dir_line = run_output
+        .lines()
+        .find(|line| line.starts_with("Run created: "))
+        .expect("run created line present");
+    let run_dir = temp.join(run_dir_line.strip_prefix("Run created: ").unwrap());
+    let run_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(run_dir.join("run.json")).unwrap()).unwrap();
+    let project = run_json.get("project").expect("project metadata recorded");
+    assert_eq!(project["id"], "minimal_2d");
+    assert_eq!(project["seedPath"], "seeds/platformer.yaml");
+    assert_eq!(project["scenarioPack"]["id"], "smoke");
+    assert_eq!(project["scenarioPack"]["scenarioIds"][0], "scaffold-smoke");
+    assert_eq!(project["scenes"][0]["path"], "scenes/main.scene.json");
+    assert!(project["manifestHash"]["value"].as_str().unwrap().len() == 16);
+    let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
+    assert!(ledger.contains("run.project_bound"));
+
+    let invalid_root = temp.join("invalid-preflight");
+    fs::create_dir_all(invalid_root.join("assets")).expect("invalid assets");
+    fs::write(
+        invalid_root.join("ouroforge.project.json"),
+        r#"{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "invalid_preflight", "name": "Invalid Preflight" },
+  "scenes": [{ "id": "main", "path": "missing.scene.json" }],
+  "seeds": [{ "id": "platformer", "path": "seeds/platformer.yaml" }],
+  "scenarioPacks": [],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}
+"#,
+    )
+    .expect("invalid manifest written");
+    let before_runs = fs::read_dir(temp.join("runs")).unwrap().count();
+    let invalid = run_cli_expect_failure(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            invalid_root.to_str().unwrap(),
+        ],
+    );
+    assert!(invalid.contains("missing file"));
+    let after_runs = fs::read_dir(temp.join("runs")).unwrap().count();
+    assert_eq!(
+        after_runs, before_runs,
+        "invalid project must fail before run creation"
+    );
+
+    let scenario_without_project = run_cli_expect_failure(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    assert!(scenario_without_project.contains("--scenario-pack requires --project"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
     let temp = unique_temp_dir("ouroforge-cli-run-transaction-binding-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
