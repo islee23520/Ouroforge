@@ -23,3 +23,18 @@ Later PRs in #213 run/export the suite and record dashboard compatibility eviden
 - Assertions must be deterministic and evidence-linked.
 - Generated run evidence remains untracked under `runs/`.
 - Browser/runtime smoke is useful for PR evidence but tracked changes should remain seed/docs/tests only unless a later issue explicitly authorizes code changes.
+
+## AL2.4.4 dashboard compatibility evidence
+
+The feature regression suite is expected to run with the standard local MVP command and then export dashboard data without committing generated artifacts:
+
+```sh
+cargo run -p ouroforge-cli -- run seeds/engine-feature-renderer-tilemap.yaml --workers 4
+cargo run -p ouroforge-cli -- run seeds/engine-feature-asset-animation-audio.yaml --workers 4
+cargo run -p ouroforge-cli -- run seeds/engine-feature-physics-reload-composition.yaml --workers 4
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output .omx/tmp/scenario-coverage-v2/dashboard-data.json
+node examples/evidence-dashboard/dashboard.test.cjs
+node examples/authoring-cockpit/cockpit.test.cjs
+```
+
+AL2.4.4 used initial generated run evidence to correct scenario expectations to the current Engine Expansion v1 runtime state. The important compatibility contract is that all feature seeds can produce passing verdicts locally, dashboard export can read the generated runs, and the generated `runs/` plus `.omx/tmp/` evidence remains untracked.

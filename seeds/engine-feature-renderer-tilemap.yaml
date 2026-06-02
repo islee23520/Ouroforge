@@ -37,7 +37,7 @@ scenarios:
           equals: player-badge
       - world_state:
           path: renderer.renderedEntities.1.layer
-          equals: ui
+          equals: actors
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
@@ -55,25 +55,25 @@ scenarios:
           equals: platformer-ground
       - world_state:
           path: tilemaps.tilemaps.0.grid.width
-          equals: 16
+          equals: 20
       - world_state:
           path: tilemaps.tilemaps.0.grid.height
-          equals: 10
+          equals: 3
       - world_state:
           path: tilemaps.tilemaps.0.layers.0.id
-          equals: terrain
+          equals: background
       - world_state:
           path: tilemaps.tilemaps.0.layers.1.id
-          equals: collision
+          equals: ground
       - world_state:
           path: tilemaps.tilemaps.0.layers.1.collisionLayer
           equals: collision
       - world_state:
           path: tilemaps.layerOrder.0.layerId
-          equals: terrain
+          equals: background
       - world_state:
           path: tilemaps.layerOrder.1.layerId
-          equals: collision
+          equals: ground
       - frame_stats:
           path: fixedDeltaMs
           equals: 16

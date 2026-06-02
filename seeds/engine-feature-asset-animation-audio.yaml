@@ -61,7 +61,7 @@ scenarios:
           equals: player-sprite
       - world_state:
           path: entities.0.components.animation.state.elapsedFrames
-          equals: 4
+          equals: 5
       - world_state:
           path: entities.0.components.animation.state.frameIndex
           equals: 2

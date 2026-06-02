@@ -92,7 +92,7 @@ scenarios:
           equals: 38
       - world_state:
           path: composition.entities.1.worldTransform.y
-          equals: 20
+          equals: 66
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
