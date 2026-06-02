@@ -106,6 +106,14 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers}`;
   }
 
+  function projectValidateCommand(projectPath = 'ouroforge.project.json') {
+    return `cargo run -p ouroforge-cli -- project validate ${projectPath}`;
+  }
+
+  function seedValidateCommand(seedPath = 'seeds/platformer.yaml') {
+    return `cargo run -p ouroforge-cli -- seed validate ${seedPath}`;
+  }
+
   function qaTransactionCommand(seedPath = 'seeds/platformer.yaml', transactionPath = 'runs/manual/transactions/scene-edit.json', workers = 4) {
     return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers} --transaction ${transactionPath}`;
   }
@@ -276,7 +284,9 @@ const OuroforgeCockpit = (() => {
 
   function studioSurfaceSummary(run) {
     const hasRun = Boolean(run);
+    const project = projectContext(run);
     return [
+      { id: 'project-workspace', label: 'Project workspace', present: Boolean(project), detail: project?.id || 'project metadata unavailable' },
       { id: 'run-browser', label: 'Run/evidence browser', present: hasRun && Array.isArray(run.evidence), detail: hasRun ? `${run.evidence.length} evidence artifact(s)` : 'dashboard data not loaded' },
       { id: 'journal-viewer', label: 'Journal viewer', present: Boolean(run?.journal_view?.exists || run?.journal), detail: run?.journal_view?.summary || 'journal artifact unavailable' },
       { id: 'mutation-review', label: 'Mutation review state', present: Boolean(run?.mutation_lifecycle), detail: run?.mutation_lifecycle?.terminal_state || 'no lifecycle read model' },
@@ -326,6 +336,53 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Preview-only read model from exported evidence. The cockpit does not own scene state or persist edits; use generated Rust commands for validation-gated changes.</p>
       <div class="field-grid">${cards}</div>
       <p class="hint">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>
+    </section>`;
+  }
+
+  function projectContext(run) {
+    const project = run?.project || run?.summary?.project || null;
+    return project && typeof project === 'object' && !Array.isArray(project) ? project : null;
+  }
+
+  function renderProjectWorkspaceSurface(run) {
+    if (!run) {
+      return '<section id="project-workspace" class="panel"><h2>Project workspace</h2><p class="empty">No dashboard-data.json run is loaded yet. Export a project-bound run to inspect manifest, scene, seed, and scenario pack context.</p></section>';
+    }
+    const project = projectContext(run);
+    if (!project) {
+      const malformed = run.project && typeof run.project !== 'object'
+        ? `<p class="error">Malformed project metadata was ignored: ${escapeText(run.project)}</p>`
+        : '';
+      return `<section id="project-workspace" class="panel"><h2>Project workspace</h2><p class="empty">No project workspace metadata is recorded for this run. Use <code>ouroforge-cli run &lt;seed&gt; --project &lt;manifest&gt;</code> to bind project context.</p>${malformed}</section>`;
+    }
+    const scenes = Array.isArray(project.scenes) ? project.scenes : [];
+    const sceneRows = scenes.length
+      ? scenes.map((scene) => `<li><strong>${escapeText(scene.id || 'scene')}</strong> · ${escapeText(scene.path || 'unknown path')} · ${escapeText(scene.hash?.algorithm || '')}:${escapeText(scene.hash?.value || 'unknown hash')}</li>`).join('')
+      : '<li>No scene sources are listed in project metadata.</li>';
+    const pack = project.scenarioPack || project.scenario_pack || null;
+    const scenarioIds = Array.isArray(pack?.scenarioIds) ? pack.scenarioIds : Array.isArray(pack?.scenario_ids) ? pack.scenario_ids : [];
+    const scenarioPack = pack
+      ? `<div><strong>Scenario pack</strong><br>${escapeText(pack.id || 'unknown')} · ${escapeText(pack.path || 'unknown path')}<br><small>${escapeText(scenarioIds.join(', ') || 'no scenario ids recorded')}</small></div>`
+      : '<div><strong>Scenario pack</strong><br><span class="status-idle">not bound</span><br><small>No project scenario pack context is recorded.</small></div>';
+    const manifestPath = project.manifestPath || 'ouroforge.project.json';
+    const seedPath = project.seedPath || 'seeds/platformer.yaml';
+    return `<section id="project-workspace" class="panel"><h2>Project workspace</h2>
+      <p class="hint">Read-only project context from Rust-exported dashboard data. The cockpit displays manifest/seed/scenario information and copyable commands only; it does not validate, write, or execute anything from the browser.</p>
+      <div class="field-grid">
+        <div><strong>Project</strong><br>${escapeText(project.id || 'unknown')} · ${escapeText(project.name || 'unknown')}</div>
+        <div><strong>Project root</strong><br>${escapeText(project.projectRoot || 'unknown')}</div>
+        <div><strong>Manifest</strong><br>${escapeText(manifestPath)}</div>
+        <div><strong>Manifest hash</strong><br>${escapeText(project.manifestHash?.algorithm || '')}:${escapeText(project.manifestHash?.value || 'unknown')}</div>
+        <div><strong>Seed</strong><br>${escapeText(seedPath)}</div>
+        ${scenarioPack}
+      </div>
+      <h3>Scene sources</h3><ul>${sceneRows}</ul>
+      <h3>Display-only project commands</h3>
+      <div class="command-list">
+        <code>${escapeText(projectValidateCommand(manifestPath))}</code>
+        <code>${escapeText(seedValidateCommand(seedPath))}</code>
+        <code>${escapeText(dashboardExportCommand())}</code>
+      </div>
     </section>`;
   }
 
@@ -529,7 +586,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -605,7 +662,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

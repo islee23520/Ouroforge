@@ -39,6 +39,16 @@ assert.equal(
 
 const run = {
   summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed', scenario_status: 'passed' },
+  project: {
+    id: 'minimal_2d',
+    name: 'Minimal 2D Ouroforge Project',
+    projectRoot: 'examples/project',
+    manifestPath: 'examples/project/ouroforge.project.json',
+    manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' },
+    seedPath: 'seeds/platformer.yaml',
+    scenes: [{ id: 'main', path: 'scenes/main.scene.json', hash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'scenehash' } }],
+    scenarioPack: { id: 'smoke', path: 'scenarios/smoke.scenario-pack.json', scenarioIds: ['scaffold-smoke'] },
+  },
   evidence: [{ id: 'evidence-1', path: 'evidence/indexed.json' }],
   mutations: [{ id: 'mutation-1' }],
   screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }],
@@ -90,8 +100,19 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 9);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 10);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
+assert.equal(cockpit.projectValidateCommand('examples/project/ouroforge.project.json'), 'cargo run -p ouroforge-cli -- project validate examples/project/ouroforge.project.json');
+assert.equal(cockpit.seedValidateCommand('seeds/platformer.yaml'), 'cargo run -p ouroforge-cli -- seed validate seeds/platformer.yaml');
+assert.match(cockpit.renderProjectWorkspaceSurface(run), /Project workspace/);
+assert.match(cockpit.renderProjectWorkspaceSurface(run), /minimal_2d/);
+assert.match(cockpit.renderProjectWorkspaceSurface(run), /scenes\/main\.scene\.json/);
+assert.match(cockpit.renderProjectWorkspaceSurface(run), /scaffold-smoke/);
+assert.match(cockpit.renderProjectWorkspaceSurface(run), /project validate examples\/project\/ouroforge\.project\.json/);
+assert.match(cockpit.renderProjectWorkspaceSurface({ summary: { id: 'run-no-project' }, evidence: [] }), /No project workspace metadata/);
+assert.match(cockpit.renderProjectWorkspaceSurface({ summary: { id: 'run-bad-project' }, project: '<script>alert(1)</script>' }), /Malformed project metadata/);
+assert.match(cockpit.renderProjectWorkspaceSurface({ summary: { id: 'run-bad-project' }, project: '<script>alert(1)</script>' }), /&lt;script&gt;alert/);
+assert.match(cockpit.renderProjectWorkspaceSurface({ summary: { id: 'run-escaped' }, project: { id: '<img>', name: '<script>', manifestPath: '<manifest>', scenes: [{ id: '<scene>', path: '<path>', hash: { value: '<hash>' } }], scenarioPack: { id: '<pack>', path: '<pack-path>', scenarioIds: ['<scenario>'] } } }), /&lt;img&gt;/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /Authoring provenance/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /scene-edit-abc123/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /beforehash/);
@@ -142,6 +163,7 @@ assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
 assert.match(cockpit.renderIntegration(run), /Pause/);
 assert.match(cockpit.renderIntegration(run), /Step 1 frame/);
+assert.match(cockpit.renderIntegration(run), /Project workspace/);
 assert.match(cockpit.renderIntegration(run), /Run\/evidence browser/);
 assert.match(cockpit.renderIntegration(run), /Authoring provenance/);
 assert.match(cockpit.renderIntegration(run), /Journal viewer/);
