@@ -2099,6 +2099,132 @@ pub struct MutationProposalInput {
     pub to: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationClassificationCategory {
+    ScenarioAssertionFailure,
+    RuntimeProbeFailure,
+    ConsoleError,
+    PerformanceRegression,
+    VisualMismatch,
+    MissingEvidence,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationClassificationState {
+    Classified,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationClassification {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal_id: Option<String>,
+    pub category: MutationClassificationCategory,
+    pub lifecycle_state: MutationClassificationState,
+    pub reason: String,
+    pub evidence_refs: Vec<String>,
+    pub verdict_ref: String,
+    pub journal_ref: String,
+    #[serde(default)]
+    pub scenario_result_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationClassificationArtifact {
+    pub schema_version: String,
+    pub run_id: String,
+    pub classifications: Vec<MutationClassification>,
+}
+
+impl MutationClassificationArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!(
+                "mutation classification schema_version must be \"1\""
+            ));
+        }
+        require_text("mutation classification run_id", &self.run_id)?;
+        if self.classifications.is_empty() {
+            return Err(anyhow!(
+                "mutation classification artifact must include at least one classification"
+            ));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for classification in &self.classifications {
+            classification.validate()?;
+            if !ids.insert(classification.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate mutation classification id: {}",
+                    classification.id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationClassification {
+    pub fn validate(&self) -> Result<()> {
+        require_text("mutation classification id", &self.id)?;
+        if let Some(proposal_id) = &self.proposal_id {
+            require_text("mutation classification proposal_id", proposal_id)?;
+        }
+        require_text("mutation classification reason", &self.reason)?;
+        require_text("mutation classification verdict_ref", &self.verdict_ref)?;
+        require_text("mutation classification journal_ref", &self.journal_ref)?;
+        for evidence_ref in &self.evidence_refs {
+            require_text("mutation classification evidence_ref", evidence_ref)?;
+        }
+        for scenario_result_ref in &self.scenario_result_refs {
+            require_text(
+                "mutation classification scenario_result_ref",
+                scenario_result_ref,
+            )?;
+        }
+        if self.category != MutationClassificationCategory::Unknown && self.evidence_refs.is_empty()
+        {
+            return Err(anyhow!(
+                "non-unknown mutation classifications require at least one evidence ref"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub fn read_mutation_classification_artifact(
+    run_dir: impl AsRef<Path>,
+) -> Result<MutationClassificationArtifact> {
+    let path = run_dir.as_ref().join("mutation/classifications.json");
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read mutation classifications {}", path.display()))?;
+    let artifact: MutationClassificationArtifact =
+        serde_json::from_str(&input).with_context(|| {
+            format!(
+                "failed to parse mutation classifications {}",
+                path.display()
+            )
+        })?;
+    artifact.validate()?;
+    Ok(artifact)
+}
+
+pub fn write_mutation_classification_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &MutationClassificationArtifact,
+) -> Result<PathBuf> {
+    artifact.validate()?;
+    let dir = run_dir.as_ref().join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    let path = dir.join("classifications.json");
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
 pub fn create_mutation_proposal(
     run_dir: impl AsRef<Path>,
     input: MutationProposalInput,
@@ -5618,6 +5744,178 @@ scenarios:
         .expect_err("missing evidence fails");
 
         assert!(error.to_string().contains("evidence id not found"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn writes_and_reads_valid_mutation_classification_artifact() {
+        let (root, artifacts) = create_test_run("ouroforge-classification-valid-test");
+        let artifact = MutationClassificationArtifact {
+            schema_version: "1".to_string(),
+            run_id: "run-classification-valid".to_string(),
+            classifications: vec![MutationClassification {
+                id: "classification-1".to_string(),
+                proposal_id: Some("mutation-1".to_string()),
+                category: MutationClassificationCategory::ScenarioAssertionFailure,
+                lifecycle_state: MutationClassificationState::Classified,
+                reason: "scenario assertion failed with linked evidence".to_string(),
+                evidence_refs: vec!["evidence/scenarios/demo/scenario-result-1.json".to_string()],
+                verdict_ref: "verdict.json".to_string(),
+                journal_ref: "journal.md".to_string(),
+                scenario_result_refs: vec![
+                    "evidence/scenarios/demo/scenario-result-1.json".to_string()
+                ],
+            }],
+        };
+
+        let path = write_mutation_classification_artifact(&artifacts.run_dir, &artifact)
+            .expect("classification writes");
+        assert_eq!(
+            path,
+            artifacts.run_dir.join("mutation/classifications.json")
+        );
+        let round_trip = read_mutation_classification_artifact(&artifacts.run_dir)
+            .expect("classification reads");
+
+        assert_eq!(round_trip, artifact);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn unknown_mutation_classification_allows_reason_without_evidence_refs() {
+        let artifact = MutationClassificationArtifact {
+            schema_version: "1".to_string(),
+            run_id: "run-classification-unknown".to_string(),
+            classifications: vec![MutationClassification {
+                id: "classification-unknown".to_string(),
+                proposal_id: None,
+                category: MutationClassificationCategory::Unknown,
+                lifecycle_state: MutationClassificationState::Classified,
+                reason: "verdict did not include enough structured evidence".to_string(),
+                evidence_refs: Vec::new(),
+                verdict_ref: "verdict.json".to_string(),
+                journal_ref: "journal.md".to_string(),
+                scenario_result_refs: Vec::new(),
+            }],
+        };
+
+        artifact
+            .validate()
+            .expect("unknown classification is valid with reason");
+    }
+
+    #[test]
+    fn rejects_non_unknown_mutation_classification_without_evidence_refs() {
+        let artifact = MutationClassificationArtifact {
+            schema_version: "1".to_string(),
+            run_id: "run-classification-invalid".to_string(),
+            classifications: vec![MutationClassification {
+                id: "classification-invalid".to_string(),
+                proposal_id: None,
+                category: MutationClassificationCategory::ConsoleError,
+                lifecycle_state: MutationClassificationState::Classified,
+                reason: "console error must cite evidence".to_string(),
+                evidence_refs: Vec::new(),
+                verdict_ref: "verdict.json".to_string(),
+                journal_ref: "journal.md".to_string(),
+                scenario_result_refs: Vec::new(),
+            }],
+        };
+
+        let error = artifact
+            .validate()
+            .expect_err("non-unknown classification without evidence fails");
+        assert!(error
+            .to_string()
+            .contains("non-unknown mutation classifications require"));
+    }
+
+    #[test]
+    fn rejects_duplicate_mutation_classification_ids() {
+        let classification = MutationClassification {
+            id: "classification-duplicate".to_string(),
+            proposal_id: None,
+            category: MutationClassificationCategory::MissingEvidence,
+            lifecycle_state: MutationClassificationState::Classified,
+            reason: "missing evidence was detected".to_string(),
+            evidence_refs: vec!["verdict.json".to_string()],
+            verdict_ref: "verdict.json".to_string(),
+            journal_ref: "journal.md".to_string(),
+            scenario_result_refs: Vec::new(),
+        };
+        let artifact = MutationClassificationArtifact {
+            schema_version: "1".to_string(),
+            run_id: "run-classification-duplicate".to_string(),
+            classifications: vec![classification.clone(), classification],
+        };
+
+        let error = artifact
+            .validate()
+            .expect_err("duplicate classification ids fail");
+        assert!(error
+            .to_string()
+            .contains("duplicate mutation classification id"));
+    }
+
+    #[test]
+    fn rejects_unsupported_mutation_classification_category() {
+        let input = r#"
+{
+  "schema_version": "1",
+  "run_id": "run-invalid-category",
+  "classifications": [
+    {
+      "id": "classification-invalid-category",
+      "category": "semantic_root_cause",
+      "lifecycle_state": "classified",
+      "reason": "unsupported broad taxonomy should fail",
+      "evidence_refs": ["verdict.json"],
+      "verdict_ref": "verdict.json",
+      "journal_ref": "journal.md"
+    }
+  ]
+}
+"#;
+
+        let error = serde_json::from_str::<MutationClassificationArtifact>(input)
+            .expect_err("unsupported category fails during parse");
+
+        assert!(error.to_string().contains("unknown variant"));
+    }
+
+    #[test]
+    fn mutation_proposals_remain_compatible_without_classifications() {
+        let (root, artifacts) = create_test_run("ouroforge-classification-compat-test");
+        fs::write(artifacts.run_dir.join("evidence/source.json"), "{}\n")
+            .expect("evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "evidence-1",
+            "application/json",
+            "evidence/source.json",
+            json!({}),
+        )
+        .expect("evidence indexed");
+
+        create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "classification schema must not be required".to_string(),
+                evidence_id: "evidence-1".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.0.assertions".to_string(),
+                from: "old".to_string(),
+                to: "new".to_string(),
+            },
+        )
+        .expect("proposal still writes without classifications");
+
+        let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
+        assert_eq!(proposals.len(), 1);
+        assert!(!artifacts
+            .run_dir
+            .join("mutation/classifications.json")
+            .exists());
         fs::remove_dir_all(root).ok();
     }
 
