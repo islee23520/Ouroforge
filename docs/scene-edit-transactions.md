@@ -38,6 +38,26 @@ cargo run -p ouroforge-cli -- scene edit examples/game-runtime/scene.json \
   --transaction-output runs/manual/transactions/invalid-size.json
 ```
 
+## Transaction-output safety
+
+`--transaction-output` is a generated evidence destination, not a trusted scene
+source destination. Rust rejects transaction artifact paths that would overwrite
+or alias the target scene before any artifact write occurs. The shared guard
+rejects:
+
+- exact path equality with the scene path;
+- canonical/symlink aliases that resolve to the scene path;
+- hard-link or same-file aliases where filesystem identity is available.
+
+This rule applies to both `scene edit --transaction-output` and scene-only
+mutation application transaction outputs. Rejection must leave the original scene
+bytes unchanged and parseable, and valid distinct transaction-output paths must
+continue to work.
+
+Manual review boundary: a transaction artifact can prove what the Rust command
+validated or rejected, but it does not authorize browser-side writes, command
+bridges, source patch application, or automatic mutation acceptance.
+
 ## Generated-state policy
 
 Transaction artifacts are generated evidence. Keep them in ignored/local paths such as `runs/...` or `.omx/tmp/...` unless a future issue explicitly asks for a small tracked fixture. Do not commit generated transaction artifacts from local authoring sessions.
