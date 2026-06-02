@@ -5108,8 +5108,34 @@ fn render_journal(
     out.push_str("## Observations\n\n");
     out.push_str(&format!("- Ledger events recorded: {}\n", ledger.len()));
     out.push_str(&format!(
-        "- Evidence artifacts indexed: {}\n\n",
+        "- Evidence artifacts indexed: {}\n",
         evidence.artifacts.len()
+    ));
+    let legacy_replay_count = evidence
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("input_replay")
+        })
+        .count();
+    let scenario_replay_count = evidence
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("scenario_input_replay")
+        })
+        .count();
+    out.push_str(&format!(
+        "- Input replay evidence: {} legacy replay artifact(s), {} scenario input replay artifact(s)\n\n",
+        legacy_replay_count, scenario_replay_count
     ));
 
     out.push_str("## Evidence\n\n");
@@ -5435,6 +5461,8 @@ pub struct RunSemanticDiff {
     pub events: RunSemanticEventDiff,
     pub performance: RunSemanticPerformanceDiff,
     pub evidence: RunSemanticEvidenceDiff,
+    #[serde(rename = "inputReplay")]
+    pub input_replay: RunSemanticReplayDiff,
     #[serde(rename = "transactionProvenance")]
     pub transaction_provenance: RunSemanticTransactionDiff,
     pub warnings: Vec<String>,
@@ -5493,6 +5521,16 @@ pub struct RunSemanticEvidenceDiff {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticReplayDiff {
+    #[serde(rename = "beforeCount")]
+    pub before_count: usize,
+    #[serde(rename = "afterCount")]
+    pub after_count: usize,
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunSemanticProjectDiff {
     pub before: Option<ProjectRunMetadata>,
     pub after: Option<ProjectRunMetadata>,
@@ -5526,6 +5564,8 @@ pub struct RunComparisonSnapshot {
     pub assertion_failures: usize,
     pub performance_artifacts: usize,
     pub evidence_artifacts: usize,
+    #[serde(rename = "inputReplayArtifacts")]
+    pub input_replay_artifacts: usize,
     pub mutation_proposals: usize,
 }
 
@@ -5537,6 +5577,7 @@ struct RunComparisonDetails {
     events: BTreeSet<String>,
     performance: BTreeMap<String, serde_json::Value>,
     evidence_keys: BTreeSet<String>,
+    input_replay_keys: BTreeSet<String>,
     project: Option<ProjectRunMetadata>,
     transaction_provenance: Option<RunTransactionProvenance>,
     warnings: Vec<String>,
@@ -5578,6 +5619,7 @@ pub fn compare_runs(
             "assertion_failures": after.assertion_failures as i64 - before.assertion_failures as i64,
             "performance_artifacts": after.performance_artifacts as i64 - before.performance_artifacts as i64,
             "evidence_artifacts": after.evidence_artifacts as i64 - before.evidence_artifacts as i64,
+            "input_replay_artifacts": after.input_replay_artifacts as i64 - before.input_replay_artifacts as i64,
             "mutation_proposals": after.mutation_proposals as i64 - before.mutation_proposals as i64
         }),
         semantic,
@@ -5613,6 +5655,13 @@ fn build_run_semantic_diff(
         },
     };
     let evidence = semantic_evidence_set_diff(&before.evidence_keys, &after.evidence_keys);
+    let input_replay_set = semantic_set_diff(&before.input_replay_keys, &after.input_replay_keys);
+    let input_replay = RunSemanticReplayDiff {
+        before_count: before.snapshot.input_replay_artifacts,
+        after_count: after.snapshot.input_replay_artifacts,
+        added: input_replay_set.added,
+        removed: input_replay_set.removed,
+    };
     let project = semantic_project_diff(&before.project, &after.project);
     let transaction_provenance = RunSemanticTransactionDiff {
         before: before.transaction_provenance.clone(),
@@ -5634,6 +5683,7 @@ fn build_run_semantic_diff(
         events: &events,
         performance: &performance,
         evidence: &evidence,
+        input_replay: &input_replay,
         project: &project,
         transaction: &transaction_provenance,
         warnings: &warnings,
@@ -5647,6 +5697,7 @@ fn build_run_semantic_diff(
         events,
         performance,
         evidence,
+        input_replay,
         transaction_provenance,
         warnings,
     }
@@ -5751,6 +5802,8 @@ fn load_run_comparison_details_without_project(
     let mut events = BTreeSet::new();
     let mut performance = BTreeMap::new();
     let mut evidence_keys = BTreeSet::new();
+    let mut input_replay_keys = BTreeSet::new();
+    let mut input_replay_artifacts = 0usize;
     let mut warnings = warnings;
     for artifact in &evidence.artifacts {
         evidence_keys.insert(format!(
@@ -5852,6 +5905,15 @@ fn load_run_comparison_details_without_project(
                     artifact.path
                 )),
             },
+            Some("input_replay") | Some("scenario_input_replay") => {
+                input_replay_artifacts += 1;
+                input_replay_keys.insert(input_replay_semantic_key(
+                    run_dir,
+                    label,
+                    artifact,
+                    &mut warnings,
+                ));
+            }
             _ => {}
         }
     }
@@ -5877,6 +5939,7 @@ fn load_run_comparison_details_without_project(
         assertion_failures,
         performance_artifacts,
         evidence_artifacts: evidence.artifacts.len(),
+        input_replay_artifacts,
         mutation_proposals,
     };
     Ok(RunComparisonDetails {
@@ -5886,10 +5949,59 @@ fn load_run_comparison_details_without_project(
         events,
         performance,
         evidence_keys,
+        input_replay_keys,
         project: None,
         transaction_provenance,
         warnings,
     })
+}
+
+fn input_replay_semantic_key(
+    run_dir: &Path,
+    label: &str,
+    artifact: &EvidenceArtifact,
+    warnings: &mut Vec<String>,
+) -> String {
+    match read_json_value(run_dir.join(&artifact.path)) {
+        Ok(value) => {
+            let scenario_id = value
+                .get("scenarioId")
+                .or_else(|| value.get("scenario_id"))
+                .and_then(|value| value.as_str())
+                .or_else(|| {
+                    artifact
+                        .metadata
+                        .get("scenario_id")
+                        .and_then(|value| value.as_str())
+                })
+                .unwrap_or("unknown-scenario");
+            let action = value
+                .get("action")
+                .and_then(|value| value.get("kind"))
+                .and_then(|value| value.as_str())
+                .or_else(|| {
+                    value
+                        .get("replay")
+                        .and_then(|replay| replay.get("id"))
+                        .and_then(|value| value.as_str())
+                })
+                .or_else(|| value.get("id").and_then(|value| value.as_str()))
+                .unwrap_or("input_replay");
+            let frame = value
+                .get("frame")
+                .and_then(|value| value.as_u64())
+                .map(|frame| frame.to_string())
+                .unwrap_or_else(|| "sequence".to_string());
+            format!("{}|{}|{}|{}", artifact.path, scenario_id, action, frame)
+        }
+        Err(error) => {
+            warnings.push(format!(
+                "{label} input replay artifact could not be read: {} ({error})",
+                artifact.path
+            ));
+            artifact.path.clone()
+        }
+    }
 }
 
 fn collect_semantic_scalars(
@@ -6221,6 +6333,7 @@ struct RunSemanticReasonInputs<'a> {
     evidence: &'a RunSemanticEvidenceDiff,
     project: &'a RunSemanticProjectDiff,
     transaction: &'a RunSemanticTransactionDiff,
+    input_replay: &'a RunSemanticReplayDiff,
     warnings: &'a [String],
 }
 
@@ -6303,6 +6416,30 @@ fn semantic_reasons(inputs: RunSemanticReasonInputs<'_>) -> Vec<RunSemanticReaso
             evidence_refs: Vec::new(),
         });
     }
+    if !inputs.input_replay.added.is_empty()
+        || !inputs.input_replay.removed.is_empty()
+        || inputs.input_replay.before_count != inputs.input_replay.after_count
+    {
+        reasons.push(RunSemanticReason {
+            kind: "input_replay".to_string(),
+            severity: "changed".to_string(),
+            summary: format!(
+                "input replay evidence changed from {} to {} artifact(s), {} added, {} removed",
+                inputs.input_replay.before_count,
+                inputs.input_replay.after_count,
+                inputs.input_replay.added.len(),
+                inputs.input_replay.removed.len()
+            ),
+            evidence_refs: inputs
+                .input_replay
+                .added
+                .iter()
+                .chain(inputs.input_replay.removed.iter())
+                .take(8)
+                .cloned()
+                .collect(),
+        });
+    }
     if !inputs.evidence.added.is_empty() || !inputs.evidence.removed.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "evidence_artifacts".to_string(),
@@ -6379,6 +6516,7 @@ fn run_comparison_snapshots_match(
         && before.assertion_failures == after.assertion_failures
         && before.performance_artifacts == after.performance_artifacts
         && before.evidence_artifacts == after.evidence_artifacts
+        && before.input_replay_artifacts == after.input_replay_artifacts
         && before.mutation_proposals == after.mutation_proposals
 }
 
@@ -10333,13 +10471,16 @@ fn dashboard_artifact_is_scenario_result(artifact: &EvidenceArtifact) -> bool {
 }
 
 fn dashboard_artifact_is_input_replay(artifact: &EvidenceArtifact) -> bool {
-    artifact
-        .metadata
-        .get("artifact")
-        .and_then(|value| value.as_str())
-        == Some("input_replay")
-        || artifact.id.contains("input-replay")
+    matches!(
+        artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str()),
+        Some("input_replay") | Some("scenario_input_replay")
+    ) || artifact.id.contains("input-replay")
         || artifact.path.contains("input-replay")
+        || artifact.id.contains("scenario-input-replay")
+        || artifact.path.contains("scenario-input-replay")
 }
 
 fn read_dashboard_replay(
@@ -10371,7 +10512,17 @@ fn read_dashboard_replay(
         let event_count = replay_value
             .and_then(|value| value.get("events"))
             .and_then(|value| value.as_array())
-            .map_or(0, Vec::len);
+            .map_or_else(
+                || {
+                    usize::from(
+                        replay_value
+                            .and_then(|value| value.get("schemaVersion"))
+                            .and_then(|value| value.as_str())
+                            == Some(SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION),
+                    )
+                },
+                Vec::len,
+            );
         let source = dashboard_replay_source(&artifact);
         let evidence_refs = std::iter::once(artifact.path.clone())
             .chain(
@@ -10423,7 +10574,13 @@ fn dashboard_replay_frames(replay: &serde_json::Value) -> Vec<u64> {
                 .filter_map(|event| event.get("frame").and_then(|value| value.as_u64()))
                 .collect::<Vec<_>>()
         })
-        .unwrap_or_default();
+        .unwrap_or_else(|| {
+            replay
+                .get("frame")
+                .and_then(|value| value.as_u64())
+                .into_iter()
+                .collect()
+        });
     frames.sort_unstable();
     frames.dedup();
     frames
@@ -10435,6 +10592,15 @@ fn dashboard_replay_source(artifact: &RunDashboardArtifact) -> String {
         .get("source")
         .and_then(|value| value.as_str())
         .map(str::to_string)
+        .or_else(|| {
+            artifact
+                .value
+                .as_ref()
+                .and_then(|value| value.get("action"))
+                .and_then(|value| value.get("kind"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        })
         .or_else(|| {
             artifact
                 .value
@@ -14397,6 +14563,34 @@ scenarios:
         );
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn compare_runs_summarizes_input_replay_artifact_changes() {
+        let (before_root, before) = create_test_run("ouroforge-compare-replay-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-replay-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+        write_scenario_input_replay_fixture(&after.run_dir, "bootstrap-smoke", 2);
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.before.input_replay_artifacts, 0);
+        assert_eq!(comparison.after.input_replay_artifacts, 1);
+        assert_eq!(comparison.deltas["input_replay_artifacts"], 1);
+        assert_eq!(comparison.semantic.input_replay.before_count, 0);
+        assert_eq!(comparison.semantic.input_replay.after_count, 1);
+        assert_eq!(comparison.semantic.input_replay.added.len(), 1);
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "input_replay" && reason.severity == "changed"));
+
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
     }
 
     #[test]
@@ -18386,6 +18580,34 @@ scenarios:
     }
 
     #[test]
+    fn dashboard_and_journal_summarize_scenario_input_replay_artifacts() {
+        let (root, artifacts) = create_test_run("dashboard-scenario-input-replay-read-model");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        evaluate_run(&artifacts.run_dir).expect("verdict written");
+        write_scenario_input_replay_fixture(&artifacts.run_dir, "bootstrap-smoke", 2);
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+        assert!(journal.contains(
+            "Input replay evidence: 0 legacy replay artifact(s), 1 scenario input replay artifact(s)"
+        ));
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.replay.present);
+        assert_eq!(model.replay.sequences.len(), 1);
+        let sequence = &model.replay.sequences[0];
+        assert_eq!(sequence.source, "scenario_input_step");
+        assert_eq!(sequence.event_count, 1);
+        assert_eq!(sequence.frames, vec![2]);
+        assert_eq!(sequence.first_frame, Some(2));
+        assert_eq!(sequence.scenario_id.as_deref(), Some("bootstrap-smoke"));
+        assert!(sequence.evidence_refs.contains(
+            &"evidence/scenarios/bootstrap-smoke/scenario-input-replay-fixture.json".to_string()
+        ));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
     fn dashboard_replay_read_model_handles_missing_replay_evidence() {
         let (root, artifacts) = create_test_run("dashboard-replay-empty-read-model");
         let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
@@ -18895,6 +19117,42 @@ scenarios:
 
         let error = first_page_target(&targets).expect_err("missing page fails");
         assert!(error.to_string().contains("no matching page CDP target"));
+    }
+
+    fn write_scenario_input_replay_fixture(run_dir: &Path, scenario_id: &str, frame: u32) {
+        let scenario_dir = run_dir.join(format!("evidence/scenarios/{scenario_id}"));
+        fs::create_dir_all(&scenario_dir).expect("scenario dir created");
+        let path = format!("evidence/scenarios/{scenario_id}/scenario-input-replay-fixture.json");
+        fs::write(
+            run_dir.join(&path),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION,
+                "scenarioId": scenario_id,
+                "stepIndex": 1,
+                "action": { "kind": "scenario_input_step" },
+                "frame": frame,
+                "tick": frame,
+                "input": { "right": true },
+                "probe": {
+                    "contractVersion": RUNTIME_PROBE_CONTRACT_VERSION,
+                    "worldStatePath": format!("evidence/scenarios/{scenario_id}/world-state.json"),
+                    "frameStatsPath": format!("evidence/scenarios/{scenario_id}/frame-stats.json")
+                },
+                "result": {
+                    "scenarioResultPath": format!("evidence/scenarios/{scenario_id}/scenario-result.json")
+                }
+            }))
+            .expect("scenario input replay serializes"),
+        )
+        .expect("scenario input replay written");
+        add_evidence_artifact(
+            run_dir,
+            "fixture-scenario-input-replay",
+            "application/json",
+            &path,
+            json!({ "artifact": "scenario_input_replay", "scenario_id": scenario_id }),
+        )
+        .expect("scenario input replay indexed");
     }
 
     fn write_scenario_result_fixture(run_dir: &Path, status: &str) {
