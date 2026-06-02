@@ -117,6 +117,9 @@ enum BrowserCommand {
 
 #[derive(Debug, Subcommand)]
 enum SceneCommand {
+    Validate {
+        scene_path: PathBuf,
+    },
     Show {
         scene_path: PathBuf,
     },
@@ -443,6 +446,19 @@ fn main() -> Result<()> {
             std::fs::write(&output, serde_json::to_string_pretty(&payload)?)
                 .with_context(|| format!("failed to write dashboard data {}", output.display()))?;
             println!("Dashboard data exported: {}", output.display());
+        }
+        Commands::Scene {
+            command: SceneCommand::Validate { scene_path },
+        } => {
+            let scene = read_scene(scene_path)?;
+            println!("Scene valid: {}", scene.id);
+            if let Some(manifest) = scene.asset_manifest {
+                println!(
+                    "Asset manifest valid: {} ({} asset(s))",
+                    manifest.id,
+                    manifest.assets.len()
+                );
+            }
         }
         Commands::Scene {
             command: SceneCommand::Show { scene_path },

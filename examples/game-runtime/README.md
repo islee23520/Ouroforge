@@ -19,13 +19,20 @@ in `getEvents()` and the current `collisions` list in `getWorldState()`.
 Snapshot/restore is in-memory only: `snapshot()` returns a local snapshot ID and
 `restore(snapshotId)` restores cloned deterministic world, input, and event state
 for QA branching without browser storage or save-game semantics.
-Local asset loading v1 is intentionally static and browser-only. Scene sprites may
-reference committed demo images under `assets/...`; the Rust scene validator
-rejects remote URLs, absolute paths, invalid characters, and directory escapes.
-The browser runtime loads those image paths directly from the same local static
-server and exposes deterministic asset metadata through
-`window.__OUROFORGE__.getWorldState().assets`. This is not a bundler, import
-pipeline, cache, marketplace, or editor asset browser.
+Local asset loading v1 is intentionally static and manifest-gated.
+`scene.json` declares `assetManifest` entries with local `assets/...` paths, and
+scene sprite/tile/audio asset fields reference those entries by ID. The Rust
+scene validator rejects unknown manifest IDs, remote URLs, absolute paths,
+invalid characters, directory escapes, duplicate manifest entries, and
+unsupported asset extensions. Use
+`cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene.json`
+to surface manifest validation errors before runtime use.
+
+The browser runtime loads only manifest-owned image paths from the same local
+static server and exposes bounded manifest plus asset metadata through
+`window.__OUROFORGE__.getWorldState().assetManifest` and `.assets`. Generated
+run state stays under `runs/` and must remain untracked. This is not a bundler,
+import pipeline, cache, marketplace, hot-reload system, or editor asset browser.
 Animation v1 chooses a single minimal `sprite_frame` mode: each animated entity
 owns local color frames plus a fixed `frameDuration`, and the browser runtime
 advances the current frame strictly by fixed simulation ticks. This keeps the

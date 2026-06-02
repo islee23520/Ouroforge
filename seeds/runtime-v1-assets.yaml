@@ -5,7 +5,7 @@ constraints:
   target: game-runtime
 acceptance:
   - Scene references local sprite assets under assets/.
-  - Runtime world state exposes sorted loaded asset metadata.
+  - Runtime world state exposes bounded manifest metadata and sorted loaded asset metadata.
   - Demo remains local and service-free.
 scenarios:
   - id: local-sprite-assets
@@ -18,6 +18,15 @@ scenarios:
           path: sceneId
           equals: foundation-scene
       - world_state:
+          path: assetManifest.id
+          equals: runtime-v1-assets
+      - world_state:
+          path: assetManifest.errors
+          equals: []
+      - world_state:
+          path: assets.0.id
+          equals: goal-sprite
+      - world_state:
           path: assets.0.path
           equals: assets/sprites/goal.svg
       - world_state:
@@ -26,6 +35,9 @@ scenarios:
       - world_state:
           path: assets.0.status
           equals: loaded
+      - world_state:
+          path: assets.1.id
+          equals: player-sprite
       - world_state:
           path: assets.1.path
           equals: assets/sprites/player.svg
