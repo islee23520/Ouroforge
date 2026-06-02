@@ -24,6 +24,7 @@ const OuroforgeCockpit = (() => {
     'metadata',
   ];
 
+
   function escapeText(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -109,6 +110,10 @@ const OuroforgeCockpit = (() => {
 
   function dashboardExportCommand(output = 'examples/evidence-dashboard/dashboard-data.json') {
     return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
+  }
+
+  function sceneMutationApplyCommand(runDir = 'runs/run-1', operationPath = 'mutation/scene-operation.json', transactionPath = 'mutation/scene-transaction.json') {
+    return `cargo run -p ouroforge-cli -- mutation apply-scene ${runDir} --operation ${operationPath} --transaction-output ${transactionPath}`;
   }
 
   function sceneValidateCommand(scenePath = DEFAULT_SCENE_PATH) {
@@ -263,7 +268,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function surfaceState(present, label = 'available') {
-    return present ? `<span class="status-ok">${label}</span>` : '<span class="status-idle">gap / unavailable</span>';
+    return present ? `<span class="status-ok">${escapeText(label)}</span>` : '<span class="status-idle">gap / unavailable</span>';
   }
 
   function studioSurfaceSummary(run) {
@@ -382,6 +387,48 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function mutationStage(lifecycle, id) {
+    return (lifecycle?.stages || []).find((stage) => stage.id === id) || null;
+  }
+
+  function renderSceneMutationLifecycleSurface(run) {
+    const lifecycle = run?.mutation_lifecycle;
+    if (!lifecycle) {
+      return '<div class="scene-mutation-lifecycle"><h3>Scene-only mutation lifecycle</h3><p class="empty compact">No mutation lifecycle read model is available.</p></div>';
+    }
+    const proposed = mutationStage(lifecycle, 'proposed');
+    const applied = mutationStage(lifecycle, 'scene_applied');
+    const runDir = run?.summary?.run_dir || (run?.summary?.id ? `runs/${run.summary.id}` : 'runs/run-1');
+    const proposedRecords = Array.isArray(proposed?.records) ? proposed.records : [];
+    const appliedRecords = Array.isArray(applied?.records) ? applied.records : [];
+    const firstApplication = appliedRecords[0] || {};
+    const targetScenePath = firstApplication.targetScenePath || DEFAULT_SCENE_PATH;
+    const transactionPath = firstApplication.transactionArtifactPath || 'mutation/scene-transaction.json';
+    const proposedRows = proposedRecords.slice(0, 3).map((record) => {
+      const id = record.id || record.proposalId || 'unknown proposal';
+      const evidence = record.evidence_id || record.evidenceId || record.evidence || 'no evidence id';
+      return `<li>${escapeText(id)} · ${escapeText(evidence)}</li>`;
+    }).join('') || '<li>No scene-safe proposal records loaded.</li>';
+    const applicationRows = appliedRecords.slice(0, 3).map((record) => `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small></div>`).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
+    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath);
+    return `<div class="scene-mutation-lifecycle"><h3>Scene-only mutation lifecycle</h3>
+      <p class="hint">Scene-only mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, or merge anything.</p>
+      <div class="field-grid">
+        <div><strong>Proposal stage</strong><br>${surfaceState(Boolean(proposed && proposed.state !== 'missing'), proposed?.state || 'missing')}<br><small>${escapeText(proposed?.record_count || 0)} record(s)</small></div>
+        <div><strong>Scene application stage</strong><br>${surfaceState(Boolean(applied && applied.state !== 'missing'), applied?.state || 'missing')}<br><small>${escapeText(applied?.record_count || 0)} record(s)</small></div>
+        <div><strong>Target scene</strong><br>${escapeText(targetScenePath)}</div>
+      </div>
+      <h4>Proposal context</h4><ul>${proposedRows}</ul>
+      <h4>Application records</h4>${applicationRows}
+      <h4>Display-only scene mutation commands</h4>
+      <div class="command-list">
+        <code>${escapeText(sceneValidateCommand(targetScenePath))}</code>
+        <code>${escapeText(applyCommand)}</code>
+        <code>${escapeText(dashboardExportCommand())}</code>
+      </div>
+    </div>`;
+  }
+
   function renderMutationReviewSurface(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -393,6 +440,7 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Inspect-only. The cockpit does not accept/reject mutations or apply patches.</p>
       <div><strong>Terminal state:</strong> ${escapeText(lifecycle.terminal_state || 'missing')}</div>
       <div class="surface-list">${stages}</div>
+      ${renderSceneMutationLifecycleSurface(run)}
       <h3>Command hints</h3><div class="command-list">${hints}</div>
     </section>`;
   }
@@ -514,7 +562,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

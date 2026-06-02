@@ -51,7 +51,14 @@ const run = {
     beforeSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' },
     afterSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash' },
   },
-  mutation_lifecycle: { terminal_state: 'pending_review', command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'], stages: [{ id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json' }] },
+  mutation_lifecycle: {
+    terminal_state: 'pending_review',
+    command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'],
+    stages: [
+      { id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json', record_count: 1, records: [{ id: 'proposal-1', evidence_id: 'verdict-1' }] },
+      { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', targetScenePath: 'examples/game-runtime/scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, status: 'applied' }] },
+    ],
+  },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
   comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
   engine_summaries: {
@@ -94,6 +101,16 @@ assert.match(cockpit.renderAuthoringProvenanceSurface(null), /No dashboard-data\
 assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>' }, evidence: [], transaction_provenance: { transactionId: '<script>alert(1)</script>', scenePath: '<img>', beforeSceneHash: { value: '<bad>' }, afterSceneHash: { value: '<worse>' } } }), /&lt;script&gt;alert/);
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Scene-only mutation lifecycle/);
+assert.match(cockpit.renderMutationReviewSurface(run), /scene-application-1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /mutation apply-scene runs\/run-1/);
+assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /proposal-1/);
+assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'run-empty' }, mutation_lifecycle: { stages: [] } }), /No scene-safe proposal records loaded/);
+assert.equal(
+  cockpit.sceneMutationApplyCommand('runs/run-1', 'mutation/scene-operation.json', 'mutation/scene-edit.json'),
+  'cargo run -p ouroforge-cli -- mutation apply-scene runs/run-1 --operation mutation/scene-operation.json --transaction-output mutation/scene-edit.json'
+);
+assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: '<script>' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: '<bad>', records: [{ id: '<script>', status: '<img>', proposalId: '<p>', transactionId: '<t>', beforeSceneHash: { value: '<b>' }, afterSceneHash: { value: '<a>' } }] }] } }), /&lt;script&gt;/);
 assert.match(cockpit.renderReplaySurface(run), /replay-1/);
 assert.match(cockpit.renderComparisonSurface(run), /before/);
 assert.match(cockpit.renderComparisonSurface(run), /after/);
