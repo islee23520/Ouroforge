@@ -3274,7 +3274,17 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
             to: "review evidence and adjust the next explicit implementation issue".to_string(),
         },
     )?;
-    proposal_ids.push(proposal.id);
+    let proposal_id = proposal.id.clone();
+    let existing_journal = fs::read_to_string(run_dir.join("journal.md")).unwrap_or_default();
+    let rationale = build_mutation_proposal_rationale(
+        &proposal,
+        &failure,
+        &verdict,
+        &evidence,
+        &existing_journal,
+    )?;
+    attach_mutation_proposal_rationale(run_dir, &proposal_id, rationale)?;
+    proposal_ids.push(proposal_id);
     update_journal(run_dir)?;
     let classification_artifact = classify_mutation_failures(run_dir, &proposal_ids)?;
     let classification_ids = classification_artifact
@@ -3348,6 +3358,96 @@ fn select_evidence_id_for_failure(
                 .first()
                 .map(|artifact| artifact.id.clone())
         })
+}
+
+fn build_mutation_proposal_rationale(
+    proposal: &MutationProposal,
+    failure: &serde_json::Value,
+    verdict: &serde_json::Value,
+    evidence: &EvidenceIndex,
+    journal: &str,
+) -> Result<MutationProposalRationale> {
+    let evidence_refs = collect_classification_evidence_refs(failure, verdict);
+    let (category, reason) = classify_failure_category(failure, verdict, journal, &evidence_refs);
+    let mut evidence_artifact_ids = Vec::new();
+    push_unique_ref(&mut evidence_artifact_ids, &proposal.evidence_id);
+    for evidence_ref in &evidence_refs {
+        if let Some(artifact) = evidence
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.path == *evidence_ref || artifact.id == *evidence_ref)
+        {
+            push_unique_ref(&mut evidence_artifact_ids, &artifact.id);
+        }
+    }
+    let rationale = MutationProposalRationale {
+        schema_version: "1".to_string(),
+        failure_classification: mutation_classification_category_label(&category).to_string(),
+        evidence_artifact_ids,
+        scenario_result_refs: collect_scenario_result_refs(&evidence_refs, evidence),
+        verdict_refs: vec!["verdict.json".to_string()],
+        expected_effect: format!(
+            "Review evidence-linked failure `{}` and adjust `{}` at `{}` only if review accepts the proposal.",
+            failure["kind"].as_str().unwrap_or("failed_verdict"),
+            proposal.target,
+            proposal.path
+        ),
+        confidence: MutationProposalRationaleConfidence::Medium,
+        reasoning_summary: reason,
+        allowed_mutation_type: MutationProposalAllowedMutationType::DataOnly,
+    };
+    rationale.validate(&proposal.evidence_id)?;
+    Ok(rationale)
+}
+
+fn mutation_classification_category_label(
+    category: &MutationClassificationCategory,
+) -> &'static str {
+    match category {
+        MutationClassificationCategory::ScenarioAssertionFailure => "scenario_assertion_failure",
+        MutationClassificationCategory::RuntimeProbeFailure => "runtime_probe_failure",
+        MutationClassificationCategory::ConsoleError => "console_error",
+        MutationClassificationCategory::PerformanceRegression => "performance_regression",
+        MutationClassificationCategory::VisualMismatch => "visual_mismatch",
+        MutationClassificationCategory::MissingEvidence => "missing_evidence",
+        MutationClassificationCategory::Unknown => "unknown",
+    }
+}
+
+fn mutation_allowed_type_label(allowed_type: &MutationProposalAllowedMutationType) -> &'static str {
+    match allowed_type {
+        MutationProposalAllowedMutationType::SceneOnly => "scene_only",
+        MutationProposalAllowedMutationType::ProjectSceneOnly => "project_scene_only",
+        MutationProposalAllowedMutationType::DataOnly => "data_only",
+    }
+}
+
+fn mutation_rationale_confidence_label(
+    confidence: &MutationProposalRationaleConfidence,
+) -> &'static str {
+    match confidence {
+        MutationProposalRationaleConfidence::Low => "low",
+        MutationProposalRationaleConfidence::Medium => "medium",
+        MutationProposalRationaleConfidence::High => "high",
+    }
+}
+
+fn collect_scenario_result_refs(evidence_refs: &[String], evidence: &EvidenceIndex) -> Vec<String> {
+    evidence_refs
+        .iter()
+        .filter(|path| {
+            path.contains("scenario-result")
+                || evidence.artifacts.iter().any(|artifact| {
+                    artifact.path == **path
+                        && artifact
+                            .metadata
+                            .get("artifact")
+                            .and_then(|value| value.as_str())
+                            == Some("scenario_result")
+                })
+        })
+        .cloned()
+        .collect()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -3662,21 +3762,7 @@ pub fn classify_mutation_failures(
     let mut classifications = Vec::new();
     for (index, failure) in failures.iter().enumerate() {
         let evidence_refs = collect_classification_evidence_refs(failure, &verdict);
-        let scenario_result_refs = evidence_refs
-            .iter()
-            .filter(|path| {
-                path.contains("scenario-result")
-                    || evidence.artifacts.iter().any(|artifact| {
-                        artifact.path == **path
-                            && artifact
-                                .metadata
-                                .get("artifact")
-                                .and_then(|value| value.as_str())
-                                == Some("scenario_result")
-                    })
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+        let scenario_result_refs = collect_scenario_result_refs(&evidence_refs, &evidence);
         let (category, reason) =
             classify_failure_category(failure, &verdict, &journal, &evidence_refs);
         let proposal_id = proposal_ids.get(index).cloned().or_else(|| {
@@ -5253,6 +5339,32 @@ fn write_mutation_proposals(
     write_json_atomic(&dir.join("proposals.json"), &json!(index))
 }
 
+fn attach_mutation_proposal_rationale(
+    run_dir: impl AsRef<Path>,
+    proposal_id: &str,
+    rationale: MutationProposalRationale,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    let mut index = read_mutation_proposals(run_dir)?;
+    let proposal = index
+        .proposals
+        .iter_mut()
+        .find(|proposal| proposal.id == proposal_id)
+        .ok_or_else(|| anyhow!("mutation proposal id not found: {proposal_id}"))?;
+    proposal.rationale = Some(rationale);
+    write_mutation_proposals(run_dir, &index)?;
+    append_ledger_event(
+        run_dir,
+        "mutation.proposal_rationale.recorded",
+        "evolve-cli",
+        json!({
+            "proposal_id": proposal_id,
+            "path": "mutation/proposals.json"
+        }),
+    )?;
+    Ok(())
+}
+
 pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let run_dir = run_dir.as_ref();
     let seed = Seed::from_path(run_dir.join("seed.snapshot.yaml"))?;
@@ -5499,6 +5611,16 @@ fn render_journal(
                 proposal.evidence_id,
                 proposal.status
             ));
+            if let Some(rationale) = &proposal.rationale {
+                out.push_str(&format!(
+                    "  - Rationale: `{}`; expected effect: {}; evidence ids: {}; allowed mutation: `{}`; confidence: `{}`\n",
+                    rationale.failure_classification,
+                    rationale.expected_effect,
+                    rationale.evidence_artifact_ids.join(", "),
+                    mutation_allowed_type_label(&rationale.allowed_mutation_type),
+                    mutation_rationale_confidence_label(&rationale.confidence)
+                ));
+            }
         }
     }
     out
@@ -14346,6 +14468,17 @@ scenarios:
         assert_eq!(summary.classification_ids, vec!["classification-1"]);
         let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
         assert_eq!(proposals[0].evidence_id, "failure-evidence");
+        let rationale = proposals[0].rationale.as_ref().expect("rationale emitted");
+        assert_eq!(
+            rationale.failure_classification,
+            "scenario_assertion_failure"
+        );
+        assert_eq!(rationale.evidence_artifact_ids, vec!["failure-evidence"]);
+        assert_eq!(rationale.verdict_refs, vec!["verdict.json"]);
+        assert_eq!(
+            rationale.allowed_mutation_type,
+            MutationProposalAllowedMutationType::DataOnly
+        );
         let classifications = read_mutation_classification_artifact(&artifacts.run_dir)
             .expect("classification artifact reads");
         assert_eq!(
@@ -14362,6 +14495,8 @@ scenarios:
         );
         let journal = show_journal(&artifacts.run_dir).expect("journal reads");
         assert!(journal.contains(&proposals[0].id));
+        assert!(journal.contains("Rationale: `scenario_assertion_failure`"));
+        assert!(journal.contains("allowed mutation: `data_only`"));
         fs::remove_dir_all(root).ok();
     }
 
