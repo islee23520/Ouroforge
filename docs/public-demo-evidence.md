@@ -6,13 +6,13 @@ Status: pre-release MVP evidence for public-readiness review; this is not a laun
 
 ## Demo media
 
-The screenshots below were captured from the static local MVP surfaces with Chrome headless and a local `python3 -m http.server` process. They are committed as public demo references, not generated run evidence.
+The screenshots below were refreshed on 2026-06-02 from the static local MVP surfaces with Chrome headless and a local `python3 -m http.server` process. They are committed as public demo references, not generated run evidence. The refreshed dashboard and cockpit captures use the AL2.8.1 generated dashboard export, including Platformer and Engine Expansion v1 smoke runs.
 
 | Surface | Screenshot | Scope boundary |
 | --- | --- | --- |
 | Minimal 2D runtime | [`docs/assets/demo/runtime-demo.png`](assets/demo/runtime-demo.png) | Canvas/runtime demo only; no engine compatibility promise. |
 | Evidence dashboard | [`docs/assets/demo/evidence-dashboard.png`](assets/demo/evidence-dashboard.png) | Read-only inspection of exported run data. |
-| Authoring cockpit | [`docs/assets/demo/authoring-cockpit.png`](assets/demo/authoring-cockpit.png) | Static cockpit prototype; browser does not write files directly. |
+| Authoring cockpit | [`docs/assets/demo/authoring-cockpit.png`](assets/demo/authoring-cockpit.png) | Static Studio v2 cockpit prototype; browser does not write files directly or execute commands. |
 
 Capture commands used locally:
 
@@ -33,6 +33,8 @@ CHROME=${OUROFORGE_CHROME:-"/Applications/Google Chrome.app/Contents/MacOS/Googl
   --screenshot=docs/assets/demo/authoring-cockpit.png --window-size=1440,1000 \
   http://127.0.0.1:8765/examples/authoring-cockpit/index.html
 ```
+
+AL2.8.2 refresh wrote current image files for all three surfaces. Chrome headless emitted local updater/crashpad noise during capture; the tracked PNG files were still written and visually checked.
 
 ## Chrome requirement
 

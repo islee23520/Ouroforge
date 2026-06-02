@@ -288,8 +288,8 @@ const OuroforgeCockpit = (() => {
 
   function renderStudioNavigation(run) {
     const items = studioSurfaceSummary(run);
-    return `<nav class="studio-nav" aria-label="Studio v1 surfaces">
-      <h2>Studio v1 demo surfaces</h2>
+    return `<nav class="studio-nav" aria-label="Studio v2 surfaces">
+      <h2>Studio v2 demo surfaces</h2>
       <p class="hint">Static local composition only. Browser UI inspects artifacts and generates Rust commands; it does not write files directly or claim production editor maturity.</p>
       <div class="surface-grid">${items.map((item) => `<a class="surface-card" href="#${escapeText(item.id)}">
         <strong>${escapeText(item.label)}</strong><br>${surfaceState(item.present)}<br><small>${escapeText(item.detail)}</small>

@@ -89,7 +89,7 @@ assert.equal(cockpit.latestRun([{ summary: { id: 'old', created_at_unix_ms: 1 } 
 assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
-assert.match(cockpit.renderStudioNavigation(run), /Studio v1 demo surfaces/);
+assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 9);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /Authoring provenance/);
