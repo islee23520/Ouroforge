@@ -30,21 +30,25 @@
     };
     const expectedCells = grid.width * grid.height;
     const tileSize = size(tilemap.tileSize);
-    const tiles = new Map();
+    const tiles = [];
+    const tileIndex = {};
     for (const tile of Array.isArray(tilemap.tiles) ? tilemap.tiles : []) {
       if (!tile || typeof tile.id !== 'string') continue;
-      tiles.set(tile.id, {
+      const normalizedTile = {
         id: tile.id,
         color: typeof tile.color === 'string' ? tile.color : '#334155',
         asset: typeof tile.asset === 'string' ? tile.asset : null,
         solid: Boolean(tile.solid),
-      });
+      };
+      tiles.push(normalizedTile);
+      tileIndex[normalizedTile.id] = normalizedTile;
     }
     return {
       id: String(tilemap.id || `tilemap-${index}`),
       tileSize,
       grid,
       tiles,
+      tileIndex,
       layers: (Array.isArray(tilemap.layers) ? tilemap.layers : [])
         .map((layer) => normalizeLayer(layer, expectedCells)),
       metadata: tilemap.metadata && typeof tilemap.metadata === 'object' && !Array.isArray(tilemap.metadata) ? clone(tilemap.metadata) : {},
@@ -76,7 +80,7 @@
       for (let cell = 0; cell < layer.data.length; cell += 1) {
         const tileId = layer.data[cell];
         if (!tileId) continue;
-        const tile = tilemap.tiles.get(tileId);
+        const tile = tilemap.tileIndex && tilemap.tileIndex[tileId];
         if (!tile) continue;
         const column = cell % tilemap.grid.width;
         const row = Math.floor(cell / tilemap.grid.width);
@@ -102,7 +106,7 @@
         id: tilemap.id,
         tileSize: clone(tilemap.tileSize),
         grid: clone(tilemap.grid),
-        tileCount: tilemap.tiles.size,
+        tileCount: Array.isArray(tilemap.tiles) ? tilemap.tiles.length : 0,
         layers: tilemap.layers.map((layer) => ({
           id: layer.id,
           order: layer.order,

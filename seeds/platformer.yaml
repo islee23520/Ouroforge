@@ -30,3 +30,18 @@ scenarios:
       - world_state:
           path: renderer.renderedEntities.0.entityId
           equals: player
+      - world_state:
+          path: tilemaps.version
+          equals: '1'
+      - world_state:
+          path: tilemaps.tilemaps.0.id
+          equals: platformer-ground
+      - world_state:
+          path: tilemaps.tilemaps.0.grid.width
+          equals: 20
+      - world_state:
+          path: tilemaps.tilemaps.0.layers.1.nonEmptyCells
+          equals: 20
+      - world_state:
+          path: tilemaps.layerOrder.0.layerId
+          equals: background
