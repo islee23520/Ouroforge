@@ -124,7 +124,10 @@ enum SceneCommand {
         scene_path: PathBuf,
         #[arg(long)]
         entity: String,
-        #[arg(long)]
+        #[arg(
+            long,
+            help = "Supported paths: sprite.color, components.transform.x, components.transform.y, components.velocity.x, components.velocity.y, components.size.width, components.size.height, components.controllable"
+        )]
         path: String,
         #[arg(long, value_name = "JSON")]
         value: String,

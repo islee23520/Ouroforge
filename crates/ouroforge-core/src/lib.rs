@@ -5565,6 +5565,21 @@ pub struct SceneEdit {
     pub value: serde_json::Value,
 }
 
+pub const SUPPORTED_SCENE_EDIT_PATHS: &[&str] = &[
+    "sprite.color",
+    "components.transform.x",
+    "components.transform.y",
+    "components.velocity.x",
+    "components.velocity.y",
+    "components.size.width",
+    "components.size.height",
+    "components.controllable",
+];
+
+pub fn supported_scene_edit_paths() -> &'static [&'static str] {
+    SUPPORTED_SCENE_EDIT_PATHS
+}
+
 fn scene_schema_v1() -> String {
     "1".to_string()
 }
@@ -5803,8 +5818,9 @@ fn apply_scene_edit(scene: &mut SceneDocument, edit: SceneEdit) -> Result<()> {
         }
         _ => {
             return Err(anyhow!(
-                "unsupported scene edit path `{}`; supported paths are sprite.color, components.transform.x/y, components.velocity.x/y, components.size.width/height, components.controllable",
-                edit.path
+                "unsupported scene edit path `{}`; supported paths are {}",
+                edit.path,
+                supported_scene_edit_paths().join(", ")
             ));
         }
     }
@@ -9956,6 +9972,19 @@ scenarios:
 
         let scene = read_scene(&scene_path).expect("scene reads");
         assert_eq!(scene.entities[0].id, "player");
+        assert_eq!(
+            supported_scene_edit_paths(),
+            &[
+                "sprite.color",
+                "components.transform.x",
+                "components.transform.y",
+                "components.velocity.x",
+                "components.velocity.y",
+                "components.size.width",
+                "components.size.height",
+                "components.controllable"
+            ]
+        );
 
         let edited = edit_scene(
             &scene_path,
@@ -9979,6 +10008,35 @@ scenarios:
         .expect("color edit applies");
         assert_eq!(edited.entities[0].sprite.color, "#ffffff");
 
+        let supported_edits = [
+            ("components.transform.y", json!(80)),
+            ("components.velocity.x", json!(3)),
+            ("components.velocity.y", json!(-2)),
+            ("components.size.width", json!(20)),
+            ("components.size.height", json!(18)),
+            ("components.controllable", json!(false)),
+        ];
+        for (path, value) in supported_edits {
+            edit_scene(
+                &scene_path,
+                SceneEdit {
+                    entity_id: "player".to_string(),
+                    path: path.to_string(),
+                    value,
+                },
+            )
+            .unwrap_or_else(|error| panic!("supported edit {path} should apply: {error}"));
+        }
+        let edited = read_scene(&scene_path).expect("edited scene reads");
+        let player = &edited.entities[0];
+        assert_eq!(player.components.transform.y, 80);
+        assert_eq!(player.components.velocity.x, 3);
+        assert_eq!(player.components.velocity.y, -2);
+        assert_eq!(player.components.size.width, 20);
+        assert_eq!(player.components.size.height, 18);
+        assert!(!player.components.controllable);
+
+        let before_invalid = fs::read_to_string(&scene_path).expect("scene before invalid read");
         let rejected = edit_scene(
             &scene_path,
             SceneEdit {
@@ -9989,6 +10047,44 @@ scenarios:
         )
         .expect_err("invalid size rejected");
         assert!(rejected.to_string().contains("size must be positive"));
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after invalid read"),
+            before_invalid,
+            "invalid Rust-validated edit must not rewrite the scene file"
+        );
+
+        let rejected = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!("48"),
+            },
+        )
+        .expect_err("invalid transform type rejected");
+        assert!(rejected.to_string().contains("requires an integer value"));
+
+        let rejected = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "sprite.color".to_string(),
+                value: json!("white"),
+            },
+        )
+        .expect_err("invalid color rejected");
+        assert!(rejected.to_string().contains("#RRGGBB"));
+
+        let rejected = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "missing".to_string(),
+                path: "sprite.color".to_string(),
+                value: json!("#000000"),
+            },
+        )
+        .expect_err("missing entity rejected");
+        assert!(rejected.to_string().contains("scene entity not found"));
 
         let rejected = edit_scene(
             &scene_path,
@@ -10000,6 +10096,7 @@ scenarios:
         )
         .expect_err("unsupported edit rejected");
         assert!(rejected.to_string().contains("unsupported scene edit path"));
+        assert!(rejected.to_string().contains("components.controllable"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

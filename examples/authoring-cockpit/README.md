@@ -12,6 +12,20 @@ Open <http://127.0.0.1:8000/examples/authoring-cockpit/>.
 
 The inspector updates scene data in memory and shows the validated `ouroforge scene edit` command for writing through Rust-side validation. Direct browser file writes are intentionally not supported.
 
+Supported Rust-validated scene edit fields:
+
+- `sprite.color`
+- `components.transform.x`
+- `components.transform.y`
+- `components.velocity.x`
+- `components.velocity.y`
+- `components.size.width`
+- `components.size.height`
+- `components.controllable`
+
+All other scene fields remain read-only in the cockpit and are rejected by the
+Rust `ouroforge scene edit` command.
+
 ## QA and evidence loop
 
 The cockpit includes a Run QA panel with the exact local commands:
