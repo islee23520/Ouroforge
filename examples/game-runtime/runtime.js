@@ -23,6 +23,9 @@
     advanceAnimations: () => {},
     activeSpriteFrame: () => null,
   };
+  const audio = window.OuroforgeAudio || {
+    emitIntentEvents: () => [],
+  };
   const tilemap = window.OuroforgeTilemap || {
     normalizeTilemaps: () => [],
     debugState: () => ({ version: '1', tilemaps: [], layerOrder: [] }),
@@ -131,7 +134,7 @@
       normalized.components.audio = {
         events: components.audio.events
           .filter((event) => event && event.trigger === 'scene_loaded' && typeof event.name === 'string')
-          .map((event) => ({ name: event.name, trigger: event.trigger, asset: event.asset })),
+          .map((event) => ({ name: event.name, trigger: event.trigger, action: event.action === 'stop' ? 'stop' : 'play', asset: event.asset })),
       };
     }
     const normalizedAnimation = animation.normalizeAnimation(components.animation);
@@ -167,21 +170,11 @@
 
 
   function emitAudioEvents(trigger) {
-    for (const entity of world.entities) {
-      const audio = entity.components.audio;
-      const audioEvents = audio && Array.isArray(audio.events) ? audio.events : [];
-      for (const event of audioEvents) {
-        if (event.trigger !== trigger) continue;
-        const emitted = {
-          tick: world.tick,
-          name: event.name,
-          trigger,
-          entityId: entity.id,
-          asset: event.asset || null,
-        };
-        world.audioEvents.push(emitted);
-        record('runtime.audio.emitted', emitted);
-      }
+    const emittedEvents = audio.emitIntentEvents({ entities: world.entities, trigger, tick: world.tick, muted: true });
+    for (const emitted of emittedEvents) {
+      world.audioEvents.push(emitted);
+      if (world.audioEvents.length > 64) world.audioEvents.shift();
+      record('runtime.audio.emitted', emitted);
     }
   }
 
