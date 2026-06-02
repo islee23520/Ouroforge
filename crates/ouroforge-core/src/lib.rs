@@ -5453,6 +5453,8 @@ pub struct SceneDocument {
     pub bounds: SceneBounds,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renderer: Option<SceneRenderer>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tilemaps: Vec<SceneTilemap>,
     pub entities: Vec<SceneEntity>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -5511,6 +5513,66 @@ pub struct SceneRenderOrderEntry {
     pub layer_order: i64,
     #[serde(rename = "spriteOrder")]
     pub sprite_order: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTilemap {
+    pub id: String,
+    #[serde(rename = "tileSize")]
+    pub tile_size: SceneSize,
+    pub grid: SceneTilemapGrid,
+    pub tiles: Vec<SceneTileDefinition>,
+    pub layers: Vec<SceneTilemapLayer>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTilemapGrid {
+    pub width: usize,
+    pub height: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTileDefinition {
+    pub id: String,
+    pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    #[serde(default)]
+    pub solid: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTilemapLayer {
+    pub id: String,
+    #[serde(default)]
+    pub order: i64,
+    #[serde(default = "default_layer_visible")]
+    pub visible: bool,
+    pub data: Vec<Option<String>>,
+    #[serde(
+        default,
+        rename = "collisionLayer",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub collision_layer: Option<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTilemapLayerOrderEntry {
+    #[serde(rename = "tilemapId")]
+    pub tilemap_id: String,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    pub order: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -5700,6 +5762,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     if let Some(renderer) = &scene.renderer {
         validate_scene_renderer(scene, renderer)?;
     }
+    validate_scene_tilemaps(&scene.tilemaps)?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     let mut ids = std::collections::BTreeSet::new();
     for entity in &scene.entities {
@@ -5746,6 +5809,145 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+fn validate_scene_tilemaps(tilemaps: &[SceneTilemap]) -> Result<()> {
+    let mut tilemap_ids = std::collections::BTreeSet::new();
+    for tilemap in tilemaps {
+        validate_path_component("scene tilemap id", &tilemap.id)?;
+        if !tilemap_ids.insert(tilemap.id.clone()) {
+            return Err(anyhow!("duplicate scene tilemap id: {}", tilemap.id));
+        }
+        if tilemap.tile_size.width <= 0 || tilemap.tile_size.height <= 0 {
+            return Err(anyhow!(
+                "scene tilemap {} tileSize must be positive",
+                tilemap.id
+            ));
+        }
+        if tilemap.grid.width == 0 || tilemap.grid.height == 0 {
+            return Err(anyhow!(
+                "scene tilemap {} grid dimensions must be positive",
+                tilemap.id
+            ));
+        }
+        let expected_cells = tilemap
+            .grid
+            .width
+            .checked_mul(tilemap.grid.height)
+            .ok_or_else(|| anyhow!("scene tilemap {} grid dimensions overflow", tilemap.id))?;
+        let mut tile_ids = std::collections::BTreeSet::new();
+        for tile in &tilemap.tiles {
+            validate_path_component(&format!("scene tilemap {} tile id", tilemap.id), &tile.id)?;
+            if !tile_ids.insert(tile.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate scene tilemap {} tile id: {}",
+                    tilemap.id,
+                    tile.id
+                ));
+            }
+            validate_scene_color(&tile.color).with_context(|| {
+                format!(
+                    "scene tilemap {} tile {} color is invalid",
+                    tilemap.id, tile.id
+                )
+            })?;
+            if let Some(asset) = &tile.asset {
+                validate_scene_local_asset_path("scene tilemap tile asset", asset)?;
+            }
+        }
+        if tile_ids.is_empty() {
+            return Err(anyhow!(
+                "scene tilemap {} tiles must not be empty",
+                tilemap.id
+            ));
+        }
+        let mut layer_ids = std::collections::BTreeSet::new();
+        for layer in &tilemap.layers {
+            validate_path_component(&format!("scene tilemap {} layer id", tilemap.id), &layer.id)?;
+            if !layer_ids.insert(layer.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate scene tilemap {} layer id: {}",
+                    tilemap.id,
+                    layer.id
+                ));
+            }
+            if layer.data.len() != expected_cells {
+                return Err(anyhow!(
+                    "scene tilemap {} layer {} data length must equal grid cell count {}",
+                    tilemap.id,
+                    layer.id,
+                    expected_cells
+                ));
+            }
+            for tile_id in layer.data.iter().flatten() {
+                if !tile_ids.contains(tile_id) {
+                    return Err(anyhow!(
+                        "scene tilemap {} layer {} references unknown tile id: {}",
+                        tilemap.id,
+                        layer.id,
+                        tile_id
+                    ));
+                }
+            }
+            validate_scene_metadata(
+                &format!("scene tilemap {} layer {} metadata", tilemap.id, layer.id),
+                &layer.metadata,
+            )?;
+        }
+        if tilemap.layers.is_empty() {
+            return Err(anyhow!(
+                "scene tilemap {} layers must not be empty",
+                tilemap.id
+            ));
+        }
+        for layer in &tilemap.layers {
+            if let Some(collision_layer) = &layer.collision_layer {
+                validate_path_component(
+                    &format!("scene tilemap {} collision layer ref", tilemap.id),
+                    collision_layer,
+                )?;
+                if !layer_ids.contains(collision_layer) {
+                    return Err(anyhow!(
+                        "scene tilemap {} layer {} references unknown collisionLayer: {}",
+                        tilemap.id,
+                        layer.id,
+                        collision_layer
+                    ));
+                }
+            }
+        }
+        validate_scene_metadata(
+            &format!("scene tilemap {} metadata", tilemap.id),
+            &tilemap.metadata,
+        )?;
+    }
+    Ok(())
+}
+
+pub fn scene_tilemap_layer_order(scene: &SceneDocument) -> Vec<SceneTilemapLayerOrderEntry> {
+    let mut entries = scene
+        .tilemaps
+        .iter()
+        .flat_map(|tilemap| {
+            tilemap
+                .layers
+                .iter()
+                .filter(|layer| layer.visible)
+                .map(|layer| SceneTilemapLayerOrderEntry {
+                    tilemap_id: tilemap.id.clone(),
+                    layer_id: layer.id.clone(),
+                    order: layer.order,
+                })
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        (left.order, left.tilemap_id.as_str(), left.layer_id.as_str()).cmp(&(
+            right.order,
+            right.tilemap_id.as_str(),
+            right.layer_id.as_str(),
+        ))
+    });
+    entries
 }
 
 fn validate_scene_renderer(scene: &SceneDocument, renderer: &SceneRenderer) -> Result<()> {
@@ -10481,6 +10683,78 @@ scenarios:
     }
 
     #[test]
+    fn scene_tilemap_v1_accepts_bounded_grid_and_deterministic_layer_order() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 3, "height": 2 },
+                    "tiles": [
+                        { "id": "empty", "color": "#172532" },
+                        { "id": "solid", "color": "#334155", "asset": "assets/tiles/solid.svg", "solid": true },
+                        { "id": "hazard", "color": "#ef4444" }
+                    ],
+                    "layers": [
+                        {
+                            "id": "foreground",
+                            "order": 10,
+                            "data": [null, null, "hazard", null, "solid", null],
+                            "collisionLayer": "collision"
+                        },
+                        {
+                            "id": "collision",
+                            "order": 0,
+                            "visible": false,
+                            "data": [null, null, null, null, "solid", null]
+                        },
+                        {
+                            "id": "background",
+                            "order": -10,
+                            "data": ["empty", "empty", "empty", "empty", "empty", "empty"],
+                            "metadata": { "role": "backdrop" }
+                        }
+                    ],
+                    "metadata": { "purpose": "tilemap fixture" }
+                }
+            ],
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("tilemap scene parses");
+
+        validate_scene(&scene).expect("tilemap v1 validates");
+        assert_eq!(scene.tilemaps[0].tile_size.width, 16);
+        assert_eq!(scene.tilemaps[0].grid.width, 3);
+        assert!(scene.tilemaps[0].tiles.iter().any(|tile| tile.solid));
+        assert_eq!(
+            scene_tilemap_layer_order(&scene)
+                .iter()
+                .map(|entry| entry.layer_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["background", "foreground"]
+        );
+        assert_eq!(
+            serde_json::to_string(&scene_tilemap_layer_order(&scene))
+                .expect("tilemap layer order serializes"),
+            r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
+        );
+    }
+
+    #[test]
     fn scene_renderer_v1_accepts_camera_layers_and_deterministic_order() {
         let scene: SceneDocument = serde_json::from_value(json!({
             "schemaVersion": "1",
@@ -10588,6 +10862,110 @@ scenarios:
 
     #[test]
     fn scene_schema_v1_rejects_invalid_entities_and_paths() {
+        let invalid_tilemap_grid = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 0, "height": 2 },
+                    "tiles": [{ "id": "solid", "color": "#334155" }],
+                    "layers": [{ "id": "ground", "data": [] }]
+                }
+            ],
+            "entities": []
+        }))
+        .expect("invalid tilemap grid parses");
+        let rejected = validate_scene(&invalid_tilemap_grid).expect_err("grid rejected");
+        assert!(rejected
+            .to_string()
+            .contains("grid dimensions must be positive"));
+
+        let invalid_tilemap_data_len = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 2, "height": 2 },
+                    "tiles": [{ "id": "solid", "color": "#334155" }],
+                    "layers": [{ "id": "ground", "data": ["solid"] }]
+                }
+            ],
+            "entities": []
+        }))
+        .expect("invalid tilemap data length parses");
+        let rejected = validate_scene(&invalid_tilemap_data_len).expect_err("data length rejected");
+        assert!(rejected
+            .to_string()
+            .contains("data length must equal grid cell count 4"));
+
+        let invalid_tile_id = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 1, "height": 1 },
+                    "tiles": [{ "id": "solid", "color": "#334155" }],
+                    "layers": [{ "id": "ground", "data": ["missing"] }]
+                }
+            ],
+            "entities": []
+        }))
+        .expect("invalid tile id parses");
+        let rejected = validate_scene(&invalid_tile_id).expect_err("unknown tile rejected");
+        assert!(rejected.to_string().contains("references unknown tile id"));
+
+        let unsafe_tile_asset = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 1, "height": 1 },
+                    "tiles": [{ "id": "solid", "color": "#334155", "asset": "https://example.com/tile.svg" }],
+                    "layers": [{ "id": "ground", "data": ["solid"] }]
+                }
+            ],
+            "entities": []
+        }))
+        .expect("unsafe tile asset parses");
+        let rejected = validate_scene(&unsafe_tile_asset).expect_err("remote tile asset rejected");
+        assert!(rejected
+            .to_string()
+            .contains("must be a local static asset path"));
+
+        let unknown_collision_layer = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 1, "height": 1 },
+                    "tiles": [{ "id": "solid", "color": "#334155" }],
+                    "layers": [{ "id": "ground", "data": ["solid"], "collisionLayer": "missing" }]
+                }
+            ],
+            "entities": []
+        }))
+        .expect("unknown collision layer parses");
+        let rejected =
+            validate_scene(&unknown_collision_layer).expect_err("collision layer rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown collisionLayer"));
+
         let duplicate_layer = serde_json::from_value::<SceneDocument>(json!({
             "schemaVersion": "1",
             "id": "renderer-v1-scene",
