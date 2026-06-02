@@ -5279,6 +5279,7 @@ pub struct RunSemanticDiff {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
     pub reasons: Vec<RunSemanticReason>,
+    pub project: RunSemanticProjectDiff,
     pub scenarios: Vec<RunSemanticScenarioDiff>,
     #[serde(rename = "worldState")]
     pub world_state: RunSemanticWorldStateDiff,
@@ -5343,6 +5344,24 @@ pub struct RunSemanticEvidenceDiff {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticProjectDiff {
+    pub before: Option<ProjectRunMetadata>,
+    pub after: Option<ProjectRunMetadata>,
+    pub relation: String,
+    pub changed: bool,
+    pub changes: Vec<RunSemanticProjectChange>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunSemanticProjectChange {
+    pub kind: String,
+    pub summary: String,
+    pub before: Option<String>,
+    pub after: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunSemanticTransactionDiff {
     pub before: Option<RunTransactionProvenance>,
     pub after: Option<RunTransactionProvenance>,
@@ -5369,6 +5388,7 @@ struct RunComparisonDetails {
     events: BTreeSet<String>,
     performance: BTreeMap<String, serde_json::Value>,
     evidence_keys: BTreeSet<String>,
+    project: Option<ProjectRunMetadata>,
     transaction_provenance: Option<RunTransactionProvenance>,
     warnings: Vec<String>,
 }
@@ -5444,6 +5464,7 @@ fn build_run_semantic_diff(
         },
     };
     let evidence = semantic_evidence_set_diff(&before.evidence_keys, &after.evidence_keys);
+    let project = semantic_project_diff(&before.project, &after.project);
     let transaction_provenance = RunSemanticTransactionDiff {
         before: before.transaction_provenance.clone(),
         after: after.transaction_provenance.clone(),
@@ -5464,12 +5485,14 @@ fn build_run_semantic_diff(
         events: &events,
         performance: &performance,
         evidence: &evidence,
+        project: &project,
         transaction: &transaction_provenance,
         warnings: &warnings,
     });
     RunSemanticDiff {
         schema_version: "run-semantic-diff-v1".to_string(),
         reasons,
+        project,
         scenarios,
         world_state,
         events,
@@ -5522,6 +5545,54 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
         .get("transaction_provenance")
         .cloned()
         .and_then(|value| serde_json::from_value(value).ok());
+    let project = match run.get("project") {
+        Some(value) => match serde_json::from_value(value.clone()) {
+            Ok(project) => Some(project),
+            Err(error) => {
+                let warnings = vec![format!(
+                    "{label} run project metadata could not be parsed: {error}"
+                )];
+                // Keep the rest of comparison readable; malformed project
+                // metadata is surfaced as a warning rather than trusted.
+                let mut details = load_run_comparison_details_without_project(
+                    run_dir,
+                    label,
+                    run,
+                    verdict,
+                    evidence,
+                    transaction_provenance,
+                    warnings,
+                )?;
+                details.project = None;
+                return Ok(details);
+            }
+        },
+        None => None,
+    };
+    load_run_comparison_details_without_project(
+        run_dir,
+        label,
+        run,
+        verdict,
+        evidence,
+        transaction_provenance,
+        Vec::new(),
+    )
+    .map(|mut details| {
+        details.project = project;
+        details
+    })
+}
+
+fn load_run_comparison_details_without_project(
+    run_dir: &Path,
+    label: &str,
+    run: serde_json::Value,
+    verdict: serde_json::Value,
+    evidence: EvidenceIndex,
+    transaction_provenance: Option<RunTransactionProvenance>,
+    warnings: Vec<String>,
+) -> Result<RunComparisonDetails> {
     let mut failed_scenarios = 0usize;
     let mut assertion_failures = 0usize;
     let mut scenario_results = 0usize;
@@ -5531,7 +5602,7 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
     let mut events = BTreeSet::new();
     let mut performance = BTreeMap::new();
     let mut evidence_keys = BTreeSet::new();
-    let mut warnings = Vec::new();
+    let mut warnings = warnings;
     for artifact in &evidence.artifacts {
         evidence_keys.insert(format!(
             "{}|{}|{}",
@@ -5666,6 +5737,7 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
         events,
         performance,
         evidence_keys,
+        project: None,
         transaction_provenance,
         warnings,
     })
@@ -5853,6 +5925,144 @@ fn semantic_evidence_set_diff(
     }
 }
 
+fn semantic_project_diff(
+    before: &Option<ProjectRunMetadata>,
+    after: &Option<ProjectRunMetadata>,
+) -> RunSemanticProjectDiff {
+    let relation = match (before, after) {
+        (None, None) => "legacy".to_string(),
+        (None, Some(_)) => "project_added".to_string(),
+        (Some(_), None) => "project_removed".to_string(),
+        (Some(before), Some(after)) if before.id == after.id => "same_project".to_string(),
+        (Some(_), Some(_)) => "different_project".to_string(),
+    };
+    let mut changes = Vec::new();
+    let mut warnings = Vec::new();
+
+    match (before, after) {
+        (None, Some(project)) => {
+            warnings
+                .push("before run has no project metadata; after run is project-bound".to_string());
+            changes.push(RunSemanticProjectChange {
+                kind: "project_presence".to_string(),
+                summary: "project metadata was added".to_string(),
+                before: None,
+                after: Some(project.id.clone()),
+            });
+        }
+        (Some(project), None) => {
+            warnings
+                .push("before run is project-bound; after run has no project metadata".to_string());
+            changes.push(RunSemanticProjectChange {
+                kind: "project_presence".to_string(),
+                summary: "project metadata was removed".to_string(),
+                before: Some(project.id.clone()),
+                after: None,
+            });
+        }
+        (Some(before), Some(after)) => {
+            push_project_change(
+                &mut changes,
+                "project_id",
+                "project id changed",
+                Some(before.id.as_str()),
+                Some(after.id.as_str()),
+            );
+            push_project_change(
+                &mut changes,
+                "manifest_hash",
+                "project manifest hash changed",
+                Some(before.manifest_hash.value.as_str()),
+                Some(after.manifest_hash.value.as_str()),
+            );
+            push_project_change(
+                &mut changes,
+                "seed_path",
+                "project seed path changed",
+                Some(before.seed_path.as_str()),
+                Some(after.seed_path.as_str()),
+            );
+            push_project_change(
+                &mut changes,
+                "scenario_pack",
+                "scenario pack changed",
+                before.scenario_pack.as_ref().map(|pack| pack.id.as_str()),
+                after.scenario_pack.as_ref().map(|pack| pack.id.as_str()),
+            );
+            push_project_change(
+                &mut changes,
+                "transaction_id",
+                "linked transaction id changed",
+                before.transaction_id.as_deref(),
+                after.transaction_id.as_deref(),
+            );
+            for change in project_scene_hash_changes(before, after) {
+                changes.push(change);
+            }
+        }
+        (None, None) => {}
+    }
+
+    RunSemanticProjectDiff {
+        before: before.clone(),
+        after: after.clone(),
+        relation,
+        changed: !changes.is_empty(),
+        changes,
+        warnings,
+    }
+}
+
+fn push_project_change(
+    changes: &mut Vec<RunSemanticProjectChange>,
+    kind: &str,
+    summary: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+) {
+    if before != after {
+        changes.push(RunSemanticProjectChange {
+            kind: kind.to_string(),
+            summary: summary.to_string(),
+            before: before.map(ToString::to_string),
+            after: after.map(ToString::to_string),
+        });
+    }
+}
+
+fn project_scene_hash_changes(
+    before: &ProjectRunMetadata,
+    after: &ProjectRunMetadata,
+) -> Vec<RunSemanticProjectChange> {
+    let before_scenes = before
+        .scenes
+        .iter()
+        .map(|scene| (scene.path.as_str(), scene.hash.value.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let after_scenes = after
+        .scenes
+        .iter()
+        .map(|scene| (scene.path.as_str(), scene.hash.value.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    before_scenes
+        .keys()
+        .chain(after_scenes.keys())
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|path| {
+            let before_hash = before_scenes.get(path).copied();
+            let after_hash = after_scenes.get(path).copied();
+            (before_hash != after_hash).then(|| RunSemanticProjectChange {
+                kind: "scene_hash".to_string(),
+                summary: format!("scene hash changed for {path}"),
+                before: before_hash.map(ToString::to_string),
+                after: after_hash.map(ToString::to_string),
+            })
+        })
+        .collect()
+}
+
 struct RunSemanticReasonInputs<'a> {
     classification: &'a str,
     scenarios: &'a [RunSemanticScenarioDiff],
@@ -5860,12 +6070,40 @@ struct RunSemanticReasonInputs<'a> {
     events: &'a RunSemanticEventDiff,
     performance: &'a RunSemanticPerformanceDiff,
     evidence: &'a RunSemanticEvidenceDiff,
+    project: &'a RunSemanticProjectDiff,
     transaction: &'a RunSemanticTransactionDiff,
     warnings: &'a [String],
 }
 
 fn semantic_reasons(inputs: RunSemanticReasonInputs<'_>) -> Vec<RunSemanticReason> {
     let mut reasons = Vec::new();
+    if inputs.project.changed {
+        let severity = match inputs.project.relation.as_str() {
+            "project_added" | "project_removed" => "warning",
+            _ => "changed",
+        };
+        reasons.push(RunSemanticReason {
+            kind: "project_context".to_string(),
+            severity: severity.to_string(),
+            summary: format!(
+                "project context {} with {} project change(s)",
+                inputs.project.relation,
+                inputs.project.changes.len()
+            ),
+            evidence_refs: Vec::new(),
+        });
+    } else if !inputs.project.warnings.is_empty() {
+        reasons.push(RunSemanticReason {
+            kind: "project_context".to_string(),
+            severity: "warning".to_string(),
+            summary: format!(
+                "project context {} with {} warning(s)",
+                inputs.project.relation,
+                inputs.project.warnings.len()
+            ),
+            evidence_refs: Vec::new(),
+        });
+    }
     for scenario in inputs.scenarios {
         reasons.push(RunSemanticReason {
             kind: "scenario_verdict".to_string(),
@@ -13179,6 +13417,177 @@ scenarios:
     }
 
     #[test]
+    fn compares_same_project_metadata_without_project_change() {
+        let (root, run) = create_test_run("ouroforge-compare-project-same-test");
+        write_scenario_result_fixture(&run.run_dir, "passed");
+        evaluate_run(&run.run_dir).expect("verdict");
+        write_project_metadata_fixture(
+            &run.run_dir,
+            project_metadata_fixture("minimal_2d", "manifesthash", "scenehash", Some("smoke")),
+        );
+
+        let comparison = compare_runs(&run.run_dir, &run.run_dir).expect("comparison");
+
+        assert_eq!(comparison.semantic.project.relation, "same_project");
+        assert!(!comparison.semantic.project.changed);
+        assert!(comparison.semantic.project.changes.is_empty());
+        assert_eq!(
+            comparison
+                .semantic
+                .project
+                .before
+                .as_ref()
+                .expect("project before")
+                .id,
+            "minimal_2d"
+        );
+        assert_eq!(
+            comparison
+                .semantic
+                .project
+                .after
+                .as_ref()
+                .expect("project after")
+                .scenario_pack
+                .as_ref()
+                .expect("scenario pack")
+                .id,
+            "smoke"
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn compares_changed_project_scene_and_scenario_context() {
+        let (before_root, before) = create_test_run("ouroforge-compare-project-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-project-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+        write_project_metadata_fixture(
+            &before.run_dir,
+            project_metadata_fixture(
+                "minimal_2d",
+                "manifest-before",
+                "scene-before",
+                Some("smoke"),
+            ),
+        );
+        write_project_metadata_fixture(
+            &after.run_dir,
+            project_metadata_fixture(
+                "minimal_2d",
+                "manifest-after",
+                "scene-after",
+                Some("regression"),
+            ),
+        );
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.semantic.project.relation, "same_project");
+        assert!(comparison.semantic.project.changed);
+        assert!(comparison
+            .semantic
+            .project
+            .changes
+            .iter()
+            .any(|change| change.kind == "manifest_hash"));
+        assert!(comparison
+            .semantic
+            .project
+            .changes
+            .iter()
+            .any(|change| change.kind == "scene_hash"));
+        assert!(comparison
+            .semantic
+            .project
+            .changes
+            .iter()
+            .any(|change| change.kind == "scenario_pack"));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "project_context" && reason.severity == "changed"));
+
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compares_project_bound_and_legacy_runs_with_warning_context() {
+        let (before_root, before) = create_test_run("ouroforge-compare-project-legacy-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-project-legacy-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+        write_project_metadata_fixture(
+            &after.run_dir,
+            project_metadata_fixture("minimal_2d", "manifesthash", "scenehash", Some("smoke")),
+        );
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.semantic.project.relation, "project_added");
+        assert!(comparison.semantic.project.changed);
+        assert!(comparison.semantic.project.before.is_none());
+        assert_eq!(
+            comparison.semantic.project.after.as_ref().unwrap().id,
+            "minimal_2d"
+        );
+        assert!(comparison
+            .semantic
+            .project
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("before run has no project metadata")));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "project_context" && reason.severity == "warning"));
+
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compares_legacy_and_malformed_project_metadata_safely() {
+        let (before_root, before) =
+            create_test_run("ouroforge-compare-project-malformed-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-project-malformed-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+        write_project_metadata_fixture(&after.run_dir, json!({ "id": 7 }));
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.semantic.project.relation, "legacy");
+        assert!(!comparison.semantic.project.changed);
+        assert!(comparison.semantic.project.before.is_none());
+        assert!(comparison.semantic.project.after.is_none());
+        assert!(comparison
+            .semantic
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("project metadata could not be parsed")));
+        assert!(comparison
+            .semantic
+            .reasons
+            .iter()
+            .any(|reason| reason.kind == "warnings" && reason.severity == "warning"));
+
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
     fn compares_run_regressions_from_supported_evidence() {
         let (before_root, before) = create_test_run("ouroforge-compare-regression-before-test");
         let (after_root, after) = create_test_run("ouroforge-compare-regression-after-test");
@@ -16971,6 +17380,42 @@ scenarios:
             )
             .expect("artifact indexed");
         }
+    }
+
+    fn project_metadata_fixture(
+        project_id: &str,
+        manifest_hash: &str,
+        scene_hash: &str,
+        scenario_pack_id: Option<&str>,
+    ) -> serde_json::Value {
+        json!({
+            "id": project_id,
+            "name": "Minimal 2D Ouroforge Project",
+            "projectRoot": ".",
+            "manifestPath": "ouroforge.project.json",
+            "manifestHash": { "algorithm": "fnv1a64-file-v1", "value": manifest_hash },
+            "seedPath": "seeds/platformer.yaml",
+            "scenes": [{
+                "id": "main",
+                "path": "scenes/main.scene.json",
+                "hash": { "algorithm": "fnv1a64-canonical-json-v1", "value": scene_hash }
+            }],
+            "scenarioPack": scenario_pack_id.map(|id| json!({
+                "id": id,
+                "path": format!("scenarios/{id}.scenario-pack.json"),
+                "scenarioIds": ["scaffold-smoke"]
+            }))
+        })
+    }
+
+    fn write_project_metadata_fixture(run_dir: &Path, project: serde_json::Value) {
+        let mut run_json = read_json_value(run_dir.join("run.json")).expect("run json reads");
+        run_json["project"] = project;
+        fs::write(
+            run_dir.join("run.json"),
+            serde_json::to_string_pretty(&run_json).expect("run json serializes"),
+        )
+        .expect("run json writes");
     }
 
     fn append_evaluator_config(run_dir: &Path, evaluator_yaml: &str) {
