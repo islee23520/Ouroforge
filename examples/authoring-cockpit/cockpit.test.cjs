@@ -44,6 +44,13 @@ const run = {
   screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }],
   journal: '# Journal',
   journal_view: { exists: true, path: 'journal.md', summary: 'journal summary', entries: [{ id: 'entry-1' }], evidence_refs: ['evidence/indexed.json'] },
+  transaction_provenance: {
+    transactionId: 'scene-edit-abc123',
+    transactionArtifactPath: '.omx/tmp/transaction.json',
+    scenePath: 'examples/game-runtime/scene.json',
+    beforeSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' },
+    afterSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash' },
+  },
   mutation_lifecycle: { terminal_state: 'pending_review', command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'], stages: [{ id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json' }] },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
   comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'] }] },
@@ -62,6 +69,7 @@ const run = {
   },
 };
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
+assert.equal(cockpit.qaTransactionCommand('seeds/platformer.yaml', '.omx/tmp/transaction.json', 4), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4 --transaction .omx/tmp/transaction.json');
 assert.match(cockpit.dashboardExportCommand(), /dashboard export/);
 assert.equal(cockpit.sceneValidateCommand('examples/game-runtime/scene.json'), 'cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene.json');
 assert.equal(cockpit.sceneReloadValidateCommand('examples/game-runtime/scene.json'), 'cargo run -p ouroforge-cli -- scene reload-validate examples/game-runtime/scene.json');
@@ -75,8 +83,15 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v1 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 8);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 9);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
+assert.match(cockpit.renderAuthoringProvenanceSurface(run), /Authoring provenance/);
+assert.match(cockpit.renderAuthoringProvenanceSurface(run), /scene-edit-abc123/);
+assert.match(cockpit.renderAuthoringProvenanceSurface(run), /beforehash/);
+assert.match(cockpit.renderAuthoringProvenanceSurface(run), /--transaction \.omx\/tmp\/transaction\.json/);
+assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: 'run-no-tx' }, evidence: [] }), /no scene edit transaction binding/i);
+assert.match(cockpit.renderAuthoringProvenanceSurface(null), /No dashboard-data\.json run/);
+assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>' }, evidence: [], transaction_provenance: { transactionId: '<script>alert(1)</script>', scenePath: '<img>', beforeSceneHash: { value: '<bad>' }, afterSceneHash: { value: '<worse>' } } }), /&lt;script&gt;alert/);
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
 assert.match(cockpit.renderReplaySurface(run), /replay-1/);
@@ -92,6 +107,7 @@ assert.match(cockpit.renderIntegration(run), /Live browser preview/);
 assert.match(cockpit.renderIntegration(run), /Pause/);
 assert.match(cockpit.renderIntegration(run), /Step 1 frame/);
 assert.match(cockpit.renderIntegration(run), /Run\/evidence browser/);
+assert.match(cockpit.renderIntegration(run), /Authoring provenance/);
 assert.match(cockpit.renderIntegration(run), /Journal viewer/);
 assert.match(cockpit.renderIntegration(run), /Mutation review state/);
 assert.match(cockpit.renderIntegration(run), /Replay controls/);

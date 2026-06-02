@@ -103,6 +103,10 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers}`;
   }
 
+  function qaTransactionCommand(seedPath = 'seeds/platformer.yaml', transactionPath = 'runs/manual/transactions/scene-edit.json', workers = 4) {
+    return `cargo run -p ouroforge-cli -- run ${seedPath} --workers ${workers} --transaction ${transactionPath}`;
+  }
+
   function dashboardExportCommand(output = 'examples/evidence-dashboard/dashboard-data.json') {
     return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
   }
@@ -271,6 +275,7 @@ const OuroforgeCockpit = (() => {
       { id: 'replay-controls', label: 'Replay controls', present: Boolean(run?.replay?.present), detail: `${(run?.replay?.sequences || []).length} sequence(s)` },
       { id: 'live-preview', label: 'Live preview controls', present: true, detail: 'ephemeral probe controls' },
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
+      { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
       { id: 'run-comparison', label: 'Run comparison', present: Boolean(run?.comparison?.present), detail: `${(run?.comparison?.artifacts || []).length} comparison artifact(s)` },
     ];
@@ -329,6 +334,41 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderAuthoringProvenanceSurface(run) {
+    const provenance = run?.transaction_provenance;
+    if (!run) {
+      return '<section id="authoring-provenance" class="panel"><h2>Authoring provenance</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to inspect transaction provenance.</p></section>';
+    }
+    if (!provenance) {
+      return `<section id="authoring-provenance" class="panel"><h2>Authoring provenance</h2>
+        <p class="empty">This run has no scene edit transaction binding. Use the Rust CLI <code>--transaction</code> option to bind a validated scene edit transaction to a QA run.</p>
+        <div class="command-list">
+          <code>${escapeText(qaTransactionCommand())}</code>
+          <code>${escapeText(dashboardExportCommand())}</code>
+        </div>
+      </section>`;
+    }
+    const transactionPath = provenance.transactionArtifactPath || 'unknown transaction artifact';
+    const scenePath = provenance.scenePath || DEFAULT_SCENE_PATH;
+    return `<section id="authoring-provenance" class="panel"><h2>Authoring provenance</h2>
+      <p class="hint">Read-only chain from Rust-authored transaction provenance. The cockpit does not write scene files or execute QA commands.</p>
+      <div class="field-grid">
+        <div><strong>Run</strong><br>${escapeText(run.summary?.id || 'unknown')}</div>
+        <div><strong>Transaction</strong><br>${escapeText(provenance.transactionId || 'unknown')}</div>
+        <div><strong>Scene</strong><br>${escapeText(scenePath)}</div>
+        <div><strong>Evidence artifacts</strong><br>${escapeText((run.evidence || []).length)}</div>
+        <div><strong>Before hash</strong><br>${escapeText(provenance.beforeSceneHash?.value || 'unknown')}</div>
+        <div><strong>After hash</strong><br>${escapeText(provenance.afterSceneHash?.value || 'unknown')}</div>
+      </div>
+      <h3>Display-only follow-up commands</h3>
+      <div class="command-list">
+        <code>${escapeText(sceneValidateCommand(scenePath))}</code>
+        <code>${escapeText(qaTransactionCommand('seeds/platformer.yaml', transactionPath))}</code>
+        <code>${escapeText(dashboardExportCommand())}</code>
+      </div>
+    </section>`;
+  }
+
   function renderJournalSurface(run) {
     const journal = run?.journal_view;
     if (!run || (!journal?.exists && !run.journal)) {
@@ -384,7 +424,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderEvidenceBrowser(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -450,7 +490,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
