@@ -176,6 +176,44 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderSemanticDiffSummary(artifact) {
+    const semantic = artifact?.semantic || artifact?.value?.semantic;
+    if (!semantic || typeof semantic !== 'object') {
+      return '<section class="panel"><h5>Semantic evidence diff</h5><p class="empty-state compact">No semantic diff section is available for this comparison artifact.</p></section>';
+    }
+    const reasons = Array.isArray(semantic.reasons) ? semantic.reasons : [];
+    const warnings = Array.isArray(semantic.warnings) ? semantic.warnings : [];
+    const reasonList = reasons.length
+      ? `<ul>${reasons.map((reason) => `<li><span class="${statusClass(reason.severity || 'changed')}">${escapeText(reason.severity || 'changed')}</span> ${escapeText(reason.kind || 'reason')}: ${escapeText(reason.summary || '')}</li>`).join('')}</ul>`
+      : '<p class="empty-state compact">No semantic reasons were recorded.</p>';
+    const scenarioCount = Array.isArray(semantic.scenarios) ? semantic.scenarios.length : 0;
+    const worldChanged = Array.isArray(semantic.worldState?.changed) ? semantic.worldState.changed.length : 0;
+    const eventAdded = Array.isArray(semantic.events?.added) ? semantic.events.added.length : 0;
+    const eventRemoved = Array.isArray(semantic.events?.removed) ? semantic.events.removed.length : 0;
+    const perfChanged = Array.isArray(semantic.performance?.changed) ? semantic.performance.changed.length : 0;
+    const evidenceAdded = Array.isArray(semantic.evidence?.added) ? semantic.evidence.added.length : 0;
+    const evidenceRemoved = Array.isArray(semantic.evidence?.removed) ? semantic.evidence.removed.length : 0;
+    const transactionChanged = semantic.transactionProvenance?.changed === true ? 'changed' : 'unchanged';
+    const warningList = warnings.length
+      ? `<div class="artifact-warning">Semantic warnings: ${escapeText(warnings.join(' · '))}</div>`
+      : '';
+    return `<section class="panel"><h5>Semantic evidence diff</h5>
+      <p class="run-meta">Read-only summary from Rust-authored comparison JSON; browser does not compute or infer comparisons.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Schema</div><div class="card-value">${escapeText(semantic.schemaVersion || 'legacy')}</div></div>
+        <div class="card"><div class="card-label">Scenario diffs</div><div class="card-value">${escapeText(scenarioCount)}</div></div>
+        <div class="card"><div class="card-label">World changes</div><div class="card-value">${escapeText(worldChanged)}</div></div>
+        <div class="card"><div class="card-label">Events +/-</div><div class="card-value">${escapeText(`${eventAdded}/${eventRemoved}`)}</div></div>
+        <div class="card"><div class="card-label">Performance changes</div><div class="card-value">${escapeText(perfChanged)}</div></div>
+        <div class="card"><div class="card-label">Evidence +/-</div><div class="card-value">${escapeText(`${evidenceAdded}/${evidenceRemoved}`)}</div></div>
+        <div class="card"><div class="card-label">Transaction</div><div class="card-value">${escapeText(transactionChanged)}</div></div>
+      </div>
+      <h6>Top semantic reasons</h6>
+      ${reasonList}
+      ${warningList}
+    </section>`;
+  }
+
   function renderRunComparison(run) {
     const comparison = run?.comparison;
     if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
@@ -201,6 +239,7 @@ const OuroforgeDashboard = (() => {
         ${artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : ''}
         ${artifact.exists === false ? '<div class="artifact-warning">Missing comparison artifact file</div>' : ''}
         <section class="panel"><h5>Scenario, verdict, performance, assertion, and evidence deltas</h5>${renderDeltaCards(artifact.deltas)}</section>
+        ${renderSemanticDiffSummary(artifact)}
         ${renderComparisonRefLinks('Before/after evidence refs', artifact.evidence_refs, run)}
         ${unsupported}
         <details class="raw-json"><summary>Raw comparison artifact</summary>${raw}</details>
@@ -467,7 +506,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -73,6 +73,20 @@ const run = {
           performance_artifacts: 1,
           evidence_artifacts: 3,
         },
+        semantic: {
+          schemaVersion: 'run-semantic-diff-v1',
+          reasons: [
+            { kind: 'scenario_verdict', severity: 'improved', summary: 'scenario smoke changed from failed to passed', evidenceRefs: [] },
+            { kind: 'world_state', severity: 'changed', summary: '2 world-state values changed, 0 added, 0 removed', evidenceRefs: [] },
+          ],
+          scenarios: [{ scenarioId: 'smoke', before: 'failed', after: 'passed', classification: 'improved', evidenceRefs: [] }],
+          worldState: { changed: [{ path: 'world/player/x', before: 1, after: 4 }], added: [], removed: [] },
+          events: { added: ['console:warn:changed'], removed: [] },
+          performance: { changed: [{ path: 'frame_stats/fps', before: 60, after: 55 }], warnings: [] },
+          evidence: { added: ['artifact|application/json|evidence/new.json'], removed: [] },
+          transactionProvenance: { changed: true },
+          warnings: ['after world_state artifact could not be read: evidence/missing.json'],
+        },
         evidence_refs: [
           'runs/before-run/verdict.json',
           'runs/after-run/verdict.json',
@@ -84,6 +98,10 @@ const run = {
           after_run_id: 'after-run',
           classification: 'improved',
           evidence_refs: ['runs/before-run/verdict.json', 'runs/after-run/verdict.json'],
+          semantic: {
+            schemaVersion: 'run-semantic-diff-v1',
+            reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic', evidenceRefs: [] }],
+          },
         },
       },
     ],
@@ -182,6 +200,10 @@ assert.match(detail, /beforehash/);
 assert.match(detail, /afterhash/);
 assert.match(detail, /Run Comparison/);
 assert.match(detail, /Read-only\. Displays existing comparison artifacts only/);
+assert.match(detail, /Semantic evidence diff/);
+assert.match(detail, /scenario smoke changed from failed to passed/);
+assert.match(detail, /run-semantic-diff-v1/);
+assert.match(detail, /Semantic warnings/);
 assert.match(detail, /before-run/);
 assert.match(detail, /after-run/);
 assert.match(detail, /improved/);
@@ -226,6 +248,8 @@ assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'jour
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
+assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
+assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
 assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
 assert.equal(dashboard.comparisonRefHref('runs/before-run/verdict.json', run), '../../runs/before-run/verdict.json');
 assert.equal(dashboard.comparisonRefHref('evidence/world.json', run), '../../runs/run-1/evidence/world.json');

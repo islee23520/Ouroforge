@@ -7714,6 +7714,7 @@ pub struct RunDashboardComparisonArtifact {
     pub after_run_id: Option<String>,
     pub classification: Option<String>,
     pub deltas: serde_json::Value,
+    pub semantic: serde_json::Value,
     pub evidence_refs: Vec<String>,
     pub unsupported: Vec<String>,
     pub value: Option<serde_json::Value>,
@@ -8387,6 +8388,7 @@ fn dashboard_comparison_artifact(run_dir: &Path, path: String) -> RunDashboardCo
             after_run_id: None,
             classification: None,
             deltas: serde_json::Value::Null,
+            semantic: serde_json::Value::Null,
             evidence_refs: Vec::new(),
             unsupported: Vec::new(),
             value: None,
@@ -8403,6 +8405,10 @@ fn dashboard_comparison_artifact(run_dir: &Path, path: String) -> RunDashboardCo
             classification: json_string(&value, "classification"),
             deltas: value
                 .get("deltas")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+            semantic: value
+                .get("semantic")
                 .cloned()
                 .unwrap_or(serde_json::Value::Null),
             evidence_refs: value
@@ -8435,6 +8441,7 @@ fn dashboard_comparison_artifact(run_dir: &Path, path: String) -> RunDashboardCo
             after_run_id: None,
             classification: None,
             deltas: serde_json::Value::Null,
+            semantic: serde_json::Value::Null,
             evidence_refs: Vec::new(),
             unsupported: Vec::new(),
             value: None,
@@ -14332,6 +14339,16 @@ scenarios:
                     "performance_artifacts": 1,
                     "evidence_artifacts": 3
                 },
+                "semantic": {
+                    "schemaVersion": "run-semantic-diff-v1",
+                    "reasons": [{
+                        "kind": "scenario_verdict",
+                        "severity": "improved",
+                        "summary": "scenario smoke changed from failed to passed",
+                        "evidenceRefs": []
+                    }],
+                    "warnings": []
+                },
                 "evidence_refs": [
                     "runs/before/verdict.json",
                     "runs/after/verdict.json"
@@ -14364,6 +14381,14 @@ scenarios:
         assert_eq!(comparison.after_run_id.as_deref(), Some("after"));
         assert_eq!(comparison.classification.as_deref(), Some("improved"));
         assert_eq!(comparison.deltas["failed_scenarios"], json!(-1));
+        assert_eq!(
+            comparison.semantic["schemaVersion"],
+            json!("run-semantic-diff-v1")
+        );
+        assert_eq!(
+            comparison.semantic["reasons"][0]["summary"],
+            json!("scenario smoke changed from failed to passed")
+        );
         assert_eq!(
             comparison.evidence_refs,
             vec![
