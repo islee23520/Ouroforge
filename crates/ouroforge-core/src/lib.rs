@@ -10787,7 +10787,7 @@ fn dashboard_probe_contract_status(
             evidence_refs.push(artifact.path.clone());
         }
     }
-    let malformed_count = evidence
+    let indexed_malformed_count = evidence
         .iter()
         .filter(|artifact| {
             artifact
@@ -10811,13 +10811,27 @@ fn dashboard_probe_contract_status(
                     .is_some_and(|value| value.get("probe_contract_failure").is_some())
             })
             .count();
+    let malformed_artifact_count = world_states
+        .iter()
+        .chain(frame_metrics.iter())
+        .chain(scenario_results.iter())
+        .filter(|artifact| artifact.exists && artifact.read_error.is_some())
+        .count();
+    let malformed_count = indexed_malformed_count + malformed_artifact_count;
     let has_world_v2 = world_states
         .iter()
-        .any(dashboard_artifact_has_probe_contract_v2);
+        .any(dashboard_artifact_has_readable_probe_contract_v2);
     let has_frame_v2 = frame_metrics
         .iter()
-        .any(dashboard_artifact_has_probe_contract_v2);
-    let missing_count = usize::from(!has_world_v2) + usize::from(!has_frame_v2);
+        .any(dashboard_artifact_has_readable_probe_contract_v2);
+    let missing_artifact_count = world_states
+        .iter()
+        .chain(frame_metrics.iter())
+        .chain(scenario_results.iter())
+        .filter(|artifact| !artifact.exists)
+        .count();
+    let missing_count =
+        usize::from(!has_world_v2) + usize::from(!has_frame_v2) + missing_artifact_count;
     let status = if malformed_count > 0 {
         "malformed"
     } else if has_world_v2 && has_frame_v2 {
@@ -10836,6 +10850,12 @@ fn dashboard_probe_contract_status(
         malformed_count,
         evidence_refs,
     }
+}
+
+fn dashboard_artifact_has_readable_probe_contract_v2(artifact: &RunDashboardArtifact) -> bool {
+    artifact.exists
+        && artifact.read_error.is_none()
+        && dashboard_artifact_has_probe_contract_v2(artifact)
 }
 
 fn dashboard_artifact_has_probe_contract_v2(artifact: &RunDashboardArtifact) -> bool {
@@ -10975,8 +10995,13 @@ fn read_dashboard_replay(
         });
     }
     Ok(RunDashboardReplay {
-        present: true,
-        empty_state: String::new(),
+        present: sequences.iter().any(|sequence| sequence.read_error.is_none()),
+        empty_state: if sequences.iter().any(|sequence| sequence.read_error.is_none()) {
+            String::new()
+        } else {
+            "Replay evidence artifacts were indexed, but no readable replay files are available."
+                .to_string()
+        },
         sequences,
     })
 }
@@ -11484,50 +11509,103 @@ fn dashboard_evidence_fidelity(
         evidence_refs: inputs.probe_contract_status.evidence_refs.clone(),
     };
 
+    let readable_replay_count = inputs
+        .replay
+        .sequences
+        .iter()
+        .filter(|sequence| sequence.read_error.is_none())
+        .count();
+    let unreadable_replay_count = inputs
+        .replay
+        .sequences
+        .iter()
+        .filter(|sequence| sequence.read_error.is_some())
+        .count();
     let replay_refs = inputs
         .replay
         .sequences
         .iter()
         .flat_map(|sequence| sequence.evidence_refs.clone())
         .collect::<Vec<_>>();
+    let replay_warnings = inputs
+        .replay
+        .sequences
+        .iter()
+        .filter_map(|sequence| {
+            sequence.read_error.as_ref().map(|error| {
+                format!(
+                    "Replay evidence {} is unavailable: {error}",
+                    sequence.replay_path
+                )
+            })
+        })
+        .collect::<Vec<_>>();
     let input_replay = RunDashboardEvidenceFidelityStatus {
         id: "input_replay".to_string(),
         label: "Input replay evidence".to_string(),
-        status: if inputs.replay.present {
+        status: if readable_replay_count > 0 && unreadable_replay_count == 0 {
             "present"
+        } else if readable_replay_count > 0 {
+            "partial"
         } else {
             "missing"
         }
         .to_string(),
-        summary: if inputs.replay.present {
+        summary: if readable_replay_count > 0 {
             format!(
-                "{} replay sequence(s) available.",
-                inputs.replay.sequences.len()
+                "{} replay sequence(s) available; {} unavailable.",
+                readable_replay_count, unreadable_replay_count
             )
         } else {
             inputs.replay.empty_state.clone()
         },
-        observed_count: inputs.replay.sequences.len(),
-        missing_count: usize::from(!inputs.replay.present),
-        warnings: if inputs.replay.present {
-            Vec::new()
+        observed_count: readable_replay_count,
+        missing_count: if inputs.replay.sequences.is_empty() {
+            1
         } else {
+            unreadable_replay_count
+        },
+        warnings: if replay_warnings.is_empty() && readable_replay_count == 0 {
             vec!["Input replay evidence is unavailable.".to_string()]
+        } else {
+            replay_warnings
         },
         evidence_refs: replay_refs,
     };
 
     let cdp_counts = [
-        ("worker screenshots", inputs.screenshots.len()),
-        ("console logs", inputs.console_logs.len()),
-        ("performance metrics", inputs.performance_metrics.len()),
-        ("CDP trace summaries", inputs.cdp_trace_summaries.len()),
+        ("worker screenshots", dashboard_readable_artifact_count(inputs.screenshots)),
+        ("console logs", dashboard_readable_artifact_count(inputs.console_logs)),
+        (
+            "performance metrics",
+            dashboard_readable_artifact_count(inputs.performance_metrics),
+        ),
+        (
+            "CDP trace summaries",
+            dashboard_readable_artifact_count(inputs.cdp_trace_summaries),
+        ),
     ];
     let missing_cdp = cdp_counts
         .iter()
         .filter(|(_, count)| *count == 0)
         .map(|(label, _)| (*label).to_string())
         .collect::<Vec<_>>();
+    let malformed_cdp = inputs
+        .screenshots
+        .iter()
+        .chain(inputs.console_logs.iter())
+        .chain(inputs.performance_metrics.iter())
+        .chain(inputs.cdp_trace_summaries.iter())
+        .filter(|artifact| artifact.exists && artifact.read_error.is_some())
+        .count();
+    let missing_cdp_artifacts = inputs
+        .screenshots
+        .iter()
+        .chain(inputs.console_logs.iter())
+        .chain(inputs.performance_metrics.iter())
+        .chain(inputs.cdp_trace_summaries.iter())
+        .filter(|artifact| !artifact.exists)
+        .count();
     let openchrome_refs = inputs
         .screenshots
         .iter()
@@ -11539,7 +11617,9 @@ fn dashboard_evidence_fidelity(
     let openchrome_cdp = RunDashboardEvidenceFidelityStatus {
         id: "openchrome_cdp".to_string(),
         label: "Openchrome/CDP evidence".to_string(),
-        status: if missing_cdp.is_empty() {
+        status: if malformed_cdp > 0 {
+            "malformed"
+        } else if missing_cdp.is_empty() && missing_cdp_artifacts == 0 {
             "present"
         } else if openchrome_refs.is_empty() {
             "missing"
@@ -11554,11 +11634,27 @@ fn dashboard_evidence_fidelity(
             inputs.performance_metrics.len(),
             inputs.cdp_trace_summaries.len()
         ),
-        observed_count: openchrome_refs.len(),
-        missing_count: missing_cdp.len(),
+        observed_count: cdp_counts.iter().map(|(_, count)| *count).sum(),
+        missing_count: missing_cdp.len() + missing_cdp_artifacts,
         warnings: missing_cdp
             .iter()
             .map(|label| format!("Missing {label}."))
+            .chain(
+                inputs
+                    .screenshots
+                    .iter()
+                    .chain(inputs.console_logs.iter())
+                    .chain(inputs.performance_metrics.iter())
+                    .chain(inputs.cdp_trace_summaries.iter())
+                    .filter_map(|artifact| {
+                        artifact.read_error.as_ref().map(|error| {
+                            format!(
+                                "Openchrome/CDP evidence {} is unavailable: {error}",
+                                artifact.path
+                            )
+                        })
+                    }),
+            )
             .collect(),
         evidence_refs: openchrome_refs,
     };
@@ -11593,6 +11689,13 @@ fn dashboard_evidence_fidelity(
         openchrome_cdp,
         command_context,
     }
+}
+
+fn dashboard_readable_artifact_count(artifacts: &[RunDashboardArtifact]) -> usize {
+    artifacts
+        .iter()
+        .filter(|artifact| artifact.exists && artifact.read_error.is_none())
+        .count()
 }
 
 fn dashboard_category_summaries(
@@ -19860,6 +19963,151 @@ scenarios:
             .replay
             .empty_state
             .contains("No replay evidence artifacts"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_replay_read_model_does_not_treat_stale_replay_index_as_present() {
+        let (root, artifacts) = create_test_run("dashboard-replay-stale-index-read-model");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/scenarios/replay-smoke"))
+            .expect("scenario evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/replay-smoke/malformed-input-replay.json"),
+            "{not-json",
+        )
+        .expect("malformed replay written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-input-replay",
+            "application/json",
+            "evidence/scenarios/replay-smoke/missing-input-replay.json",
+            json!({ "artifact": "input_replay", "scenario_id": "replay-smoke" }),
+        )
+        .expect("missing replay indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "malformed-input-replay",
+            "application/json",
+            "evidence/scenarios/replay-smoke/malformed-input-replay.json",
+            json!({ "artifact": "input_replay", "scenario_id": "replay-smoke" }),
+        )
+        .expect("malformed replay indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(!model.replay.present);
+        assert_eq!(model.replay.sequences.len(), 2);
+        assert!(model
+            .replay
+            .empty_state
+            .contains("no readable replay files"));
+        assert!(model
+            .replay
+            .sequences
+            .iter()
+            .all(|sequence| sequence.read_error.is_some()));
+        assert_eq!(model.evidence_fidelity.input_replay.status, "missing");
+        assert_eq!(model.evidence_fidelity.input_replay.observed_count, 0);
+        assert_eq!(model.evidence_fidelity.input_replay.missing_count, 2);
+        assert_eq!(model.evidence_fidelity.input_replay.warnings.len(), 2);
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_probe_and_cdp_fidelity_do_not_treat_stale_indexes_as_present() {
+        let (root, artifacts) = create_test_run("dashboard-probe-cdp-stale-index");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({ "tick": 1 }))
+                .expect("world state serializes"),
+        )
+        .expect("world state written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/console-log.json"),
+            "{not-json",
+        )
+        .expect("malformed console log written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state-v2",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({
+                "probe_call": "getWorldState",
+                "worker_id": "worker-1",
+                "probe_contract": {
+                    "name": RUNTIME_PROBE_CONTRACT_NAME,
+                    "version": RUNTIME_PROBE_CONTRACT_VERSION
+                }
+            }),
+        )
+        .expect("world state indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-frame-stats-v2",
+            "application/json",
+            "evidence/workers/worker-1/missing-frame-stats.json",
+            json!({
+                "probe_call": "getFrameStats",
+                "worker_id": "worker-1",
+                "probe_contract": {
+                    "name": RUNTIME_PROBE_CONTRACT_NAME,
+                    "version": RUNTIME_PROBE_CONTRACT_VERSION
+                }
+            }),
+        )
+        .expect("missing frame stats indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-screenshot",
+            "image/png",
+            "evidence/workers/worker-1/missing-browser-smoke.png",
+            json!({ "worker_id": "worker-1" }),
+        )
+        .expect("missing screenshot indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "malformed-console-log",
+            "application/json",
+            "evidence/workers/worker-1/console-log.json",
+            json!({ "artifact": "console_log", "worker_id": "worker-1" }),
+        )
+        .expect("malformed console log indexed");
+
+        let partial = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(partial.probe_contract_status.status, "partial");
+        assert!(partial.probe_contract_status.missing_count >= 1);
+        assert_ne!(partial.evidence_fidelity.runtime_probe.status, "present");
+        assert_eq!(partial.evidence_fidelity.openchrome_cdp.status, "malformed");
+        assert_eq!(partial.evidence_fidelity.openchrome_cdp.observed_count, 0);
+        assert!(partial.evidence_fidelity.openchrome_cdp.missing_count >= 1);
+        assert!(partial
+            .evidence_fidelity
+            .openchrome_cdp
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("console-log.json")));
+
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/missing-frame-stats.json"),
+            "{not-json",
+        )
+        .expect("malformed frame stats written");
+        let malformed = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(malformed.probe_contract_status.status, "malformed");
+        assert!(malformed.probe_contract_status.malformed_count >= 1);
+        assert_ne!(malformed.evidence_fidelity.runtime_probe.status, "present");
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
