@@ -190,7 +190,8 @@ pub struct InputReplayEvent {
     pub pressed: bool,
 }
 
-const SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION: &str = "ouroforge.scenario-input-replay.v1";
+pub const SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION: &str =
+    "ouroforge.scenario-input-replay.v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -6631,7 +6632,9 @@ fn run_scenario<T: CdpTransport>(
     let mut visual_checkpoint_screenshot_paths = Vec::new();
     let mut visual_checkpoint_summaries = Vec::new();
     let mut snapshot_ids = std::collections::BTreeMap::new();
-    for step in &scenario.steps {
+    let mut pending_replay_artifacts = Vec::new();
+    let mut scenario_frame = 0u32;
+    for (step_index, step) in scenario.steps.iter().enumerate() {
         match step {
             ScenarioStep::Replay { replay } => {
                 let replay_path = write_scenario_json_artifact(
@@ -6644,6 +6647,16 @@ fn run_scenario<T: CdpTransport>(
                     &json!(replay),
                 )?;
                 replay_paths.push(replay_path.clone());
+                pending_replay_artifacts.extend(pending_replay_artifacts_from_replay(
+                    scenario,
+                    step_index,
+                    scenario_frame,
+                    replay,
+                    "inline_replay_event",
+                )?);
+                scenario_frame = scenario_frame
+                    .checked_add(input_replay_last_frame(replay))
+                    .ok_or_else(|| anyhow!("scenario replay frame overflow"))?;
                 append_ledger_event(
                     &config.run_dir,
                     "scenario.input_replay",
@@ -6673,6 +6686,16 @@ fn run_scenario<T: CdpTransport>(
                     }),
                 )?;
                 replay_paths.push(replay_path.clone());
+                pending_replay_artifacts.extend(pending_replay_artifacts_from_replay(
+                    scenario,
+                    step_index,
+                    scenario_frame,
+                    &replay,
+                    "referenced_replay_event",
+                )?);
+                scenario_frame = scenario_frame
+                    .checked_add(input_replay_last_frame(&replay))
+                    .ok_or_else(|| anyhow!("scenario replay frame overflow"))?;
                 append_ledger_event(
                     &config.run_dir,
                     "scenario.input_replay",
@@ -6782,7 +6805,31 @@ fn run_scenario<T: CdpTransport>(
                     }),
                 )?;
             }
-            _ => execute_scenario_step(client, step)?,
+            ScenarioStep::Wait { wait } => {
+                execute_scenario_step(client, step)?;
+                scenario_frame = scenario_frame
+                    .checked_add(wait.frames)
+                    .ok_or_else(|| anyhow!("scenario wait frame overflow"))?;
+            }
+            ScenarioStep::Input { input } => {
+                pending_replay_artifacts.push(ScenarioInputReplayArtifact {
+                    schema_version: SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION.to_string(),
+                    scenario_id: scenario.id.clone(),
+                    worker_id: None,
+                    step_index,
+                    action: ScenarioInputReplayAction {
+                        kind: "scenario_input_step".to_string(),
+                        key: None,
+                        pressed: None,
+                    },
+                    frame: scenario_frame,
+                    tick: Some(u64::from(scenario_frame)),
+                    input: input.clone(),
+                    probe: None,
+                    result: None,
+                });
+                execute_scenario_step(client, step)?;
+            }
         }
     }
 
@@ -7006,6 +7053,16 @@ fn run_scenario<T: CdpTransport>(
             .all(|summary| summary["passed"].as_bool() != Some(false));
     let status = if passed { "passed" } else { "failed" };
     let result_path = format!("{scenario_dir}/scenario-result-{}.json", unix_millis()?);
+    let deterministic_replay_paths = write_pending_replay_artifacts(
+        config,
+        scenario,
+        &scenario_dir,
+        pending_replay_artifacts,
+        &world_state_path,
+        &frame_stats_path,
+        &result_path,
+    )?;
+    replay_paths.extend(deterministic_replay_paths.clone());
     write_json(
         &config.run_dir.join(&result_path),
         &json!({
@@ -7015,6 +7072,7 @@ fn run_scenario<T: CdpTransport>(
                 "world_state": world_state_path,
                 "frame_stats": frame_stats_path,
                 "input_replays": replay_paths.clone(),
+                "scenario_input_replays": deterministic_replay_paths.clone(),
                 "snapshots": snapshot_paths.clone(),
                 "visual_checkpoints": visual_checkpoint_paths.clone(),
                 "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
@@ -7043,6 +7101,7 @@ fn run_scenario<T: CdpTransport>(
             "world_state_path": world_state_path,
             "frame_stats_path": frame_stats_path,
             "input_replay_paths": replay_paths.clone(),
+            "scenario_input_replay_paths": deterministic_replay_paths.clone(),
             "snapshot_paths": snapshot_paths.clone(),
             "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
             "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
@@ -7066,6 +7125,109 @@ fn run_scenario<T: CdpTransport>(
         evidence_paths,
         result_path,
     })
+}
+
+fn input_replay_last_frame(replay: &InputReplay) -> u32 {
+    replay.events.last().map_or(0, |event| event.frame)
+}
+
+fn pending_replay_artifacts_from_replay(
+    scenario: &Scenario,
+    step_index: usize,
+    base_frame: u32,
+    replay: &InputReplay,
+    action_kind: &str,
+) -> Result<Vec<ScenarioInputReplayArtifact>> {
+    replay.validate()?;
+    let mut artifacts = Vec::new();
+    let mut index = 0;
+    while index < replay.events.len() {
+        let frame = replay.events[index].frame;
+        let absolute_frame = base_frame
+            .checked_add(frame)
+            .ok_or_else(|| anyhow!("scenario replay frame overflow"))?;
+        let mut input = InputStep::default();
+        let first_event = replay.events[index].clone();
+        let mut event_count = 0usize;
+        while index < replay.events.len() && replay.events[index].frame == frame {
+            let event = &replay.events[index];
+            match event.key {
+                ReplayKey::Left => input.left = Some(event.pressed),
+                ReplayKey::Right => input.right = Some(event.pressed),
+                ReplayKey::Up => input.up = Some(event.pressed),
+                ReplayKey::Down => input.down = Some(event.pressed),
+            }
+            event_count += 1;
+            index += 1;
+        }
+        artifacts.push(ScenarioInputReplayArtifact {
+            schema_version: SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION.to_string(),
+            scenario_id: scenario.id.clone(),
+            worker_id: None,
+            step_index,
+            action: ScenarioInputReplayAction {
+                kind: action_kind.to_string(),
+                key: (event_count == 1).then_some(first_event.key),
+                pressed: (event_count == 1).then_some(first_event.pressed),
+            },
+            frame: absolute_frame,
+            tick: Some(u64::from(absolute_frame)),
+            input,
+            probe: None,
+            result: None,
+        });
+    }
+    Ok(artifacts)
+}
+
+fn write_pending_replay_artifacts(
+    config: &ScenarioRunConfig,
+    scenario: &Scenario,
+    scenario_dir: &str,
+    artifacts: Vec<ScenarioInputReplayArtifact>,
+    world_state_path: &str,
+    frame_stats_path: &str,
+    result_path: &str,
+) -> Result<Vec<String>> {
+    let mut paths = Vec::new();
+    for (artifact_index, mut artifact) in artifacts.into_iter().enumerate() {
+        artifact.probe = Some(ScenarioInputReplayProbeCorrelation {
+            contract_version: RUNTIME_PROBE_CONTRACT_VERSION.to_string(),
+            world_state_path: Some(world_state_path.to_string()),
+            frame_stats_path: Some(frame_stats_path.to_string()),
+        });
+        artifact.result = Some(ScenarioInputReplayResultCorrelation {
+            scenario_result_path: result_path.to_string(),
+            verdict_path: None,
+        });
+        artifact.validate()?;
+        let replay_path = write_scenario_json_artifact(
+            config,
+            scenario,
+            scenario_dir,
+            &format!(
+                "scenario-input-replay-step-{}-frame-{}",
+                artifact.step_index, artifact.frame
+            ),
+            "scenario_input_replay",
+            unix_millis()? * 1000 + artifact_index as u128,
+            &json!(artifact),
+        )?;
+        append_ledger_event(
+            &config.run_dir,
+            "scenario.input_replay_artifact",
+            "scenario-runner",
+            json!({
+                "scenario_id": scenario.id,
+                "step_index": artifact.step_index,
+                "frame": artifact.frame,
+                "path": replay_path,
+                "artifact": "scenario_input_replay"
+            }),
+        )?;
+        paths.push(replay_path);
+    }
+    Ok(paths)
 }
 
 fn evaluate_runtime_probe_object<T: CdpTransport>(
@@ -14988,7 +15150,9 @@ scenarios:
                         .expect("expression present")
                         .to_string();
                     self.calls.push(expression.clone());
-                    let value = if expression.contains("getWorldState") {
+                    let value = if expression.contains("typeof window.__OUROFORGE__.step") {
+                        json!(true)
+                    } else if expression.contains("getWorldState") {
                         json!({ "object": { "x": 32 } })
                     } else if expression.contains("getFrameStats") {
                         json!({ "fixedDeltaMs": 16 })
@@ -15162,6 +15326,111 @@ scenarios:
             .run_dir
             .join("evidence/scenarios/second-fail")
             .is_dir());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scenario_run_emits_deterministic_input_replay_artifacts() {
+        let (root, artifacts) = create_test_run("ouroforge-scenario-input-replay-artifacts");
+        let seed = Seed::from_yaml_str(
+            r#"
+id: replay-artifact.v1
+title: Replay Artifact Fixture
+goal: Emit deterministic replay artifacts.
+constraints:
+  target: file-harness
+acceptance:
+  - Preserve scenario input replay evidence.
+scenarios:
+  - id: replay-smoke
+    description: Scenario with direct input and inline replay.
+    steps:
+      - wait:
+          frames: 2
+      - input:
+          right: true
+      - replay:
+          schemaVersion: "1"
+          id: move-left
+          events:
+            - frame: 0
+              key: left
+              pressed: true
+            - frame: 3
+              key: left
+              pressed: false
+"#,
+        )
+        .expect("seed parses");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8080")
+            .expect("scenario config");
+        let mut client = CdpClient::new(SuiteScenarioTransport { calls: Vec::new() });
+
+        let summary =
+            run_scenarios_with_client(&config, &seed, &mut client).expect("scenario runs");
+
+        assert_eq!(summary.passed, 1);
+        let result_path = summary.result_paths.first().expect("result path exists");
+        let result = read_json_value(artifacts.run_dir.join(result_path)).expect("result reads");
+        let deterministic_replays = result["evidence"]["scenario_input_replays"]
+            .as_array()
+            .expect("scenario input replays listed");
+        assert_eq!(deterministic_replays.len(), 3);
+        assert_eq!(
+            result["evidence"]["input_replays"]
+                .as_array()
+                .unwrap()
+                .len(),
+            4
+        );
+
+        let first_path = deterministic_replays[0]
+            .as_str()
+            .expect("first replay path is string");
+        let first_artifact: ScenarioInputReplayArtifact = serde_json::from_value(
+            read_json_value(artifacts.run_dir.join(first_path)).expect("replay artifact reads"),
+        )
+        .expect("replay artifact parses");
+        first_artifact
+            .validate()
+            .expect("replay artifact validates");
+        assert_eq!(
+            first_artifact.schema_version,
+            SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION
+        );
+        assert_eq!(first_artifact.scenario_id, "replay-smoke");
+        assert_eq!(first_artifact.step_index, 1);
+        assert_eq!(first_artifact.frame, 2);
+        assert_eq!(first_artifact.action.kind, "scenario_input_step");
+        assert_eq!(first_artifact.input.right, Some(true));
+        assert_eq!(
+            first_artifact
+                .probe
+                .as_ref()
+                .and_then(|probe| probe.world_state_path.as_deref()),
+            result["evidence"]["world_state"].as_str()
+        );
+        assert_eq!(
+            first_artifact
+                .result
+                .as_ref()
+                .map(|result| result.scenario_result_path.as_str()),
+            Some(result_path.as_str())
+        );
+
+        let replay_artifacts = read_evidence_index(&artifacts.run_dir)
+            .expect("evidence index reads")
+            .artifacts
+            .into_iter()
+            .filter(|artifact| {
+                artifact
+                    .metadata
+                    .get("artifact")
+                    .and_then(|value| value.as_str())
+                    == Some("scenario_input_replay")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(replay_artifacts.len(), 3);
         fs::remove_dir_all(root).ok();
     }
 
