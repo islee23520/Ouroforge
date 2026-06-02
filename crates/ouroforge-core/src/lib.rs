@@ -10158,6 +10158,7 @@ pub struct RunDashboardSummary {
     pub worker_count: usize,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
+    pub evidence_fidelity: RunDashboardEvidenceFidelity,
     pub journal_path: PathBuf,
 }
 
@@ -10179,6 +10180,27 @@ pub struct RunDashboardCategorySummary {
     pub count: usize,
     pub missing_count: usize,
     pub malformed_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardEvidenceFidelityStatus {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+    pub summary: String,
+    pub observed_count: usize,
+    pub missing_count: usize,
+    pub warnings: Vec<String>,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardEvidenceFidelity {
+    pub transaction: RunDashboardEvidenceFidelityStatus,
+    pub runtime_probe: RunDashboardEvidenceFidelityStatus,
+    pub input_replay: RunDashboardEvidenceFidelityStatus,
+    pub openchrome_cdp: RunDashboardEvidenceFidelityStatus,
+    pub command_context: RunDashboardEvidenceFidelityStatus,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -10217,6 +10239,7 @@ pub struct RunDashboardReadModel {
     pub engine_summaries: RunDashboardEngineSummaries,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
+    pub evidence_fidelity: RunDashboardEvidenceFidelity,
     pub mutations: Vec<MutationProposal>,
 }
 
@@ -10411,6 +10434,16 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results: &scenario_results,
         mutation_artifacts: &mutation_artifacts,
     });
+    let evidence_fidelity = dashboard_evidence_fidelity(DashboardEvidenceFidelityInputs {
+        transaction_provenance: transaction_provenance.as_ref(),
+        probe_contract_status: &probe_contract_status,
+        replay: &replay,
+        screenshots: &screenshots,
+        console_logs: &console_logs,
+        performance_metrics: &performance_metrics,
+        cdp_trace_summaries: &cdp_trace_summaries,
+        command_context: command_context.as_ref(),
+    });
     Ok(RunDashboardReadModel {
         summary,
         run,
@@ -10435,6 +10468,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         engine_summaries,
         evidence_categories,
         probe_contract_status,
+        evidence_fidelity,
         mutations,
     })
 }
@@ -10476,6 +10510,23 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         &frame_metrics,
         &scenario_results,
     );
+    let transaction_provenance = read_dashboard_transaction_provenance(&run);
+    let command_context = read_dashboard_command_context(&run);
+    let replay = read_dashboard_replay(run_dir, &evidence).unwrap_or_else(|_| RunDashboardReplay {
+        present: false,
+        empty_state: "Replay read model unavailable.".to_string(),
+        sequences: Vec::new(),
+    });
+    let evidence_fidelity = dashboard_evidence_fidelity(DashboardEvidenceFidelityInputs {
+        transaction_provenance: transaction_provenance.as_ref(),
+        probe_contract_status: &probe_contract_status,
+        replay: &replay,
+        screenshots: &screenshots,
+        console_logs: &console_logs,
+        performance_metrics: &performance_metrics,
+        cdp_trace_summaries: &cdp_trace_summaries,
+        command_context: command_context.as_ref(),
+    });
     let id = json_string(&run, "id").unwrap_or_else(|| {
         run_dir
             .file_name()
@@ -10489,7 +10540,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         seed_id: json_string(&run, "seed_id").unwrap_or_else(|| "unknown-seed".to_string()),
         seed_title: json_string(&run, "seed_title").unwrap_or_else(|| "Untitled Seed".to_string()),
         project: read_dashboard_project_context(&run),
-        command_context: read_dashboard_command_context(&run),
+        command_context,
         run_status: json_string(&run, "status").unwrap_or_else(|| "unknown".to_string()),
         verdict_status: json_string(&verdict, "status").unwrap_or_else(|| "unknown".to_string()),
         scenario_status: dashboard_scenario_status(&verdict),
@@ -10503,6 +10554,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         worker_count: dashboard_worker_count(&evidence),
         evidence_categories,
         probe_contract_status,
+        evidence_fidelity,
         journal_path: run_dir.join("journal.md"),
     })
 }
@@ -11239,6 +11291,181 @@ struct DashboardCategoryArtifacts<'a> {
     cdp_trace_summaries: &'a [RunDashboardArtifact],
     scenario_results: &'a [RunDashboardArtifact],
     mutation_artifacts: &'a [RunDashboardArtifact],
+}
+
+struct DashboardEvidenceFidelityInputs<'a> {
+    transaction_provenance: Option<&'a RunTransactionProvenance>,
+    probe_contract_status: &'a RunDashboardProbeContractStatus,
+    replay: &'a RunDashboardReplay,
+    screenshots: &'a [RunDashboardArtifact],
+    console_logs: &'a [RunDashboardArtifact],
+    performance_metrics: &'a [RunDashboardArtifact],
+    cdp_trace_summaries: &'a [RunDashboardArtifact],
+    command_context: Option<&'a RunCommandContext>,
+}
+
+fn dashboard_evidence_fidelity(
+    inputs: DashboardEvidenceFidelityInputs<'_>,
+) -> RunDashboardEvidenceFidelity {
+    let transaction = match inputs.transaction_provenance {
+        Some(provenance) => RunDashboardEvidenceFidelityStatus {
+            id: "transaction".to_string(),
+            label: "Transaction provenance".to_string(),
+            status: "present".to_string(),
+            summary: format!(
+                "Transaction {} records scene edit provenance.",
+                provenance.transaction_id
+            ),
+            observed_count: 1,
+            missing_count: 0,
+            warnings: Vec::new(),
+            evidence_refs: vec![provenance.transaction_artifact_path.clone()],
+        },
+        None => RunDashboardEvidenceFidelityStatus {
+            id: "transaction".to_string(),
+            label: "Transaction provenance".to_string(),
+            status: "missing".to_string(),
+            summary: "No transaction provenance is recorded for this run.".to_string(),
+            observed_count: 0,
+            missing_count: 1,
+            warnings: vec!["Scene edit transaction provenance is unavailable.".to_string()],
+            evidence_refs: Vec::new(),
+        },
+    };
+
+    let runtime_probe = RunDashboardEvidenceFidelityStatus {
+        id: "runtime_probe".to_string(),
+        label: "Runtime probe contract".to_string(),
+        status: inputs.probe_contract_status.status.clone(),
+        summary: format!(
+            "{} {} observed; {} missing; {} malformed.",
+            inputs.probe_contract_status.contract_name,
+            inputs.probe_contract_status.observed_count,
+            inputs.probe_contract_status.missing_count,
+            inputs.probe_contract_status.malformed_count
+        ),
+        observed_count: inputs.probe_contract_status.observed_count,
+        missing_count: inputs.probe_contract_status.missing_count,
+        warnings: if inputs.probe_contract_status.status == "present" {
+            Vec::new()
+        } else {
+            vec![format!(
+                "Runtime probe contract status is {}.",
+                inputs.probe_contract_status.status
+            )]
+        },
+        evidence_refs: inputs.probe_contract_status.evidence_refs.clone(),
+    };
+
+    let replay_refs = inputs
+        .replay
+        .sequences
+        .iter()
+        .flat_map(|sequence| sequence.evidence_refs.clone())
+        .collect::<Vec<_>>();
+    let input_replay = RunDashboardEvidenceFidelityStatus {
+        id: "input_replay".to_string(),
+        label: "Input replay evidence".to_string(),
+        status: if inputs.replay.present {
+            "present"
+        } else {
+            "missing"
+        }
+        .to_string(),
+        summary: if inputs.replay.present {
+            format!(
+                "{} replay sequence(s) available.",
+                inputs.replay.sequences.len()
+            )
+        } else {
+            inputs.replay.empty_state.clone()
+        },
+        observed_count: inputs.replay.sequences.len(),
+        missing_count: usize::from(!inputs.replay.present),
+        warnings: if inputs.replay.present {
+            Vec::new()
+        } else {
+            vec!["Input replay evidence is unavailable.".to_string()]
+        },
+        evidence_refs: replay_refs,
+    };
+
+    let cdp_counts = [
+        ("worker screenshots", inputs.screenshots.len()),
+        ("console logs", inputs.console_logs.len()),
+        ("performance metrics", inputs.performance_metrics.len()),
+        ("CDP trace summaries", inputs.cdp_trace_summaries.len()),
+    ];
+    let missing_cdp = cdp_counts
+        .iter()
+        .filter(|(_, count)| *count == 0)
+        .map(|(label, _)| (*label).to_string())
+        .collect::<Vec<_>>();
+    let openchrome_refs = inputs
+        .screenshots
+        .iter()
+        .chain(inputs.console_logs.iter())
+        .chain(inputs.performance_metrics.iter())
+        .chain(inputs.cdp_trace_summaries.iter())
+        .map(|artifact| artifact.path.clone())
+        .collect::<Vec<_>>();
+    let openchrome_cdp = RunDashboardEvidenceFidelityStatus {
+        id: "openchrome_cdp".to_string(),
+        label: "Openchrome/CDP evidence".to_string(),
+        status: if missing_cdp.is_empty() {
+            "present"
+        } else if openchrome_refs.is_empty() {
+            "missing"
+        } else {
+            "partial"
+        }
+        .to_string(),
+        summary: format!(
+            "{} screenshot(s), {} console log(s), {} performance metric(s), {} CDP trace summarie(s).",
+            inputs.screenshots.len(),
+            inputs.console_logs.len(),
+            inputs.performance_metrics.len(),
+            inputs.cdp_trace_summaries.len()
+        ),
+        observed_count: openchrome_refs.len(),
+        missing_count: missing_cdp.len(),
+        warnings: missing_cdp
+            .iter()
+            .map(|label| format!("Missing {label}."))
+            .collect(),
+        evidence_refs: openchrome_refs,
+    };
+
+    let command_context = match inputs.command_context {
+        Some(context) => RunDashboardEvidenceFidelityStatus {
+            id: "command_context".to_string(),
+            label: "Reproducible command context".to_string(),
+            status: "present".to_string(),
+            summary: format!("{} worker(s), seed {}.", context.workers, context.seed_path),
+            observed_count: 1,
+            missing_count: 0,
+            warnings: Vec::new(),
+            evidence_refs: Vec::new(),
+        },
+        None => RunDashboardEvidenceFidelityStatus {
+            id: "command_context".to_string(),
+            label: "Reproducible command context".to_string(),
+            status: "missing".to_string(),
+            summary: "No reproducible command context is recorded.".to_string(),
+            observed_count: 0,
+            missing_count: 1,
+            warnings: vec!["Command context is unavailable for this run.".to_string()],
+            evidence_refs: Vec::new(),
+        },
+    };
+
+    RunDashboardEvidenceFidelity {
+        transaction,
+        runtime_probe,
+        input_replay,
+        openchrome_cdp,
+        command_context,
+    }
 }
 
 fn dashboard_category_summaries(
@@ -18861,6 +19088,15 @@ scenarios:
         assert_eq!(model.mutation_artifacts.len(), 1);
         assert_eq!(model.mutations.len(), 1);
         assert!(model.transaction_provenance.is_none());
+        assert_eq!(model.evidence_fidelity.openchrome_cdp.status, "present");
+        assert_eq!(model.evidence_fidelity.openchrome_cdp.observed_count, 4);
+        assert_eq!(model.evidence_fidelity.command_context.status, "present");
+        assert_eq!(model.evidence_fidelity.transaction.status, "missing");
+        assert_eq!(model.evidence_fidelity.input_replay.status, "missing");
+        assert_eq!(
+            model.summary.evidence_fidelity.openchrome_cdp.status,
+            model.evidence_fidelity.openchrome_cdp.status
+        );
         let world_state = model.world_states[0]
             .value
             .as_ref()
