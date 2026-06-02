@@ -2326,6 +2326,21 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 "assertions": result.get("assertions").cloned().unwrap_or_else(|| json!([]))
             }));
         }
+        if let Some(assertions) = result.get("assertions").and_then(|value| value.as_array()) {
+            for assertion in assertions.iter().filter(|assertion| {
+                assertion.get("passed").and_then(|value| value.as_bool()) == Some(false)
+            }) {
+                failures.push(json!({
+                    "kind": "assertion_failed",
+                    "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "path": path,
+                    "target": assertion.get("target").cloned().unwrap_or(serde_json::Value::Null),
+                    "assertion_path": assertion.get("path").cloned().unwrap_or(serde_json::Value::Null),
+                    "operator": assertion.get("operator").cloned().unwrap_or(serde_json::Value::Null),
+                    "evidence_ref": assertion.get("evidence_ref").cloned().unwrap_or(serde_json::Value::Null)
+                }));
+            }
+        }
         for evidence_path in ["world_state", "frame_stats"] {
             if let Some(path) = result
                 .get("evidence")
@@ -2768,7 +2783,19 @@ fn run_scenario<T: CdpTransport>(
     let mut console_paths = Vec::new();
     let mut performance_paths = Vec::new();
     let mut trace_paths = Vec::new();
+    let mut console_source = json!({ "logs": [], "count": 0 });
     if let Ok(console_logs) = client.evaluate_json("window.__OUROFORGE_CONSOLE__ || []") {
+        console_source = json!({
+            "logs": console_entries(&console_logs)
+                .into_iter()
+                .filter(|entry| entry.get("level").and_then(|value| value.as_str()) == Some("error"))
+                .cloned()
+                .collect::<Vec<_>>(),
+            "count": console_entries(&console_logs)
+                .into_iter()
+                .filter(|entry| entry.get("level").and_then(|value| value.as_str()) == Some("error"))
+                .count()
+        });
         let console_path = write_scenario_json_artifact(
             config,
             scenario,
@@ -2785,11 +2812,13 @@ fn run_scenario<T: CdpTransport>(
         console_paths.push(console_path);
     }
     let mut scenario_performance_metric_count = None;
+    let mut performance_source = json!({});
     if let Ok(performance_metrics) = client
         .enable_performance()
         .and_then(|_| client.performance_metrics())
     {
         scenario_performance_metric_count = Some(count_cdp_metrics(&performance_metrics));
+        performance_source = performance_metrics_by_name(&performance_metrics);
         let performance_path = write_scenario_json_artifact(
             config,
             scenario,
@@ -2825,9 +2854,65 @@ fn run_scenario<T: CdpTransport>(
             ]
         }),
     )?;
-    trace_paths.push(trace_path);
+    trace_paths.push(trace_path.clone());
 
-    let assertions = evaluate_scenario_assertions(scenario, &world_state, &frame_stats);
+    let runtime_events = json!({
+        "steps": &scenario.steps,
+        "stepCount": scenario.steps.len(),
+        "inputReplays": &replay_paths,
+        "snapshots": &snapshot_paths
+    });
+    let collision_source = world_state
+        .get("collisions")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let audio_source = world_state
+        .get("audio")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let animation_source = world_state
+        .get("animation")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let assertion_sources = ScenarioAssertionSources {
+        world_state: AssertionSource {
+            value: &world_state,
+            evidence_ref: &world_state_path,
+        },
+        frame_stats: AssertionSource {
+            value: &frame_stats,
+            evidence_ref: &frame_stats_path,
+        },
+        runtime_events: AssertionSource {
+            value: &runtime_events,
+            evidence_ref: &trace_path,
+        },
+        performance_metrics: AssertionSource {
+            value: &performance_source,
+            evidence_ref: performance_paths
+                .first()
+                .map_or(frame_stats_path.as_str(), String::as_str),
+        },
+        console_errors: AssertionSource {
+            value: &console_source,
+            evidence_ref: console_paths
+                .first()
+                .map_or(trace_path.as_str(), String::as_str),
+        },
+        collision_evidence: AssertionSource {
+            value: &collision_source,
+            evidence_ref: &world_state_path,
+        },
+        audio_evidence: AssertionSource {
+            value: &audio_source,
+            evidence_ref: &world_state_path,
+        },
+        animation_evidence: AssertionSource {
+            value: &animation_source,
+            evidence_ref: &world_state_path,
+        },
+    };
+    let assertions = evaluate_scenario_assertions(scenario, &assertion_sources);
     for assertion in &assertions {
         append_ledger_event(
             &config.run_dir,
@@ -2838,7 +2923,7 @@ fn run_scenario<T: CdpTransport>(
                 "target": assertion["target"],
                 "path": assertion["path"],
                 "passed": assertion["passed"],
-                "evidence_path": if assertion["target"] == "world_state" { &world_state_path } else { &frame_stats_path }
+                "evidence_path": assertion["evidence_ref"]
             }),
         )?;
     }
@@ -2923,60 +3008,215 @@ fn write_scenario_json_artifact(
     Ok(rel_path)
 }
 
+#[derive(Clone, Copy)]
+struct AssertionSource<'a> {
+    value: &'a serde_json::Value,
+    evidence_ref: &'a str,
+}
+
+struct ScenarioAssertionSources<'a> {
+    world_state: AssertionSource<'a>,
+    frame_stats: AssertionSource<'a>,
+    runtime_events: AssertionSource<'a>,
+    performance_metrics: AssertionSource<'a>,
+    console_errors: AssertionSource<'a>,
+    collision_evidence: AssertionSource<'a>,
+    audio_evidence: AssertionSource<'a>,
+    animation_evidence: AssertionSource<'a>,
+}
+
 fn evaluate_scenario_assertions(
     scenario: &Scenario,
-    world_state: &serde_json::Value,
-    frame_stats: &serde_json::Value,
+    sources: &ScenarioAssertionSources<'_>,
 ) -> Vec<serde_json::Value> {
     scenario
         .assertions
         .iter()
         .map(|assertion| {
-            let (target, assertion) = match assertion {
-                ScenarioAssertion::WorldState { world_state } => ("world_state", world_state),
-                ScenarioAssertion::FrameStats { frame_stats } => ("frame_stats", frame_stats),
+            let (target, assertion, source) = match assertion {
+                ScenarioAssertion::WorldState { world_state } => {
+                    ("world_state", world_state, sources.world_state)
+                }
+                ScenarioAssertion::FrameStats { frame_stats } => {
+                    ("frame_stats", frame_stats, sources.frame_stats)
+                }
                 ScenarioAssertion::RuntimeEvents { runtime_events } => {
-                    ("runtime_events", runtime_events)
+                    ("runtime_events", runtime_events, sources.runtime_events)
                 }
                 ScenarioAssertion::PerformanceMetrics {
                     performance_metrics,
-                } => ("performance_metrics", performance_metrics),
+                } => (
+                    "performance_metrics",
+                    performance_metrics,
+                    sources.performance_metrics,
+                ),
                 ScenarioAssertion::ConsoleErrors { console_errors } => {
-                    ("console_errors", console_errors)
+                    ("console_errors", console_errors, sources.console_errors)
                 }
-                ScenarioAssertion::CollisionEvidence { collision_evidence } => {
-                    ("collision_evidence", collision_evidence)
-                }
+                ScenarioAssertion::CollisionEvidence { collision_evidence } => (
+                    "collision_evidence",
+                    collision_evidence,
+                    sources.collision_evidence,
+                ),
                 ScenarioAssertion::AudioEvidence { audio_evidence } => {
-                    ("audio_evidence", audio_evidence)
+                    ("audio_evidence", audio_evidence, sources.audio_evidence)
                 }
-                ScenarioAssertion::AnimationEvidence { animation_evidence } => {
-                    ("animation_evidence", animation_evidence)
-                }
+                ScenarioAssertion::AnimationEvidence { animation_evidence } => (
+                    "animation_evidence",
+                    animation_evidence,
+                    sources.animation_evidence,
+                ),
             };
-            let null_source = serde_json::Value::Null;
-            let source = match target {
-                "world_state" => world_state,
-                "frame_stats" => frame_stats,
-                _ => &null_source,
-            };
-            let actual = read_json_path(source, &assertion.path)
+            let actual = read_json_path(source.value, &assertion.path)
                 .cloned()
                 .unwrap_or(serde_json::Value::Null);
-            let passed = assertion
-                .equals
-                .as_ref()
-                .is_some_and(|expected| &actual == expected);
+            let outcome = evaluate_json_path_assertion(assertion, &actual);
             json!({
                 "target": target,
                 "path": assertion.path,
-                "operator": if assertion.equals.is_some() { "equals" } else { "unsupported_until_evaluation_pr" },
-                "expected": assertion.equals,
+                "operator": outcome.operator,
+                "expected": outcome.expected,
                 "actual": actual,
-                "passed": passed
+                "passed": outcome.passed,
+                "evidence_ref": source.evidence_ref
             })
         })
         .collect()
+}
+
+struct AssertionEvaluation {
+    operator: &'static str,
+    expected: serde_json::Value,
+    passed: bool,
+}
+
+fn evaluate_json_path_assertion(
+    assertion: &JsonPathAssertion,
+    actual: &serde_json::Value,
+) -> AssertionEvaluation {
+    if let Some(expected) = &assertion.equals {
+        return AssertionEvaluation {
+            operator: "equals",
+            expected: expected.clone(),
+            passed: actual == expected,
+        };
+    }
+    if let Some(expected) = &assertion.not_equals {
+        return AssertionEvaluation {
+            operator: "notEquals",
+            expected: expected.clone(),
+            passed: actual != expected,
+        };
+    }
+    if let Some(expected) = assertion.exists {
+        return AssertionEvaluation {
+            operator: "exists",
+            expected: json!(expected),
+            passed: (actual != &serde_json::Value::Null) == expected,
+        };
+    }
+    if let Some(expected) = &assertion.contains {
+        return AssertionEvaluation {
+            operator: "contains",
+            expected: expected.clone(),
+            passed: json_contains(actual, expected),
+        };
+    }
+    if let Some(expected) = &assertion.greater_than {
+        return AssertionEvaluation {
+            operator: "greaterThan",
+            expected: expected.clone(),
+            passed: compare_json_numbers(actual, expected, std::cmp::Ordering::Greater),
+        };
+    }
+    if let Some(expected) = &assertion.less_than {
+        return AssertionEvaluation {
+            operator: "lessThan",
+            expected: expected.clone(),
+            passed: compare_json_numbers(actual, expected, std::cmp::Ordering::Less),
+        };
+    }
+    if let Some(expected) = assertion.count_equals {
+        return AssertionEvaluation {
+            operator: "countEquals",
+            expected: json!(expected),
+            passed: json_count(actual) == Some(expected),
+        };
+    }
+    if let Some(expected) = assertion.count_greater_than {
+        return AssertionEvaluation {
+            operator: "countGreaterThan",
+            expected: json!(expected),
+            passed: json_count(actual).is_some_and(|actual| actual > expected),
+        };
+    }
+    if let Some(expected) = assertion.count_less_than {
+        return AssertionEvaluation {
+            operator: "countLessThan",
+            expected: json!(expected),
+            passed: json_count(actual).is_some_and(|actual| actual < expected),
+        };
+    }
+    AssertionEvaluation {
+        operator: "invalid",
+        expected: serde_json::Value::Null,
+        passed: false,
+    }
+}
+
+fn json_contains(actual: &serde_json::Value, expected: &serde_json::Value) -> bool {
+    match actual {
+        serde_json::Value::Array(items) => items.iter().any(|item| item == expected),
+        serde_json::Value::Object(object) => expected
+            .as_str()
+            .is_some_and(|key| object.contains_key(key)),
+        serde_json::Value::String(text) => expected
+            .as_str()
+            .is_some_and(|needle| text.contains(needle)),
+        _ => false,
+    }
+}
+
+fn compare_json_numbers(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    ordering: std::cmp::Ordering,
+) -> bool {
+    match (actual.as_f64(), expected.as_f64()) {
+        (Some(actual), Some(expected)) => actual.partial_cmp(&expected) == Some(ordering),
+        _ => false,
+    }
+}
+
+fn json_count(value: &serde_json::Value) -> Option<u64> {
+    match value {
+        serde_json::Value::Array(items) => Some(items.len() as u64),
+        serde_json::Value::Object(object) => Some(object.len() as u64),
+        serde_json::Value::String(text) => Some(text.chars().count() as u64),
+        _ => None,
+    }
+}
+
+fn performance_metrics_by_name(metrics: &serde_json::Value) -> serde_json::Value {
+    let mut mapped = serde_json::Map::new();
+    let values = metrics
+        .get("metrics")
+        .or_else(|| metrics.get("Metrics"))
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten();
+    for metric in values {
+        if let (Some(name), Some(value)) = (
+            metric
+                .get("name")
+                .or_else(|| metric.get("Name"))
+                .and_then(|value| value.as_str()),
+            metric.get("value").or_else(|| metric.get("Value")).cloned(),
+        ) {
+            mapped.insert(name.to_string(), value);
+        }
+    }
+    serde_json::Value::Object(mapped)
 }
 
 fn read_json_path<'a>(value: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
@@ -4924,6 +5164,47 @@ scenarios:
     }
 
     #[test]
+    fn evaluator_reports_assertion_failures_with_evidence_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-assertion-failure-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "failed");
+        let result_path = artifacts
+            .run_dir
+            .join("evidence/scenarios/bootstrap-smoke/scenario-result.json");
+        fs::write(
+            &result_path,
+            r#"{
+  "scenario_id": "bootstrap-smoke",
+  "status": "failed",
+  "evidence": {
+    "world_state": "evidence/scenarios/bootstrap-smoke/world-state.json",
+    "frame_stats": "evidence/scenarios/bootstrap-smoke/frame-stats.json"
+  },
+  "assertions": [
+    {
+      "target": "world_state",
+      "path": "tick",
+      "operator": "greaterThan",
+      "expected": 10,
+      "actual": 2,
+      "passed": false,
+      "evidence_ref": "evidence/scenarios/bootstrap-smoke/world-state.json"
+    }
+  ]
+}"#,
+        )
+        .expect("failed scenario result written");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict.failures.iter().any(|failure| {
+            failure["kind"] == "assertion_failed"
+                && failure["evidence_ref"] == "evidence/scenarios/bootstrap-smoke/world-state.json"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn evaluator_fails_on_configured_console_level() {
         let (root, artifacts) = create_test_run("ouroforge-eval-console-threshold-test");
         write_scenario_result_fixture(&artifacts.run_dir, "passed");
@@ -5016,25 +5297,56 @@ scenarios:
                 ScenarioAssertion::WorldState {
                     world_state: json_path_equals("collisions.0.pairId", json!("goal:player")),
                 },
+                ScenarioAssertion::WorldState {
+                    world_state: json_path_assertion("collisions", |assertion| {
+                        assertion.count_equals = Some(1);
+                    }),
+                },
+                ScenarioAssertion::ConsoleErrors {
+                    console_errors: json_path_assertion("logs", |assertion| {
+                        assertion.count_equals = Some(0);
+                    }),
+                },
+                ScenarioAssertion::PerformanceMetrics {
+                    performance_metrics: json_path_assertion("ScriptDuration", |assertion| {
+                        assertion.less_than = Some(json!(10));
+                    }),
+                },
             ],
         };
-
-        let assertions = evaluate_scenario_assertions(
-            &scenario,
-            &json!({
-                "tick": 2,
-                "object": { "id": "probe-square" },
-                "collisions": [{ "pairId": "goal:player" }]
-            }),
-            &json!({ "fixedDeltaMs": 16 }),
+        let world_state = json!({
+            "tick": 2,
+            "object": { "id": "probe-square" },
+            "collisions": [{ "pairId": "goal:player" }]
+        });
+        let frame_stats = json!({ "fixedDeltaMs": 16 });
+        let runtime_events = json!({ "stepCount": 0 });
+        let performance_metrics = json!({ "ScriptDuration": 2.5 });
+        let console_errors = json!({ "logs": [], "count": 0 });
+        let none = serde_json::Value::Null;
+        let sources = assertion_sources_for_test(
+            &world_state,
+            &frame_stats,
+            &runtime_events,
+            &performance_metrics,
+            &console_errors,
+            &world_state["collisions"],
+            &none,
+            &none,
         );
 
-        assert_eq!(assertions.len(), 4);
+        let assertions = evaluate_scenario_assertions(&scenario, &sources);
+
+        assert_eq!(assertions.len(), 7);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
         assert_eq!(assertions[2]["actual"], "probe-square");
         assert_eq!(assertions[3]["passed"], true);
+        assert_eq!(assertions[4]["operator"], "countEquals");
+        assert_eq!(assertions[4]["evidence_ref"], "evidence/world-state.json");
+        assert_eq!(assertions[5]["passed"], true);
+        assert_eq!(assertions[6]["passed"], true);
     }
 
     #[test]
@@ -5874,9 +6186,18 @@ scenarios:
     }
 
     fn json_path_equals(path: &str, expected: serde_json::Value) -> JsonPathAssertion {
-        JsonPathAssertion {
+        json_path_assertion(path, |assertion| {
+            assertion.equals = Some(expected);
+        })
+    }
+
+    fn json_path_assertion(
+        path: &str,
+        configure: impl FnOnce(&mut JsonPathAssertion),
+    ) -> JsonPathAssertion {
+        let mut assertion = JsonPathAssertion {
             path: path.to_string(),
-            equals: Some(expected),
+            equals: None,
             not_equals: None,
             exists: None,
             contains: None,
@@ -5885,6 +6206,55 @@ scenarios:
             count_equals: None,
             count_greater_than: None,
             count_less_than: None,
+        };
+        configure(&mut assertion);
+        assertion
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn assertion_sources_for_test<'a>(
+        world_state: &'a serde_json::Value,
+        frame_stats: &'a serde_json::Value,
+        runtime_events: &'a serde_json::Value,
+        performance_metrics: &'a serde_json::Value,
+        console_errors: &'a serde_json::Value,
+        collision_evidence: &'a serde_json::Value,
+        audio_evidence: &'a serde_json::Value,
+        animation_evidence: &'a serde_json::Value,
+    ) -> ScenarioAssertionSources<'a> {
+        ScenarioAssertionSources {
+            world_state: AssertionSource {
+                value: world_state,
+                evidence_ref: "evidence/world-state.json",
+            },
+            frame_stats: AssertionSource {
+                value: frame_stats,
+                evidence_ref: "evidence/frame-stats.json",
+            },
+            runtime_events: AssertionSource {
+                value: runtime_events,
+                evidence_ref: "evidence/cdp-trace-summary.json",
+            },
+            performance_metrics: AssertionSource {
+                value: performance_metrics,
+                evidence_ref: "evidence/performance-metrics.json",
+            },
+            console_errors: AssertionSource {
+                value: console_errors,
+                evidence_ref: "evidence/console-log.json",
+            },
+            collision_evidence: AssertionSource {
+                value: collision_evidence,
+                evidence_ref: "evidence/world-state.json",
+            },
+            audio_evidence: AssertionSource {
+                value: audio_evidence,
+                evidence_ref: "evidence/world-state.json",
+            },
+            animation_evidence: AssertionSource {
+                value: animation_evidence,
+                evidence_ref: "evidence/world-state.json",
+            },
         }
     }
 
