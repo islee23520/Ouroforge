@@ -1,0 +1,23 @@
+id: evolve.v1.demo
+title: Evolve v1 Controlled Failure Demo
+goal: Demonstrate the evidence-native evolve lifecycle with a controlled assertion failure.
+constraints:
+  target: game-runtime
+acceptance:
+  - Seed validation reports the evolve.v1.demo seed as valid.
+  - Running the seed produces a controlled failed verdict suitable for evolve classification and patch drafting.
+scenarios:
+  - id: evolve-controlled-failure
+    description: Move the player right, then intentionally assert the wrong position to create deterministic failure evidence.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 999
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
