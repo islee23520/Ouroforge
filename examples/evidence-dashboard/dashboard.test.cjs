@@ -31,8 +31,10 @@ const run = {
       { id: 'scenario_results', label: 'Scenario results', count: 1, missing_count: 0, malformed_count: 0 },
       { id: 'mutation_artifacts', label: 'Mutation artifacts', count: 1, missing_count: 0, malformed_count: 0 },
     ],
+    probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
   },
   evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
+  probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -279,6 +281,9 @@ assert.match(detail, /mutation review runs\/run-1 --accept/);
 assert.match(detail, /No lifecycle records for this stage|patch-draft-1/);
 assert.match(detail, /fixture journal summary/);
 assert.match(detail, /Observations/);
+assert.match(detail, /Runtime probe contract/);
+assert.match(detail, /ouroforge-runtime-probe v2/);
+assert.match(detail, /observed 2/);
 assert.ok(detail.includes('../../runs/run-1/evidence/world.json'));
 assert.ok(detail.includes('../../runs/run-1/verdict.json'));
 assert.match(detail, /mutation-1/);
@@ -289,6 +294,8 @@ assert.match(detail, /1 missing/);
 assert.match(detail, /1 malformed/);
 assert.match(detail, /bad json/);
 assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /Frame\/performance metrics/);
+assert.match(dashboard.renderProbeContractStatus(run.probe_contract_status), /present/);
+assert.match(dashboard.renderProbeContractStatus({ status: 'malformed', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 1, missing_count: 1, malformed_count: 1, evidence_refs: ['evidence/failure.json'] }), /1 malformed/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);

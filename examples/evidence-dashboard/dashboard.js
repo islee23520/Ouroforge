@@ -126,6 +126,25 @@ const OuroforgeDashboard = (() => {
     return `<div class="category-grid">${cards}</div>`;
   }
 
+  function renderProbeContractStatus(status = {}) {
+    const state = status.status || 'legacy';
+    const label = `${status.contract_name || 'ouroforge-runtime-probe'} ${status.version || 'unknown'}`;
+    const warnings = [];
+    if (status.missing_count) warnings.push(`${status.missing_count} missing`);
+    if (status.malformed_count) warnings.push(`${status.malformed_count} malformed`);
+    const refs = Array.isArray(status.evidence_refs) ? status.evidence_refs : [];
+    const refList = refs.length
+      ? `<div class="run-meta">Evidence: ${escapeText(refs.slice(0, 4).join(' · '))}${refs.length > 4 ? ' …' : ''}</div>`
+      : '<div class="run-meta">No v2 probe evidence refs recorded</div>';
+    return `<article class="category-card probe-contract-status">
+      <div class="card-label">Runtime probe contract</div>
+      <div class="card-value"><span class="${statusClass(state)}">${escapeText(state)}</span></div>
+      <div class="run-meta">${escapeText(label)} · observed ${escapeText(status.observed_count ?? 0)}</div>
+      ${warnings.length ? `<div class="artifact-warning">${escapeText(warnings.join(' · '))}</div>` : '<div class="run-meta">No probe contract failures recorded</div>'}
+      ${refList}
+    </article>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -529,6 +548,7 @@ const OuroforgeDashboard = (() => {
         <div class="card"><div class="card-label">Mutations</div><div class="card-value">${mutations.length}</div></div>
       </div>
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
+      <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
@@ -597,7 +617,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -9480,7 +9480,19 @@ pub struct RunDashboardSummary {
     pub mutation_count: usize,
     pub worker_count: usize,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
+    pub probe_contract_status: RunDashboardProbeContractStatus,
     pub journal_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardProbeContractStatus {
+    pub status: String,
+    pub contract_name: String,
+    pub version: String,
+    pub observed_count: usize,
+    pub missing_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -9526,6 +9538,7 @@ pub struct RunDashboardReadModel {
     pub transaction_provenance: Option<RunTransactionProvenance>,
     pub engine_summaries: RunDashboardEngineSummaries,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
+    pub probe_contract_status: RunDashboardProbeContractStatus,
     pub mutations: Vec<MutationProposal>,
 }
 
@@ -9703,6 +9716,12 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let transaction_provenance = read_dashboard_transaction_provenance(&run);
     let project = read_dashboard_project_context(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
+    let probe_contract_status = dashboard_probe_contract_status(
+        &evidence,
+        &world_states,
+        &frame_metrics,
+        &scenario_results,
+    );
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -9735,6 +9754,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         transaction_provenance,
         engine_summaries,
         evidence_categories,
+        probe_contract_status,
         mutations,
     })
 }
@@ -9770,6 +9790,12 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         scenario_results: &scenario_results,
         mutation_artifacts: &mutation_artifacts,
     });
+    let probe_contract_status = dashboard_probe_contract_status(
+        &evidence,
+        &world_states,
+        &frame_metrics,
+        &scenario_results,
+    );
     let id = json_string(&run, "id").unwrap_or_else(|| {
         run_dir
             .file_name()
@@ -9795,6 +9821,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         mutation_count: mutations.len(),
         worker_count: dashboard_worker_count(&evidence),
         evidence_categories,
+        probe_contract_status,
         journal_path: run_dir.join("journal.md"),
     })
 }
@@ -9878,6 +9905,86 @@ fn dashboard_artifact_is_cdp_trace_summary(artifact: &EvidenceArtifact) -> bool 
         == Some("cdp_trace_summary")
         || artifact.id.contains("cdp-trace")
         || artifact.path.contains("cdp-trace")
+}
+
+fn dashboard_probe_contract_status(
+    evidence: &[EvidenceArtifact],
+    world_states: &[RunDashboardArtifact],
+    frame_metrics: &[RunDashboardArtifact],
+    scenario_results: &[RunDashboardArtifact],
+) -> RunDashboardProbeContractStatus {
+    let mut evidence_refs = Vec::new();
+    let mut observed_count = 0usize;
+    for artifact in evidence {
+        if artifact
+            .metadata
+            .get("probe_contract")
+            .and_then(|value| value.get("version"))
+            .and_then(|value| value.as_str())
+            == Some(RUNTIME_PROBE_CONTRACT_VERSION)
+        {
+            observed_count += 1;
+            evidence_refs.push(artifact.path.clone());
+        }
+    }
+    let malformed_count = evidence
+        .iter()
+        .filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("runtime_probe_contract_failure")
+                || artifact
+                    .metadata
+                    .get("probe_contract_failure")
+                    .and_then(|value| value.as_bool())
+                    == Some(true)
+        })
+        .count()
+        + scenario_results
+            .iter()
+            .filter(|artifact| {
+                artifact
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| value.get("probe_contract_failure").is_some())
+            })
+            .count();
+    let has_world_v2 = world_states
+        .iter()
+        .any(dashboard_artifact_has_probe_contract_v2);
+    let has_frame_v2 = frame_metrics
+        .iter()
+        .any(dashboard_artifact_has_probe_contract_v2);
+    let missing_count = usize::from(!has_world_v2) + usize::from(!has_frame_v2);
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if has_world_v2 && has_frame_v2 {
+        "present"
+    } else if observed_count > 0 {
+        "partial"
+    } else {
+        "legacy"
+    };
+    RunDashboardProbeContractStatus {
+        status: status.to_string(),
+        contract_name: RUNTIME_PROBE_CONTRACT_NAME.to_string(),
+        version: RUNTIME_PROBE_CONTRACT_VERSION.to_string(),
+        observed_count,
+        missing_count,
+        malformed_count,
+        evidence_refs,
+    }
+}
+
+fn dashboard_artifact_has_probe_contract_v2(artifact: &RunDashboardArtifact) -> bool {
+    artifact
+        .metadata
+        .get("probe_contract")
+        .and_then(|value| value.get("version"))
+        .and_then(|value| value.as_str())
+        == Some(RUNTIME_PROBE_CONTRACT_VERSION)
 }
 
 fn dashboard_artifact_is_world_state(artifact: &EvidenceArtifact) -> bool {
