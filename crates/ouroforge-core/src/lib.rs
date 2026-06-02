@@ -2433,6 +2433,114 @@ fn classify_failure_category(
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PatchDraftState {
+    Drafted,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDraft {
+    pub id: String,
+    pub proposal_id: String,
+    pub classification_id: String,
+    pub lifecycle_state: PatchDraftState,
+    pub target_path: String,
+    pub rationale: String,
+    pub evidence_refs: Vec<String>,
+    pub draft_text: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDraftArtifact {
+    pub schema_version: String,
+    pub run_id: String,
+    pub drafts: Vec<PatchDraft>,
+}
+
+impl PatchDraftArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!("patch draft schema_version must be \"1\""));
+        }
+        require_text("patch draft run_id", &self.run_id)?;
+        if self.drafts.is_empty() {
+            return Err(anyhow!(
+                "patch draft artifact must include at least one draft"
+            ));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for draft in &self.drafts {
+            draft.validate()?;
+            if !ids.insert(draft.id.as_str()) {
+                return Err(anyhow!("duplicate patch draft id: {}", draft.id));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl PatchDraft {
+    pub fn validate(&self) -> Result<()> {
+        require_text("patch draft id", &self.id)?;
+        require_text("patch draft proposal_id", &self.proposal_id)?;
+        require_text("patch draft classification_id", &self.classification_id)?;
+        validate_patch_draft_target_path(&self.target_path)?;
+        require_text("patch draft rationale", &self.rationale)?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("patch draft requires at least one evidence ref"));
+        }
+        for evidence_ref in &self.evidence_refs {
+            require_text("patch draft evidence_ref", evidence_ref)?;
+        }
+        require_text("patch draft draft_text", &self.draft_text)?;
+        Ok(())
+    }
+}
+
+fn validate_patch_draft_target_path(target_path: &str) -> Result<()> {
+    require_text("patch draft target_path", target_path)?;
+    let path = Path::new(target_path);
+    if path.is_absolute() {
+        return Err(anyhow!("patch draft target_path must be relative"));
+    }
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return Err(anyhow!(
+            "patch draft target_path must not escape the repository"
+        ));
+    }
+    Ok(())
+}
+
+pub fn read_patch_draft_artifact(run_dir: impl AsRef<Path>) -> Result<PatchDraftArtifact> {
+    let path = run_dir.as_ref().join("mutation/patch-drafts.json");
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read patch drafts {}", path.display()))?;
+    let artifact: PatchDraftArtifact = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse patch drafts {}", path.display()))?;
+    artifact.validate()?;
+    Ok(artifact)
+}
+
+pub fn write_patch_draft_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &PatchDraftArtifact,
+) -> Result<PathBuf> {
+    artifact.validate()?;
+    let dir = run_dir.as_ref().join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    let path = dir.join("patch-drafts.json");
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
 pub fn create_mutation_proposal(
     run_dir: impl AsRef<Path>,
     input: MutationProposalInput,
@@ -6222,6 +6330,84 @@ scenarios:
             assert_eq!(actual, expected, "reason: {reason}");
             assert!(!reason.is_empty());
         }
+    }
+
+    fn valid_patch_draft_artifact() -> PatchDraftArtifact {
+        PatchDraftArtifact {
+            schema_version: "1".to_string(),
+            run_id: "run-patch-draft".to_string(),
+            drafts: vec![PatchDraft {
+                id: "patch-draft-1".to_string(),
+                proposal_id: "mutation-1".to_string(),
+                classification_id: "classification-1".to_string(),
+                lifecycle_state: PatchDraftState::Drafted,
+                target_path: "seeds/platformer.yaml".to_string(),
+                rationale: "draft follows evidence-linked mutation proposal".to_string(),
+                evidence_refs: vec!["evidence/scenarios/demo/scenario-result-1.json".to_string()],
+                draft_text: "--- a/seeds/platformer.yaml\n+++ b/seeds/platformer.yaml\n# inspectable draft only\n"
+                    .to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn writes_and_reads_valid_patch_draft_artifact() {
+        let (root, artifacts) = create_test_run("ouroforge-patch-draft-valid-test");
+        let artifact = valid_patch_draft_artifact();
+
+        let path = write_patch_draft_artifact(&artifacts.run_dir, &artifact).expect("draft writes");
+        assert_eq!(path, artifacts.run_dir.join("mutation/patch-drafts.json"));
+        let round_trip = read_patch_draft_artifact(&artifacts.run_dir).expect("draft reads");
+
+        assert_eq!(round_trip, artifact);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_patch_draft_unsafe_target_paths() {
+        let mut artifact = valid_patch_draft_artifact();
+        artifact.drafts[0].target_path = "../secrets.yaml".to_string();
+
+        let error = artifact.validate().expect_err("escaping target path fails");
+
+        assert!(error.to_string().contains("must not escape the repository"));
+    }
+
+    #[test]
+    fn rejects_patch_draft_without_evidence_refs() {
+        let mut artifact = valid_patch_draft_artifact();
+        artifact.drafts[0].evidence_refs.clear();
+
+        let error = artifact.validate().expect_err("missing evidence refs fail");
+
+        assert!(error
+            .to_string()
+            .contains("requires at least one evidence ref"));
+    }
+
+    #[test]
+    fn rejects_duplicate_patch_draft_ids() {
+        let mut artifact = valid_patch_draft_artifact();
+        artifact.drafts.push(artifact.drafts[0].clone());
+
+        let error = artifact.validate().expect_err("duplicate drafts fail");
+
+        assert!(error.to_string().contains("duplicate patch draft id"));
+    }
+
+    #[test]
+    fn writing_patch_draft_artifact_does_not_modify_target_file() {
+        let (root, artifacts) = create_test_run("ouroforge-patch-draft-no-mutate-test");
+        let target = root.join("seeds/platformer.yaml");
+        fs::create_dir_all(target.parent().expect("target parent")).expect("parent exists");
+        fs::write(&target, "original seed content\n").expect("target written");
+        let artifact = valid_patch_draft_artifact();
+
+        write_patch_draft_artifact(&artifacts.run_dir, &artifact).expect("draft writes");
+
+        let target_after = fs::read_to_string(&target).expect("target reads");
+        assert_eq!(target_after, "original seed content\n");
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
