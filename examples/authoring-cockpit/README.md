@@ -1,6 +1,6 @@
-# Studio v1 Demo Cockpit
+# Studio v2 Authoring Cockpit
 
-Static local browser UI for composing completed Studio v1 surfaces: run/evidence inspection, journal viewing, mutation review state, replay evidence, live preview controls, Rust-validated scene edit command generation, and run comparison display.
+Static local browser UI for composing Authoring Loop v2 surfaces: scene edit command generation, transaction provenance, QA evidence inspection, journal viewing, semantic run comparison, scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -27,30 +27,32 @@ All other scene fields remain read-only in the cockpit and are rejected by the
 Rust `ouroforge scene edit` command.
 
 
-## Studio v1 demo surfaces
+## Studio v2 demo surfaces
 
 The cockpit composes completed local surfaces only:
 
 - run/evidence browser from generated dashboard data;
 - journal viewer when journal data exists;
 - mutation review lifecycle state and manual command hints when artifacts exist;
+- scene-only mutation proposal/application lifecycle state when artifacts exist;
 - replay evidence surface when replay artifacts exist;
 - live preview controls through the existing runtime probe;
 - scene edit command generation for Rust-validated fields;
-- run comparison artifact surface when comparison artifacts exist.
+- transaction-bound QA command generation;
+- semantic run comparison artifact surface when comparison artifacts exist.
 
-Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, or mutation acceptance from the browser. Demo verification evidence is recorded in `../../docs/studio-v1-demo.md`.
+Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, or mutation acceptance from the browser. Studio v2 verification evidence is recorded in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
 
 ## QA and evidence loop
 
-The cockpit includes a Run QA panel with the exact local commands:
+The cockpit includes a Run QA panel with local display-only commands:
 
 ```bash
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 ```
 
-After exporting dashboard data, refresh the cockpit to view the latest run evidence and journal pane. The browser still does not mutate files directly.
+After exporting dashboard data, refresh the cockpit to view the latest run evidence, authoring provenance, semantic comparison, scene-only mutation lifecycle, and journal panes. The browser still does not mutate files directly.
 
 ## Live preview controls
 
