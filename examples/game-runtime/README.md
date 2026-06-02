@@ -19,3 +19,10 @@ in `getEvents()` and the current `collisions` list in `getWorldState()`.
 Snapshot/restore is in-memory only: `snapshot()` returns a local snapshot ID and
 `restore(snapshotId)` restores cloned deterministic world, input, and event state
 for QA branching without browser storage or save-game semantics.
+Local asset loading v1 is intentionally static and browser-only. Scene sprites may
+reference committed demo images under `assets/...`; the Rust scene validator
+rejects remote URLs, absolute paths, invalid characters, and directory escapes.
+The browser runtime loads those image paths directly from the same local static
+server and exposes deterministic asset metadata through
+`window.__OUROFORGE__.getWorldState().assets`. This is not a bundler, import
+pipeline, cache, marketplace, or editor asset browser.

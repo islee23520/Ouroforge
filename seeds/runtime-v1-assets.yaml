@@ -1,0 +1,37 @@
+id: runtime-v1.assets
+title: Runtime v1 Local Asset Loading Seed
+goal: Load committed local sprite assets and expose deterministic asset metadata through runtime evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Scene references local sprite assets under assets/.
+  - Runtime world state exposes sorted loaded asset metadata.
+  - Demo remains local and service-free.
+scenarios:
+  - id: local-sprite-assets
+    description: Open the minimal runtime and assert local sprite asset metadata is evidence-observable.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: assets.0.path
+          equals: assets/sprites/goal.svg
+      - world_state:
+          path: assets.0.kind
+          equals: image
+      - world_state:
+          path: assets.0.status
+          equals: loaded
+      - world_state:
+          path: assets.1.path
+          equals: assets/sprites/player.svg
+      - world_state:
+          path: assets.1.kind
+          equals: image
+      - world_state:
+          path: assets.1.status
+          equals: loaded

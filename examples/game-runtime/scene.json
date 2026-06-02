@@ -13,7 +13,8 @@
     {
       "id": "player",
       "sprite": {
-        "color": "#5eead4"
+        "color": "#5eead4",
+        "asset": "assets/sprites/player.svg"
       },
       "components": {
         "transform": {
@@ -54,7 +55,8 @@
     {
       "id": "goal",
       "sprite": {
-        "color": "#facc15"
+        "color": "#facc15",
+        "asset": "assets/sprites/goal.svg"
       },
       "components": {
         "transform": {

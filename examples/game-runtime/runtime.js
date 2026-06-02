@@ -11,6 +11,13 @@
       list: () => [],
     }),
   }).createSnapshotRegistry();
+  const assets = (window.OuroforgeAssets || {
+    createAssetTracker: () => ({
+      load: () => [],
+      metadata: () => [],
+      imageFor: () => null,
+    }),
+  }).createAssetTracker();
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -149,8 +156,13 @@
     for (const entity of world.entities) {
       const transform = entity.components.transform;
       const size = entity.components.size;
-      context.fillStyle = entity.sprite?.color || '#f2f6f8';
-      context.fillRect(transform.x, transform.y, size.width, size.height);
+      const image = entity.sprite?.asset ? assets.imageFor(entity.sprite.asset) : null;
+      if (image) {
+        context.drawImage(image, transform.x, transform.y, size.width, size.height);
+      } else {
+        context.fillStyle = entity.sprite?.color || '#f2f6f8';
+        context.fillRect(transform.x, transform.y, size.width, size.height);
+      }
     }
     context.fillStyle = '#f2f6f8';
     context.font = '10px ui-monospace, monospace';
@@ -172,10 +184,12 @@
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
     world.tick = 0;
+    const assetMetadata = assets.load(world.entities);
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,
       sceneId: world.sceneId,
       entityCount: world.entities.length,
+      assetCount: assetMetadata.length,
     });
     renderDebug();
     return api.getWorldState();
@@ -220,6 +234,7 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      state.assets = assets.metadata();
       state.snapshots = snapshots.list();
       const currentPlayer = player();
       state.object = {
