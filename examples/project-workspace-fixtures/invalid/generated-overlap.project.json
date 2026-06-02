@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "generated_overlap", "name": "Generated Overlap" },
+  "scenes": [{ "id": "main", "path": "runs/main.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}

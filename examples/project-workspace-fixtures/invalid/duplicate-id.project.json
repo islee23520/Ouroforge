@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "duplicate_id", "name": "Duplicate Id" },
+  "scenes": [
+    { "id": "main", "path": "scenes/main.scene.json" },
+    { "id": "main", "path": "scenes/other.scene.json" }
+  ],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}

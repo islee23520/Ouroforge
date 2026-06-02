@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "bad_path", "name": "Bad Path" },
+  "scenes": [{ "id": "main", "path": "../outside.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}

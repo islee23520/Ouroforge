@@ -1,0 +1,10 @@
+id: missing-ref.smoke
+title: Missing Ref Smoke
+goal: Fixture for missing scene ref.
+constraints:
+  target: file-harness
+acceptance:
+  - Missing scene is rejected.
+scenarios:
+  - id: smoke
+    description: Missing ref fixture.

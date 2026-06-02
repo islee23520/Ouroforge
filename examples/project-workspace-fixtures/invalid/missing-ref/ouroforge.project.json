@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "missing_ref", "name": "Missing Ref" },
+  "scenes": [{ "id": "main", "path": "scenes/missing.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}

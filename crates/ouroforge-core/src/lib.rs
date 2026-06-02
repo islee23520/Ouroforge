@@ -666,6 +666,324 @@ fn validate_visual_artifact_path(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "project-manifest-v1";
+const PROJECT_MANIFEST_FILE_NAME: &str = "ouroforge.project.json";
+const LOCAL_TOOL_ROOTS: &[&str] = &[".claude", ".git", ".omc", ".omx", ".openchrome"];
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectManifest {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub project: ProjectManifestProject,
+    #[serde(default)]
+    pub scenes: Vec<ProjectManifestPathRef>,
+    #[serde(default)]
+    pub seeds: Vec<ProjectManifestPathRef>,
+    #[serde(default, rename = "scenarioPacks")]
+    pub scenario_packs: Vec<ProjectManifestPathRef>,
+    #[serde(default, rename = "assetRoots")]
+    pub asset_roots: Vec<String>,
+    #[serde(rename = "runsRoot")]
+    pub runs_root: String,
+    pub generated: ProjectManifestGeneratedPolicy,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectManifestProject {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectManifestPathRef {
+    pub id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectManifestGeneratedPolicy {
+    pub roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ProjectManifestValidationReport {
+    pub project_id: String,
+    pub manifest_path: PathBuf,
+    pub source_refs: usize,
+    pub asset_roots: usize,
+    pub runs_root: String,
+    pub generated_roots: Vec<String>,
+}
+
+impl ProjectManifest {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let manifest: ProjectManifest =
+            serde_json::from_str(input).context("failed to parse Project Manifest JSON")?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        if path.file_name().and_then(|name| name.to_str()) != Some(PROJECT_MANIFEST_FILE_NAME) {
+            return Err(anyhow!(
+                "project manifest file must be named {PROJECT_MANIFEST_FILE_NAME}"
+            ));
+        }
+        let input = fs::read_to_string(path)
+            .with_context(|| format!("failed to read project manifest {}", path.display()))?;
+        let manifest = Self::from_json_str(&input)
+            .with_context(|| format!("failed to parse project manifest {}", path.display()))?;
+        let base_dir = match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent,
+            _ => Path::new("."),
+        };
+        manifest.validate_references(base_dir).with_context(|| {
+            format!(
+                "project manifest {} references invalid files",
+                path.display()
+            )
+        })?;
+        Ok(manifest)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != PROJECT_MANIFEST_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "project manifest schemaVersion must be {PROJECT_MANIFEST_SCHEMA_VERSION}"
+            ));
+        }
+        self.project.validate()?;
+        if self.scenes.is_empty() {
+            return Err(anyhow!("project manifest scenes must not be empty"));
+        }
+        if self.seeds.is_empty() {
+            return Err(anyhow!("project manifest seeds must not be empty"));
+        }
+        if self.asset_roots.is_empty() {
+            return Err(anyhow!("project manifest assetRoots must not be empty"));
+        }
+        validate_project_manifest_path("project manifest runsRoot", &self.runs_root)?;
+        if !self
+            .generated
+            .roots
+            .iter()
+            .any(|root| root == &self.runs_root)
+        {
+            return Err(anyhow!(
+                "project manifest generated.roots must include runsRoot {}",
+                self.runs_root
+            ));
+        }
+        self.generated.validate()?;
+        validate_manifest_ref_list("project manifest scenes", &self.scenes)?;
+        validate_manifest_ref_list("project manifest seeds", &self.seeds)?;
+        validate_manifest_ref_list("project manifest scenarioPacks", &self.scenario_packs)?;
+        validate_project_path_list("project manifest assetRoots", &self.asset_roots)?;
+        self.validate_source_generated_overlap()?;
+        Ok(())
+    }
+
+    pub fn validate_references(&self, base_dir: &Path) -> Result<ProjectManifestValidationReport> {
+        self.validate()?;
+        let base = base_dir
+            .canonicalize()
+            .with_context(|| format!("failed to resolve project root {}", base_dir.display()))?;
+        for (field, refs) in [
+            ("scenes", self.scenes.as_slice()),
+            ("seeds", self.seeds.as_slice()),
+            ("scenarioPacks", self.scenario_packs.as_slice()),
+        ] {
+            for reference in refs {
+                let path = base_dir.join(&reference.path);
+                if !path.is_file() {
+                    return Err(anyhow!(
+                        "project manifest {field} ref {} missing file: {}",
+                        reference.id,
+                        reference.path
+                    ));
+                }
+                let resolved = path.canonicalize().with_context(|| {
+                    format!(
+                        "failed to resolve project manifest {field} ref {} path {}",
+                        reference.id, reference.path
+                    )
+                })?;
+                if !resolved.starts_with(&base) {
+                    return Err(anyhow!(
+                        "project manifest {field} ref {} must stay inside the project root",
+                        reference.id
+                    ));
+                }
+            }
+        }
+        for root in &self.asset_roots {
+            let path = base_dir.join(root);
+            if !path.is_dir() {
+                return Err(anyhow!(
+                    "project manifest assetRoots missing directory: {root}"
+                ));
+            }
+            let resolved = path
+                .canonicalize()
+                .with_context(|| format!("failed to resolve project manifest assetRoot {root}"))?;
+            if !resolved.starts_with(&base) {
+                return Err(anyhow!(
+                    "project manifest assetRoot {root} must stay inside the project root"
+                ));
+            }
+        }
+        Ok(ProjectManifestValidationReport {
+            project_id: self.project.id.clone(),
+            manifest_path: base_dir.join(PROJECT_MANIFEST_FILE_NAME),
+            source_refs: self.scenes.len() + self.seeds.len() + self.scenario_packs.len(),
+            asset_roots: self.asset_roots.len(),
+            runs_root: self.runs_root.clone(),
+            generated_roots: self.generated.roots.clone(),
+        })
+    }
+
+    fn source_paths(&self) -> Vec<(&'static str, &str)> {
+        self.scenes
+            .iter()
+            .map(|reference| ("scenes", reference.path.as_str()))
+            .chain(
+                self.seeds
+                    .iter()
+                    .map(|reference| ("seeds", reference.path.as_str())),
+            )
+            .chain(
+                self.scenario_packs
+                    .iter()
+                    .map(|reference| ("scenarioPacks", reference.path.as_str())),
+            )
+            .chain(
+                self.asset_roots
+                    .iter()
+                    .map(|root| ("assetRoots", root.as_str())),
+            )
+            .collect()
+    }
+
+    fn validate_source_generated_overlap(&self) -> Result<()> {
+        for (field, source_path) in self.source_paths() {
+            for generated_root in &self.generated.roots {
+                if project_manifest_paths_overlap(source_path, generated_root) {
+                    return Err(anyhow!(
+                        "project manifest {field} path {source_path} must not overlap generated root {generated_root}"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ProjectManifestProject {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("project manifest project.id", &self.id)?;
+        require_text("project manifest project.name", &self.name)
+    }
+}
+
+impl ProjectManifestPathRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field} id"), &self.id)?;
+        validate_project_manifest_path(&format!("{field} path"), &self.path)
+    }
+}
+
+impl ProjectManifestGeneratedPolicy {
+    fn validate(&self) -> Result<()> {
+        if self.roots.is_empty() {
+            return Err(anyhow!(
+                "project manifest generated.roots must not be empty"
+            ));
+        }
+        validate_project_path_list("project manifest generated.roots", &self.roots)
+    }
+}
+
+fn validate_manifest_ref_list(field: &str, refs: &[ProjectManifestPathRef]) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for (index, reference) in refs.iter().enumerate() {
+        reference.validate(&format!("{field}[{index}]"))?;
+        if !ids.insert(reference.id.clone()) {
+            return Err(anyhow!("duplicate {field} id: {}", reference.id));
+        }
+        if !paths.insert(reference.path.clone()) {
+            return Err(anyhow!("duplicate {field} path: {}", reference.path));
+        }
+    }
+    Ok(())
+}
+
+fn validate_project_path_list(field: &str, values: &[String]) -> Result<()> {
+    let mut paths = BTreeSet::new();
+    for (index, value) in values.iter().enumerate() {
+        validate_project_manifest_path(&format!("{field}[{index}]"), value)?;
+        if !paths.insert(value.clone()) {
+            return Err(anyhow!("duplicate {field} path: {value}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_project_manifest_path(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '-' | '_'))
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '/', '.', '-' or '_'"
+        ));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(value) => {
+                let Some(component) = value.to_str() else {
+                    return Err(anyhow!("{field} must be valid UTF-8"));
+                };
+                if component.starts_with('.') {
+                    return Err(anyhow!(
+                        "{field} must not use hidden local tool directories or hidden path components"
+                    ));
+                }
+                if LOCAL_TOOL_ROOTS.contains(&component) {
+                    return Err(anyhow!(
+                        "{field} must not point at hidden local tool directory {component}"
+                    ));
+                }
+            }
+            Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must stay inside the project root")),
+        }
+    }
+    Ok(())
+}
+
+fn project_manifest_paths_overlap(left: &str, right: &str) -> bool {
+    let left = left.trim_matches('/');
+    let right = right.trim_matches('/');
+    left == right
+        || left
+            .strip_prefix(right)
+            .is_some_and(|rest| rest.starts_with('/'))
+        || right
+            .strip_prefix(left)
+            .is_some_and(|rest| rest.starts_with('/'))
+}
+
 const ASSET_MANIFEST_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -9817,11 +10135,103 @@ scenarios:
     description: Create initial run artifacts.
 "#;
 
+    fn repo_fixture_path(relative: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(relative)
+    }
+
     #[test]
     fn parses_valid_seed() {
         let seed = Seed::from_yaml_str(VALID_SEED).expect("valid seed parses");
         assert_eq!(seed.id, "platformer.v0");
         assert_eq!(seed.constraints.target, "file-harness");
+    }
+
+    #[test]
+    fn project_manifest_v1_validates_fixture_and_refs() {
+        let manifest_path =
+            repo_fixture_path("examples/project-workspace-fixtures/valid/ouroforge.project.json");
+        let manifest = ProjectManifest::from_path(&manifest_path)
+            .expect("valid project manifest fixture validates");
+        assert_eq!(manifest.schema_version, "project-manifest-v1");
+        assert_eq!(manifest.project.id, "project_workspace_fixture");
+        assert_eq!(manifest.scenes[0].path, "scenes/main.scene.json");
+        let report = manifest
+            .validate_references(manifest_path.parent().expect("fixture parent"))
+            .expect("references validate");
+        assert_eq!(report.project_id, "project_workspace_fixture");
+        assert_eq!(report.source_refs, 3);
+        assert_eq!(report.asset_roots, 1);
+        assert_eq!(report.runs_root, "runs");
+    }
+
+    #[test]
+    fn project_manifest_v1_rejects_invalid_schema_and_duplicate_ids() {
+        let bad_schema = serde_json::json!({
+            "schemaVersion": "future-project-manifest",
+            "project": { "id": "bad_schema", "name": "Bad Schema" },
+            "scenes": [{ "id": "main", "path": "scenes/main.scene.json" }],
+            "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+            "scenarioPacks": [],
+            "assetRoots": ["assets"],
+            "runsRoot": "runs",
+            "generated": { "roots": ["runs"] }
+        });
+        let rejected = ProjectManifest::from_json_str(&bad_schema.to_string())
+            .expect_err("invalid schemaVersion rejected");
+        assert!(rejected.to_string().contains("schemaVersion"));
+
+        let duplicate = include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/duplicate-id.project.json"
+        );
+        let rejected =
+            ProjectManifest::from_json_str(duplicate).expect_err("duplicate scene id rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate project manifest scenes id"));
+    }
+
+    #[test]
+    fn project_manifest_v1_rejects_unsafe_generated_and_hidden_paths() {
+        let unsafe_path = include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/unsafe-path.project.json"
+        );
+        let rejected =
+            ProjectManifest::from_json_str(unsafe_path).expect_err("path traversal rejected");
+        assert!(rejected.to_string().contains("project root"));
+
+        let generated_overlap = include_str!(
+            "../../../examples/project-workspace-fixtures/invalid/generated-overlap.project.json"
+        );
+        let rejected = ProjectManifest::from_json_str(generated_overlap)
+            .expect_err("generated overlap rejected");
+        assert!(rejected.to_string().contains("generated root"));
+
+        let hidden_source = serde_json::json!({
+            "schemaVersion": "project-manifest-v1",
+            "project": { "id": "hidden_source", "name": "Hidden Source" },
+            "scenes": [{ "id": "main", "path": ".omx/main.scene.json" }],
+            "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+            "scenarioPacks": [],
+            "assetRoots": ["assets"],
+            "runsRoot": "runs",
+            "generated": { "roots": ["runs"] }
+        });
+        let rejected = ProjectManifest::from_json_str(&hidden_source.to_string())
+            .expect_err("hidden source path rejected");
+        assert!(rejected.to_string().contains("hidden"));
+    }
+
+    #[test]
+    fn project_manifest_v1_rejects_missing_references() {
+        let rejected = ProjectManifest::from_path(repo_fixture_path(
+            "examples/project-workspace-fixtures/invalid/missing-ref/ouroforge.project.json",
+        ))
+        .expect_err("missing referenced scene rejected");
+        let rejected = format!("{rejected:#}");
+        assert!(rejected.contains("missing file"));
+        assert!(rejected.to_string().contains("scenes/missing.scene.json"));
     }
 
     #[test]
