@@ -455,6 +455,52 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+
+  function evidenceFidelity(run) {
+    const fidelity = run?.evidence_fidelity || run?.summary?.evidence_fidelity || null;
+    return fidelity && typeof fidelity === 'object' ? fidelity : null;
+  }
+
+  function renderFidelityStatusCard(status, fallbackId, fallbackLabel) {
+    const item = status && typeof status === 'object' ? status : null;
+    if (!item) {
+      return `<article class="fidelity-card warning"><h3>${escapeText(fallbackLabel)}</h3><p class="empty compact">No ${escapeText(fallbackLabel)} read-model data is available.</p></article>`;
+    }
+    const warnings = Array.isArray(item.warnings) ? item.warnings : [];
+    const refs = Array.isArray(item.evidence_refs) ? item.evidence_refs : [];
+    const state = item.status || 'unknown';
+    return `<article class="fidelity-card ${escapeText(state)}"><h3>${escapeText(item.label || fallbackLabel)}</h3>
+      <p><strong>Status:</strong> ${escapeText(state)}</p>
+      <p>${escapeText(item.summary || 'No summary recorded.')}</p>
+      <div class="field-grid compact">
+        <div><strong>Observed</strong><br>${escapeText(item.observed_count ?? 0)}</div>
+        <div><strong>Missing</strong><br>${escapeText(item.missing_count ?? 0)}</div>
+      </div>
+      ${warnings.length ? `<div class="warning">${warnings.map(escapeText).join(' · ')}</div>` : ''}
+      ${refs.length ? `<details><summary>Evidence refs</summary>${renderRefLinks(refs, { summary: { run_dir: '' } })}</details>` : ''}
+    </article>`;
+  }
+
+  function renderEvidenceFidelitySurface(run) {
+    const fidelity = evidenceFidelity(run);
+    if (!run) {
+      return '<section id="evidence-fidelity" class="panel"><h2>Evidence fidelity</h2><p class="empty">No dashboard-data.json run is loaded yet.</p></section>';
+    }
+    if (!fidelity) {
+      return '<section id="evidence-fidelity" class="panel"><h2>Evidence fidelity</h2><p class="empty">No evidence fidelity read model is available. Export dashboard data with a newer Rust CLI.</p></section>';
+    }
+    return `<section id="evidence-fidelity" class="panel"><h2>Evidence fidelity</h2>
+      <p class="hint">Read-only status from Rust-exported dashboard data. Missing evidence is shown as warnings; the cockpit does not write files, execute commands, rerun QA, or apply mutations.</p>
+      <div class="fidelity-grid">
+        ${renderFidelityStatusCard(fidelity.transaction, 'transaction', 'Transaction provenance')}
+        ${renderFidelityStatusCard(fidelity.runtime_probe, 'runtime_probe', 'Runtime probe contract')}
+        ${renderFidelityStatusCard(fidelity.input_replay, 'input_replay', 'Input replay evidence')}
+        ${renderFidelityStatusCard(fidelity.openchrome_cdp, 'openchrome_cdp', 'Openchrome/CDP evidence')}
+        ${renderFidelityStatusCard(fidelity.command_context, 'command_context', 'Reproducible command context')}
+      </div>
+    </section>`;
+  }
+
   function renderEvidenceBrowser(run) {
     if (!run) {
       return '<section id="run-browser" class="panel"><h2>Run/evidence browser</h2><p class="empty">No dashboard-data.json run is loaded yet. Run QA and export dashboard data to populate this pane.</p></section>';
@@ -662,7 +708,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -738,7 +784,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

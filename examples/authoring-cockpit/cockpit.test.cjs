@@ -53,6 +53,13 @@ const run = {
     cdpTransport: 'chrome_devtools_protocol',
     environmentHints: ['The cockpit does not execute commands'],
   },
+  evidence_fidelity: {
+    transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
+    runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
+    input_replay: { id: 'input_replay', label: 'Input replay evidence', status: 'missing', summary: 'No replay evidence.', observed_count: 0, missing_count: 1, warnings: ['Input replay evidence is unavailable.'], evidence_refs: [] },
+    openchrome_cdp: { id: 'openchrome_cdp', label: 'Openchrome/CDP evidence', status: 'partial', summary: '1 screenshot, 1 console log, 0 performance metric, 1 CDP trace summary.', observed_count: 3, missing_count: 1, warnings: ['Missing performance metrics.'], evidence_refs: ['evidence/shot.png', 'evidence/console.json'] },
+    command_context: { id: 'command_context', label: 'Reproducible command context', status: 'present', summary: '4 workers, seed seeds/platformer.yaml.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: [] },
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -138,6 +145,10 @@ assert.match(cockpit.renderProjectRunSurface(run), /openchrome_cdp/);
 assert.match(cockpit.renderRunCommandContext({}), /No run command context/);
 assert.match(cockpit.renderProjectRunSurface(null), /No dashboard-data\.json run/);
 assert.match(cockpit.renderProjectRunSurface({ summary: { id: 'legacy-run' } }), /No project-bound run metadata/);
+assert.match(cockpit.renderEvidenceFidelitySurface(run), /Evidence fidelity/);
+assert.match(cockpit.renderEvidenceFidelitySurface(run), /Transaction provenance/);
+assert.match(cockpit.renderEvidenceFidelitySurface(run), /Missing performance metrics/);
+assert.match(cockpit.renderEvidenceFidelitySurface({ summary: { id: 'legacy-run' } }), /No evidence fidelity read model/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /Authoring provenance/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /scene-edit-abc123/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /beforehash/);
@@ -260,6 +271,8 @@ assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('
 const xssRun = { summary: { id: 'r', run_dir: 'runs/x', verdict_status: 'passed' }, command_context: { command: '<script>alert(1)</script>', seedPath: '<script>seed</script>', workers: '<script>workers</script>', runsRoot: 'runs', scenarioPackId: '<script>pack</script>', runtimeTarget: '<script>runtime</script>', browserBoundary: '<script>boundary</script>', cdpTransport: '<script>transport</script>', environmentHints: ['<script>hint</script>'] }, project: { id: 'p', name: 'p', manifestPath: 'm', seedPath: 's' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>', replay: { present: false, empty_state: '<script>alert(1)</script>' }, comparison: { present: false, empty_state: '<script>alert(1)</script>' } };
 assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
 assert.ok(!cockpit.renderProjectRunSurface(xssRun).includes('<script>hint</script>'), 'command context hints must be escaped');
+const xssFidelity = { summary: { id: 'x' }, evidence_fidelity: { transaction: { label: '<script>tx</script>', status: '<script>bad</script>', summary: '<script>summary</script>', warnings: ['<script>warn</script>'], evidence_refs: ['<script>ref</script>'] } } };
+assert.ok(!cockpit.renderEvidenceFidelitySurface(xssFidelity).includes('<script>warn</script>'), 'fidelity warnings must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
