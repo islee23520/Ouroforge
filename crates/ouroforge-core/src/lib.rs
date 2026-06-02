@@ -8802,9 +8802,7 @@ fn is_documented_generated_artifact_path(path: &Path) -> bool {
             value.as_ref(),
             "runs" | "target" | "dashboard-data" | ".omx" | ".openchrome" | ".omc" | ".claude"
         )
-    }) || path.ends_with(Path::new(
-        "examples/evidence-dashboard/dashboard-data.json",
-    ))
+    }) || path.ends_with(Path::new("examples/evidence-dashboard/dashboard-data.json"))
 }
 
 fn is_source_like_artifact_path(path: &Path) -> bool {

@@ -49,9 +49,9 @@ const run = {
   screenshots: [{ id: 'shot-1', kind: 'image/png', path: 'evidence/shot.png', metadata: {}, exists: true }],
   world_states: [{ id: 'world-1', kind: 'application/json', path: 'evidence/world.json', value: { object: { x: 40 } }, metadata: {} }],
   frame_metrics: [{ id: 'frame-1', kind: 'application/json', path: 'evidence/frame.json', value: { frame: 1 }, metadata: {} }],
-  performance_metrics: [{ id: 'perf-1', kind: 'application/json', path: 'evidence/perf.json', value: { metrics: [] }, metadata: {} }],
-  console_logs: [{ id: 'console-1', kind: 'application/json', path: 'evidence/console.json', value: [{ text: 'ready' }], metadata: {} }],
-  cdp_trace_summaries: [{ id: 'cdp-1', kind: 'application/json', path: 'evidence/cdp.json', value: null, read_error: 'bad json', metadata: {} }],
+  performance_metrics: [{ id: 'perf-1', kind: 'application/json', path: 'evidence/perf.json', value: { metrics: [] }, metadata: { artifact: 'performance_metrics', worker_id: 'worker-1', worker_session_id: 'run-1:worker-1', run_id: 'run-1', execution_boundary: 'openchrome_cdp', cdp_transport: 'chrome_devtools_protocol', bounded: true, optional: true } }],
+  console_logs: [{ id: 'console-1', kind: 'application/json', path: 'evidence/console.json', value: [{ text: 'ready' }], metadata: { artifact: 'console_log', worker_id: 'worker-1', worker_session_id: 'run-1:worker-1', run_id: 'run-1', execution_boundary: 'openchrome_cdp', cdp_transport: 'chrome_devtools_protocol', bounded: true, limit: 100 } }],
+  cdp_trace_summaries: [{ id: 'cdp-1', kind: 'application/json', path: 'evidence/cdp.json', value: null, read_error: 'bad json', metadata: { artifact: 'cdp_trace_summary', worker_id: '<script>worker</script>', worker_session_id: 'run-1:<script>worker</script>', run_id: 'run-1', execution_boundary: 'openchrome_cdp', cdp_transport: 'chrome_devtools_protocol', bounded: true, limit: 32 } }],
   scenario_results: [{ id: 'scenario-1', kind: 'application/json', path: 'evidence/scenario.json', value: { status: 'passed' }, metadata: {} }],
   mutation_artifacts: [{ id: 'mutation-proposals', kind: 'application/json', path: 'mutation/proposals.json', value: { proposals: [] }, metadata: {} }],
   mutations: [{ id: 'mutation-1', evidence_id: 'artifact-1', status: 'proposed' }],
@@ -221,6 +221,12 @@ const detail = dashboard.renderRunDetail(run);
 assert.match(detail, /World-state snapshots/);
 assert.match(detail, /Frame\/performance metrics/);
 assert.match(detail, /Console\/CDP summaries/);
+assert.match(detail, /worker session id/);
+assert.match(detail, /run-1:worker-1/);
+assert.match(detail, /openchrome_cdp/);
+assert.match(detail, /chrome_devtools_protocol/);
+assert.match(detail, /bad json/);
+assert.ok(!detail.includes('<script>worker</script>'), 'CDP metadata must be escaped');
 assert.match(detail, /Scenario results/);
 assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
@@ -330,7 +336,7 @@ assert.match(dashboard.renderReplayControls(run, replayState), /Current tick/);
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {
   summary: { id: '<img src=x onerror=alert(1)>', run_dir: 'runs/x', seed_id: 's', run_status: 'created', verdict_status: 'failed', scenario_status: 'pending', evidence_count: 0, mutation_count: 0, worker_count: 0 },
-  evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [], console_logs: [], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
+  evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [{ id: '<script>perf</script>', kind: 'application/json', path: 'evidence/<script>perf</script>.json', value: null, read_error: '<script>bad perf</script>', metadata: { worker_id: '<script>worker</script>', execution_boundary: '<script>boundary</script>' } }], console_logs: [{ id: '<script>console</script>', kind: 'application/json', path: 'evidence/<script>console</script>.json', value: [{ text: '<script>log</script>' }], metadata: { worker_session_id: '<img src=x onerror=alert(1)>', cdp_transport: '<script>transport</script>' } }], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
@@ -341,5 +347,7 @@ const xssDetail = dashboard.renderRunDetail(xssRun);
 assert.ok(!xssDetail.includes('<script>alert(1)</script>'), 'journal markup must be escaped');
 assert.match(xssDetail, /&lt;script&gt;/);
 assert.ok(!xssDetail.includes('<img>'), 'journal headings must be escaped');
+assert.ok(!xssDetail.includes('<script>worker</script>'), 'artifact metadata must be escaped');
+assert.ok(!xssDetail.includes('<img src=x onerror=alert(1)>'), 'artifact session metadata must be escaped');
 assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'), 'run id markup must be escaped');
 console.log('dashboard smoke test passed');

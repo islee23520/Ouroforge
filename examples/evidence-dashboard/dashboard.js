@@ -63,6 +63,28 @@ const OuroforgeDashboard = (() => {
     }).join('');
   }
 
+
+  function renderArtifactMetadata(artifact) {
+    const metadata = artifact && typeof artifact.metadata === 'object' && artifact.metadata ? artifact.metadata : {};
+    const keys = [
+      'artifact',
+      'worker_id',
+      'worker_session_id',
+      'run_id',
+      'execution_boundary',
+      'cdp_transport',
+      'phase',
+      'bounded',
+      'limit',
+      'optional',
+    ].filter((key) => Object.prototype.hasOwnProperty.call(metadata, key));
+    if (!keys.length) return '';
+    return `<dl class="artifact-metadata">${keys.map((key) => {
+      const value = metadata[key];
+      return `<dt>${escapeText(key.replace(/_/g, ' '))}</dt><dd>${escapeText(typeof value === 'object' ? JSON.stringify(value) : value)}</dd>`;
+    }).join('')}</dl>`;
+  }
+
   function renderArtifacts(title, artifacts, run, renderer = renderArtifactLink) {
     const body = artifacts.length
       ? `<div class="artifact-grid">${artifacts.map((artifact) => renderer(artifact, run)).join('')}</div>`
@@ -77,6 +99,7 @@ const OuroforgeDashboard = (() => {
       <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
       <div class="run-meta">${escapeText(artifact.kind)}</div>
       <div class="run-meta">${escapeText(artifact.path)}</div>
+      ${renderArtifactMetadata(artifact)}
       ${missing}${readError}
     </article>`;
   }
@@ -100,6 +123,7 @@ const OuroforgeDashboard = (() => {
     return `<article class="artifact">
       <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
       <div class="run-meta">${escapeText(artifact.path)}</div>
+      ${renderArtifactMetadata(artifact)}
       ${artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : ''}
       ${preview}
     </article>`;
