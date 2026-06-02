@@ -6065,6 +6065,24 @@ pub fn hash_scene_document(scene: &SceneDocument) -> Result<SceneHash> {
     })
 }
 
+pub fn write_scene_edit_transaction_artifact(
+    path: impl AsRef<Path>,
+    transaction: &SceneEditTransaction,
+) -> Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "failed to create transaction artifact directory {}",
+                    parent.display()
+                )
+            })?;
+        }
+    }
+    write_json(path, &json!(transaction))
+}
+
 pub fn preview_scene_edit_transaction(
     scene_path: impl AsRef<Path>,
     edit: SceneEdit,

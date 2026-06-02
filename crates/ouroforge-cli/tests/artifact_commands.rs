@@ -76,6 +76,77 @@ fn ledger_and_evidence_commands_operate_on_run_artifacts() {
     fs::remove_dir_all(temp).ok();
 }
 
+#[test]
+fn scene_edit_transaction_output_records_success_and_failure() {
+    let temp = unique_temp_dir("ouroforge-cli-scene-transaction-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let scene_path = temp.join("scene.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    let success_artifact = temp.join("transactions/success.json");
+
+    let success = run_cli(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "48",
+            "--transaction-output",
+            success_artifact.to_str().unwrap(),
+        ],
+    );
+    assert!(success.contains(r#""validationResult""#));
+    assert!(success.contains(r#""status": "passed""#));
+    let success_json = fs::read_to_string(&success_artifact).expect("success artifact written");
+    assert!(success_json.contains(r#""beforeSceneHash""#));
+    assert!(success_json.contains(r#""afterSceneHash""#));
+    let edited_scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).expect("scene read")).unwrap();
+    assert_eq!(
+        edited_scene.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(48))
+    );
+
+    let failure_artifact = temp.join("transactions/failure.json");
+    let failure = run_cli_expect_failure(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.size.width",
+            "--value",
+            "0",
+            "--transaction-output",
+            failure_artifact.to_str().unwrap(),
+        ],
+    );
+    assert!(failure.contains("scene edit transaction failed validation"));
+    let failure_json = fs::read_to_string(&failure_artifact).expect("failure artifact written");
+    assert!(failure_json.contains(r#""status": "failed""#));
+    assert!(!failure_json.contains(r#""afterSceneHash""#));
+    let preserved_scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).expect("scene read")).unwrap();
+    assert_eq!(
+        preserved_scene.pointer("/entities/0/components/size/width"),
+        Some(&serde_json::json!(16))
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
         .current_dir(current_dir)
@@ -97,4 +168,23 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .expect("time works")
         .as_millis();
     std::env::temp_dir().join(format!("{prefix}-{}-{millis}", std::process::id()))
+}
+
+fn run_cli_expect_failure(current_dir: &Path, args: &[&str]) -> String {
+    let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
+        .current_dir(current_dir)
+        .args(args)
+        .output()
+        .expect("cli runs");
+    assert!(
+        !output.status.success(),
+        "command unexpectedly succeeded\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
 }
