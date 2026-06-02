@@ -1955,6 +1955,7 @@ pub struct EvolveSummary {
     pub status: String,
     pub proposals_created: usize,
     pub proposal_ids: Vec<String>,
+    pub classification_ids: Vec<String>,
     pub reason: String,
 }
 
@@ -1973,6 +1974,7 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
             status: "noop".to_string(),
             proposals_created: 0,
             proposal_ids: Vec::new(),
+            classification_ids: Vec::new(),
             reason: format!("verdict status is {verdict_status}; evolve v0 only proposes mutations for failed runs"),
         };
         append_ledger_event(
@@ -2009,11 +2011,19 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         },
     )?;
     proposal_ids.push(proposal.id);
+    update_journal(run_dir)?;
+    let classification_artifact = classify_mutation_failures(run_dir, &proposal_ids)?;
+    let classification_ids = classification_artifact
+        .classifications
+        .iter()
+        .map(|classification| classification.id.clone())
+        .collect::<Vec<_>>();
 
     let summary = EvolveSummary {
         status: "proposed".to_string(),
         proposals_created: proposal_ids.len(),
         proposal_ids,
+        classification_ids,
         reason: "failed verdict produced deterministic placeholder mutation proposal".to_string(),
     };
     append_ledger_event(
@@ -2023,10 +2033,10 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         json!({
             "status": summary.status,
             "proposals_created": summary.proposals_created,
-            "proposal_ids": summary.proposal_ids
+            "proposal_ids": summary.proposal_ids,
+            "classification_ids": summary.classification_ids
         }),
     )?;
-    update_journal(run_dir)?;
     Ok(summary)
 }
 
@@ -2223,6 +2233,204 @@ pub fn write_mutation_classification_artifact(
     let path = dir.join("classifications.json");
     write_json_atomic(&path, &json!(artifact))?;
     Ok(path)
+}
+
+pub fn classify_mutation_failures(
+    run_dir: impl AsRef<Path>,
+    proposal_ids: &[String],
+) -> Result<MutationClassificationArtifact> {
+    let run_dir = run_dir.as_ref();
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let run_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    let verdict = read_json_value(run_dir.join("verdict.json"))?;
+    let journal = fs::read_to_string(run_dir.join("journal.md"))
+        .context("failed to read journal for mutation classification")?;
+    let evidence = read_evidence_index(run_dir)?;
+    let failures = verdict
+        .get("failures")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let failures = if failures.is_empty() {
+        vec![json!({
+            "kind": "unknown",
+            "summary": "failed verdict did not include structured failures"
+        })]
+    } else {
+        failures
+    };
+
+    let mut classifications = Vec::new();
+    for (index, failure) in failures.iter().enumerate() {
+        let evidence_refs = collect_classification_evidence_refs(failure, &verdict);
+        let scenario_result_refs = evidence_refs
+            .iter()
+            .filter(|path| {
+                path.contains("scenario-result")
+                    || evidence.artifacts.iter().any(|artifact| {
+                        artifact.path == **path
+                            && artifact
+                                .metadata
+                                .get("artifact")
+                                .and_then(|value| value.as_str())
+                                == Some("scenario_result")
+                    })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let (category, reason) =
+            classify_failure_category(failure, &verdict, &journal, &evidence_refs);
+        let proposal_id = proposal_ids.get(index).cloned().or_else(|| {
+            if proposal_ids.len() == 1 {
+                proposal_ids.first().cloned()
+            } else {
+                None
+            }
+        });
+        classifications.push(MutationClassification {
+            id: format!("classification-{}", index + 1),
+            proposal_id,
+            category,
+            lifecycle_state: MutationClassificationState::Classified,
+            reason,
+            evidence_refs,
+            verdict_ref: "verdict.json".to_string(),
+            journal_ref: "journal.md".to_string(),
+            scenario_result_refs,
+        });
+    }
+
+    let artifact = MutationClassificationArtifact {
+        schema_version: "1".to_string(),
+        run_id,
+        classifications,
+    };
+    let path = write_mutation_classification_artifact(run_dir, &artifact)?;
+    append_ledger_event(
+        run_dir,
+        "mutation.classified",
+        "evolve-cli",
+        json!({
+            "path": path
+                .strip_prefix(run_dir)
+                .ok()
+                .and_then(|path| path.to_str())
+                .unwrap_or("mutation/classifications.json"),
+            "classification_ids": artifact
+                .classifications
+                .iter()
+                .map(|classification| classification.id.clone())
+                .collect::<Vec<_>>()
+        }),
+    )?;
+    Ok(artifact)
+}
+
+fn collect_classification_evidence_refs(
+    failure: &serde_json::Value,
+    verdict: &serde_json::Value,
+) -> Vec<String> {
+    let mut refs = Vec::new();
+    for key in ["path", "evidence_path"] {
+        if let Some(path) = failure.get(key).and_then(|value| value.as_str()) {
+            push_unique_ref(&mut refs, path);
+        }
+    }
+    if let Some(paths) = failure
+        .get("evidence_refs")
+        .and_then(|value| value.as_array())
+    {
+        for path in paths.iter().filter_map(|value| value.as_str()) {
+            push_unique_ref(&mut refs, path);
+        }
+    }
+    if refs.is_empty() {
+        if let Some(paths) = verdict
+            .get("evidence_refs")
+            .and_then(|value| value.as_array())
+        {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                push_unique_ref(&mut refs, path);
+            }
+        }
+    }
+    refs
+}
+
+fn push_unique_ref(refs: &mut Vec<String>, value: &str) {
+    if !value.trim().is_empty() && !refs.iter().any(|existing| existing == value) {
+        refs.push(value.to_string());
+    }
+}
+
+fn classify_failure_category(
+    failure: &serde_json::Value,
+    verdict: &serde_json::Value,
+    journal: &str,
+    evidence_refs: &[String],
+) -> (MutationClassificationCategory, String) {
+    if evidence_refs.is_empty() {
+        return (
+            MutationClassificationCategory::Unknown,
+            "failed verdict did not provide evidence refs for deterministic classification"
+                .to_string(),
+        );
+    }
+    let haystack = [
+        failure.to_string(),
+        verdict
+            .get("summary")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        journal.to_string(),
+        evidence_refs.join(" "),
+    ]
+    .join(" ")
+    .to_ascii_lowercase();
+
+    if haystack.contains("visual") || haystack.contains("screenshot") {
+        (
+            MutationClassificationCategory::VisualMismatch,
+            "failure references visual or screenshot evidence".to_string(),
+        )
+    } else if haystack.contains("performance") || haystack.contains("metric") {
+        (
+            MutationClassificationCategory::PerformanceRegression,
+            "failure references performance evidence".to_string(),
+        )
+    } else if haystack.contains("console") {
+        (
+            MutationClassificationCategory::ConsoleError,
+            "failure references console evidence".to_string(),
+        )
+    } else if haystack.contains("runtime") || haystack.contains("probe") {
+        (
+            MutationClassificationCategory::RuntimeProbeFailure,
+            "failure references runtime probe evidence".to_string(),
+        )
+    } else if haystack.contains("missing") && haystack.contains("evidence") {
+        (
+            MutationClassificationCategory::MissingEvidence,
+            "failure reports missing evidence".to_string(),
+        )
+    } else if haystack.contains("assertion") || haystack.contains("scenario") {
+        (
+            MutationClassificationCategory::ScenarioAssertionFailure,
+            "failure references scenario assertion evidence".to_string(),
+        )
+    } else {
+        (
+            MutationClassificationCategory::Unknown,
+            "failure evidence did not match a bounded classification category".to_string(),
+        )
+    }
 }
 
 pub fn create_mutation_proposal(
@@ -5653,8 +5861,23 @@ scenarios:
 
         assert_eq!(summary.status, "proposed");
         assert_eq!(summary.proposals_created, 1);
+        assert_eq!(summary.classification_ids, vec!["classification-1"]);
         let proposals = list_mutation_proposals(&artifacts.run_dir).expect("proposals list");
         assert_eq!(proposals[0].evidence_id, "failure-evidence");
+        let classifications = read_mutation_classification_artifact(&artifacts.run_dir)
+            .expect("classification artifact reads");
+        assert_eq!(
+            classifications.classifications[0].category,
+            MutationClassificationCategory::ScenarioAssertionFailure
+        );
+        assert_eq!(
+            classifications.classifications[0].proposal_id.as_deref(),
+            Some(proposals[0].id.as_str())
+        );
+        assert_eq!(
+            classifications.classifications[0].evidence_refs,
+            vec!["evidence/failure.json"]
+        );
         let journal = show_journal(&artifacts.run_dir).expect("journal reads");
         assert!(journal.contains(&proposals[0].id));
         fs::remove_dir_all(root).ok();
@@ -5672,6 +5895,7 @@ scenarios:
         let summary = evolve_run(&artifacts.run_dir).expect("evolve succeeds");
 
         assert_eq!(summary.status, "noop");
+        assert!(summary.classification_ids.is_empty());
         assert!(list_mutation_proposals(&artifacts.run_dir)
             .unwrap()
             .is_empty());
@@ -5881,6 +6105,123 @@ scenarios:
             .expect_err("unsupported category fails during parse");
 
         assert!(error.to_string().contains("unknown variant"));
+    }
+
+    #[test]
+    fn classifies_unknown_failed_verdict_without_evidence_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-classification-unknown-run-test");
+        write_json(
+            &artifacts.run_dir.join("verdict.json"),
+            &json!({
+                "status": "failed",
+                "summary": "failed without structured refs",
+                "failures": [{ "kind": "unstructured_failure" }],
+                "evidence_refs": [],
+                "metadata": {}
+            }),
+        )
+        .expect("verdict written");
+
+        let artifact =
+            classify_mutation_failures(&artifacts.run_dir, &[]).expect("classification writes");
+
+        assert_eq!(
+            artifact.classifications[0].category,
+            MutationClassificationCategory::Unknown
+        );
+        assert!(artifact.classifications[0].evidence_refs.is_empty());
+        assert!(artifact.classifications[0]
+            .reason
+            .contains("did not provide evidence refs"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn classification_generation_is_deterministic_for_same_inputs() {
+        let (root, artifacts) = create_test_run("ouroforge-classification-deterministic-test");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/scenarios/demo"))
+            .expect("scenario evidence dir exists");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/demo/scenario-result-1.json"),
+            "{}\n",
+        )
+        .expect("scenario result written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "scenario-result-1",
+            "application/json",
+            "evidence/scenarios/demo/scenario-result-1.json",
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("evidence indexed");
+        write_json(
+            &artifacts.run_dir.join("verdict.json"),
+            &json!({
+                "status": "failed",
+                "summary": "scenario assertion failed",
+                "failures": [{
+                    "kind": "scenario_assertion_failure",
+                    "path": "evidence/scenarios/demo/scenario-result-1.json"
+                }],
+                "evidence_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                "metadata": {}
+            }),
+        )
+        .expect("verdict written");
+        let proposal_ids = vec!["mutation-1".to_string()];
+
+        let first = classify_mutation_failures(&artifacts.run_dir, &proposal_ids)
+            .expect("first classification writes");
+        let second = classify_mutation_failures(&artifacts.run_dir, &proposal_ids)
+            .expect("second classification writes");
+
+        assert_eq!(first, second);
+        assert_eq!(
+            first.classifications[0].scenario_result_refs,
+            vec!["evidence/scenarios/demo/scenario-result-1.json"]
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn maps_supported_mutation_classification_categories() {
+        let cases = [
+            (
+                json!({ "kind": "scenario_assertion_failure", "path": "evidence/scenario-result.json" }),
+                MutationClassificationCategory::ScenarioAssertionFailure,
+            ),
+            (
+                json!({ "kind": "runtime_probe_failure", "path": "evidence/world-state.json" }),
+                MutationClassificationCategory::RuntimeProbeFailure,
+            ),
+            (
+                json!({ "kind": "console_error", "path": "evidence/console-log.json" }),
+                MutationClassificationCategory::ConsoleError,
+            ),
+            (
+                json!({ "kind": "performance_regression", "path": "evidence/performance-metrics.json" }),
+                MutationClassificationCategory::PerformanceRegression,
+            ),
+            (
+                json!({ "kind": "visual_mismatch", "path": "evidence/visual-checkpoint.png" }),
+                MutationClassificationCategory::VisualMismatch,
+            ),
+            (
+                json!({ "kind": "missing_evidence", "path": "verdict.json" }),
+                MutationClassificationCategory::MissingEvidence,
+            ),
+        ];
+        let verdict = json!({ "summary": "" });
+
+        for (failure, expected) in cases {
+            let evidence_refs = collect_classification_evidence_refs(&failure, &verdict);
+            let (actual, reason) =
+                classify_failure_category(&failure, &verdict, "", &evidence_refs);
+            assert_eq!(actual, expected, "reason: {reason}");
+            assert!(!reason.is_empty());
+        }
     }
 
     #[test]
