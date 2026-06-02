@@ -1,11 +1,13 @@
 id: platformer.v0
-title: Platformer Harness Seed
-goal: Drive the local private MVP loop through the minimal 2D runtime and evidence pipeline.
+title: Engine Expansion v1 Platformer Template Seed
+goal: Prove the one-screen Engine Expansion v1 playable template through scenario-linked evidence.
 constraints:
   target: game-runtime
 acceptance:
   - Seed validation reports the platformer.v0 seed as valid.
   - Running the seed with workers creates independent browser evidence, scenario results, a verdict, and a journal.
+  - Scenario assertions observe renderer, tilemap, asset manifest, animation, audio intent, physics/collision, and scene composition evidence.
+  - The template remains one-screen and evidence-native rather than a complete game.
 scenarios:
   - id: bootstrap-smoke
     description: Move the player right for four fixed-timestep frames in the minimal game runtime.
@@ -45,3 +47,86 @@ scenarios:
       - world_state:
           path: tilemaps.layerOrder.0.layerId
           equals: background
+      - world_state:
+          path: assetManifest.enabled
+          equals: true
+      - world_state:
+          path: assetManifest.assetCount
+          equals: 3
+      - world_state:
+          path: assets.0.status
+          equals: loaded
+      - world_state:
+          path: entities.0.components.animation.mode
+          equals: sprite_frame
+      - world_state:
+          path: entities.0.components.animation.state.frameIndex
+          equals: 2
+      - world_state:
+          path: audioEvents.0.name
+          equals: player_spawn
+      - world_state:
+          path: audioEvents.0.playback
+          equals: intent
+      - world_state:
+          path: componentDefaults.controllable
+          equals: false
+      - world_state:
+          path: composition.version
+          equals: '1'
+      - world_state:
+          path: composition.entities.1.entityId
+          equals: player-badge
+      - world_state:
+          path: composition.entities.1.parent
+          equals: player
+      - world_state:
+          path: composition.entities.1.worldTransform.x
+          equals: 38
+      - world_state:
+          path: renderer.renderedEntities.1.entityId
+          equals: player-badge
+  - id: objective-contact
+    description: Move the player across the one-screen template into the goal trigger and wall contact, proving objective and collision evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: platformer-template-objective
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 150
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 288
+      - world_state:
+          path: collisions.0.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisions.0.pairId
+          equals: player:wall
+      - world_state:
+          path: collisions.0.normal.x
+          equals: -1
+      - world_state:
+          path: collisionEvents.0.type
+          equals: runtime.collision.trigger
+      - world_state:
+          path: collisionEvents.0.pairId
+          equals: goal:player
+      - world_state:
+          path: collisionEvents.15.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisionEvents.15.staticEntityId
+          equals: wall
+      - world_state:
+          path: composition.entities.1.parent
+          equals: player
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
