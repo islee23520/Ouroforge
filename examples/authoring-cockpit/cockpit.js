@@ -82,6 +82,10 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- scene edit ${scenePath} --entity ${entityId} --path ${path} --value '${JSON.stringify(value)}'`;
   }
 
+  function transactionCommand(scenePath, entityId, path, value, outputPath = 'runs/manual/transactions/scene-edit.json') {
+    return `${cliCommand(scenePath, entityId, path, value)} --transaction-output ${outputPath}`;
+  }
+
   function readOnlyFieldValue(entity, path) {
     if (path === 'schemaVersion' || path === 'id' || path === 'bounds') return 'scene-level read-only';
     return getValue(entity, path);
@@ -231,11 +235,12 @@ const OuroforgeCockpit = (() => {
 
   function renderCommandGenerationPanel(scenePath = DEFAULT_SCENE_PATH) {
     return `<section class="panel"><h2>Validation command generation</h2>
-      <p class="hint">Display-only. Copy these Rust CLI commands into a terminal when you want validation-gated persistence; the browser never executes commands or writes files.</p>
+      <p class="hint">Display-only. Copy these Rust CLI commands into a terminal when you want validation-gated persistence; the browser never executes commands or writes files. Transaction output is a Rust CLI artifact, not browser persistence.</p>
       <div class="command-list">
         <code>${escapeText(sceneValidateCommand(scenePath))}</code>
         <code>${escapeText(sceneReloadValidateCommand(scenePath))}</code>
         <code>${escapeText(cliCommand(scenePath, 'player', 'components.transform.x', 48))}</code>
+        <code>${escapeText(transactionCommand(scenePath, 'player', 'components.transform.x', 48))}</code>
         <code>${escapeText(runtimeReloadPayloadCommand(scenePath))}</code>
       </div>
     </section>`;
@@ -445,7 +450,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, qaCommand, readPreviewProbe, reloadPreview, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, runtimeReloadPayloadCommand, sceneReloadValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

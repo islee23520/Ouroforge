@@ -32,6 +32,10 @@ assert.equal(
   cockpit.cliCommand('examples/game-runtime/scene.json', 'player', 'components.transform.x', 48),
   "cargo run -p ouroforge-cli -- scene edit examples/game-runtime/scene.json --entity player --path components.transform.x --value '48'"
 );
+assert.equal(
+  cockpit.transactionCommand('examples/game-runtime/scene.json', 'player', 'components.transform.x', 48, 'runs/manual/transactions/player-x-48.json'),
+  "cargo run -p ouroforge-cli -- scene edit examples/game-runtime/scene.json --entity player --path components.transform.x --value '48' --transaction-output runs/manual/transactions/player-x-48.json"
+);
 
 const run = {
   summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed', scenario_status: 'passed' },
@@ -63,6 +67,8 @@ assert.equal(cockpit.sceneValidateCommand('examples/game-runtime/scene.json'), '
 assert.equal(cockpit.sceneReloadValidateCommand('examples/game-runtime/scene.json'), 'cargo run -p ouroforge-cli -- scene reload-validate examples/game-runtime/scene.json');
 assert.match(cockpit.runtimeReloadPayloadCommand('examples/game-runtime/scene.json'), /display-only payload shape/);
 assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /browser never executes commands/);
+assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /--transaction-output/);
+assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /Transaction output is a Rust CLI artifact/);
 assert.match(cockpit.renderCommandGenerationPanel('examples/game-runtime/scene.json'), /scene reload-validate/);
 assert.equal(cockpit.latestRun([{ summary: { id: 'old', created_at_unix_ms: 1 } }, { summary: { id: 'new', created_at_unix_ms: 2 } }]).summary.id, 'new');
 assert.match(cockpit.renderPreview(), /runtime-preview/);
