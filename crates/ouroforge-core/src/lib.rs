@@ -2535,6 +2535,196 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     Ok(verdict)
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunComparison {
+    pub before_run_id: String,
+    pub after_run_id: String,
+    pub classification: String,
+    pub before: RunComparisonSnapshot,
+    pub after: RunComparisonSnapshot,
+    pub deltas: serde_json::Value,
+    pub evidence_refs: Vec<String>,
+    pub unsupported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunComparisonSnapshot {
+    pub run_id: String,
+    pub verdict_status: String,
+    pub scenario_results: usize,
+    pub failed_scenarios: usize,
+    pub assertion_failures: usize,
+    pub performance_artifacts: usize,
+    pub evidence_artifacts: usize,
+    pub mutation_proposals: usize,
+}
+
+pub fn compare_runs(
+    before_run_dir: impl AsRef<Path>,
+    after_run_dir: impl AsRef<Path>,
+) -> Result<RunComparison> {
+    let before_run_dir = before_run_dir.as_ref();
+    let after_run_dir = after_run_dir.as_ref();
+    let before = load_run_comparison_snapshot(before_run_dir, "before")?;
+    let after = load_run_comparison_snapshot(after_run_dir, "after")?;
+    let classification = classify_run_comparison(&before, &after).to_string();
+    let evidence_refs = vec![
+        before_run_dir.join("run.json").display().to_string(),
+        before_run_dir.join("verdict.json").display().to_string(),
+        before_run_dir
+            .join("evidence/index.json")
+            .display()
+            .to_string(),
+        after_run_dir.join("run.json").display().to_string(),
+        after_run_dir.join("verdict.json").display().to_string(),
+        after_run_dir
+            .join("evidence/index.json")
+            .display()
+            .to_string(),
+    ];
+    Ok(RunComparison {
+        before_run_id: before.run_id.clone(),
+        after_run_id: after.run_id.clone(),
+        classification,
+        deltas: json!({
+            "scenario_results": after.scenario_results as i64 - before.scenario_results as i64,
+            "failed_scenarios": after.failed_scenarios as i64 - before.failed_scenarios as i64,
+            "assertion_failures": after.assertion_failures as i64 - before.assertion_failures as i64,
+            "performance_artifacts": after.performance_artifacts as i64 - before.performance_artifacts as i64,
+            "evidence_artifacts": after.evidence_artifacts as i64 - before.evidence_artifacts as i64,
+            "mutation_proposals": after.mutation_proposals as i64 - before.mutation_proposals as i64
+        }),
+        before,
+        after,
+        evidence_refs,
+        unsupported: vec![
+            "semantic gameplay quality is not inferred beyond verdict/scenario/evidence deltas"
+                .to_string(),
+        ],
+    })
+}
+
+pub fn write_run_comparison_artifact(
+    before_run_dir: impl AsRef<Path>,
+    after_run_dir: impl AsRef<Path>,
+    output_dir: impl AsRef<Path>,
+) -> Result<PathBuf> {
+    let comparison = compare_runs(before_run_dir, after_run_dir)?;
+    validate_path_component("before run id", &comparison.before_run_id)?;
+    validate_path_component("after run id", &comparison.after_run_id)?;
+    let output_dir = output_dir.as_ref();
+    fs::create_dir_all(output_dir).with_context(|| {
+        format!(
+            "failed to create comparison output dir {}",
+            output_dir.display()
+        )
+    })?;
+    let path = output_dir.join(format!(
+        "run-comparison-{}--{}.json",
+        comparison.before_run_id, comparison.after_run_id
+    ));
+    write_json(&path, &json!(comparison))?;
+    Ok(path)
+}
+
+fn load_run_comparison_snapshot(run_dir: &Path, label: &str) -> Result<RunComparisonSnapshot> {
+    let run_path = run_dir.join("run.json");
+    let verdict_path = run_dir.join("verdict.json");
+    let evidence_path = run_dir.join("evidence/index.json");
+    for path in [&run_path, &verdict_path, &evidence_path] {
+        if !path.is_file() {
+            return Err(anyhow!(
+                "{label} run is missing required artifact {}",
+                path.display()
+            ));
+        }
+    }
+    let run = read_json_value(&run_path)?;
+    let verdict = read_json_value(&verdict_path)?;
+    let evidence = read_evidence_index(run_dir)?;
+    let mut failed_scenarios = 0usize;
+    let mut assertion_failures = 0usize;
+    let mut scenario_results = 0usize;
+    let mut performance_artifacts = 0usize;
+    let mut mutation_proposals = 0usize;
+    for artifact in &evidence.artifacts {
+        match artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+        {
+            Some("scenario_result") => {
+                scenario_results += 1;
+                let result = read_json_value(run_dir.join(&artifact.path))?;
+                if result.get("status").and_then(|value| value.as_str()) != Some("passed") {
+                    failed_scenarios += 1;
+                }
+                assertion_failures += result
+                    .get("assertions")
+                    .and_then(|value| value.as_array())
+                    .map(|assertions| {
+                        assertions
+                            .iter()
+                            .filter(|assertion| {
+                                assertion.get("passed").and_then(|value| value.as_bool())
+                                    == Some(false)
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+            }
+            Some("performance_metrics") => performance_artifacts += 1,
+            Some("mutation_proposal") => mutation_proposals += 1,
+            _ => {}
+        }
+    }
+    Ok(RunComparisonSnapshot {
+        run_id: run
+            .get("id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("{label} run.json missing id"))?
+            .to_string(),
+        verdict_status: verdict
+            .get("status")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown")
+            .to_string(),
+        scenario_results,
+        failed_scenarios,
+        assertion_failures,
+        performance_artifacts,
+        evidence_artifacts: evidence.artifacts.len(),
+        mutation_proposals,
+    })
+}
+
+fn classify_run_comparison(
+    before: &RunComparisonSnapshot,
+    after: &RunComparisonSnapshot,
+) -> &'static str {
+    match (
+        before.verdict_status.as_str(),
+        after.verdict_status.as_str(),
+    ) {
+        (before_status, after_status) if before_status != "passed" && after_status == "passed" => {
+            "improved"
+        }
+        ("passed", after_status) if after_status != "passed" => "regressed",
+        _ if after.failed_scenarios < before.failed_scenarios
+            || after.assertion_failures < before.assertion_failures =>
+        {
+            "improved"
+        }
+        _ if after.failed_scenarios > before.failed_scenarios
+            || after.assertion_failures > before.assertion_failures =>
+        {
+            "regressed"
+        }
+        _ if before == after => "no_change",
+        _ => "changed",
+    }
+}
+
 fn apply_explicit_evaluator_checks(
     run_dir: &Path,
     evidence: &EvidenceIndex,
@@ -5552,6 +5742,65 @@ scenarios:
                 && failure["evidence_ref"] == "evidence/scenarios/bootstrap-smoke/world-state.json"
         }));
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn compares_runs_without_mutating_sources() {
+        let (before_root, before) = create_test_run("ouroforge-compare-before-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        let before_run_json =
+            fs::read_to_string(before.run_dir.join("run.json")).expect("before run reads");
+        let output_dir = before_root.join("comparisons");
+
+        let artifact_path =
+            write_run_comparison_artifact(&before.run_dir, &before.run_dir, &output_dir)
+                .expect("comparison written");
+
+        assert!(artifact_path.is_file());
+        let comparison = read_json_value(&artifact_path).expect("comparison reads");
+        assert_eq!(comparison["classification"], "no_change");
+        assert_eq!(comparison["before"]["verdict_status"], "passed");
+        assert_eq!(comparison["after"]["verdict_status"], "passed");
+        assert_eq!(
+            fs::read_to_string(before.run_dir.join("run.json")).expect("before run rereads"),
+            before_run_json
+        );
+        fs::remove_dir_all(before_root).ok();
+    }
+
+    #[test]
+    fn compares_run_regressions_from_supported_evidence() {
+        let (before_root, before) = create_test_run("ouroforge-compare-regression-before-test");
+        let (after_root, after) = create_test_run("ouroforge-compare-regression-after-test");
+        write_scenario_result_fixture(&before.run_dir, "passed");
+        write_scenario_result_fixture(&after.run_dir, "failed");
+        evaluate_run(&before.run_dir).expect("before verdict");
+        evaluate_run(&after.run_dir).expect("after verdict");
+
+        let comparison = compare_runs(&before.run_dir, &after.run_dir).expect("comparison");
+
+        assert_eq!(comparison.classification, "regressed");
+        assert_eq!(comparison.before.verdict_status, "passed");
+        assert_eq!(comparison.after.verdict_status, "failed");
+        assert_eq!(comparison.after.failed_scenarios, 1);
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
+    }
+
+    #[test]
+    fn compare_runs_fails_clearly_for_missing_artifacts() {
+        let (before_root, before) = create_test_run("ouroforge-compare-missing-before-test");
+        let after_root = unique_temp_dir("ouroforge-compare-missing-after-test");
+        fs::create_dir_all(&after_root).expect("after dir");
+
+        let error = compare_runs(&before.run_dir, &after_root).expect_err("missing after fails");
+
+        assert!(error
+            .to_string()
+            .contains("after run is missing required artifact"));
+        fs::remove_dir_all(before_root).ok();
+        fs::remove_dir_all(after_root).ok();
     }
 
     #[test]
