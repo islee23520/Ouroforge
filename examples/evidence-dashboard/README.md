@@ -43,7 +43,7 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output example
 
 Refresh the dashboard after export to inspect the platformer template run, its
 2 scenario results, linked world-state/fixture evidence, verdict, journal, and
-read-only comparison artifact. Generated `runs/` and `dashboard-data.json`
+read-only comparison artifact, including Project Comparison v1 fields when present. Generated `runs/` and `dashboard-data.json`
 remain local inspection state and must not be committed.
 
 Engine Expansion v1 integration-demo inspection:

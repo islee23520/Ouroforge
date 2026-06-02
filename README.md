@@ -14,7 +14,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Propose deterministic mutation records for failed runs.
 - Inspect runs with a read-only evidence dashboard.
 - Inspect/edit the minimal game-runtime scene through Rust-validated scene edit commands and a static authoring cockpit prototype.
-- Inspect existing before/after run comparison artifacts in the read-only evidence dashboard.
+- Inspect existing before/after run comparison artifacts, including project comparison context, in the read-only evidence dashboard.
 - Validate a local project workspace manifest with `project validate`.
 - Scaffold a tiny local project workspace with `project init --template minimal-2d`.
 - Validate project scenario packs through `project validate`.
@@ -95,7 +95,7 @@ For Engine Expansion v1 integration evidence, validate and run `seeds/engine-exp
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
 - `examples/authoring-cockpit` — static authoring cockpit prototype over the minimal scene model.
-- `docs/` — architecture, roadmap, manifest/project-run contracts, public-readiness audit, and demo evidence notes.
+- `docs/` — architecture, roadmap, manifest/project-run/project-comparison contracts, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 

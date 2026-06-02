@@ -172,7 +172,7 @@ evaluation remain design references only.
 - #249 binds runs to project manifest, scene, seed, scenario pack, and optional
   transaction provenance. The command contract and metadata fields are documented
   in `docs/project-run-v1.md`.
-- #250 extends semantic comparison with project-level context.
+- #250 extends semantic comparison with project-level context. The field contract and limitations are documented in `docs/project-comparison-v1.md`.
 - #251 makes scene-only mutation application project-aware and limited to
   manifest-authorized scenes.
 - #252 surfaces project workspace state in Studio v3 without browser writes or

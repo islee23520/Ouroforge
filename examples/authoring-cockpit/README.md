@@ -39,7 +39,7 @@ The cockpit composes completed local surfaces only:
 - live preview controls through the existing runtime probe;
 - scene edit command generation for Rust-validated fields;
 - transaction-bound QA command generation;
-- semantic run comparison artifact surface when comparison artifacts exist.
+- semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist.
 
 Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, or mutation acceptance from the browser. Studio v2 verification evidence is recorded in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
 
