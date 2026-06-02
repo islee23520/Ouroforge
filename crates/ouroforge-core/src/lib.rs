@@ -6728,6 +6728,81 @@ pub fn validate_scene_only_mutation_operation(
     })
 }
 
+pub fn apply_scene_only_mutation_operation(
+    run_dir: impl AsRef<Path>,
+    operation: &SceneOnlyMutationOperation,
+    transaction_output: impl AsRef<Path>,
+) -> Result<SceneEditTransaction> {
+    let run_dir = run_dir.as_ref();
+    let transaction_output = transaction_output.as_ref();
+    if operation.schema_version != "scene-only-mutation-v1" {
+        return Err(anyhow!(
+            "scene-only mutation schemaVersion must be scene-only-mutation-v1"
+        ));
+    }
+    if !operation.validation_required {
+        return Err(anyhow!(
+            "scene-only mutation requires validationRequired=true"
+        ));
+    }
+    if !supported_scene_edit_paths().contains(&operation.edit.path.as_str()) {
+        return Err(anyhow!(
+            "scene-only mutation edit path is not allowed: {}",
+            operation.edit.path
+        ));
+    }
+    let proposals = read_mutation_proposals(run_dir)?;
+    let proposal = proposals
+        .proposals
+        .iter()
+        .find(|proposal| proposal.id == operation.proposal_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "scene-only mutation proposal id not found: {}",
+                operation.proposal_id
+            )
+        })?;
+    if proposal.status != "proposed" {
+        return Err(anyhow!(
+            "scene-only mutation requires a proposed mutation; found status {}",
+            proposal.status
+        ));
+    }
+    let scene = read_scene(&operation.target_scene_path)?;
+    let before_scene_hash = hash_scene_document(&scene)?;
+    if before_scene_hash != operation.expected_before_scene_hash {
+        return Err(anyhow!(
+            "scene-only mutation before hash mismatch; expected {}, found {}",
+            operation.expected_before_scene_hash.value,
+            before_scene_hash.value
+        ));
+    }
+    let transaction =
+        preview_scene_edit_transaction(&operation.target_scene_path, operation.edit.clone())?;
+    write_scene_edit_transaction_artifact(transaction_output, &transaction)?;
+    if transaction.validation_result.status != "passed" {
+        return Err(anyhow!(
+            "scene-only mutation transaction failed validation; artifact written to {}",
+            transaction_output.display()
+        ));
+    }
+    edit_scene(&operation.target_scene_path, operation.edit.clone())?;
+    append_ledger_event(
+        run_dir,
+        "mutation.scene_applied",
+        "mutation-cli",
+        json!({
+            "proposal_id": operation.proposal_id,
+            "transaction_id": transaction.id,
+            "transaction_artifact_path": transaction_output.to_string_lossy(),
+            "target_scene_path": operation.target_scene_path,
+            "before_scene_hash": transaction.before_scene_hash,
+            "after_scene_hash": transaction.after_scene_hash
+        }),
+    )?;
+    Ok(transaction)
+}
+
 pub fn read_scene_edit_transaction_artifact(
     path: impl AsRef<Path>,
 ) -> Result<SceneEditTransaction> {
@@ -12580,6 +12655,71 @@ scenarios:
             fs::read_to_string(&scene_path).expect("scene after reads"),
             before_contents,
             "failed validation must leave trusted scene unchanged"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scene_only_mutation_application_writes_transaction_and_fails_safely() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-apply");
+        let transaction_path = root.join("transactions/apply.json");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id.clone(),
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash.clone(),
+            validation_required: true,
+        };
+        let transaction =
+            apply_scene_only_mutation_operation(&artifacts.run_dir, &operation, &transaction_path)
+                .expect("scene-only mutation applies");
+        assert_eq!(transaction.validation_result.status, "passed");
+        assert!(transaction_path.is_file());
+        assert_eq!(
+            read_scene(&scene_path).expect("scene reads").entities[0]
+                .components
+                .transform
+                .x,
+            48
+        );
+        let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(ledger
+            .iter()
+            .any(|event| event["event"] == "mutation.scene_applied"));
+
+        let failed_path = root.join("transactions/failure.json");
+        let failing_operation = SceneOnlyMutationOperation {
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.size.width".to_string(),
+                value: json!(0),
+            },
+            expected_before_scene_hash: hash_scene_document(
+                &read_scene(&scene_path).expect("updated scene reads"),
+            )
+            .expect("updated hash"),
+            ..operation
+        };
+        let error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &failing_operation,
+            &failed_path,
+        )
+        .expect_err("validation failure rejected");
+        assert!(error.to_string().contains("transaction failed validation"));
+        assert!(failed_path.is_file());
+        assert_eq!(
+            read_scene(&scene_path).expect("scene reads").entities[0]
+                .components
+                .size
+                .width,
+            16
         );
         fs::remove_dir_all(root).ok();
     }

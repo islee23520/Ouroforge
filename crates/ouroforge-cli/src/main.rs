@@ -2,14 +2,16 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
-    apply_patch_sandbox_from_path, bind_run_transaction_provenance, create_mutation_proposal,
-    create_run, edit_scene, evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
+    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation,
+    bind_run_transaction_provenance, create_mutation_proposal, create_run, edit_scene,
+    evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
     list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke,
     run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     update_journal, validate_scene_reload, write_run_comparison_artifact,
     write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
+    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -177,6 +179,13 @@ enum MutationCommand {
     },
     List {
         run_dir: PathBuf,
+    },
+    ApplyScene {
+        run_dir: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        operation: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        transaction_output: PathBuf,
     },
     Review {
         run_or_draft_path: PathBuf,
@@ -410,6 +419,35 @@ fn main() -> Result<()> {
         } => {
             let proposals = list_mutation_proposals(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&proposals)?);
+        }
+        Commands::Mutation {
+            command:
+                MutationCommand::ApplyScene {
+                    run_dir,
+                    operation,
+                    transaction_output,
+                },
+        } => {
+            let input = std::fs::read_to_string(&operation)
+                .with_context(|| format!("failed to read operation {}", operation.display()))?;
+            let operation_model: SceneOnlyMutationOperation = serde_json::from_str(&input)
+                .with_context(|| format!("failed to parse operation {}", operation.display()))?;
+            let transaction = apply_scene_only_mutation_operation(
+                &run_dir,
+                &operation_model,
+                &transaction_output,
+            )?;
+            println!("Scene-only mutation applied: {}", transaction.id);
+            println!("Transaction artifact: {}", transaction_output.display());
+            println!("Before scene hash: {}", transaction.before_scene_hash.value);
+            if let Some(after_hash) = &transaction.after_scene_hash {
+                println!("After scene hash: {}", after_hash.value);
+            }
+            println!(
+                "Next QA command: cargo run -p ouroforge-cli -- run <seed> --transaction {}",
+                transaction_output.display()
+            );
+            println!("{}", serde_json::to_string_pretty(&transaction)?);
         }
         Commands::Mutation {
             command:
