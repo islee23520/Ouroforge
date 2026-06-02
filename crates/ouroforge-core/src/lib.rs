@@ -130,6 +130,30 @@ pub struct RestoreStep {
 #[serde(deny_unknown_fields)]
 pub struct VisualCheckpointStep {
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<VisualBaselineMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<VisualThreshold>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualBaselineMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualThreshold {
+    #[serde(rename = "maxDimensionDelta")]
+    pub max_dimension_delta: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -415,13 +439,45 @@ impl ScenarioStep {
                 })?;
             }
             ScenarioStep::VisualCheckpoint { visual_checkpoint } => {
-                validate_path_component("visual checkpoint id", &visual_checkpoint.id)
-                    .with_context(|| {
-                        format!(
-                            "scenarios[{scenario_index}].steps[{step_index}].visualCheckpoint.id is invalid"
-                        )
-                    })?;
+                visual_checkpoint.validate().with_context(|| {
+                    format!(
+                        "scenarios[{scenario_index}].steps[{step_index}].visualCheckpoint is invalid"
+                    )
+                })?;
             }
+        }
+        Ok(())
+    }
+}
+
+impl VisualCheckpointStep {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("visual checkpoint id", &self.id)?;
+        if let Some(baseline) = &self.baseline {
+            baseline.validate()?;
+        }
+        if self.threshold.is_some() {
+            let baseline = self
+                .baseline
+                .as_ref()
+                .ok_or_else(|| anyhow!("visual checkpoint threshold requires baseline metadata"))?;
+            if baseline.width.is_none() || baseline.height.is_none() {
+                return Err(anyhow!(
+                    "visual checkpoint threshold requires baseline width and height"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl VisualBaselineMetadata {
+    fn validate(&self) -> Result<()> {
+        if let Some(id) = &self.id {
+            validate_path_component("visual baseline id", id)?;
+        }
+        if let Some(path) = &self.path {
+            validate_replay_reference_path("visual baseline path", path)?;
         }
         Ok(())
     }
@@ -2359,6 +2415,23 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 }));
             }
         }
+        if let Some(visual_checks) = result
+            .get("visual_checkpoints")
+            .and_then(|value| value.as_array())
+        {
+            for visual_check in visual_checks.iter().filter(|visual_check| {
+                visual_check.get("passed").and_then(|value| value.as_bool()) == Some(false)
+            }) {
+                failures.push(json!({
+                    "kind": "visual_checkpoint_failed",
+                    "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "path": path,
+                    "checkpoint_id": visual_check.get("checkpoint_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "evidence_ref": visual_check.get("evidence_ref").cloned().unwrap_or(serde_json::Value::Null),
+                    "comparison": visual_check.get("comparison").cloned().unwrap_or(serde_json::Value::Null)
+                }));
+            }
+        }
         for evidence_path in ["world_state", "frame_stats"] {
             if let Some(path) = result
                 .get("evidence")
@@ -2650,6 +2723,7 @@ fn run_scenario<T: CdpTransport>(
     let mut snapshot_paths = Vec::new();
     let mut visual_checkpoint_paths = Vec::new();
     let mut visual_checkpoint_screenshot_paths = Vec::new();
+    let mut visual_checkpoint_summaries = Vec::new();
     let mut snapshot_ids = std::collections::BTreeMap::new();
     for step in &scenario.steps {
         match step {
@@ -2788,6 +2862,7 @@ fn run_scenario<T: CdpTransport>(
                 )?;
                 visual_checkpoint_paths.push(capture.metadata_path.clone());
                 visual_checkpoint_screenshot_paths.push(capture.screenshot_path.clone());
+                visual_checkpoint_summaries.push(capture.summary.clone());
                 append_ledger_event(
                     &config.run_dir,
                     "scenario.visual_checkpoint",
@@ -2974,7 +3049,10 @@ fn run_scenario<T: CdpTransport>(
     }
     let passed = assertions
         .iter()
-        .all(|assertion| assertion["passed"].as_bool() == Some(true));
+        .all(|assertion| assertion["passed"].as_bool() == Some(true))
+        && visual_checkpoint_summaries
+            .iter()
+            .all(|summary| summary["passed"].as_bool() != Some(false));
     let status = if passed { "passed" } else { "failed" };
     let result_path = format!("{scenario_dir}/scenario-result-{}.json", unix_millis()?);
     write_json(
@@ -2993,7 +3071,8 @@ fn run_scenario<T: CdpTransport>(
                 "performance_metrics": performance_paths.clone(),
                 "cdp_trace_summaries": trace_paths.clone()
             },
-            "assertions": assertions
+            "assertions": assertions,
+            "visual_checkpoints": visual_checkpoint_summaries
         }),
     )?;
     add_evidence_artifact(
@@ -3079,6 +3158,7 @@ struct ScenarioAssertionSources<'a> {
 struct VisualCheckpointCapture {
     screenshot_path: String,
     metadata_path: String,
+    summary: serde_json::Value,
 }
 
 fn capture_visual_checkpoint<T: CdpTransport>(
@@ -3090,6 +3170,12 @@ fn capture_visual_checkpoint<T: CdpTransport>(
 ) -> Result<VisualCheckpointCapture> {
     let suffix = unix_millis()?;
     let screenshot = client.capture_screenshot_png()?;
+    let dimensions = png_dimensions(&screenshot);
+    let comparison = visual_comparison_summary(checkpoint, dimensions);
+    let passed = comparison
+        .get("passed")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true);
     let screenshot_path = format!(
         "{scenario_dir}/visual-checkpoint-{}-{suffix}.png",
         checkpoint.id
@@ -3114,9 +3200,18 @@ fn capture_visual_checkpoint<T: CdpTransport>(
             "checkpoint_id": checkpoint.id,
             "url": config.url,
             "artifact": "visual_checkpoint_screenshot",
-            "advisory": true
+            "advisory": checkpoint.threshold.is_none()
         }),
     )?;
+    let summary = json!({
+        "checkpoint_id": checkpoint.id,
+        "screenshot_path": screenshot_path,
+        "metadata_path": format!("{scenario_dir}/visual-checkpoint-{}-{suffix}.json", checkpoint.id),
+        "advisory": checkpoint.threshold.is_none(),
+        "passed": passed,
+        "evidence_ref": screenshot_path,
+        "comparison": comparison
+    });
 
     let metadata_path = write_scenario_json_artifact(
         config,
@@ -3128,14 +3223,59 @@ fn capture_visual_checkpoint<T: CdpTransport>(
         &json!({
             "checkpoint_id": checkpoint.id,
             "screenshot_path": screenshot_path,
-            "advisory": true,
-            "comparison": null,
-            "baseline": null
+            "advisory": checkpoint.threshold.is_none(),
+            "passed": passed,
+            "dimensions": dimensions.map(|(width, height)| json!({ "width": width, "height": height })),
+            "comparison": comparison,
+            "baseline": checkpoint.baseline
         }),
     )?;
     Ok(VisualCheckpointCapture {
         screenshot_path,
         metadata_path,
+        summary,
+    })
+}
+
+fn png_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+    if bytes.len() < 24 || &bytes[0..8] != PNG_SIGNATURE || &bytes[12..16] != b"IHDR" {
+        return None;
+    }
+    let width = u32::from_be_bytes(bytes[16..20].try_into().ok()?);
+    let height = u32::from_be_bytes(bytes[20..24].try_into().ok()?);
+    Some((width, height))
+}
+
+fn visual_comparison_summary(
+    checkpoint: &VisualCheckpointStep,
+    dimensions: Option<(u32, u32)>,
+) -> serde_json::Value {
+    let baseline = checkpoint.baseline.as_ref();
+    let threshold = checkpoint.threshold.as_ref();
+    let width_delta = baseline
+        .and_then(|baseline| baseline.width)
+        .zip(dimensions.map(|(width, _)| width))
+        .map(|(baseline, actual)| baseline.abs_diff(actual));
+    let height_delta = baseline
+        .and_then(|baseline| baseline.height)
+        .zip(dimensions.map(|(_, height)| height))
+        .map(|(baseline, actual)| baseline.abs_diff(actual));
+    let passed = threshold.map(|threshold| {
+        width_delta.is_some_and(|delta| delta <= threshold.max_dimension_delta)
+            && height_delta.is_some_and(|delta| delta <= threshold.max_dimension_delta)
+    });
+    json!({
+        "bounded": true,
+        "kind": "dimension_summary",
+        "pixel_diff": null,
+        "dimensions": dimensions.map(|(width, height)| json!({ "width": width, "height": height })),
+        "baseline": baseline,
+        "threshold": threshold,
+        "width_delta": width_delta,
+        "height_delta": height_delta,
+        "advisory": threshold.is_none(),
+        "passed": passed
     })
 }
 
@@ -4588,6 +4728,12 @@ scenarios:
     steps:
       - visualCheckpoint:
           id: after-load
+          baseline:
+            id: baseline-a
+            width: 320
+            height: 180
+          threshold:
+            maxDimensionDelta: 0
 "#;
 
         let seed = Seed::from_yaml_str(valid).expect("visual checkpoint seed parses");
@@ -4596,7 +4742,7 @@ scenarios:
             &seed.scenarios[0].steps[0],
             ScenarioStep::VisualCheckpoint {
                 visual_checkpoint
-            } if visual_checkpoint.id == "after-load"
+            } if visual_checkpoint.id == "after-load" && visual_checkpoint.threshold.is_some()
         ));
     }
 
@@ -5600,7 +5746,9 @@ scenarios:
             _params: serde_json::Value,
         ) -> Result<serde_json::Value> {
             match method {
-                "Page.captureScreenshot" => Ok(json!({ "data": "iVBORw0KGgo=" })),
+                "Page.captureScreenshot" => Ok(json!({
+                    "data": base64::engine::general_purpose::STANDARD.encode(test_png_bytes(320, 180))
+                })),
                 _ => Ok(json!({})),
             }
         }
@@ -5612,7 +5760,8 @@ scenarios:
 
         let bytes = client.capture_screenshot_png().expect("screenshot decodes");
 
-        assert_eq!(bytes, vec![137, 80, 78, 71, 13, 10, 26, 10]);
+        assert_eq!(&bytes[0..8], b"\x89PNG\r\n\x1a\n");
+        assert_eq!(png_dimensions(&bytes), Some((320, 180)));
     }
 
     #[test]
@@ -5636,6 +5785,8 @@ scenarios:
             scenario_dir,
             &VisualCheckpointStep {
                 id: "after-load".to_string(),
+                baseline: None,
+                threshold: None,
             },
             &mut client,
         )
@@ -5648,6 +5799,11 @@ scenarios:
         assert_eq!(metadata["checkpoint_id"], "after-load");
         assert_eq!(metadata["screenshot_path"], capture.screenshot_path);
         assert_eq!(metadata["advisory"], true);
+        assert_eq!(
+            metadata["dimensions"],
+            json!({ "width": 320, "height": 180 })
+        );
+        assert_eq!(metadata["comparison"]["advisory"], true);
         let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
         assert!(artifacts_list.iter().any(|artifact| {
             artifact.metadata["artifact"] == "visual_checkpoint_screenshot"
@@ -5658,6 +5814,29 @@ scenarios:
             .any(|artifact| artifact.metadata["artifact"] == "visual_checkpoint"));
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn visual_checkpoint_threshold_can_fail_deterministically() {
+        let checkpoint = VisualCheckpointStep {
+            id: "after-load".to_string(),
+            baseline: Some(VisualBaselineMetadata {
+                id: Some("baseline-a".to_string()),
+                path: None,
+                width: Some(640),
+                height: Some(480),
+            }),
+            threshold: Some(VisualThreshold {
+                max_dimension_delta: 0,
+            }),
+        };
+
+        let comparison = visual_comparison_summary(&checkpoint, Some((320, 180)));
+
+        assert_eq!(comparison["advisory"], false);
+        assert_eq!(comparison["passed"], false);
+        assert_eq!(comparison["width_delta"], 320);
+        assert_eq!(comparison["height_delta"], 300);
     }
 
     #[test]
@@ -6445,6 +6624,18 @@ scenarios:
                 evidence_ref: "evidence/world-state.json",
             },
         }
+    }
+
+    fn test_png_bytes(width: u32, height: u32) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"\x89PNG\r\n\x1a\n");
+        bytes.extend_from_slice(&13u32.to_be_bytes());
+        bytes.extend_from_slice(b"IHDR");
+        bytes.extend_from_slice(&width.to_be_bytes());
+        bytes.extend_from_slice(&height.to_be_bytes());
+        bytes.extend_from_slice(&[8, 6, 0, 0, 0]);
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        bytes
     }
 
     fn create_test_run(prefix: &str) -> (PathBuf, RunArtifacts) {
