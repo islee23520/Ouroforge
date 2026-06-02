@@ -577,7 +577,7 @@ fn write_cli_scenario_result(run_dir: &Path, status: &str) {
 }
 
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
+    let output = Command::new(env!("CARGO_BIN_EXE_ouroforge"))
         .current_dir(current_dir)
         .args(args)
         .output()
@@ -600,7 +600,7 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 }
 
 fn run_cli_expect_failure(current_dir: &Path, args: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
+    let output = Command::new(env!("CARGO_BIN_EXE_ouroforge"))
         .current_dir(current_dir)
         .args(args)
         .output()

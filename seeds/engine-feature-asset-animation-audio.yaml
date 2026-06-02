@@ -59,6 +59,10 @@ scenarios:
       - world_state:
           path: entities.0.components.animation.clips.0.frames.2.asset
           equals: player-sprite
+      # elapsedFrames is 5, not 4: scenarios run in document order on the same
+      # browser page, so the preceding asset-manifest-regression scenario has
+      # already advanced the animation by 1 frame (1 + the 4 waited here = 5).
+      # Reordering or removing that scenario requires updating this value.
       - world_state:
           path: entities.0.components.animation.state.elapsedFrames
           equals: 5

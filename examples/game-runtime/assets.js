@@ -6,6 +6,10 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function compareCodeUnits(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
   function isPlainObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value);
   }
@@ -68,7 +72,7 @@
       normalized.byId.set(entry.id, entry);
     }
     if (normalized.entries.length === 0) normalized.errors.push('asset manifest assets must not be empty');
-    normalized.entries.sort((left, right) => left.id.localeCompare(right.id) || left.kind.localeCompare(right.kind) || left.path.localeCompare(right.path));
+    normalized.entries.sort((left, right) => compareCodeUnits(left.id, right.id) || compareCodeUnits(left.kind, right.kind) || compareCodeUnits(left.path, right.path));
     return normalized;
   }
 
@@ -76,9 +80,22 @@
     const scene = Array.isArray(sceneOrEntities) ? { entities: sceneOrEntities } : (sceneOrEntities || {});
     const normalizedManifest = normalizeManifest(manifest || scene.assetManifest);
     const refs = new Set();
+    function addFrameAssets(frames) {
+      for (const frame of Array.isArray(frames) ? frames : []) {
+        const frameAsset = frame && frame.asset;
+        if (typeof frameAsset === 'string' && frameAsset.length > 0) refs.add(frameAsset);
+      }
+    }
     for (const entity of Array.isArray(scene.entities) ? scene.entities : []) {
       const asset = entity && entity.sprite && entity.sprite.asset;
       if (typeof asset === 'string' && asset.length > 0) refs.add(asset);
+      const animation = entity && entity.components && entity.components.animation;
+      if (animation) {
+        addFrameAssets(animation.frames);
+        for (const clip of Array.isArray(animation.clips) ? animation.clips : []) {
+          addFrameAssets(clip && clip.frames);
+        }
+      }
     }
     for (const tilemap of Array.isArray(scene.tilemaps) ? scene.tilemaps : []) {
       for (const tile of Array.isArray(tilemap.tiles) ? tilemap.tiles : []) {
@@ -96,6 +113,7 @@
 
   function createAssetTracker(options = {}) {
     const ImageCtor = options.ImageCtor || root.Image;
+    const onChange = typeof options.onChange === 'function' ? options.onChange : null;
     let manifest = normalizeManifest(options.manifest);
     const records = new Map();
     const unresolvedRefs = new Set();
@@ -144,9 +162,11 @@
         record.status = 'loaded';
         record.width = image.naturalWidth || image.width || null;
         record.height = image.naturalHeight || image.height || null;
+        if (onChange) onChange(record);
       };
       image.onerror = () => {
         record.status = 'failed';
+        if (onChange) onChange(record);
       };
       image.src = entry.path;
       return record;
@@ -161,7 +181,7 @@
 
     function metadata() {
       const loaded = Array.from(records.values())
-        .sort((a, b) => a.id.localeCompare(b.id) || a.path.localeCompare(b.path))
+        .sort((a, b) => compareCodeUnits(a.id, b.id) || compareCodeUnits(a.path, b.path))
         .map((record) => ({
           id: record.id,
           path: record.path,

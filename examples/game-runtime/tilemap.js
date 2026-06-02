@@ -3,6 +3,10 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function compareCodeUnits(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
   function size(value = {}, fallback = { width: 16, height: 16 }) {
     return {
       width: Number.isFinite(value.width) && value.width > 0 ? value.width : fallback.width,
@@ -31,7 +35,7 @@
     const expectedCells = grid.width * grid.height;
     const tileSize = size(tilemap.tileSize);
     const tiles = [];
-    const tileIndex = {};
+    const tileIndex = Object.create(null);
     for (const tile of Array.isArray(tilemap.tiles) ? tilemap.tiles : []) {
       if (!tile || typeof tile.id !== 'string') continue;
       const normalizedTile = {
@@ -66,8 +70,8 @@
         .map((layer) => ({ tilemap, layer, tilemapId: tilemap.id, layerId: layer.id, order: layer.order })))
       .sort((left, right) => (
         left.order - right.order
-        || left.tilemapId.localeCompare(right.tilemapId)
-        || left.layerId.localeCompare(right.layerId)
+        || compareCodeUnits(left.tilemapId, right.tilemapId)
+        || compareCodeUnits(left.layerId, right.layerId)
       ));
   }
 

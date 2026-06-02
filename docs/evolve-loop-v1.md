@@ -88,7 +88,7 @@ invalid.
 | --- | --- |
 | `proposed` -> `classified` | source proposal id, `journal.md`, `verdict.json`, relevant evidence ids/paths, classification reason |
 | `classified` -> `drafted` | classification record, draft id, target files/paths as text metadata, patch draft artifact, rationale, source evidence refs |
-| `drafted` -> `sandbox_applied` | draft id, sandbox/worktree path or id, apply log, changed-file list, failure log when apply fails |
+| `drafted` -> `sandbox_applied` | draft id, sandbox/worktree path or id, apply log, changed-file list (a failed apply does not advance to `sandbox_applied` — the mutation is closed as `rejected` instead) |
 | `sandbox_applied` -> `rerun_compared` | before run id, sandbox after run id, rerun command, comparison artifact path, verdict/scenario refs |
 | `rerun_compared` -> `pending_review` | comparison classification, supported deltas, known unsupported claims, reviewer checklist input |
 | `pending_review` -> `accepted` | explicit manual reviewer decision, reviewer identity/source, accepted scope, evidence refs, follow-up action boundary |

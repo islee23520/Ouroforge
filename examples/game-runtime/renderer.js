@@ -3,6 +3,10 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function compareCodeUnits(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
   function point(value = {}, fallback = { x: 0, y: 0 }) {
     return {
       x: Number.isFinite(value.x) ? value.x : fallback.x,
@@ -76,7 +80,7 @@
       .sort((left, right) => (
         left.layerOrder - right.layerOrder
         || left.spriteOrder - right.spriteOrder
-        || left.entityId.localeCompare(right.entityId)
+        || compareCodeUnits(left.entityId, right.entityId)
       ));
   }
 
@@ -116,7 +120,8 @@
         : null;
       const frameAsset = activeFrame && typeof activeFrame.asset === 'string' ? activeFrame.asset : null;
       const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
-      const image = assets && typeof assets.imageFor === 'function'
+      const preferFrameColor = activeFrame && typeof activeFrame.color === 'string' && !frameAsset;
+      const image = !preferFrameColor && assets && typeof assets.imageFor === 'function'
         ? assets.imageFor(frameAsset || spriteAsset)
         : null;
       if (image) {

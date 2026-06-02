@@ -10,6 +10,8 @@ const OuroforgeCockpit = (() => {
     ['components.controllable', 'boolean'],
   ];
 
+  let lastEditCommand = null;
+
   const DEFAULT_SCENE_PATH = 'examples/game-runtime/scene.json';
   const DEFAULT_DASHBOARD_DATA_PATH = '../evidence-dashboard/dashboard-data.json';
   const READ_ONLY_FIELDS = [
@@ -152,7 +154,7 @@ const OuroforgeCockpit = (() => {
       return `<label>${escapeText(path)}${input}</label>`;
     }).join('');
     const error = editError ? `<div class="error" id="edit-error">${escapeText(editError)}</div>` : '<div class="hint" id="edit-error">No validation errors.</div>';
-    return `<div class="inspector"><div class="panel"><h2>${escapeText(entity.id)}</h2><p class="hint">Supported fields update browser memory only. Use the generated Rust command to persist through validation.</p>${error}<div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${escapeText(JSON.stringify(entity, null, 2))}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${escapeText(cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x))}</pre></div>${renderReadOnlyFields(entity)}</div>`;
+    return `<div class="inspector"><div class="panel"><h2>${escapeText(entity.id)}</h2><p class="hint">Supported fields update browser memory only. Use the generated Rust command to persist through validation.</p>${error}<div class="field-grid">${fields}</div></div><div class="panel"><h3>Current component JSON</h3><pre>${escapeText(JSON.stringify(entity, null, 2))}</pre></div><div class="panel"><h3>Validated write path</h3><pre id="edit-command">${escapeText(lastEditCommand || cliCommand(scenePath, entity.id, 'components.transform.x', entity.components.transform.x))}</pre></div>${renderReadOnlyFields(entity)}</div>`;
   }
 
   function renderPreview(scenePath = '../game-runtime/index.html') {
@@ -500,7 +502,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderIntegration(run, previewState = null) {
-    return `${renderStudioNavigation(run)}<section id="live-preview">${renderPreview()}${renderPreviewControls(previewState)}</section><section id="scene-editing">${renderQaPanel()}</section>${renderEvidencePane(run)}${renderStudioGaps()}`;
+    return `${renderStudioNavigation(run)}<section id="live-preview">${renderPreview()}<div id="preview-controls-host">${renderPreviewControls(previewState)}</div></section><section id="scene-editing">${renderQaPanel()}</section>${renderEvidencePane(run)}${renderStudioGaps()}`;
   }
 
   async function loadDashboardData(path = DEFAULT_DASHBOARD_DATA_PATH) {
@@ -524,6 +526,26 @@ const OuroforgeCockpit = (() => {
     } catch (_) {
       latest = null;
     }
+    // Rebinds only the preview-control buttons inside the stable controls host.
+    // Keeps the #runtime-preview iframe untouched so Pause/Resume/Step state persists.
+    const bindPreviewControls = () => {
+      integrationEl.querySelectorAll('[data-preview-action]').forEach((button) => button.addEventListener('click', () => {
+        const previewFrame = document.getElementById('runtime-preview');
+        const action = button.dataset.previewAction;
+        if (action === 'reset') {
+          previewState = reloadPreview(previewFrame);
+        } else if (action === 'step') {
+          previewState = callPreviewProbe(previewFrame, 'step', 1);
+        } else {
+          previewState = callPreviewProbe(previewFrame, action);
+        }
+        const host = document.getElementById('preview-controls-host');
+        if (host) {
+          host.innerHTML = renderPreviewControls(previewState);
+          bindPreviewControls();
+        }
+      }));
+    };
     const paint = () => {
       treeEl.innerHTML = renderTree(scene, selectedId);
       inspectorEl.innerHTML = renderInspector(scene, selectedId, DEFAULT_SCENE_PATH, editError);
@@ -535,7 +557,8 @@ const OuroforgeCockpit = (() => {
           scene = applyEdit(scene, selectedId, path, input.value);
           editError = null;
           const entity = scene.entities.find((candidate) => candidate.id === selectedId);
-          document.getElementById('edit-command').textContent = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
+          lastEditCommand = cliCommand(DEFAULT_SCENE_PATH, selectedId, path, getValue(entity, path));
+          document.getElementById('edit-command').textContent = lastEditCommand;
           document.getElementById('edit-error').textContent = 'No validation errors.';
           document.getElementById('edit-error').className = 'hint';
         } catch (error) {
@@ -543,18 +566,7 @@ const OuroforgeCockpit = (() => {
           paint();
         }
       }));
-      integrationEl.querySelectorAll('[data-preview-action]').forEach((button) => button.addEventListener('click', () => {
-        const previewFrame = document.getElementById('runtime-preview');
-        const action = button.dataset.previewAction;
-        if (action === 'reset') {
-          previewState = reloadPreview(previewFrame);
-        } else if (action === 'step') {
-          previewState = callPreviewProbe(previewFrame, 'step', 1);
-        } else {
-          previewState = callPreviewProbe(previewFrame, action);
-        }
-        paint();
-      }));
+      bindPreviewControls();
       document.getElementById('run-qa-button')?.addEventListener('click', () => {
         document.getElementById('qa-command').textContent = `${qaCommand()}\n${dashboardExportCommand()}`;
       });

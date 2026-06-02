@@ -18,7 +18,7 @@
       metadata: () => [],
       imageFor: () => null,
     }),
-  }).createAssetTracker();
+  }).createAssetTracker({ onChange: () => renderCanvas() });
   const animation = window.OuroforgeAnimation || {
     normalizeAnimation: () => null,
     advanceAnimations: () => {},
@@ -40,6 +40,15 @@
       background: '#172532',
       layers: [{ id: 'default', order: 0, visible: true }],
       debug: { showBounds: false, showCamera: false, showEntityIds: false },
+    }),
+    debugState: (state) => ({
+      version: (state && state.version) || '1',
+      camera: (state && state.camera) || { x: 0, y: 0 },
+      viewport: (state && state.viewport) || { width: 320, height: 180 },
+      background: (state && state.background) || '#172532',
+      layers: (state && Array.isArray(state.layers)) ? state.layers : [],
+      debug: (state && state.debug) || { showBounds: false, showCamera: false, showEntityIds: false },
+      renderedEntities: [],
     }),
     drawRuntime: () => [],
   };
@@ -95,16 +104,18 @@
   }
 
   function point(value = {}, fallback = { x: 0, y: 0 }) {
+    const source = value && typeof value === 'object' ? value : {};
     return {
-      x: Number.isFinite(value.x) ? value.x : fallback.x,
-      y: Number.isFinite(value.y) ? value.y : fallback.y,
+      x: Number.isFinite(source.x) ? source.x : fallback.x,
+      y: Number.isFinite(source.y) ? source.y : fallback.y,
     };
   }
 
   function size(value = {}, fallback = { width: 16, height: 16 }) {
+    const source = value && typeof value === 'object' ? value : {};
     return {
-      width: Number.isFinite(value.width) && value.width > 0 ? value.width : fallback.width,
-      height: Number.isFinite(value.height) && value.height > 0 ? value.height : fallback.height,
+      width: Number.isFinite(source.width) && source.width > 0 ? source.width : fallback.width,
+      height: Number.isFinite(source.height) && source.height > 0 ? source.height : fallback.height,
     };
   }
 
@@ -160,11 +171,12 @@
 
 
   function normalizeComponentDefaults(defaults = {}) {
+    const source = defaults && typeof defaults === 'object' ? defaults : {};
     return {
-      transform: point(defaults.transform),
-      velocity: point(defaults.velocity),
-      size: size(defaults.size),
-      controllable: Boolean(defaults.controllable),
+      transform: point(source.transform),
+      velocity: point(source.velocity),
+      size: size(source.size),
+      controllable: Boolean(source.controllable),
     };
   }
 
@@ -199,7 +211,7 @@
       return entity.components.transform;
     }
 
-    for (const entity of entities.slice().sort((left, right) => left.id.localeCompare(right.id))) {
+    for (const entity of entities.slice().sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))) {
       resolveEntity(entity);
     }
     return entities;
@@ -279,8 +291,8 @@
   }
 
   function loadScene(scene) {
-    snapshots = snapshotFactory.createSnapshotRegistry();
     const normalized = normalizeScene(scene);
+    snapshots = snapshotFactory.createSnapshotRegistry();
     world.schemaVersion = normalized.schemaVersion;
     world.sceneId = normalized.id;
     world.bounds = clone(normalized.bounds);
@@ -337,7 +349,12 @@
     if (payload.assetManifest && typeof payload.assetManifest === 'object' && !Array.isArray(payload.assetManifest)) {
       scene.assetManifest = clone(payload.assetManifest);
     }
-    loadScene(scene);
+    try {
+      loadScene(scene);
+    } catch (error) {
+      recordReloadOutcome({ status: 'failed', reason: String(error.message || error) });
+      throw error;
+    }
     recordReloadOutcome({
       status: 'succeeded',
       schemaVersion: payload.schemaVersion,
@@ -368,7 +385,7 @@
   }
 
   function snapshot() {
-    const snapshotId = snapshots.capture({ world, input, events }, world.tick);
+    const snapshotId = snapshots.capture({ world, input, events, rendererState }, world.tick);
     record('runtime.snapshot.captured', { snapshotId, tick: world.tick });
     renderDebug();
     return { snapshotId, metadata: snapshots.metadata(snapshotId) };
@@ -379,6 +396,7 @@
     Object.assign(world, clone(snapshotValue.world || world));
     Object.assign(input, clone(snapshotValue.input || input));
     events.splice(0, events.length, ...clone(snapshotValue.events || []));
+    if (snapshotValue.rendererState) rendererState = clone(snapshotValue.rendererState);
     record('runtime.snapshot.restored', { snapshotId, tick: world.tick });
     renderDebug();
     return api.getWorldState();
@@ -452,11 +470,15 @@
     if (event.key === 'ArrowDown') setInput({ down: false });
   });
 
-  window.__OUROFORGE__ = api;
   record('runtime.loaded', { api: Object.keys(api) });
   renderDebug();
-  fetch('scene.json')
+  const sceneReady = fetch('scene.json')
     .then((response) => response.json())
     .then((scene) => loadScene(scene))
     .catch((error) => record('runtime.scene.load_failed', { error: String(error) }));
+  // Expose a readiness accessor so harnesses can await the fetched scene before
+  // reading world state (otherwise they observe the synchronous fallback scene
+  // and a late loadScene would reset the steps they executed in the interim).
+  api.whenReady = () => sceneReady;
+  window.__OUROFORGE__ = api;
 })();

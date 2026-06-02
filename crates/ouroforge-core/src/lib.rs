@@ -15,8 +15,9 @@ use tungstenite::client::IntoClientRequest;
 
 static LEDGER_APPEND_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVIDENCE_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static MUTATION_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Seed {
     pub id: String,
@@ -35,7 +36,7 @@ pub struct Constraints {
     pub target: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluatorConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,11 +52,14 @@ pub struct ConsoleEvaluatorConfig {
     pub fail_on_levels: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PerformanceEvaluatorConfig {
+    // Thresholds are floating point: Chrome performance metrics are fractional
+    // seconds, so a sub-second threshold like `ScriptDuration: 0.05` must be
+    // representable (a u64 would reject it before evaluation).
     #[serde(rename = "maxMetrics")]
-    pub max_metrics: std::collections::BTreeMap<String, u64>,
+    pub max_metrics: std::collections::BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -264,8 +268,47 @@ pub struct JsonPathAssertion {
     pub count_less_than: Option<u64>,
 }
 
+/// Reject scenario `steps`/`assertions` entries that carry more than one key.
+/// These are untagged enums, so a map with two action/target keys would
+/// otherwise deserialize as the first matching variant and silently drop the
+/// rest. Parsed against the raw YAML so it runs before the lossy typed parse.
+fn validate_single_key_scenario_entries(input: &str) -> Result<()> {
+    let value: serde_yaml::Value = match serde_yaml::from_str(input) {
+        Ok(value) => value,
+        // Let the typed parse surface the real syntax error.
+        Err(_) => return Ok(()),
+    };
+    let Some(scenarios) = value.get("scenarios").and_then(|value| value.as_sequence()) else {
+        return Ok(());
+    };
+    for (scenario_index, scenario) in scenarios.iter().enumerate() {
+        for (field, label) in [("steps", "step"), ("assertions", "assertion")] {
+            let Some(entries) = scenario.get(field).and_then(|value| value.as_sequence()) else {
+                continue;
+            };
+            for (entry_index, entry) in entries.iter().enumerate() {
+                if let Some(mapping) = entry.as_mapping() {
+                    if mapping.len() != 1 {
+                        return Err(anyhow!(
+                            "scenario[{scenario_index}] {label}[{entry_index}] must contain exactly one key, found {}",
+                            mapping.len()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Seed {
     pub fn from_yaml_str(input: &str) -> Result<Self> {
+        // Scenario steps and assertions are untagged enums, so serde silently
+        // accepts the first matching variant and drops any extra action/target
+        // keys in the same map. Reject multi-key entries up front so a malformed
+        // DSL like `{ wait: ..., input: ... }` fails validation instead of
+        // quietly ignoring one of the actions.
+        validate_single_key_scenario_entries(input)?;
         let seed: Seed = serde_yaml::from_str(input).context("failed to parse Seed YAML")?;
         seed.validate()?;
         Ok(seed)
@@ -374,7 +417,7 @@ impl PerformanceEvaluatorConfig {
         }
         for (metric, threshold) in &self.max_metrics {
             require_text("evaluator.performance metric name", metric)?;
-            if *threshold == 0 {
+            if !threshold.is_finite() || *threshold <= 0.0 {
                 return Err(anyhow!(
                     "evaluator.performance.maxMetrics thresholds must be greater than 0"
                 ));
@@ -479,7 +522,7 @@ impl VisualBaselineMetadata {
             validate_path_component("visual baseline id", id)?;
         }
         if let Some(path) = &self.path {
-            validate_replay_reference_path("visual baseline path", path)?;
+            validate_visual_artifact_path("visual baseline path", path)?;
         }
         Ok(())
     }
@@ -593,6 +636,36 @@ fn validate_replay_reference_path(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+/// Validate a visual baseline screenshot path. Baselines are image artifacts,
+/// not input replay fixtures, so they must not be forced through the
+/// `replays/*.yaml|json` replay-reference rules (which would reject a normal
+/// `baselines/home.png`). The path still has to be a relative, in-tree image.
+fn validate_visual_artifact_path(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !(value.ends_with(".png") || value.ends_with(".jpg") || value.ends_with(".jpeg")) {
+        return Err(anyhow!("{field} must point to a PNG or JPEG image"));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '-' | '_'))
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '/', '.', '-' or '_'"
+        ));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must stay inside the project tree")),
+        }
+    }
+    Ok(())
+}
+
 const ASSET_MANIFEST_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -651,7 +724,13 @@ impl AssetManifest {
             .with_context(|| format!("failed to read asset manifest {}", path.display()))?;
         let manifest = Self::from_json_str(&input)
             .with_context(|| format!("failed to parse asset manifest {}", path.display()))?;
-        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        // `Path::parent()` returns `Some("")` (not `None`) for a bare filename
+        // with no directory component, and an empty path fails to canonicalize;
+        // treat that as the current directory.
+        let base_dir = match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent,
+            _ => Path::new("."),
+        };
         manifest
             .validate_files(base_dir)
             .with_context(|| format!("asset manifest {} references invalid files", manifest.id))?;
@@ -1784,13 +1863,31 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
     result
 }
 
+const RUNTIME_PROBE_MAX_ATTEMPTS: u32 = 20;
+const RUNTIME_PROBE_RETRY_INTERVAL: Duration = Duration::from_millis(50);
+
 fn capture_runtime_probe<T: CdpTransport>(
     config: &BrowserSmokeConfig,
     client: &mut CdpClient<T>,
 ) -> Result<()> {
-    let available = client.evaluate_json(
-        "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.getWorldState === 'function' && typeof window.__OUROFORGE__.getFrameStats === 'function')",
-    )?;
+    // The probe API (`window.__OUROFORGE__`) only appears once the page's bundle
+    // has loaded, which can take longer than the fixed post-navigation settle on
+    // slow local/CI loads. Retry the availability check until it appears (or the
+    // budget is exhausted) instead of skipping after a single attempt, so we
+    // don't record `browser.probe.skipped` for a page that was merely still
+    // loading.
+    let mut available = json!(false);
+    for attempt in 0..RUNTIME_PROBE_MAX_ATTEMPTS {
+        available = client.evaluate_json(
+            "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.getWorldState === 'function' && typeof window.__OUROFORGE__.getFrameStats === 'function')",
+        )?;
+        if available == json!(true) {
+            break;
+        }
+        if attempt + 1 < RUNTIME_PROBE_MAX_ATTEMPTS {
+            std::thread::sleep(RUNTIME_PROBE_RETRY_INTERVAL);
+        }
+    }
     if available != json!(true) {
         append_ledger_event(
             &config.run_dir,
@@ -1883,12 +1980,17 @@ const CONSOLE_CAPTURE_SCRIPT: &str = r#"
     const original = console[level] && console[level].bind(console);
     console[level] = (...args) => {
       try {
+        var MAX_TEXT = 2048;
+        var rendered = args.map((arg) => {
+          if (typeof arg === 'string') return arg;
+          try { return JSON.stringify(arg); } catch (_) { return String(arg); }
+        }).join(' ');
+        var truncated = rendered.length > MAX_TEXT;
+        if (truncated) rendered = rendered.slice(0, MAX_TEXT);
         window.__OUROFORGE_CONSOLE__.push({
           level,
-          text: args.map((arg) => {
-            if (typeof arg === 'string') return arg;
-            try { return JSON.stringify(arg); } catch (_) { return String(arg); }
-          }).join(' '),
+          text: rendered,
+          truncated,
           argCount: args.length,
           timestampMs: Math.round(performance.now())
         });
@@ -2531,7 +2633,10 @@ fn collect_classification_evidence_refs(
     verdict: &serde_json::Value,
 ) -> Vec<String> {
     let mut refs = Vec::new();
-    for key in ["path", "evidence_path"] {
+    // `evidence_ref` (singular) is where failed assertions / visual checkpoints
+    // record their direct artifact link, while `path` only points at the broader
+    // scenario result; include it so those links are not dropped.
+    for key in ["path", "evidence_path", "evidence_ref"] {
         if let Some(path) = failure.get(key).and_then(|value| value.as_str()) {
             push_unique_ref(&mut refs, path);
         }
@@ -3009,7 +3114,15 @@ pub fn generate_patch_drafts(run_dir: impl AsRef<Path>) -> Result<PatchDraftArti
             .find(|classification| {
                 classification.proposal_id.as_deref() == Some(proposal.id.as_str())
             })
-            .or_else(|| classifications.classifications.get(index))
+            // Only fall back to positional matching for legacy classifications
+            // that carry no proposal_id; otherwise an index hit could pair this
+            // proposal with a classification that explicitly belongs to another.
+            .or_else(|| {
+                classifications
+                    .classifications
+                    .get(index)
+                    .filter(|candidate| candidate.proposal_id.is_none())
+            })
             .ok_or_else(|| {
                 anyhow!(
                     "patch draft generation requires classification for proposal {}",
@@ -3300,6 +3413,18 @@ fn ensure_path_inside(root: &Path, candidate: &Path) -> Result<()> {
     let root = root
         .canonicalize()
         .with_context(|| format!("failed to canonicalize root {}", root.display()))?;
+    // If the candidate already exists, canonicalize it directly so a symlinked
+    // leaf that resolves outside the root is rejected (canonicalizing only the
+    // parent would miss a worktree symlink that escapes the sandbox).
+    if candidate.exists() {
+        let canonical = candidate
+            .canonicalize()
+            .with_context(|| format!("failed to canonicalize {}", candidate.display()))?;
+        if !canonical.starts_with(&root) {
+            return Err(anyhow!("path is outside sandbox root"));
+        }
+        return Ok(());
+    }
     let parent = candidate.parent().unwrap_or(candidate);
     let existing_parent = first_existing_ancestor(parent)
         .ok_or_else(|| anyhow!("no existing parent for {}", candidate.display()))?;
@@ -3374,6 +3499,23 @@ pub fn create_patch_sandbox_layout(
     let worktree = run_dir.join(&plan.layout.worktree_path);
     let evidence = run_dir.join(&plan.layout.evidence_path);
     ensure_path_inside(run_dir, &root)?;
+    // Reject a pre-existing symlinked worktree/evidence leaf before create_dir_all
+    // would follow it: otherwise patch application could write through the symlink
+    // into the primary filesystem instead of the isolated run sandbox.
+    for leaf in [&worktree, &evidence] {
+        if leaf
+            .symlink_metadata()
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            return Err(anyhow!(
+                "patch sandbox path must not be a symlink: {}",
+                leaf.display()
+            ));
+        }
+    }
+    ensure_path_inside(run_dir, &worktree)?;
+    ensure_path_inside(run_dir, &evidence)?;
     fs::create_dir_all(&worktree).context("failed to create patch sandbox worktree")?;
     fs::create_dir_all(&evidence).context("failed to create patch sandbox evidence")?;
     let plan_path = run_dir.join(&plan.layout.plan_path);
@@ -3942,6 +4084,13 @@ pub fn create_mutation_proposal(
                 .map(str::to_string)
         })
         .unwrap_or_else(|| "unknown".to_string());
+    // Serialize the read-modify-write of the proposals index so concurrent
+    // proposal creation for the same run cannot lose a proposal, mirroring how
+    // add_evidence_artifact guards the evidence index.
+    let _guard = MUTATION_INDEX_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| anyhow!("mutation index lock poisoned"))?;
     let mut index = read_mutation_proposals(run_dir)?;
     let created_at_unix_ms = unix_millis()?;
     let proposal = MutationProposal {
@@ -4275,19 +4424,35 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 }));
             }
         }
+        let scenario_passed =
+            result.get("status").and_then(|value| value.as_str()) == Some("passed");
         for evidence_path in ["world_state", "frame_stats"] {
-            if let Some(path) = result
+            match result
                 .get("evidence")
                 .and_then(|evidence| evidence.get(evidence_path))
                 .and_then(|value| value.as_str())
             {
-                if !run_dir.join(path).is_file() {
+                Some(path) => {
+                    if !run_dir.join(path).is_file() {
+                        failures.push(json!({
+                            "kind": "missing_scenario_evidence",
+                            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                            "path": path
+                        }));
+                    }
+                }
+                // A passed scenario must carry its required evidence refs; an
+                // absent or non-string ref is itself a consistency failure rather
+                // than something to silently ignore.
+                None if scenario_passed => {
                     failures.push(json!({
                         "kind": "missing_scenario_evidence",
                         "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                        "path": path
+                        "evidence_field": evidence_path,
+                        "reason": "absent_or_non_string"
                     }));
                 }
+                None => {}
             }
         }
         if let Some(paths) = result
@@ -4633,7 +4798,6 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
     let mut assertion_failures = 0usize;
     let mut scenario_results = 0usize;
     let mut performance_artifacts = 0usize;
-    let mut mutation_proposals = 0usize;
     let mut scenario_statuses = BTreeMap::new();
     let mut world_state = BTreeMap::new();
     let mut events = BTreeSet::new();
@@ -4652,13 +4816,17 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
         {
             Some("scenario_result") => {
                 scenario_results += 1;
-                let Ok(result) = read_json_value(run_dir.join(&artifact.path)) else {
-                    warnings.push(format!(
+                // Scenario results are required comparison inputs: classification
+                // and deltas are derived from these counters, so an indexed but
+                // unreadable/corrupt scenario_result must fail the comparison
+                // rather than silently contributing zero failures (which could be
+                // reported as no_change/improved on incomplete data).
+                let result = read_json_value(run_dir.join(&artifact.path)).with_context(|| {
+                    format!(
                         "{label} scenario_result artifact could not be read: {}",
                         artifact.path
-                    ));
-                    continue;
-                };
+                    )
+                })?;
                 let scenario_id = result
                     .get("scenario_id")
                     .and_then(|value| value.as_str())
@@ -4688,7 +4856,15 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
                     .unwrap_or(0);
             }
             Some("world_state") => match read_json_value(run_dir.join(&artifact.path)) {
-                Ok(value) => collect_semantic_scalars("world", &value, &mut world_state, 64),
+                // Namespace per artifact (like performance/frame_stats) so multiple
+                // world_state artifacts from different scenarios don't overwrite
+                // each other under a shared "world/..." key and drop a change.
+                Ok(value) => collect_semantic_scalars(
+                    &format!("world/{}", artifact.id),
+                    &value,
+                    &mut world_state,
+                    64,
+                ),
                 Err(_) => warnings.push(format!(
                     "{label} world_state artifact could not be read: {}",
                     artifact.path
@@ -4728,10 +4904,15 @@ fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunCompari
                     artifact.path
                 )),
             },
-            Some("mutation_proposal") => mutation_proposals += 1,
             _ => {}
         }
     }
+    // Proposals live in mutation/proposals.json (not the evidence index), so
+    // count them there; the evidence index never carries mutation_proposal
+    // artifacts, which previously made this count always zero.
+    let mutation_proposals = list_mutation_proposals(run_dir)
+        .map(|proposals| proposals.len())
+        .unwrap_or(0);
     let snapshot = RunComparisonSnapshot {
         run_id: run
             .get("id")
@@ -5133,7 +5314,7 @@ fn apply_explicit_evaluator_checks(
             let value = read_json_value(run_dir.join(&artifact.path))?;
             for (metric, threshold) in &performance.max_metrics {
                 if let Some(actual) = performance_metric_value(&value, metric) {
-                    if actual > *threshold as f64 {
+                    if actual > *threshold {
                         failures.push(json!({
                             "kind": "performance_threshold_exceeded",
                             "metric": metric,
@@ -5597,12 +5778,17 @@ fn run_scenario<T: CdpTransport>(
         .get("collisions")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    // The runtime exposes audio under `audioEvents` and animation per-entity
+    // under `entities[*].components.animation` (examples/game-runtime/runtime.js),
+    // so point the audio/animation assertion sources at the data that actually
+    // exists instead of nonexistent top-level `audio`/`animation` keys (which
+    // would make every audio_evidence/animation_evidence assertion read Null).
     let audio_source = world_state
-        .get("audio")
+        .get("audioEvents")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
     let animation_source = world_state
-        .get("animation")
+        .get("entities")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
     let assertion_sources = ScenarioAssertionSources {
@@ -6530,6 +6716,10 @@ fn default_audio_action() -> String {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SceneEdit {
+    // Serialize as camelCase `entityId` to match the rest of the public
+    // transaction schema (scenePath, beforeSceneHash, ...) and existing JSON
+    // entity references; keep accepting legacy `entity_id` on input.
+    #[serde(rename = "entityId", alias = "entity_id")]
     pub entity_id: String,
     pub path: String,
     pub value: serde_json::Value,
@@ -7106,7 +7296,23 @@ pub fn read_scene(scene_path: impl AsRef<Path>) -> Result<SceneDocument> {
 }
 
 pub fn validate_scene_reload(scene_path: impl AsRef<Path>) -> Result<SceneReloadValidationReport> {
+    let scene_path = scene_path.as_ref();
     let scene = read_scene(scene_path)?;
+    // read_scene only runs structural manifest validation; the reload boundary
+    // must also confirm the embedded manifest's files exist relative to the
+    // scene directory, otherwise it can report a scene the runtime cannot load.
+    if let Some(manifest) = &scene.asset_manifest {
+        let base_dir = match scene_path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent,
+            _ => Path::new("."),
+        };
+        manifest.validate_files(base_dir).with_context(|| {
+            format!(
+                "scene asset manifest {} references invalid files",
+                manifest.id
+            )
+        })?;
+    }
     Ok(SceneReloadValidationReport {
         schema_version: "ouroforge.scene-reload.v0".to_string(),
         scene_id: scene.id.clone(),
@@ -7191,7 +7397,12 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         }
         validate_scene_color(&entity.sprite.color)?;
         if let Some(asset) = &entity.sprite.asset {
-            validate_scene_asset_ref("scene sprite asset", asset, scene.asset_manifest.as_ref())?;
+            validate_scene_asset_ref(
+                "scene sprite asset",
+                asset,
+                scene.asset_manifest.as_ref(),
+                &[AssetManifestKind::Image, AssetManifestKind::Sprite],
+            )?;
         }
         if let Some(layer) = &entity.sprite.layer {
             validate_path_component(&format!("scene entity {} sprite layer", entity.id), layer)?;
@@ -7327,7 +7538,12 @@ fn validate_scene_tilemaps(
                 )
             })?;
             if let Some(asset) = &tile.asset {
-                validate_scene_asset_ref("scene tilemap tile asset", asset, manifest)?;
+                validate_scene_asset_ref(
+                    "scene tilemap tile asset",
+                    asset,
+                    manifest,
+                    &[AssetManifestKind::Image, AssetManifestKind::Sprite],
+                )?;
             }
         }
         if tile_ids.is_empty() {
@@ -7467,10 +7683,30 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
         })
         .unwrap_or_default();
 
+    // Entities on a layer marked `visible: false` are not rendered. The browser
+    // renderer already honors this (examples/game-runtime/renderer.js), so the
+    // canonical render order must too, otherwise hidden-layer entities leak into
+    // the evidence as renderable.
+    let hidden_layers = scene
+        .renderer
+        .as_ref()
+        .map(|renderer| {
+            renderer
+                .layers
+                .iter()
+                .filter(|layer| !layer.visible)
+                .map(|layer| layer.id.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+        })
+        .unwrap_or_default();
+
     let mut entries = scene
         .entities
         .iter()
-        .filter(|entity| entity.sprite.visible)
+        .filter(|entity| {
+            entity.sprite.visible
+                && !hidden_layers.contains(entity.sprite.layer.as_deref().unwrap_or("default"))
+        })
         .map(|entity| {
             let layer = entity
                 .sprite
@@ -7500,15 +7736,20 @@ fn validate_scene_asset_ref(
     field: &str,
     value: &str,
     manifest: Option<&AssetManifest>,
+    expected: &[AssetManifestKind],
 ) -> Result<()> {
     if let Some(manifest) = manifest {
         validate_path_component(field, value)?;
-        if manifest.assets.iter().any(|asset| asset.id == value) {
-            Ok(())
-        } else {
-            Err(anyhow!(
+        match manifest.assets.iter().find(|asset| asset.id == value) {
+            Some(asset) if expected.contains(&asset.kind) => Ok(()),
+            Some(asset) => Err(anyhow!(
+                "{field} references manifest asset {value} of kind {:?}, expected one of {:?}",
+                asset.kind,
+                expected
+            )),
+            None => Err(anyhow!(
                 "{field} references unknown asset manifest id: {value}"
-            ))
+            )),
         }
     } else {
         validate_scene_local_asset_path(field, value)
@@ -7609,7 +7850,9 @@ fn validate_scene_animation(
             &format!("scene entity {entity_id} animation currentClip"),
             current_clip,
         )?;
-        if !animation.clips.is_empty() && !clip_ids.contains(current_clip) {
+        // `currentClip` is a clip reference, so it is invalid when the animation
+        // declares no clips at all (only the legacy `frames` list).
+        if !clip_ids.contains(current_clip) {
             return Err(anyhow!(
                 "scene entity {entity_id} animation currentClip references unknown clip: {current_clip}"
             ));
@@ -7621,15 +7864,19 @@ fn validate_scene_animation(
                 &format!("scene entity {entity_id} animation state currentClip"),
                 current_clip,
             )?;
-            if !animation.clips.is_empty() && !clip_ids.contains(current_clip) {
+            if !clip_ids.contains(current_clip) {
                 return Err(anyhow!(
                     "scene entity {entity_id} animation state currentClip references unknown clip: {current_clip}"
                 ));
             }
         }
-        let frame_count = animation
+        // Bound frameIndex against the clip the state actually selects (falling
+        // back to the top-level currentClip, then the first clip), so a state
+        // pointing at a short clip can't pass by borrowing a longer clip's length.
+        let frame_count = state
             .current_clip
             .as_ref()
+            .or(animation.current_clip.as_ref())
             .and_then(|clip_id| animation.clips.iter().find(|clip| clip.id == *clip_id))
             .or_else(|| animation.clips.first())
             .map(|clip| clip.frames.len())
@@ -7653,7 +7900,12 @@ fn validate_scene_animation_frame(
         format!("scene entity {entity_id} animation clip {clip_id} frame color is invalid")
     })?;
     if let Some(asset) = &frame.asset {
-        validate_scene_asset_ref("scene animation frame asset", asset, manifest)?;
+        validate_scene_asset_ref(
+            "scene animation frame asset",
+            asset,
+            manifest,
+            &[AssetManifestKind::Image, AssetManifestKind::Sprite],
+        )?;
     }
     Ok(())
 }
@@ -7698,7 +7950,12 @@ fn validate_scene_audio(
             ));
         }
         if let Some(asset) = &event.asset {
-            validate_scene_asset_ref("scene audio asset", asset, manifest)?;
+            validate_scene_asset_ref(
+                "scene audio asset",
+                asset,
+                manifest,
+                &[AssetManifestKind::Audio],
+            )?;
         }
     }
     Ok(())
@@ -8444,11 +8701,17 @@ fn dashboard_replay_checkpoints(
                 .get("frame_stats")
                 .and_then(|value| value.as_str())
                 .map(str::to_string);
+            // These refs come from scenario-result JSON, which may be external or
+            // malformed; unlike evidence-index paths they are otherwise unchecked.
+            // Constrain them to the run's evidence tree before reading so a value
+            // like "../../secret.json" cannot disclose arbitrary files.
             let world_state = world_state_path
                 .as_ref()
+                .filter(|path| validate_evidence_artifact_path(path.as_str()).is_ok())
                 .and_then(|path| read_json_value(run_dir.join(path)).ok());
             let frame_stats = frame_stats_path
                 .as_ref()
+                .filter(|path| validate_evidence_artifact_path(path.as_str()).is_ok())
                 .and_then(|path| read_json_value(run_dir.join(path)).ok());
             let tick = world_state
                 .as_ref()
@@ -8846,9 +9109,29 @@ fn dashboard_scenario_status(verdict: &serde_json::Value) -> String {
         .and_then(|value| value.as_u64())
         .unwrap_or(0);
     if scenario_results == 0 {
-        "pending".to_string()
+        return "pending".to_string();
+    }
+    // Derive the scenario status from genuine scenario outcomes, not the overall
+    // verdict status. A verdict can fail purely for evidence-consistency reasons
+    // (e.g. missing_scenario_evidence) while the scenarios themselves passed, and
+    // the dashboard needs to distinguish "scenario passed, evidence incomplete"
+    // from an actually failed scenario.
+    let scenario_failed = verdict
+        .get("failures")
+        .and_then(|value| value.as_array())
+        .map(|failures| {
+            failures.iter().any(|failure| {
+                matches!(
+                    failure.get("kind").and_then(|value| value.as_str()),
+                    Some("scenario_failed" | "assertion_failed" | "visual_checkpoint_failed")
+                )
+            })
+        })
+        .unwrap_or(false);
+    if scenario_failed {
+        "failed".to_string()
     } else {
-        json_string(verdict, "status").unwrap_or_else(|| "unknown".to_string())
+        "passed".to_string()
     }
 }
 
@@ -8869,9 +9152,12 @@ fn read_dashboard_journal(
             evidence,
             mutations,
         ),
+        // The journal file is present but unreadable (e.g. invalid UTF-8 or a
+        // permission error). Report it as existing with a read_error so it is
+        // distinguishable from a genuinely missing journal.
         Err(error) => parse_dashboard_journal(
             &path,
-            false,
+            true,
             Some(format!("failed to read journal artifact: {error}")),
             "",
             evidence,
@@ -9295,7 +9581,10 @@ fn dashboard_comparison_artifact_paths(run_dir: &Path) -> Vec<String> {
 
 fn dashboard_review_state(records: &[serde_json::Value]) -> String {
     let mut has_pending = false;
-    for record in records {
+    // Review decisions are append-only, so the CURRENT review outcome is the
+    // latest terminal decision — scan newest-first so an accept followed by a
+    // later reject reports "rejected", not the stale first decision.
+    for record in records.iter().rev() {
         match record.get("state").and_then(|value| value.as_str()) {
             Some("accepted") => return "accepted".to_string(),
             Some("rejected") => return "rejected".to_string(),
@@ -11896,7 +12185,7 @@ scenarios:
             .world_state
             .changed
             .iter()
-            .any(|diff| diff.path == "world/player/x"));
+            .any(|diff| diff.path == "world/fixture-world-state/player/x"));
         assert!(comparison
             .semantic
             .events

@@ -192,9 +192,19 @@
       record('probe.loaded', { api: Object.keys(window.__OUROFORGE__) });
       step(1);
 
-      function loop() {
-        if (!paused) {
-          step(1);
+      let lastTime = null;
+      let accumulator = 0;
+      function loop(now) {
+        if (paused) {
+          lastTime = now;
+        } else {
+          if (lastTime === null) lastTime = now;
+          accumulator += now - lastTime;
+          lastTime = now;
+          while (accumulator >= fixedDeltaMs) {
+            step(1);
+            accumulator -= fixedDeltaMs;
+          }
         }
         window.requestAnimationFrame(loop);
       }

@@ -261,9 +261,18 @@ fn main() -> Result<()> {
             }
             let artifacts = create_run(seed_path, "runs")?;
             if let Some(transaction_path) = transaction {
-                let provenance =
-                    bind_run_transaction_provenance(&artifacts.run_dir, transaction_path)?;
-                println!("Run transaction bound: {}", provenance.transaction_id);
+                // A stale/malformed transaction (or scene-hash mismatch) must not
+                // leave an orphaned run behind for `ledger list`/dashboard exports
+                // to pick up, so remove the freshly created run on bind failure.
+                match bind_run_transaction_provenance(&artifacts.run_dir, transaction_path) {
+                    Ok(provenance) => {
+                        println!("Run transaction bound: {}", provenance.transaction_id);
+                    }
+                    Err(error) => {
+                        let _ = std::fs::remove_dir_all(&artifacts.run_dir);
+                        return Err(error);
+                    }
+                }
             }
             println!("Run created: {}", artifacts.run_dir.display());
             if workers > 1 {
@@ -506,9 +515,22 @@ fn main() -> Result<()> {
         Commands::Scene {
             command: SceneCommand::Validate { scene_path },
         } => {
-            let scene = read_scene(scene_path)?;
+            let scene = read_scene(&scene_path)?;
             println!("Scene valid: {}", scene.id);
             if let Some(manifest) = scene.asset_manifest {
+                // read_scene only runs structural manifest validation; verify the
+                // referenced files actually exist relative to the scene directory
+                // before reporting success, matching the runtime's load contract.
+                let base_dir = match scene_path.parent() {
+                    Some(parent) if !parent.as_os_str().is_empty() => parent,
+                    _ => Path::new("."),
+                };
+                manifest.validate_files(base_dir).with_context(|| {
+                    format!(
+                        "scene asset manifest {} references invalid files",
+                        manifest.id
+                    )
+                })?;
                 println!(
                     "Asset manifest valid: {} ({} asset(s))",
                     manifest.id,
@@ -549,6 +571,16 @@ fn main() -> Result<()> {
                 value,
             };
             if let Some(output_path) = transaction_output {
+                let same_path = match (output_path.canonicalize(), scene_path.canonicalize()) {
+                    (Ok(a), Ok(b)) => a == b,
+                    _ => output_path == scene_path,
+                };
+                if same_path {
+                    return Err(anyhow!(
+                        "--transaction-output must not equal the scene path {}",
+                        scene_path.display()
+                    ));
+                }
                 let transaction = preview_scene_edit_transaction(&scene_path, edit.clone())?;
                 write_scene_edit_transaction_artifact(&output_path, &transaction)?;
                 if transaction.validation_result.status != "passed" {

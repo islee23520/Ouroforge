@@ -1,4 +1,8 @@
 (function attachCollision(root) {
+  function compareCodeUnits(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
   function uniqueStrings(values) {
     return Array.isArray(values) ? values.map(String).filter(Boolean) : [];
   }
@@ -52,7 +56,7 @@
     return entities
       .map((entity) => ({ entity, rect: rectForEntity(entity) }))
       .filter((entry) => entry.rect)
-      .sort((a, b) => a.rect.entityId.localeCompare(b.rect.entityId));
+      .sort((a, b) => compareCodeUnits(a.rect.entityId, b.rect.entityId));
   }
 
   function eventFor({ tick, type, moving, other, normal }) {
@@ -110,7 +114,7 @@
       }
     }
 
-    return events.sort((a, b) => a.pairId.localeCompare(b.pairId) || a.type.localeCompare(b.type));
+    return events.sort((a, b) => compareCodeUnits(a.pairId, b.pairId) || compareCodeUnits(a.type, b.type));
   }
 
   function clamp(value, min, max) {
@@ -198,7 +202,7 @@
         return true;
       });
 
-    return { events: events.concat(triggers).sort((a, b) => a.pairId.localeCompare(b.pairId) || a.type.localeCompare(b.type)) };
+    return { events: events.concat(triggers).sort((a, b) => compareCodeUnits(a.pairId, b.pairId) || compareCodeUnits(a.type, b.type)) };
   }
 
   const api = Object.freeze({ rectForEntity, overlaps, detectAabbCollisions, stepAabbPhysics });

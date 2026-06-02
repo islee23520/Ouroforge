@@ -20,7 +20,7 @@ Engine Expansion v1 playable-template inspection:
 ```bash
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
 LATEST_RUN=$(ls -td runs/run-* | head -1)
-cargo run -p ouroforge-cli -- compare "$LATEST_RUN" "$LATEST_RUN"
+cargo run -p ouroforge-cli -- compare "$LATEST_RUN" "$LATEST_RUN" --output-dir "$LATEST_RUN/comparisons"
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 ```
 
@@ -38,7 +38,7 @@ BEFORE_RUN=$(ls -td runs/run-* | sed -n '2p')
 AFTER_RUN=$(ls -td runs/run-* | head -1)
 test -n "$BEFORE_RUN"
 test -n "$AFTER_RUN"
-cargo run -p ouroforge-cli -- compare "$BEFORE_RUN" "$AFTER_RUN"
+cargo run -p ouroforge-cli -- compare "$BEFORE_RUN" "$AFTER_RUN" --output-dir "$AFTER_RUN/comparisons"
 cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
 ```
 

@@ -78,9 +78,14 @@ const OuroforgeDashboard = (() => {
   }
 
   function renderScreenshot(artifact, run) {
+    const image = artifact.exists === false
+      ? '<div class="artifact-warning">Missing generated file</div>'
+      : artifact.read_error
+        ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>`
+        : `<img class="screenshot" src="${escapeText(artifactHref(artifact, run))}" alt="${escapeText(artifact.id)}" />`;
     return `<article class="artifact">
       <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
-      <img class="screenshot" src="${escapeText(artifactHref(artifact, run))}" alt="${escapeText(artifact.id)}" />
+      ${image}
     </article>`;
   }
 
@@ -117,10 +122,20 @@ const OuroforgeDashboard = (() => {
     return `<div class="category-grid">${cards}</div>`;
   }
 
+  function artifactRefHref(ref, run) {
+    const text = String(ref ?? '');
+    if (!text) return null;
+    const evidence = Array.isArray(run?.evidence) ? run.evidence : [];
+    const match = evidence.find((artifact) => artifact && (artifact.id === text || artifact.path === text));
+    if (match) return artifactHref(match, run);
+    if (text.includes('/') || /\.[a-z0-9]+$/i.test(text)) return runRelativeHref(text, run);
+    return null;
+  }
+
   function renderRefLinks(title, refs, run, kind = 'artifact') {
     if (!Array.isArray(refs) || !refs.length) return '';
     const links = refs.map((ref) => {
-      const href = kind === 'mutation' ? null : runRelativeHref(ref, run);
+      const href = kind === 'mutation' ? null : artifactRefHref(ref, run);
       return href
         ? `<a class="ref-chip" href="${escapeText(href)}" target="_blank" rel="noreferrer">${escapeText(ref)}</a>`
         : `<span class="ref-chip">${escapeText(ref)}</span>`;
@@ -172,7 +187,9 @@ const OuroforgeDashboard = (() => {
         <dt>Before hash</dt><dd>${escapeText(provenance.beforeSceneHash && provenance.beforeSceneHash.value)}</dd>
         <dt>After hash</dt><dd>${escapeText(provenance.afterSceneHash && provenance.afterSceneHash.value)}</dd>
       </dl>
-      <div class="refs">${refs.map((ref) => `<a href="${escapeText(comparisonRefHref(ref, run))}">${escapeText(ref)}</a>`).join('')}</div>
+      <div class="refs">${refs.map((ref) => String(ref).startsWith('runs/')
+        ? `<a href="${escapeText(comparisonRefHref(ref, run))}">${escapeText(ref)}</a>`
+        : `<span>${escapeText(ref)}</span>`).join('')}</div>
     </section>`;
   }
 
@@ -344,7 +361,7 @@ const OuroforgeDashboard = (() => {
     const safeFrameIndex = Math.max(0, Math.min(state.frameIndex ?? 0, Math.max(frames.length - 1, 0)));
     const frame = frames.length ? frames[safeFrameIndex] : null;
     const checkpoints = Array.isArray(sequence.checkpoints) ? sequence.checkpoints : [];
-    const checkpoint = checkpoints.find((item) => Number(item.frame ?? item.tick) === frame) || checkpoints[0] || null;
+    const checkpoint = checkpoints.find((item) => Number(item.frame ?? item.tick) === frame) || null;
     return {
       sequence,
       frames,

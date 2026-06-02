@@ -3,6 +3,15 @@ name = "ouroforge-cli"
 version = "0.1.0"
 edition = "2021"
 
+# Expose the binary as `ouroforge` to match the command documented across docs/
+# (e.g. `ouroforge scene edit`, `ouroforge run ...`). Without an explicit target
+# the produced/installed binary would be `ouroforge-cli`, so the advertised
+# command would not exist. The package name stays `ouroforge-cli`, so
+# `cargo run -p ouroforge-cli -- ...` continues to work.
+[[bin]]
+name = "ouroforge"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
