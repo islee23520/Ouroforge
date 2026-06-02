@@ -8023,24 +8023,43 @@ pub fn validate_scene_only_mutation_operation(
     })
 }
 
-fn reject_scene_mutation_transaction_output_collision(
+pub fn reject_transaction_output_target_collision(
     transaction_output: &Path,
     target_scene_path: &Path,
 ) -> Result<()> {
-    let same_path = match (
+    let direct_path_match = transaction_output == target_scene_path;
+    let canonical_path_match = match (
         transaction_output.canonicalize(),
         target_scene_path.canonicalize(),
     ) {
         (Ok(output), Ok(target)) => output == target,
-        _ => transaction_output == target_scene_path,
+        _ => false,
     };
-    if same_path || same_existing_file(transaction_output, target_scene_path) {
+    if direct_path_match
+        || canonical_path_match
+        || same_existing_file(transaction_output, target_scene_path)
+    {
         return Err(anyhow!(
-            "scene-only mutation transaction output must not equal target scene path {}",
+            "transaction output must not equal target scene path {}",
             target_scene_path.display()
         ));
     }
     Ok(())
+}
+
+fn reject_scene_mutation_transaction_output_collision(
+    transaction_output: &Path,
+    target_scene_path: &Path,
+) -> Result<()> {
+    reject_transaction_output_target_collision(transaction_output, target_scene_path).map_err(
+        |error| {
+            let message = error.to_string();
+            let suffix = message
+                .strip_prefix("transaction output ")
+                .unwrap_or(&message);
+            anyhow!("scene-only mutation transaction output {suffix}")
+        },
+    )
 }
 
 #[cfg(unix)]
@@ -14969,6 +14988,82 @@ scenarios:
         assert_eq!(
             applied.records[0]["rollback"]["restoreHash"]["value"],
             project_context.scene_hash.value
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn transaction_output_collision_helper_rejects_direct_and_canonical_scene_aliases() {
+        let root = unique_temp_dir("transaction-output-collision-helper-canonical");
+        fs::create_dir_all(root.join("nested")).expect("temp dirs exist");
+        let scene_path = root.join("scene.json");
+        fs::write(&scene_path, "{}").expect("scene placeholder written");
+
+        let direct_error = reject_transaction_output_target_collision(&scene_path, &scene_path)
+            .expect_err("direct target path is rejected");
+        assert!(
+            direct_error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{direct_error:#}"
+        );
+
+        let canonical_alias = root.join("nested/../scene.json");
+        assert_ne!(canonical_alias, scene_path);
+        let canonical_error =
+            reject_transaction_output_target_collision(&canonical_alias, &scene_path)
+                .expect_err("canonical alias is rejected");
+        assert!(
+            canonical_error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{canonical_error:#}"
+        );
+
+        reject_transaction_output_target_collision(&root.join("transaction.json"), &scene_path)
+            .expect("distinct transaction output remains allowed");
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn transaction_output_collision_helper_rejects_hard_link_scene_alias() {
+        let root = unique_temp_dir("transaction-output-collision-helper-hardlink");
+        fs::create_dir_all(&root).expect("temp dir exists");
+        let scene_path = root.join("scene.json");
+        let hard_link_path = root.join("transaction-hardlink.json");
+        fs::write(&scene_path, "{}").expect("scene placeholder written");
+        fs::hard_link(&scene_path, &hard_link_path).expect("hard link to scene can be created");
+
+        let error = reject_transaction_output_target_collision(&hard_link_path, &scene_path)
+            .expect_err("hard link alias is rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{error:#}"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn transaction_output_collision_helper_rejects_symlink_scene_alias() {
+        use std::os::unix::fs::symlink;
+
+        let root = unique_temp_dir("transaction-output-collision-helper-symlink");
+        fs::create_dir_all(&root).expect("temp dir exists");
+        let scene_path = root.join("scene.json");
+        let symlink_path = root.join("transaction-symlink.json");
+        fs::write(&scene_path, "{}").expect("scene placeholder written");
+        symlink(&scene_path, &symlink_path).expect("symlink to scene can be created");
+
+        let error = reject_transaction_output_target_collision(&symlink_path, &scene_path)
+            .expect_err("symlink alias is rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("transaction output must not equal target scene path"),
+            "{error:#}"
         );
         fs::remove_dir_all(root).ok();
     }
