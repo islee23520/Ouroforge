@@ -2,19 +2,19 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
-    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_project_metadata,
-    bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
-    create_run, edit_scene, evaluate_run, evolve_run, hash_project_manifest_file,
-    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
-    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_command_context,
+    bind_run_project_metadata, bind_run_transaction_provenance, create_minimal_2d_project_scaffold,
+    create_mutation_proposal, create_run, edit_scene, evaluate_run, evolve_run,
+    hash_project_manifest_file, hash_scene_document, list_dashboard_runs, list_evidence_artifacts,
+    list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
     read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
-    validate_scene_reload, write_run_comparison_artifact, write_scene_edit_transaction_artifact,
-    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState,
-    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, WorkerId,
+    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    update_journal, validate_scene_reload, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewState, ProjectManifest, ProjectSceneMutationContext,
+    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -339,6 +339,7 @@ fn main() -> Result<()> {
                 }
                 None
             };
+            let transaction_path_for_context = transaction.clone();
             let artifacts = create_run(&seed_path, "runs")?;
             let mut transaction_id = None;
             if let Some(transaction_path) = transaction {
@@ -356,12 +357,22 @@ fn main() -> Result<()> {
                     }
                 }
             }
+            let mut bound_project_metadata = None;
             if let Some(mut metadata) = project_metadata {
-                metadata.transaction_id = transaction_id;
+                metadata.transaction_id = transaction_id.clone();
                 let project_id = metadata.id.clone();
-                bind_run_project_metadata(&artifacts.run_dir, metadata)?;
+                let metadata = bind_run_project_metadata(&artifacts.run_dir, metadata)?;
+                bound_project_metadata = Some(metadata);
                 println!("Run project bound: {project_id}");
             }
+            let command_context = run_command_context_for_run(
+                &seed_path,
+                Path::new("runs"),
+                workers,
+                bound_project_metadata.as_ref(),
+                transaction_path_for_context.as_deref(),
+            );
+            bind_run_command_context(&artifacts.run_dir, command_context)?;
             println!("Run created: {}", artifacts.run_dir.display());
             if workers > 1 {
                 let summary = run_private_mvp(&artifacts.run_dir, workers)?;

@@ -525,8 +525,23 @@ fn run_command_binds_validated_project_metadata_and_preflights_invalid_projects(
     assert_eq!(project["scenarioPack"]["scenarioIds"][0], "scaffold-smoke");
     assert_eq!(project["scenes"][0]["path"], "scenes/main.scene.json");
     assert!(project["manifestHash"]["value"].as_str().unwrap().len() == 16);
+    let command_context = run_json
+        .get("run_command_context")
+        .expect("run command context recorded");
+    assert_eq!(command_context["schemaVersion"], "run-command-context-v1");
+    assert_eq!(command_context["workers"], 1);
+    assert_eq!(
+        command_context["projectRoot"],
+        project_dir.to_string_lossy().to_string()
+    );
+    assert_eq!(command_context["scenarioPackId"], "smoke");
+    assert!(command_context["command"]
+        .as_str()
+        .unwrap()
+        .contains("--scenario-pack smoke"));
     let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
     assert!(ledger.contains("run.project_bound"));
+    assert!(ledger.contains("run.command_context_recorded"));
 
     let invalid_root = temp.join("invalid-preflight");
     fs::create_dir_all(invalid_root.join("assets")).expect("invalid assets");
@@ -634,9 +649,21 @@ fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
         provenance["scenePath"],
         scene_path.to_string_lossy().to_string()
     );
+    let command_context = run_json
+        .get("run_command_context")
+        .expect("run command context recorded");
+    assert_eq!(
+        command_context["transactionPath"],
+        transaction_path.to_string_lossy().to_string()
+    );
+    assert!(command_context["command"]
+        .as_str()
+        .unwrap()
+        .contains("--transaction"));
 
     let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
     assert!(ledger.contains("run.transaction_bound"));
+    assert!(ledger.contains("run.command_context_recorded"));
 
     run_cli(&temp, &["journal", "update", run_dir.to_str().unwrap()]);
     let journal = run_cli(&temp, &["journal", "show", run_dir.to_str().unwrap()]);

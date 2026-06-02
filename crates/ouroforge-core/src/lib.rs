@@ -11889,6 +11889,36 @@ pub struct ProjectRunMetadata {
     pub transaction_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunCommandContext {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "seedPath")]
+    pub seed_path: String,
+    pub workers: usize,
+    #[serde(rename = "runsRoot")]
+    pub runs_root: String,
+    #[serde(rename = "projectRoot", skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
+    #[serde(rename = "manifestPath", skip_serializing_if = "Option::is_none")]
+    pub manifest_path: Option<String>,
+    #[serde(rename = "scenarioPackId", skip_serializing_if = "Option::is_none")]
+    pub scenario_pack_id: Option<String>,
+    #[serde(rename = "transactionPath", skip_serializing_if = "Option::is_none")]
+    pub transaction_path: Option<String>,
+    #[serde(rename = "runtimeTarget")]
+    pub runtime_target: String,
+    #[serde(rename = "browserBoundary")]
+    pub browser_boundary: String,
+    #[serde(rename = "cdpTransport")]
+    pub cdp_transport: String,
+    #[serde(rename = "environmentHints")]
+    pub environment_hints: Vec<String>,
+}
+
 pub fn hash_project_manifest_file(path: impl AsRef<Path>) -> Result<ProjectArtifactHash> {
     let path = path.as_ref();
     let bytes = fs::read(path)
@@ -11967,6 +11997,119 @@ pub fn project_run_metadata_from_manifest(
     })
 }
 
+pub fn run_command_context_for_run(
+    seed_path: impl AsRef<Path>,
+    runs_root: impl AsRef<Path>,
+    workers: usize,
+    project: Option<&ProjectRunMetadata>,
+    transaction_path: Option<&Path>,
+) -> RunCommandContext {
+    let seed_path = seed_path.as_ref().to_string_lossy().to_string();
+    let runs_root = runs_root.as_ref().to_string_lossy().to_string();
+    let project_root = project.map(|metadata| metadata.project_root.clone());
+    let manifest_path = project.map(|metadata| metadata.manifest_path.clone());
+    let scenario_pack_id = project
+        .and_then(|metadata| metadata.scenario_pack.as_ref())
+        .map(|pack| pack.id.clone());
+    let transaction_path = transaction_path.map(|path| path.to_string_lossy().to_string());
+
+    let mut argv = vec![
+        "cargo".to_string(),
+        "run".to_string(),
+        "-p".to_string(),
+        "ouroforge-cli".to_string(),
+        "--".to_string(),
+        "run".to_string(),
+        seed_path.clone(),
+    ];
+    if let Some(project_root) = &project_root {
+        argv.push("--project".to_string());
+        argv.push(project_root.clone());
+    }
+    argv.push("--workers".to_string());
+    argv.push(workers.to_string());
+    if let Some(scenario_pack_id) = &scenario_pack_id {
+        argv.push("--scenario-pack".to_string());
+        argv.push(scenario_pack_id.clone());
+    }
+    if let Some(transaction_path) = &transaction_path {
+        argv.push("--transaction".to_string());
+        argv.push(transaction_path.clone());
+    }
+    let command = argv
+        .iter()
+        .map(|arg| shell_quote_command_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    RunCommandContext {
+        schema_version: "run-command-context-v1".to_string(),
+        command,
+        argv,
+        seed_path,
+        workers,
+        runs_root,
+        project_root,
+        manifest_path,
+        scenario_pack_id,
+        transaction_path,
+        runtime_target: "local-static-browser".to_string(),
+        browser_boundary: "openchrome_cdp".to_string(),
+        cdp_transport: "chrome_devtools_protocol".to_string(),
+        environment_hints: vec![
+            "Local Chrome/CDP is required for browser smoke and scenario execution.".to_string(),
+            "Generated run artifacts stay under the recorded runs root and remain untracked."
+                .to_string(),
+            "Dashboard and cockpit surfaces may display this context but must not execute it."
+                .to_string(),
+        ],
+    }
+}
+
+fn shell_quote_command_arg(arg: &str) -> String {
+    if !arg.is_empty()
+        && arg
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | '='))
+    {
+        return arg.to_string();
+    }
+    format!("'{}'", arg.replace('\'', "'\\''"))
+}
+
+pub fn bind_run_command_context(
+    run_dir: impl AsRef<Path>,
+    context: RunCommandContext,
+) -> Result<RunCommandContext> {
+    let run_dir = run_dir.as_ref();
+    let run_path = run_dir.join("run.json");
+    let mut run = read_json_value(&run_path)?;
+    let run_object = run
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("run.json must be a JSON object"))?;
+    run_object.insert("run_command_context".to_string(), json!(context.clone()));
+    write_json_atomic(&run_path, &run)?;
+    append_ledger_event(
+        run_dir,
+        "run.command_context_recorded",
+        "run-core",
+        json!({
+            "schema_version": context.schema_version,
+            "seed_path": context.seed_path,
+            "workers": context.workers,
+            "runs_root": context.runs_root,
+            "project_root": context.project_root,
+            "manifest_path": context.manifest_path,
+            "scenario_pack_id": context.scenario_pack_id,
+            "transaction_path": context.transaction_path,
+            "runtime_target": context.runtime_target,
+            "browser_boundary": context.browser_boundary,
+            "cdp_transport": context.cdp_transport
+        }),
+    )?;
+    Ok(context)
+}
+
 pub fn bind_run_project_metadata(
     run_dir: impl AsRef<Path>,
     metadata: ProjectRunMetadata,
@@ -12037,6 +12180,7 @@ pub fn create_run(
         .with_context(|| format!("failed to create run directory {}", run_dir.display()))?;
     fs::create_dir(run_dir.join("evidence")).context("failed to create evidence directory")?;
 
+    let command_context = run_command_context_for_run(seed_path, runs_root, 1, None, None);
     write_json(
         &run_dir.join("run.json"),
         &json!({
@@ -12045,6 +12189,7 @@ pub fn create_run(
             "seed_title": seed.title,
             "status": "created",
             "created_at_unix_ms": created_at_unix_ms,
+            "run_command_context": command_context,
         }),
     )?;
     fs::write(run_dir.join("seed.snapshot.yaml"), seed_yaml)
@@ -13008,6 +13153,102 @@ scenarios:
             .any(|event| event["event"] == "run.project_bound"));
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn run_command_context_model_records_legacy_run_defaults() {
+        let (root, artifacts) = create_test_run("run-command-context-legacy");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        let context: RunCommandContext = serde_json::from_value(
+            run.get("run_command_context")
+                .cloned()
+                .expect("command context present"),
+        )
+        .expect("command context parses");
+
+        assert_eq!(context.schema_version, "run-command-context-v1");
+        assert_eq!(context.workers, 1);
+        assert!(context.seed_path.ends_with("seed.yaml"));
+        assert!(context.runs_root.ends_with("runs"));
+        assert_eq!(context.project_root, None);
+        assert_eq!(context.manifest_path, None);
+        assert_eq!(context.scenario_pack_id, None);
+        assert_eq!(context.runtime_target, "local-static-browser");
+        assert_eq!(context.browser_boundary, "openchrome_cdp");
+        assert_eq!(context.cdp_transport, "chrome_devtools_protocol");
+        assert!(context.argv.contains(&"--workers".to_string()));
+        assert!(context
+            .command
+            .contains("cargo run -p ouroforge-cli -- run"));
+        assert!(!serde_json::to_string(&context)
+            .expect("context serializes")
+            .to_ascii_lowercase()
+            .contains("secret"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn run_command_context_model_updates_project_runs_without_secret_env() {
+        let root = unique_temp_dir("run-command-context-project");
+        let project = root.join("project");
+        create_minimal_2d_project_scaffold(&project).expect("project scaffolded");
+        let manifest_path = project.join("ouroforge.project.json");
+        let seed_path = project.join("seeds/platformer.yaml");
+        let runs_root = root.join("runs");
+        fs::create_dir_all(&runs_root).expect("runs root created");
+        let artifacts = create_run(&seed_path, &runs_root).expect("run created");
+        let metadata =
+            project_run_metadata_from_manifest(&manifest_path, &seed_path, Some("smoke"))
+                .expect("project metadata created");
+        bind_run_project_metadata(&artifacts.run_dir, metadata.clone()).expect("project bound");
+        let context = run_command_context_for_run(
+            &seed_path,
+            &runs_root,
+            3,
+            Some(&metadata),
+            Some(Path::new("runs/manual/transactions/scene-edit.json")),
+        );
+        bind_run_command_context(&artifacts.run_dir, context.clone()).expect("context bound");
+
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        let stored: RunCommandContext = serde_json::from_value(
+            run.get("run_command_context")
+                .cloned()
+                .expect("command context present"),
+        )
+        .expect("command context parses");
+        assert_eq!(stored.workers, 3);
+        assert_eq!(
+            stored.project_root.as_deref(),
+            Some(metadata.project_root.as_str())
+        );
+        assert_eq!(
+            stored.manifest_path.as_deref(),
+            Some(metadata.manifest_path.as_str())
+        );
+        assert_eq!(stored.scenario_pack_id.as_deref(), Some("smoke"));
+        assert_eq!(
+            stored.transaction_path.as_deref(),
+            Some("runs/manual/transactions/scene-edit.json")
+        );
+        assert!(stored.command.contains("--project"));
+        assert!(stored.command.contains("--scenario-pack smoke"));
+        assert!(stored
+            .command
+            .contains("--transaction runs/manual/transactions/scene-edit.json"));
+        assert!(stored.environment_hints.iter().all(|hint| {
+            let lower = hint.to_ascii_lowercase();
+            !lower.contains("token") && !lower.contains("password") && !lower.contains("secret")
+        }));
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(events.iter().any(|event| {
+            event["event"] == "run.command_context_recorded"
+                && event["payload"]["workers"] == json!(3)
+                && event["payload"]["scenario_pack_id"] == json!("smoke")
+        }));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
