@@ -45,11 +45,25 @@ pub struct Scenario {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum ScenarioStep {
-    Wait { wait: WaitStep },
-    Input { input: InputStep },
-    Replay { replay: InputReplay },
-    Snapshot { snapshot: SnapshotStep },
-    Restore { restore: RestoreStep },
+    Wait {
+        wait: WaitStep,
+    },
+    Input {
+        input: InputStep,
+    },
+    Replay {
+        replay: InputReplay,
+    },
+    ReplayRef {
+        #[serde(rename = "replayRef")]
+        replay_ref: ReplayReference,
+    },
+    Snapshot {
+        snapshot: SnapshotStep,
+    },
+    Restore {
+        restore: RestoreStep,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -81,6 +95,13 @@ pub struct SnapshotStep {
 #[serde(deny_unknown_fields)]
 pub struct RestoreStep {
     pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReplayReference {
+    pub id: String,
+    pub path: String,
 }
 
 const INPUT_REPLAY_SCHEMA_VERSION: &str = "1";
@@ -139,7 +160,10 @@ impl Seed {
         let path = path.as_ref();
         let input = fs::read_to_string(path)
             .with_context(|| format!("failed to read Seed file {}", path.display()))?;
-        Self::from_yaml_str(&input)
+        let seed = Self::from_yaml_str(&input)?;
+        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        seed.validate_replay_references(base_dir)?;
+        Ok(seed)
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -162,6 +186,23 @@ impl Seed {
             scenario.validate(index)?;
         }
 
+        Ok(())
+    }
+
+    fn validate_replay_references(&self, base_dir: &Path) -> Result<()> {
+        for (scenario_index, scenario) in self.scenarios.iter().enumerate() {
+            for (step_index, step) in scenario.steps.iter().enumerate() {
+                if let ScenarioStep::ReplayRef { replay_ref } = step {
+                    replay_ref
+                        .load_from_base(base_dir)
+                        .with_context(|| {
+                            format!(
+                                "scenarios[{scenario_index}].steps[{step_index}].replayRef could not be loaded"
+                            )
+                        })?;
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -207,6 +248,9 @@ impl ScenarioStep {
             ScenarioStep::Replay { replay } => replay.validate().with_context(|| {
                 format!("scenarios[{scenario_index}].steps[{step_index}].replay is invalid")
             })?,
+            ScenarioStep::ReplayRef { replay_ref } => replay_ref.validate().with_context(|| {
+                format!("scenarios[{scenario_index}].steps[{step_index}].replayRef is invalid")
+            })?,
             ScenarioStep::Snapshot { snapshot } => {
                 validate_path_component("snapshot step id", &snapshot.id).with_context(|| {
                     format!(
@@ -221,6 +265,34 @@ impl ScenarioStep {
             }
         }
         Ok(())
+    }
+}
+
+impl ReplayReference {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("replay reference id", &self.id)?;
+        validate_replay_reference_path("replay reference path", &self.path)
+    }
+
+    fn load_from_base(&self, base_dir: &Path) -> Result<InputReplay> {
+        self.validate()?;
+        let path = base_dir.join(&self.path);
+        let input = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read replay reference {}", path.display()))?;
+        let replay = if self.path.ends_with(".json") {
+            InputReplay::from_json_str(&input)
+        } else {
+            InputReplay::from_yaml_str(&input)
+        }
+        .with_context(|| format!("failed to parse replay reference {}", path.display()))?;
+        if replay.id != self.id {
+            return Err(anyhow!(
+                "replay reference id {} does not match replay id {}",
+                self.id,
+                replay.id
+            ));
+        }
+        Ok(replay)
     }
 }
 
@@ -277,6 +349,35 @@ impl InputReplay {
 
 fn input_replay_schema_v1() -> String {
     INPUT_REPLAY_SCHEMA_VERSION.to_string()
+}
+
+fn validate_replay_reference_path(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !value.starts_with("replays/") {
+        return Err(anyhow!("{field} must start with replays/"));
+    }
+    if !(value.ends_with(".yaml") || value.ends_with(".yml") || value.ends_with(".json")) {
+        return Err(anyhow!("{field} must point to a YAML or JSON replay file"));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '-' | '_'))
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '/', '.', '-' or '_'"
+        ));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must stay inside the replay fixture tree")),
+        }
+    }
+    Ok(())
 }
 
 impl ScenarioAssertion {
@@ -2315,6 +2416,11 @@ fn execute_scenario_step<T: CdpTransport>(
         ScenarioStep::Replay { replay } => {
             execute_input_replay(client, replay)?;
         }
+        ScenarioStep::ReplayRef { .. } => {
+            return Err(anyhow!(
+                "replayRef execution is implemented by scenario evidence context"
+            ));
+        }
         ScenarioStep::Snapshot { .. } | ScenarioStep::Restore { .. } => {
             return Err(anyhow!(
                 "snapshot/restore steps require scenario evidence context"
@@ -3102,6 +3208,142 @@ scenarios:
 
         assert_eq!(seed.scenarios[0].steps.len(), 2);
         assert_eq!(seed.scenarios[0].assertions.len(), 2);
+    }
+
+    #[test]
+    fn scenario_replay_reference_validates_referenced_file() {
+        let root = unique_temp_dir("scenario-replay-ref-valid");
+        fs::create_dir_all(root.join("replays")).expect("replay fixture dir exists");
+        fs::write(
+            root.join("replays/move-right.yaml"),
+            r#"
+schemaVersion: "1"
+id: move-right
+events:
+  - frame: 0
+    key: right
+    pressed: true
+  - frame: 4
+    key: right
+    pressed: false
+"#,
+        )
+        .expect("replay fixture written");
+        let seed_path = root.join("seed.yaml");
+        fs::write(
+            &seed_path,
+            r#"
+id: replay-ref.seed
+title: Replay Ref Seed
+goal: Validate replay references.
+constraints:
+  target: game-runtime
+acceptance:
+  - Replay reference validates.
+scenarios:
+  - id: replay-ref-smoke
+    description: Bind replay from a fixture file.
+    steps:
+      - replayRef:
+          id: move-right
+          path: replays/move-right.yaml
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 40
+"#,
+        )
+        .expect("seed written");
+
+        let seed = Seed::from_path(&seed_path).expect("replay reference validates");
+        assert!(matches!(
+            seed.scenarios[0].steps[0],
+            ScenarioStep::ReplayRef { .. }
+        ));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scenario_replay_reference_rejects_missing_and_malformed_files() {
+        let root = unique_temp_dir("scenario-replay-ref-invalid");
+        fs::create_dir_all(root.join("replays")).expect("replay fixture dir exists");
+        let seed_path = root.join("missing-seed.yaml");
+        fs::write(
+            &seed_path,
+            r#"
+id: replay-ref.seed
+title: Replay Ref Seed
+goal: Validate replay references.
+constraints:
+  target: game-runtime
+acceptance:
+  - Replay reference validates.
+scenarios:
+  - id: replay-ref-smoke
+    description: Bind replay from a fixture file.
+    steps:
+      - replayRef:
+          id: move-right
+          path: replays/missing.yaml
+"#,
+        )
+        .expect("missing seed written");
+        let rejected = Seed::from_path(&seed_path).expect_err("missing replay reference rejected");
+        assert!(rejected
+            .to_string()
+            .contains("replayRef could not be loaded"));
+
+        fs::write(root.join("replays/bad.yaml"), "id: bad\n").expect("bad replay written");
+        let malformed_seed_path = root.join("malformed-seed.yaml");
+        fs::write(
+            &malformed_seed_path,
+            r#"
+id: replay-ref.seed
+title: Replay Ref Seed
+goal: Validate replay references.
+constraints:
+  target: game-runtime
+acceptance:
+  - Replay reference validates.
+scenarios:
+  - id: replay-ref-smoke
+    description: Bind replay from a fixture file.
+    steps:
+      - replayRef:
+          id: bad
+          path: replays/bad.yaml
+"#,
+        )
+        .expect("malformed seed written");
+        let rejected =
+            Seed::from_path(&malformed_seed_path).expect_err("malformed replay rejected");
+        assert!(rejected
+            .to_string()
+            .contains("replayRef could not be loaded"));
+
+        let escaping = Seed::from_yaml_str(
+            r#"
+id: replay-ref.seed
+title: Replay Ref Seed
+goal: Validate replay references.
+constraints:
+  target: game-runtime
+acceptance:
+  - Replay reference validates.
+scenarios:
+  - id: replay-ref-smoke
+    description: Bind replay from a fixture file.
+    steps:
+      - replayRef:
+          id: move-right
+          path: replays/../move-right.yaml
+"#,
+        )
+        .expect_err("escaping replay reference rejected");
+        assert!(escaping.to_string().contains("replayRef is invalid"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
