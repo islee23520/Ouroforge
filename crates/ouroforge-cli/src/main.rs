@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
-    add_evidence_artifact, append_ledger_event, apply_patch_sandbox_from_path,
-    create_mutation_proposal, create_run, edit_scene, evaluate_run, evolve_run,
-    list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
+    apply_patch_sandbox_from_path, create_mutation_proposal, create_run, edit_scene, evaluate_run,
+    evolve_run, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
     orchestrate_evolve_rerun_from_path, read_cdp_targets, read_dashboard_run, read_ledger_events,
     read_scene, run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal,
     update_journal, write_run_comparison_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
+    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -162,6 +162,19 @@ enum MutationCommand {
     },
     List {
         run_dir: PathBuf,
+    },
+    Review {
+        run_or_draft_path: PathBuf,
+        #[arg(long)]
+        accept: bool,
+        #[arg(long)]
+        reject: bool,
+        #[arg(long)]
+        reason: String,
+        #[arg(long = "evidence")]
+        evidence_refs: Vec<String>,
+        #[arg(long, default_value = "mutation-review-cli")]
+        reviewer: String,
     },
 }
 
@@ -372,6 +385,35 @@ fn main() -> Result<()> {
         } => {
             let proposals = list_mutation_proposals(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&proposals)?);
+        }
+        Commands::Mutation {
+            command:
+                MutationCommand::Review {
+                    run_or_draft_path,
+                    accept,
+                    reject,
+                    reason,
+                    evidence_refs,
+                    reviewer,
+                },
+        } => {
+            let state = match (accept, reject) {
+                (true, false) => MutationReviewState::Accepted,
+                (false, true) => MutationReviewState::Rejected,
+                _ => {
+                    return Err(anyhow!(
+                        "mutation review requires exactly one of --accept or --reject"
+                    ))
+                }
+            };
+            let decision = append_mutation_review_decision_from_path(
+                run_or_draft_path,
+                state,
+                reason,
+                evidence_refs,
+                reviewer,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&decision)?);
         }
         Commands::Dashboard {
             command: DashboardCommand::Export { runs_root, output },
