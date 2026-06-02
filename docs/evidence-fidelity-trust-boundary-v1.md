@@ -233,7 +233,7 @@ Evidence Fidelity & Trust Boundary Hardening v1 does not authorize:
 - #288 updates the runtime probe contract so observations are structured,
   bounded, and attributable.
 - #289 strengthens replay and deterministic scenario evidence through `docs/input-replay-evidence-v2.md`.
-- #290 improves openchrome/CDP evidence fidelity while keeping browser
+- #290 improves openchrome/CDP evidence fidelity through `docs/openchrome-cdp-evidence-fidelity-v2.md` while keeping browser
   observation non-authoritative.
 - #291 records reproducible command context for reruns and audits.
 - #292 exposes the hardened evidence chain in Studio without browser writes or

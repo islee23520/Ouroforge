@@ -90,3 +90,21 @@ in-memory step/reset/jump controls. It displays the current frame/tick,
 evidence links, and linked world-state snapshots from the generated export.
 It does not edit replay inputs, record new inputs, persist browser-side replay
 state, or mutate run artifacts.
+
+
+Openchrome/CDP Evidence Fidelity v2 inspection:
+
+```bash
+cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 2
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+node --check examples/evidence-dashboard/dashboard.js
+node examples/evidence-dashboard/dashboard.test.cjs
+```
+
+Refresh the dashboard after export to inspect escaped worker/session metadata for
+worker screenshots, console logs, performance metrics, and CDP trace summaries.
+The dashboard displays metadata produced by Rust/openchrome CDP workers, including
+`worker_id`, `worker_session_id`, `run_id`, `execution_boundary`, and
+`cdp_transport`; it does not compute browser-side comparisons, rerun workers,
+write files, or execute commands. Remove generated `dashboard-data.json` before
+committing. See `docs/openchrome-cdp-evidence-fidelity-v2.md`.
