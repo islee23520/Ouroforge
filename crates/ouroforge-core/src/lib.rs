@@ -3480,9 +3480,7 @@ pub struct MutationProposalRationale {
     pub schema_version: String,
     pub failure_classification: String,
     pub evidence_artifact_ids: Vec<String>,
-    #[serde(default)]
     pub scenario_result_refs: Vec<String>,
-    #[serde(default)]
     pub verdict_refs: Vec<String>,
     pub expected_effect: String,
     pub confidence: MutationProposalRationaleConfidence,
@@ -3580,11 +3578,21 @@ impl MutationProposalRationale {
                 proposal_evidence_id
             ));
         }
+        if self.scenario_result_refs.is_empty() {
+            return Err(anyhow!(
+                "mutation proposal rationale requires at least one scenario_result_ref"
+            ));
+        }
         for scenario_ref in &self.scenario_result_refs {
             require_text(
                 "mutation proposal rationale scenario_result_ref",
                 scenario_ref,
             )?;
+        }
+        if self.verdict_refs.is_empty() {
+            return Err(anyhow!(
+                "mutation proposal rationale requires at least one verdict_ref"
+            ));
         }
         for verdict_ref in &self.verdict_refs {
             require_text("mutation proposal rationale verdict_ref", verdict_ref)?;
@@ -10970,7 +10978,7 @@ fn dashboard_probe_contract_status(
         usize::from(!has_world_v2) + usize::from(!has_frame_v2) + missing_artifact_count;
     let status = if malformed_count > 0 {
         "malformed"
-    } else if has_world_v2 && has_frame_v2 {
+    } else if has_world_v2 && has_frame_v2 && missing_artifact_count == 0 {
         "present"
     } else if observed_count > 0 {
         "partial"
@@ -14540,14 +14548,17 @@ scenarios:
     #[test]
     fn evolve_failed_run_creates_proposal_and_updates_journal() {
         let (root, artifacts) = create_test_run("ouroforge-evolve-failed-test");
-        fs::write(artifacts.run_dir.join("evidence/failure.json"), "{}\n")
-            .expect("evidence written");
+        fs::write(
+            artifacts.run_dir.join("evidence/scenario-result.json"),
+            "{}\n",
+        )
+        .expect("evidence written");
         add_evidence_artifact(
             &artifacts.run_dir,
             "failure-evidence",
             "application/json",
-            "evidence/failure.json",
-            json!({}),
+            "evidence/scenario-result.json",
+            json!({ "artifact": "scenario_result" }),
         )
         .expect("evidence indexed");
         write_json(
@@ -14555,8 +14566,8 @@ scenarios:
             &json!({
                 "status": "failed",
                 "summary": "failed",
-                "failures": [{ "kind": "scenario_failed", "path": "evidence/failure.json" }],
-                "evidence_refs": ["evidence/failure.json"],
+                "failures": [{ "kind": "scenario_failed", "path": "evidence/scenario-result.json" }],
+                "evidence_refs": ["evidence/scenario-result.json"],
                 "metadata": {}
             }),
         )
@@ -14575,6 +14586,10 @@ scenarios:
             "scenario_assertion_failure"
         );
         assert_eq!(rationale.evidence_artifact_ids, vec!["failure-evidence"]);
+        assert_eq!(
+            rationale.scenario_result_refs,
+            vec!["evidence/scenario-result.json"]
+        );
         assert_eq!(rationale.verdict_refs, vec!["verdict.json"]);
         assert_eq!(
             rationale.allowed_mutation_type,
@@ -14592,7 +14607,7 @@ scenarios:
         );
         assert_eq!(
             classifications.classifications[0].evidence_refs,
-            vec!["evidence/failure.json"]
+            vec!["evidence/scenario-result.json"]
         );
         let journal = show_journal(&artifacts.run_dir).expect("journal reads");
         assert!(journal.contains(&proposals[0].id));
@@ -14692,8 +14707,6 @@ scenarios:
                         "schema_version": "1",
                         "failure_classification": "scenario_assertion_failure",
                         "evidence_artifact_ids": ["failure-evidence"],
-                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
-                        "verdict_refs": ["verdict.json"],
                         "expected_effect": "player reaches the exit flag",
                         "confidence": "medium",
                         "reasoning_summary": "failure evidence shows the jump assertion did not pass",
@@ -14720,6 +14733,11 @@ scenarios:
             MutationProposalRationaleConfidence::Medium
         );
         assert_eq!(rationale.evidence_artifact_ids, vec!["failure-evidence"]);
+        assert_eq!(
+            rationale.scenario_result_refs,
+            vec!["evidence/scenarios/demo/scenario-result-1.json"]
+        );
+        assert_eq!(rationale.verdict_refs, vec!["verdict.json"]);
         fs::remove_dir_all(root).ok();
     }
 
@@ -14746,6 +14764,8 @@ scenarios:
                         "schema_version": "1",
                         "failure_classification": "scenario_assertion_failure",
                         "evidence_artifact_ids": [],
+                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                        "verdict_refs": ["verdict.json"],
                         "expected_effect": "player reaches the exit flag",
                         "confidence": "medium",
                         "reasoning_summary": "failure evidence shows the jump assertion did not pass",
@@ -14764,6 +14784,141 @@ scenarios:
             .contains("failed to validate mutation proposals"));
         assert!(format!("{error:#}")
             .contains("mutation proposal rationale requires at least one evidence_artifact_id"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_proposal_rationale_rejects_omitted_required_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-omitted-refs-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": ["failure-evidence"],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "scene_only"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let error =
+            list_mutation_proposals(&artifacts.run_dir).expect_err("omitted rationale refs fail");
+
+        assert!(error
+            .to_string()
+            .contains("failed to parse mutation proposals"));
+        assert!(format!("{error:#}").contains("missing field `scenario_result_refs`"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_proposal_rationale_rejects_empty_required_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-empty-refs-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": ["failure-evidence"],
+                        "scenario_result_refs": [],
+                        "verdict_refs": [],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "scene_only"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let error =
+            list_mutation_proposals(&artifacts.run_dir).expect_err("empty rationale refs fail");
+
+        assert!(error
+            .to_string()
+            .contains("failed to validate mutation proposals"));
+        assert!(format!("{error:#}")
+            .contains("mutation proposal rationale requires at least one scenario_result_ref"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_proposal_rationale_rejects_empty_verdict_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-mutation-rationale-empty-verdict-test");
+        fs::create_dir_all(artifacts.run_dir.join("mutation")).expect("mutation dir");
+        write_json(
+            &artifacts.run_dir.join("mutation/proposals.json"),
+            &json!({
+                "proposals": [{
+                    "id": "mutation-1",
+                    "reason": "raise jump impulse after scenario failure",
+                    "evidence_id": "failure-evidence",
+                    "target": "scenes/platformer.yaml",
+                    "path": "entities.player.jump_impulse",
+                    "from": "7.5",
+                    "to": "9.0",
+                    "confidence": "medium",
+                    "status": "proposed",
+                    "verdict_status": "failed",
+                    "created_at_unix_ms": 123,
+                    "rationale": {
+                        "schema_version": "1",
+                        "failure_classification": "scenario_assertion_failure",
+                        "evidence_artifact_ids": ["failure-evidence"],
+                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                        "verdict_refs": [],
+                        "expected_effect": "player reaches the exit flag",
+                        "confidence": "medium",
+                        "reasoning_summary": "failure evidence shows the jump assertion did not pass",
+                        "allowed_mutation_type": "scene_only"
+                    }
+                }]
+            }),
+        )
+        .expect("proposal fixture written");
+
+        let error =
+            list_mutation_proposals(&artifacts.run_dir).expect_err("empty verdict refs fail");
+
+        assert!(error
+            .to_string()
+            .contains("failed to validate mutation proposals"));
+        assert!(format!("{error:#}")
+            .contains("mutation proposal rationale requires at least one verdict_ref"));
         fs::remove_dir_all(root).ok();
     }
 
@@ -14790,6 +14945,8 @@ scenarios:
                         "schema_version": "1",
                         "failure_classification": "scenario_assertion_failure",
                         "evidence_artifact_ids": ["failure-evidence"],
+                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                        "verdict_refs": ["verdict.json"],
                         "expected_effect": "player reaches the exit flag",
                         "confidence": "medium",
                         "reasoning_summary": "failure evidence shows the jump assertion did not pass",
@@ -20402,6 +20559,76 @@ scenarios:
         assert_eq!(malformed.probe_contract_status.status, "malformed");
         assert!(malformed.probe_contract_status.malformed_count >= 1);
         assert_ne!(malformed.evidence_fidelity.runtime_probe.status, "present");
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_probe_contract_status_is_partial_when_indexed_probe_artifact_is_missing() {
+        let (root, artifacts) = create_test_run("dashboard-probe-missing-indexed-artifact");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({ "tick": 1 })).expect("world state serializes"),
+        )
+        .expect("world state written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/frame-stats.json"),
+            serde_json::to_string_pretty(&json!({ "frame": 1, "fps": 60 }))
+                .expect("frame stats serializes"),
+        )
+        .expect("frame stats written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state-v2",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({
+                "probe_call": "getWorldState",
+                "worker_id": "worker-1",
+                "probe_contract": {
+                    "name": RUNTIME_PROBE_CONTRACT_NAME,
+                    "version": RUNTIME_PROBE_CONTRACT_VERSION
+                }
+            }),
+        )
+        .expect("world state indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-frame-stats-v2",
+            "application/json",
+            "evidence/workers/worker-1/frame-stats.json",
+            json!({
+                "probe_call": "getFrameStats",
+                "worker_id": "worker-1",
+                "probe_contract": {
+                    "name": RUNTIME_PROBE_CONTRACT_NAME,
+                    "version": RUNTIME_PROBE_CONTRACT_VERSION
+                }
+            }),
+        )
+        .expect("frame stats indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-scenario-result-v2",
+            "application/json",
+            "evidence/scenarios/bootstrap-smoke/missing-scenario-result.json",
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("missing scenario result indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+
+        assert_eq!(model.probe_contract_status.status, "partial");
+        assert!(model.probe_contract_status.missing_count > 0);
+        assert_eq!(model.probe_contract_status.malformed_count, 0);
+        assert_eq!(model.evidence_fidelity.runtime_probe.status, "partial");
+        assert!(model.evidence_fidelity.runtime_probe.missing_count > 0);
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

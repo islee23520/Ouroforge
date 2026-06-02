@@ -242,7 +242,7 @@ const OuroforgeDashboard = (() => {
 
 
   function commandContext(run) {
-    const context = run?.command_context || run?.summary?.command_context || run?.run?.run_command_context || null;
+    const context = run?.command_context || run?.summary?.command_context || null;
     return context && typeof context === 'object' ? context : null;
   }
 

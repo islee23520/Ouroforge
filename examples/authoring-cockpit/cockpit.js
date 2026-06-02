@@ -467,7 +467,7 @@ const OuroforgeCockpit = (() => {
     return fidelity && typeof fidelity === 'object' ? fidelity : null;
   }
 
-  function renderFidelityStatusCard(status, fallbackId, fallbackLabel) {
+  function renderFidelityStatusCard(status, fallbackId, fallbackLabel, run) {
     const item = status && typeof status === 'object' ? status : null;
     if (!item) {
       return `<article class="fidelity-card warning"><h3>${escapeText(fallbackLabel)}</h3><p class="empty compact">No ${escapeText(fallbackLabel)} read-model data is available.</p></article>`;
@@ -484,7 +484,7 @@ const OuroforgeCockpit = (() => {
         <div><strong>Missing</strong><br>${escapeText(item.missing_count ?? 0)}</div>
       </div>
       ${warnings.length ? `<div class="warning">${warnings.map(escapeText).join(' · ')}</div>` : ''}
-      ${refs.length ? `<details><summary>Evidence refs</summary>${renderRefLinks(refs, { summary: { run_dir: '' } })}</details>` : ''}
+      ${refs.length ? `<details><summary>Evidence refs</summary>${renderRefLinks(refs, run)}</details>` : ''}
     </article>`;
   }
 
@@ -499,11 +499,11 @@ const OuroforgeCockpit = (() => {
     return `<section id="evidence-fidelity" class="panel"><h2>Evidence fidelity</h2>
       <p class="hint">Read-only status from Rust-exported dashboard data. Missing evidence is shown as warnings; the cockpit does not write files, execute commands, rerun QA, or apply mutations.</p>
       <div class="fidelity-grid">
-        ${renderFidelityStatusCard(fidelity.transaction, 'transaction', 'Transaction provenance')}
-        ${renderFidelityStatusCard(fidelity.runtime_probe, 'runtime_probe', 'Runtime probe contract')}
-        ${renderFidelityStatusCard(fidelity.input_replay, 'input_replay', 'Input replay evidence')}
-        ${renderFidelityStatusCard(fidelity.openchrome_cdp, 'openchrome_cdp', 'Openchrome/CDP evidence')}
-        ${renderFidelityStatusCard(fidelity.command_context, 'command_context', 'Reproducible command context')}
+        ${renderFidelityStatusCard(fidelity.transaction, 'transaction', 'Transaction provenance', run)}
+        ${renderFidelityStatusCard(fidelity.runtime_probe, 'runtime_probe', 'Runtime probe contract', run)}
+        ${renderFidelityStatusCard(fidelity.input_replay, 'input_replay', 'Input replay evidence', run)}
+        ${renderFidelityStatusCard(fidelity.openchrome_cdp, 'openchrome_cdp', 'Openchrome/CDP evidence', run)}
+        ${renderFidelityStatusCard(fidelity.command_context, 'command_context', 'Reproducible command context', run)}
       </div>
     </section>`;
   }

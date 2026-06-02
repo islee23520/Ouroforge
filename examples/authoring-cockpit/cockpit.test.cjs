@@ -148,6 +148,8 @@ assert.match(cockpit.renderProjectRunSurface({ summary: { id: 'legacy-run' } }),
 assert.match(cockpit.renderEvidenceFidelitySurface(run), /Evidence fidelity/);
 assert.match(cockpit.renderEvidenceFidelitySurface(run), /Transaction provenance/);
 assert.match(cockpit.renderEvidenceFidelitySurface(run), /Missing performance metrics/);
+assert.match(cockpit.renderEvidenceFidelitySurface(run), /\.\.\/\.\.\/runs\/run-1\/evidence\/world\.json/);
+assert.doesNotMatch(cockpit.renderEvidenceFidelitySurface(run), /\.\.\/\.\.\/evidence\/world\.json/);
 assert.match(cockpit.renderEvidenceFidelitySurface({ summary: { id: 'legacy-run' } }), /No evidence fidelity read model/);
 const malformedFidelity = cockpit.renderEvidenceFidelitySurface({ summary: { id: 'malformed' }, evidence_fidelity: { transaction: '<script>bad</script>', runtime_probe: { label: 'Runtime', status: 'present evil', summary: '<b>safe</b>', warnings: '<script>warn</script>', evidence_refs: '<script>ref</script>' } } });
 assert.match(malformedFidelity, /No Transaction provenance read-model data/);

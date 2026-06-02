@@ -375,4 +375,13 @@ assert.ok(!xssDetail.includes('<script>worker</script>'), 'artifact metadata mus
 assert.ok(!xssDetail.includes('<img src=x onerror=alert(1)>'), 'artifact session metadata must be escaped');
 assert.ok(!xssDetail.includes('<script>hint</script>'), 'command context hints must be escaped');
 assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'), 'run id markup must be escaped');
+
+const rawMalformedCommandContextRun = {
+  summary: { id: 'raw-malformed', run_dir: 'runs/raw-malformed', verdict_status: 'passed' },
+  run: { run_command_context: { schemaVersion: 7, command: 'untrusted raw command' } },
+  evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [], console_logs: [], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
+};
+const rawMalformedCommandContextDetail = dashboard.renderRunDetail(rawMalformedCommandContextRun);
+assert.match(rawMalformedCommandContextDetail, /No run command context is recorded/);
+assert.ok(!rawMalformedCommandContextDetail.includes('untrusted raw command'), 'raw malformed run_command_context must not render');
 console.log('dashboard smoke test passed');
