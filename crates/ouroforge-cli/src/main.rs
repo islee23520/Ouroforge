@@ -1,20 +1,22 @@
 use anyhow::{anyhow, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use ouroforge_core::{
-    add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
-    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_command_context,
-    bind_run_project_metadata, bind_run_transaction_provenance, create_minimal_2d_project_scaffold,
-    create_mutation_proposal, create_run, edit_scene, evaluate_run, evolve_run,
-    hash_project_manifest_file, hash_scene_document, list_dashboard_runs, list_evidence_artifacts,
-    list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    add_evidence_artifact, append_ledger_event,
+    append_mutation_review_decision_for_proposal_from_path, apply_patch_sandbox_from_path,
+    apply_scene_only_mutation_operation, bind_run_command_context, bind_run_project_metadata,
+    bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
+    create_run, edit_scene, evaluate_run, evolve_run, hash_project_manifest_file,
+    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
     read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
     run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     update_journal, validate_scene_reload, write_run_comparison_artifact,
     write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewState, ProjectManifest, ProjectSceneMutationContext,
-    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed, WorkerId,
+    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
+    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -183,6 +185,40 @@ enum DashboardCommand {
     },
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+enum CliMutationReviewDecision {
+    Accepted,
+    Rejected,
+    Deferred,
+}
+
+impl From<CliMutationReviewDecision> for MutationReviewState {
+    fn from(value: CliMutationReviewDecision) -> Self {
+        match value {
+            CliMutationReviewDecision::Accepted => MutationReviewState::Accepted,
+            CliMutationReviewDecision::Rejected => MutationReviewState::Rejected,
+            CliMutationReviewDecision::Deferred => MutationReviewState::Deferred,
+        }
+    }
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+enum CliMutationReviewReviewerType {
+    Human,
+    Agent,
+    System,
+}
+
+impl From<CliMutationReviewReviewerType> for MutationReviewReviewerType {
+    fn from(value: CliMutationReviewReviewerType) -> Self {
+        match value {
+            CliMutationReviewReviewerType::Human => MutationReviewReviewerType::Human,
+            CliMutationReviewReviewerType::Agent => MutationReviewReviewerType::Agent,
+            CliMutationReviewReviewerType::System => MutationReviewReviewerType::System,
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 enum MutationCommand {
     Create {
@@ -215,15 +251,23 @@ enum MutationCommand {
     Review {
         run_or_draft_path: PathBuf,
         #[arg(long)]
+        proposal: Option<String>,
+        #[arg(long, value_enum)]
+        decision: Option<CliMutationReviewDecision>,
+        #[arg(long)]
         accept: bool,
         #[arg(long)]
         reject: bool,
+        #[arg(long)]
+        defer: bool,
         #[arg(long)]
         reason: String,
         #[arg(long = "evidence")]
         evidence_refs: Vec<String>,
         #[arg(long, default_value = "mutation-review-cli")]
         reviewer: String,
+        #[arg(long, value_enum, default_value = "human")]
+        reviewer_type: CliMutationReviewReviewerType,
     },
 }
 
@@ -569,28 +613,41 @@ fn main() -> Result<()> {
             command:
                 MutationCommand::Review {
                     run_or_draft_path,
+                    proposal,
+                    decision,
                     accept,
                     reject,
+                    defer,
                     reason,
                     evidence_refs,
                     reviewer,
+                    reviewer_type,
                 },
         } => {
-            let state = match (accept, reject) {
-                (true, false) => MutationReviewState::Accepted,
-                (false, true) => MutationReviewState::Rejected,
+            let legacy_flags = [accept, reject, defer]
+                .iter()
+                .filter(|selected| **selected)
+                .count();
+            let state = match (decision, accept, reject, defer) {
+                (Some(decision), false, false, false) => MutationReviewState::from(decision),
+                (None, true, false, false) => MutationReviewState::Accepted,
+                (None, false, true, false) => MutationReviewState::Rejected,
+                (None, false, false, true) => MutationReviewState::Deferred,
                 _ => {
+                    let _ = legacy_flags;
                     return Err(anyhow!(
-                        "mutation review requires exactly one of --accept or --reject"
-                    ))
+                        "mutation review requires exactly one of --decision, --accept, --reject, or --defer"
+                    ));
                 }
             };
-            let decision = append_mutation_review_decision_from_path(
+            let decision = append_mutation_review_decision_for_proposal_from_path(
                 run_or_draft_path,
+                proposal,
                 state,
                 reason,
                 evidence_refs,
                 reviewer,
+                Some(MutationReviewReviewerType::from(reviewer_type)),
             )?;
             println!("{}", serde_json::to_string_pretty(&decision)?);
         }

@@ -4321,14 +4321,40 @@ pub fn append_mutation_review_decision_from_path(
     evidence_refs: Vec<String>,
     reviewer: String,
 ) -> Result<MutationReviewDecision> {
+    append_mutation_review_decision_for_proposal_from_path(
+        run_or_draft_path,
+        None,
+        state,
+        reason,
+        evidence_refs,
+        reviewer,
+        Some(MutationReviewReviewerType::Human),
+    )
+}
+
+pub fn append_mutation_review_decision_for_proposal_from_path(
+    run_or_draft_path: impl AsRef<Path>,
+    proposal_id: Option<String>,
+    state: MutationReviewState,
+    reason: String,
+    evidence_refs: Vec<String>,
+    reviewer: String,
+    reviewer_type: Option<MutationReviewReviewerType>,
+) -> Result<MutationReviewDecision> {
     let run_dir = resolve_patch_sandbox_run_dir(run_or_draft_path.as_ref())?;
     let drafts = read_patch_draft_artifact(&run_dir)?;
-    let patch_draft_id = drafts
-        .drafts
-        .first()
-        .ok_or_else(|| anyhow!("mutation review requires at least one patch draft"))?
-        .id
-        .clone();
+    let patch_draft = match proposal_id.as_deref() {
+        Some(proposal_id) => drafts
+            .drafts
+            .iter()
+            .find(|draft| draft.proposal_id == proposal_id)
+            .ok_or_else(|| anyhow!("mutation review proposal id not found: {proposal_id}"))?,
+        None => drafts
+            .drafts
+            .first()
+            .ok_or_else(|| anyhow!("mutation review requires at least one patch draft"))?,
+    };
+    let patch_draft_id = patch_draft.id.clone();
     let evidence_refs = if evidence_refs.is_empty() {
         default_mutation_review_evidence_refs(&run_dir, &patch_draft_id)?
     } else {
@@ -4338,9 +4364,9 @@ pub fn append_mutation_review_decision_from_path(
         run_dir,
         MutationReviewDecisionInput {
             patch_draft_id,
-            proposal_id: None,
+            proposal_id,
             state,
-            reviewer_type: Some(MutationReviewReviewerType::Human),
+            reviewer_type,
             reason,
             evidence_refs,
             reviewer,
@@ -14863,6 +14889,8 @@ scenarios:
                         "schema_version": "1",
                         "failure_classification": "scenario_assertion_failure",
                         "evidence_artifact_ids": ["failure-evidence"],
+                        "scenario_result_refs": ["evidence/scenarios/demo/scenario-result-1.json"],
+                        "verdict_refs": ["verdict.json"],
                         "expected_effect": "player reaches the exit flag",
                         "confidence": "medium",
                         "reasoning_summary": "failure evidence shows the jump assertion did not pass",

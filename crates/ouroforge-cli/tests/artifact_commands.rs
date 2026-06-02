@@ -866,6 +866,86 @@ fn compare_command_prints_project_semantic_context_and_writes_artifact() {
 }
 
 #[test]
+fn mutation_review_records_proposal_decision_statuses_without_applying() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let run_output = run_cli(
+        &repo_root,
+        &["run", "seeds/evolve-v1-demo.yaml", "--workers", "1"],
+    );
+    let run_dir = run_dir_from_output(&repo_root, &run_output);
+    run_cli(&repo_root, &["evolve", run_dir.to_str().unwrap()]);
+
+    let list_output = run_cli(&repo_root, &["mutation", "list", run_dir.to_str().unwrap()]);
+    assert!(list_output.contains("proposal"));
+    let proposals: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("mutation/proposals.json")).expect("proposals read"),
+    )
+    .expect("proposals json parses");
+    let proposal_id = proposals["proposals"][0]["id"]
+        .as_str()
+        .expect("proposal id")
+        .to_string();
+
+    let accepted = run_cli(
+        &repo_root,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            &proposal_id,
+            "--decision",
+            "accepted",
+            "--reason",
+            "manual test",
+            "--evidence",
+            "mutation/patch-drafts.json",
+            "--reviewer-type",
+            "agent",
+        ],
+    );
+    let accepted: serde_json::Value = serde_json::from_str(&accepted).expect("decision json");
+    assert_eq!(accepted["proposal_id"].as_str(), Some(proposal_id.as_str()));
+    assert_eq!(accepted["decision_status"].as_str(), Some("accepted"));
+    assert_eq!(accepted["reviewer_type"].as_str(), Some("agent"));
+
+    let deferred = run_cli(
+        &repo_root,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--defer",
+            "--reason",
+            "needs another comparison",
+            "--evidence",
+            "mutation/patch-drafts.json",
+        ],
+    );
+    assert!(deferred.contains("deferred"));
+
+    let invalid = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            "missing-proposal",
+            "--decision",
+            "rejected",
+            "--reason",
+            "bad proposal should fail",
+            "--evidence",
+            "mutation/patch-drafts.json",
+        ],
+    );
+    assert!(invalid.contains("proposal id not found"));
+    assert!(!Path::new("seeds/evolve-v1-draft-target.yaml.applied").exists());
+    fs::remove_dir_all(run_dir).ok();
+}
+
+#[test]
 fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     let temp = unique_temp_dir("ouroforge-cli-scene-mutation-apply-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
