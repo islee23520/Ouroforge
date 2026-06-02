@@ -2471,6 +2471,43 @@ pub struct PatchDraftArtifact {
     pub drafts: Vec<PatchDraft>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationReviewState {
+    PendingReview,
+    Accepted,
+    Rejected,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationReviewDecision {
+    pub id: String,
+    pub patch_draft_id: String,
+    pub state: MutationReviewState,
+    pub reason: String,
+    pub evidence_refs: Vec<String>,
+    pub reviewer: String,
+    pub decided_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationReviewArtifact {
+    pub schema_version: String,
+    pub run_id: String,
+    pub decisions: Vec<MutationReviewDecision>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutationReviewDecisionInput {
+    pub patch_draft_id: String,
+    pub state: MutationReviewState,
+    pub reason: String,
+    pub evidence_refs: Vec<String>,
+    pub reviewer: String,
+}
+
 impl PatchDraftArtifact {
     pub fn validate(&self) -> Result<()> {
         if self.schema_version != "1" {
@@ -2509,6 +2546,167 @@ impl PatchDraft {
         require_text("patch draft draft_text", &self.draft_text)?;
         Ok(())
     }
+}
+
+impl MutationReviewArtifact {
+    pub fn validate(&self, run_dir: impl AsRef<Path>) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!("mutation review schema_version must be \"1\""));
+        }
+        require_text("mutation review run_id", &self.run_id)?;
+        let drafts = read_patch_draft_artifact(run_dir)?;
+        let draft_ids = drafts
+            .drafts
+            .iter()
+            .map(|draft| draft.id.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        let mut decision_ids = std::collections::HashSet::new();
+        for decision in &self.decisions {
+            decision.validate(&draft_ids)?;
+            if !decision_ids.insert(decision.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate mutation review decision id: {}",
+                    decision.id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationReviewDecision {
+    fn validate(&self, draft_ids: &std::collections::HashSet<&str>) -> Result<()> {
+        require_text("mutation review decision id", &self.id)?;
+        validate_path_component("mutation review decision id", &self.id)?;
+        require_text("mutation review patch_draft_id", &self.patch_draft_id)?;
+        if !draft_ids.contains(self.patch_draft_id.as_str()) {
+            return Err(anyhow!(
+                "mutation review patch draft id not found: {}",
+                self.patch_draft_id
+            ));
+        }
+        match self.state {
+            MutationReviewState::Accepted | MutationReviewState::Rejected => {
+                require_text("mutation review reason", &self.reason)?;
+                if self.evidence_refs.is_empty() {
+                    return Err(anyhow!(
+                        "mutation review accept/reject requires evidence or comparison ref"
+                    ));
+                }
+            }
+            MutationReviewState::PendingReview => {}
+        }
+        for evidence_ref in &self.evidence_refs {
+            validate_mutation_review_ref(evidence_ref)?;
+        }
+        require_text("mutation review reviewer", &self.reviewer)?;
+        Ok(())
+    }
+}
+
+pub fn read_mutation_review_artifact(run_dir: impl AsRef<Path>) -> Result<MutationReviewArtifact> {
+    let run_dir = run_dir.as_ref();
+    let path = run_dir.join("mutation/review-decisions.json");
+    if !path.is_file() {
+        let run = read_json_value(run_dir.join("run.json"))?;
+        let run_id = json_string(&run, "id").unwrap_or_else(|| {
+            run_dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("unknown-run")
+                .to_string()
+        });
+        return Ok(MutationReviewArtifact {
+            schema_version: "1".to_string(),
+            run_id,
+            decisions: Vec::new(),
+        });
+    }
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read mutation review {}", path.display()))?;
+    let artifact: MutationReviewArtifact = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse mutation review {}", path.display()))?;
+    artifact.validate(run_dir)?;
+    Ok(artifact)
+}
+
+pub fn write_mutation_review_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &MutationReviewArtifact,
+) -> Result<PathBuf> {
+    let run_dir = run_dir.as_ref();
+    artifact.validate(run_dir)?;
+    let dir = run_dir.join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    let path = dir.join("review-decisions.json");
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
+pub fn append_mutation_review_decision(
+    run_dir: impl AsRef<Path>,
+    input: MutationReviewDecisionInput,
+) -> Result<MutationReviewDecision> {
+    let run_dir = run_dir.as_ref();
+    let mut artifact = read_mutation_review_artifact(run_dir)?;
+    let next_index = artifact.decisions.len() + 1;
+    let decision = MutationReviewDecision {
+        id: format!("review-decision-{next_index}"),
+        patch_draft_id: input.patch_draft_id,
+        state: input.state,
+        reason: input.reason,
+        evidence_refs: input.evidence_refs,
+        reviewer: input.reviewer,
+        decided_at_unix_ms: unix_millis()?,
+    };
+    let drafts = read_patch_draft_artifact(run_dir)?;
+    let draft_ids = drafts
+        .drafts
+        .iter()
+        .map(|draft| draft.id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    decision.validate(&draft_ids)?;
+    artifact.decisions.push(decision.clone());
+    write_mutation_review_artifact(run_dir, &artifact)?;
+    append_ledger_event(
+        run_dir,
+        "mutation.review_decision",
+        "mutation-review",
+        json!({
+            "decision_id": decision.id,
+            "patch_draft_id": decision.patch_draft_id,
+            "state": decision.state,
+            "evidence_refs": decision.evidence_refs,
+            "reviewer": decision.reviewer,
+        }),
+    )?;
+    Ok(decision)
+}
+
+fn validate_mutation_review_ref(reference: &str) -> Result<()> {
+    require_text("mutation review evidence ref", reference)?;
+    let path = Path::new(reference);
+    if path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(anyhow!(
+            "mutation review evidence ref must be run-relative and must not escape the run"
+        ));
+    }
+    if !(reference.starts_with("evidence/")
+        || reference.starts_with("mutation/")
+        || reference.starts_with("sandbox/"))
+    {
+        return Err(anyhow!(
+            "mutation review evidence ref must point to evidence/, mutation/, or sandbox/"
+        ));
+    }
+    Ok(())
 }
 
 fn validate_patch_draft_target_path(target_path: &str) -> Result<()> {
@@ -7387,6 +7585,109 @@ scenarios:
         let (root, artifacts, _) = create_draft_generation_fixture(prefix);
         let drafts = generate_patch_drafts(&artifacts.run_dir).expect("draft generates");
         (root, artifacts, drafts)
+    }
+
+    #[test]
+    fn appends_mutation_review_decisions_without_overwriting_history() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-review-append-test");
+
+        let accepted = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Accepted,
+                reason: "comparison evidence improved the failed scenario".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect("accepted decision appends");
+        let rejected = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Rejected,
+                reason: "manual review found the draft too broad".to_string(),
+                evidence_refs: vec!["sandbox/patch-draft-1/evidence/result.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect("rejected decision appends");
+
+        let artifact =
+            read_mutation_review_artifact(&artifacts.run_dir).expect("review artifact reads");
+        assert_eq!(accepted.id, "review-decision-1");
+        assert_eq!(rejected.id, "review-decision-2");
+        assert_eq!(artifact.decisions.len(), 2);
+        assert_eq!(artifact.decisions[0].state, MutationReviewState::Accepted);
+        assert_eq!(artifact.decisions[1].state, MutationReviewState::Rejected);
+        assert!(artifacts
+            .run_dir
+            .join("mutation/review-decisions.json")
+            .is_file());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_review_accept_reject_require_reason_and_evidence() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-review-required-test");
+
+        let missing_reason = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Accepted,
+                reason: " ".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect_err("missing reason fails");
+        let missing_evidence = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Rejected,
+                reason: "not enough evidence".to_string(),
+                evidence_refs: Vec::new(),
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect_err("missing evidence fails");
+
+        assert!(missing_reason
+            .to_string()
+            .contains("mutation review reason"));
+        assert!(missing_evidence
+            .to_string()
+            .contains("requires evidence or comparison ref"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_review_decision_does_not_apply_patch() {
+        let (root, artifacts, drafts) = create_sandbox_fixture("ouroforge-review-no-apply-test");
+        let target = root.join("seeds/platformer.yaml");
+        fs::create_dir_all(target.parent().expect("target parent")).expect("parent exists");
+        fs::write(&target, "primary source remains unchanged\n").expect("target written");
+
+        append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: drafts.drafts[0].id.clone(),
+                state: MutationReviewState::Accepted,
+                reason: "accepted for audit only".to_string(),
+                evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+            },
+        )
+        .expect("decision appends");
+
+        assert_eq!(
+            fs::read_to_string(&target).expect("target reads"),
+            "primary source remains unchanged\n"
+        );
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
