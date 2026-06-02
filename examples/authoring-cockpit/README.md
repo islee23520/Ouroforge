@@ -1,6 +1,6 @@
-# Authoring Cockpit v0
+# Studio v1 Demo Cockpit
 
-Minimal browser UI for inspecting the existing game-runtime scene and editing only the fields supported by the Rust scene edit model.
+Static local browser UI for composing completed Studio v1 surfaces: run/evidence inspection, journal viewing, mutation review state, replay evidence, live preview controls, Rust-validated scene edit command generation, and run comparison display.
 
 Run locally from the repo root:
 
@@ -25,6 +25,21 @@ Supported Rust-validated scene edit fields:
 
 All other scene fields remain read-only in the cockpit and are rejected by the
 Rust `ouroforge scene edit` command.
+
+
+## Studio v1 demo surfaces
+
+The cockpit composes completed local surfaces only:
+
+- run/evidence browser from generated dashboard data;
+- journal viewer when journal data exists;
+- mutation review lifecycle state and manual command hints when artifacts exist;
+- replay evidence surface when replay artifacts exist;
+- live preview controls through the existing runtime probe;
+- scene edit command generation for Rust-validated fields;
+- run comparison artifact surface when comparison artifacts exist.
+
+Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, or mutation acceptance from the browser. Demo verification evidence is recorded in `../../docs/studio-v1-demo.md`.
 
 ## QA and evidence loop
 

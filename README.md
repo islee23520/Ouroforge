@@ -59,7 +59,7 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
-Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`.
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`. Studio v1 composition evidence is recorded in `docs/studio-v1-demo.md`.
 
 ## Verification
 
@@ -97,6 +97,7 @@ Do not commit generated or local runtime/tool state:
 - `examples/evidence-dashboard/dashboard-data.json`
 - `.openchrome/`
 - `.omc/`
+- `.omx/`
 
 ## Maturity boundaries
 
