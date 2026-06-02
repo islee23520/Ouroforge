@@ -19,6 +19,8 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Scaffold a tiny local project workspace with `project init --template minimal-2d`.
 - Validate project scenario packs through `project validate`.
 - Run project-declared Seeds with additive project metadata using `run <seed> --project <root-or-manifest> --scenario-pack <id>`.
+- Apply scene-only mutations through Rust validation when authorized by project manifest context.
+- Inspect Project Workspace Loop v1 state in the static Studio v3 cockpit without browser writes or command execution.
 
 ## Prerequisites
 
@@ -68,7 +70,7 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
-Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. The Engine Expansion v1 playable template is `examples/game-runtime/scene.json` plus `seeds/platformer.yaml`; the final integration demo is `seeds/engine-expansion-v1-demo.yaml` and documented in `docs/engine-expansion-v1-demo.md`. Run either seed with `--workers 4`, export dashboard data, and compare generated runs when checking dashboard/compare compatibility. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`. Studio v1 composition evidence is recorded in `docs/studio-v1-demo.md`.
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. The Engine Expansion v1 playable template is `examples/game-runtime/scene.json` plus `seeds/platformer.yaml`; the final integration demo is `seeds/engine-expansion-v1-demo.yaml` and documented in `docs/engine-expansion-v1-demo.md`. Run either seed with `--workers 4`, export dashboard data, and compare generated runs when checking dashboard/compare compatibility. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`. Evolve Loop v1 integration demo evidence is recorded in `docs/evolve-loop-v1-demo.md`. Studio v1 composition evidence is recorded in `docs/studio-v1-demo.md`. Authoring Loop v2 evidence is documented in `docs/authoring-loop-v2.md`, `docs/scene-edit-transactions.md`, `docs/run-comparison-v2.md`, `docs/scene-only-mutation-v2.md`, and `docs/studio-v2-cockpit.md`. Project Workspace Loop v1 evidence is documented in `docs/project-workspace-loop-v1.md`, `docs/project-run-v1.md`, `docs/project-comparison-v1.md`, `docs/project-mutation-loop-v1.md`, and `docs/studio-v3-project-workspace-cockpit.md`.
 
 ## Verification
 
@@ -84,18 +86,18 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-For Engine Expansion v1 integration evidence, validate and run `seeds/engine-expansion-v1-demo.yaml` and `seeds/platformer.yaml` with `--workers 4`, export dashboard data, compare the latest two generated runs, and record the generated run ids plus comparison artifact. For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. The dashboard comparison panel is read-only: it displays existing comparison artifacts and evidence links without computing browser-side comparisons, mutating runs, accepting mutations, or generating AI summaries. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
+For Engine Expansion v1 integration evidence, validate and run `seeds/engine-expansion-v1-demo.yaml` and `seeds/platformer.yaml` with `--workers 4`, export dashboard data, compare the latest two generated runs, and record the generated run ids plus comparison artifact. For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. The dashboard comparison panel is read-only: it displays existing comparison artifacts and evidence links without computing browser-side comparisons, mutating runs, accepting mutations, or generating AI summaries. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For Project Workspace Loop v1 evidence, scaffold a temporary `minimal-2d` project, validate the manifest, run the project seed with `--project` and `--scenario-pack`, export dashboard data, and remove generated dashboard output after verification. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
 
 ## Repository map
 
-- `crates/ouroforge-core` — Seed, run artifacts, ledger/evidence APIs, CDP/browser smoke, Scenario DSL, evaluator, journal, mutation proposals, evolve v0, dashboard read model, scene edit model.
-- `crates/ouroforge-cli` — CLI entrypoints for Seed/run/evidence/journal/mutation/dashboard/scene commands.
+- `crates/ouroforge-core` — Seed, run artifacts, ledger/evidence APIs, CDP/browser smoke, Scenario DSL, evaluator, journal, mutation proposals, evolve v0, project manifest/scaffold/run/comparison/mutation models, dashboard read model, scene edit model.
+- `crates/ouroforge-cli` — CLI entrypoints for Seed/run/evidence/journal/mutation/dashboard/scene/project commands.
 - `seeds/` — MVP Seed examples.
 - `examples/runtime-probe` — minimal runtime probe page.
 - `examples/game-runtime` — minimal 2D runtime demo.
 - `examples/evidence-dashboard` — read-only static run inspection UI.
-- `examples/authoring-cockpit` — static authoring cockpit prototype over the minimal scene model.
-- `docs/` — architecture, roadmap, manifest/project-run/project-comparison contracts, public-readiness audit, and demo evidence notes.
+- `examples/authoring-cockpit` — static Studio v3 authoring cockpit prototype over exported run/project evidence and the minimal scene model.
+- `docs/` — architecture, roadmap, manifest/scaffold/scenario-pack/project-run/project-comparison/project-mutation contracts, public-readiness audit, and demo evidence notes.
 
 ## Generated local state
 
@@ -115,10 +117,11 @@ Ouroforge currently targets one local reproducible MVP demo. It does not provide
 
 - hosted/cloud execution;
 - authentication or authorization;
-- native app packaging;
+- native app packaging or native export implementation;
 - plugin systems;
 - marketplace features;
 - visual scripting;
+- browser-side trusted file writes or command bridges;
 - broad engine compatibility guarantees.
 
 Public release requires the evidence gates in `docs/public-readiness-audit.md` and `docs/public-launch-checklist.md`, followed by a separate manual visibility decision.
