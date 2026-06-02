@@ -2720,9 +2720,22 @@ fn classify_run_comparison(
         {
             "regressed"
         }
-        _ if before == after => "no_change",
+        _ if run_comparison_snapshots_match(before, after) => "no_change",
         _ => "changed",
     }
+}
+
+fn run_comparison_snapshots_match(
+    before: &RunComparisonSnapshot,
+    after: &RunComparisonSnapshot,
+) -> bool {
+    before.verdict_status == after.verdict_status
+        && before.scenario_results == after.scenario_results
+        && before.failed_scenarios == after.failed_scenarios
+        && before.assertion_failures == after.assertion_failures
+        && before.performance_artifacts == after.performance_artifacts
+        && before.evidence_artifacts == after.evidence_artifacts
+        && before.mutation_proposals == after.mutation_proposals
 }
 
 fn apply_explicit_evaluator_checks(

@@ -5,8 +5,8 @@ use ouroforge_core::{
     evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
     list_mutation_proposals, read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene,
     run_browser_smoke, run_browser_smoke_pool, run_scenarios, show_journal, update_journal,
-    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, ScenarioRunConfig,
-    SceneEdit, Seed, WorkerId,
+    write_run_comparison_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -52,6 +52,12 @@ enum Commands {
     },
     Evolve {
         run_dir: PathBuf,
+    },
+    Compare {
+        before_run_dir: PathBuf,
+        after_run_dir: PathBuf,
+        #[arg(long, default_value = "runs/comparisons")]
+        output_dir: PathBuf,
     },
     Journal {
         #[command(subcommand)]
@@ -307,6 +313,17 @@ fn main() -> Result<()> {
         Commands::Evolve { run_dir } => {
             let summary = evolve_run(run_dir)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::Compare {
+            before_run_dir,
+            after_run_dir,
+            output_dir,
+        } => {
+            let path = write_run_comparison_artifact(before_run_dir, after_run_dir, output_dir)?;
+            let comparison = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read comparison {}", path.display()))?;
+            println!("Comparison written: {}", path.display());
+            println!("{comparison}");
         }
         Commands::Journal {
             command: JournalCommand::Update { run_dir },
