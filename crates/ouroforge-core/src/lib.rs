@@ -4564,16 +4564,16 @@ fn build_run_semantic_diff(
         .collect::<Vec<_>>();
     warnings.sort();
     warnings.dedup();
-    let reasons = semantic_reasons(
+    let reasons = semantic_reasons(RunSemanticReasonInputs {
         classification,
-        &scenarios,
-        &world_state,
-        &events,
-        &performance,
-        &evidence,
-        &transaction_provenance,
-        &warnings,
-    );
+        scenarios: &scenarios,
+        world_state: &world_state,
+        events: &events,
+        performance: &performance,
+        evidence: &evidence,
+        transaction: &transaction_provenance,
+        warnings: &warnings,
+    });
     RunSemanticDiff {
         schema_version: "run-semantic-diff-v1".to_string(),
         reasons,
@@ -4944,18 +4944,20 @@ fn semantic_evidence_set_diff(
     }
 }
 
-fn semantic_reasons(
-    classification: &str,
-    scenarios: &[RunSemanticScenarioDiff],
-    world_state: &RunSemanticWorldStateDiff,
-    events: &RunSemanticEventDiff,
-    performance: &RunSemanticPerformanceDiff,
-    evidence: &RunSemanticEvidenceDiff,
-    transaction: &RunSemanticTransactionDiff,
-    warnings: &[String],
-) -> Vec<RunSemanticReason> {
+struct RunSemanticReasonInputs<'a> {
+    classification: &'a str,
+    scenarios: &'a [RunSemanticScenarioDiff],
+    world_state: &'a RunSemanticWorldStateDiff,
+    events: &'a RunSemanticEventDiff,
+    performance: &'a RunSemanticPerformanceDiff,
+    evidence: &'a RunSemanticEvidenceDiff,
+    transaction: &'a RunSemanticTransactionDiff,
+    warnings: &'a [String],
+}
+
+fn semantic_reasons(inputs: RunSemanticReasonInputs<'_>) -> Vec<RunSemanticReason> {
     let mut reasons = Vec::new();
-    for scenario in scenarios {
+    for scenario in inputs.scenarios {
         reasons.push(RunSemanticReason {
             kind: "scenario_verdict".to_string(),
             severity: scenario.classification.clone(),
@@ -4966,55 +4968,58 @@ fn semantic_reasons(
             evidence_refs: scenario.evidence_refs.clone(),
         });
     }
-    if !world_state.changed.is_empty()
-        || !world_state.added.is_empty()
-        || !world_state.removed.is_empty()
+    if !inputs.world_state.changed.is_empty()
+        || !inputs.world_state.added.is_empty()
+        || !inputs.world_state.removed.is_empty()
     {
         reasons.push(RunSemanticReason {
             kind: "world_state".to_string(),
             severity: "changed".to_string(),
             summary: format!(
                 "{} world-state values changed, {} added, {} removed",
-                world_state.changed.len(),
-                world_state.added.len(),
-                world_state.removed.len()
+                inputs.world_state.changed.len(),
+                inputs.world_state.added.len(),
+                inputs.world_state.removed.len()
             ),
             evidence_refs: Vec::new(),
         });
     }
-    if !events.added.is_empty() || !events.removed.is_empty() {
+    if !inputs.events.added.is_empty() || !inputs.events.removed.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "events".to_string(),
             severity: "changed".to_string(),
             summary: format!(
                 "{} events added, {} removed",
-                events.added.len(),
-                events.removed.len()
+                inputs.events.added.len(),
+                inputs.events.removed.len()
             ),
             evidence_refs: Vec::new(),
         });
     }
-    if !performance.changed.is_empty() {
+    if !inputs.performance.changed.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "performance".to_string(),
             severity: "changed".to_string(),
-            summary: format!("{} performance values changed", performance.changed.len()),
+            summary: format!(
+                "{} performance values changed",
+                inputs.performance.changed.len()
+            ),
             evidence_refs: Vec::new(),
         });
     }
-    if !evidence.added.is_empty() || !evidence.removed.is_empty() {
+    if !inputs.evidence.added.is_empty() || !inputs.evidence.removed.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "evidence_artifacts".to_string(),
             severity: "changed".to_string(),
             summary: format!(
                 "{} evidence artifacts added, {} removed",
-                evidence.added.len(),
-                evidence.removed.len()
+                inputs.evidence.added.len(),
+                inputs.evidence.removed.len()
             ),
             evidence_refs: Vec::new(),
         });
     }
-    if transaction.changed {
+    if inputs.transaction.changed {
         reasons.push(RunSemanticReason {
             kind: "transaction_provenance".to_string(),
             severity: "changed".to_string(),
@@ -5022,19 +5027,19 @@ fn semantic_reasons(
             evidence_refs: Vec::new(),
         });
     }
-    if !warnings.is_empty() {
+    if !inputs.warnings.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "warnings".to_string(),
             severity: "warning".to_string(),
-            summary: format!("{} semantic diff warning(s)", warnings.len()),
+            summary: format!("{} semantic diff warning(s)", inputs.warnings.len()),
             evidence_refs: Vec::new(),
         });
     }
     if reasons.is_empty() {
         reasons.push(RunSemanticReason {
             kind: "classification".to_string(),
-            severity: classification.to_string(),
-            summary: format!("comparison classification is {classification}"),
+            severity: inputs.classification.to_string(),
+            summary: format!("comparison classification is {}", inputs.classification),
             evidence_refs: Vec::new(),
         });
     }
