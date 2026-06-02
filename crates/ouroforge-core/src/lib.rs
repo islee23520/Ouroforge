@@ -10366,6 +10366,173 @@ pub struct RunArtifacts {
     pub run_dir: PathBuf,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectArtifactHash {
+    pub algorithm: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectRunSceneMetadata {
+    pub id: String,
+    pub path: String,
+    pub hash: SceneHash,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectRunScenarioPackMetadata {
+    pub id: String,
+    pub path: String,
+    #[serde(rename = "scenarioIds")]
+    pub scenario_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectRunMetadata {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "projectRoot")]
+    pub project_root: String,
+    #[serde(rename = "manifestPath")]
+    pub manifest_path: String,
+    #[serde(rename = "manifestHash")]
+    pub manifest_hash: ProjectArtifactHash,
+    #[serde(rename = "seedPath")]
+    pub seed_path: String,
+    pub scenes: Vec<ProjectRunSceneMetadata>,
+    #[serde(rename = "scenarioPack", skip_serializing_if = "Option::is_none")]
+    pub scenario_pack: Option<ProjectRunScenarioPackMetadata>,
+}
+
+pub fn hash_project_manifest_file(path: impl AsRef<Path>) -> Result<ProjectArtifactHash> {
+    let path = path.as_ref();
+    let bytes = fs::read(path)
+        .with_context(|| format!("failed to read project manifest {}", path.display()))?;
+    Ok(ProjectArtifactHash {
+        algorithm: "fnv1a64-file-v1".to_string(),
+        value: format!("{:016x}", fnv1a64(&bytes)),
+    })
+}
+
+pub fn project_run_metadata_from_manifest(
+    manifest_path: impl AsRef<Path>,
+    seed_path: impl AsRef<Path>,
+    scenario_pack_id: Option<&str>,
+) -> Result<ProjectRunMetadata> {
+    let manifest_path = manifest_path.as_ref();
+    let manifest = ProjectManifest::from_path(manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let seed_path = seed_path.as_ref();
+    let relative_seed_path = project_relative_path(project_root, seed_path)?;
+    if !manifest
+        .seeds
+        .iter()
+        .any(|reference| reference.path == relative_seed_path)
+    {
+        return Err(anyhow!(
+            "project run seed {} is not declared in project manifest seeds",
+            relative_seed_path
+        ));
+    }
+    let manifest_hash = hash_project_manifest_file(manifest_path)?;
+    let mut scenes = Vec::new();
+    for scene_ref in &manifest.scenes {
+        let scene_path = project_root.join(&scene_ref.path);
+        let scene = read_scene(&scene_path)
+            .with_context(|| format!("failed to read project scene {}", scene_ref.path))?;
+        scenes.push(ProjectRunSceneMetadata {
+            id: scene_ref.id.clone(),
+            path: scene_ref.path.clone(),
+            hash: hash_scene_document(&scene)?,
+        });
+    }
+    let resolved_packs = manifest.resolve_scenario_packs(project_root)?;
+    let scenario_pack = match scenario_pack_id {
+        Some(id) => {
+            let pack_ref = manifest
+                .scenario_packs
+                .iter()
+                .find(|reference| reference.id == id)
+                .ok_or_else(|| anyhow!("scenario pack id not found in project manifest: {id}"))?;
+            let pack = resolved_packs
+                .iter()
+                .find(|pack| pack.id == id)
+                .ok_or_else(|| anyhow!("scenario pack id did not resolve: {id}"))?;
+            Some(ProjectRunScenarioPackMetadata {
+                id: pack.id.clone(),
+                path: pack_ref.path.clone(),
+                scenario_ids: pack.ordered_scenario_ids(),
+            })
+        }
+        None => None,
+    };
+    Ok(ProjectRunMetadata {
+        id: manifest.project.id,
+        name: manifest.project.name,
+        project_root: project_root.to_string_lossy().to_string(),
+        manifest_path: manifest_path.to_string_lossy().to_string(),
+        manifest_hash,
+        seed_path: relative_seed_path,
+        scenes,
+        scenario_pack,
+    })
+}
+
+pub fn bind_run_project_metadata(
+    run_dir: impl AsRef<Path>,
+    metadata: ProjectRunMetadata,
+) -> Result<ProjectRunMetadata> {
+    let run_dir = run_dir.as_ref();
+    let run_path = run_dir.join("run.json");
+    let mut run = read_json_value(&run_path)?;
+    let run_object = run
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("run.json must be a JSON object"))?;
+    run_object.insert("project".to_string(), json!(metadata.clone()));
+    write_json_atomic(&run_path, &run)?;
+    append_ledger_event(
+        run_dir,
+        "run.project_bound",
+        "run-core",
+        json!({
+            "project_id": metadata.id,
+            "manifest_path": metadata.manifest_path,
+            "manifest_hash": metadata.manifest_hash,
+            "seed_path": metadata.seed_path,
+            "scene_paths": metadata.scenes.iter().map(|scene| scene.path.clone()).collect::<Vec<_>>(),
+            "scenario_pack_id": metadata.scenario_pack.as_ref().map(|pack| pack.id.clone())
+        }),
+    )?;
+    Ok(metadata)
+}
+
+fn project_relative_path(root: &Path, path: &Path) -> Result<String> {
+    let relative = if path.is_absolute() {
+        path.strip_prefix(root).with_context(|| {
+            format!(
+                "{} is outside project root {}",
+                path.display(),
+                root.display()
+            )
+        })?
+    } else if path.starts_with(root) {
+        path.strip_prefix(root).unwrap_or(path)
+    } else {
+        path
+    };
+    relative
+        .to_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("project-relative path is not valid UTF-8"))
+}
+
 pub fn create_run(
     seed_path: impl AsRef<Path>,
     runs_root: impl AsRef<Path>,
@@ -11195,6 +11362,75 @@ scenarios:
             .expect_err("failed transaction rejected");
         assert!(error.to_string().contains("requires a passed transaction"));
         fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn project_run_metadata_records_manifest_scene_hashes_and_pack_context() {
+        let root = unique_temp_dir("project-run-metadata");
+        let project = root.join("project");
+        create_minimal_2d_project_scaffold(&project).expect("project scaffolded");
+        let seed_path = project.join("seeds/platformer.yaml");
+        let runs_root = root.join("runs");
+        let artifacts = create_run(&seed_path, &runs_root).expect("legacy run created first");
+        let metadata = project_run_metadata_from_manifest(
+            project.join("ouroforge.project.json"),
+            &seed_path,
+            Some("smoke"),
+        )
+        .expect("metadata resolves");
+        assert_eq!(metadata.id, "minimal_2d");
+        assert_eq!(metadata.seed_path, "seeds/platformer.yaml");
+        assert_eq!(metadata.scenes.len(), 1);
+        assert_eq!(metadata.scenes[0].path, "scenes/main.scene.json");
+        assert_eq!(
+            metadata.scenes[0].hash.algorithm,
+            "fnv1a64-canonical-json-v1"
+        );
+        assert_eq!(metadata.manifest_hash.algorithm, "fnv1a64-file-v1");
+        assert_eq!(
+            metadata.scenario_pack.as_ref().unwrap().scenario_ids,
+            vec!["scaffold-smoke".to_string()]
+        );
+
+        bind_run_project_metadata(&artifacts.run_dir, metadata).expect("metadata bound");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        assert_eq!(run["project"]["id"], "minimal_2d");
+        assert_eq!(run["project"]["scenarioPack"]["id"], "smoke");
+        assert!(
+            run["project"]["manifestHash"]["value"]
+                .as_str()
+                .unwrap()
+                .len()
+                == 16
+        );
+        let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(ledger
+            .iter()
+            .any(|event| event["event"] == "run.project_bound"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn project_run_metadata_is_optional_for_legacy_runs_and_rejects_unknown_seed() {
+        let root = unique_temp_dir("project-run-metadata-legacy");
+        let project = root.join("project");
+        create_minimal_2d_project_scaffold(&project).expect("project scaffolded");
+        let legacy_seed = root.join("legacy.yaml");
+        fs::write(&legacy_seed, VALID_SEED).expect("legacy seed written");
+        let artifacts = create_run(&legacy_seed, root.join("runs")).expect("legacy run created");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        assert!(run.get("project").is_none());
+
+        let rejected = project_run_metadata_from_manifest(
+            project.join("ouroforge.project.json"),
+            &legacy_seed,
+            None,
+        )
+        .expect_err("undeclared seed rejected");
+        assert!(format!("{rejected:#}").contains("outside project root"));
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
