@@ -48,7 +48,7 @@ Tracked fixtures live under `examples/project-workspace-fixtures/`.
 | `seeds[]` | yes, non-empty | Seed references with unique `id` and project-relative `path`. |
 | `scenarioPacks[]` | optional | Scenario pack references with unique `id` and project-relative `path`. The manifest validates existence only; scenario pack execution is scoped to #248. |
 | `assetRoots[]` | yes, non-empty | Project-relative source asset directories. |
-| `runsRoot` | yes | Project-relative generated run root. It must also appear in `generated.roots`. |
+| `runsRoot` | yes | Project-relative generated run root policy entry. In Project Workspace Loop v1 it marks generated run state that source paths must avoid and must also appear in `generated.roots`; the current `run` and dashboard commands still use the repository-level `runs/` root unless a later issue wires manifest-owned run storage. |
 | `generated.roots[]` | yes, non-empty | Project-relative generated/local roots that source paths must not overlap. |
 
 ## Validation command
@@ -97,6 +97,12 @@ Validation rejects:
 
 `generated.roots` may name directories that do not yet exist. They are policy
 entries, not source inputs.
+
+`runsRoot` is intentionally conservative in v1: validation treats it as a
+project-local generated-state declaration, while run creation and dashboard
+export continue to use their explicit CLI run roots. Treating manifest
+`runsRoot` as the runtime storage authority is a future design/implementation
+change, not an implicit v1 behavior.
 
 ## Relation to Seed, Run, Evidence, and Mutation
 

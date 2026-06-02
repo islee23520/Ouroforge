@@ -215,3 +215,17 @@ After Project Workspace Loop v1 implementation, the top-level governance state i
 The implementation handoff for #253 should comment on #1 with the completed
 milestone summary and this decision. Closing or replacing #1 remains out of
 scope unless maintainers approve a separate replacement source of truth.
+
+
+## Follow-up maintainability candidates
+
+These are not Project Workspace Loop v1 completion blockers, but they should be
+kept visible for the next consolidation pass:
+
+- Decide whether manifest `runsRoot` should become the actual run-storage
+  authority or remain generated-state policy metadata. Project Workspace Loop v1
+  keeps current explicit CLI run roots.
+- Split the static Studio cockpit into smaller read-model modules once the
+  project workspace surface grows beyond the current prototype.
+- Consolidate generated-state policy declarations if additional ignored roots or
+  templates are added, so `.gitignore`, scaffold output, and docs do not drift.
