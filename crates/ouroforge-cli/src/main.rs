@@ -425,7 +425,7 @@ fn main() -> Result<()> {
                 .map(|summary| read_dashboard_run(&summary.run_dir))
                 .collect::<Result<Vec<_>>>()?;
             let payload = serde_json::json!({
-                "schema": "ouroforge-dashboard-v0",
+                "schema": "ouroforge-dashboard-v1",
                 "runs_root": runs_root,
                 "runs": runs
             });

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
@@ -5849,10 +5850,22 @@ pub struct RunDashboardSummary {
     pub seed_title: String,
     pub run_status: String,
     pub verdict_status: String,
+    pub scenario_status: String,
     pub created_at_unix_ms: u128,
     pub evidence_count: usize,
     pub mutation_count: usize,
+    pub worker_count: usize,
+    pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub journal_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardCategorySummary {
+    pub id: String,
+    pub label: String,
+    pub count: usize,
+    pub missing_count: usize,
+    pub malformed_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -5862,6 +5875,8 @@ pub struct RunDashboardArtifact {
     pub path: String,
     pub metadata: serde_json::Value,
     pub value: Option<serde_json::Value>,
+    pub exists: bool,
+    pub read_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -5873,7 +5888,13 @@ pub struct RunDashboardReadModel {
     pub evidence: Vec<EvidenceArtifact>,
     pub screenshots: Vec<RunDashboardArtifact>,
     pub console_logs: Vec<RunDashboardArtifact>,
+    pub cdp_trace_summaries: Vec<RunDashboardArtifact>,
     pub world_states: Vec<RunDashboardArtifact>,
+    pub frame_metrics: Vec<RunDashboardArtifact>,
+    pub performance_metrics: Vec<RunDashboardArtifact>,
+    pub scenario_results: Vec<RunDashboardArtifact>,
+    pub mutation_artifacts: Vec<RunDashboardArtifact>,
+    pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
 }
 
@@ -5914,8 +5935,27 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_screenshot)?;
     let console_logs =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_console_log)?;
+    let cdp_trace_summaries =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_cdp_trace_summary)?;
     let world_states =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_world_state)?;
+    let frame_metrics =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_frame_metric)?;
+    let performance_metrics =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_performance_metric)?;
+    let scenario_results =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
+    let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
+    let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
+        screenshots: &screenshots,
+        world_states: &world_states,
+        frame_metrics: &frame_metrics,
+        performance_metrics: &performance_metrics,
+        console_logs: &console_logs,
+        cdp_trace_summaries: &cdp_trace_summaries,
+        scenario_results: &scenario_results,
+        mutation_artifacts: &mutation_artifacts,
+    });
     let mutations = list_mutation_proposals(run_dir)?;
     Ok(RunDashboardReadModel {
         summary,
@@ -5925,16 +5965,48 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         evidence,
         screenshots,
         console_logs,
+        cdp_trace_summaries,
         world_states,
+        frame_metrics,
+        performance_metrics,
+        scenario_results,
+        mutation_artifacts,
+        evidence_categories,
         mutations,
     })
 }
 
 fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
     let run = read_json_value(run_dir.join("run.json"))?;
-    let evidence_count = read_evidence_index(run_dir)?.artifacts.len();
+    let evidence = read_evidence_index(run_dir)?.artifacts;
+    let evidence_count = evidence.len();
     let mutations = list_mutation_proposals(run_dir)?;
     let verdict = read_json_value(run_dir.join("verdict.json"))?;
+    let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
+    let screenshots =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_screenshot)?;
+    let console_logs =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_console_log)?;
+    let cdp_trace_summaries =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_cdp_trace_summary)?;
+    let world_states =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_world_state)?;
+    let frame_metrics =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_frame_metric)?;
+    let performance_metrics =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_performance_metric)?;
+    let scenario_results =
+        select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
+    let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
+        screenshots: &screenshots,
+        world_states: &world_states,
+        frame_metrics: &frame_metrics,
+        performance_metrics: &performance_metrics,
+        console_logs: &console_logs,
+        cdp_trace_summaries: &cdp_trace_summaries,
+        scenario_results: &scenario_results,
+        mutation_artifacts: &mutation_artifacts,
+    });
     let id = json_string(&run, "id").unwrap_or_else(|| {
         run_dir
             .file_name()
@@ -5949,6 +6021,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         seed_title: json_string(&run, "seed_title").unwrap_or_else(|| "Untitled Seed".to_string()),
         run_status: json_string(&run, "status").unwrap_or_else(|| "unknown".to_string()),
         verdict_status: json_string(&verdict, "status").unwrap_or_else(|| "unknown".to_string()),
+        scenario_status: dashboard_scenario_status(&verdict),
         created_at_unix_ms: run
             .get("created_at_unix_ms")
             .and_then(|value| value.as_u64())
@@ -5956,6 +6029,8 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
             .unwrap_or(0),
         evidence_count,
         mutation_count: mutations.len(),
+        worker_count: dashboard_worker_count(&evidence),
+        evidence_categories,
         journal_path: run_dir.join("journal.md"),
     })
 }
@@ -5973,17 +6048,47 @@ fn select_dashboard_artifacts(
 }
 
 fn dashboard_artifact(run_dir: &Path, artifact: &EvidenceArtifact) -> Result<RunDashboardArtifact> {
-    let value = if artifact.kind == "application/json" || artifact.path.ends_with(".json") {
-        Some(read_json_value(run_dir.join(&artifact.path))?)
+    dashboard_artifact_from_parts(
+        run_dir,
+        artifact.id.clone(),
+        artifact.kind.clone(),
+        artifact.path.clone(),
+        artifact.metadata.clone(),
+    )
+}
+
+fn dashboard_artifact_from_parts(
+    run_dir: &Path,
+    id: String,
+    kind: String,
+    path: String,
+    metadata: serde_json::Value,
+) -> Result<RunDashboardArtifact> {
+    let absolute_path = run_dir.join(&path);
+    let exists = absolute_path.is_file();
+    let mut read_error = None;
+    let value = if exists && (kind == "application/json" || path.ends_with(".json")) {
+        match read_json_value(&absolute_path) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                read_error = Some(error.to_string());
+                None
+            }
+        }
+    } else if exists {
+        None
     } else {
+        read_error = Some(format!("missing artifact file: {path}"));
         None
     };
     Ok(RunDashboardArtifact {
-        id: artifact.id.clone(),
-        kind: artifact.kind.clone(),
-        path: artifact.path.clone(),
-        metadata: artifact.metadata.clone(),
+        id,
+        kind,
+        path,
+        metadata,
         value,
+        exists,
+        read_error,
     })
 }
 
@@ -6001,6 +6106,16 @@ fn dashboard_artifact_is_console_log(artifact: &EvidenceArtifact) -> bool {
         || artifact.path.contains("console")
 }
 
+fn dashboard_artifact_is_cdp_trace_summary(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("cdp_trace_summary")
+        || artifact.id.contains("cdp-trace")
+        || artifact.path.contains("cdp-trace")
+}
+
 fn dashboard_artifact_is_world_state(artifact: &EvidenceArtifact) -> bool {
     artifact
         .metadata
@@ -6014,6 +6129,166 @@ fn dashboard_artifact_is_world_state(artifact: &EvidenceArtifact) -> bool {
             == Some("getWorldState")
         || artifact.id.contains("world-state")
         || artifact.path.contains("world-state")
+}
+
+fn dashboard_artifact_is_frame_metric(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("probe_call")
+        .and_then(|value| value.as_str())
+        == Some("getFrameStats")
+        || artifact.id.contains("frame-stats")
+        || artifact.path.contains("frame-stats")
+}
+
+fn dashboard_artifact_is_performance_metric(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("performance_metrics")
+        || artifact.id.contains("performance")
+        || artifact.path.contains("metrics")
+}
+
+fn dashboard_artifact_is_scenario_result(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("scenario_result")
+        || artifact.id.contains("scenario-result")
+        || artifact.path.contains("scenario-result")
+}
+
+fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboardArtifact>> {
+    [
+        ("mutation-proposals", "mutation/proposals.json"),
+        ("mutation-classifications", "mutation/classifications.json"),
+        ("mutation-patch-drafts", "mutation/patch-drafts.json"),
+        (
+            "mutation-rerun-orchestration",
+            "mutation/rerun-orchestration.json",
+        ),
+        (
+            "mutation-review-decisions",
+            "mutation/review-decisions.json",
+        ),
+        (
+            "mutation-evolve-v1-demo-summary",
+            "mutation/evolve-v1-demo-summary.json",
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, path)| run_dir.join(path).is_file())
+    .map(|(id, path)| {
+        dashboard_artifact_from_parts(
+            run_dir,
+            id.to_string(),
+            "application/json".to_string(),
+            path.to_string(),
+            json!({ "artifact": "mutation_artifact", "read_only": true }),
+        )
+    })
+    .collect()
+}
+
+struct DashboardCategoryArtifacts<'a> {
+    screenshots: &'a [RunDashboardArtifact],
+    world_states: &'a [RunDashboardArtifact],
+    frame_metrics: &'a [RunDashboardArtifact],
+    performance_metrics: &'a [RunDashboardArtifact],
+    console_logs: &'a [RunDashboardArtifact],
+    cdp_trace_summaries: &'a [RunDashboardArtifact],
+    scenario_results: &'a [RunDashboardArtifact],
+    mutation_artifacts: &'a [RunDashboardArtifact],
+}
+
+fn dashboard_category_summaries(
+    artifacts: DashboardCategoryArtifacts<'_>,
+) -> Vec<RunDashboardCategorySummary> {
+    vec![
+        dashboard_category_summary("screenshots", "Screenshots", artifacts.screenshots),
+        dashboard_category_summary(
+            "world_states",
+            "World-state snapshots",
+            artifacts.world_states,
+        ),
+        dashboard_category_summary(
+            "frame_performance_metrics",
+            "Frame/performance metrics",
+            &artifacts
+                .frame_metrics
+                .iter()
+                .chain(artifacts.performance_metrics.iter())
+                .cloned()
+                .collect::<Vec<_>>(),
+        ),
+        dashboard_category_summary(
+            "console_cdp_summaries",
+            "Console/CDP summaries",
+            &artifacts
+                .console_logs
+                .iter()
+                .chain(artifacts.cdp_trace_summaries.iter())
+                .cloned()
+                .collect::<Vec<_>>(),
+        ),
+        dashboard_category_summary(
+            "scenario_results",
+            "Scenario results",
+            artifacts.scenario_results,
+        ),
+        dashboard_category_summary(
+            "mutation_artifacts",
+            "Mutation artifacts",
+            artifacts.mutation_artifacts,
+        ),
+    ]
+}
+
+fn dashboard_category_summary(
+    id: &str,
+    label: &str,
+    artifacts: &[RunDashboardArtifact],
+) -> RunDashboardCategorySummary {
+    RunDashboardCategorySummary {
+        id: id.to_string(),
+        label: label.to_string(),
+        count: artifacts.len(),
+        missing_count: artifacts.iter().filter(|artifact| !artifact.exists).count(),
+        malformed_count: artifacts
+            .iter()
+            .filter(|artifact| artifact.exists && artifact.read_error.is_some())
+            .count(),
+    }
+}
+
+fn dashboard_worker_count(evidence: &[EvidenceArtifact]) -> usize {
+    let mut worker_ids = BTreeSet::new();
+    for artifact in evidence {
+        if let Some(worker_id) = artifact
+            .metadata
+            .get("worker_id")
+            .and_then(|value| value.as_str())
+        {
+            worker_ids.insert(worker_id.to_string());
+        }
+    }
+    worker_ids.len()
+}
+
+fn dashboard_scenario_status(verdict: &serde_json::Value) -> String {
+    let scenario_results = verdict
+        .get("metadata")
+        .and_then(|metadata| metadata.get("scenario_results"))
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    if scenario_results == 0 {
+        "pending".to_string()
+    } else {
+        json_string(verdict, "status").unwrap_or_else(|| "unknown".to_string())
+    }
 }
 
 fn read_json_value(path: impl AsRef<Path>) -> Result<serde_json::Value> {
@@ -9325,6 +9600,36 @@ scenarios:
             "[{\"level\":\"info\",\"text\":\"ready\"}]\n",
         )
         .expect("console log written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/frame-stats.json"),
+            "{\"frame\":3,\"fps\":60}\n",
+        )
+        .expect("frame stats written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/performance-metrics.json"),
+            "{\"metrics\":[{\"name\":\"ScriptDuration\",\"value\":1}]}\n",
+        )
+        .expect("performance metrics written");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/cdp-trace-summary.json"),
+            "{\"bounded\":true,\"events\":[]}\n",
+        )
+        .expect("cdp trace summary written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/scenarios/bootstrap-smoke"))
+            .expect("scenario evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/scenarios/bootstrap-smoke/scenario-result.json"),
+            "{\"scenario_id\":\"bootstrap-smoke\",\"status\":\"passed\"}\n",
+        )
+        .expect("scenario result written");
         add_evidence_artifact(
             &artifacts.run_dir,
             "fixture-screenshot",
@@ -9349,6 +9654,38 @@ scenarios:
             json!({ "artifact": "console_log", "worker_id": "worker-1" }),
         )
         .expect("console log indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-frame-stats",
+            "application/json",
+            "evidence/workers/worker-1/frame-stats.json",
+            json!({ "probe_call": "getFrameStats", "worker_id": "worker-1" }),
+        )
+        .expect("frame stats indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-performance-metrics",
+            "application/json",
+            "evidence/workers/worker-1/performance-metrics.json",
+            json!({ "artifact": "performance_metrics", "worker_id": "worker-1" }),
+        )
+        .expect("performance metrics indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-cdp-trace-summary",
+            "application/json",
+            "evidence/workers/worker-1/cdp-trace-summary.json",
+            json!({ "artifact": "cdp_trace_summary", "worker_id": "worker-1" }),
+        )
+        .expect("cdp trace summary indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-scenario-result",
+            "application/json",
+            "evidence/scenarios/bootstrap-smoke/scenario-result.json",
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("scenario result indexed");
         create_mutation_proposal(
             &artifacts.run_dir,
             MutationProposalInput {
@@ -9365,15 +9702,22 @@ scenarios:
         let runs = list_dashboard_runs(root.join("runs")).expect("dashboard runs listed");
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].verdict_status, "failed");
-        assert_eq!(runs[0].evidence_count, 3);
+        assert_eq!(runs[0].scenario_status, "pending");
+        assert_eq!(runs[0].evidence_count, 7);
         assert_eq!(runs[0].mutation_count, 1);
+        assert_eq!(runs[0].worker_count, 1);
 
         let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run read");
         assert_eq!(model.summary.id, runs[0].id);
-        assert_eq!(model.evidence.len(), 3);
+        assert_eq!(model.evidence.len(), 7);
         assert_eq!(model.screenshots.len(), 1);
         assert_eq!(model.world_states.len(), 1);
         assert_eq!(model.console_logs.len(), 1);
+        assert_eq!(model.frame_metrics.len(), 1);
+        assert_eq!(model.performance_metrics.len(), 1);
+        assert_eq!(model.cdp_trace_summaries.len(), 1);
+        assert_eq!(model.scenario_results.len(), 1);
+        assert_eq!(model.mutation_artifacts.len(), 1);
         assert_eq!(model.mutations.len(), 1);
         let world_state = model.world_states[0]
             .value
@@ -9385,6 +9729,92 @@ scenarios:
             .expect("console log JSON loaded");
         assert_eq!(world_state["object"]["x"], json!(40));
         assert_eq!(console_log[0]["text"], json!("ready"));
+        assert!(model
+            .evidence_categories
+            .iter()
+            .any(|category| category.id == "screenshots" && category.count == 1));
+        assert!(model
+            .evidence_categories
+            .iter()
+            .any(|category| { category.id == "frame_performance_metrics" && category.count == 2 }));
+        assert!(model
+            .evidence_categories
+            .iter()
+            .any(|category| { category.id == "console_cdp_summaries" && category.count == 2 }));
+        assert!(model
+            .evidence_categories
+            .iter()
+            .any(|category| category.id == "scenario_results" && category.count == 1));
+        assert!(model
+            .evidence_categories
+            .iter()
+            .any(|category| category.id == "mutation_artifacts" && category.count == 1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_read_model_surfaces_missing_and_malformed_evidence_without_mutating() {
+        let (root, artifacts) = create_test_run("dashboard-partial-read-model");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"pending\",\"metadata\":{\"scenario_results\":0}}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-2"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-2/malformed-world-state.json"),
+            "{not-json",
+        )
+        .expect("malformed world state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "missing-world-state",
+            "application/json",
+            "evidence/workers/worker-2/missing-world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-2" }),
+        )
+        .expect("missing artifact indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "malformed-world-state",
+            "application/json",
+            "evidence/workers/worker-2/malformed-world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-2" }),
+        )
+        .expect("malformed artifact indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir)
+            .expect("partial dashboard run remains inspectable");
+        assert_eq!(model.world_states.len(), 2);
+        assert_eq!(
+            model
+                .world_states
+                .iter()
+                .filter(|artifact| !artifact.exists)
+                .count(),
+            1
+        );
+        assert_eq!(
+            model
+                .world_states
+                .iter()
+                .filter(|artifact| artifact.exists && artifact.read_error.is_some())
+                .count(),
+            1
+        );
+        let world_state_category = model
+            .evidence_categories
+            .iter()
+            .find(|category| category.id == "world_states")
+            .expect("world-state category summarized");
+        assert_eq!(world_state_category.count, 2);
+        assert_eq!(world_state_category.missing_count, 1);
+        assert_eq!(world_state_category.malformed_count, 1);
+        assert_eq!(model.summary.worker_count, 1);
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
