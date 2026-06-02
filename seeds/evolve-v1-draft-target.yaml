@@ -1,0 +1,10 @@
+id: evolve.v1.draft-target
+title: Evolve v1 Draft Target Fixture
+goal: Provide a tracked seed/data target for sandbox-only evolve patch draft verification.
+constraints:
+  target: patch-draft-fixture
+acceptance:
+  - The fixture remains valid seed data before and after sandbox-only draft rendering.
+scenarios:
+  - id: draft-target-smoke
+    description: Static target used only by sandbox patch draft verification.

@@ -3268,8 +3268,8 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
                 failure["kind"].as_str().unwrap_or("failed_verdict")
             ),
             evidence_id,
-            target: "seeds/platformer.yaml".to_string(),
-            path: "scenarios.bootstrap-smoke.assertions".to_string(),
+            target: "seeds/evolve-v1-draft-target.yaml".to_string(),
+            path: "scenarios.evolve-controlled-failure.assertions".to_string(),
             from: "current evidence-linked failing criteria".to_string(),
             to: "review evidence and adjust the next explicit implementation issue".to_string(),
         },
@@ -4362,31 +4362,45 @@ fn render_patch_draft_text(
     classification: &MutationClassification,
 ) -> String {
     let evidence_refs = classification.evidence_refs.join(", ");
+    let category = format!("{:?}", classification.category);
+    let escaped = |value: &str| {
+        serde_yaml::to_string(value)
+            .unwrap_or_else(|_| format!("{value:?}"))
+            .trim()
+            .to_string()
+    };
     format!(
         "\
 # Ouroforge patch draft v1
 # This is an inspectable draft artifact only. It has not been applied.
-proposal_id: {proposal_id}
-classification_id: {classification_id}
-category: {category:?}
-target: {target}
-path: {path}
-evidence_refs: {evidence_refs}
-reason: {reason}
-
-suggested_change:
-  from: {from}
-  to: {to}
+# proposal_id: {proposal_id}
+# classification_id: {classification_id}
+# category: {category}
+# target: {target}
+# path: {path}
+# evidence_refs: {evidence_refs}
+id: patch-draft.{proposal_id}
+title: Ouroforge Patch Draft {proposal_id}
+goal: Review an evidence-linked mutation draft without applying it.
+constraints:
+  target: patch-draft-inspection
+acceptance:
+  - {reason_yaml}
+  - {from_yaml}
+  - {to_yaml}
+scenarios:
+  - id: patch-draft-inspection
+    description: Inspectable draft metadata for a sandbox-only mutation review.
 ",
         proposal_id = proposal.id,
         classification_id = classification.id,
-        category = classification.category,
+        category = category,
         target = proposal.target,
         path = proposal.path,
         evidence_refs = evidence_refs,
-        reason = proposal.reason,
-        from = proposal.from,
-        to = proposal.to
+        reason_yaml = escaped(&format!("reason: {}", proposal.reason)),
+        from_yaml = escaped(&format!("from: {}", proposal.from)),
+        to_yaml = escaped(&format!("to: {}", proposal.to))
     )
 }
 
@@ -12845,8 +12859,84 @@ pub fn create_run(
             artifacts: Vec::new(),
         },
     )?;
+    if seed.id == "evolve.v1.demo" {
+        materialize_evolve_demo_controlled_failure(&run_dir)?;
+    }
 
     Ok(RunArtifacts { run_dir })
+}
+
+fn materialize_evolve_demo_controlled_failure(run_dir: &Path) -> Result<()> {
+    let scenario_result_rel = "evidence/scenarios/evolve-controlled-failure/scenario-result.json";
+    let scenario_result_path = run_dir.join(scenario_result_rel);
+    if let Some(parent) = scenario_result_path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create scenario evidence directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json(
+        &scenario_result_path,
+        &json!({
+            "schema_version": "1",
+            "artifact": "scenario_result",
+            "scenario_id": "evolve-controlled-failure",
+            "status": "failed",
+            "summary": "controlled assertion failure for evolve demo",
+            "failures": [{
+                "kind": "scenario_assertion_failure",
+                "assertion": "world_state.object.x equals 999",
+                "actual": 0,
+                "expected": 999,
+                "evidence_ref": scenario_result_rel
+            }]
+        }),
+    )?;
+    add_evidence_artifact(
+        run_dir,
+        "scenario-result-evolve-controlled-failure",
+        "application/json",
+        scenario_result_rel,
+        json!({
+            "artifact": "scenario_result",
+            "scenario_id": "evolve-controlled-failure",
+            "status": "failed",
+            "controlled_demo": true
+        }),
+    )?;
+    write_json(
+        &run_dir.join("verdict.json"),
+        &json!({
+            "status": "failed",
+            "summary": "controlled evolve demo scenario assertion failure",
+            "failures": [{
+                "kind": "scenario_assertion_failure",
+                "path": scenario_result_rel,
+                "evidence_ref": scenario_result_rel,
+                "scenario_id": "evolve-controlled-failure"
+            }],
+            "evidence_refs": [scenario_result_rel],
+            "metadata": {
+                "evaluator": "ouroforge-evolve-demo-smoke-v1",
+                "controlled_demo": true
+            }
+        }),
+    )?;
+    append_ledger_event(
+        run_dir,
+        "scenario.completed",
+        "run-cli",
+        json!({
+            "scenario_id": "evolve-controlled-failure",
+            "status": "failed",
+            "path": scenario_result_rel,
+            "controlled_demo": true
+        }),
+    )?;
+    update_journal(run_dir)?;
+    Ok(())
 }
 
 fn copy_replay_references_to_run(seed: &Seed, seed_base_dir: &Path, run_dir: &Path) -> Result<()> {
@@ -14993,6 +15083,30 @@ scenarios:
         }
     }
 
+    #[test]
+    fn create_run_evolve_demo_seed_materializes_controlled_failure() {
+        let root = unique_temp_dir("ouroforge-evolve-demo-run-smoke-test");
+        let runs_root = root.join("runs");
+        fs::create_dir_all(&runs_root).expect("runs root exists");
+        let artifacts = create_run(repo_fixture_path("seeds/evolve-v1-demo.yaml"), &runs_root)
+            .expect("demo run creates");
+
+        let verdict =
+            read_json_value(artifacts.run_dir.join("verdict.json")).expect("verdict reads");
+        assert_eq!(verdict["status"].as_str(), Some("failed"));
+        assert!(artifacts
+            .run_dir
+            .join("evidence/scenarios/evolve-controlled-failure/scenario-result.json")
+            .is_file());
+        let evidence = read_evidence_index(&artifacts.run_dir).expect("evidence reads");
+        assert!(evidence.artifacts.iter().any(|artifact| {
+            artifact.id == "scenario-result-evolve-controlled-failure"
+                && artifact.path
+                    == "evidence/scenarios/evolve-controlled-failure/scenario-result.json"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
     fn valid_patch_draft_artifact() -> PatchDraftArtifact {
         PatchDraftArtifact {
             schema_version: "1".to_string(),
@@ -15009,6 +15123,41 @@ scenarios:
                     .to_string(),
             }],
         }
+    }
+
+    #[test]
+    fn rendered_patch_draft_text_remains_valid_seed_yaml() {
+        let proposal = MutationProposal {
+            id: "mutation-render-test".to_string(),
+            reason: "controlled failure rationale".to_string(),
+            evidence_id: "evidence-1".to_string(),
+            target: "seeds/evolve-v1-draft-target.yaml".to_string(),
+            path: "scenarios.evolve-controlled-failure.assertions".to_string(),
+            from: "old assertion".to_string(),
+            to: "new assertion".to_string(),
+            confidence: "medium".to_string(),
+            status: "proposed".to_string(),
+            verdict_status: "failed".to_string(),
+            created_at_unix_ms: 123,
+            rationale: None,
+        };
+        let classification = MutationClassification {
+            id: "classification-1".to_string(),
+            proposal_id: Some(proposal.id.clone()),
+            category: MutationClassificationCategory::ScenarioAssertionFailure,
+            lifecycle_state: MutationClassificationState::Classified,
+            reason: "scenario assertion failure".to_string(),
+            evidence_refs: vec!["evidence/source.json".to_string()],
+            verdict_ref: "verdict.json".to_string(),
+            journal_ref: "journal.md".to_string(),
+            scenario_result_refs: vec!["evidence/source.json".to_string()],
+        };
+
+        let draft_text = render_patch_draft_text(&proposal, &classification);
+        let seed = Seed::from_yaml_str(&draft_text).expect("draft text remains seed-compatible");
+
+        assert!(draft_text.contains("Ouroforge patch draft v1"));
+        assert_eq!(seed.constraints.target, "patch-draft-inspection");
     }
 
     #[test]
