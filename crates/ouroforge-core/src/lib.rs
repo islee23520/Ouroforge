@@ -6648,7 +6648,29 @@ fn run_scenario<T: CdpTransport>(
         }
     }
 
-    let world_state = client.evaluate_json("window.__OUROFORGE__.getWorldState()")?;
+    let mut prior_evidence_paths = replay_paths.clone();
+    prior_evidence_paths.extend(snapshot_paths.clone());
+    prior_evidence_paths.extend(visual_checkpoint_paths.clone());
+    prior_evidence_paths.extend(visual_checkpoint_screenshot_paths.clone());
+
+    let world_state = match evaluate_runtime_probe_object(
+        client,
+        "getWorldState",
+        "window.__OUROFORGE__.getWorldState()",
+    ) {
+        Ok(value) => value,
+        Err(error) => {
+            return write_runtime_probe_contract_failure_result(
+                config,
+                scenario,
+                &scenario_dir,
+                "getWorldState",
+                "JSON object world state",
+                error,
+                prior_evidence_paths,
+            );
+        }
+    };
     let world_state_path = write_scenario_json_artifact(
         config,
         scenario,
@@ -6658,7 +6680,25 @@ fn run_scenario<T: CdpTransport>(
         suffix,
         &world_state,
     )?;
-    let frame_stats = client.evaluate_json("window.__OUROFORGE__.getFrameStats()")?;
+    prior_evidence_paths.push(world_state_path.clone());
+    let frame_stats = match evaluate_runtime_probe_object(
+        client,
+        "getFrameStats",
+        "window.__OUROFORGE__.getFrameStats()",
+    ) {
+        Ok(value) => value,
+        Err(error) => {
+            return write_runtime_probe_contract_failure_result(
+                config,
+                scenario,
+                &scenario_dir,
+                "getFrameStats",
+                "JSON object frame stats",
+                error,
+                prior_evidence_paths,
+            );
+        }
+    };
     let frame_stats_path = write_scenario_json_artifact(
         config,
         scenario,
@@ -6888,6 +6928,139 @@ fn run_scenario<T: CdpTransport>(
         evidence_paths,
         result_path,
     })
+}
+
+fn evaluate_runtime_probe_object<T: CdpTransport>(
+    client: &mut CdpClient<T>,
+    method: &str,
+    expression: &str,
+) -> Result<serde_json::Value> {
+    let value = client
+        .evaluate_json(expression)
+        .with_context(|| format!("runtime probe {method} failed"))?;
+    if !value.is_object() {
+        return Err(anyhow!(
+            "runtime probe {method} returned malformed response; expected JSON object, found {}",
+            json_type_name(&value)
+        ));
+    }
+    Ok(value)
+}
+
+fn write_runtime_probe_contract_failure_result(
+    config: &ScenarioRunConfig,
+    scenario: &Scenario,
+    scenario_dir: &str,
+    method: &str,
+    expected: &str,
+    error: anyhow::Error,
+    mut evidence_paths: Vec<String>,
+) -> Result<ScenarioExecutionResult> {
+    let suffix = unix_millis()?;
+    let failure_path = format!("{scenario_dir}/runtime-probe-contract-failure-{suffix}.json");
+    let failure = json!({
+        "artifact": "runtime_probe_contract_failure",
+        "scenario_id": scenario.id,
+        "status": "failed",
+        "method": method,
+        "expected": expected,
+        "error": error.to_string(),
+        "probe_contract": {
+            "name": RUNTIME_PROBE_CONTRACT_NAME,
+            "version": RUNTIME_PROBE_CONTRACT_VERSION
+        }
+    });
+    write_json(&config.run_dir.join(&failure_path), &failure)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!(
+            "scenario-runtime-probe-contract-failure-{}-{suffix}",
+            scenario.id
+        ),
+        "application/json",
+        &failure_path,
+        json!({
+            "scenario_id": scenario.id,
+            "url": config.url,
+            "artifact": "runtime_probe_contract_failure",
+            "status": "failed",
+            "probe_call": method,
+            "probe_contract": {
+                "name": RUNTIME_PROBE_CONTRACT_NAME,
+                "version": RUNTIME_PROBE_CONTRACT_VERSION
+            }
+        }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "scenario.probe_contract_failed",
+        "scenario-runner",
+        json!({
+            "scenario_id": scenario.id,
+            "status": "failed",
+            "probe_call": method,
+            "expected": expected,
+            "error": failure["error"],
+            "path": failure_path,
+            "probe_contract": failure["probe_contract"]
+        }),
+    )?;
+
+    let result_path = format!("{scenario_dir}/scenario-result-{}.json", unix_millis()?);
+    write_json(
+        &config.run_dir.join(&result_path),
+        &json!({
+            "scenario_id": scenario.id,
+            "status": "failed",
+            "evidence": {
+                "runtime_probe_contract_failure": failure_path
+            },
+            "assertions": [],
+            "probe_contract_failure": failure
+        }),
+    )?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!("scenario-result-{}-{}", scenario.id, unix_millis()?),
+        "application/json",
+        &result_path,
+        json!({
+            "scenario_id": scenario.id,
+            "url": config.url,
+            "artifact": "scenario_result",
+            "status": "failed",
+            "probe_contract_failure": true
+        }),
+    )?;
+    append_ledger_event(
+        &config.run_dir,
+        "scenario.completed",
+        "scenario-runner",
+        json!({
+            "scenario_id": scenario.id,
+            "status": "failed",
+            "runtime_probe_contract_failure_path": failure_path,
+            "result_path": result_path
+        }),
+    )?;
+
+    evidence_paths.push(failure_path);
+    Ok(ScenarioExecutionResult {
+        passed: false,
+        evidence_paths,
+        result_path,
+    })
+}
+
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
 }
 
 fn write_scenario_json_artifact(
@@ -14470,6 +14643,92 @@ scenarios:
                 _ => Ok(json!({})),
             }
         }
+    }
+
+    struct MalformedProbeScenarioTransport;
+
+    impl CdpTransport for MalformedProbeScenarioTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            match method {
+                "Runtime.evaluate" => {
+                    let expression = params["expression"].as_str().unwrap_or_default();
+                    if expression.contains("getWorldState") {
+                        Ok(json!({ "result": { "value": "not-a-world-state-object" } }))
+                    } else {
+                        Ok(json!({ "result": { "value": {} } }))
+                    }
+                }
+                _ => Ok(json!({})),
+            }
+        }
+    }
+
+    #[test]
+    fn scenario_malformed_runtime_probe_records_failure_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-scenario-malformed-runtime-probe");
+        let seed = Seed::from_yaml_str(
+            r#"
+id: malformed-probe.v1
+title: Malformed Probe Fixture
+goal: Fail with explicit probe contract evidence.
+constraints:
+  target: file-harness
+acceptance:
+  - Runtime probe failure is explicit.
+scenarios:
+  - id: malformed-probe
+    description: Runtime world state is malformed.
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 32
+"#,
+        )
+        .expect("seed parses");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8080")
+            .expect("scenario config");
+        let mut client = CdpClient::new(MalformedProbeScenarioTransport);
+
+        let summary = run_scenarios_with_client(&config, &seed, &mut client)
+            .expect("suite records probe failure instead of aborting");
+
+        assert_eq!(summary.completed, 1);
+        assert_eq!(summary.passed, 0);
+        assert_eq!(summary.failed, 1);
+        let failure_path = summary
+            .evidence_paths
+            .iter()
+            .find(|path| path.contains("runtime-probe-contract-failure"))
+            .expect("probe contract failure evidence path");
+        let failure = read_json_value(artifacts.run_dir.join(failure_path))
+            .expect("probe failure evidence reads");
+        assert_eq!(failure["artifact"], "runtime_probe_contract_failure");
+        assert_eq!(failure["method"], "getWorldState");
+        assert_eq!(
+            failure["probe_contract"]["version"],
+            RUNTIME_PROBE_CONTRACT_VERSION
+        );
+        assert!(failure["error"]
+            .as_str()
+            .expect("error text")
+            .contains("malformed response"));
+        let result = read_json_value(artifacts.run_dir.join(&summary.result_paths[0]))
+            .expect("scenario result reads");
+        assert_eq!(result["status"], "failed");
+        assert_eq!(
+            result["evidence"]["runtime_probe_contract_failure"],
+            json!(failure_path)
+        );
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(events.iter().any(|event| {
+            event["event"] == "scenario.probe_contract_failed"
+                && event["payload"]["probe_call"] == "getWorldState"
+        }));
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
