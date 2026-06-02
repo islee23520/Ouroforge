@@ -1984,6 +1984,13 @@ impl CdpTargetSelection {
             target_id: Some(target_id),
         })
     }
+
+    fn label(&self) -> String {
+        self.target_id
+            .as_ref()
+            .map(|target_id| format!("target_id:{target_id}"))
+            .unwrap_or_else(|| "first_page".to_string())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2693,6 +2700,44 @@ const RUNTIME_PROBE_CONTRACT_VERSION: &str = "v2";
 const RUNTIME_PROBE_MAX_ATTEMPTS: u32 = 20;
 const RUNTIME_PROBE_RETRY_INTERVAL: Duration = Duration::from_millis(50);
 
+fn run_id_from_run_dir(run_dir: &Path) -> String {
+    run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown-run")
+        .to_string()
+}
+
+fn browser_worker_evidence_metadata(
+    config: &BrowserSmokeConfig,
+    artifact: &str,
+    extra: serde_json::Value,
+) -> serde_json::Value {
+    let run_id = run_id_from_run_dir(&config.run_dir);
+    let mut metadata = json!({
+        "artifact": artifact,
+        "worker_id": config.worker_id.as_str(),
+        "worker_session_id": format!("{}:{}", run_id, config.worker_id.as_str()),
+        "run_id": run_id,
+        "url": config.url,
+        "evidence_dir": config.worker_id.evidence_dir(),
+        "execution_boundary": "openchrome_cdp",
+        "cdp_transport": "chrome_devtools_protocol",
+        "target_selection": config.target_selection.label(),
+        "target_ws_url_bound": config.target_ws_url.is_some()
+    });
+    merge_json_object(&mut metadata, extra);
+    metadata
+}
+
+fn merge_json_object(target: &mut serde_json::Value, extra: serde_json::Value) {
+    if let (Some(target), Some(extra)) = (target.as_object_mut(), extra.as_object()) {
+        for (key, value) in extra {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+}
+
 fn capture_runtime_probe<T: CdpTransport>(
     config: &BrowserSmokeConfig,
     client: &mut CdpClient<T>,
@@ -2777,15 +2822,17 @@ fn capture_runtime_probe_value<T: CdpTransport>(
         ),
         "application/json",
         &rel_path,
-        json!({
-            "worker_id": config.worker_id.as_str(),
-            "url": config.url,
-            "probe_call": call_name,
-            "probe_contract": {
-                "name": RUNTIME_PROBE_CONTRACT_NAME,
-                "version": RUNTIME_PROBE_CONTRACT_VERSION
-            }
-        }),
+        browser_worker_evidence_metadata(
+            config,
+            artifact_name,
+            json!({
+                "probe_call": call_name,
+                "probe_contract": {
+                    "name": RUNTIME_PROBE_CONTRACT_NAME,
+                    "version": RUNTIME_PROBE_CONTRACT_VERSION
+                }
+            }),
+        ),
     )?;
     append_ledger_event(
         &config.run_dir,
@@ -2865,13 +2912,14 @@ fn capture_console_log<T: CdpTransport>(
         &format!("browser-console-{}-{suffix}", config.worker_id.as_str()),
         "application/json",
         &rel_path,
-        json!({
-            "artifact": "console_log",
-            "worker_id": config.worker_id.as_str(),
-            "url": config.url,
-            "bounded": true,
-            "limit": 100
-        }),
+        browser_worker_evidence_metadata(
+            config,
+            "console_log",
+            json!({
+                "bounded": true,
+                "limit": 100
+            }),
+        ),
     )?;
     append_ledger_event(
         &config.run_dir,
@@ -2931,13 +2979,14 @@ fn write_worker_cdp_trace_summary(
         ),
         "application/json",
         &rel_path,
-        json!({
-            "artifact": "cdp_trace_summary",
-            "worker_id": config.worker_id.as_str(),
-            "url": config.url,
-            "bounded": true,
-            "limit": 32
-        }),
+        browser_worker_evidence_metadata(
+            config,
+            "cdp_trace_summary",
+            json!({
+                "bounded": true,
+                "limit": 32
+            }),
+        ),
     )?;
     append_ledger_event(
         &config.run_dir,
@@ -3005,7 +3054,7 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
         ),
         "image/png",
         &screenshot_rel_path,
-        json!({ "worker_id": config.worker_id.as_str(), "url": config.url }),
+        browser_worker_evidence_metadata(config, "screenshot", json!({})),
     )?;
     append_ledger_event(
         &config.run_dir,
@@ -3033,13 +3082,14 @@ fn run_browser_smoke_inner(config: &BrowserSmokeConfig) -> Result<BrowserSmokeRe
                 ),
                 "application/json",
                 &metrics_rel_path,
-                json!({
-                    "artifact": "performance_metrics",
-                    "worker_id": config.worker_id.as_str(),
-                    "url": config.url,
-                    "optional": true,
-                    "bounded": true
-                }),
+                browser_worker_evidence_metadata(
+                    config,
+                    "performance_metrics",
+                    json!({
+                        "optional": true,
+                        "bounded": true
+                    }),
+                ),
             );
             append_ledger_event(
                 &config.run_dir,
@@ -13099,6 +13149,36 @@ scenarios:
     }
 
     #[test]
+    fn browser_worker_evidence_metadata_records_run_session_and_boundary() {
+        let (root, artifacts) = create_test_run("browser-worker-evidence-metadata-test");
+        let mut config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8765")
+            .expect("config builds");
+        config.worker_id = WorkerId::new("worker-7").expect("worker id parses");
+        config.target_ws_url = Some("ws://127.0.0.1:9222/devtools/page/fixture".to_string());
+        config.target_selection = CdpTargetSelection::target_id("fixture-page").expect("target id");
+
+        let metadata = browser_worker_evidence_metadata(
+            &config,
+            "console_log",
+            json!({ "bounded": true, "limit": 100 }),
+        );
+
+        let run_id = run_id_from_run_dir(&artifacts.run_dir);
+        assert_eq!(metadata["artifact"], "console_log");
+        assert_eq!(metadata["worker_id"], "worker-7");
+        assert_eq!(metadata["run_id"], run_id);
+        assert_eq!(metadata["worker_session_id"], format!("{run_id}:worker-7"));
+        assert_eq!(metadata["evidence_dir"], "evidence/workers/worker-7");
+        assert_eq!(metadata["execution_boundary"], "openchrome_cdp");
+        assert_eq!(metadata["cdp_transport"], "chrome_devtools_protocol");
+        assert_eq!(metadata["target_selection"], "target_id:fixture-page");
+        assert_eq!(metadata["target_ws_url_bound"], true);
+        assert_eq!(metadata["bounded"], true);
+        assert_eq!(metadata["limit"], 100);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn browser_smoke_config_rejects_non_http_url() {
         for url in [
             "file:///etc/passwd",
@@ -13195,6 +13275,17 @@ scenarios:
         assert!(artifacts_list.iter().all(|artifact| {
             artifact.path.starts_with("evidence/workers/worker-1/")
                 && artifact.metadata["worker_id"] == "worker-1"
+                && artifact.metadata["run_id"]
+                    .as_str()
+                    .is_some_and(|id| id.starts_with("run-"))
+                && artifact.metadata["worker_session_id"]
+                    .as_str()
+                    .is_some_and(|session| session.ends_with(":worker-1"))
+                && artifact.metadata["evidence_dir"] == "evidence/workers/worker-1"
+                && artifact.metadata["execution_boundary"] == "openchrome_cdp"
+                && artifact.metadata["cdp_transport"] == "chrome_devtools_protocol"
+                && artifact.metadata["target_selection"] == "first_page"
+                && artifact.metadata["target_ws_url_bound"] == false
                 && artifact.metadata["probe_contract"]["name"] == RUNTIME_PROBE_CONTRACT_NAME
                 && artifact.metadata["probe_contract"]["version"] == RUNTIME_PROBE_CONTRACT_VERSION
         }));
@@ -13247,6 +13338,18 @@ scenarios:
             .expect("console artifact indexed");
         assert_eq!(console_artifact.metadata["bounded"], true);
         assert_eq!(console_artifact.metadata["limit"], 100);
+        assert_eq!(
+            console_artifact.metadata["run_id"],
+            run_id_from_run_dir(&artifacts.run_dir)
+        );
+        assert_eq!(
+            console_artifact.metadata["worker_session_id"],
+            format!("{}:worker-1", run_id_from_run_dir(&artifacts.run_dir))
+        );
+        assert_eq!(
+            console_artifact.metadata["execution_boundary"],
+            "openchrome_cdp"
+        );
 
         fs::remove_dir_all(root).ok();
     }
