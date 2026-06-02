@@ -2752,6 +2752,7 @@ pub struct EvolveRerunOrchestration {
     pub before: EvolveRunReference,
     pub after: EvolveSandboxRunReference,
     pub comparison_artifact_path: Option<String>,
+    pub final_classification: Option<String>,
     pub evolve_evidence_path: String,
     pub primary_git_status_before: String,
     pub primary_git_status_after: String,
@@ -2982,6 +2983,13 @@ pub fn orchestrate_evolve_rerun(
         .iter()
         .flat_map(|output| [output.stdout_path.clone(), output.stderr_path.clone()])
         .collect::<Vec<_>>();
+    let after_run_dir = write_sandbox_after_run_reference(run_dir, &sandbox, &after_run_id)?;
+    let comparison_path =
+        write_run_comparison_artifact(run_dir, &after_run_dir, run_dir.join("mutation"))?;
+    let comparison = compare_runs(run_dir, &after_run_dir)?;
+    let comparison_artifact_path = run_relative_path(run_dir, &comparison_path)?;
+    let final_classification =
+        normalize_evolve_comparison_classification(&comparison.classification).to_string();
     let evolve_evidence_path = "mutation/rerun-orchestration.json".to_string();
     let result = EvolveRerunOrchestration {
         schema_version: "1".to_string(),
@@ -2997,7 +3005,8 @@ pub fn orchestrate_evolve_rerun(
             applied_target_path: sandbox.applied_target_path,
             verification_evidence_refs,
         },
-        comparison_artifact_path: None,
+        comparison_artifact_path: Some(comparison_artifact_path),
+        final_classification: Some(final_classification),
         evolve_evidence_path,
         primary_git_status_before: sandbox.primary_git_status_before,
         primary_git_status_after: sandbox.primary_git_status_after,
@@ -3014,9 +3023,94 @@ pub fn orchestrate_evolve_rerun(
             "after_run_id": result.after.run_id,
             "evolve_evidence_path": result.evolve_evidence_path,
             "comparison_artifact_path": result.comparison_artifact_path,
+            "final_classification": result.final_classification,
         }),
     )?;
     Ok(result)
+}
+
+fn write_sandbox_after_run_reference(
+    source_run_dir: &Path,
+    sandbox: &PatchSandboxApplicationResult,
+    after_run_id: &str,
+) -> Result<PathBuf> {
+    let after_run_dir = source_run_dir.join(&sandbox.sandbox_root).join("after-run");
+    let evidence_dir = after_run_dir.join("evidence");
+    fs::create_dir_all(&evidence_dir)
+        .with_context(|| format!("failed to create {}", evidence_dir.display()))?;
+    write_json(
+        &after_run_dir.join("run.json"),
+        &json!({
+            "id": after_run_id,
+            "source_run_id": sandbox.run_id,
+            "sandbox_result_path": sandbox.result_path,
+            "status": "sandbox_verified",
+        }),
+    )?;
+    let verdict_status = if sandbox.lifecycle_state == PatchSandboxState::Verified {
+        "passed"
+    } else {
+        "failed"
+    };
+    write_json(
+        &after_run_dir.join("verdict.json"),
+        &json!({
+            "status": verdict_status,
+            "summary": "Sandbox verification result used as evolve after-run reference.",
+            "failures": [],
+            "evidence_refs": [
+                sandbox.result_path,
+                sandbox.applied_draft_path,
+            ],
+            "metadata": {
+                "evaluator": "ouroforge-evolve-rerun-v1",
+                "sandbox_id": sandbox.sandbox_id,
+                "patch_draft_id": sandbox.patch_draft_id,
+            }
+        }),
+    )?;
+    let mut artifacts = vec![
+        EvidenceArtifact {
+            id: "sandbox-result".to_string(),
+            kind: "application/json".to_string(),
+            path: "evidence/sandbox-result.json".to_string(),
+            metadata: json!({ "artifact": "sandbox_result" }),
+            added_at_unix_ms: unix_millis()?,
+        },
+        EvidenceArtifact {
+            id: "applied-draft".to_string(),
+            kind: "text/plain".to_string(),
+            path: "evidence/applied-draft.txt".to_string(),
+            metadata: json!({ "artifact": "applied_patch_draft" }),
+            added_at_unix_ms: unix_millis()?,
+        },
+    ];
+    for (index, output) in sandbox.verification.iter().enumerate() {
+        artifacts.push(EvidenceArtifact {
+            id: format!("sandbox-verification-{}", index + 1),
+            kind: "text/plain".to_string(),
+            path: format!("evidence/sandbox-verification-{}.txt", index + 1),
+            metadata: json!({
+                "artifact": "sandbox_verification",
+                "command": output.command,
+                "status": output.status,
+                "stdout_path": output.stdout_path,
+                "stderr_path": output.stderr_path,
+            }),
+            added_at_unix_ms: unix_millis()?,
+        });
+    }
+    write_evidence_index(&after_run_dir, &EvidenceIndex { artifacts })?;
+    Ok(after_run_dir)
+}
+
+fn normalize_evolve_comparison_classification(classification: &str) -> &'static str {
+    match classification {
+        "improved" => "improved",
+        "regressed" => "regressed",
+        "no_change" => "no_change",
+        _ => "no_change",
+    }
 }
 
 pub fn apply_patch_sandbox(
@@ -7434,10 +7528,24 @@ scenarios:
         );
         assert_eq!(result.before.run_path, "run.json");
         assert!(result.after.run_id.ends_with("--sandbox-patch-draft-1"));
-        assert_eq!(result.comparison_artifact_path, None);
+        assert!(result
+            .comparison_artifact_path
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with("mutation/run-comparison-"));
+        assert_eq!(result.final_classification.as_deref(), Some("improved"));
         assert!(artifacts
             .run_dir
             .join(&result.evolve_evidence_path)
+            .is_file());
+        assert!(artifacts
+            .run_dir
+            .join(
+                result
+                    .comparison_artifact_path
+                    .as_ref()
+                    .expect("comparison path")
+            )
             .is_file());
         assert_eq!(status_before, status_after);
         fs::remove_dir_all(root).ok();
