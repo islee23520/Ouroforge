@@ -39,6 +39,20 @@ assert.equal(
 
 const run = {
   summary: { id: 'run-1', run_dir: 'runs/run-1', verdict_status: 'passed', scenario_status: 'passed' },
+  command_context: {
+    schemaVersion: 'run-command-context-v1',
+    command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
+    seedPath: 'seeds/platformer.yaml',
+    workers: 4,
+    runsRoot: 'runs',
+    projectRoot: 'examples/project',
+    manifestPath: 'examples/project/ouroforge.project.json',
+    scenarioPackId: 'smoke',
+    runtimeTarget: 'local-static-browser',
+    browserBoundary: 'openchrome_cdp',
+    cdpTransport: 'chrome_devtools_protocol',
+    environmentHints: ['The cockpit does not execute commands'],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -119,6 +133,9 @@ assert.match(cockpit.renderProjectRunSurface(run), /Project run summary/);
 assert.match(cockpit.renderProjectRunSurface(run), /run-1/);
 assert.match(cockpit.renderProjectRunSurface(run), /local\/untracked expected/);
 assert.match(cockpit.renderProjectRunSurface(run), /--project examples\/project\/ouroforge\.project\.json --workers 4 --scenario-pack smoke/);
+assert.match(cockpit.renderProjectRunSurface(run), /Reproducible command context/);
+assert.match(cockpit.renderProjectRunSurface(run), /openchrome_cdp/);
+assert.match(cockpit.renderRunCommandContext({}), /No run command context/);
 assert.match(cockpit.renderProjectRunSurface(null), /No dashboard-data\.json run/);
 assert.match(cockpit.renderProjectRunSurface({ summary: { id: 'legacy-run' } }), /No project-bound run metadata/);
 assert.match(cockpit.renderAuthoringProvenanceSurface(run), /Authoring provenance/);
@@ -240,8 +257,9 @@ const xssScene = {
 };
 assert.ok(!cockpit.renderTree(xssScene, null).includes('<img src=x onerror'), 'tree entity id must be escaped');
 assert.ok(!cockpit.renderInspector(xssScene, xssScene.entities[0].id).includes('<img src=x onerror'), 'inspector entity id must be escaped');
-const xssRun = { summary: { id: 'r', run_dir: 'runs/x', verdict_status: 'passed' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>', replay: { present: false, empty_state: '<script>alert(1)</script>' }, comparison: { present: false, empty_state: '<script>alert(1)</script>' } };
+const xssRun = { summary: { id: 'r', run_dir: 'runs/x', verdict_status: 'passed' }, command_context: { command: '<script>alert(1)</script>', seedPath: '<script>seed</script>', workers: '<script>workers</script>', runsRoot: 'runs', scenarioPackId: '<script>pack</script>', runtimeTarget: '<script>runtime</script>', browserBoundary: '<script>boundary</script>', cdpTransport: '<script>transport</script>', environmentHints: ['<script>hint</script>'] }, project: { id: 'p', name: 'p', manifestPath: 'm', seedPath: 's' }, evidence: [], mutations: [], screenshots: [], journal: '<script>alert(1)</script>', replay: { present: false, empty_state: '<script>alert(1)</script>' }, comparison: { present: false, empty_state: '<script>alert(1)</script>' } };
 assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script>'), 'evidence journal must be escaped');
+assert.ok(!cockpit.renderProjectRunSurface(xssRun).includes('<script>hint</script>'), 'command context hints must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');

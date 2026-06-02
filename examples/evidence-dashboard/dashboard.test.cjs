@@ -35,6 +35,21 @@ const run = {
   },
   evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
   probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
+  command_context: {
+    schemaVersion: 'run-command-context-v1',
+    command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
+    argv: ['cargo', 'run', '-p', 'ouroforge-cli', '--', 'run', 'seeds/platformer.yaml', '--project', 'examples/project', '--workers', '4', '--scenario-pack', 'smoke'],
+    seedPath: 'seeds/platformer.yaml',
+    workers: 4,
+    runsRoot: 'runs',
+    projectRoot: 'examples/project',
+    manifestPath: 'examples/project/ouroforge.project.json',
+    scenarioPackId: 'smoke',
+    runtimeTarget: 'local-static-browser',
+    browserBoundary: 'openchrome_cdp',
+    cdpTransport: 'chrome_devtools_protocol',
+    environmentHints: ['Local Chrome/CDP required', 'Dashboard does not execute commands'],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -314,6 +329,8 @@ assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons:
 assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
 assert.match(dashboard.renderProjectContext({}), /No project workspace metadata/);
 assert.match(dashboard.renderProjectContext(run), /Scenario pack/);
+assert.match(dashboard.renderCommandContext({}), /No run command context/);
+assert.match(dashboard.renderCommandContext(run), /openchrome_cdp/);
 assert.equal(dashboard.comparisonRefHref('runs/before-run/verdict.json', run), '../../runs/before-run/verdict.json');
 assert.equal(dashboard.comparisonRefHref('evidence/world.json', run), '../../runs/run-1/evidence/world.json');
 assert.match(dashboard.renderRunList([], null), /No runs found/);
@@ -336,6 +353,7 @@ assert.match(dashboard.renderReplayControls(run, replayState), /Current tick/);
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {
   summary: { id: '<img src=x onerror=alert(1)>', run_dir: 'runs/x', seed_id: 's', run_status: 'created', verdict_status: 'failed', scenario_status: 'pending', evidence_count: 0, mutation_count: 0, worker_count: 0 },
+  command_context: { command: '<script>alert(1)</script>', argv: ['<img src=x onerror=alert(1)>'], seedPath: '<script>seed</script>', workers: '<script>workers</script>', runsRoot: 'runs', scenarioPackId: '<script>pack</script>', runtimeTarget: '<script>runtime</script>', browserBoundary: '<script>boundary</script>', cdpTransport: '<script>transport</script>', environmentHints: ['<script>hint</script>'] },
   evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [{ id: '<script>perf</script>', kind: 'application/json', path: 'evidence/<script>perf</script>.json', value: null, read_error: '<script>bad perf</script>', metadata: { worker_id: '<script>worker</script>', execution_boundary: '<script>boundary</script>' } }], console_logs: [{ id: '<script>console</script>', kind: 'application/json', path: 'evidence/<script>console</script>.json', value: [{ text: '<script>log</script>' }], metadata: { worker_session_id: '<img src=x onerror=alert(1)>', cdp_transport: '<script>transport</script>' } }], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
@@ -349,5 +367,6 @@ assert.match(xssDetail, /&lt;script&gt;/);
 assert.ok(!xssDetail.includes('<img>'), 'journal headings must be escaped');
 assert.ok(!xssDetail.includes('<script>worker</script>'), 'artifact metadata must be escaped');
 assert.ok(!xssDetail.includes('<img src=x onerror=alert(1)>'), 'artifact session metadata must be escaped');
+assert.ok(!xssDetail.includes('<script>hint</script>'), 'command context hints must be escaped');
 assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'), 'run id markup must be escaped');
 console.log('dashboard smoke test passed');

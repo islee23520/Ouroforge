@@ -396,6 +396,33 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+
+  function runCommandContext(run) {
+    const context = run?.command_context || run?.summary?.command_context || run?.run?.run_command_context || null;
+    return context && typeof context === 'object' ? context : null;
+  }
+
+  function renderRunCommandContext(run) {
+    const context = runCommandContext(run);
+    if (!context) {
+      return '<div class="command-context"><h3>Reproducible command context</h3><p class="empty compact">No run command context is recorded for this legacy export.</p></div>';
+    }
+    const hints = Array.isArray(context.environmentHints) ? context.environmentHints : [];
+    return `<div class="command-context"><h3>Reproducible command context</h3>
+      <p class="hint">Display-only. Copy manually if needed; the cockpit does not execute commands, start bridges, or rerun QA.</p>
+      <code>${escapeText(context.command || 'No command string recorded.')}</code>
+      <div class="field-grid">
+        <div><strong>Seed</strong><br>${escapeText(context.seedPath || 'unknown')}</div>
+        <div><strong>Workers</strong><br>${escapeText(context.workers ?? 'unknown')}</div>
+        <div><strong>Runs root</strong><br>${escapeText(context.runsRoot || 'runs')}</div>
+        <div><strong>Scenario pack</strong><br>${escapeText(context.scenarioPackId || 'none')}</div>
+        <div><strong>Runtime</strong><br>${escapeText(context.runtimeTarget || 'unknown')}</div>
+        <div><strong>Browser boundary</strong><br>${escapeText(context.browserBoundary || 'unknown')} / ${escapeText(context.cdpTransport || 'unknown')}</div>
+      </div>
+      ${hints.length ? `<ul>${hints.map((hint) => `<li>${escapeText(hint)}</li>`).join('')}</ul>` : ''}
+    </div>`;
+  }
+
   function renderProjectRunSurface(run) {
     if (!run) {
       return '<section id="project-run" class="panel"><h2>Project run summary</h2><p class="empty">No dashboard-data.json run is loaded yet. Run project QA and export dashboard data to inspect latest project-bound run state.</p></section>';
@@ -419,6 +446,7 @@ const OuroforgeCockpit = (() => {
         <div><strong>Evidence</strong><br>${escapeText(summary.evidence_count ?? (run.evidence || []).length)}</div>
         <div><strong>Generated-state status</strong><br>local/untracked expected</div>
       </div>
+      ${renderRunCommandContext(run)}
       <h3>Display-only project run commands</h3>
       <div class="command-list">
         <code>${escapeText(projectRunCommand(seedPath, manifestPath, 4, pack?.id || null))}</code>
@@ -710,7 +738,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidencePane, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

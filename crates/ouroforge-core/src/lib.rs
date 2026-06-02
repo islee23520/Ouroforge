@@ -5209,6 +5209,43 @@ fn render_journal(
         out.push('\n');
     }
 
+    if run.get("run_command_context").is_some() {
+        out.push_str("## Reproducible Command Context\n\n");
+        match read_dashboard_command_context(run) {
+            Some(context) => {
+                out.push_str("- Display-only: copy manually if needed; Ouroforge does not auto-rerun this command from browser surfaces.\n");
+                out.push_str(&format!("- Command: `{}`\n", context.command));
+                out.push_str(&format!("- Seed path: `{}`\n", context.seed_path));
+                out.push_str(&format!("- Workers: `{}`\n", context.workers));
+                out.push_str(&format!("- Runs root: `{}`\n", context.runs_root));
+                if let Some(project_root) = &context.project_root {
+                    out.push_str(&format!("- Project root: `{project_root}`\n"));
+                }
+                if let Some(manifest_path) = &context.manifest_path {
+                    out.push_str(&format!("- Manifest: `{manifest_path}`\n"));
+                }
+                if let Some(scenario_pack_id) = &context.scenario_pack_id {
+                    out.push_str(&format!("- Scenario pack: `{scenario_pack_id}`\n"));
+                }
+                if let Some(transaction_path) = &context.transaction_path {
+                    out.push_str(&format!("- Transaction: `{transaction_path}`\n"));
+                }
+                out.push_str(&format!(
+                    "- Target assumption: `{}`\n",
+                    context.runtime_target
+                ));
+                out.push_str(&format!(
+                    "- Browser boundary: `{}` / `{}`\n",
+                    context.browser_boundary, context.cdp_transport
+                ));
+            }
+            None => {
+                out.push_str("- Command context is present but malformed; no reproduction command was inferred.\n");
+            }
+        }
+        out.push('\n');
+    }
+
     if let Some(provenance) = run.get("transaction_provenance") {
         out.push_str("## Scene Edit Transaction\n\n");
         if let Some(id) = provenance
@@ -10111,6 +10148,7 @@ pub struct RunDashboardSummary {
     pub seed_id: String,
     pub seed_title: String,
     pub project: Option<ProjectRunMetadata>,
+    pub command_context: Option<RunCommandContext>,
     pub run_status: String,
     pub verdict_status: String,
     pub scenario_status: String,
@@ -10159,6 +10197,7 @@ pub struct RunDashboardReadModel {
     pub summary: RunDashboardSummary,
     pub run: serde_json::Value,
     pub project: Option<ProjectRunMetadata>,
+    pub command_context: Option<RunCommandContext>,
     pub verdict: serde_json::Value,
     pub journal: String,
     pub journal_view: RunDashboardJournal,
@@ -10354,6 +10393,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let comparison = read_dashboard_comparison(run_dir);
     let transaction_provenance = read_dashboard_transaction_provenance(&run);
     let project = read_dashboard_project_context(&run);
+    let command_context = read_dashboard_command_context(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
@@ -10375,6 +10415,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         summary,
         run,
         project,
+        command_context,
         verdict,
         journal,
         journal_view,
@@ -10448,6 +10489,7 @@ fn read_dashboard_run_summary(run_dir: &Path) -> Result<RunDashboardSummary> {
         seed_id: json_string(&run, "seed_id").unwrap_or_else(|| "unknown-seed".to_string()),
         seed_title: json_string(&run, "seed_title").unwrap_or_else(|| "Untitled Seed".to_string()),
         project: read_dashboard_project_context(&run),
+        command_context: read_dashboard_command_context(&run),
         run_status: json_string(&run, "status").unwrap_or_else(|| "unknown".to_string()),
         verdict_status: json_string(&verdict, "status").unwrap_or_else(|| "unknown".to_string()),
         scenario_status: dashboard_scenario_status(&verdict),
@@ -10934,6 +10976,12 @@ fn read_dashboard_transaction_provenance(
     run: &serde_json::Value,
 ) -> Option<RunTransactionProvenance> {
     run.get("transaction_provenance")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+}
+
+fn read_dashboard_command_context(run: &serde_json::Value) -> Option<RunCommandContext> {
+    run.get("run_command_context")
         .cloned()
         .and_then(|value| serde_json::from_value(value).ok())
 }
@@ -18942,6 +18990,90 @@ scenarios:
         );
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_read_model_handles_command_context_missing_and_malformed() {
+        let (root, artifacts) = create_test_run("dashboard-command-context");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.command_context.is_some());
+        assert!(model.summary.command_context.is_some());
+        assert_eq!(
+            model.command_context.as_ref().unwrap().schema_version,
+            "run-command-context-v1"
+        );
+
+        let run_path = artifacts.run_dir.join("run.json");
+        let mut run_json = read_json_value(&run_path).expect("run json reads");
+        run_json
+            .as_object_mut()
+            .expect("run json object")
+            .remove("run_command_context");
+        fs::write(
+            &run_path,
+            serde_json::to_string_pretty(&run_json).expect("run serializes"),
+        )
+        .expect("run json updated");
+        let legacy = read_dashboard_run(&artifacts.run_dir).expect("legacy dashboard run reads");
+        assert!(legacy.command_context.is_none());
+        assert!(legacy.summary.command_context.is_none());
+
+        run_json["run_command_context"] = json!({ "schemaVersion": 7, "command": false });
+        fs::write(
+            &run_path,
+            serde_json::to_string_pretty(&run_json).expect("run serializes"),
+        )
+        .expect("run json updated");
+        let malformed = read_dashboard_run(&artifacts.run_dir).expect("malformed context ignored");
+        assert!(malformed.command_context.is_none());
+        assert!(malformed.summary.command_context.is_none());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn journal_renders_reproducible_command_context_without_inference() {
+        let seed = Seed::from_yaml_str(VALID_SEED).expect("seed parses");
+        let evidence = EvidenceIndex {
+            artifacts: Vec::new(),
+        };
+        let run = json!({
+            "run_command_context": {
+                "schemaVersion": "run-command-context-v1",
+                "command": "cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 2",
+                "argv": ["cargo", "run", "-p", "ouroforge-cli", "--", "run", "seeds/platformer.yaml", "--workers", "2"],
+                "seedPath": "seeds/platformer.yaml",
+                "workers": 2,
+                "runsRoot": "runs",
+                "runtimeTarget": "local-static-browser",
+                "browserBoundary": "openchrome_cdp",
+                "cdpTransport": "chrome_devtools_protocol",
+                "environmentHints": []
+            }
+        });
+        let journal = render_journal(
+            &seed,
+            &evidence,
+            &[],
+            &json!({ "status": "pending" }),
+            &[],
+            &run,
+        );
+        assert!(journal.contains("## Reproducible Command Context"));
+        assert!(journal.contains("Display-only"));
+        assert!(journal.contains("run seeds/platformer.yaml"));
+        assert!(journal.contains("Target assumption: `local-static-browser`"));
+        assert!(journal.contains("Browser boundary: `openchrome_cdp` / `chrome_devtools_protocol`"));
+
+        let malformed = render_journal(
+            &seed,
+            &evidence,
+            &[],
+            &json!({ "status": "pending" }),
+            &[],
+            &json!({ "run_command_context": { "schemaVersion": 7 } }),
+        );
+        assert!(malformed.contains("present but malformed"));
     }
 
     #[test]

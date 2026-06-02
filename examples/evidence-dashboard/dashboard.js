@@ -240,6 +240,40 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+
+  function commandContext(run) {
+    const context = run?.command_context || run?.summary?.command_context || run?.run?.run_command_context || null;
+    return context && typeof context === 'object' ? context : null;
+  }
+
+  function renderCommandContext(run) {
+    const context = commandContext(run);
+    if (!context) {
+      return '<section class="panel"><h3>Reproducible Command Context</h3><p class="empty-state">No run command context is recorded for this legacy run.</p></section>';
+    }
+    const argv = Array.isArray(context.argv) ? context.argv : [];
+    const hints = Array.isArray(context.environmentHints) ? context.environmentHints : [];
+    const fields = [
+      ['Schema', context.schemaVersion || 'legacy'],
+      ['Seed path', context.seedPath || 'unknown'],
+      ['Workers', context.workers ?? 'unknown'],
+      ['Runs root', context.runsRoot || 'runs'],
+      ['Project root', context.projectRoot || 'none'],
+      ['Manifest', context.manifestPath || 'none'],
+      ['Scenario pack', context.scenarioPackId || 'none'],
+      ['Transaction', context.transactionPath || 'none'],
+      ['Runtime target', context.runtimeTarget || 'unknown'],
+      ['Browser boundary', `${context.browserBoundary || 'unknown'} / ${context.cdpTransport || 'unknown'}`],
+    ];
+    return `<section class="panel"><h3>Reproducible Command Context</h3>
+      <p class="run-meta">Read-only copy evidence from Rust-authored run metadata. The dashboard does not execute, rerun, or bridge this command.</p>
+      <pre>${escapeText(context.command || argv.join(' ') || 'No command string recorded.')}</pre>
+      <dl>${fields.map(([key, value]) => `<dt>${escapeText(key)}</dt><dd>${escapeText(value)}</dd>`).join('')}</dl>
+      ${argv.length ? `<details class="raw-json"><summary>Command argv</summary><pre>${escapeText(JSON.stringify(argv, null, 2))}</pre></details>` : ''}
+      ${hints.length ? `<ul>${hints.map((hint) => `<li>${escapeText(hint)}</li>`).join('')}</ul>` : ''}
+    </section>`;
+  }
+
   function renderProjectContext(run) {
     const project = run?.project || run?.summary?.project;
     if (!project) {
@@ -574,6 +608,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
+      ${renderCommandContext(run)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderProjectContext(run)}
@@ -641,7 +676,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
