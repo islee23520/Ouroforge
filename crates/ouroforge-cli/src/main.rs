@@ -284,6 +284,7 @@ fn main() -> Result<()> {
             println!("Manifest: {}", manifest_path.display());
             println!("Source refs: {}", report.source_refs);
             println!("Asset roots: {}", report.asset_roots);
+            println!("Scenario packs: {}", report.scenario_packs);
             println!("Runs root: {}", report.runs_root);
             println!("Generated roots: {}", report.generated_roots.join(","));
         }

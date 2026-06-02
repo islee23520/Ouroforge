@@ -1,0 +1,10 @@
+id: project-workspace.smoke
+title: Project Workspace Smoke
+goal: Validate a project workspace manifest fixture.
+constraints:
+  target: file-harness
+acceptance:
+  - Manifest fixture validates.
+scenarios:
+  - id: manifest-smoke
+    description: Validate manifest fixture wiring.

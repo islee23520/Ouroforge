@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "bad_scenario_pack", "name": "Bad Scenario Pack" },
+  "scenes": [{ "id": "main", "path": "scenes/main.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [{ "id": "unsupported", "path": "scenarios/regression.json" }],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs"] }
+}

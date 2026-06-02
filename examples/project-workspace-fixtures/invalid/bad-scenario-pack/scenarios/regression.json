@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "unsupported",
+  "description": "Unsupported field fixture.",
+  "seed": "seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    {
+      "id": "smoke",
+      "description": "Smoke",
+      "scenarios": [
+        { "id": "bad", "description": "Bad", "aiJudge": true }
+      ]
+    }
+  ]
+}

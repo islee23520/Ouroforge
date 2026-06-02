@@ -816,6 +816,7 @@ pub struct ProjectManifestValidationReport {
     pub manifest_path: PathBuf,
     pub source_refs: usize,
     pub asset_roots: usize,
+    pub scenario_packs: usize,
     pub runs_root: String,
     pub generated_roots: Vec<String>,
 }
@@ -938,11 +939,13 @@ impl ProjectManifest {
                 ));
             }
         }
+        let scenario_packs = self.resolve_scenario_packs(base_dir)?;
         Ok(ProjectManifestValidationReport {
             project_id: self.project.id.clone(),
             manifest_path: base_dir.join(PROJECT_MANIFEST_FILE_NAME),
             source_refs: self.scenes.len() + self.seeds.len() + self.scenario_packs.len(),
             asset_roots: self.asset_roots.len(),
+            scenario_packs: scenario_packs.len(),
             runs_root: self.runs_root.clone(),
             generated_roots: self.generated.roots.clone(),
         })
@@ -968,6 +971,59 @@ impl ProjectManifest {
                     .map(|root| ("assetRoots", root.as_str())),
             )
             .collect()
+    }
+
+    pub fn resolve_scenario_packs(&self, base_dir: &Path) -> Result<Vec<ScenarioPack>> {
+        self.validate()?;
+        let mut packs = Vec::new();
+        let mut pack_ids = BTreeSet::new();
+        let seed_paths = self
+            .seeds
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect::<BTreeSet<_>>();
+        let scene_paths = self
+            .scenes
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect::<BTreeSet<_>>();
+        for reference in &self.scenario_packs {
+            let path = base_dir.join(&reference.path);
+            let pack = ScenarioPack::from_path(&path).with_context(|| {
+                format!(
+                    "project manifest scenarioPacks ref {} failed validation: {}",
+                    reference.id, reference.path
+                )
+            })?;
+            if pack.id != reference.id {
+                return Err(anyhow!(
+                    "project manifest scenarioPacks ref {} id mismatch: pack id is {}",
+                    reference.id,
+                    pack.id
+                ));
+            }
+            if !seed_paths.contains(pack.seed.as_str()) {
+                return Err(anyhow!(
+                    "scenario pack {} seed {} is not declared in project manifest seeds",
+                    pack.id,
+                    pack.seed
+                ));
+            }
+            for scene in &pack.scenes {
+                if !scene_paths.contains(scene.as_str()) {
+                    return Err(anyhow!(
+                        "scenario pack {} scene {} is not declared in project manifest scenes",
+                        pack.id,
+                        scene
+                    ));
+                }
+            }
+            if !pack_ids.insert(pack.id.clone()) {
+                return Err(anyhow!("duplicate resolved scenario pack id: {}", pack.id));
+            }
+            packs.push(pack);
+        }
+        Ok(packs)
     }
 
     fn validate_source_generated_overlap(&self) -> Result<()> {
@@ -14164,6 +14220,36 @@ scenarios:
                 .expect("tilemap layer order serializes"),
             r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
         );
+    }
+
+    #[test]
+    fn project_manifest_resolves_and_validates_scenario_packs() {
+        let manifest_path =
+            repo_fixture_path("examples/project-workspace-fixtures/valid/ouroforge.project.json");
+        let manifest = ProjectManifest::from_path(&manifest_path)
+            .expect("project manifest with scenario pack validates");
+        let root = manifest_path.parent().expect("manifest parent");
+        let packs = manifest
+            .resolve_scenario_packs(root)
+            .expect("scenario packs resolve");
+        assert_eq!(packs.len(), 1);
+        assert_eq!(packs[0].id, "regression");
+        assert_eq!(packs[0].ordered_scenario_ids().len(), 4);
+        let report = manifest
+            .validate_references(root)
+            .expect("report validates");
+        assert_eq!(report.scenario_packs, 1);
+    }
+
+    #[test]
+    fn project_manifest_reports_bad_scenario_pack_errors() {
+        let rejected = ProjectManifest::from_path(repo_fixture_path(
+            "examples/project-workspace-fixtures/invalid/bad-scenario-pack/ouroforge.project.json",
+        ))
+        .expect_err("bad scenario pack rejected during project validation");
+        let rejected = format!("{rejected:#}");
+        assert!(rejected.contains("scenarioPacks ref unsupported failed validation"));
+        assert!(rejected.contains("unknown field"));
     }
 
     #[test]
