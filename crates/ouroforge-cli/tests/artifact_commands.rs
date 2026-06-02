@@ -532,6 +532,104 @@ fn compare_command_prints_semantic_reasons_and_writes_artifact() {
 }
 
 #[test]
+fn compare_command_prints_project_semantic_context_and_writes_artifact() {
+    let temp = unique_temp_dir("ouroforge-cli-project-compare-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let project_dir = temp.join("project");
+    run_cli(
+        &temp,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    let seed_path = project_dir.join("seeds/platformer.yaml");
+    let before_output = run_cli(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    let before_dir = run_dir_from_output(&temp, &before_output);
+
+    let scene_path = project_dir.join("scenes/main.scene.json");
+    let mut scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).expect("scene reads"))
+            .expect("scene parses");
+    scene["entities"][0]["components"]["transform"]["x"] = serde_json::json!(96);
+    fs::write(
+        &scene_path,
+        serde_json::to_string_pretty(&scene).expect("scene serializes"),
+    )
+    .expect("scene writes");
+
+    let after_output = run_cli(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    let after_dir = run_dir_from_output(&temp, &after_output);
+
+    let output_dir = temp.join("comparisons");
+    let compare = run_cli(
+        &temp,
+        &[
+            "compare",
+            before_dir.to_str().unwrap(),
+            after_dir.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+        ],
+    );
+
+    assert!(compare.contains("Project comparison:"));
+    assert!(compare.contains("- relation: same_project"));
+    assert!(compare.contains("- changed: true"));
+    assert!(compare.contains("[scene_hash] scene hash changed"));
+    assert!(compare.contains("[changed] project_context"));
+    let comparison_artifact = fs::read_dir(&output_dir)
+        .expect("comparison output dir")
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("run-comparison-")
+        })
+        .expect("comparison artifact written");
+    let artifact_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(comparison_artifact).expect("artifact reads"))
+            .expect("artifact parses");
+    assert_eq!(
+        artifact_json["semantic"]["project"]["relation"],
+        "same_project"
+    );
+    assert_eq!(artifact_json["semantic"]["project"]["changed"], true);
+    assert!(artifact_json["semantic"]["project"]["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|change| change["kind"] == "scene_hash"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     let temp = unique_temp_dir("ouroforge-cli-scene-mutation-apply-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
@@ -794,6 +892,14 @@ fn write_cli_scenario_result(run_dir: &Path, status: &str) {
         ],
     );
     assert!(output.contains("scenario-result-smoke"));
+}
+
+fn run_dir_from_output(root: &Path, output: &str) -> PathBuf {
+    let line = output
+        .lines()
+        .find(|line| line.starts_with("Run created: "))
+        .expect("run created line present");
+    root.join(line.strip_prefix("Run created: ").unwrap())
 }
 
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {

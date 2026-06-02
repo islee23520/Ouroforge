@@ -911,6 +911,48 @@ fn print_semantic_compare_summary(comparison_json: &str) -> Result<()> {
             println!("- {}", warning.as_str().unwrap_or("unknown warning"));
         }
     }
+    if let Some(project) = comparison.pointer("/semantic/project") {
+        let relation = project
+            .get("relation")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let changed = project
+            .get("changed")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        println!("Project comparison:");
+        println!("- relation: {relation}");
+        println!("- changed: {changed}");
+        if let Some(changes) = project.get("changes").and_then(|value| value.as_array()) {
+            for change in changes {
+                let kind = change
+                    .get("kind")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let summary = change
+                    .get("summary")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("no summary");
+                let before = change
+                    .get("before")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("none");
+                let after = change
+                    .get("after")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("none");
+                println!("- [{kind}] {summary}: {before} -> {after}");
+            }
+        }
+        if let Some(project_warnings) = project.get("warnings").and_then(|value| value.as_array()) {
+            for warning in project_warnings {
+                println!(
+                    "- [warning] {}",
+                    warning.as_str().unwrap_or("unknown project warning")
+                );
+            }
+        }
+    }
     Ok(())
 }
 
