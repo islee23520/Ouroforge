@@ -2460,6 +2460,13 @@ impl WorkerId {
         )
     }
 
+    pub fn failure_path(&self, suffix: u128) -> String {
+        format!(
+            "{}/browser-worker-failure-{suffix}.json",
+            self.evidence_dir()
+        )
+    }
+
     pub fn probe_json_path(&self, probe_name: &str, suffix: u128) -> String {
         format!(
             "{}/browser-probe-{probe_name}-{suffix}.json",
@@ -2587,6 +2594,12 @@ pub fn run_browser_smoke_pool(config: &BrowserSmokePoolConfig) -> BrowserSmokePo
                     }
                     Err(error) => {
                         let error_message = error.to_string();
+                        let failure_path = write_browser_worker_failure_artifact(
+                            &worker_config,
+                            "target_setup",
+                            &error_message,
+                        )
+                        .ok();
                         let _ = append_ledger_event(
                             &worker_config.run_dir,
                             "browser.worker.failed",
@@ -2594,7 +2607,8 @@ pub fn run_browser_smoke_pool(config: &BrowserSmokePoolConfig) -> BrowserSmokePo
                             json!({
                                 "worker_id": worker_config.worker_id.as_str(),
                                 "error": error_message,
-                                "phase": "target_setup"
+                                "phase": "target_setup",
+                                "failure_path": failure_path
                             }),
                         );
                         setup_failures.push(BrowserSmokeWorkerOutcome {
@@ -2684,11 +2698,19 @@ pub fn run_browser_smoke(config: &BrowserSmokeConfig) -> Result<BrowserSmokeResu
             )?;
         }
         Err(error) => {
+            let error_message = error.to_string();
+            let failure_path =
+                write_browser_worker_failure_artifact(config, "worker_run", &error_message).ok();
             let _ = append_ledger_event(
                 &config.run_dir,
                 "browser.worker.failed",
                 "browser-smoke",
-                json!({ "worker_id": config.worker_id.as_str(), "error": error.to_string() }),
+                json!({
+                    "worker_id": config.worker_id.as_str(),
+                    "error": error_message,
+                    "phase": "worker_run",
+                    "failure_path": failure_path
+                }),
             );
         }
     }
@@ -2736,6 +2758,61 @@ fn merge_json_object(target: &mut serde_json::Value, extra: serde_json::Value) {
             target.insert(key.clone(), value.clone());
         }
     }
+}
+
+fn write_browser_worker_failure_artifact(
+    config: &BrowserSmokeConfig,
+    phase: &str,
+    error: &str,
+) -> Result<String> {
+    validate_path_component("browser worker failure phase", phase)?;
+    let suffix = unix_millis()?;
+    let rel_path = config.worker_id.failure_path(suffix);
+    fs::create_dir_all(config.run_dir.join(config.worker_id.evidence_dir())).with_context(
+        || {
+            format!(
+                "failed to create worker evidence directory {}",
+                config
+                    .run_dir
+                    .join(config.worker_id.evidence_dir())
+                    .display()
+            )
+        },
+    )?;
+    let failure = json!({
+        "artifact": "browser_worker_failure",
+        "worker_id": config.worker_id.as_str(),
+        "run_id": run_id_from_run_dir(&config.run_dir),
+        "worker_session_id": format!("{}:{}", run_id_from_run_dir(&config.run_dir), config.worker_id.as_str()),
+        "phase": phase,
+        "error": error,
+        "url": config.url,
+        "debugging_http_url": config.debugging_http_url,
+        "execution_boundary": "openchrome_cdp",
+        "cdp_transport": "chrome_devtools_protocol",
+        "target_selection": config.target_selection.label(),
+        "target_ws_url_bound": config.target_ws_url.is_some(),
+        "bounded": true
+    });
+    write_json(&config.run_dir.join(&rel_path), &failure)?;
+    add_evidence_artifact(
+        &config.run_dir,
+        &format!(
+            "browser-worker-failure-{}-{phase}-{suffix}",
+            config.worker_id.as_str()
+        ),
+        "application/json",
+        &rel_path,
+        browser_worker_evidence_metadata(
+            config,
+            "browser_worker_failure",
+            json!({
+                "phase": phase,
+                "bounded": true
+            }),
+        ),
+    )?;
+    Ok(rel_path)
 }
 
 fn capture_runtime_probe<T: CdpTransport>(
@@ -15351,6 +15428,47 @@ scenarios:
             transport.calls[10],
             "window.__OUROFORGE__.setInput({\"right\":false})"
         );
+    }
+
+    #[test]
+    fn browser_smoke_records_worker_run_failure_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-browser-worker-run-failure-test");
+        let mut config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8765")
+            .expect("config builds");
+        config.debugging_http_url = "http://127.0.0.1:9".to_string();
+
+        let error = run_browser_smoke(&config).expect_err("worker run fails without chrome");
+        assert!(!error.to_string().is_empty());
+
+        let index = read_evidence_index(&artifacts.run_dir).expect("evidence index reads");
+        let failure = index
+            .artifacts
+            .iter()
+            .find(|artifact| {
+                artifact
+                    .metadata
+                    .get("artifact")
+                    .and_then(|value| value.as_str())
+                    == Some("browser_worker_failure")
+            })
+            .expect("failure artifact indexed");
+        assert_eq!(failure.metadata["phase"], "worker_run");
+        assert_eq!(failure.metadata["worker_id"], "worker-1");
+        assert!(artifacts.run_dir.join(&failure.path).is_file());
+        let failure_value =
+            read_json_value(artifacts.run_dir.join(&failure.path)).expect("failure artifact reads");
+        assert_eq!(failure_value["artifact"], "browser_worker_failure");
+        assert_eq!(failure_value["phase"], "worker_run");
+        assert_eq!(failure_value["execution_boundary"], "openchrome_cdp");
+
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(events.iter().any(|event| {
+            event["event"] == "browser.worker.failed"
+                && event["payload"]["worker_id"] == "worker-1"
+                && event["payload"]["phase"] == "worker_run"
+                && event["payload"]["failure_path"] == failure.path
+        }));
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
