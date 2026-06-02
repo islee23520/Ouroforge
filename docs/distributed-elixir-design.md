@@ -198,3 +198,171 @@ writes the explicit ADR.
 - What event stream needs live fanout rather than file-based ledger/evidence?
 - How would remote artifacts be reconciled into a canonical local run directory?
 - What local-only fallback command remains when the distributed layer is absent?
+
+---
+
+# ADR: Elixir/BEAM adoption decision
+
+Status: **NO-GO for implementation now**
+
+Decision date: 2026-06-02
+
+## ADR question
+
+Should Ouroforge introduce Elixir/BEAM now for distributed orchestration?
+
+## Decision
+
+Do **not** introduce Elixir/BEAM implementation in the current roadmap state.
+
+The evidence shows the current Rust local worker pool is sufficient for the
+completed local MVP and v1 tracks. The project has plausible future distributed
+coordination needs, but those needs are not yet concrete enough to justify adding
+a second runtime, supervision tree, server assumptions, or remote execution
+architecture.
+
+Elixir remains a reserved future option only after a later milestone produces
+specific evidence that Rust local/process orchestration is insufficient.
+
+## Why Rust local orchestration is not currently insufficient
+
+Current merged evidence demonstrates local runs with four browser workers,
+scenario execution, evaluator verdicts, journals, mutation artifacts, comparison,
+and static Studio inspection. The current problem is not failed local
+orchestration; it is preserving reproducible local artifact contracts while the
+engine matures.
+
+No current issue requires:
+
+- multi-machine worker assignment;
+- remote browser worker restart policies;
+- long-running coordinator heartbeats;
+- live telemetry subscribers;
+- hosted live ops;
+- distributed artifact reconciliation;
+- server/database/cloud deployment.
+
+Without one of those concrete needs, adding Elixir would be an architectural
+pre-optimization.
+
+## Rejected BEAM supervision use cases for now
+
+These use cases are rejected for current implementation, not permanently:
+
+| Use case | Current decision | Reason |
+| --- | --- | --- |
+| Distributed worker orchestration | Reject now | No remote QA node protocol or multi-machine failure evidence exists. |
+| Long-running agent coordination | Reject now | Current workflows are command-scoped and artifact-backed; no multi-hour coordinator failure mode is proven. |
+| Live ops | Reject now | Ouroforge has no hosted runtime, user accounts, production service, or live game operation surface. |
+| Telemetry fanout | Reject now | Ledger/evidence files are sufficient for current inspection; no live subscriber requirement exists. |
+| Supervised remote QA clusters | Reject now | Local `--workers N` evidence passes; no remote cluster or node failure evidence exists. |
+
+## If Elixir is adopted later, what it may own
+
+If a future issue reopens this decision with concrete evidence, Elixir may own
+only orchestration boundaries such as:
+
+- supervising remote QA worker processes that invoke Rust CLI commands;
+- queueing artifact-producing jobs for remote/local workers;
+- heartbeats, restart policy, and backoff for long-running coordinators;
+- telemetry fanout of run progress events derived from Rust-owned artifacts;
+- aggregating remote worker status before handing artifacts back to Rust-owned
+  validation/import paths.
+
+Elixir may coordinate work, but it must not define the semantic meaning of any
+Ouroforge artifact.
+
+## What Elixir must not own
+
+Elixir must not own or replace:
+
+- Seed schema or validation;
+- run directory layout;
+- ledger event schema;
+- evidence artifact schema or file integrity rules;
+- journal rendering semantics;
+- verdict/evaluator logic;
+- mutation proposal/classification/patch/review artifact semantics;
+- CLI/local run contract;
+- browser rendering, physics, frame loop, deterministic simulation, scene schema,
+  runtime probes, or comparison semantics;
+- source-code patch acceptance, commit, merge, or release decisions.
+
+Rust remains the harness kernel and canonical artifact owner.
+
+## Rust artifact contract preservation plan
+
+A future orchestration layer may call Rust commands and may move complete artifact
+bundles, but artifact validity must be checked by Rust. Any remote result must be
+importable into the same file-based contracts used by local runs:
+
+1. Rust creates or validates the Seed and Run identity.
+2. Workers produce evidence into isolated artifact bundles.
+3. Rust validates paths and schema before accepting evidence into a run.
+4. Rust writes ledger, verdict, journal, comparison, and mutation artifacts.
+5. Static UIs read exported dashboard data; they do not depend on Elixir state.
+
+Elixir state must be treated as operational state, not product truth.
+
+## Local-first compatibility plan
+
+The local path remains mandatory:
+
+```bash
+cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
+```
+
+Future distributed orchestration, if any, must be optional. A fresh checkout must
+remain able to validate Seeds, run local browser workers, produce evidence,
+evaluate verdicts, render journals, inspect dashboards, and execute scene edit
+validation without Elixir, OTP, Phoenix, a database, cloud credentials, or a
+network coordinator.
+
+## Alternatives selected for now
+
+Selected current path:
+
+1. Continue Rust-only local orchestration.
+2. If local failures appear, improve Rust child-process/process-pool supervision
+   first.
+3. Use shell/CI/tmux fanout for occasional human-operated parallel verification.
+4. Revisit Elixir only after concrete distributed QA evidence exists.
+
+External queues, hosted services, databases, and cloud orchestration remain
+rejected unless a future issue explicitly changes the product boundary.
+
+## Revisit criteria
+
+Reopen this decision only if at least one of these evidence-backed triggers
+appears:
+
+- local `--workers N` is insufficient because required QA must run across
+  multiple machines;
+- repeated long-running orchestration failures require supervised restart/backoff
+  beyond reasonable Rust process management;
+- a future milestone requires live progress fanout to multiple observers and file
+  artifacts alone are demonstrably insufficient;
+- remote QA nodes exist and need assignment, heartbeat, quarantine, and artifact
+  handoff;
+- local-first fallback remains defined and tested even with distributed
+  orchestration.
+
+A revisit issue must include concrete failure logs, run IDs, or operational
+requirements. Abstract scale concerns are not enough.
+
+## Follow-up implementation issues
+
+None.
+
+Because this ADR is **NO-GO for implementation now**, #92 creates no Elixir,
+OTP, Phoenix, distributed worker, server, database, cloud, or remote execution
+implementation issues.
+
+## Final recommendation
+
+Final recommendation: **NO-GO now; reserve Elixir for a future evidence-backed
+distributed orchestration milestone.**
+
+This preserves the current local-first MVP, keeps Rust artifact contracts
+authoritative, avoids premature distributed architecture, and leaves a clear path
+to revisit BEAM only when concrete remote/supervision needs exist.
