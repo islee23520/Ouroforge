@@ -2,14 +2,14 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
-    apply_patch_sandbox_from_path, create_mutation_proposal, create_run, edit_scene, evaluate_run,
-    evolve_run, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
-    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction, read_cdp_targets,
-    read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke, run_browser_smoke_pool,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
-    validate_scene_reload, write_run_comparison_artifact, write_scene_edit_transaction_artifact,
-    BrowserSmokeConfig, BrowserSmokePoolConfig, MutationProposalInput, MutationReviewState,
-    ScenarioRunConfig, SceneEdit, Seed, WorkerId,
+    apply_patch_sandbox_from_path, bind_run_transaction_provenance, create_mutation_proposal,
+    create_run, edit_scene, evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
+    list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke,
+    run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    update_journal, validate_scene_reload, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -33,6 +33,8 @@ enum Commands {
         seed_path: PathBuf,
         #[arg(long, default_value_t = 1)]
         workers: usize,
+        #[arg(long, value_name = "PATH")]
+        transaction: Option<PathBuf>,
     },
     Ledger {
         #[command(subcommand)]
@@ -240,11 +242,20 @@ fn main() -> Result<()> {
             let seed = Seed::from_path(seed_path)?;
             println!("Seed valid: {}", seed.id);
         }
-        Commands::Run { seed_path, workers } => {
+        Commands::Run {
+            seed_path,
+            workers,
+            transaction,
+        } => {
             if workers == 0 {
                 return Err(anyhow!("--workers must be at least 1"));
             }
             let artifacts = create_run(seed_path, "runs")?;
+            if let Some(transaction_path) = transaction {
+                let provenance =
+                    bind_run_transaction_provenance(&artifacts.run_dir, transaction_path)?;
+                println!("Run transaction bound: {}", provenance.transaction_id);
+            }
             println!("Run created: {}", artifacts.run_dir.display());
             if workers > 1 {
                 let summary = run_private_mvp(&artifacts.run_dir, workers)?;

@@ -147,6 +147,104 @@ fn scene_edit_transaction_output_records_success_and_failure() {
     fs::remove_dir_all(temp).ok();
 }
 
+#[test]
+fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
+    let temp = unique_temp_dir("ouroforge-cli-run-transaction-binding-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let seed_path = temp.join("seed.yaml");
+    fs::write(&seed_path, VALID_SEED).expect("seed written");
+    let scene_path = temp.join("scene.json");
+    fs::write(
+        &scene_path,
+        include_str!("../../../examples/game-runtime/scene.json"),
+    )
+    .expect("scene written");
+    let transaction_path = temp.join("transactions/success.json");
+    run_cli(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.transform.x",
+            "--value",
+            "48",
+            "--transaction-output",
+            transaction_path.to_str().unwrap(),
+        ],
+    );
+
+    let run_output = run_cli(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--transaction",
+            transaction_path.to_str().unwrap(),
+        ],
+    );
+    assert!(run_output.contains("Run transaction bound: scene-edit-"));
+    let run_dir_line = run_output
+        .lines()
+        .find(|line| line.starts_with("Run created: "))
+        .expect("run created line present");
+    let run_dir = temp.join(run_dir_line.strip_prefix("Run created: ").unwrap());
+    let run_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(run_dir.join("run.json")).unwrap()).unwrap();
+    let provenance = run_json
+        .get("transaction_provenance")
+        .expect("transaction provenance recorded");
+    assert!(provenance["transactionId"]
+        .as_str()
+        .unwrap()
+        .starts_with("scene-edit-"));
+    assert_eq!(
+        provenance["scenePath"],
+        scene_path.to_string_lossy().to_string()
+    );
+
+    let ledger = run_cli(&temp, &["ledger", "list", run_dir.to_str().unwrap()]);
+    assert!(ledger.contains("run.transaction_bound"));
+
+    run_cli(&temp, &["journal", "update", run_dir.to_str().unwrap()]);
+    let journal = run_cli(&temp, &["journal", "show", run_dir.to_str().unwrap()]);
+    assert!(journal.contains("## Scene Edit Transaction"));
+    assert!(journal.contains("scene-edit-"));
+
+    let failed_transaction_path = temp.join("transactions/failure.json");
+    run_cli_expect_failure(
+        &temp,
+        &[
+            "scene",
+            "edit",
+            scene_path.to_str().unwrap(),
+            "--entity",
+            "player",
+            "--path",
+            "components.size.width",
+            "--value",
+            "0",
+            "--transaction-output",
+            failed_transaction_path.to_str().unwrap(),
+        ],
+    );
+    let failed_run = run_cli_expect_failure(
+        &temp,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--transaction",
+            failed_transaction_path.to_str().unwrap(),
+        ],
+    );
+    assert!(failed_run.contains("requires a passed transaction"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_ouroforge-cli"))
         .current_dir(current_dir)

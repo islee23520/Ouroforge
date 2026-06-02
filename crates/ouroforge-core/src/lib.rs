@@ -4010,8 +4010,9 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         .context("failed to read verdict for journal")?;
     let verdict: serde_json::Value =
         serde_json::from_str(&verdict_input).context("failed to parse verdict for journal")?;
+    let run = read_json_value(run_dir.join("run.json"))?;
     let proposals = read_mutation_proposals(run_dir)?.proposals;
-    let journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals);
+    let journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
     fs::write(run_dir.join("journal.md"), &journal).context("failed to write journal")?;
     Ok(journal)
 }
@@ -4026,6 +4027,7 @@ fn render_journal(
     ledger: &[serde_json::Value],
     verdict: &serde_json::Value,
     proposals: &[MutationProposal],
+    run: &serde_json::Value,
 ) -> String {
     let mut out = String::new();
     out.push_str("# Ouroforge Run Journal\n\n");
@@ -4039,6 +4041,26 @@ fn render_journal(
         out.push_str(&format!("- {}\n", item));
     }
     out.push('\n');
+
+    if let Some(provenance) = run.get("transaction_provenance") {
+        out.push_str("## Scene Edit Transaction\n\n");
+        if let Some(id) = provenance
+            .get("transactionId")
+            .and_then(|value| value.as_str())
+        {
+            out.push_str(&format!("- Transaction: `{}`\n", id));
+        }
+        if let Some(path) = provenance
+            .get("transactionArtifactPath")
+            .and_then(|value| value.as_str())
+        {
+            out.push_str(&format!("- Artifact: `{}`\n", path));
+        }
+        if let Some(scene_path) = provenance.get("scenePath").and_then(|value| value.as_str()) {
+            out.push_str(&format!("- Scene: `{}`\n", scene_path));
+        }
+        out.push('\n');
+    }
 
     out.push_str("## Executed Scenarios\n\n");
     for scenario in &seed.scenarios {
@@ -6131,6 +6153,52 @@ pub fn run_transaction_provenance_from_artifact(
         before_scene_hash: transaction.before_scene_hash,
         after_scene_hash,
     })
+}
+
+pub fn bind_run_transaction_provenance(
+    run_dir: impl AsRef<Path>,
+    transaction_path: impl AsRef<Path>,
+) -> Result<RunTransactionProvenance> {
+    let run_dir = run_dir.as_ref();
+    let provenance = run_transaction_provenance_from_artifact(&transaction_path)?;
+    let scene = read_scene(&provenance.scene_path).with_context(|| {
+        format!(
+            "failed to read transaction source scene {}",
+            provenance.scene_path
+        )
+    })?;
+    let current_hash = hash_scene_document(&scene)?;
+    if current_hash != provenance.after_scene_hash {
+        return Err(anyhow!(
+            "transaction source scene hash mismatch for {}; expected afterSceneHash {}, found {}",
+            provenance.transaction_id,
+            provenance.after_scene_hash.value,
+            current_hash.value
+        ));
+    }
+    let run_path = run_dir.join("run.json");
+    let mut run = read_json_value(&run_path)?;
+    let run_object = run
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("run.json must be a JSON object"))?;
+    run_object.insert(
+        "transaction_provenance".to_string(),
+        json!(provenance.clone()),
+    );
+    write_json_atomic(&run_path, &run)?;
+    append_ledger_event(
+        run_dir,
+        "run.transaction_bound",
+        "run-cli",
+        json!({
+            "transaction_id": provenance.transaction_id,
+            "transaction_artifact_path": provenance.transaction_artifact_path,
+            "scene_path": provenance.scene_path,
+            "before_scene_hash": provenance.before_scene_hash,
+            "after_scene_hash": provenance.after_scene_hash
+        }),
+    )?;
+    Ok(provenance)
 }
 
 pub fn preview_scene_edit_transaction(
@@ -10745,6 +10813,7 @@ scenarios:
                     "failures": if status == "failed" { vec![json!({"kind": "scenario_failed"})] } else { Vec::new() }
                 }),
                 &[],
+                &json!({}),
             );
             assert!(journal.contains(&format!("- Status: `{status}`")));
             assert!(journal.contains("`artifact-1`"));
