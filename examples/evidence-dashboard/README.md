@@ -108,3 +108,16 @@ The dashboard displays metadata produced by Rust/openchrome CDP workers, includi
 `cdp_transport`; it does not compute browser-side comparisons, rerun workers,
 write files, or execute commands. Remove generated `dashboard-data.json` before
 committing. See `docs/openchrome-cdp-evidence-fidelity-v2.md`.
+
+
+Reproducible Run Command Context v1 inspection:
+
+```bash
+cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 1
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+```
+
+Refresh the dashboard to inspect the escaped, display-only Reproducible Command
+Context panel. The panel is copied from Rust-authored `run.json` metadata and
+must not execute commands, rerun QA, write files, or start a command bridge. See
+`docs/reproducible-run-command-context-v1.md`.

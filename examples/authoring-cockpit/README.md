@@ -100,3 +100,10 @@ commands. The cockpit inspects exported data; it does not run seeds, compare
 runs, persist edits, apply mutations, or write files from browser JavaScript.
 
 The authoring cockpit is a static, local preview surface. It may display copyable Rust CLI commands such as `cargo run -p ouroforge-cli -- project validate`, `run --project`, `compare`, `scene validate`, `scene edit`, `scene reload-validate`, `mutation apply-scene --project`, and dashboard export commands, but it must not execute them from browser JavaScript. Persistent scene changes remain routed through Rust validation in the CLI. Browser-owned persistence APIs such as localStorage, indexedDB, showSaveFilePicker, direct file writes, native shell calls, hosted backends, auth, database, command bridges, auto-apply/auto-merge, plugin UI, and visual scripting are outside this demo boundary.
+
+
+Reproducible run command context is shown as escaped display-only evidence when
+`dashboard-data.json` includes `run_command_context`. The cockpit may show the
+copyable command, seed path, workers, scenario pack, and Openchrome/CDP boundary,
+but it must not execute, rerun, bridge, or persist that command. See
+`docs/reproducible-run-command-context-v1.md`.
