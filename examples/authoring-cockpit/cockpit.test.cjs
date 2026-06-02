@@ -43,6 +43,19 @@ const run = {
   mutation_lifecycle: { terminal_state: 'pending_review', command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'], stages: [{ id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json' }] },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
   comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'] }] },
+  engine_summaries: {
+    present: true,
+    source_world_state: 'evidence/world.json',
+    scene: { sceneId: 'foundation-scene', entityCount: 3, tick: 4 },
+    renderer: { version: '1', renderedEntities: 3, camera: { x: 0, y: 0 } },
+    tilemaps: { tilemapCount: 1, layerCount: 4 },
+    assets: { manifestId: 'runtime-v1-assets', assetCount: 3 },
+    animation: { animatedEntityCount: 1 },
+    audio: { audioEntityCount: 1, audioEventCount: 1 },
+    physics: { colliderEntityCount: 3, collisionEventCount: 1 },
+    reload: { reloadCount: 1, lastStatus: 'succeeded' },
+    composition: { entityCount: 3, parentedEntityCount: 1 },
+  },
 };
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
 assert.match(cockpit.dashboardExportCommand(), /dashboard export/);
@@ -51,13 +64,17 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v1 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 7);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 8);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
 assert.match(cockpit.renderReplaySurface(run), /replay-1/);
 assert.match(cockpit.renderComparisonSurface(run), /before/);
 assert.match(cockpit.renderComparisonSurface(run), /after/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /foundation-scene/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /runtime-v1-assets/);
+assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
@@ -68,6 +85,7 @@ assert.match(cockpit.renderIntegration(run), /Journal viewer/);
 assert.match(cockpit.renderIntegration(run), /Mutation review state/);
 assert.match(cockpit.renderIntegration(run), /Replay controls/);
 assert.match(cockpit.renderIntegration(run), /Run comparison/);
+assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
 assert.match(cockpit.renderIntegration(run), /Scene editing commands/);
 assert.match(cockpit.renderIntegration(run), /does not write files directly/);
 assert.match(cockpit.renderPreviewControls({ ok: false, error: 'probe missing' }), /probe missing/);
