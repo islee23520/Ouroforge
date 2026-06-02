@@ -8480,6 +8480,19 @@ scenarios:
     }
 
     #[test]
+    fn validates_physics_reload_composition_feature_regression_seed() {
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../seeds/engine-feature-physics-reload-composition.yaml"
+        ))
+        .expect("physics/reload/composition regression seed validates");
+        assert_eq!(seed.id, "engine-feature.physics-reload-composition");
+        assert_eq!(seed.scenarios.len(), 3);
+        assert_eq!(seed.scenarios[0].id, "physics-contact-trigger-regression");
+        assert_eq!(seed.scenarios[1].id, "reload-boundary-regression");
+        assert_eq!(seed.scenarios[2].id, "scene-composition-regression");
+    }
+
+    #[test]
     fn parses_valid_scenario_dsl() {
         let valid = r#"
 id: platformer.v0

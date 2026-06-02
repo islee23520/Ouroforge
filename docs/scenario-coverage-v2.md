@@ -11,8 +11,11 @@ Scenario Coverage v2 separates Engine Expansion v1 regression coverage into smal
 | Asset loading | `seeds/engine-feature-asset-animation-audio.yaml` / `asset-manifest-regression` | `world_state.assetManifest.*`, `world_state.assets.*` | Checks manifest and loaded state only; no network or server. |
 | Animation | `seeds/engine-feature-asset-animation-audio.yaml` / `animation-frame-regression` | `world_state.entities.*.components.animation.*` | Fixed-frame assertions; no visual AI judgment. |
 | Audio event | `seeds/engine-feature-asset-animation-audio.yaml` / `audio-intent-regression` | `world_state.audioEvents.*` | Intent evidence only; no real playback assertion. |
+| Collision/physics | `seeds/engine-feature-physics-reload-composition.yaml` / `physics-contact-trigger-regression` | `world_state.collisions.*`, `world_state.collisionEvents.*` | Fixed replay input; no wall-clock assertions. |
+| Hot reload boundary | `seeds/engine-feature-physics-reload-composition.yaml` / `reload-boundary-regression` | `world_state.reloads`, component defaults, scene id | Documents the boundary; does not add source-code HMR or watchers. |
+| Scene composition | `seeds/engine-feature-physics-reload-composition.yaml` / `scene-composition-regression` | `world_state.composition.*` | Parent/child world transform evidence. |
 
-Later PRs in #213 extend this map for physics/collision, hot reload, and scene composition.
+Later PRs in #213 run/export the suite and record dashboard compatibility evidence without committing generated artifacts.
 
 ## Guardrails
 

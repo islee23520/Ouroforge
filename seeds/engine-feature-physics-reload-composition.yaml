@@ -1,0 +1,98 @@
+id: engine-feature.physics-reload-composition
+title: Engine Feature Regression - Physics, Reload Boundary, and Composition
+goal: Isolate collision/physics v2, hot reload boundary state, and scene composition evidence for Engine Expansion v1 regression coverage.
+constraints:
+  target: game-runtime
+acceptance:
+  - Collision/contact and trigger evidence remains deterministic after fixed replay input.
+  - Hot reload boundary assertions remain explicit without adding source-code HMR or filesystem watchers.
+  - Parent/child scene composition and world transform evidence remains observable.
+scenarios:
+  - id: physics-contact-trigger-regression
+    description: Move the player into goal/wall contacts and assert deterministic collision and trigger evidence.
+    steps:
+      - replay:
+          schemaVersion: "1"
+          id: physics-contact-trigger-regression
+          events:
+            - frame: 0
+              key: right
+              pressed: true
+            - frame: 150
+              key: right
+              pressed: false
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 288
+      - world_state:
+          path: collisions.0.type
+          equals: runtime.collision.contact
+      - world_state:
+          path: collisions.0.pairId
+          equals: player:wall
+      - world_state:
+          path: collisions.0.normal.x
+          equals: -1
+      - world_state:
+          path: collisionEvents.0.type
+          equals: runtime.collision.trigger
+      - world_state:
+          path: collisionEvents.0.pairId
+          equals: goal:player
+      - world_state:
+          path: collisionEvents.15.staticEntityId
+          equals: wall
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: reload-boundary-regression
+    description: Assert the completed reload boundary is visible as bounded runtime state without enabling source-code hot reload.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: reloads
+          countEquals: 0
+      - world_state:
+          path: componentDefaults.controllable
+          equals: false
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: scene-composition-regression
+    description: Assert parented badge composition and derived world transform evidence after deterministic movement.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: composition.version
+          equals: '1'
+      - world_state:
+          path: composition.entities.0.entityId
+          equals: player
+      - world_state:
+          path: composition.entities.0.parent
+          exists: false
+      - world_state:
+          path: composition.entities.1.entityId
+          equals: player-badge
+      - world_state:
+          path: composition.entities.1.parent
+          equals: player
+      - world_state:
+          path: composition.entities.1.worldTransform.x
+          equals: 38
+      - world_state:
+          path: composition.entities.1.worldTransform.y
+          equals: 20
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
