@@ -2499,7 +2499,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         }
         validate_scene_color(&entity.sprite.color)?;
         if let Some(asset) = &entity.sprite.asset {
-            validate_scene_local_path("scene sprite asset", asset)?;
+            validate_scene_local_asset_path("scene sprite asset", asset)?;
         }
         if entity.components.size.width <= 0 || entity.components.size.height <= 0 {
             return Err(anyhow!("scene entity {} size must be positive", entity.id));
@@ -2554,8 +2554,23 @@ fn validate_scene_metadata(field: &str, metadata: &serde_json::Value) -> Result<
     }
 }
 
-fn validate_scene_local_path(field: &str, value: &str) -> Result<()> {
+fn validate_scene_local_asset_path(field: &str, value: &str) -> Result<()> {
     require_text(field, value)?;
+    let lowered = value.to_ascii_lowercase();
+    if lowered.starts_with("http://") || lowered.starts_with("https://") {
+        return Err(anyhow!("{field} must be a local static asset path"));
+    }
+    if !value.starts_with("assets/") {
+        return Err(anyhow!("{field} must start with assets/"));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '-' | '_'))
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '/', '.', '-' or '_'"
+        ));
+    }
     let path = Path::new(value);
     if path.is_absolute() {
         return Err(anyhow!("{field} must be relative"));
@@ -4236,7 +4251,7 @@ scenarios:
                     "id": "player",
                     "sprite": {
                         "color": "#5eead4",
-                        "asset": "../outside.png"
+                        "asset": "assets/../outside.png"
                     },
                     "components": {
                         "transform": { "x": 32, "y": 72 },
@@ -4250,6 +4265,56 @@ scenarios:
         .expect("path fixture parses");
         let rejected = validate_scene(&path_escape).expect_err("asset path escape rejected");
         assert!(rejected.to_string().contains("local scene asset tree"));
+
+        let absolute_path = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": {
+                        "color": "#5eead4",
+                        "asset": "/tmp/player.png"
+                    },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("absolute path fixture parses");
+        let rejected = validate_scene(&absolute_path).expect_err("absolute asset path rejected");
+        assert!(rejected.to_string().contains("must start with assets/"));
+
+        let remote_url = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "runtime-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": {
+                        "color": "#5eead4",
+                        "asset": "https://example.com/player.png"
+                    },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("remote URL fixture parses");
+        let rejected = validate_scene(&remote_url).expect_err("remote asset URL rejected");
+        assert!(rejected
+            .to_string()
+            .contains("must be a local static asset path"));
 
         let future_collider = serde_json::from_value::<SceneDocument>(json!({
             "schemaVersion": "1",
