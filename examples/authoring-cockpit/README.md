@@ -107,3 +107,10 @@ Reproducible run command context is shown as escaped display-only evidence when
 copyable command, seed path, workers, scenario pack, and Openchrome/CDP boundary,
 but it must not execute, rerun, bridge, or persist that command. See
 `docs/reproducible-run-command-context-v1.md`.
+
+Studio evidence fidelity surfaces show transaction provenance, Runtime Probe
+Contract status, input replay presence, Openchrome/CDP evidence completeness,
+and reproducible command context from exported dashboard data. Missing or
+malformed evidence is displayed as warning/empty state. The cockpit remains
+read-only and must not write files, execute commands, rerun QA, or apply
+mutations. See `docs/studio-evidence-fidelity-surfaces.md`.
