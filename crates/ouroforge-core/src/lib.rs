@@ -6635,6 +6635,99 @@ pub struct RunTransactionProvenance {
     pub after_scene_hash: SceneHash,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneOnlyMutationOperation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "targetScenePath")]
+    pub target_scene_path: String,
+    pub edit: SceneEdit,
+    #[serde(rename = "expectedBeforeSceneHash")]
+    pub expected_before_scene_hash: SceneHash,
+    #[serde(rename = "validationRequired")]
+    pub validation_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SceneOnlyMutationValidation {
+    pub status: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "targetScenePath")]
+    pub target_scene_path: String,
+    #[serde(rename = "beforeSceneHash")]
+    pub before_scene_hash: SceneHash,
+    #[serde(rename = "allowedPath")]
+    pub allowed_path: bool,
+}
+
+pub fn validate_scene_only_mutation_operation(
+    run_dir: impl AsRef<Path>,
+    operation: &SceneOnlyMutationOperation,
+) -> Result<SceneOnlyMutationValidation> {
+    let run_dir = run_dir.as_ref();
+    if operation.schema_version != "scene-only-mutation-v1" {
+        return Err(anyhow!(
+            "scene-only mutation schemaVersion must be scene-only-mutation-v1"
+        ));
+    }
+    if !operation.validation_required {
+        return Err(anyhow!(
+            "scene-only mutation requires validationRequired=true"
+        ));
+    }
+    require_text("scene-only mutation proposalId", &operation.proposal_id)?;
+    require_text(
+        "scene-only mutation targetScenePath",
+        &operation.target_scene_path,
+    )?;
+    if !supported_scene_edit_paths().contains(&operation.edit.path.as_str()) {
+        return Err(anyhow!(
+            "scene-only mutation edit path is not allowed: {}",
+            operation.edit.path
+        ));
+    }
+    let proposals = read_mutation_proposals(run_dir)?;
+    let proposal = proposals
+        .proposals
+        .iter()
+        .find(|proposal| proposal.id == operation.proposal_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "scene-only mutation proposal id not found: {}",
+                operation.proposal_id
+            )
+        })?;
+    if proposal.status != "proposed" {
+        return Err(anyhow!(
+            "scene-only mutation requires a proposed mutation; found status {}",
+            proposal.status
+        ));
+    }
+    let scene = read_scene(&operation.target_scene_path)?;
+    let before_scene_hash = hash_scene_document(&scene)?;
+    if before_scene_hash != operation.expected_before_scene_hash {
+        return Err(anyhow!(
+            "scene-only mutation before hash mismatch; expected {}, found {}",
+            operation.expected_before_scene_hash.value,
+            before_scene_hash.value
+        ));
+    }
+    let mut candidate_scene = scene.clone();
+    apply_scene_edit(&mut candidate_scene, operation.edit.clone())?;
+    validate_scene(&candidate_scene).context("scene-only mutation candidate validation failed")?;
+    Ok(SceneOnlyMutationValidation {
+        status: "passed".to_string(),
+        proposal_id: operation.proposal_id.clone(),
+        target_scene_path: operation.target_scene_path.clone(),
+        before_scene_hash,
+        allowed_path: true,
+    })
+}
+
 pub fn read_scene_edit_transaction_artifact(
     path: impl AsRef<Path>,
 ) -> Result<SceneEditTransaction> {
@@ -12382,6 +12475,116 @@ scenarios:
     }
 
     #[test]
+    fn scene_only_mutation_operation_validates_allowed_edit_without_writing() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-valid");
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            expected_before_scene_hash: before_hash.clone(),
+            validation_required: true,
+        };
+
+        let validation = validate_scene_only_mutation_operation(&artifacts.run_dir, &operation)
+            .expect("scene-only mutation validates");
+
+        assert_eq!(validation.status, "passed");
+        assert_eq!(validation.before_scene_hash, before_hash);
+        assert!(validation.allowed_path);
+        let persisted = read_scene(&scene_path).expect("scene still parses");
+        assert_eq!(
+            persisted.entities[0].components.transform.x, 32,
+            "schema validation must not write trusted scene state"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scene_only_mutation_operation_rejects_forbidden_path_and_stale_hash() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-rejects");
+        let forbidden = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id.clone(),
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "metadata.debug.mode".to_string(),
+                value: json!("unsafe"),
+            },
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        };
+        let forbidden_error =
+            validate_scene_only_mutation_operation(&artifacts.run_dir, &forbidden)
+                .expect_err("forbidden path rejected");
+        assert!(forbidden_error.to_string().contains("not allowed"));
+
+        let stale = SceneOnlyMutationOperation {
+            expected_before_scene_hash: SceneHash {
+                algorithm: "fnv1a64-canonical-json-v1".to_string(),
+                value: "0000000000000000".to_string(),
+            },
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            ..forbidden
+        };
+        let stale_error = validate_scene_only_mutation_operation(&artifacts.run_dir, &stale)
+            .expect_err("stale hash rejected");
+        assert!(stale_error.to_string().contains("before hash mismatch"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scene_only_mutation_operation_rejects_malformed_or_validation_failure() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("scene-only-mutation-malformed");
+        let malformed = serde_json::from_value::<SceneOnlyMutationOperation>(json!({
+            "schemaVersion": "scene-only-mutation-v1",
+            "proposalId": proposal.id.clone(),
+            "targetScenePath": scene_path.to_string_lossy().to_string(),
+            "edit": { "entity_id": "player", "path": "components.transform.x", "value": 48 },
+            "expectedBeforeSceneHash": before_hash.clone(),
+            "validationRequired": true,
+            "extra": "rejected"
+        }))
+        .expect_err("unknown fields rejected");
+        assert!(malformed.to_string().contains("unknown field"));
+
+        let operation = SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id,
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.size.width".to_string(),
+                value: json!(0),
+            },
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        };
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+        let error = validate_scene_only_mutation_operation(&artifacts.run_dir, &operation)
+            .expect_err("candidate validation failure rejected");
+        assert!(error.to_string().contains("candidate validation failed"));
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after reads"),
+            before_contents,
+            "failed validation must leave trusted scene unchanged"
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn scene_edit_model_validates_and_preserves_scene_shape() {
         let root = unique_temp_dir("scene-edit-model");
         fs::create_dir_all(&root).expect("temp root exists");
@@ -14962,6 +15165,41 @@ scenarios:
         let runs_root = root.join("runs");
         let artifacts = create_run(&seed_path, &runs_root).expect("run artifacts created");
         (root, artifacts)
+    }
+
+    fn create_scene_only_mutation_fixture(
+        prefix: &str,
+    ) -> (PathBuf, RunArtifacts, MutationProposal, PathBuf, SceneHash) {
+        let (root, artifacts) = create_test_run(prefix);
+        let scene_path = root.join("scene.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene.json"),
+        )
+        .expect("scene written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "scene-only-mutation-evidence",
+            "application/json",
+            "evidence/scene-only-mutation.json",
+            json!({ "source": "scene-only-mutation-test" }),
+        )
+        .expect("evidence indexed");
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "scene-only mutation fixture".to_string(),
+                evidence_id: "scene-only-mutation-evidence".to_string(),
+                target: scene_path.to_string_lossy().to_string(),
+                path: "components.transform.x".to_string(),
+                from: "32".to_string(),
+                to: "48".to_string(),
+            },
+        )
+        .expect("proposal created");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let before_hash = hash_scene_document(&scene).expect("scene hashes");
+        (root, artifacts, proposal, scene_path, before_hash)
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
