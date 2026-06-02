@@ -46,6 +46,41 @@ const run = {
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ state: 'accepted' }] },
     ],
   },
+  comparison: {
+    present: true,
+    empty_state: '',
+    artifacts: [
+      {
+        id: 'run-comparison-before--after',
+        path: 'mutation/run-comparison-before--after.json',
+        exists: true,
+        read_error: null,
+        before_run_id: 'before-run',
+        after_run_id: 'after-run',
+        classification: 'improved',
+        deltas: {
+          scenario_results: 1,
+          verdict_status: 'failed -> passed',
+          failed_scenarios: -1,
+          assertion_failures: -2,
+          performance_artifacts: 1,
+          evidence_artifacts: 3,
+        },
+        evidence_refs: [
+          'runs/before-run/verdict.json',
+          'runs/after-run/verdict.json',
+          'evidence/scenarios/replay-smoke/scenario-result.json',
+        ],
+        unsupported: ['semantic gameplay quality is not inferred'],
+        value: {
+          before_run_id: 'before-run',
+          after_run_id: 'after-run',
+          classification: 'improved',
+          evidence_refs: ['runs/before-run/verdict.json', 'runs/after-run/verdict.json'],
+        },
+      },
+    ],
+  },
   replay: {
     present: true,
     empty_state: '',
@@ -134,6 +169,18 @@ assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
 assert.match(detail, /Replay Controls/);
+assert.match(detail, /Run Comparison/);
+assert.match(detail, /Read-only\. Displays existing comparison artifacts only/);
+assert.match(detail, /before-run/);
+assert.match(detail, /after-run/);
+assert.match(detail, /improved/);
+assert.match(detail, /scenario results/);
+assert.match(detail, /verdict status/);
+assert.match(detail, /assertion failures/);
+assert.match(detail, /semantic gameplay quality is not inferred/);
+assert.ok(detail.includes('../../runs/before-run/verdict.json'));
+assert.ok(detail.includes('../../runs/after-run/verdict.json'));
+assert.ok(detail.includes('../../runs/run-1/evidence/scenarios/replay-smoke/scenario-result.json'));
 assert.match(detail, /Inspect-only\. Controls are local\/in-memory/);
 assert.match(detail, /Current frame/);
 assert.match(detail, /Initial state/);
@@ -167,6 +214,9 @@ assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
+assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
+assert.equal(dashboard.comparisonRefHref('runs/before-run/verdict.json', run), '../../runs/before-run/verdict.json');
+assert.equal(dashboard.comparisonRefHref('evidence/world.json', run), '../../runs/run-1/evidence/world.json');
 assert.match(dashboard.renderRunList([], null), /No runs found/);
 
 let replayState = dashboard.createReplayState(run);
@@ -191,6 +241,7 @@ const xssRun = {
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
+  comparison: { present: true, empty_state: '', artifacts: [{ id: '<img>', path: 'mutation/<script>.json', exists: true, read_error: '<script>alert(1)</script>', before_run_id: '<script>', after_run_id: '<img>', classification: '<script>', deltas: { '<script>': '<img>' }, evidence_refs: ['javascript:alert(1)', '<script>'], unsupported: ['<script>alert(1)</script>'], value: { unsafe: '<script>alert(1)</script>' } }] },
   verdict: {}, journal: '<script>alert(1)</script>',
 };
 const xssDetail = dashboard.renderRunDetail(xssRun);

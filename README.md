@@ -14,6 +14,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Propose deterministic mutation records for failed runs.
 - Inspect runs with a read-only evidence dashboard.
 - Inspect/edit the minimal game-runtime scene through Rust-validated scene edit commands and a static authoring cockpit prototype.
+- Inspect existing before/after run comparison artifacts in the read-only evidence dashboard.
 
 ## Prerequisites
 
@@ -74,7 +75,7 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
+For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. The dashboard comparison panel is read-only: it displays existing comparison artifacts and evidence links without computing browser-side comparisons, mutating runs, accepting mutations, or generating AI summaries. For Evolve Loop v1 demo evidence, validate and run `seeds/evolve-v1-demo.yaml`, then run `cargo run -p ouroforge-cli -- evolve demo runs/<run-id>` and record the lifecycle summary. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
 
 ## Repository map
 

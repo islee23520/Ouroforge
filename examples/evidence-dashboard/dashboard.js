@@ -128,6 +128,73 @@ const OuroforgeDashboard = (() => {
     return `<div class="ref-group"><div class="card-label">${escapeText(title)}</div><div class="ref-list">${links}</div></div>`;
   }
 
+
+  function comparisonRefHref(ref, run) {
+    const text = String(ref || '');
+    if (!text) return '';
+    if (/^(https?:|data:|javascript:)/i.test(text)) return '';
+    if (text.startsWith('runs/')) return `../../${text}`;
+    return runRelativeHref(text, run);
+  }
+
+  function renderComparisonRefLinks(title, refs, run) {
+    if (!Array.isArray(refs) || !refs.length) return '';
+    const links = refs.map((ref) => {
+      const href = comparisonRefHref(ref, run);
+      return href
+        ? `<a class="ref-chip" href="${escapeText(href)}" target="_blank" rel="noreferrer">${escapeText(ref)}</a>`
+        : `<span class="ref-chip">${escapeText(ref)}</span>`;
+    }).join('');
+    return `<div class="ref-group"><div class="card-label">${escapeText(title)}</div><div class="ref-list">${links}</div></div>`;
+  }
+
+  function renderDeltaCards(deltas) {
+    if (!deltas || typeof deltas !== 'object' || Array.isArray(deltas) || !Object.keys(deltas).length) {
+      return '<p class="empty-state compact">No delta fields were recorded in this comparison artifact.</p>';
+    }
+    return `<div class="delta-grid">${Object.entries(deltas).map(([key, value]) => `<article class="delta-card">
+      <div class="card-label">${escapeText(key.replace(/_/g, ' '))}</div>
+      <div class="card-value">${escapeText(typeof value === 'object' ? JSON.stringify(value) : value)}</div>
+    </article>`).join('')}</div>`;
+  }
+
+  function renderRunComparison(run) {
+    const comparison = run?.comparison;
+    if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
+      return `<section class="panel"><h3>Run Comparison</h3><p class="empty-state">${escapeText(comparison?.empty_state || 'No run comparison artifacts were found for this run.')}</p></section>`;
+    }
+    const artifactsHtml = comparison.artifacts.map((artifact) => {
+      const raw = artifact.value === undefined || artifact.value === null
+        ? '<p class="empty-state compact">No raw comparison preview is available.</p>'
+        : `<pre>${escapeText(JSON.stringify(artifact.value, null, 2))}</pre>`;
+      const unsupported = Array.isArray(artifact.unsupported) && artifact.unsupported.length
+        ? `<div class="artifact-warning">Unsupported claims not inferred: ${escapeText(artifact.unsupported.join(' · '))}</div>`
+        : '';
+      return `<article class="comparison-artifact">
+        <div class="journal-entry-header">
+          <h4><a href="${escapeText(runRelativeHref(artifact.path, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id || artifact.path)}</a></h4>
+          <span class="${statusClass(artifact.classification || 'unknown')}">${escapeText(artifact.classification || 'unknown')}</span>
+        </div>
+        <div class="cards">
+          <div class="card"><div class="card-label">Before run</div><div class="card-value">${escapeText(artifact.before_run_id || 'unknown')}</div></div>
+          <div class="card"><div class="card-label">After run</div><div class="card-value">${escapeText(artifact.after_run_id || 'unknown')}</div></div>
+          <div class="card"><div class="card-label">Artifact path</div><div class="card-value">${escapeText(artifact.path)}</div></div>
+        </div>
+        ${artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : ''}
+        ${artifact.exists === false ? '<div class="artifact-warning">Missing comparison artifact file</div>' : ''}
+        <section class="panel"><h5>Scenario, verdict, performance, assertion, and evidence deltas</h5>${renderDeltaCards(artifact.deltas)}</section>
+        ${renderComparisonRefLinks('Before/after evidence refs', artifact.evidence_refs, run)}
+        ${unsupported}
+        <details class="raw-json"><summary>Raw comparison artifact</summary>${raw}</details>
+      </article>`;
+    }).join('');
+    return `<section class="panel">
+      <h3>Run Comparison</h3>
+      <p class="run-meta">Read-only. Displays existing comparison artifacts only; does not compute comparisons, mutate runs, accept/reject mutations, or generate AI summaries.</p>
+      <div class="comparison-grid">${artifactsHtml}</div>
+    </section>`;
+  }
+
   function renderJournalViewer(run) {
     const journal = run?.journal_view;
     if (!journal) {
@@ -319,6 +386,7 @@ const OuroforgeDashboard = (() => {
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderReplayControls(run, replayState)}
+      ${renderRunComparison(run)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
       ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
       ${renderArtifacts('Frame/performance metrics', artifacts(run.frame_metrics, run.performance_metrics), run, renderJsonArtifact)}
@@ -380,7 +448,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunDetail, renderRunDetailWithState, renderRunList, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderJournalViewer, renderMutationLifecycle, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

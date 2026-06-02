@@ -51,3 +51,10 @@ h1,h2,h3,h4 { margin:0; }
 .ref-chip { display:inline-block; border:1px solid #3b4658; border-radius:999px; padding:.2rem .5rem; background:#0f172a; color:#8bd3ff; font-size:.8rem; overflow-wrap:anywhere; }
 .screenshot { max-width:100%; border-radius:.5rem; border:1px solid #334155; background:#0f172a; }
 pre { white-space:pre-wrap; overflow:auto; background:#0b1020; border:1px solid #293241; border-radius:.75rem; padding:1rem; }
+
+.comparison-grid { display:grid; gap:.75rem; margin-top:1rem; }
+.comparison-artifact { border:1px solid #334155; border-radius:.75rem; padding:.75rem; background:#111827; overflow-wrap:anywhere; }
+.delta-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(12rem,1fr)); gap:.75rem; margin-top:.75rem; }
+.delta-card { border:1px solid #3b4658; border-radius:.75rem; padding:.75rem; background:#0f172a; }
+.raw-json { margin-top:.75rem; }
+.raw-json summary { color:#8bd3ff; cursor:pointer; }
