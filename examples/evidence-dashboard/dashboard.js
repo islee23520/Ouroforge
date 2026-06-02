@@ -9,12 +9,16 @@ const OuroforgeDashboard = (() => {
   }
 
   function summarizeRun(run) {
+    const summary = run.summary || {};
     return {
-      id: run.summary.id,
-      seed: run.summary.seed_id,
-      verdict: run.summary.verdict_status,
-      evidenceCount: run.summary.evidence_count,
-      mutationCount: run.summary.mutation_count,
+      id: summary.id,
+      seed: summary.seed_id,
+      runStatus: summary.run_status || 'unknown',
+      verdict: summary.verdict_status || 'unknown',
+      scenario: summary.scenario_status || 'unknown',
+      workerCount: summary.worker_count ?? 0,
+      evidenceCount: summary.evidence_count ?? 0,
+      mutationCount: summary.mutation_count ?? 0,
     };
   }
 
@@ -36,8 +40,12 @@ const OuroforgeDashboard = (() => {
       const active = summary.id === selectedId ? ' active' : '';
       return `<button class="run-button${active}" data-run-id="${escapeText(summary.id)}">
         <div class="run-id">${escapeText(summary.id)}</div>
-        <div class="run-meta">${escapeText(summary.seed)} · ${summary.evidenceCount} evidence · ${summary.mutationCount} mutations</div>
-        <span class="${statusClass(summary.verdict)}">${escapeText(summary.verdict)}</span>
+        <div class="run-meta">${escapeText(summary.seed)} · ${summary.evidenceCount} evidence · ${summary.mutationCount} mutations · ${summary.workerCount} workers</div>
+        <div class="run-status-row">
+          <span class="${statusClass(summary.runStatus)}">run ${escapeText(summary.runStatus)}</span>
+          <span class="${statusClass(summary.verdict)}">verdict ${escapeText(summary.verdict)}</span>
+          <span class="${statusClass(summary.scenario)}">scenario ${escapeText(summary.scenario)}</span>
+        </div>
       </button>`;
     }).join('');
   }
@@ -50,10 +58,13 @@ const OuroforgeDashboard = (() => {
   }
 
   function renderArtifactLink(artifact, run) {
+    const missing = artifact.exists === false ? '<div class="artifact-warning">Missing generated file</div>' : '';
+    const readError = artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : '';
     return `<article class="artifact">
       <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
       <div class="run-meta">${escapeText(artifact.kind)}</div>
       <div class="run-meta">${escapeText(artifact.path)}</div>
+      ${missing}${readError}
     </article>`;
   }
 
@@ -65,30 +76,65 @@ const OuroforgeDashboard = (() => {
   }
 
   function renderJsonArtifact(artifact, run) {
+    const preview = artifact.value === undefined || artifact.value === null
+      ? '<p class="empty-state compact">No JSON preview available.</p>'
+      : `<pre>${escapeText(JSON.stringify(artifact.value, null, 2))}</pre>`;
     return `<article class="artifact">
       <a href="${escapeText(artifactHref(artifact, run))}" target="_blank" rel="noreferrer">${escapeText(artifact.id)}</a>
-      <pre>${escapeText(JSON.stringify(artifact.value, null, 2))}</pre>
+      <div class="run-meta">${escapeText(artifact.path)}</div>
+      ${artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : ''}
+      ${preview}
     </article>`;
+  }
+
+  function artifacts(...groups) {
+    return groups.flatMap((group) => Array.isArray(group) ? group : []);
+  }
+
+  function renderCategorySummary(categories = []) {
+    if (!categories.length) {
+      return '<p class="empty-state">No evidence category summaries are available.</p>';
+    }
+    const cards = categories.map((category) => {
+      const warnings = [];
+      if (category.missing_count) warnings.push(`${category.missing_count} missing`);
+      if (category.malformed_count) warnings.push(`${category.malformed_count} malformed`);
+      return `<article class="category-card">
+        <div class="card-label">${escapeText(category.label || category.id)}</div>
+        <div class="card-value">${escapeText(category.count ?? 0)}</div>
+        ${warnings.length ? `<div class="artifact-warning">${escapeText(warnings.join(' · '))}</div>` : '<div class="run-meta">All indexed files readable</div>'}
+      </article>`;
+    }).join('');
+    return `<div class="category-grid">${cards}</div>`;
   }
 
   function renderRunDetail(run) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
+    const summary = summarizeRun(run);
+    const evidence = Array.isArray(run.evidence) ? run.evidence : [];
+    const mutations = Array.isArray(run.mutations) ? run.mutations : [];
     return `<article>
-      <h2>${escapeText(run.summary.id)}</h2>
+      <h2>${escapeText(summary.id)}</h2>
       <div class="cards">
-        <div class="card"><div class="card-label">Seed</div><div class="card-value">${escapeText(run.summary.seed_id)}</div></div>
-        <div class="card"><div class="card-label">Verdict</div><div class="card-value"><span class="${statusClass(run.summary.verdict_status)}">${escapeText(run.summary.verdict_status)}</span></div></div>
-        <div class="card"><div class="card-label">Evidence</div><div class="card-value">${run.evidence.length}</div></div>
-        <div class="card"><div class="card-label">Mutations</div><div class="card-value">${run.mutations.length}</div></div>
+        <div class="card"><div class="card-label">Seed</div><div class="card-value">${escapeText(summary.seed)}</div></div>
+        <div class="card"><div class="card-label">Run</div><div class="card-value"><span class="${statusClass(summary.runStatus)}">${escapeText(summary.runStatus)}</span></div></div>
+        <div class="card"><div class="card-label">Verdict</div><div class="card-value"><span class="${statusClass(summary.verdict)}">${escapeText(summary.verdict)}</span></div></div>
+        <div class="card"><div class="card-label">Scenario</div><div class="card-value"><span class="${statusClass(summary.scenario)}">${escapeText(summary.scenario)}</span></div></div>
+        <div class="card"><div class="card-label">Workers</div><div class="card-value">${escapeText(summary.workerCount)}</div></div>
+        <div class="card"><div class="card-label">Evidence</div><div class="card-value">${evidence.length}</div></div>
+        <div class="card"><div class="card-label">Mutations</div><div class="card-value">${mutations.length}</div></div>
       </div>
+      <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       <section class="panel"><h3>Journal</h3><pre>${escapeText(run.journal)}</pre></section>
-      ${renderArtifacts('Screenshots', run.screenshots, run, renderScreenshot)}
-      ${renderArtifacts('World state', run.world_states, run, renderJsonArtifact)}
-      ${renderArtifacts('Console logs', run.console_logs, run, renderJsonArtifact)}
-      ${renderArtifacts('Mutation proposals', run.mutations.map((mutation) => ({ id: mutation.id, kind: 'mutation/proposal', path: mutation.evidence_id, value: mutation })), run, renderJsonArtifact)}
-      ${renderArtifacts('Evidence index', run.evidence, run, renderArtifactLink)}
+      ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
+      ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
+      ${renderArtifacts('Frame/performance metrics', artifacts(run.frame_metrics, run.performance_metrics), run, renderJsonArtifact)}
+      ${renderArtifacts('Console/CDP summaries', artifacts(run.console_logs, run.cdp_trace_summaries), run, renderJsonArtifact)}
+      ${renderArtifacts('Scenario results', artifacts(run.scenario_results), run, renderJsonArtifact)}
+      ${renderArtifacts('Mutation artifacts', artifacts(run.mutation_artifacts), run, renderJsonArtifact)}
+      ${renderArtifacts('Evidence index', evidence, run, renderArtifactLink)}
     </article>`;
   }
 
@@ -99,6 +145,7 @@ const OuroforgeDashboard = (() => {
       const response = await fetch('dashboard-data.json', { cache: 'no-store' });
       if (!response.ok) throw new Error(`failed to load dashboard-data.json: ${response.status}`);
       const data = await response.json();
+      if (!Array.isArray(data.runs)) throw new Error('malformed dashboard-data.json: runs must be an array');
       const runs = data.runs || [];
       let selected = runs[0] || null;
       const paint = () => {
@@ -114,10 +161,11 @@ const OuroforgeDashboard = (() => {
       paint();
     } catch (error) {
       listEl.innerHTML = `<div class="empty-state">${escapeText(error.message)}</div>`;
+      detailEl.innerHTML = '<div class="empty-state">Generate dashboard data with the Rust CLI export command, then refresh.</div>';
     }
   }
 
-  return { artifactHref, init, renderRunDetail, renderRunList, statusClass, summarizeRun };
+  return { artifactHref, init, renderCategorySummary, renderRunDetail, renderRunList, statusClass, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
