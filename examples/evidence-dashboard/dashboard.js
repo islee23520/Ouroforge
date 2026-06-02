@@ -470,6 +470,32 @@ const OuroforgeDashboard = (() => {
     return `<section class="panel"><h4>Proposal rationale</h4><p class="run-meta">Read-only proposal quality metadata. The dashboard does not apply, accept, reject, promote, or execute mutations.</p><div class="lifecycle-grid">${cards}</div></section>`;
   }
 
+
+  function renderReviewDecisionRecords(stage, run) {
+    if (!stage || stage.id !== 'reviewed' || !Array.isArray(stage.records) || !stage.records.length) {
+      return '';
+    }
+    const cards = stage.records.map((record) => {
+      const status = record.decision_status || record.state || 'unknown';
+      const reviewerType = record.reviewer_type || 'unknown';
+      const guardrails = record.guardrail_checklist && typeof record.guardrail_checklist === 'object'
+        ? Object.entries(record.guardrail_checklist).map(([key, value]) => `${escapeText(key)}=${escapeText(value)}`).join(', ')
+        : 'not recorded';
+      return `<div class="review-decision-card">
+        <strong>${escapeText(record.id || 'review-decision')}</strong> <span class="${statusClass(status)}">${escapeText(status)}</span>
+        <dl>
+          <dt>Proposal</dt><dd>${escapeText(record.proposal_id || 'unlinked')}</dd>
+          <dt>Patch draft</dt><dd>${escapeText(record.patch_draft_id || 'unknown')}</dd>
+          <dt>Reviewer</dt><dd>${escapeText(record.reviewer || 'unknown')} (${escapeText(reviewerType)})</dd>
+          <dt>Reason</dt><dd>${escapeText(record.reason || '')}</dd>
+          <dt>Guardrails</dt><dd>${guardrails}</dd>
+        </dl>
+        ${renderRefLinks('Decision evidence refs', record.evidence_refs, run)}
+      </div>`;
+    }).join('');
+    return `<section class="review-decision-summary"><h5>Review decision ledger</h5><p class="run-meta">Read-only append-only decision records. Accepted decisions do not apply mutations.</p>${cards}</section>`;
+  }
+
   function renderMutationLifecycle(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -490,6 +516,7 @@ const OuroforgeDashboard = (() => {
       ${stage.read_error ? `<div class="artifact-warning">${escapeText(stage.read_error)}</div>` : ''}
       ${renderRefLinks('Evidence refs', stage.evidence_refs, run)}
       ${projectMutationContext}
+      ${renderReviewDecisionRecords(stage, run)}
       ${Array.isArray(stage.records) && stage.records.length ? `<pre>${escapeText(JSON.stringify(stage.records, null, 2))}</pre>` : '<p class="empty-state compact">No lifecycle records for this stage.</p>'}
     </article>`;
     }).join('') : '<p class="empty-state">No mutation lifecycle stages are available.</p>';

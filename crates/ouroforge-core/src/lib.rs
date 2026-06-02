@@ -4311,6 +4311,7 @@ pub fn append_mutation_review_decision(
             "reviewer": decision.reviewer,
         }),
     )?;
+    update_journal(run_dir)?;
     Ok(decision)
 }
 
@@ -5580,7 +5581,9 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         serde_json::from_str(&verdict_input).context("failed to parse verdict for journal")?;
     let run = read_json_value(run_dir.join("run.json"))?;
     let proposals = read_mutation_proposals(run_dir)?.proposals;
-    let journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
+    let reviews = read_mutation_review_artifact(run_dir)?.decisions;
+    let mut journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
+    journal.push_str(&render_review_decision_journal_section(&reviews));
     fs::write(run_dir.join("journal.md"), &journal).context("failed to write journal")?;
     Ok(journal)
 }
@@ -5825,6 +5828,64 @@ fn render_journal(
                     mutation_rationale_confidence_label(&rationale.confidence)
                 ));
             }
+        }
+    }
+    out
+}
+
+fn render_review_decision_journal_section(reviews: &[MutationReviewDecision]) -> String {
+    let mut out = String::new();
+    out.push_str(
+        "
+## Review Decisions
+
+",
+    );
+    if reviews.is_empty() {
+        out.push_str(
+            "- No review decisions recorded.
+",
+        );
+        return out;
+    }
+    for decision in reviews {
+        let status = decision.decision_status.as_ref().unwrap_or(&decision.state);
+        out.push_str(&format!(
+            "- `{}`: `{:?}` for proposal `{}` patch draft `{}` by `{}` (`{:?}`)
+",
+            decision.id,
+            status,
+            decision.proposal_id.as_deref().unwrap_or("unlinked"),
+            decision.patch_draft_id,
+            decision.reviewer,
+            decision
+                .reviewer_type
+                .as_ref()
+                .unwrap_or(&MutationReviewReviewerType::Human),
+        ));
+        out.push_str(&format!(
+            "  - Reason: {}
+",
+            decision.reason
+        ));
+        out.push_str(&format!(
+            "  - Evidence refs: {}
+",
+            if decision.evidence_refs.is_empty() {
+                "none".to_string()
+            } else {
+                decision.evidence_refs.join(", ")
+            }
+        ));
+        if let Some(checklist) = &decision.guardrail_checklist {
+            out.push_str(&format!(
+                "  - Guardrails: record_only={} accepted_does_not_apply={} browser_read_only={} evidence_refs_checked={}
+",
+                checklist.proposal_is_record_only,
+                checklist.accepted_does_not_apply,
+                checklist.browser_read_only,
+                checklist.evidence_refs_checked
+            ));
         }
     }
     out

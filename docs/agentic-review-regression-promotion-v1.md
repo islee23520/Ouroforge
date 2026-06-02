@@ -266,3 +266,7 @@ Follow-up PRs should prefer narrow schemas, existing ledger/evidence helpers,
 existing scenario-pack validation, and existing dashboard/Studio read-model
 patterns before adding abstractions. Any scope movement must be documented in
 the affected issue before implementation proceeds.
+
+## Review Decision Ledger v1
+
+See [Review Decision Ledger v1](review-decision-ledger-v1.md).

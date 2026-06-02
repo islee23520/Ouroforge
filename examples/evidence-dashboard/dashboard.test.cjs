@@ -83,7 +83,7 @@ const run = {
       { id: 'sandboxed', label: 'Sandboxed', state: 'sandboxed', artifact_path: 'sandbox/*/evidence/result.json', record_count: 1, evidence_refs: ['sandbox/patch-draft-1/evidence/result.json'], records: [{ patch_draft_id: 'patch-draft-1' }] },
       { id: 'compared', label: 'Compared', state: 'compared', artifact_path: 'mutation/rerun-orchestration.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ comparison_artifact_path: 'mutation/run-comparison-before--after.json' }] },
       { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, evidence_refs: [], records: [{ id: 'scene-application-1', proposalId: 'mutation-1', transactionId: 'scene-edit-abc123', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'ouroforge.project.json', manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' }, scenePath: 'scenes/main.scene.json', sceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' } }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' }, strategy: 'restore beforeSceneHash' }, status: 'applied' }] },
-      { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ state: 'accepted' }] },
+      { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'agent', reviewer: 'agent-reviewer', reason: '<script>accepted</script>', evidence_refs: ['mutation/rerun-orchestration.json'], guardrail_checklist: { proposal_is_record_only: true, accepted_does_not_apply: true, browser_read_only: true, evidence_refs_checked: true } }] },
     ],
   },
   transaction_provenance: {
@@ -298,6 +298,11 @@ assert.match(detail, /Rollback/);
 assert.match(detail, /Manual review/);
 assert.match(detail, /accepted/);
 assert.match(detail, /mutation\/review-decisions\.json/);
+assert.match(detail, /Review decision ledger/);
+assert.match(detail, /review-decision-1/);
+assert.match(detail, /agent-reviewer/);
+assert.match(detail, /accepted_does_not_apply=true/);
+assert.ok(!detail.includes('<script>accepted</script>'));
 assert.match(detail, /mutation review runs\/run-1 --accept/);
 assert.match(detail, /No lifecycle records for this stage|patch-draft-1/);
 assert.match(detail, /fixture journal summary/);

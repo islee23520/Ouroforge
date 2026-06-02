@@ -86,6 +86,7 @@ const run = {
     terminal_state: 'pending_review',
     command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'],
     stages: [
+      { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'human', reviewer: 'manual-reviewer', reason: '<b>accepted</b>', evidence_refs: ['mutation/rerun-orchestration.json'] }] },
       { id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json', record_count: 1, records: [{ id: 'proposal-1', evidence_id: 'verdict-1' }] },
       { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'examples/project/ouroforge.project.json', scenePath: 'scenes/main.scene.json' }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' } }, status: 'applied' }] },
     ],
@@ -328,3 +329,9 @@ assert.ok(!cockpit.renderEvidenceFidelitySurface(xssFidelity).includes('<script>
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
+
+assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
+assert.match(cockpit.renderMutationReviewSurface(run), /review-decision-1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /manual-reviewer/);
+assert.ok(!cockpit.renderMutationReviewSurface(run).includes('<b>accepted</b>'));
+assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No review decisions recorded/);

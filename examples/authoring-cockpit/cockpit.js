@@ -686,6 +686,17 @@ const OuroforgeCockpit = (() => {
     return `<div class="proposal-rationale"><h3>Proposal rationale</h3><p class="hint">Read-only evidence-linked rationale. The cockpit does not accept, apply, promote, rerun, or execute proposal actions.</p>${rows}</div>`;
   }
 
+
+  function renderReviewDecisionSurface(lifecycle, run) {
+    const stage = (lifecycle?.stages || []).find((item) => item.id === 'reviewed');
+    const records = Array.isArray(stage?.records) ? stage.records : [];
+    if (!records.length) {
+      return '<div class="proposal-rationale"><h3>Review decisions</h3><p class="empty compact">No review decisions recorded. Use the Rust CLI outside the browser to append decisions.</p></div>';
+    }
+    const rows = records.map((record) => `<div class="surface-row"><strong>${escapeText(record.id || 'review-decision')}</strong> ${surfaceState(true, record.decision_status || record.state || 'unknown')}<br><small>proposal ${escapeText(record.proposal_id || 'unlinked')} · reviewer ${escapeText(record.reviewer || 'unknown')} (${escapeText(record.reviewer_type || 'unknown')})</small><br><span>${escapeText(record.reason || '')}</span>${renderRefLinks(record.evidence_refs, run)}</div>`).join('');
+    return `<div class="proposal-rationale"><h3>Review decisions</h3><p class="hint">Read-only append-only review ledger. The cockpit does not write, accept, apply, promote, rerun, or merge mutations.</p>${rows}</div>`;
+  }
+
   function renderMutationReviewSurface(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -698,6 +709,7 @@ const OuroforgeCockpit = (() => {
       <div><strong>Terminal state:</strong> ${escapeText(lifecycle.terminal_state || 'missing')}</div>
       <div class="surface-list">${stages}</div>
       ${renderProposalRationaleSurface(run)}
+      ${renderReviewDecisionSurface(lifecycle, run)}
       ${renderSceneMutationLifecycleSurface(run)}
       <h3>Command hints</h3><div class="command-list">${hints}</div>
     </section>`;
@@ -851,7 +863,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
