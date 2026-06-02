@@ -5918,8 +5918,14 @@ pub struct SceneAudio {
 pub struct SceneAudioEvent {
     pub name: String,
     pub trigger: String,
+    #[serde(default = "default_audio_action")]
+    pub action: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
+}
+
+fn default_audio_action() -> String {
+    "play".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6444,6 +6450,18 @@ fn validate_scene_audio(
         if event.trigger != "scene_loaded" {
             return Err(anyhow!(
                 "scene entity {entity_id} audio trigger must be scene_loaded"
+            ));
+        }
+        if !matches!(event.action.as_str(), "play" | "stop") {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio event {} action must be play or stop",
+                event.name
+            ));
+        }
+        if event.action == "play" && event.asset.is_none() {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio event {} play action requires an asset ref",
+                event.name
             ));
         }
         if let Some(asset) = &event.asset {
@@ -11254,6 +11272,73 @@ scenarios:
             .contains("must be a local static asset path"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scene_audio_v1_validates_intent_events_and_manifest_refs() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "audio-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "assetManifest": {
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    { "id": "player-sprite", "kind": "sprite", "path": "assets/sprites/player.svg" },
+                    { "id": "spawn-audio", "kind": "audio", "path": "assets/audio/player-spawn.ogg" }
+                ]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "asset": "player-sprite" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "audio": { "events": [{ "name": "player_spawn", "trigger": "scene_loaded", "action": "play", "asset": "spawn-audio" }] }
+                }
+            }]
+        }))
+        .expect("audio scene parses");
+        validate_scene(&scene).expect("audio intent validates");
+
+        let mut missing_asset = scene.clone();
+        missing_asset.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .events[0]
+            .asset = None;
+        let rejected = validate_scene(&missing_asset).expect_err("play asset required");
+        assert!(rejected
+            .to_string()
+            .contains("play action requires an asset ref"));
+
+        let mut invalid_action = scene.clone();
+        invalid_action.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .events[0]
+            .action = "stream".to_string();
+        let rejected = validate_scene(&invalid_action).expect_err("invalid audio action rejected");
+        assert!(rejected.to_string().contains("action must be play or stop"));
+
+        let mut unknown_ref = scene.clone();
+        unknown_ref.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .events[0]
+            .asset = Some("missing-audio".to_string());
+        let rejected = validate_scene(&unknown_ref).expect_err("unknown audio ref rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown asset manifest id"));
     }
 
     #[test]

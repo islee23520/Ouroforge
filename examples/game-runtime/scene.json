@@ -80,7 +80,9 @@
           "events": [
             {
               "name": "player_spawn",
-              "trigger": "scene_loaded"
+              "trigger": "scene_loaded",
+              "action": "play",
+              "asset": "player-spawn-audio"
             }
           ]
         }
@@ -476,6 +478,11 @@
         "id": "goal-sprite",
         "kind": "sprite",
         "path": "assets/sprites/goal.svg"
+      },
+      {
+        "id": "player-spawn-audio",
+        "kind": "audio",
+        "path": "assets/audio/player-spawn.ogg"
       },
       {
         "id": "player-sprite",
