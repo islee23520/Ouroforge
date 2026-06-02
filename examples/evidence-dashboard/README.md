@@ -29,6 +29,25 @@ Refresh the dashboard after export to inspect the platformer template run, its
 read-only comparison artifact. Generated `runs/` and `dashboard-data.json`
 remain local inspection state and must not be committed.
 
+Engine Expansion v1 integration-demo inspection:
+
+```bash
+cargo run -p ouroforge-cli -- seed validate seeds/engine-expansion-v1-demo.yaml
+cargo run -p ouroforge-cli -- run seeds/engine-expansion-v1-demo.yaml --workers 4
+BEFORE_RUN=$(ls -td runs/run-* | sed -n '2p')
+AFTER_RUN=$(ls -td runs/run-* | head -1)
+test -n "$BEFORE_RUN"
+test -n "$AFTER_RUN"
+cargo run -p ouroforge-cli -- compare "$BEFORE_RUN" "$AFTER_RUN"
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+```
+
+Refresh the dashboard after export to inspect the integration seed, scenario
+results, verdict, journal, comparison artifact, screenshots, world-state
+artifacts, and Engine Expansion summary cards. The dashboard remains read-only
+and does not execute comparisons, accept mutations, or infer semantic gameplay
+quality in browser JavaScript.
+
 Runtime v1 demo inspection:
 
 ```bash

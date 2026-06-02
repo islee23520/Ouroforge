@@ -75,4 +75,19 @@ cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4
 
 ## Studio v2 command boundary
 
+Engine Expansion v1 integration-demo inspection:
+
+```bash
+cargo run -p ouroforge-cli -- seed validate seeds/engine-expansion-v1-demo.yaml
+cargo run -p ouroforge-cli -- run seeds/engine-expansion-v1-demo.yaml --workers 4
+cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json
+python3 -m http.server 8000 --bind 127.0.0.1 --directory .
+```
+
+Then open <http://127.0.0.1:8000/examples/authoring-cockpit/> to inspect the
+static scene/entity/component view, Engine Expansion state panel, and copyable
+Rust validation/reload/dashboard commands. The cockpit inspects the same
+`examples/game-runtime/scene.json` used by the integration seed; it does not run
+the seed, compare runs, persist edits, or write files from browser JavaScript.
+
 The authoring cockpit is a static, local preview surface. It may display copyable Rust CLI commands such as `cargo run -p ouroforge-cli -- scene validate`, `scene edit`, `scene reload-validate`, and dashboard export commands, but it must not execute them from browser JavaScript. Persistent scene changes remain routed through Rust validation in the CLI. Browser-owned persistence APIs such as localStorage, indexedDB, showSaveFilePicker, direct file writes, native shell calls, hosted backends, auth, database, plugin UI, and visual scripting are outside this demo boundary.
