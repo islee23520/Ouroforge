@@ -5885,6 +5885,7 @@ pub struct RunDashboardReadModel {
     pub run: serde_json::Value,
     pub verdict: serde_json::Value,
     pub journal: String,
+    pub journal_view: RunDashboardJournal,
     pub evidence: Vec<EvidenceArtifact>,
     pub screenshots: Vec<RunDashboardArtifact>,
     pub console_logs: Vec<RunDashboardArtifact>,
@@ -5896,6 +5897,30 @@ pub struct RunDashboardReadModel {
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub mutations: Vec<MutationProposal>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardJournal {
+    pub path: String,
+    pub exists: bool,
+    pub read_error: Option<String>,
+    pub summary: String,
+    pub entries: Vec<RunDashboardJournalEntry>,
+    pub evidence_refs: Vec<String>,
+    pub verdict_refs: Vec<String>,
+    pub mutation_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardJournalEntry {
+    pub id: String,
+    pub heading: String,
+    pub level: usize,
+    pub category: String,
+    pub body: String,
+    pub evidence_refs: Vec<String>,
+    pub verdict_refs: Vec<String>,
+    pub mutation_refs: Vec<String>,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -5928,9 +5953,14 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let summary = read_dashboard_run_summary(run_dir)?;
     let run = read_json_value(run_dir.join("run.json"))?;
     let verdict = read_json_value(run_dir.join("verdict.json"))?;
-    let journal = fs::read_to_string(run_dir.join("journal.md"))
-        .with_context(|| format!("failed to read journal for {}", run_dir.display()))?;
     let evidence = read_evidence_index(run_dir)?.artifacts;
+    let mutations = list_mutation_proposals(run_dir)?;
+    let journal_view = read_dashboard_journal(run_dir, &evidence, &mutations);
+    let journal = if journal_view.exists {
+        fs::read_to_string(run_dir.join("journal.md")).unwrap_or_default()
+    } else {
+        String::new()
+    };
     let screenshots =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_screenshot)?;
     let console_logs =
@@ -5956,12 +5986,12 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results: &scenario_results,
         mutation_artifacts: &mutation_artifacts,
     });
-    let mutations = list_mutation_proposals(run_dir)?;
     Ok(RunDashboardReadModel {
         summary,
         run,
         verdict,
         journal,
+        journal_view,
         evidence,
         screenshots,
         console_logs,
@@ -6289,6 +6319,234 @@ fn dashboard_scenario_status(verdict: &serde_json::Value) -> String {
     } else {
         json_string(verdict, "status").unwrap_or_else(|| "unknown".to_string())
     }
+}
+
+fn read_dashboard_journal(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+    mutations: &[MutationProposal],
+) -> RunDashboardJournal {
+    let path = "journal.md".to_string();
+    let absolute_path = run_dir.join(&path);
+    match fs::read_to_string(&absolute_path) {
+        Ok(body) => parse_dashboard_journal(&path, true, None, &body, evidence, mutations),
+        Err(error) if error.kind() == ErrorKind::NotFound => parse_dashboard_journal(
+            &path,
+            false,
+            Some("missing journal artifact".to_string()),
+            "",
+            evidence,
+            mutations,
+        ),
+        Err(error) => parse_dashboard_journal(
+            &path,
+            false,
+            Some(format!("failed to read journal artifact: {error}")),
+            "",
+            evidence,
+            mutations,
+        ),
+    }
+}
+
+fn parse_dashboard_journal(
+    path: &str,
+    exists: bool,
+    read_error: Option<String>,
+    journal: &str,
+    evidence: &[EvidenceArtifact],
+    mutations: &[MutationProposal],
+) -> RunDashboardJournal {
+    let entries = dashboard_journal_entries(journal, evidence, mutations);
+    let evidence_refs = collect_entry_refs(&entries, |entry| &entry.evidence_refs);
+    let verdict_refs = collect_entry_refs(&entries, |entry| &entry.verdict_refs);
+    let mutation_refs = collect_entry_refs(&entries, |entry| &entry.mutation_refs);
+    RunDashboardJournal {
+        path: path.to_string(),
+        exists,
+        read_error,
+        summary: dashboard_journal_summary(journal, &entries),
+        entries,
+        evidence_refs,
+        verdict_refs,
+        mutation_refs,
+    }
+}
+
+fn dashboard_journal_entries(
+    journal: &str,
+    evidence: &[EvidenceArtifact],
+    mutations: &[MutationProposal],
+) -> Vec<RunDashboardJournalEntry> {
+    let mut entries = Vec::new();
+    let mut current_heading = String::new();
+    let mut current_level = 0usize;
+    let mut current_body = String::new();
+
+    for line in journal.lines() {
+        if let Some((level, heading)) = markdown_heading(line) {
+            push_dashboard_journal_entry(
+                &mut entries,
+                &current_heading,
+                current_level,
+                &current_body,
+                evidence,
+                mutations,
+            );
+            current_heading = heading;
+            current_level = level;
+            current_body.clear();
+        } else {
+            current_body.push_str(line);
+            current_body.push('\n');
+        }
+    }
+    push_dashboard_journal_entry(
+        &mut entries,
+        &current_heading,
+        current_level,
+        &current_body,
+        evidence,
+        mutations,
+    );
+    entries
+}
+
+fn push_dashboard_journal_entry(
+    entries: &mut Vec<RunDashboardJournalEntry>,
+    heading: &str,
+    level: usize,
+    body: &str,
+    evidence: &[EvidenceArtifact],
+    mutations: &[MutationProposal],
+) {
+    let body = body.trim();
+    if heading.trim().is_empty() && body.is_empty() {
+        return;
+    }
+    let fallback_heading = if heading.trim().is_empty() {
+        "Journal"
+    } else {
+        heading.trim()
+    };
+    let category = dashboard_journal_category(fallback_heading);
+    let entry_text = format!("{fallback_heading}\n{body}");
+    let index = entries.len() + 1;
+    entries.push(RunDashboardJournalEntry {
+        id: format!("journal-entry-{index}-{}", slug_for_id(fallback_heading)),
+        heading: fallback_heading.to_string(),
+        level,
+        category,
+        body: body.to_string(),
+        evidence_refs: extract_journal_evidence_refs(&entry_text, evidence),
+        verdict_refs: extract_journal_verdict_refs(&entry_text),
+        mutation_refs: extract_journal_mutation_refs(&entry_text, mutations),
+    });
+}
+
+fn markdown_heading(line: &str) -> Option<(usize, String)> {
+    let trimmed = line.trim_start();
+    let level = trimmed.chars().take_while(|ch| *ch == '#').count();
+    if level == 0 || level > 6 {
+        return None;
+    }
+    let rest = trimmed.get(level..)?.trim();
+    if rest.is_empty() {
+        return None;
+    }
+    Some((level, rest.to_string()))
+}
+
+fn dashboard_journal_category(heading: &str) -> String {
+    let lowered = heading.to_ascii_lowercase();
+    if lowered.contains("hypothesis") {
+        "hypothesis"
+    } else if lowered.contains("observation") || lowered.contains("evidence") {
+        "observation"
+    } else if lowered.contains("failed") || lowered.contains("failure") {
+        "failure"
+    } else if lowered.contains("mutation") {
+        "next_mutation"
+    } else if lowered.contains("verdict") {
+        "verdict"
+    } else {
+        "summary"
+    }
+    .to_string()
+}
+
+fn dashboard_journal_summary(journal: &str, entries: &[RunDashboardJournalEntry]) -> String {
+    for line in journal.lines() {
+        let trimmed = line.trim();
+        if let Some(summary) = trimmed.strip_prefix("- Summary:") {
+            return summary.trim().to_string();
+        }
+    }
+    entries
+        .iter()
+        .find_map(|entry| {
+            entry
+                .body
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "No journal content available.".to_string())
+}
+
+fn extract_journal_evidence_refs(text: &str, evidence: &[EvidenceArtifact]) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for artifact in evidence {
+        if text.contains(&artifact.path) || text.contains(&artifact.id) {
+            refs.insert(artifact.path.clone());
+        }
+    }
+    refs.into_iter().collect()
+}
+
+fn extract_journal_verdict_refs(text: &str) -> Vec<String> {
+    let lowered = text.to_ascii_lowercase();
+    if lowered.contains("verdict") || lowered.contains("failed criteria") {
+        vec!["verdict.json".to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
+fn extract_journal_mutation_refs(text: &str, mutations: &[MutationProposal]) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for mutation in mutations {
+        if text.contains(&mutation.id) {
+            refs.insert(mutation.id.clone());
+        }
+    }
+    refs.into_iter().collect()
+}
+
+fn collect_entry_refs(
+    entries: &[RunDashboardJournalEntry],
+    selector: fn(&RunDashboardJournalEntry) -> &Vec<String>,
+) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for entry in entries {
+        for reference in selector(entry) {
+            refs.insert(reference.clone());
+        }
+    }
+    refs.into_iter().collect()
+}
+
+fn slug_for_id(value: &str) -> String {
+    let mut slug = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    slug.trim_matches('-').to_string()
 }
 
 fn read_json_value(path: impl AsRef<Path>) -> Result<serde_json::Value> {
@@ -9815,6 +10073,108 @@ scenarios:
         assert_eq!(world_state_category.missing_count, 1);
         assert_eq!(world_state_category.malformed_count, 1);
         assert_eq!(model.summary.worker_count, 1);
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_journal_read_model_links_evidence_verdict_and_mutations() {
+        let (root, artifacts) = create_test_run("dashboard-journal-read-model");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"failed\",\"summary\":\"fixture journal failure\",\"failures\":[{\"kind\":\"assertion_failed\"}]}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            "{\"object\":{\"x\":40}}\n",
+        )
+        .expect("world state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world state indexed");
+        let proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "fixture failure".to_string(),
+                evidence_id: "fixture-world-state".to_string(),
+                target: "seeds/platformer.yaml".to_string(),
+                path: "scenarios.bootstrap-smoke.assertions".to_string(),
+                from: "x == -1".to_string(),
+                to: "x == 40".to_string(),
+            },
+        )
+        .expect("mutation proposal created");
+        fs::write(
+            artifacts.run_dir.join("journal.md"),
+            format!(
+                "# Ouroforge Run Journal\n\n## Hypothesis\n\n- Validate the failure links.\n\n## Observations\n\n- Evidence `fixture-world-state` at `evidence/workers/worker-1/world-state.json`.\n\n## Verdict Summary\n\n- Status: `failed`\n- Summary: fixture journal failure\n\n## Failed Criteria\n\n- `assertion_failed`: fixture\n\n## Next Mutation\n\n- `{}`: inspect proposal.\n",
+                proposal.id
+            ),
+        )
+        .expect("journal written");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.journal_view.exists);
+        assert_eq!(model.journal_view.path, "journal.md");
+        assert_eq!(model.journal_view.summary, "fixture journal failure");
+        assert!(model
+            .journal_view
+            .entries
+            .iter()
+            .any(|entry| entry.category == "hypothesis"));
+        assert!(model
+            .journal_view
+            .entries
+            .iter()
+            .any(|entry| entry.category == "observation"
+                && entry
+                    .evidence_refs
+                    .contains(&"evidence/workers/worker-1/world-state.json".to_string())));
+        assert!(model
+            .journal_view
+            .entries
+            .iter()
+            .any(|entry| entry.category == "verdict"
+                && entry.verdict_refs.contains(&"verdict.json".to_string())));
+        assert!(model
+            .journal_view
+            .entries
+            .iter()
+            .any(|entry| entry.category == "next_mutation"
+                && entry.mutation_refs.contains(&proposal.id)));
+        assert!(model
+            .journal_view
+            .evidence_refs
+            .contains(&"evidence/workers/worker-1/world-state.json".to_string()));
+        assert!(model
+            .journal_view
+            .verdict_refs
+            .contains(&"verdict.json".to_string()));
+        assert!(model.journal_view.mutation_refs.contains(&proposal.id));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_journal_read_model_handles_missing_journal() {
+        let (root, artifacts) = create_test_run("dashboard-missing-journal-read-model");
+        fs::remove_file(artifacts.run_dir.join("journal.md")).expect("journal removed");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run still reads");
+        assert!(!model.journal_view.exists);
+        assert_eq!(model.journal_view.summary, "No journal content available.");
+        assert!(model.journal_view.read_error.is_some());
+        assert!(model.journal_view.entries.is_empty());
+        assert!(model.journal.is_empty());
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
