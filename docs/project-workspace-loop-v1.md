@@ -167,7 +167,8 @@ evaluation remain design references only.
   external template system. The command and generated file tree are documented
   in `docs/project-scaffold-v1.md`.
 - #248 adds project-level scenario packs while preserving existing Scenario DSL
-  semantics.
+  semantics. The schema, examples, and execution boundary are documented in
+  `docs/scenario-pack-v1.md`.
 - #249 binds runs to project manifest, scene, seed, scenario pack, and optional
   transaction provenance.
 - #250 extends semantic comparison with project-level context.

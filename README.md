@@ -17,6 +17,7 @@ Ouroforge is an evidence-native game engine experiment built around local Ourobo
 - Inspect existing before/after run comparison artifacts in the read-only evidence dashboard.
 - Validate a local project workspace manifest with `project validate`.
 - Scaffold a tiny local project workspace with `project init --template minimal-2d`.
+- Validate project scenario packs through `project validate`.
 
 ## Prerequisites
 

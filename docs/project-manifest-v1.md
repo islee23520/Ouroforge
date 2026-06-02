@@ -109,8 +109,9 @@ workspace boundary:
 - **Run/Evidence**: current runs still work under the repository-level `runs/`
   default. Project run binding in #249 may use `runsRoot` and manifest
   provenance, but this manifest issue does not change run metadata.
-- **Scenario packs**: the manifest can reference pack files now; execution and
-  scenario-pack semantics remain a #248 responsibility.
+- **Scenario packs**: the manifest can reference pack files and `project validate`
+  resolves them through Scenario Pack v1 validation. The pack schema and current
+  execution boundary are documented in `docs/scenario-pack-v1.md`.
 - **Mutation**: scene-only mutation can later be limited to manifest-authorized
   scene paths. This manifest issue does not apply mutations.
 - **Studio**: browser-facing Studio surfaces may display manifest-derived state
