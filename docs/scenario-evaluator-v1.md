@@ -178,3 +178,11 @@ Primary drift risks and countermeasures:
 
 Every follow-up PR must include verification output and guardrail checks in the
 PR body. Generated run artifacts remain local state and must not be committed.
+
+## 11. Integration demo evidence
+
+The Scenario/Evaluator v1 integration demo is documented in
+`docs/scenario-evaluator-v1-demo.md` and uses
+`seeds/scenario-evaluator-v1-demo.yaml`. The demo composes the completed #69-#74
+capabilities through the existing local evidence-native loop; it does not add new
+Scenario/Evaluator behavior or broaden the maturity claim.

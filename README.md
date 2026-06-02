@@ -58,7 +58,7 @@ Then open:
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
-Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`.
+Public-readiness demo screenshots and fresh-clone smoke evidence are recorded in `docs/public-demo-evidence.md`. Runtime v1 playable demo evidence is recorded in `docs/runtime-v1-demo.md`. Scenario/Evaluator v1 integration demo evidence is recorded in `docs/scenario-evaluator-v1-demo.md`.
 
 ## Verification
 
@@ -74,7 +74,7 @@ node examples/authoring-cockpit/cockpit.test.cjs
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
+For Runtime v1 demo evidence, run `cargo run -p ouroforge-cli -- run seeds/runtime-v1-demo.yaml --workers 4`, export dashboard data, and record the generated run id. For Scenario/Evaluator v1 demo evidence, validate and run `seeds/scenario-evaluator-v1-demo.yaml`, compare two generated demo runs when before/after evidence is needed, export dashboard data, and record the generated run ids. For public-readiness smoke evidence, also run the MVP command with `--workers 4` and record the generated run id.
 
 ## Repository map
 
