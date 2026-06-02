@@ -3,14 +3,15 @@
   const input = { left: false, right: false, up: false, down: false };
   const events = [];
   const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
-  const snapshots = (window.OuroforgeSnapshots || {
+  const snapshotFactory = (window.OuroforgeSnapshots || {
     createSnapshotRegistry: () => ({
       capture: () => 'snapshot-unavailable',
       restore: () => { throw new Error('snapshot registry unavailable'); },
       metadata: () => null,
       list: () => [],
     }),
-  }).createSnapshotRegistry();
+  });
+  let snapshots = snapshotFactory.createSnapshotRegistry();
   const assets = (window.OuroforgeAssets || {
     createAssetTracker: () => ({
       load: () => [],
@@ -227,6 +228,7 @@
   }
 
   function loadScene(scene) {
+    snapshots = snapshotFactory.createSnapshotRegistry();
     const normalized = normalizeScene(scene);
     world.schemaVersion = normalized.schemaVersion;
     world.sceneId = normalized.id;
@@ -251,6 +253,29 @@
     emitAudioEvents('scene_loaded');
     renderDebug();
     return api.getWorldState();
+  }
+
+
+  function reload(payload = {}) {
+    if (!payload || typeof payload !== 'object' || payload.schemaVersion !== 'ouroforge.scene-reload.v0') {
+      throw new Error('reload payload schemaVersion must be ouroforge.scene-reload.v0');
+    }
+    if (!payload.scene || typeof payload.scene !== 'object' || Array.isArray(payload.scene)) {
+      throw new Error('reload payload scene is required');
+    }
+    const scene = clone(payload.scene);
+    if (payload.assetManifest && typeof payload.assetManifest === 'object' && !Array.isArray(payload.assetManifest)) {
+      scene.assetManifest = clone(payload.assetManifest);
+    }
+    const state = loadScene(scene);
+    record('runtime.reload.succeeded', {
+      schemaVersion: payload.schemaVersion,
+      sceneId: world.sceneId,
+      entityCount: world.entities.length,
+      assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
+    });
+    renderDebug();
+    return state;
   }
 
   function setInput(nextInput = {}) {
@@ -326,6 +351,7 @@
     snapshot,
     restore,
     loadScene,
+    reload,
   });
 
   window.addEventListener('keydown', (event) => {
