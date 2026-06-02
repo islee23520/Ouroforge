@@ -506,6 +506,7 @@ const OuroforgeCockpit = (() => {
     const targetScenePath = firstApplication.targetScenePath || DEFAULT_SCENE_PATH;
     const transactionPath = firstApplication.transactionArtifactPath || 'mutation/scene-transaction.json';
     const projectPath = firstApplication.project?.manifestPath || null;
+    const projectMutationRecords = appliedRecords.filter((record) => record.project && typeof record.project === 'object');
     const proposedRows = proposedRecords.slice(0, 3).map((record) => {
       const id = record.id || record.proposalId || 'unknown proposal';
       const evidence = record.evidence_id || record.evidenceId || record.evidence || 'no evidence id';
@@ -523,11 +524,13 @@ const OuroforgeCockpit = (() => {
       return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
     }).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
     const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath);
-    return `<div class="scene-mutation-lifecycle"><h3>Scene-only mutation lifecycle</h3>
-      <p class="hint">Scene-only mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, or merge anything.</p>
+    const projectCommand = projectPath ? `<code>${escapeText(projectValidateCommand(projectPath))}</code>` : '';
+    return `<div class="scene-mutation-lifecycle"><h3>Project-scoped scene mutation lifecycle</h3>
+      <p class="hint">Scene-only project mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, rollback, or merge anything.</p>
       <div class="field-grid">
         <div><strong>Proposal stage</strong><br>${surfaceState(Boolean(proposed && proposed.state !== 'missing'), proposed?.state || 'missing')}<br><small>${escapeText(proposed?.record_count || 0)} record(s)</small></div>
         <div><strong>Scene application stage</strong><br>${surfaceState(Boolean(applied && applied.state !== 'missing'), applied?.state || 'missing')}<br><small>${escapeText(applied?.record_count || 0)} record(s)</small></div>
+        <div><strong>Project-scoped applications</strong><br>${escapeText(projectMutationRecords.length)} record(s)</div>
         <div><strong>Target scene</strong><br>${escapeText(targetScenePath)}</div>
         <div><strong>Project manifest</strong><br>${escapeText(projectPath || 'legacy/no project context')}</div>
       </div>
@@ -535,6 +538,7 @@ const OuroforgeCockpit = (() => {
       <h4>Application records</h4>${applicationRows}
       <h4>Display-only scene mutation commands</h4>
       <div class="command-list">
+        ${projectCommand}
         <code>${escapeText(sceneValidateCommand(targetScenePath))}</code>
         <code>${escapeText(applyCommand)}</code>
         <code>${escapeText(dashboardExportCommand())}</code>

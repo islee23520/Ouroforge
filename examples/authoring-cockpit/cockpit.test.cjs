@@ -130,12 +130,18 @@ assert.match(cockpit.renderAuthoringProvenanceSurface(null), /No dashboard-data\
 assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>' }, evidence: [], transaction_provenance: { transactionId: '<script>alert(1)</script>', scenePath: '<img>', beforeSceneHash: { value: '<bad>' }, afterSceneHash: { value: '<worse>' } } }), /&lt;script&gt;alert/);
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
-assert.match(cockpit.renderMutationReviewSurface(run), /Scene-only mutation lifecycle/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped scene mutation lifecycle/);
 assert.match(cockpit.renderMutationReviewSurface(run), /scene-application-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /minimal_2d/);
 assert.match(cockpit.renderMutationReviewSurface(run), /examples\/project\/ouroforge\.project\.json/);
 assert.match(cockpit.renderMutationReviewSurface(run), /--project examples\/project\/ouroforge\.project\.json/);
+assert.match(cockpit.renderMutationReviewSurface(run), /project validate examples\/project\/ouroforge\.project\.json/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped applications/);
+assert.match(cockpit.renderMutationReviewSurface(run), /rollback/);
+assert.match(cockpit.renderMutationReviewSurface(run), /does not apply, accept, reject, rollback, or merge/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /proposal-1/);
+assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /1 record\(s\)/);
+assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'legacy-run' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: 'applied', record_count: 1, records: [{ id: 'legacy-application', status: 'applied', proposalId: 'proposal-legacy', transactionId: 'scene-edit-legacy', beforeSceneHash: { value: 'before' }, afterSceneHash: { value: 'after' } }] }] } }), /legacy\/no project mutation context recorded/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'run-empty' }, mutation_lifecycle: { stages: [] } }), /No scene-safe proposal records loaded/);
 assert.equal(
   cockpit.sceneMutationApplyCommand('runs/run-1', 'mutation/scene-operation.json', 'mutation/scene-edit.json'),
