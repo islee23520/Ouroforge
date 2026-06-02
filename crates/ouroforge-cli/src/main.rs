@@ -10,7 +10,7 @@ use ouroforge_core::{
     run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     update_journal, validate_scene_reload, write_run_comparison_artifact,
     write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewState, ScenarioRunConfig, SceneEdit,
+    MutationProposalInput, MutationReviewState, ProjectManifest, ScenarioRunConfig, SceneEdit,
     SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
@@ -30,6 +30,10 @@ enum Commands {
     Seed {
         #[command(subcommand)]
         command: SeedCommand,
+    },
+    Project {
+        #[command(subcommand)]
+        command: ProjectCommand,
     },
     Run {
         seed_path: PathBuf,
@@ -87,6 +91,11 @@ enum Commands {
 #[derive(Debug, Subcommand)]
 enum SeedCommand {
     Validate { seed_path: PathBuf },
+}
+
+#[derive(Debug, Subcommand)]
+enum ProjectCommand {
+    Validate { project_root_or_manifest: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -250,6 +259,26 @@ fn main() -> Result<()> {
         } => {
             let seed = Seed::from_path(seed_path)?;
             println!("Seed valid: {}", seed.id);
+        }
+        Commands::Project {
+            command:
+                ProjectCommand::Validate {
+                    project_root_or_manifest,
+                },
+        } => {
+            let manifest_path = resolve_project_manifest_path(&project_root_or_manifest);
+            let manifest = ProjectManifest::from_path(&manifest_path)?;
+            let base_dir = match manifest_path.parent() {
+                Some(parent) if !parent.as_os_str().is_empty() => parent,
+                _ => Path::new("."),
+            };
+            let report = manifest.validate_references(base_dir)?;
+            println!("Project manifest valid: {}", report.project_id);
+            println!("Manifest: {}", manifest_path.display());
+            println!("Source refs: {}", report.source_refs);
+            println!("Asset roots: {}", report.asset_roots);
+            println!("Runs root: {}", report.runs_root);
+            println!("Generated roots: {}", report.generated_roots.join(","));
         }
         Commands::Run {
             seed_path,
@@ -600,6 +629,14 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_project_manifest_path(project_root_or_manifest: &Path) -> PathBuf {
+    if project_root_or_manifest.is_dir() {
+        project_root_or_manifest.join("ouroforge.project.json")
+    } else {
+        project_root_or_manifest.to_path_buf()
+    }
 }
 
 fn try_handle_evolve_sandbox_command() -> Result<bool> {

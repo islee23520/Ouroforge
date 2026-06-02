@@ -17,6 +17,46 @@ scenarios:
 "#;
 
 #[test]
+fn project_validate_reports_manifest_summary_and_rejects_invalid_manifest() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let valid_root = repo_root.join("examples/project-workspace-fixtures/valid");
+    let valid_manifest = valid_root.join("ouroforge.project.json");
+
+    let by_root = run_cli(
+        &repo_root,
+        &["project", "validate", valid_root.to_str().unwrap()],
+    );
+    assert!(by_root.contains("Project manifest valid: project_workspace_fixture"));
+    assert!(by_root.contains("Source refs: 3"));
+    assert!(by_root.contains("Asset roots: 1"));
+    assert!(by_root.contains("Runs root: runs"));
+    assert!(by_root.contains("Generated roots: runs,target,dashboard-data"));
+
+    let by_file = run_cli(
+        &repo_root,
+        &["project", "validate", valid_manifest.to_str().unwrap()],
+    );
+    assert!(by_file.contains("Project manifest valid: project_workspace_fixture"));
+
+    let invalid_manifest = repo_root
+        .join("examples/project-workspace-fixtures/invalid/missing-ref/ouroforge.project.json");
+    let invalid = run_cli_expect_failure(
+        &repo_root,
+        &["project", "validate", invalid_manifest.to_str().unwrap()],
+    );
+    assert!(invalid.contains("missing file"));
+    assert!(invalid.contains("scenes/missing.scene.json"));
+
+    let wrong_name =
+        repo_root.join("examples/project-workspace-fixtures/invalid/unsafe-path.project.json");
+    let rejected_name = run_cli_expect_failure(
+        &repo_root,
+        &["project", "validate", wrong_name.to_str().unwrap()],
+    );
+    assert!(rejected_name.contains("must be named ouroforge.project.json"));
+}
+
+#[test]
 fn ledger_and_evidence_commands_operate_on_run_artifacts() {
     let temp = unique_temp_dir("ouroforge-cli-artifacts-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
