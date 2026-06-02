@@ -1023,6 +1023,58 @@ pub fn minimal_2d_project_scaffold_files() -> Vec<ProjectScaffoldFile> {
     ]
 }
 
+pub fn create_minimal_2d_project_scaffold(
+    destination: impl AsRef<Path>,
+) -> Result<ProjectManifestValidationReport> {
+    let destination = destination.as_ref();
+    validate_project_scaffold_destination_path(destination)?;
+    if destination.exists() {
+        if !destination.is_dir() {
+            return Err(anyhow!(
+                "project scaffold destination exists and is not a directory: {}",
+                destination.display()
+            ));
+        }
+        if destination
+            .read_dir()
+            .with_context(|| format!("failed to read destination {}", destination.display()))?
+            .next()
+            .is_some()
+        {
+            return Err(anyhow!(
+                "project scaffold destination must be empty: {}",
+                destination.display()
+            ));
+        }
+    } else {
+        fs::create_dir_all(destination).with_context(|| {
+            format!(
+                "failed to create project scaffold destination {}",
+                destination.display()
+            )
+        })?;
+    }
+
+    for file in minimal_2d_project_scaffold_files() {
+        let relative = Path::new(file.path);
+        let path = destination.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("failed to create scaffold directory {}", parent.display())
+            })?;
+        }
+        fs::write(&path, file.contents)
+            .with_context(|| format!("failed to write scaffold file {}", path.display()))?;
+    }
+
+    let manifest_path = destination.join(PROJECT_MANIFEST_FILE_NAME);
+    let manifest = ProjectManifest::from_path(&manifest_path)?;
+    let report = manifest.validate_references(destination)?;
+    Seed::from_path(destination.join("seeds/platformer.yaml"))?;
+    read_scene(destination.join("scenes/main.scene.json"))?;
+    Ok(report)
+}
+
 pub fn validate_project_scaffold_destination_path(path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
     require_text("project scaffold destination", &path.to_string_lossy())?;

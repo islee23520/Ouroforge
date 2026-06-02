@@ -57,6 +57,82 @@ fn project_validate_reports_manifest_summary_and_rejects_invalid_manifest() {
 }
 
 #[test]
+fn project_init_creates_valid_minimal_workspace_and_rejects_unsafe_destinations() {
+    let temp = unique_temp_dir("ouroforge-cli-project-init-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let project_dir = temp.join("minimal-project");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    assert!(output.contains("Project scaffold created:"));
+    assert!(output.contains("Template: minimal-2d"));
+    assert!(output.contains("Project manifest valid: minimal_2d"));
+    assert!(project_dir.join("ouroforge.project.json").is_file());
+    assert!(project_dir.join("scenes/main.scene.json").is_file());
+    assert!(project_dir.join("seeds/platformer.yaml").is_file());
+    assert!(project_dir
+        .join("scenarios/smoke.scenario-pack.json")
+        .is_file());
+    assert!(project_dir.join(".gitignore").is_file());
+
+    let validate = run_cli(
+        &temp,
+        &["project", "validate", project_dir.to_str().unwrap()],
+    );
+    assert!(validate.contains("Project manifest valid: minimal_2d"));
+
+    let seed = run_cli(
+        &temp,
+        &[
+            "seed",
+            "validate",
+            project_dir.join("seeds/platformer.yaml").to_str().unwrap(),
+        ],
+    );
+    assert!(seed.contains("Seed valid: minimal-2d.platformer"));
+
+    let non_empty = run_cli_expect_failure(
+        &temp,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    assert!(non_empty.contains("destination must be empty"));
+
+    let traversal = run_cli_expect_failure(
+        &temp,
+        &["project", "init", "../outside", "--template", "minimal-2d"],
+    );
+    assert!(traversal.contains("path traversal"));
+
+    let unsupported = run_cli_expect_failure(
+        &temp,
+        &[
+            "project",
+            "init",
+            temp.join("unsupported").to_str().unwrap(),
+            "--template",
+            "future-3d",
+        ],
+    );
+    assert!(unsupported.contains("unsupported project template"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn ledger_and_evidence_commands_operate_on_run_artifacts() {
     let temp = unique_temp_dir("ouroforge-cli-artifacts-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

@@ -3,8 +3,8 @@ use clap::{Parser, Subcommand};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event, append_mutation_review_decision_from_path,
     apply_patch_sandbox_from_path, apply_scene_only_mutation_operation,
-    bind_run_transaction_provenance, create_mutation_proposal, create_run, edit_scene,
-    evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
+    bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
+    create_run, edit_scene, evaluate_run, evolve_run, list_dashboard_runs, list_evidence_artifacts,
     list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
     read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene, run_browser_smoke,
     run_browser_smoke_pool, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
@@ -95,7 +95,14 @@ enum SeedCommand {
 
 #[derive(Debug, Subcommand)]
 enum ProjectCommand {
-    Validate { project_root_or_manifest: PathBuf },
+    Validate {
+        project_root_or_manifest: PathBuf,
+    },
+    Init {
+        destination: PathBuf,
+        #[arg(long, default_value = "minimal-2d")]
+        template: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -279,6 +286,25 @@ fn main() -> Result<()> {
             println!("Asset roots: {}", report.asset_roots);
             println!("Runs root: {}", report.runs_root);
             println!("Generated roots: {}", report.generated_roots.join(","));
+        }
+        Commands::Project {
+            command:
+                ProjectCommand::Init {
+                    destination,
+                    template,
+                },
+        } => {
+            if template != "minimal-2d" {
+                return Err(anyhow!(
+                    "unsupported project template {template}; supported templates: minimal-2d"
+                ));
+            }
+            let report = create_minimal_2d_project_scaffold(&destination)?;
+            println!("Project scaffold created: {}", destination.display());
+            println!("Template: minimal-2d");
+            println!("Project manifest valid: {}", report.project_id);
+            println!("Source refs: {}", report.source_refs);
+            println!("Runs root: {}", report.runs_root);
         }
         Commands::Run {
             seed_path,
