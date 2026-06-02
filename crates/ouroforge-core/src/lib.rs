@@ -2644,6 +2644,7 @@ pub struct ScenarioRunSummary {
     pub completed: usize,
     pub passed: usize,
     pub failed: usize,
+    pub scenario_order: Vec<String>,
     pub evidence_paths: Vec<String>,
     pub result_paths: Vec<String>,
 }
@@ -2666,12 +2667,22 @@ pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
     client.navigate(&config.url)?;
     std::thread::sleep(Duration::from_millis(300));
 
+    run_scenarios_with_client(config, &seed, &mut client)
+}
+
+fn run_scenarios_with_client<T: CdpTransport>(
+    config: &ScenarioRunConfig,
+    seed: &Seed,
+    client: &mut CdpClient<T>,
+) -> Result<ScenarioRunSummary> {
     let mut evidence_paths = Vec::new();
     let mut result_paths = Vec::new();
+    let mut scenario_order = Vec::new();
     let mut passed = 0;
     let mut failed = 0;
     for scenario in &seed.scenarios {
-        let result = run_scenario(config, &mut client, scenario)?;
+        scenario_order.push(scenario.id.clone());
+        let result = run_scenario(config, client, scenario)?;
         evidence_paths.extend(result.evidence_paths);
         result_paths.push(result.result_path);
         if result.passed {
@@ -2686,6 +2697,7 @@ pub fn run_scenarios(config: &ScenarioRunConfig) -> Result<ScenarioRunSummary> {
         completed: result_paths.len(),
         passed,
         failed,
+        scenario_order,
         evidence_paths,
         result_paths,
     })
@@ -5837,6 +5849,99 @@ scenarios:
         assert_eq!(comparison["passed"], false);
         assert_eq!(comparison["width_delta"], 320);
         assert_eq!(comparison["height_delta"], 300);
+    }
+
+    struct SuiteScenarioTransport {
+        calls: Vec<String>,
+    }
+
+    impl CdpTransport for SuiteScenarioTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            match method {
+                "Runtime.evaluate" => {
+                    let expression = params["expression"]
+                        .as_str()
+                        .expect("expression present")
+                        .to_string();
+                    self.calls.push(expression.clone());
+                    let value = if expression.contains("getWorldState") {
+                        json!({ "object": { "x": 32 } })
+                    } else if expression.contains("getFrameStats") {
+                        json!({ "fixedDeltaMs": 16 })
+                    } else if expression.contains("__OUROFORGE_CONSOLE__") {
+                        json!([])
+                    } else {
+                        json!({})
+                    };
+                    Ok(json!({ "result": { "value": value } }))
+                }
+                "Performance.enable" => Ok(json!({})),
+                "Performance.getMetrics" => Ok(json!({ "metrics": [] })),
+                _ => Ok(json!({})),
+            }
+        }
+    }
+
+    #[test]
+    fn suite_execution_preserves_document_order_and_failure_isolation() {
+        let (root, artifacts) = create_test_run("ouroforge-suite-order-test");
+        let seed = Seed::from_yaml_str(
+            r#"
+id: suite.v1
+title: Suite Fixture
+goal: Run multiple scenarios deterministically.
+constraints:
+  target: file-harness
+acceptance:
+  - Preserve scenario evidence.
+scenarios:
+  - id: first-pass
+    description: First scenario passes.
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 32
+  - id: second-fail
+    description: Second scenario fails without removing first evidence.
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 999
+"#,
+        )
+        .expect("suite seed parses");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8080")
+            .expect("scenario config");
+        let mut client = CdpClient::new(SuiteScenarioTransport { calls: Vec::new() });
+
+        let summary = run_scenarios_with_client(&config, &seed, &mut client).expect("suite runs");
+
+        assert_eq!(summary.scenario_order, vec!["first-pass", "second-fail"]);
+        assert_eq!(summary.completed, 2);
+        assert_eq!(summary.passed, 1);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.result_paths.len(), 2);
+        assert!(summary
+            .result_paths
+            .iter()
+            .any(|path| path.contains("first-pass")));
+        assert!(summary
+            .result_paths
+            .iter()
+            .any(|path| path.contains("second-fail")));
+        assert!(artifacts
+            .run_dir
+            .join("evidence/scenarios/first-pass")
+            .is_dir());
+        assert!(artifacts
+            .run_dir
+            .join("evidence/scenarios/second-fail")
+            .is_dir());
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]

@@ -1,0 +1,32 @@
+id: multi-scenario.v1
+title: Multi-Scenario Suite Fixture
+goal: Run multiple scenarios in deterministic document order while preserving per-scenario evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Each scenario writes namespaced result and evidence artifacts.
+  - Suite execution preserves seed document order.
+scenarios:
+  - id: suite-start
+    description: Validate the initial runtime state.
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 32
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
+  - id: suite-move-right
+    description: Move the player right and validate the updated state.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 4
+    assertions:
+      - world_state:
+          path: object.x
+          equals: 40
+      - frame_stats:
+          path: fixedDeltaMs
+          equals: 16
