@@ -10419,6 +10419,62 @@ impl VisualEditDraftArtifact {
         }
         Ok(())
     }
+
+    pub fn validate_scene_preflight(&self, scene: &SceneDocument) -> Result<Vec<SceneEdit>> {
+        self.validate()?;
+        if self.target.target_type != VisualEditDraftTargetType::Scene {
+            return Err(anyhow!(
+                "visual edit scene draft preflight requires target type scene"
+            ));
+        }
+        if let Some(target_id) = &self.target.id {
+            if target_id != &scene.id {
+                return Err(anyhow!(
+                    "visual edit scene draft target id mismatch: expected {}, found {}",
+                    target_id,
+                    scene.id
+                ));
+            }
+        }
+        let scene_hash = hash_scene_document(scene)?;
+        let (expected_algorithm, expected_before_hash) =
+            parse_visual_edit_draft_hash("visual edit draft beforeHash", &self.before_hash)?;
+        if scene_hash.algorithm != expected_algorithm || scene_hash.value != expected_before_hash {
+            return Err(anyhow!(
+                "visual edit scene draft beforeHash mismatch: expected {}:{}, found {}:{}",
+                expected_algorithm,
+                expected_before_hash,
+                scene_hash.algorithm,
+                scene_hash.value
+            ));
+        }
+
+        let mut edits = Vec::new();
+        for operation in &self.proposed_operations {
+            let Some(scene_operation) = &operation.scene_operation else {
+                return Err(anyhow!(
+                    "visual edit scene draft operation {} requires sceneOperation",
+                    operation.id
+                ));
+            };
+            let edit = scene_operation.to_scene_edit()?;
+            let mut candidate = scene.clone();
+            apply_scene_edit(&mut candidate, edit.clone()).with_context(|| {
+                format!(
+                    "visual edit scene draft operation {} failed preflight",
+                    operation.id
+                )
+            })?;
+            validate_scene(&candidate).with_context(|| {
+                format!(
+                    "visual edit scene draft operation {} produced invalid scene",
+                    operation.id
+                )
+            })?;
+            edits.push(edit);
+        }
+        Ok(edits)
+    }
 }
 
 impl VisualEditDraftTarget {
@@ -10465,6 +10521,45 @@ impl VisualEditSceneDraftOperation {
         }
         Ok(())
     }
+
+    pub fn to_scene_edit(&self) -> Result<SceneEdit> {
+        self.validate()?;
+        match self.kind {
+            VisualEditSceneDraftOperationKind::TransformMove
+            | VisualEditSceneDraftOperationKind::SpriteColorChange
+            | VisualEditSceneDraftOperationKind::ColliderSizeChange
+            | VisualEditSceneDraftOperationKind::HudTextChange
+            | VisualEditSceneDraftOperationKind::HudValueChange
+            | VisualEditSceneDraftOperationKind::CameraTargetSelection => {
+                if !supported_scene_edit_paths().contains(&self.scene_edit_path.as_str()) {
+                    return Err(anyhow!(
+                        "unsupported visual edit scene draft path `{}`; supported paths are {}",
+                        self.scene_edit_path,
+                        supported_scene_edit_paths().join(", ")
+                    ));
+                }
+            }
+            VisualEditSceneDraftOperationKind::SpriteFrameChange
+            | VisualEditSceneDraftOperationKind::ColliderToggle
+            | VisualEditSceneDraftOperationKind::TriggerConfigChange => {
+                return Err(anyhow!(
+                    "visual edit scene draft operation kind {:?} is not supported by scene edit transaction preflight yet",
+                    self.kind
+                ));
+            }
+        }
+        let value = self.value.clone().ok_or_else(|| {
+            anyhow!(
+                "visual edit scene draft operation {} requires value",
+                self.scene_edit_path
+            )
+        })?;
+        Ok(SceneEdit {
+            entity_id: self.entity_id.clone(),
+            path: self.scene_edit_path.clone(),
+            value,
+        })
+    }
 }
 
 impl VisualEditDraftAuthor {
@@ -10478,18 +10573,37 @@ impl VisualEditDraftAuthor {
 }
 
 fn validate_visual_edit_draft_hash(field: &str, value: &str) -> Result<()> {
+    parse_visual_edit_draft_hash(field, value)?;
+    Ok(())
+}
+
+fn parse_visual_edit_draft_hash(field: &str, value: &str) -> Result<(String, String)> {
     require_text(field, value)?;
-    let Some(hash) = value.strip_prefix("sha256:") else {
-        return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
-    };
-    if hash.len() != 64
-        || !hash
-            .chars()
-            .all(|ch| ch.is_ascii_digit() || matches!(ch, 'a'..='f'))
-    {
+    if let Some(hash) = value.strip_prefix("sha256:") {
+        if hash.len() == 64
+            && hash
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, 'a'..='f'))
+        {
+            return Ok(("sha256".to_string(), hash.to_string()));
+        }
         return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
     }
-    Ok(())
+    if let Some(hash) = value.strip_prefix("fnv1a64-canonical-json-v1:") {
+        if hash.len() == 16
+            && hash
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, 'a'..='f'))
+        {
+            return Ok(("fnv1a64-canonical-json-v1".to_string(), hash.to_string()));
+        }
+        return Err(anyhow!(
+            "{field} must use fnv1a64-canonical-json-v1:<16 lowercase hex>"
+        ));
+    }
+    Err(anyhow!(
+        "{field} must use sha256:<64 lowercase hex> or fnv1a64-canonical-json-v1:<16 lowercase hex>"
+    ))
 }
 
 fn validate_visual_edit_draft_operation_path(field: &str, value: &str) -> Result<()> {
@@ -23016,6 +23130,142 @@ scenarios:
         let round_trip: VisualEditDraftArtifact =
             serde_json::from_str(&serialized).expect("serialized catalog parses");
         assert_eq!(round_trip, draft);
+    }
+
+    fn valid_scene_visual_edit_draft_for_scene(scene: &SceneDocument) -> VisualEditDraftArtifact {
+        let before_hash = hash_scene_document(scene).expect("scene hashes");
+        VisualEditDraftArtifact {
+            schema_version: VISUAL_EDIT_DRAFT_SCHEMA_VERSION.to_string(),
+            draft_id: "draft-scene-preflight".to_string(),
+            target: VisualEditDraftTarget {
+                target_type: VisualEditDraftTargetType::Scene,
+                path: "examples/game-runtime/scene.json".to_string(),
+                id: Some(scene.id.clone()),
+            },
+            proposed_operations: vec![
+                VisualEditDraftOperation {
+                    id: "op-move-player-x".to_string(),
+                    kind: VisualEditDraftOperationKind::Update,
+                    path: "entities.player.components.transform.x".to_string(),
+                    summary: Some("Move player x without writing the scene file.".to_string()),
+                    value: Some(json!(48)),
+                    scene_operation: Some(VisualEditSceneDraftOperation {
+                        kind: VisualEditSceneDraftOperationKind::TransformMove,
+                        entity_id: "player".to_string(),
+                        scene_edit_path: "components.transform.x".to_string(),
+                        value: Some(json!(48)),
+                        summary: None,
+                    }),
+                },
+                VisualEditDraftOperation {
+                    id: "op-player-color".to_string(),
+                    kind: VisualEditDraftOperationKind::Update,
+                    path: "entities.player.sprite.color".to_string(),
+                    summary: Some(
+                        "Change player color without writing the scene file.".to_string(),
+                    ),
+                    value: Some(json!("#ffcc00")),
+                    scene_operation: Some(VisualEditSceneDraftOperation {
+                        kind: VisualEditSceneDraftOperationKind::SpriteColorChange,
+                        entity_id: "player".to_string(),
+                        scene_edit_path: "sprite.color".to_string(),
+                        value: Some(json!("#ffcc00")),
+                        summary: None,
+                    }),
+                },
+            ],
+            before_hash: format!("{}:{}", before_hash.algorithm, before_hash.value),
+            expected_after_summary: "Scene preflight returns scene edits without applying them."
+                .to_string(),
+            linked_evidence: vec![
+                "runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json".to_string(),
+            ],
+            author: VisualEditDraftAuthor {
+                author_type: VisualEditDraftAuthorType::Agent,
+                id: "visual-authoring-assistant".to_string(),
+                source: Some("unit-test".to_string()),
+            },
+            validation_status: VisualEditDraftValidationStatus::Unvalidated,
+            blocked_reasons: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_preflights_supported_scene_edits_without_writes() {
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let before_bytes = fs::read(&scene_path).expect("scene bytes read before preflight");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let draft = valid_scene_visual_edit_draft_for_scene(&scene);
+
+        let edits = draft
+            .validate_scene_preflight(&scene)
+            .expect("scene draft preflights");
+
+        assert_eq!(edits.len(), 2);
+        assert_eq!(edits[0].entity_id, "player");
+        assert_eq!(edits[0].path, "components.transform.x");
+        assert_eq!(edits[0].value, json!(48));
+        assert_eq!(edits[1].path, "sprite.color");
+        assert_eq!(
+            fs::read(&scene_path).expect("scene bytes read after preflight"),
+            before_bytes
+        );
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_rejects_stale_hash_missing_entity_and_unsupported_paths() {
+        let scene =
+            read_scene(repo_fixture_path("examples/game-runtime/scene.json")).expect("scene reads");
+
+        let mut stale = valid_scene_visual_edit_draft_for_scene(&scene);
+        stale.before_hash =
+            "sha256:9999999999999999999999999999999999999999999999999999999999999999".to_string();
+        let error = stale
+            .validate_scene_preflight(&scene)
+            .expect_err("stale hash fails");
+        assert!(error.to_string().contains("beforeHash mismatch"));
+
+        let mut missing_entity = valid_scene_visual_edit_draft_for_scene(&scene);
+        missing_entity.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .entity_id = "missing-player".to_string();
+        let error = missing_entity
+            .validate_scene_preflight(&scene)
+            .expect_err("missing entity fails");
+        assert!(error.to_string().contains("failed preflight"));
+
+        let mut unsupported_path = valid_scene_visual_edit_draft_for_scene(&scene);
+        unsupported_path.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .scene_edit_path = "components.collider.sensor".to_string();
+        let error = unsupported_path
+            .validate_scene_preflight(&scene)
+            .expect_err("unsupported path fails");
+        assert!(error
+            .to_string()
+            .contains("unsupported visual edit scene draft path"));
+
+        let mut unsupported_kind = valid_scene_visual_edit_draft_for_scene(&scene);
+        unsupported_kind.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .kind = VisualEditSceneDraftOperationKind::ColliderToggle;
+        unsupported_kind.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .scene_edit_path = "components.collider.sensor".to_string();
+        let error = unsupported_kind
+            .validate_scene_preflight(&scene)
+            .expect_err("unsupported kind fails");
+        assert!(error
+            .to_string()
+            .contains("not supported by scene edit transaction preflight yet"));
     }
 
     #[test]
