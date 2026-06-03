@@ -46,7 +46,16 @@ function createRuntime() {
   assert.equal(state.audioEvents[0].requestId, 'audio-0-1');
   assert.equal(state.audioEvents[0].sceneId, state.sceneId);
   assert.equal(state.audioEvents[0].name, 'player_spawn');
+  assert.equal(state.audioEvents[0].asset, 'collect_sound');
   assert.equal(state.entities.find((entity) => entity.id === 'player').components.animation.mode, 'sprite_frame');
+  assert.equal(state.assetManifest.id, 'collect-and-exit-runtime-assets');
+  assert.equal(state.assetManifest.assetCount, 2);
+  assert.equal(state.assetManifest.errors.length, 0);
+  assert.ok(state.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
+  assert.equal(state.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
+  assert.equal(state.tilemaps.tilemaps[0].grid.width, 10);
+  assert.equal(state.tilemaps.tilemaps[0].authoring.triggerCells[0].trigger, 'key_collected');
+  assert.equal(state.tilemaps.tilemaps[0].authoring.goalCells[0].tileId, 'exit_marker');
 
   api.setInput({ right: true });
   state = api.step(40);

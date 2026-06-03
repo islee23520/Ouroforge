@@ -89,6 +89,8 @@ function generatedStateAudit() {
       .filter((entity) => entity.components && entity.components.animation)
       .map((entity) => ({ entityId: entity.id, ...entity.components.animation })),
     audio_evidence: afterExit.audioEvents,
+    asset_loading: afterExit.assets,
+    tilemap_evidence: afterExit.tilemaps,
     comparison: {
       beforeSceneId: initial.sceneId,
       afterSceneId: afterExit.sceneId,
@@ -101,6 +103,15 @@ function generatedStateAudit() {
   assert.equal(afterKey.componentModel.goalFlags.key_collected, true);
   assert.equal(afterKey.componentModel.goalFlags.door_open, true);
   assert.equal(afterExit.componentModel.goalFlags.exit_reached, true);
+  assert.equal(afterExit.assetManifest.id, 'collect-and-exit-runtime-assets');
+  assert.equal(afterExit.assetManifest.assetCount, 2);
+  assert.equal(afterExit.assetManifest.errors.length, 0);
+  assert.ok(afterExit.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
+  assert.equal(afterExit.audioEvents[0].asset, 'collect_sound');
+  assert.equal(afterExit.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
+  assert.equal(afterExit.tilemaps.tilemaps[0].grid.width, 10);
+  assert.equal(afterExit.tilemaps.tilemaps[0].authoring.triggerCells[0].trigger, 'key_collected');
+  assert.equal(afterExit.tilemaps.tilemaps[0].authoring.goalCells[0].tileId, 'exit_marker');
   assert.ok(afterKeyEvents.some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'collect_key'));
   assert.ok(runtimeEvents.some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'enter_exit'));
   assert.deepEqual(evidence.comparison.changedFlags, ['door_open', 'exit_reached', 'key_collected']);
