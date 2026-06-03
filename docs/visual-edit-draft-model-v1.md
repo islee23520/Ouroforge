@@ -20,8 +20,8 @@ A draft artifact uses `schemaVersion: "visual-edit-draft-v1"` and includes:
 | `draftId` | Stable draft id for evidence, review, and diagnostics. |
 | `target.type` | Bounded target enum: `scene`, `tilemap`, or `asset-reference`. |
 | `target.path` / `target.id` | Project-relative target path and optional manifest/read-model id. |
-| `proposedOperations[]` | Inert operation envelopes with id, kind, path, optional summary, and optional JSON value. |
-| `beforeHash` | Expected `sha256:<64 hex>` hash for stale-draft detection. |
+| `proposedOperations[]` | Inert operation envelopes with id, kind, path, optional summary, optional JSON value, and optional target-specific metadata such as `sceneOperation`. |
+| `beforeHash` | Expected hash for stale-draft detection. Generic fixtures may use `sha256:<64 hex>`; scene preflight uses the trusted scene hash form `fnv1a64-canonical-json-v1:<16 hex>`. |
 | `expectedAfterSummary` | Human-readable summary of the intended after state. |
 | `linkedEvidence[]` | Project-relative evidence refs that justify or explain the draft. |
 | `author` | Human/agent/Studio/system source metadata. |
@@ -41,9 +41,10 @@ in-memory Studio draft or generated draft JSON
   -> later visual diff / review gate / apply issue
 ```
 
-VA1.2 only defines the artifact and its validation. It does not define operation
-semantics, write behavior, rollback, visual diff rendering, or review-gated
-apply behavior.
+VA1.2 defines the artifact and generic validation. VA1.3 adds scene-specific
+operation metadata, scene hash preflight, and preview-only transaction generation
+for currently supported scalar scene edits. It still does not authorize trusted
+writes, visual diff rendering, review-gated apply, or Studio authoring UI.
 
 ## Read-model compatibility
 
@@ -73,6 +74,34 @@ Dashboard, Journal, and Studio read models should preserve unknown future draft
 records as display-only diagnostics unless a later issue explicitly adds a
 trusted parser/export path. Browser surfaces may copy draft JSON or commands for
 a human to run elsewhere, but they must not write files or execute commands.
+
+
+## Scene Visual Edit Draft v1 compatibility
+
+Scene drafts may include a `sceneOperation` object on each operation:
+
+| Field | Purpose |
+| --- | --- |
+| `sceneOperation.kind` | Bounded scene draft category such as `transform_move`, `sprite_color_change`, `collider_size_change`, `hud_text_change`, `hud_value_change`, or `camera_target_selection`. Other declared categories remain rejected until the underlying scene edit transaction model supports them. |
+| `sceneOperation.entityId` | Existing scene entity id to preview against. Missing entities fail preflight before preview output. |
+| `sceneOperation.sceneEditPath` | Existing Rust scene edit path. Supported preview paths currently match `supported_scene_edit_paths()` in Rust: `sprite.color`, transform/velocity/size scalar fields, `components.controllable`, status hit point fields, input speed/jump fields, `components.cameraTarget.weight`, and `components.uiText.text`. |
+| `sceneOperation.value` | JSON value for the scene edit. Rust validates the value through the same preview path used by scene edit transactions. |
+| `sceneOperation.summary` | Optional display-only authoring note. |
+
+Scene draft preflight is Rust-owned and side-effect-free: it checks the draft
+shape, target type/id, current scene hash, operation support, entity presence,
+value type, and candidate scene validity before returning transaction previews.
+Transaction previews preserve `beforeSceneHash`, compute `afterSceneHash` for
+valid edits, and include rollback metadata, but they do not write scene files or
+transaction artifacts. Review-gated apply remains a separate trusted CLI flow.
+
+Read-only dashboards, journals, and Studio surfaces may display scene draft
+operation summaries and preview metadata as escaped diagnostics. They must not
+claim that a draft has been applied or reviewed, and they must not execute the
+preview or apply commands from browser JavaScript. Unsupported scene categories
+such as sprite frame changes, collider toggles, and trigger/flag configuration
+are intentionally visible as draft categories but fail closed until separately
+supported by the Rust transaction model.
 
 ## Generated-state policy
 

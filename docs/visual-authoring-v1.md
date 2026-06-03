@@ -89,9 +89,10 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
 1. **Visual Edit Draft Model v1** — define the data-only draft schema, ids,
    operation categories, provenance, diagnostics, fixture policy, and read-model
    compatibility notes (see `docs/visual-edit-draft-model-v1.md`).
-2. **Scene Visual Edit Draft v1** — support draft descriptions for scene entity,
-   component, trigger, HUD, animation/audio event, and transition edits within
-   the draft model.
+2. **Scene Visual Edit Draft v1** — support draft descriptions, Rust preflight,
+   and preview-only transaction generation for bounded scene entity/component
+   edits within the existing scene edit transaction model; unsupported scene
+   categories remain rejected before preview.
 3. **Tilemap Visual Edit Draft v1** — support draft descriptions for tilemap,
    layer, tileset, collision-tag, and placement edits without direct writes.
 4. **Asset Reference Edit Draft v1** — support draft descriptions for manifest,

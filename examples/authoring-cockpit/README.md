@@ -12,7 +12,7 @@ Open <http://127.0.0.1:8000/examples/authoring-cockpit/>.
 
 The inspector updates scene data in memory and shows the validated `ouroforge scene edit` command for writing through Rust-side validation. Direct browser file writes are intentionally not supported.
 
-Supported Rust-validated scene edit fields:
+Supported Rust-validated scalar scene edit fields:
 
 - `sprite.color`
 - `components.transform.x`
@@ -22,9 +22,18 @@ Supported Rust-validated scene edit fields:
 - `components.size.width`
 - `components.size.height`
 - `components.controllable`
+- `components.status.hitPoints`
+- `components.status.maxHitPoints`
+- `components.input.moveSpeed`
+- `components.input.jumpImpulse`
+- `components.cameraTarget.weight`
+- `components.uiText.text`
 
-All other scene fields remain read-only in the cockpit and are rejected by the
-Rust `ouroforge scene edit` command.
+Scene Visual Edit Draft v1 may describe these supported scalar edits as inert
+`sceneOperation` records and Rust can preflight them into transaction previews
+without applying writes. All other scene fields remain read-only in the cockpit
+and are rejected before trusted writes. The browser still does not execute
+commands, write files, persist trusted draft state, or apply previews.
 
 
 ## Studio v3 demo surfaces
