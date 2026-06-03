@@ -134,6 +134,23 @@ const run = {
     missingRefs: ['comparison:runs/<comparison>.json'],
     boundary: 'Generated local index only; <browser> read-only.',
   }],
+  loop_cockpit: {
+    schemaVersion: 'studio-loop-cockpit-v1',
+    boundary: 'Read-only normalized loop cockpit read model; <browser> cannot execute commands.',
+    loops: [{
+      loopId: '<cockpit-loop>',
+      status: 'blocked',
+      planPath: '<loop-plan.json>',
+      currentStep: { stepId: '<step-current>', kind: 'compare-runs', status: 'blocked' },
+      steps: [
+        { stepId: '<step-plan>', kind: 'run-baseline', status: 'completed', path: 'runs/<baseline>/run.json' },
+        { stepId: '<step-current>', kind: 'compare-runs', status: 'blocked', path: 'runs/<comparison>.json' },
+      ],
+      blockers: ['missing <comparison>'],
+      requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+      boundary: 'Display-only cockpit row; does not execute commands.',
+    }],
+  },
   evidence_fidelity: {
     transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
     runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
@@ -252,7 +269,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 12);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 13);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -549,6 +566,18 @@ assert.match(cockpit.renderLoopRecoverySurface(run), /&lt;missing comparison&gt;
 assert.doesNotMatch(cockpit.renderLoopRecoverySurface(run), /<missing comparison>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop recovery/);
 assert.match(cockpit.renderLoopRecoverySurface({ summary: { id: 'run-no-loop' } }), /No recovery status/);
+
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Loop cockpit/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /&lt;cockpit-loop&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /&lt;step-current&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Blockers: missing &lt;comparison&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Required decisions: &lt;human-review&gt;:human-review/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /No browser authority|does not execute commands/);
+assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<cockpit-loop>/);
+assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<button/i);
+assert.match(cockpit.renderStudioLoopCockpitSurface({ loop_cockpit: { schemaVersion: '<schema>', loops: '<bad>' } }), /Malformed loop cockpit read-model/);
+assert.match(cockpit.renderStudioLoopCockpitSurface({}), /No loop cockpit read-model/);
+assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
 assert.match(cockpit.renderAgentHandoffSurface(run), /blocked/);

@@ -311,6 +311,7 @@ const OuroforgeCockpit = (() => {
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
       { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
+      { id: 'loop-cockpit', label: 'Loop cockpit', present: Boolean(normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length), detail: `${normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length} loop(s)` },
       { id: 'run-comparison', label: 'Run comparison', present: Boolean(run?.comparison?.present), detail: `${(run?.comparison?.artifacts || []).length} comparison artifact(s)` },
     ];
   }
@@ -974,6 +975,48 @@ const OuroforgeCockpit = (() => {
     return [];
   }
 
+  function normalizeStudioLoopCockpit(value = null) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { schemaVersion: null, loops: [], boundary: null, warning: 'No loop cockpit read-model is attached to dashboard-data.json.' };
+    }
+    if (!Array.isArray(value.loops)) {
+      return { schemaVersion: value.schemaVersion || null, loops: [], boundary: value.boundary || null, warning: 'Malformed loop cockpit read-model: loops must be an array.' };
+    }
+    return { schemaVersion: value.schemaVersion || null, loops: value.loops, boundary: value.boundary || null, warning: null };
+  }
+
+  function renderLoopCockpitTimeline(loop) {
+    const steps = Array.isArray(loop?.steps) ? loop.steps : [];
+    if (!steps.length) return '<p class="empty compact">No loop plan timeline steps exported.</p>';
+    return `<ol class="timeline">${steps.map((step) => `<li><strong>${escapeText(step.stepId || step.id || 'step')}</strong> ${surfaceState(Boolean(step.status), step.status || 'unknown')}<br><small>${escapeText(step.kind || 'unknown')} · ${escapeText(step.path || step.artifactPath || 'no artifact path')}</small></li>`).join('')}</ol>`;
+  }
+
+  function renderStudioLoopCockpitSurface(run) {
+    const cockpit = normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null);
+    if (!cockpit.loops.length) {
+      return `<section id="loop-cockpit" class="panel"><h2>Loop cockpit</h2><p class="empty">${escapeText(cockpit.warning || 'No loop cockpit read-model loops are available.')}</p><p class="hint">Read-only Studio loop cockpit. The browser does not execute commands, write files, resume loops, apply mutations, or promote regressions.</p></section>`;
+    }
+    const rows = cockpit.loops.map((loop) => {
+      const blockers = Array.isArray(loop.blockers) ? loop.blockers : [];
+      const decisions = Array.isArray(loop.requiredDecisions) ? loop.requiredDecisions : [];
+      const current = loop.currentStep && typeof loop.currentStep === 'object' ? loop.currentStep : null;
+      const status = loop.status || loop.bundleStatus || loop.handoffStatus || 'unknown';
+      return `<div class="surface-row"><strong>${escapeText(loop.loopId || 'unknown-loop')}</strong> ${surfaceState(Boolean(status), status)}<br>
+        <small>Plan: ${escapeText(loop.planPath || 'unrecorded')}</small>
+        <div class="hint">Current step: ${escapeText(current?.stepId || 'none')} · ${escapeText(current?.kind || 'unknown')} · ${escapeText(current?.status || 'unknown')}</div>
+        ${renderLoopCockpitTimeline(loop)}
+        ${blockers.length ? `<div class="hint">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="hint">No blockers reported.</div>'}
+        ${decisions.length ? `<div class="hint">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="hint">No required decisions reported.</div>'}
+        <small>${escapeText(loop.boundary || 'Display-only loop cockpit row; no browser authority.')}</small>
+      </div>`;
+    }).join('');
+    return `<section id="loop-cockpit" class="panel"><h2>Loop cockpit</h2>
+      <p class="hint">Read-only loop plan/status timeline. Copyable or next-action text stays inert; the browser does not execute commands or write trusted state.</p>
+      <div class="hint">Schema: ${escapeText(cockpit.schemaVersion || 'unknown')} · ${escapeText(cockpit.boundary || 'No boundary text exported.')}</div>
+      ${rows}
+    </section>`;
+  }
+
   function renderAgentHandoffSurface(run) {
     const handoffs = normalizeAgentHandoffs(run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
     if (!handoffs.length) {
@@ -1073,7 +1116,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1098,12 +1141,13 @@ const OuroforgeCockpit = (() => {
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
-      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix || dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || dashboardData.agent_handoffs || dashboardData.agentHandoffs)) {
+      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix || dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || dashboardData.agent_handoffs || dashboardData.agentHandoffs || dashboardData.loop_cockpit || dashboardData.loopCockpit)) {
         latest = {
           ...latest,
           regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix,
           loop_evidence_bundles: dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || [],
           agent_handoffs: dashboardData.agent_handoffs || dashboardData.agentHandoffs || [],
+          loop_cockpit: dashboardData.loop_cockpit || dashboardData.loopCockpit || null,
         };
       }
     } catch (_) {
@@ -1157,7 +1201,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
