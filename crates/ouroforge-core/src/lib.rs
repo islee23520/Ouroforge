@@ -5843,6 +5843,9 @@ pub struct ProjectAssetManifestValidationReport {
     pub assets: usize,
     pub source_like_assets: usize,
     pub generated_assets: usize,
+    pub sprite_atlases: usize,
+    pub sprite_atlas_frames: usize,
+    pub sprite_atlas_animations: usize,
     pub asset_types: BTreeMap<ProjectAssetType, usize>,
 }
 
@@ -5906,6 +5909,9 @@ impl ProjectAssetManifest {
         let mut asset_types = BTreeMap::new();
         let mut source_like_assets = 0;
         let mut generated_assets = 0;
+        let mut sprite_atlases = 0;
+        let mut sprite_atlas_frames = 0;
+        let mut sprite_atlas_animations = 0;
 
         for (index, asset) in self.assets.iter().enumerate() {
             asset.validate_integrity(index, base_dir, &base)?;
@@ -5926,6 +5932,13 @@ impl ProjectAssetManifest {
                 ProjectAssetClassification::SourceLike => source_like_assets += 1,
                 ProjectAssetClassification::Generated => generated_assets += 1,
             }
+            if asset.asset_type == ProjectAssetType::SpriteAtlas {
+                sprite_atlases += 1;
+                if let Some(atlas) = &asset.atlas {
+                    sprite_atlas_frames += atlas.frames.len();
+                    sprite_atlas_animations += atlas.animations.len();
+                }
+            }
         }
 
         self.validate_sprite_atlases()?;
@@ -5935,6 +5948,9 @@ impl ProjectAssetManifest {
             assets: self.assets.len(),
             source_like_assets,
             generated_assets,
+            sprite_atlases,
+            sprite_atlas_frames,
+            sprite_atlas_animations,
             asset_types,
         })
     }
@@ -22202,9 +22218,12 @@ scenarios:
             valid_frames.clone(),
             valid_animations.clone(),
         );
-        valid
+        let report = valid
             .validate_assets(&root)
             .expect("sprite atlas integrity validates");
+        assert_eq!(report.sprite_atlases, 1);
+        assert_eq!(report.sprite_atlas_frames, 2);
+        assert_eq!(report.sprite_atlas_animations, 1);
 
         let unknown_image = manifest_with(
             "missing_sheet_image",

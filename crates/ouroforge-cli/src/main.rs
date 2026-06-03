@@ -455,6 +455,12 @@ fn main() -> Result<()> {
             println!("Assets: {}", report.assets);
             println!("Source-like assets: {}", report.source_like_assets);
             println!("Generated assets: {}", report.generated_assets);
+            println!("Sprite atlases: {}", report.sprite_atlases);
+            println!("Sprite atlas frames: {}", report.sprite_atlas_frames);
+            println!(
+                "Sprite atlas animations: {}",
+                report.sprite_atlas_animations
+            );
             println!(
                 "Asset types: {}",
                 format_asset_type_counts(&report.asset_types)

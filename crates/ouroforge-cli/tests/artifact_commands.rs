@@ -269,6 +269,79 @@ fn asset_validate_reports_manifest_summary_and_rejects_invalid_assets() {
 }
 
 #[test]
+fn asset_validate_reports_sprite_atlas_read_only_summary() {
+    let temp = unique_temp_dir("ouroforge-cli-sprite-atlas-summary-test");
+    fs::create_dir_all(temp.join("assets/sprites")).expect("sprite dir");
+    fs::create_dir_all(temp.join("assets/atlases")).expect("atlas dir");
+    fs::write(
+        temp.join("assets/sprites/player-sheet.png"),
+        b"sheet fixture",
+    )
+    .expect("sheet writes");
+    fs::write(
+        temp.join("assets/atlases/player-sheet.atlas.json"),
+        br#"{"frames":["idle_0","idle_1"]}"#,
+    )
+    .expect("atlas writes");
+    let sheet_hash = fnv1a64_hex(b"sheet fixture");
+    let atlas_hash = fnv1a64_hex(br#"{"frames":["idle_0","idle_1"]}"#);
+    let manifest_path = temp.join("asset-manifest.json");
+    fs::write(
+        &manifest_path,
+        format!(
+            r#"{{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "cli_sprite_atlas_fixture",
+  "assets": [
+    {{
+      "id": "player_sheet_image",
+      "type": "image",
+      "path": "assets/sprites/player-sheet.png",
+      "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{sheet_hash}" }},
+      "classification": "source_like",
+      "dimensions": {{ "width": 32, "height": 16 }}
+    }},
+    {{
+      "id": "player_sheet_atlas",
+      "type": "sprite_atlas",
+      "path": "assets/atlases/player-sheet.atlas.json",
+      "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{atlas_hash}" }},
+      "classification": "source_like",
+      "atlas": {{
+        "imageAssetId": "player_sheet_image",
+        "frames": [
+          {{ "id": "idle_0", "rect": {{ "x": 0, "y": 0, "width": 16, "height": 16 }} }},
+          {{ "id": "idle_1", "rect": {{ "x": 16, "y": 0, "width": 16, "height": 16 }} }}
+        ],
+        "animations": [
+          {{ "id": "idle", "frames": [
+            {{ "frameId": "idle_0", "durationMs": 120 }},
+            {{ "frameId": "idle_1", "durationMs": 120 }}
+          ]}}
+        ]
+      }}
+    }}
+  ]
+}}"#
+        ),
+    )
+    .expect("manifest writes");
+
+    let output = run_cli(
+        &temp,
+        &["asset", "validate", manifest_path.to_str().unwrap()],
+    );
+    assert!(output.contains("Asset manifest valid: cli_sprite_atlas_fixture"));
+    assert!(output.contains("Assets: 2"));
+    assert!(output.contains("Sprite atlases: 1"));
+    assert!(output.contains("Sprite atlas frames: 2"));
+    assert!(output.contains("Sprite atlas animations: 1"));
+    assert!(output.contains("Asset types: image=1,sprite_atlas=1"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn project_init_creates_valid_minimal_workspace_and_rejects_unsafe_destinations() {
     let temp = unique_temp_dir("ouroforge-cli-project-init-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

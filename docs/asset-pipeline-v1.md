@@ -52,7 +52,8 @@ Follow-up Asset Pipeline v1 issues should be implemented in this order:
    relative paths, file types, integrity hashes, CLI validation, and fixture policy
    (see `docs/asset-manifest-v1.md`).
 2. **Sprite Atlas Manifest v1** — define sprite atlas metadata, frame regions,
-   animation frame refs, deterministic ordering, and validation boundaries.
+   animation frame refs, deterministic ordering, and validation boundaries (see
+   `docs/sprite-atlas-manifest-v1.md`).
 3. **Tileset and Tilemap Authoring v2** — extend tilemap authoring around
    manifest-declared tilesets, layers, collision tags, and source-like fixtures.
 4. **Asset Reference Integrity v1** — validate scene, animation, audio, font,

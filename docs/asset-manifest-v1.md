@@ -44,7 +44,8 @@ browser writes, package assets, load plugins, or implement runtime asset loading
 | `assets[].path` | yes | Project-relative file path; duplicate paths are rejected. |
 | `assets[].contentHash` | yes | File integrity hash. Algorithm must be `fnv1a64-file-v1`; value is 16 lowercase hex characters. |
 | `assets[].classification` | yes | `source_like` for tracked source assets or `generated` for generated/local evidence assets. |
-| `dimensions` | image-like optional metadata | Width and height must both be greater than zero when present. |
+| `dimensions` | image-like optional metadata | Width and height must both be greater than zero when present. Sprite atlas image references require image dimensions for bounds validation. |
+| `atlas` | `sprite_atlas` only | Sprite atlas payload with `imageAssetId`, named frame rectangles, and optional animation frame refs. See `docs/sprite-atlas-manifest-v1.md`. |
 | `durationMs` | audio optional metadata | Duration must be greater than zero when present. |
 | `license`, `source`, `metadata` | optional | Human review notes only; not remote authority. |
 
@@ -66,6 +67,9 @@ Manifest: path/to/asset-manifest.json
 Assets: 2
 Source-like assets: 1
 Generated assets: 1
+Sprite atlases: 0
+Sprite atlas frames: 0
+Sprite atlas animations: 0
 Asset types: image=2
 ```
 
@@ -85,6 +89,7 @@ Asset validation rejects:
   `dashboard-data`;
 - missing files;
 - duplicate asset ids or duplicate asset paths;
+- sprite atlas entries with missing image refs, duplicate frame ids, out-of-bounds frame rectangles, or unknown animation frame refs;
 - unsupported file extensions for the declared type;
 - non-`fnv1a64-file-v1` hash algorithms;
 - malformed hash strings; and
