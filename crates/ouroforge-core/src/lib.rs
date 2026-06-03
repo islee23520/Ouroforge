@@ -6003,6 +6003,238 @@ pub struct ProjectAssetReferenceIntegrityWarning {
     pub path: Option<String>,
 }
 
+const RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION: &str = "runtime-asset-load-evidence-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeAssetLoadEvidence {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "workerId")]
+    pub worker_id: String,
+    #[serde(rename = "workerSessionId")]
+    pub worker_session_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "manifestId", skip_serializing_if = "Option::is_none")]
+    pub manifest_id: Option<String>,
+    #[serde(rename = "recordedAtUnixMs")]
+    pub recorded_at_unix_ms: u128,
+    pub loads: Vec<RuntimeAssetLoadRecord>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeAssetLoadRecord {
+    #[serde(rename = "attemptId")]
+    pub attempt_id: String,
+    #[serde(rename = "assetId")]
+    pub asset_id: String,
+    #[serde(rename = "assetType")]
+    pub asset_type: ProjectAssetType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    pub status: RuntimeAssetLoadStatus,
+    #[serde(rename = "startedAtUnixMs")]
+    pub started_at_unix_ms: u128,
+    #[serde(rename = "endedAtUnixMs", skip_serializing_if = "Option::is_none")]
+    pub ended_at_unix_ms: Option<u128>,
+    #[serde(rename = "loadDurationMs", skip_serializing_if = "Option::is_none")]
+    pub load_duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(rename = "mediaDurationMs", skip_serializing_if = "Option::is_none")]
+    pub media_duration_ms: Option<u64>,
+    #[serde(rename = "failureReason", skip_serializing_if = "Option::is_none")]
+    pub failure_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeAssetLoadStatus {
+    Attempted,
+    Loaded,
+    Failed,
+    Rejected,
+    Fallback,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeAssetLoadEvidenceSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "workerId")]
+    pub worker_id: String,
+    #[serde(rename = "workerSessionId")]
+    pub worker_session_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "manifestId", skip_serializing_if = "Option::is_none")]
+    pub manifest_id: Option<String>,
+    #[serde(rename = "attemptCount")]
+    pub attempt_count: usize,
+    #[serde(rename = "loadedAssetIds")]
+    pub loaded_asset_ids: Vec<String>,
+    #[serde(rename = "failedAssetIds")]
+    pub failed_asset_ids: Vec<String>,
+    #[serde(rename = "rejectedAssetIds")]
+    pub rejected_asset_ids: Vec<String>,
+    #[serde(rename = "fallbackAssetIds")]
+    pub fallback_asset_ids: Vec<String>,
+}
+
+impl RuntimeAssetLoadEvidence {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: RuntimeAssetLoadEvidence = serde_json::from_str(input)
+            .context("failed to parse Runtime Asset Load Evidence JSON")?;
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "runtime asset load evidence schemaVersion must be {RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("runtime asset load evidence runId", &self.run_id)?;
+        validate_path_component("runtime asset load evidence workerId", &self.worker_id)?;
+        require_text(
+            "runtime asset load evidence workerSessionId",
+            &self.worker_session_id,
+        )?;
+        if let Some(scenario_id) = &self.scenario_id {
+            validate_path_component("runtime asset load evidence scenarioId", scenario_id)?;
+        }
+        if let Some(manifest_id) = &self.manifest_id {
+            validate_path_component("runtime asset load evidence manifestId", manifest_id)?;
+        }
+        if self.loads.is_empty() {
+            return Err(anyhow!(
+                "runtime asset load evidence loads must not be empty"
+            ));
+        }
+        let mut attempt_ids = BTreeSet::new();
+        for (index, load) in self.loads.iter().enumerate() {
+            load.validate(index)?;
+            if !attempt_ids.insert(load.attempt_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate runtime asset load evidence attemptId: {}",
+                    load.attempt_id
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn summary(&self) -> RuntimeAssetLoadEvidenceSummary {
+        let ids_with_status = |status: RuntimeAssetLoadStatus| -> Vec<String> {
+            let mut ids = self
+                .loads
+                .iter()
+                .filter(|load| load.status == status)
+                .map(|load| load.asset_id.clone())
+                .collect::<Vec<_>>();
+            ids.sort();
+            ids.dedup();
+            ids
+        };
+        RuntimeAssetLoadEvidenceSummary {
+            schema_version: self.schema_version.clone(),
+            run_id: self.run_id.clone(),
+            worker_id: self.worker_id.clone(),
+            worker_session_id: self.worker_session_id.clone(),
+            scenario_id: self.scenario_id.clone(),
+            manifest_id: self.manifest_id.clone(),
+            attempt_count: self.loads.len(),
+            loaded_asset_ids: ids_with_status(RuntimeAssetLoadStatus::Loaded),
+            failed_asset_ids: ids_with_status(RuntimeAssetLoadStatus::Failed),
+            rejected_asset_ids: ids_with_status(RuntimeAssetLoadStatus::Rejected),
+            fallback_asset_ids: ids_with_status(RuntimeAssetLoadStatus::Fallback),
+        }
+    }
+}
+
+impl RuntimeAssetLoadRecord {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("runtime asset load evidence loads[{index}].attemptId"),
+            &self.attempt_id,
+        )?;
+        validate_path_component(
+            &format!("runtime asset load evidence loads[{index}].assetId"),
+            &self.asset_id,
+        )?;
+        if let Some(path) = &self.path {
+            validate_project_asset_path(
+                &format!("runtime asset load evidence loads[{index}].path"),
+                path,
+                self.asset_type,
+                ProjectAssetClassification::SourceLike,
+            )?;
+        }
+        if let Some(ended_at) = self.ended_at_unix_ms {
+            if ended_at < self.started_at_unix_ms {
+                return Err(anyhow!(
+                    "runtime asset load evidence loads[{index}].endedAtUnixMs must be greater than or equal to startedAtUnixMs"
+                ));
+            }
+        }
+        if self.load_duration_ms == Some(0) {
+            return Err(anyhow!(
+                "runtime asset load evidence loads[{index}].loadDurationMs must be positive when present"
+            ));
+        }
+        if self.media_duration_ms == Some(0) {
+            return Err(anyhow!(
+                "runtime asset load evidence loads[{index}].mediaDurationMs must be positive when present"
+            ));
+        }
+        if self.width == Some(0) || self.height == Some(0) {
+            return Err(anyhow!(
+                "runtime asset load evidence loads[{index}] dimensions must be positive when present"
+            ));
+        }
+        match self.status {
+            RuntimeAssetLoadStatus::Loaded => {
+                if self.failure_reason.is_some() {
+                    return Err(anyhow!(
+                        "runtime asset load evidence loads[{index}] loaded status must not include failureReason"
+                    ));
+                }
+                if self.ended_at_unix_ms.is_none() {
+                    return Err(anyhow!(
+                        "runtime asset load evidence loads[{index}] loaded status requires endedAtUnixMs"
+                    ));
+                }
+            }
+            RuntimeAssetLoadStatus::Failed
+            | RuntimeAssetLoadStatus::Rejected
+            | RuntimeAssetLoadStatus::Fallback => {
+                let Some(reason) = &self.failure_reason else {
+                    return Err(anyhow!(
+                        "runtime asset load evidence loads[{index}] {:?} status requires failureReason",
+                        self.status
+                    ));
+                };
+                require_bounded_display_text(
+                    &format!("runtime asset load evidence loads[{index}].failureReason"),
+                    reason,
+                )?;
+            }
+            RuntimeAssetLoadStatus::Attempted => {}
+        }
+        Ok(())
+    }
+}
+
 impl ProjectAssetManifest {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let manifest: ProjectAssetManifest =
@@ -23002,6 +23234,164 @@ scenarios:
         let rejected = format!("{rejected:#}");
         assert!(rejected.contains("missing file"));
         assert!(rejected.to_string().contains("scenes/missing.scene.json"));
+    }
+
+    #[test]
+    fn runtime_asset_load_evidence_model_accepts_attempts_and_summarizes_statuses() {
+        let evidence = RuntimeAssetLoadEvidence::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-asset-load-evidence-v1",
+                "runId": "run_asset_smoke",
+                "workerId": "worker-1",
+                "workerSessionId": "run_asset_smoke:worker-1",
+                "scenarioId": "asset-smoke",
+                "manifestId": "runtime_assets",
+                "recordedAtUnixMs": 1000,
+                "loads": [
+                    {
+                        "attemptId": "load-player",
+                        "assetId": "player_sprite",
+                        "assetType": "image",
+                        "path": "assets/sprites/player.png",
+                        "status": "loaded",
+                        "startedAtUnixMs": 1010,
+                        "endedAtUnixMs": 1025,
+                        "loadDurationMs": 15,
+                        "width": 16,
+                        "height": 16
+                    },
+                    {
+                        "attemptId": "load-spawn",
+                        "assetId": "spawn_audio",
+                        "assetType": "audio",
+                        "path": "assets/audio/spawn.ogg",
+                        "status": "failed",
+                        "startedAtUnixMs": 1030,
+                        "endedAtUnixMs": 1040,
+                        "loadDurationMs": 10,
+                        "mediaDurationMs": 240,
+                        "failureReason": "decode error"
+                    },
+                    {
+                        "attemptId": "reject-remote",
+                        "assetId": "remote_sprite",
+                        "assetType": "image",
+                        "status": "rejected",
+                        "startedAtUnixMs": 1050,
+                        "failureReason": "remote URL rejected before browser trust"
+                    },
+                    {
+                        "attemptId": "fallback-missing",
+                        "assetId": "missing_sprite",
+                        "assetType": "image",
+                        "status": "fallback",
+                        "startedAtUnixMs": 1060,
+                        "failureReason": "explicit placeholder rendered after failed asset lookup"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("runtime asset evidence parses");
+
+        let summary = evidence.summary();
+        assert_eq!(summary.attempt_count, 4);
+        assert_eq!(summary.loaded_asset_ids, vec!["player_sprite".to_string()]);
+        assert_eq!(summary.failed_asset_ids, vec!["spawn_audio".to_string()]);
+        assert_eq!(
+            summary.rejected_asset_ids,
+            vec!["remote_sprite".to_string()]
+        );
+        assert_eq!(
+            summary.fallback_asset_ids,
+            vec!["missing_sprite".to_string()]
+        );
+        let serialized = serde_json::to_string(&summary).expect("summary serializes");
+        assert!(serialized.contains("loadedAssetIds"));
+        assert!(serialized.contains("workerSessionId"));
+    }
+
+    #[test]
+    fn runtime_asset_load_evidence_model_rejects_silent_or_unsafe_records() {
+        let base = |load: serde_json::Value| {
+            json!({
+                "schemaVersion": "runtime-asset-load-evidence-v1",
+                "runId": "run_asset_smoke",
+                "workerId": "worker-1",
+                "workerSessionId": "run_asset_smoke:worker-1",
+                "recordedAtUnixMs": 1000,
+                "loads": [load]
+            })
+        };
+        let valid_loaded = json!({
+            "attemptId": "load-player",
+            "assetId": "player_sprite",
+            "assetType": "image",
+            "path": "assets/sprites/player.png",
+            "status": "loaded",
+            "startedAtUnixMs": 1010,
+            "endedAtUnixMs": 1020
+        });
+
+        let missing_reason = RuntimeAssetLoadEvidence::from_json_str(
+            &base(json!({
+                "attemptId": "fail-player",
+                "assetId": "player_sprite",
+                "assetType": "image",
+                "path": "assets/sprites/player.png",
+                "status": "failed",
+                "startedAtUnixMs": 1010,
+                "endedAtUnixMs": 1020
+            }))
+            .to_string(),
+        )
+        .expect_err("failed loads require explicit reasons");
+        assert!(missing_reason
+            .to_string()
+            .contains("requires failureReason"));
+
+        let unsafe_path = RuntimeAssetLoadEvidence::from_json_str(
+            &base(json!({
+                "attemptId": "load-remote",
+                "assetId": "remote_sprite",
+                "assetType": "image",
+                "path": "https://example.com/player.png",
+                "status": "attempted",
+                "startedAtUnixMs": 1010
+            }))
+            .to_string(),
+        )
+        .expect_err("remote paths rejected by model");
+        assert!(unsafe_path.to_string().contains("ASCII"));
+
+        let backwards_timing = RuntimeAssetLoadEvidence::from_json_str(
+            &base(json!({
+                "attemptId": "load-backwards",
+                "assetId": "player_sprite",
+                "assetType": "image",
+                "path": "assets/sprites/player.png",
+                "status": "loaded",
+                "startedAtUnixMs": 1020,
+                "endedAtUnixMs": 1010
+            }))
+            .to_string(),
+        )
+        .expect_err("timing must be monotonic");
+        assert!(backwards_timing.to_string().contains("endedAtUnixMs"));
+
+        let duplicate_attempts = RuntimeAssetLoadEvidence::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-asset-load-evidence-v1",
+                "runId": "run_asset_smoke",
+                "workerId": "worker-1",
+                "workerSessionId": "run_asset_smoke:worker-1",
+                "recordedAtUnixMs": 1000,
+                "loads": [valid_loaded.clone(), valid_loaded]
+            })
+            .to_string(),
+        )
+        .expect_err("duplicate attempts rejected");
+        assert!(duplicate_attempts.to_string().contains("duplicate"));
     }
 
     #[test]
