@@ -48,3 +48,52 @@ stale-target controls exist. Until then, source mutation apply remains blocked.
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. This document does not close, replace, or narrow either issue.
+
+## Review levels
+
+| Review level | Applies to | Required reviewer evidence |
+| --- | --- | --- |
+| Standard design review | Documentation/governance docs that do not alter public readiness claims or trusted boundaries. | Issue/PR drift lock, no-implementation audit, conservative wording scan, and #1/#23 open-state check. |
+| Elevated source-like data review | Deterministic scene fixtures, scenario packs, runtime demo config, and promoted deterministic templates. | File-class label, source/generated boundary check, semantic rationale, stale-target check, rollback/audit expectation, and focused verification list. |
+| Elevated behavior review | Bounded game behavior modules, tests, evidence readers, browser/Studio display code, or Rust trust-boundary-adjacent files if separately approved. | Independent reviewer separation, risk IDs from the threat model, affected-surface summary, multi-file invariant checklist, rollback plan, and explicit proof that no command bridge/trusted write path is introduced. |
+| Separate governance approval | Rust trust-boundary code, dependency manifests/lockfiles, CI/workflow/secrets, build scripts, plugin/runtime/hosted/native export/public launch scope. | A new design/governance issue must authorize the class before any future patch preview can include it. Default decision is reject/hold. |
+| Reject by default | Ignored generated state, opaque binaries, stale previews, symlink/hard-link/path-ambiguous targets, unclassified files, or any file outside canonical repo root. | Reviewer-visible rejection reason and no source write. |
+
+## File-class drift detection expectations
+
+Future preview/review artifacts should detect and report drift before any reviewer
+decision:
+
+1. **Path drift**: canonical path must stay inside the repository root and must
+   not traverse through symlinks, hard links, hidden generated roots, or ignored
+   local state.
+2. **Classification drift**: every touched file must have exactly one current
+   file-class label; unknown or newly introduced classes default to reject/hold.
+3. **Boundary drift**: a patch that changes browser/Studio code, tests, evidence
+   readers, review gates, rollback contracts, sandbox contracts, or trust-boundary
+   Rust code must be elevated even if another file in the same patch is lower
+   risk.
+4. **Generated-state drift**: ignored local/generated files must remain ignored
+   and untracked; deterministic generated-origin fixtures need explicit promotion
+   rationale.
+5. **Stale-target drift**: previewed target hashes and latest-main context must
+   match at review time; mismatches require regenerating the preview.
+6. **Governance drift**: #1 and #23 must remain open, conservative public wording
+   must be preserved, and no future patch may claim production/source-mutation
+   readiness from a design-only artifact.
+7. **Scope drift**: adding source mutation apply, arbitrary patch apply,
+   auto-merge/auto-accept, hidden command execution, browser trusted writes,
+   dependency changes, CI mutation, plugin runtime, hosted/server/auth, native
+   export, public launch automation, or Godot replacement scope is a hard reject.
+
+## Closure expectations for later file-class decisions
+
+Any later issue that changes this matrix must record:
+
+- the previous class and proposed class;
+- why the change is necessary for the current milestone;
+- affected threat-model risk IDs;
+- required review level before and after the change;
+- verification commands and evidence needed to prove no boundary weakening;
+- generated-state audit result; and
+- #1/#23 open-state confirmation.
