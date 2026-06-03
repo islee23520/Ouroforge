@@ -3659,6 +3659,54 @@ pub fn build_authoring_loop_status(
     })
 }
 
+/// Canonicalize the deepest existing ancestor of `path` and re-attach the
+/// remaining (not-yet-created) components. This lets a not-yet-written output
+/// path be compared against a canonicalized base directory even when a prefix is
+/// a symlink (e.g. macOS `/tmp` -> `/private/tmp`).
+fn canonicalize_existing_prefix(path: &Path) -> PathBuf {
+    let mut tail_rev: Vec<std::ffi::OsString> = Vec::new();
+    let mut current = path.to_path_buf();
+    loop {
+        if current.exists() {
+            let mut resolved = current.canonicalize().unwrap_or(current);
+            for component in tail_rev.iter().rev() {
+                resolved.push(component);
+            }
+            return resolved;
+        }
+        match current.file_name() {
+            Some(name) => tail_rev.push(name.to_os_string()),
+            None => return path.to_path_buf(),
+        }
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => return path.to_path_buf(),
+        }
+    }
+}
+
+/// Resolve a generated output path to a base-relative form so the generated-root
+/// policy applies regardless of whether the caller spelled the plan path (and
+/// thus `base_dir`) relatively or the output path absolutely. A relative output
+/// is already base-relative; an absolute output is relativized against the
+/// canonicalized base so an absolute path inside a generated root is accepted.
+fn relative_generated_output_path(base_dir: &Path, output_path: &Path) -> PathBuf {
+    if !output_path.is_absolute() {
+        return output_path
+            .strip_prefix(base_dir)
+            .unwrap_or(output_path)
+            .to_path_buf();
+    }
+    let canonical_base = base_dir
+        .canonicalize()
+        .unwrap_or_else(|_| base_dir.to_path_buf());
+    let canonical_output = canonicalize_existing_prefix(output_path);
+    canonical_output
+        .strip_prefix(&canonical_base)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|_| output_path.to_path_buf())
+}
+
 pub fn write_agent_handoff_contract_from_path(
     plan_path: impl AsRef<Path>,
     output_path: impl AsRef<Path>,
@@ -3677,10 +3725,10 @@ pub fn write_agent_handoff_contract_from_path(
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let relative_output_path = output_path.strip_prefix(base_dir).unwrap_or(output_path);
+    let relative_output_path = relative_generated_output_path(base_dir, output_path);
     validate_authoring_loop_generated_artifact_path(
         "agent handoff output path",
-        relative_output_path,
+        &relative_output_path,
         &plan.generated_state.roots,
     )?;
     let handoff = build_agent_handoff_contract(&plan, base_dir, plan_path, output_path)?;
@@ -3701,7 +3749,7 @@ pub fn write_agent_handoff_contract_from_path(
         json!({
             "loop_id": handoff.loop_id,
             "status": handoff.status,
-            "handoff_path": relative_path_string(base_dir, output_path)?,
+            "handoff_path": relative_output_path.to_string_lossy(),
             "next_safe_action": handoff.next_safe_action,
             "blockers": handoff.blockers,
             "allowed_commands": handoff.allowed_commands,
@@ -3838,7 +3886,12 @@ pub fn build_agent_handoff_contract(
             },
             AuthoringLoopArtifactRef {
                 id: "agent-handoff".to_string(),
-                path: relative_path_string(base_dir, output_path)?,
+                // Relativize the output the same way the writer validates it, so an
+                // absolute output inside a generated root (with a relative plan
+                // path) yields a clean base-relative ref instead of failing.
+                path: relative_generated_output_path(base_dir, output_path)
+                    .to_string_lossy()
+                    .to_string(),
                 description: Some("generated advisory handoff contract".to_string()),
             },
         ],
@@ -19097,6 +19150,30 @@ scenarios:
         write_agent_handoff_contract_from_path(&plan_path, &generated_path)
             .expect("generated-root handoff output path writes");
         assert!(generated_path.is_file());
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn handoff_output_path_relativizes_absolute_outputs_under_base() {
+        let root = unique_temp_dir("handoff-output-relativize");
+        let target_rel = Path::new("runs/agent-handoffs/temp-loop/handoff.json");
+        fs::create_dir_all(root.join(target_rel.parent().expect("parent"))).expect("dirs");
+
+        // An absolute output inside the (canonicalized) base is relativized to the
+        // base-relative form even across symlinked temp prefixes, so the
+        // generated-root policy accepts it regardless of relative/absolute
+        // spelling. Previously a plain strip_prefix left it absolute and rejected.
+        let absolute_output = root.join(target_rel);
+        assert_eq!(
+            relative_generated_output_path(&root, &absolute_output),
+            target_rel
+        );
+        // A relative output is returned unchanged.
+        assert_eq!(
+            relative_generated_output_path(&root, target_rel),
+            target_rel
+        );
 
         fs::remove_dir_all(root).ok();
     }
