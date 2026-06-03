@@ -86,6 +86,40 @@ assert.equal(state.componentModel.goalFlags.coin_collected, true);
 assert.equal(state.entities.find((entity) => entity.id === 'coin').sprite.visible, false);
 assert.ok(api.getEvents().slice(presetEventCount).some((event) => event.type === 'runtime.trigger.entered'));
 
+const gameplayInitialFlagScene = structuredClone(scene);
+gameplayInitialFlagScene.gameplayRules = {
+  version: '1',
+  flags: [
+    { id: 'door_open', initial: true, label: 'Door open' },
+    { id: 'coin_collected', initial: false, label: 'Coin collected' },
+  ],
+};
+const gameplayCoin = gameplayInitialFlagScene.entities.find((entity) => entity.id === 'coin');
+gameplayCoin.components.transform.x = 34;
+gameplayCoin.components.collider = {
+  shape: 'aabb',
+  body: 'static',
+  offset: { x: 0, y: 0 },
+  size: { width: 12, height: 12 },
+  sensor: false,
+  trigger: true,
+  collisionGroup: 'triggers',
+};
+gameplayCoin.components.trigger.requiredFlags = ['door_open'];
+gameplayCoin.components.trigger.onEnter = [{ kind: 'hideEntity', entityId: 'coin' }];
+delete gameplayCoin.components.goalFlag;
+const gameplayPlayer = gameplayInitialFlagScene.entities.find((entity) => entity.id === 'player');
+gameplayPlayer.components.collider.collisionMask = ['triggers'];
+state = api.loadScene(gameplayInitialFlagScene);
+assert.equal(state.gameplayRules.version, '1');
+assert.equal(state.componentModel.goalFlags.door_open, true);
+assert.equal(state.componentModel.goalFlags.coin_collected, undefined);
+const gameplayEventCount = api.getEvents().length;
+state = api.step(1);
+assert.equal(state.componentModel.goalFlags.coin_collected, true);
+assert.equal(state.entities.find((entity) => entity.id === 'coin').sprite.visible, false);
+assert.ok(api.getEvents().slice(gameplayEventCount).some((event) => event.type === 'runtime.trigger.entered'));
+
 state = api.loadScene(scene);
 assert.equal(state.componentModel.goalFlags.coin_collected, false);
 api.setInput({ right: true });

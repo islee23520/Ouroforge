@@ -284,6 +284,24 @@
     };
   }
 
+  function normalizeGameplayRules(gameplayRules = null) {
+    if (!gameplayRules || typeof gameplayRules !== 'object' || Array.isArray(gameplayRules)) return null;
+    const source = objectValue(gameplayRules);
+    return {
+      ...source,
+      version: typeof source.version === 'string' ? source.version : '1',
+      flags: Array.isArray(source.flags)
+        ? source.flags
+          .filter((flag) => flag && typeof flag === 'object' && typeof flag.id === 'string' && flag.id)
+          .map((flag) => ({
+            ...objectValue(flag),
+            id: flag.id,
+            initial: flag.initial === true,
+          }))
+        : [],
+    };
+  }
+
   function resolveComposition(entities) {
     const byId = new Map(entities.map((entity) => [entity.id, entity]));
     const resolving = new Set();
@@ -334,6 +352,7 @@
       renderer: renderer.normalizeRenderer(scene.renderer, bounds),
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
       collisionRules: normalizeCollisionRules(scene.collisionRules),
+      gameplayRules: normalizeGameplayRules(scene.gameplayRules),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       metadata: objectValue(scene.metadata),
       componentDefaults,
@@ -500,11 +519,17 @@
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
     world.collisionRules = clone(normalized.collisionRules);
+    world.gameplayRules = normalized.gameplayRules ? clone(normalized.gameplayRules) : null;
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     world.goalFlags = {};
     world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };
     for (const entity of world.entities) {
       if (isDynamicPhysicsEntity(entity)) world.physics.grounded[entity.id] = false;
+    }
+    if (world.gameplayRules && Array.isArray(world.gameplayRules.flags)) {
+      for (const flag of world.gameplayRules.flags) {
+        if (flag.initial === true) world.goalFlags[flag.id] = true;
+      }
     }
     for (const entity of world.entities) {
       const goalFlag = entity.components && entity.components.goalFlag;
