@@ -5928,6 +5928,8 @@ impl ProjectAssetManifest {
             }
         }
 
+        self.validate_sprite_atlases()?;
+
         Ok(ProjectAssetManifestValidationReport {
             manifest_id: self.id.clone(),
             assets: self.assets.len(),
@@ -5935,6 +5937,49 @@ impl ProjectAssetManifest {
             generated_assets,
             asset_types,
         })
+    }
+
+    fn validate_sprite_atlases(&self) -> Result<()> {
+        let assets_by_id: BTreeMap<&str, &ProjectAssetManifestEntry> = self
+            .assets
+            .iter()
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect();
+
+        for atlas_asset in self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::SpriteAtlas)
+        {
+            let Some(atlas) = &atlas_asset.atlas else {
+                continue;
+            };
+            let image_asset = assets_by_id
+                .get(atlas.image_asset_id.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "sprite atlas {} imageAssetId references unknown asset {}",
+                        atlas_asset.id,
+                        atlas.image_asset_id
+                    )
+                })?;
+            if image_asset.asset_type != ProjectAssetType::Image {
+                return Err(anyhow!(
+                    "sprite atlas {} imageAssetId {} must reference an image asset",
+                    atlas_asset.id,
+                    atlas.image_asset_id
+                ));
+            }
+            let dimensions = image_asset.dimensions.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "sprite atlas {} imageAssetId {} must reference an image asset with dimensions",
+                    atlas_asset.id,
+                    atlas.image_asset_id
+                )
+            })?;
+            atlas.validate_integrity(&atlas_asset.id, dimensions)?;
+        }
+        Ok(())
     }
 }
 
@@ -6090,12 +6135,59 @@ impl ProjectSpriteAtlasManifest {
         }
         Ok(())
     }
+
+    fn validate_integrity(
+        &self,
+        atlas_asset_id: &str,
+        dimensions: &ProjectAssetDimensions,
+    ) -> Result<()> {
+        let mut frame_ids = BTreeSet::new();
+        for frame in &self.frames {
+            if !frame_ids.insert(frame.id.as_str()) {
+                return Err(anyhow!(
+                    "sprite atlas {atlas_asset_id} duplicate frame id: {}",
+                    frame.id
+                ));
+            }
+            frame.validate_bounds(atlas_asset_id, dimensions)?;
+        }
+        for animation in &self.animations {
+            animation.validate_frame_refs(atlas_asset_id, &frame_ids)?;
+        }
+        Ok(())
+    }
 }
 
 impl ProjectSpriteAtlasFrame {
     fn validate_schema(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field}.id"), &self.id)?;
         self.rect.validate_schema(&format!("{field}.rect"))
+    }
+
+    fn validate_bounds(
+        &self,
+        atlas_asset_id: &str,
+        dimensions: &ProjectAssetDimensions,
+    ) -> Result<()> {
+        let right = self.rect.x.checked_add(self.rect.width).ok_or_else(|| {
+            anyhow!(
+                "sprite atlas {atlas_asset_id} frame {} rectangle overflows image bounds",
+                self.id
+            )
+        })?;
+        let bottom = self.rect.y.checked_add(self.rect.height).ok_or_else(|| {
+            anyhow!(
+                "sprite atlas {atlas_asset_id} frame {} rectangle overflows image bounds",
+                self.id
+            )
+        })?;
+        if right > dimensions.width || bottom > dimensions.height {
+            return Err(anyhow!(
+                "sprite atlas {atlas_asset_id} frame {} rectangle is outside atlas image bounds",
+                self.id
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -6118,6 +6210,19 @@ impl ProjectSpriteAtlasAnimation {
         }
         for (index, frame) in self.frames.iter().enumerate() {
             frame.validate_schema(&format!("{field}.frames[{index}]"))?;
+        }
+        Ok(())
+    }
+
+    fn validate_frame_refs(&self, atlas_asset_id: &str, frame_ids: &BTreeSet<&str>) -> Result<()> {
+        for frame in &self.frames {
+            if !frame_ids.contains(frame.frame_id.as_str()) {
+                return Err(anyhow!(
+                    "sprite atlas {atlas_asset_id} animation {} references unknown frame {}",
+                    self.id,
+                    frame.frame_id
+                ));
+            }
         }
         Ok(())
     }
@@ -22016,6 +22121,157 @@ scenarios:
         let rejected = ProjectAssetManifest::from_json_str(&zero_duration.to_string())
             .expect_err("zero duration rejected");
         assert!(rejected.to_string().contains("durationMs"));
+    }
+
+    #[test]
+    fn sprite_atlas_manifest_v1_validates_image_refs_bounds_frames_and_animation_refs() {
+        let root = unique_temp_dir("sprite-atlas-manifest-validates");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("assets/atlases")).expect("atlases dir");
+        fs::write(
+            root.join("assets/sprites/player-sheet.png"),
+            b"sheet fixture",
+        )
+        .expect("sheet file");
+        fs::write(
+            root.join("assets/atlases/player-sheet.atlas.json"),
+            br#"{"frames":["idle_0","idle_1"]}"#,
+        )
+        .expect("atlas file");
+        let sheet_hash = hash_project_asset_file(root.join("assets/sprites/player-sheet.png"))
+            .expect("sheet hash");
+        let atlas_hash =
+            hash_project_asset_file(root.join("assets/atlases/player-sheet.atlas.json"))
+                .expect("atlas hash");
+
+        let manifest_with = |image_asset_id: &str,
+                             image_type: ProjectAssetType,
+                             image_dimensions: Option<serde_json::Value>,
+                             frames: serde_json::Value,
+                             animations: serde_json::Value| {
+            let mut image_asset = json!({
+                "id": "player_sheet_image",
+                "type": image_type,
+                "path": if image_type == ProjectAssetType::Image { "assets/sprites/player-sheet.png" } else { "assets/atlases/player-sheet.atlas.json" },
+                "contentHash": if image_type == ProjectAssetType::Image { sheet_hash.clone() } else { atlas_hash.clone() },
+                "classification": "source_like"
+            });
+            if let Some(dimensions) = image_dimensions {
+                image_asset["dimensions"] = dimensions;
+            }
+            ProjectAssetManifest::from_json_str(
+                &json!({
+                    "schemaVersion": "asset-manifest-v1",
+                    "id": "sprite_atlas_validation_fixture",
+                    "assets": [
+                        image_asset,
+                        {
+                            "id": "player_sheet_atlas",
+                            "type": "sprite_atlas",
+                            "path": "assets/atlases/player-sheet.atlas.json",
+                            "contentHash": atlas_hash.clone(),
+                            "classification": "source_like",
+                            "atlas": {
+                                "imageAssetId": image_asset_id,
+                                "frames": frames,
+                                "animations": animations
+                            }
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .expect("manifest parses")
+        };
+
+        let valid_frames = json!([
+            { "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } },
+            { "id": "idle_1", "rect": { "x": 16, "y": 0, "width": 16, "height": 16 } }
+        ]);
+        let valid_animations = json!([
+            { "id": "idle", "frames": [
+                { "frameId": "idle_0", "durationMs": 120 },
+                { "frameId": "idle_1", "durationMs": 120 }
+            ]}
+        ]);
+
+        let valid = manifest_with(
+            "player_sheet_image",
+            ProjectAssetType::Image,
+            Some(json!({ "width": 32, "height": 16 })),
+            valid_frames.clone(),
+            valid_animations.clone(),
+        );
+        valid
+            .validate_assets(&root)
+            .expect("sprite atlas integrity validates");
+
+        let unknown_image = manifest_with(
+            "missing_sheet_image",
+            ProjectAssetType::Image,
+            Some(json!({ "width": 32, "height": 16 })),
+            valid_frames.clone(),
+            valid_animations.clone(),
+        );
+        let rejected = unknown_image
+            .validate_assets(&root)
+            .expect_err("unknown atlas image rejected");
+        assert!(rejected.to_string().contains("unknown asset"));
+
+        let missing_dimensions = manifest_with(
+            "player_sheet_image",
+            ProjectAssetType::Image,
+            None,
+            valid_frames.clone(),
+            valid_animations.clone(),
+        );
+        let rejected = missing_dimensions
+            .validate_assets(&root)
+            .expect_err("atlas image dimensions required");
+        assert!(rejected.to_string().contains("with dimensions"));
+
+        let duplicate_frame = manifest_with(
+            "player_sheet_image",
+            ProjectAssetType::Image,
+            Some(json!({ "width": 32, "height": 16 })),
+            json!([
+                { "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } },
+                { "id": "idle_0", "rect": { "x": 16, "y": 0, "width": 16, "height": 16 } }
+            ]),
+            valid_animations.clone(),
+        );
+        let rejected = duplicate_frame
+            .validate_assets(&root)
+            .expect_err("duplicate frame rejected");
+        assert!(rejected.to_string().contains("duplicate frame id"));
+
+        let out_of_bounds = manifest_with(
+            "player_sheet_image",
+            ProjectAssetType::Image,
+            Some(json!({ "width": 32, "height": 16 })),
+            json!([
+                { "id": "idle_0", "rect": { "x": 24, "y": 0, "width": 16, "height": 16 } }
+            ]),
+            json!([{ "id": "idle", "frames": [{ "frameId": "idle_0", "durationMs": 120 }] }]),
+        );
+        let rejected = out_of_bounds
+            .validate_assets(&root)
+            .expect_err("out of bounds frame rejected");
+        assert!(rejected.to_string().contains("outside atlas image bounds"));
+
+        let unknown_frame_ref = manifest_with(
+            "player_sheet_image",
+            ProjectAssetType::Image,
+            Some(json!({ "width": 32, "height": 16 })),
+            valid_frames,
+            json!([{ "id": "idle", "frames": [{ "frameId": "missing_frame", "durationMs": 120 }] }]),
+        );
+        let rejected = unknown_frame_ref
+            .validate_assets(&root)
+            .expect_err("unknown animation frame rejected");
+        assert!(rejected.to_string().contains("unknown frame"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
