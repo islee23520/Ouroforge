@@ -1,6 +1,6 @@
 # Studio v3 Project Workspace Cockpit
 
-Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
+Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, Asset Pipeline v1 inspector panels, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -46,9 +46,21 @@ The cockpit composes completed local surfaces only:
 - live preview controls through the existing runtime probe;
 - scene edit command generation for Rust-validated fields;
 - transaction-bound QA command generation;
-- semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist.
+- semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist;
+- Asset Inspector v1 manifest/status, asset rows, atlas frame, tilemap, and runtime load evidence from Rust-exported dashboard data.
 
 Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, command bridge, or mutation acceptance/application from the browser. Studio Review Cockpit v1 review/regression boundaries are documented in `../../docs/studio-review-cockpit-v1.md`. Studio v3 verification evidence is recorded in `../../docs/studio-v3-project-workspace-cockpit.md`; Studio v2 evidence remains in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
+
+## Studio Asset Inspector v1
+
+When exported dashboard data includes `asset_inspector`, the cockpit displays a
+read-only Asset Inspector panel with manifest/status counts, asset ids/types/paths,
+warnings, atlas frame rows, tilemap summaries, runtime load attempts, and evidence
+refs. The browser escapes displayed values and provides empty states when asset
+evidence is unavailable. It never uploads assets, writes manifests or generated
+evidence, fetches remote assets, executes commands, or acts as a marketplace,
+plugin host, native export path, production editor, or visual asset editor. See
+`../../docs/studio-asset-inspector-v1.md`.
 
 ## Expressive Scene Inspection v2
 

@@ -67,7 +67,8 @@ Follow-up Asset Pipeline v1 issues should be implemented in this order:
    atlases, tilesets, tilemaps, audio metadata, and missing/malformed refs
    (see `docs/asset-preview-evidence-v1.md`).
 7. **Studio Asset Inspector v1** — render exported asset/preview/reference state
-   as escaped read-only Studio data with no uploads, writes, or commands.
+   as escaped read-only Studio data with no uploads, writes, or commands (see
+   `docs/studio-asset-inspector-v1.md`).
 8. **Playable Demo Asset Refresh** — update the local collect-and-exit demo to
    use manifest-backed assets and evidence without broad production claims.
 9. **Scenario Coverage v4** — add regression coverage for asset manifest,
