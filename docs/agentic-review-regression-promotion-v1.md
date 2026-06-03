@@ -1,13 +1,11 @@
 # Agentic Review & Regression Promotion v1
 
-Agentic Review & Regression Promotion v1 is the next local-first consolidation
-milestone after Evidence Fidelity & Trust Boundary Hardening v1. Ouroforge now
-has stronger evidence provenance, trusted artifact boundaries, runtime probe
-contracts, replay evidence, Openchrome/CDP observation fidelity, reproducible run
-command context, and static Studio evidence-fidelity surfaces. The next
-bottleneck is turning that evidence into auditable human/agent review decisions
-and durable regression coverage without making the system autonomous in unsafe
-ways.
+Agentic Review & Regression Promotion v1 is a completed local-first
+consolidation milestone after Evidence Fidelity & Trust Boundary Hardening v1.
+Ouroforge now has evidence-linked proposal rationale, append-only review
+decisions, review-gated scene application, rerun comparison, regression
+promotion, regression matrix state, Evidence-Backed Journal v2, and a static
+Studio Review Cockpit without making the system autonomous in unsafe ways.
 
 The milestone preserves the current loop while adding review governance:
 
@@ -75,10 +73,9 @@ maintainers can answer:
 7. How does the journal and Studio surface the decision without inventing trusted
    browser authority?
 
-## Follow-up Issue Dependency Order
+## Completed Follow-up Issue Dependency Order
 
-Implement follow-up issues in this order unless a concrete blocker is documented
-in the affected issue before changing scope:
+The milestone was implemented in this order:
 
 1. #294 — Agentic Review & Regression Promotion v1 Scope and Contract.
 2. #295 — Mutation Proposal Quality v2: Evidence-Linked Change Rationale.
@@ -90,7 +87,7 @@ in the affected issue before changing scope:
 8. #301 — Studio Review Cockpit v1.
 9. #302 — Roadmap and #1 Governance Refresh after Review/Regression v1.
 
-The order intentionally improves proposal quality before decisions, decisions
+The order intentionally improved proposal quality before decisions, decisions
 before review-gated application, application before regression promotion,
 regression promotion before matrices, and backend/read-model evidence before
 Journal/Studio governance surfaces.
@@ -118,8 +115,8 @@ rerun, comparison, and issue-level verification pass.
 
 ## Review-Gated Scene Application Boundary
 
-This milestone may extend scene-only mutation application only when follow-up
-issues explicitly scope it. Any accepted application path must:
+This milestone extended scene-only mutation application only through explicitly
+scoped follow-up issues. Any accepted application path must:
 
 - operate on scene data or project-authorized scene files only;
 - require a valid accepted review decision;
@@ -172,7 +169,7 @@ Dashboard and cockpit surfaces display those records read-only with copyable
 dry-run commands; browser JavaScript must not generate drafts, promote, write
 scenario packs, or execute CLI commands.
 
-The milestone should prefer small deterministic fixtures and focused tests over
+The milestone preferred small deterministic fixtures and focused tests over
 large generated run artifacts.
 
 ## Regression Run Matrix Boundary
@@ -215,7 +212,7 @@ semantics and generated-state policy.
 
 ## Verification Policy for Follow-up Issues
 
-Every fixed PR unit in this milestone must include:
+Every fixed PR unit in this milestone included, and future follow-ups should continue to include:
 
 - current issue number and PR unit id;
 - exact authorized behavior;
@@ -249,7 +246,7 @@ gap blocks completion.
 
 ## Closure Gates
 
-Do not mark an Agentic Review & Regression Promotion v1 issue complete until:
+Do not mark a future Agentic Review & Regression Promotion v1 follow-up issue complete until:
 
 - every fixed PR unit from that issue is merged in order;
 - latest `main` has been pulled;

@@ -4,11 +4,13 @@
 
 Ouroforge is a local, evidence-native MVP. It now supports a small project
 workspace loop in addition to the original run-centered demo, with hardened
-run evidence fidelity around transactions, runtime probes, replay artifacts,
-Openchrome/CDP observations, and reproducible command context:
+run evidence fidelity and a completed Agentic Review & Regression Promotion v1
+loop around proposal rationale, review decisions, review-gated scene
+application, rerun comparison, regression promotion, Journal v2, and Studio
+review cockpit state:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> journal/mutation review -> Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -42,6 +44,14 @@ The current implementation has completed these documented milestone surfaces:
   `docs/openchrome-cdp-evidence-fidelity-v2.md`,
   `docs/reproducible-run-command-context-v1.md`,
   `docs/studio-evidence-fidelity-surfaces.md`)
+- Agentic Review & Regression Promotion v1
+  (`docs/agentic-review-regression-promotion-v1.md`,
+  `docs/mutation-proposal-quality-v2.md`,
+  `docs/review-decision-ledger-v1.md`,
+  `docs/project-mutation-loop-v1.md`,
+  `docs/regression-run-matrix-v1.md`,
+  `docs/evidence-backed-journal-v2.md`,
+  `docs/studio-review-cockpit-v1.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -49,16 +59,17 @@ scopes a tiny deterministic fixture as tracked source-like data.
 
 ## Near-term governance and public-readiness work
 
-Evidence Fidelity & Trust Boundary Hardening v1 issue #293 is the current
-roadmap/#1 governance refresh. Its purpose is to keep top-level docs and #1
-aligned with the completed evidence-fidelity hardening milestone while
-preserving conservative public wording.
+Agentic Review & Regression Promotion v1 issue #302 is the current roadmap/#1
+governance refresh. Its purpose is to keep top-level docs and #1 aligned with
+the completed review/regression milestone while preserving conservative public
+wording and leaving #1/#23 open.
 
-After #293, the next milestone candidates should stay inside the same
+After #302, the next milestone candidates should stay inside the same
 local-first, Rust-trusted, browser-read-only boundary. Suitable candidates are
-agentic review/regression promotion, loop orchestration hardening, or playable
-authoring expressiveness only when each is backed by fixed PR units, regression
-coverage, generated-state audits, and explicit non-goals.
+agentic loop orchestration hardening, playable authoring expressiveness,
+source-mutation design gates, asset pipeline work, visual authoring, or public
+alpha readiness only when each is backed by fixed PR units, regression coverage,
+generated-state audits, and explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -80,11 +91,12 @@ code path.
 - Expand runtime/scenario coverage only when backed by concrete issues and
   tests.
 - Keep authoring actions connected to QA evidence, semantic comparison,
-  journals, rollback metadata, and explicit mutation review.
-- Treat evidence fidelity as a first-class contract: every run-facing surface
-  should distinguish Rust-trusted artifacts from browser/CDP observations and
-  should expose missing or malformed evidence as warnings instead of inferred
-  passes.
+  journals, rollback metadata, explicit mutation review, and regression
+  promotion/matrix context.
+- Treat evidence fidelity and review governance as first-class contracts: every
+  run-facing surface should distinguish Rust-trusted artifacts from browser/CDP
+  observations, and should expose missing or malformed evidence/review state as
+  warnings instead of inferred passes.
 
 ## Active anchors
 
