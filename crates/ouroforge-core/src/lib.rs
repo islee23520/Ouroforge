@@ -6110,6 +6110,16 @@ impl RuntimeAssetLoadEvidence {
             "runtime asset load evidence workerSessionId",
             &self.worker_session_id,
         )?;
+        // The session id correlates a record to its run and worker: it must be
+        // exactly "{runId}:{workerId}" so a blob from another worker session
+        // cannot be summarized under a different run or worker.
+        let expected_session = format!("{}:{}", self.run_id, self.worker_id);
+        if self.worker_session_id != expected_session {
+            return Err(anyhow!(
+                "runtime asset load evidence workerSessionId must equal \"{{runId}}:{{workerId}}\" ({expected_session}), got {}",
+                self.worker_session_id
+            ));
+        }
         if let Some(scenario_id) = &self.scenario_id {
             validate_path_component("runtime asset load evidence scenarioId", scenario_id)?;
         }
@@ -14741,15 +14751,16 @@ fn runtime_asset_load_evidence_from_world_state(
     if loads.is_empty() {
         return Ok(None);
     }
+    let run_id = runtime_asset_evidence_component(&run_id_from_run_dir(&config.run_dir), "run");
+    let worker_id = "scenario-runner".to_string();
+    // Build the session id from the same sanitized run/worker values stored on
+    // the record so it satisfies the "{runId}:{workerId}" correlation invariant.
+    let worker_session_id = format!("{run_id}:{worker_id}");
     let evidence = RuntimeAssetLoadEvidence {
         schema_version: RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION.to_string(),
-        run_id: runtime_asset_evidence_component(&run_id_from_run_dir(&config.run_dir), "run"),
-        worker_id: "scenario-runner".to_string(),
-        worker_session_id: format!(
-            "{}:{}",
-            run_id_from_run_dir(&config.run_dir),
-            "scenario-runner"
-        ),
+        run_id,
+        worker_id,
+        worker_session_id,
         scenario_id: Some(scenario.id.clone()),
         manifest_id: world_state
             .pointer("/assetManifest/id")
@@ -23617,6 +23628,49 @@ scenarios:
         let serialized = serde_json::to_string(&summary).expect("summary serializes");
         assert!(serialized.contains("loadedAssetIds"));
         assert!(serialized.contains("workerSessionId"));
+    }
+
+    #[test]
+    fn runtime_asset_load_evidence_rejects_uncorrelated_worker_session_id() {
+        // workerSessionId must equal "{runId}:{workerId}"; a value tied to a
+        // different run or worker must be rejected, not accepted as-is.
+        let base = json!({
+            "schemaVersion": "runtime-asset-load-evidence-v1",
+            "runId": "run_asset_smoke",
+            "workerId": "worker-1",
+            "workerSessionId": "run_asset_smoke:worker-1",
+            "recordedAtUnixMs": 1700000000000_u64,
+            "loads": [
+                {
+                    "attemptId": "load-player",
+                    "assetId": "player_sprite",
+                    "assetType": "image",
+                    "path": "assets/sprites/player.png",
+                    "status": "loaded",
+                    "startedAtUnixMs": 1000,
+                    "endedAtUnixMs": 1016,
+                    "loadDurationMs": 16
+                }
+            ]
+        });
+        // Sanity: the correlated baseline validates.
+        RuntimeAssetLoadEvidence::from_json_str(&base.to_string())
+            .expect("correlated evidence validates");
+
+        for bad_session in [
+            "other_run:worker-1",
+            "run_asset_smoke:worker-2",
+            "run_asset_smoke",
+        ] {
+            let mut blob = base.clone();
+            blob["workerSessionId"] = json!(bad_session);
+            let error = RuntimeAssetLoadEvidence::from_json_str(&blob.to_string())
+                .expect_err("uncorrelated workerSessionId rejected");
+            assert!(
+                error.to_string().contains("workerSessionId must equal"),
+                "unexpected error for {bad_session}: {error}"
+            );
+        }
     }
 
     #[test]
