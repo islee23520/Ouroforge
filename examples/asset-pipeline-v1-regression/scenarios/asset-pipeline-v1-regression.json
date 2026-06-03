@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "asset-pipeline-v1-regression",
+  "description": "Scenario Coverage v4 source fixture matrix for Asset Pipeline v1 regression coverage. Invalid manifest cases are source-controlled fixtures for focused Rust validation; generated evidence/verdict links are exercised by later PR units without committing runs.",
+  "seed": "seeds/asset-pipeline-regression.yaml",
+  "scenes": [
+    "scenes/asset-pipeline-regression.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "asset-pipeline-regression-matrix",
+      "description": "Manifest, integrity, atlas, tilemap, runtime loading, and Studio read-model compatibility coverage.",
+      "scenarios": [
+        {
+          "id": "manifest-validation",
+          "description": "Valid manifest and project source references stay local-first and Rust-trusted.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "assetManifest.id",
+                "equals": "asset-pipeline-regression-runtime-assets"
+              }
+            },
+            {
+              "world_state": {
+                "path": "assetManifest.assetCount",
+                "equals": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "hash-mismatch-regression",
+          "description": "Invalid fixture records the stale-hash case for AP1.10 validation tests and later generated verdict evidence.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "assets",
+                "countGreaterThan": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "missing-asset-regression",
+          "description": "Invalid fixture records missing local asset behavior without remote fallback.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "assetManifest.errors",
+                "exists": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "atlas-frame-validation",
+          "description": "Atlas frame metadata remains bounded to declared image dimensions.",
+          "assertions": [
+            {
+              "animation_evidence": {
+                "path": "0.mode",
+                "equals": "sprite_frame"
+              }
+            }
+          ]
+        },
+        {
+          "id": "tile-collision-extraction",
+          "description": "Tilemap regression fixture exposes collision, trigger, hazard, and goal cells.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "tilemaps.tilemaps.0.authoring.collisionCells",
+                "countGreaterThan": 0
+              }
+            },
+            {
+              "world_state": {
+                "path": "tilemaps.tilemaps.0.authoring.triggerCells",
+                "countGreaterThan": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "runtime-asset-load-evidence",
+          "description": "Runtime asset load attempts link to generated evidence/verdict outputs in AP1.10.2.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "assets",
+                "countGreaterThan": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "studio-read-model-compatibility",
+          "description": "Dashboard and Studio read-model compatibility is covered by generated evidence in AP1.10.2/AP1.10.3 while browser surfaces stay read-only.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "sceneId",
+                "equals": "asset-pipeline-regression-scene"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

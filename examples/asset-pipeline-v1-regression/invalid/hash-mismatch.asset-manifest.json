@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "asset_pipeline_hash_mismatch_fixture",
+  "notes": "Deterministic source-like fixture set for #341 AP1.10.1 Scenario Coverage v4. Generated runs, previews, dashboard exports, and local tool state remain untracked.",
+  "assets": [
+    {
+      "id": "asset_regression_sheet",
+      "type": "image",
+      "path": "assets/sprites/asset-regression-sheet.png",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "0000000000000000"
+      },
+      "classification": "source_like",
+      "dimensions": {
+        "width": 64,
+        "height": 32
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "scenario-coverage-v4-asset-pipeline",
+        "issue": "341",
+        "prUnit": "AP1.10.1"
+      }
+    },
+    {
+      "id": "asset_regression_atlas",
+      "type": "sprite_atlas",
+      "path": "assets/atlases/asset-regression.atlas.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "e743877638d14bab"
+      },
+      "classification": "source_like",
+      "atlas": {
+        "imageAssetId": "asset_regression_sheet",
+        "frames": [
+          {
+            "id": "idle_0",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "idle_1",
+            "rect": {
+              "x": 16,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "missing_marker",
+            "rect": {
+              "x": 32,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "exit_marker",
+            "rect": {
+              "x": 48,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "ground",
+            "rect": {
+              "x": 0,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "hazard",
+            "rect": {
+              "x": 16,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          }
+        ],
+        "animations": [
+          {
+            "id": "idle",
+            "frames": [
+              {
+                "frameId": "idle_0",
+                "durationMs": 120
+              },
+              {
+                "frameId": "idle_1",
+                "durationMs": 120
+              }
+            ]
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "atlas-frame-validation",
+        "issue": "341",
+        "prUnit": "AP1.10.1"
+      }
+    },
+    {
+      "id": "asset_regression_tileset",
+      "type": "tileset",
+      "path": "assets/tilesets/asset-regression.tileset.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "914864c8b6a09ff4"
+      },
+      "classification": "source_like",
+      "tileset": {
+        "tileWidth": 16,
+        "tileHeight": 16,
+        "tiles": [
+          {
+            "id": "empty",
+            "index": 0
+          },
+          {
+            "id": "ground",
+            "index": 1,
+            "solid": true
+          },
+          {
+            "id": "missing_marker",
+            "index": 2,
+            "trigger": "missing_asset_observed"
+          },
+          {
+            "id": "exit_marker",
+            "index": 3,
+            "goal": true
+          },
+          {
+            "id": "hazard",
+            "index": 4,
+            "hazard": true
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "tile-collision-extraction",
+        "issue": "341",
+        "prUnit": "AP1.10.1"
+      }
+    },
+    {
+      "id": "asset_regression_tilemap",
+      "type": "tilemap",
+      "path": "assets/tilemaps/asset-regression.tilemap.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "cbc4e7d2d2f959f5"
+      },
+      "classification": "source_like",
+      "tilemap": {
+        "tilesetAssetId": "asset_regression_tileset",
+        "width": 4,
+        "height": 3,
+        "layers": [
+          {
+            "id": "terrain",
+            "kind": "visual",
+            "data": [
+              "empty",
+              "missing_marker",
+              "exit_marker",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "hazard",
+              "empty",
+              "empty",
+              "ground",
+              "empty"
+            ]
+          },
+          {
+            "id": "collision",
+            "kind": "collision",
+            "data": [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "hazard",
+              "empty",
+              "empty",
+              "ground",
+              "empty"
+            ]
+          },
+          {
+            "id": "triggers",
+            "kind": "trigger",
+            "data": [
+              "empty",
+              "missing_marker",
+              "exit_marker",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "tilemap-regression-scenario",
+        "issue": "341",
+        "prUnit": "AP1.10.1"
+      }
+    },
+    {
+      "id": "asset_regression_audio",
+      "type": "audio",
+      "path": "assets/audio/asset-regression.ogg",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "753548a3398e0802"
+      },
+      "classification": "source_like",
+      "durationMs": 180,
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "runtime-load-evidence",
+        "issue": "341",
+        "prUnit": "AP1.10.1"
+      }
+    }
+  ]
+}

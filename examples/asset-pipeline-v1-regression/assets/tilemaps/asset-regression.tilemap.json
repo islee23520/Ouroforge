@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "asset-regression-tilemap-fixture-v1",
+  "tileset": "asset_regression_tileset",
+  "width": 4,
+  "height": 3,
+  "layers": [
+    {
+      "id": "terrain",
+      "kind": "visual",
+      "data": [
+        "empty",
+        "missing_marker",
+        "exit_marker",
+        "empty",
+        "ground",
+        "ground",
+        "ground",
+        "hazard",
+        "empty",
+        "empty",
+        "ground",
+        "empty"
+      ]
+    },
+    {
+      "id": "collision",
+      "kind": "collision",
+      "data": [
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "ground",
+        "ground",
+        "ground",
+        "hazard",
+        "empty",
+        "empty",
+        "ground",
+        "empty"
+      ]
+    },
+    {
+      "id": "triggers",
+      "kind": "trigger",
+      "data": [
+        "empty",
+        "missing_marker",
+        "exit_marker",
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "empty",
+        "empty"
+      ]
+    }
+  ]
+}

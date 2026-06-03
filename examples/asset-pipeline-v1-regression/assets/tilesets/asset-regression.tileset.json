@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "asset-regression-tileset-fixture-v1",
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "tiles": [
+    {
+      "id": "empty",
+      "index": 0
+    },
+    {
+      "id": "ground",
+      "index": 1,
+      "solid": true
+    },
+    {
+      "id": "missing_marker",
+      "index": 2,
+      "trigger": "missing_asset_observed"
+    },
+    {
+      "id": "exit_marker",
+      "index": 3,
+      "goal": true
+    },
+    {
+      "id": "hazard",
+      "index": 4,
+      "hazard": true
+    }
+  ]
+}

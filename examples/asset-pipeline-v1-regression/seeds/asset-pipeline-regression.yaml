@@ -1,0 +1,44 @@
+id: asset-pipeline.v1-regression
+title: Scenario Coverage v4 Asset Pipeline Regression Fixture
+goal: Prove asset pipeline regression coverage fixtures remain deterministic, local-first, and evidence-linked without committing generated output.
+constraints:
+  target: game-runtime
+acceptance:
+  - Asset manifest validation covers valid, hash mismatch, missing asset, atlas frame, and tilemap fixture contracts.
+  - Runtime-visible scenario assertions link asset manifest, asset load, animation, audio, and tilemap evidence paths.
+  - Studio/dashboard compatibility remains read-only and is verified by generated evidence in later PR units.
+  - Generated runs, dashboard data, previews, and local tool state remain untracked.
+scenarios:
+  - id: asset-manifest-validation
+    description: Valid asset manifest fixture is source-like, deterministic, and Rust-trusted.
+    assertions:
+      - world_state:
+          path: assetManifest.id
+          equals: asset-pipeline-regression-runtime-assets
+      - world_state:
+          path: assetManifest.assetCount
+          equals: 2
+  - id: runtime-asset-load-evidence
+    description: Runtime world state exposes local asset loading attempts for generated evidence linkage.
+    assertions:
+      - world_state:
+          path: assets
+          countGreaterThan: 0
+      - animation_evidence:
+          path: "0.mode"
+          equals: sprite_frame
+      - audio_evidence:
+          path: "0.name"
+          equals: asset_probe_spawn
+  - id: tilemap-authoring-evidence
+    description: Tilemap fixture exposes collision, trigger, hazard, and goal cells for evidence extraction.
+    assertions:
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.collisionCells
+          countGreaterThan: 0
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.triggerCells
+          countGreaterThan: 0
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.goalCells
+          countGreaterThan: 0
