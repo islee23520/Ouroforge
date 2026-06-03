@@ -1,0 +1,335 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "collect_and_exit_demo_assets",
+  "notes": "Deterministic source-like local asset fixtures for #340 AP1.9.1. These files are checked-in fixtures only; generated runs/previews/dashboard output stay untracked.",
+  "assets": [
+    {
+      "id": "collect_and_exit_sheet",
+      "type": "image",
+      "path": "assets/sprites/collect-and-exit-sheet.png",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "43551e3333e18eff"
+      },
+      "classification": "source_like",
+      "dimensions": {
+        "width": 64,
+        "height": 32
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "playable-demo-asset-refresh",
+        "issue": "340",
+        "prUnit": "AP1.9.1"
+      }
+    },
+    {
+      "id": "collect_and_exit_atlas",
+      "type": "sprite_atlas",
+      "path": "assets/atlases/collect-and-exit.atlas.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "9771bcfd71451b09"
+      },
+      "classification": "source_like",
+      "atlas": {
+        "imageAssetId": "collect_and_exit_sheet",
+        "frames": [
+          {
+            "id": "player_idle_0",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "player_idle_1",
+            "rect": {
+              "x": 16,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "key",
+            "rect": {
+              "x": 32,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "door_closed",
+            "rect": {
+              "x": 48,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "ground",
+            "rect": {
+              "x": 0,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          },
+          {
+            "id": "exit",
+            "rect": {
+              "x": 16,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          }
+        ],
+        "animations": [
+          {
+            "id": "player_idle",
+            "frames": [
+              {
+                "frameId": "player_idle_0",
+                "durationMs": 120
+              },
+              {
+                "frameId": "player_idle_1",
+                "durationMs": 120
+              }
+            ]
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "playable-demo-sprite-atlas",
+        "issue": "340",
+        "prUnit": "AP1.9.1"
+      }
+    },
+    {
+      "id": "collect_and_exit_tileset",
+      "type": "tileset",
+      "path": "assets/tilesets/collect-and-exit.tileset.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "6d7b84406cadbffa"
+      },
+      "classification": "source_like",
+      "tileset": {
+        "tileWidth": 16,
+        "tileHeight": 16,
+        "tiles": [
+          {
+            "id": "empty",
+            "index": 0
+          },
+          {
+            "id": "ground",
+            "index": 1,
+            "solid": true
+          },
+          {
+            "id": "key_marker",
+            "index": 2,
+            "trigger": "key_collected"
+          },
+          {
+            "id": "exit_marker",
+            "index": 3,
+            "goal": true
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "playable-demo-tileset",
+        "issue": "340",
+        "prUnit": "AP1.9.1"
+      }
+    },
+    {
+      "id": "collect_and_exit_tilemap",
+      "type": "tilemap",
+      "path": "assets/tilemaps/collect-and-exit.tilemap.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "4e35f8e351364178"
+      },
+      "classification": "source_like",
+      "tilemap": {
+        "tilesetAssetId": "collect_and_exit_tileset",
+        "width": 10,
+        "height": 6,
+        "layers": [
+          {
+            "id": "terrain",
+            "kind": "visual",
+            "data": [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "empty",
+              "key_marker",
+              "empty",
+              "empty",
+              "empty",
+              "exit_marker",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground"
+            ]
+          },
+          {
+            "id": "collision",
+            "kind": "collision",
+            "data": [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground",
+              "ground"
+            ]
+          }
+        ]
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "playable-demo-tilemap",
+        "issue": "340",
+        "prUnit": "AP1.9.1"
+      }
+    },
+    {
+      "id": "collect_sound",
+      "type": "audio",
+      "path": "assets/audio/collect.ogg",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "00995d93410fb166"
+      },
+      "classification": "source_like",
+      "durationMs": 240,
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "playable-demo-local-audio-metadata",
+        "issue": "340",
+        "prUnit": "AP1.9.1"
+      }
+    }
+  ]
+}

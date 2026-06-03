@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "demo-tileset-fixture-v1",
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "tiles": [
+    {
+      "id": "empty",
+      "index": 0
+    },
+    {
+      "id": "ground",
+      "index": 1,
+      "solid": true
+    },
+    {
+      "id": "key_marker",
+      "index": 2,
+      "trigger": "key_collected"
+    },
+    {
+      "id": "exit_marker",
+      "index": 3,
+      "goal": true
+    }
+  ]
+}
