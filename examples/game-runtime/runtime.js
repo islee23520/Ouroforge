@@ -493,11 +493,57 @@
     }
   }
 
+  function animationState(entity) {
+    const animationComponent = entity && entity.components && entity.components.animation;
+    const state = animationComponent && animationComponent.state;
+    if (!animationComponent || !state) return null;
+    return {
+      mode: animationComponent.mode,
+      currentClip: state.currentClip || animationComponent.currentClip || null,
+      frameIndex: Number.isInteger(state.frameIndex) ? state.frameIndex : 0,
+      elapsedFrames: Number.isInteger(state.elapsedFrames) ? state.elapsedFrames : 0,
+    };
+  }
+
+  function animationStatesByEntity(entities) {
+    const states = new Map();
+    for (const entity of entities) {
+      const state = animationState(entity);
+      if (state) states.set(entity.id, state);
+    }
+    return states;
+  }
+
+  function recordAnimationTransitions(beforeStates) {
+    for (const entity of world.entities) {
+      const after = animationState(entity);
+      if (!after) continue;
+      const before = beforeStates.get(entity.id) || null;
+      const changed = !before
+        || before.currentClip !== after.currentClip
+        || before.frameIndex !== after.frameIndex
+        || before.elapsedFrames !== after.elapsedFrames;
+      if (!changed) continue;
+      record('runtime.animation.state', {
+        sceneId: world.sceneId,
+        entityId: entity.id,
+        mode: after.mode,
+        from: before,
+        to: after,
+        currentClip: after.currentClip,
+        frameIndex: after.frameIndex,
+        elapsedFrames: after.elapsedFrames,
+      });
+    }
+  }
+
   function stepOne() {
     applyInput();
     applyGravity();
+    const beforeAnimationStates = animationStatesByEntity(world.entities);
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
+    recordAnimationTransitions(beforeAnimationStates);
     if (typeof collision.stepAabbPhysics === 'function') {
       world.collisions = collision.stepAabbPhysics(world.entities, world.bounds, world.tick, world.collisionRules).events;
     } else {
