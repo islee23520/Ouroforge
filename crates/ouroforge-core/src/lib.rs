@@ -10455,6 +10455,28 @@ pub struct VisualEditAssetReferenceDraftOperation {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct VisualEditAssetReferenceDraftPreflight {
+    #[serde(rename = "manifestId")]
+    pub manifest_id: String,
+    pub kind: VisualEditAssetReferenceDraftOperationKind,
+    #[serde(rename = "targetReferencePath")]
+    pub target_reference_path: String,
+    #[serde(rename = "replacementAssetId")]
+    pub replacement_asset_id: String,
+    #[serde(rename = "assetType")]
+    pub asset_type: ProjectAssetType,
+    pub path: String,
+    #[serde(rename = "contentHash")]
+    pub content_hash: ProjectAssetContentHash,
+    #[serde(rename = "frameId", default, skip_serializing_if = "Option::is_none")]
+    pub frame_id: Option<String>,
+    #[serde(rename = "eventId", default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct VisualEditTilemapDraftPreflight {
     #[serde(rename = "operationId")]
     pub operation_id: String,
@@ -10710,6 +10732,67 @@ impl VisualEditDraftArtifact {
                 layer_id: tilemap_operation.layer_id.clone(),
                 affected_cells,
             });
+        }
+        Ok(preflights)
+    }
+
+    pub fn validate_asset_reference_preflight(
+        &self,
+        manifest: &ProjectAssetManifest,
+        manifest_base_dir: impl AsRef<Path>,
+    ) -> Result<Vec<VisualEditAssetReferenceDraftPreflight>> {
+        self.validate()?;
+        if self.target.target_type != VisualEditDraftTargetType::AssetReference {
+            return Err(anyhow!(
+                "visual edit asset reference preflight requires target type asset-reference"
+            ));
+        }
+        if let Some(target_id) = &self.target.id {
+            if target_id != &manifest.id {
+                return Err(anyhow!(
+                    "visual edit asset reference preflight target id mismatch: expected {}, found {}",
+                    target_id,
+                    manifest.id
+                ));
+            }
+        }
+        let mut seen_targets = BTreeSet::new();
+        let mut preflights = Vec::new();
+        for operation in &self.proposed_operations {
+            let Some(asset_reference_operation) = &operation.asset_reference_operation else {
+                return Err(anyhow!(
+                    "visual edit asset reference preflight operation {} requires assetReferenceOperation",
+                    operation.id
+                ));
+            };
+            if operation.scene_operation.is_some() || operation.tilemap_operation.is_some() {
+                return Err(anyhow!(
+                    "visual edit asset reference preflight operation {} must not include sceneOperation or tilemapOperation",
+                    operation.id
+                ));
+            }
+            if operation.path != asset_reference_operation.target_reference_path {
+                return Err(anyhow!(
+                    "visual edit asset reference preflight operation {} path must match assetReferenceOperation.targetReferencePath",
+                    operation.id
+                ));
+            }
+            if !seen_targets.insert(operation.path.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual edit asset reference preflight target path: {}",
+                    operation.path
+                ));
+            }
+            preflights.push(
+                asset_reference_operation
+                    .preflight(manifest, manifest_base_dir.as_ref())
+                    .with_context(|| {
+                        format!(
+                            "visual edit asset reference preflight operation {} failed",
+                            operation.id
+                        )
+                    })?,
+            );
         }
         Ok(preflights)
     }
@@ -11142,6 +11225,190 @@ impl VisualEditAssetReferenceDraftOperation {
         }
         Ok(())
     }
+
+    pub fn preflight(
+        &self,
+        manifest: &ProjectAssetManifest,
+        manifest_base_dir: impl AsRef<Path>,
+    ) -> Result<VisualEditAssetReferenceDraftPreflight> {
+        self.validate()?;
+        manifest.validate_schema()?;
+        let manifest_base_dir = manifest_base_dir.as_ref();
+        let manifest_base = manifest_base_dir.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve project asset manifest base {}",
+                manifest_base_dir.display()
+            )
+        })?;
+        validate_asset_reference_target_compatibility(&self.kind, &self.target_reference_path)?;
+        let expected_types = visual_edit_asset_reference_expected_types(&self.kind);
+        let (asset_index, asset) = manifest
+            .assets
+            .iter()
+            .enumerate()
+            .find(|(_, asset)| asset.id == self.replacement_asset_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "visual edit asset reference draft replacementAssetId references unknown project asset id: {}",
+                    self.replacement_asset_id
+                )
+            })?;
+        if !expected_types.contains(&asset.asset_type) {
+            return Err(anyhow!(
+                "visual edit asset reference draft replacementAssetId {} has type {:?}, expected one of {:?}",
+                asset.id,
+                asset.asset_type,
+                expected_types
+            ));
+        }
+        if let Some(expected_asset_type) = self.expected_asset_type {
+            if expected_asset_type != asset.asset_type {
+                return Err(anyhow!(
+                    "visual edit asset reference draft expectedAssetType {:?} does not match manifest asset {} type {:?}",
+                    expected_asset_type,
+                    asset.id,
+                    asset.asset_type
+                ));
+            }
+        }
+        if let Some(expected_content_hash) = &self.expected_content_hash {
+            if expected_content_hash.algorithm != asset.content_hash.algorithm
+                || expected_content_hash.value != asset.content_hash.value
+            {
+                return Err(anyhow!(
+                    "visual edit asset reference draft expectedContentHash mismatch for asset {}: expected {}:{}, manifest has {}:{}",
+                    asset.id,
+                    expected_content_hash.algorithm,
+                    expected_content_hash.value,
+                    asset.content_hash.algorithm,
+                    asset.content_hash.value
+                ));
+            }
+        }
+        validate_asset_reference_kind_payload(self, asset)?;
+        asset
+            .validate_integrity(asset_index, manifest_base_dir, &manifest_base)
+            .with_context(|| {
+                format!(
+                    "visual edit asset reference draft integrity preflight failed for asset {}",
+                    asset.id
+                )
+            })?;
+        Ok(VisualEditAssetReferenceDraftPreflight {
+            manifest_id: manifest.id.clone(),
+            kind: self.kind.clone(),
+            target_reference_path: self.target_reference_path.clone(),
+            replacement_asset_id: asset.id.clone(),
+            asset_type: asset.asset_type,
+            path: asset.path.clone(),
+            content_hash: asset.content_hash.clone(),
+            frame_id: self.frame_id.clone(),
+            event_id: self.event_id.clone(),
+            status: "ready".to_string(),
+        })
+    }
+}
+
+fn visual_edit_asset_reference_expected_types(
+    kind: &VisualEditAssetReferenceDraftOperationKind,
+) -> &'static [ProjectAssetType] {
+    match kind {
+        VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference => {
+            &[ProjectAssetType::Image]
+        }
+        VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference => {
+            &[ProjectAssetType::SpriteAtlas]
+        }
+        VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference => {
+            &[ProjectAssetType::Audio]
+        }
+        VisualEditAssetReferenceDraftOperationKind::FontAssetReference => &[ProjectAssetType::Font],
+        VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference => {
+            &[ProjectAssetType::Tileset]
+        }
+    }
+}
+
+fn validate_asset_reference_target_compatibility(
+    kind: &VisualEditAssetReferenceDraftOperationKind,
+    target_reference_path: &str,
+) -> Result<()> {
+    let compatible = match kind {
+        VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference => {
+            target_reference_path.contains(".sprite.asset")
+                || target_reference_path.contains(".sprite.assetId")
+        }
+        VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference => {
+            target_reference_path.contains(".sprite.frame")
+                || target_reference_path.contains(".sprite.frameId")
+                || target_reference_path.contains(".animation.")
+        }
+        VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference => {
+            target_reference_path.contains(".audio.")
+                || target_reference_path.contains("audio.events")
+        }
+        VisualEditAssetReferenceDraftOperationKind::FontAssetReference => {
+            target_reference_path.contains(".font")
+                || target_reference_path.contains(".fontAsset")
+                || target_reference_path.contains(".fontAssetId")
+        }
+        VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference => {
+            target_reference_path.contains("tilemap") && target_reference_path.contains("tileset")
+        }
+    };
+    if compatible {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "visual edit asset reference draft targetReferencePath {} is not compatible with {:?}",
+            target_reference_path,
+            kind
+        ))
+    }
+}
+
+fn validate_asset_reference_kind_payload(
+    operation: &VisualEditAssetReferenceDraftOperation,
+    asset: &ProjectAssetManifestEntry,
+) -> Result<()> {
+    match operation.kind {
+        VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference => {
+            let frame_id = operation.frame_id.as_ref().ok_or_else(|| {
+                anyhow!("visual edit sprite frame asset reference requires frameId")
+            })?;
+            let atlas = asset.atlas.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "visual edit sprite frame asset reference asset {} requires atlas payload",
+                    asset.id
+                )
+            })?;
+            if !atlas.frames.iter().any(|frame| frame.id == *frame_id) {
+                return Err(anyhow!(
+                    "visual edit sprite frame asset reference frameId {} is not declared by atlas asset {}",
+                    frame_id,
+                    asset.id
+                ));
+            }
+        }
+        VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference => {
+            if operation.event_id.is_none() {
+                return Err(anyhow!(
+                    "visual edit audio event asset reference requires eventId"
+                ));
+            }
+        }
+        VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference => {
+            if asset.tileset.is_none() {
+                return Err(anyhow!(
+                    "visual edit tilemap tileset reference asset {} requires tileset payload",
+                    asset.id
+                ));
+            }
+        }
+        VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference
+        | VisualEditAssetReferenceDraftOperationKind::FontAssetReference => {}
+    }
+    Ok(())
 }
 
 fn require_known_tile_id(
@@ -24151,6 +24418,302 @@ scenarios:
         let round_trip: VisualEditDraftArtifact =
             serde_json::from_str(&serialized).expect("serialized catalog parses");
         assert_eq!(round_trip, draft);
+    }
+
+    #[test]
+    fn visual_edit_asset_reference_draft_v1_preflights_manifest_integrity() {
+        let root = unique_temp_dir("visual-edit-asset-reference-preflight");
+        let manifest = valid_asset_reference_preflight_manifest(&root);
+
+        let sprite = manifest
+            .assets
+            .iter()
+            .find(|asset| asset.id == "player_sprite")
+            .expect("sprite asset");
+        let operation = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference,
+            target_reference_path: "scenes.collect-and-exit.entities.player.sprite.assetId"
+                .to_string(),
+            replacement_asset_id: "player_sprite".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Image),
+            expected_content_hash: Some(sprite.content_hash.clone()),
+            frame_id: None,
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: Some("Preflight player sprite reference.".to_string()),
+        };
+
+        let report = operation
+            .preflight(&manifest, &root)
+            .expect("sprite reference preflights");
+        assert_eq!(report.manifest_id, "asset_ref_preflight_manifest");
+        assert_eq!(report.replacement_asset_id, "player_sprite");
+        assert_eq!(report.asset_type, ProjectAssetType::Image);
+        assert_eq!(report.status, "ready");
+        assert_eq!(report.content_hash, sprite.content_hash);
+
+        let atlas_frame = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference,
+            target_reference_path: "scenes.collect-and-exit.entities.player.sprite.frameId"
+                .to_string(),
+            replacement_asset_id: "player_atlas".to_string(),
+            expected_asset_type: Some(ProjectAssetType::SpriteAtlas),
+            expected_content_hash: None,
+            frame_id: Some("idle_0".to_string()),
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: None,
+        };
+        let atlas_report = atlas_frame
+            .preflight(&manifest, &root)
+            .expect("atlas frame reference preflights");
+        assert_eq!(atlas_report.frame_id.as_deref(), Some("idle_0"));
+
+        let audio_event = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference,
+            target_reference_path: "scenes.collect-and-exit.audio.events.pickup.assetId"
+                .to_string(),
+            replacement_asset_id: "pickup_audio".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Audio),
+            expected_content_hash: None,
+            frame_id: None,
+            event_id: Some("pickup".to_string()),
+            metadata: BTreeMap::new(),
+            summary: None,
+        };
+        assert_eq!(
+            audio_event
+                .preflight(&manifest, &root)
+                .expect("audio event reference preflights")
+                .event_id
+                .as_deref(),
+            Some("pickup")
+        );
+
+        let font = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::FontAssetReference,
+            target_reference_path: "scenes.collect-and-exit.hud.score.fontAssetId".to_string(),
+            replacement_asset_id: "hud_font".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Font),
+            expected_content_hash: None,
+            frame_id: None,
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: None,
+        };
+        assert_eq!(
+            font.preflight(&manifest, &root)
+                .expect("font reference preflights")
+                .asset_type,
+            ProjectAssetType::Font
+        );
+
+        let tileset = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference,
+            target_reference_path: "tilemaps.collect-and-exit.tilesetAssetId".to_string(),
+            replacement_asset_id: "ground_tileset".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Tileset),
+            expected_content_hash: None,
+            frame_id: None,
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: None,
+        };
+        assert_eq!(
+            tileset
+                .preflight(&manifest, &root)
+                .expect("tileset reference preflights")
+                .asset_type,
+            ProjectAssetType::Tileset
+        );
+
+        let fixture_input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/asset-reference-operations.visual-edit-draft.json",
+        );
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&fixture_input).expect("asset reference draft parses");
+        draft.target.id = Some(manifest.id.clone());
+        draft.proposed_operations[0]
+            .asset_reference_operation
+            .as_mut()
+            .expect("asset reference operation")
+            .expected_content_hash = Some(sprite.content_hash.clone());
+        let draft_preflights = draft
+            .validate_asset_reference_preflight(&manifest, &root)
+            .expect("asset reference draft artifact preflights");
+        assert_eq!(draft_preflights.len(), 5);
+        assert_eq!(
+            draft_preflights
+                .iter()
+                .map(|preflight| preflight.kind.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference,
+                VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::FontAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference,
+            ]
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn visual_edit_asset_reference_draft_v1_rejects_invalid_preflight_inputs() {
+        let root = unique_temp_dir("visual-edit-asset-reference-preflight-rejections");
+        let manifest = valid_asset_reference_preflight_manifest(&root);
+        let sprite = manifest
+            .assets
+            .iter()
+            .find(|asset| asset.id == "player_sprite")
+            .expect("sprite asset");
+        let mut operation = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference,
+            target_reference_path: "scenes.collect-and-exit.entities.player.sprite.assetId"
+                .to_string(),
+            replacement_asset_id: "player_sprite".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Image),
+            expected_content_hash: Some(sprite.content_hash.clone()),
+            frame_id: None,
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: None,
+        };
+
+        operation.replacement_asset_id = "missing_sprite".to_string();
+        assert!(operation
+            .preflight(&manifest, &root)
+            .expect_err("unknown asset id rejected")
+            .to_string()
+            .contains("unknown project asset id"));
+
+        operation.replacement_asset_id = "pickup_audio".to_string();
+        operation.expected_asset_type = Some(ProjectAssetType::Audio);
+        operation.expected_content_hash = None;
+        assert!(operation
+            .preflight(&manifest, &root)
+            .expect_err("wrong replacement asset type rejected")
+            .to_string()
+            .contains("expected one of"));
+
+        operation.replacement_asset_id = "player_sprite".to_string();
+        operation.expected_asset_type = Some(ProjectAssetType::Image);
+        operation.expected_content_hash = Some(ProjectAssetContentHash {
+            algorithm: PROJECT_ASSET_CONTENT_HASH_ALGORITHM.to_string(),
+            value: "0000000000000000".to_string(),
+        });
+        assert!(operation
+            .preflight(&manifest, &root)
+            .expect_err("expected hash mismatch rejected")
+            .to_string()
+            .contains("expectedContentHash mismatch"));
+
+        operation.expected_content_hash = None;
+        operation.target_reference_path =
+            "scenes.collect-and-exit.audio.events.pickup.assetId".to_string();
+        assert!(operation
+            .preflight(&manifest, &root)
+            .expect_err("target kind mismatch rejected")
+            .to_string()
+            .contains("not compatible"));
+
+        operation.target_reference_path =
+            "scenes.collect-and-exit.entities.player.sprite.assetId".to_string();
+        fs::write(root.join("assets/sprites/player.png"), b"sprite-v2").expect("stale sprite");
+        let stale_error = operation
+            .preflight(&manifest, &root)
+            .expect_err("stale file hash rejected");
+        assert!(format!("{stale_error:?}").contains("contentHash mismatch"));
+
+        fs::remove_file(root.join("assets/sprites/player.png")).expect("remove sprite");
+        let missing_file_error = operation
+            .preflight(&manifest, &root)
+            .expect_err("missing file rejected");
+        assert!(format!("{missing_file_error:?}").contains("missing file"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    fn valid_asset_reference_preflight_manifest(root: &Path) -> ProjectAssetManifest {
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("assets/atlases")).expect("atlases dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio dir");
+        fs::create_dir_all(root.join("assets/fonts")).expect("fonts dir");
+        fs::create_dir_all(root.join("assets/tilesets")).expect("tilesets dir");
+        fs::write(root.join("assets/sprites/player.png"), b"sprite-v1").expect("sprite");
+        fs::write(root.join("assets/atlases/player.json"), b"atlas-v1").expect("atlas");
+        fs::write(root.join("assets/audio/pickup.ogg"), b"audio-v1").expect("audio");
+        fs::write(root.join("assets/fonts/hud.woff2"), b"font-v1").expect("font");
+        fs::write(root.join("assets/tilesets/ground.json"), b"tileset-v1").expect("tileset");
+        let sprite_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("sprite hash");
+        let atlas_hash =
+            hash_project_asset_file(root.join("assets/atlases/player.json")).expect("atlas hash");
+        let audio_hash =
+            hash_project_asset_file(root.join("assets/audio/pickup.ogg")).expect("audio hash");
+        let font_hash =
+            hash_project_asset_file(root.join("assets/fonts/hud.woff2")).expect("font hash");
+        let tileset_hash = hash_project_asset_file(root.join("assets/tilesets/ground.json"))
+            .expect("tileset hash");
+        ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "asset_ref_preflight_manifest",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": sprite_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "player_atlas",
+                        "type": "sprite_atlas",
+                        "path": "assets/atlases/player.json",
+                        "contentHash": atlas_hash,
+                        "classification": "source_like",
+                        "atlas": {
+                            "imageAssetId": "player_sprite",
+                            "frames": [
+                                { "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } }
+                            ]
+                        }
+                    },
+                    {
+                        "id": "pickup_audio",
+                        "type": "audio",
+                        "path": "assets/audio/pickup.ogg",
+                        "contentHash": audio_hash,
+                        "classification": "source_like",
+                        "durationMs": 100
+                    },
+                    {
+                        "id": "hud_font",
+                        "type": "font",
+                        "path": "assets/fonts/hud.woff2",
+                        "contentHash": font_hash,
+                        "classification": "source_like"
+                    },
+                    {
+                        "id": "ground_tileset",
+                        "type": "tileset",
+                        "path": "assets/tilesets/ground.json",
+                        "contentHash": tileset_hash,
+                        "classification": "source_like",
+                        "tileset": {
+                            "tileWidth": 16,
+                            "tileHeight": 16,
+                            "tiles": [{ "id": "ground", "index": 0, "solid": true }]
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("preflight manifest parses")
     }
 
     fn tilemap_authoring_fixture_parts() -> (
