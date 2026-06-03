@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "collect_and_exit_demo",
+    "name": "Collect and Exit Demo"
+  },
+  "scenes": [
+    {
+      "id": "collect-and-exit",
+      "path": "scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "collect-and-exit",
+      "path": "seeds/collect-and-exit.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "collect-and-exit",
+      "path": "scenarios/collect-and-exit.json"
+    }
+  ],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": ["runs", "target", "dashboard-data"]
+  }
+}

@@ -1,0 +1,29 @@
+id: playable-demo.collect-and-exit
+title: Playable Demo v2 Collect and Exit Source Fixture
+goal: Prove a one-screen collect-and-exit demo fixture through deterministic source contracts without committing generated run evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Project manifest, scene, Seed, and scenario pack fixtures validate as source-like inputs.
+  - The scene contains player movement, key collection, HUD values, door/exit flags, animation, and audio intent metadata.
+  - Scenario assertions remain bounded to runtime evidence paths.
+  - Generated run/dashboard artifacts remain untracked.
+scenarios:
+  - id: collect-and-exit-source-smoke
+    description: Source-level scenario contract for the collect-and-exit playable demo fixture.
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: collect-and-exit-scene
+      - world_state:
+          path: componentModel.counts.hudValue
+          greaterThan: 0
+      - world_state:
+          path: goalFlags.key_collected
+          equals: false
+      - animation_evidence:
+          path: "0.mode"
+          equals: sprite_frame
+      - audio_evidence:
+          path: "0.name"
+          equals: player_spawn
