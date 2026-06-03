@@ -10252,6 +10252,20 @@ pub enum VisualEditDraftOperationKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum VisualEditSceneDraftOperationKind {
+    TransformMove,
+    SpriteColorChange,
+    SpriteFrameChange,
+    ColliderToggle,
+    ColliderSizeChange,
+    TriggerConfigChange,
+    HudTextChange,
+    HudValueChange,
+    CameraTargetSelection,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum VisualEditDraftValidationStatus {
     Unvalidated,
     Partial,
@@ -10318,6 +10332,26 @@ pub struct VisualEditDraftOperation {
     pub summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<serde_json::Value>,
+    #[serde(
+        rename = "sceneOperation",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scene_operation: Option<VisualEditSceneDraftOperation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditSceneDraftOperation {
+    pub kind: VisualEditSceneDraftOperationKind,
+    #[serde(rename = "entityId")]
+    pub entity_id: String,
+    #[serde(rename = "sceneEditPath")]
+    pub scene_edit_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10404,10 +10438,30 @@ impl VisualEditDraftOperation {
         if let Some(summary) = &self.summary {
             require_text("visual edit draft operation summary", summary)?;
         }
+        if let Some(scene_operation) = &self.scene_operation {
+            scene_operation.validate()?;
+        }
         if self.value.is_none() && self.summary.is_none() {
             return Err(anyhow!(
                 "visual edit draft operation must include summary or value"
             ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualEditSceneDraftOperation {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "visual edit scene draft operation entityId",
+            &self.entity_id,
+        )?;
+        validate_visual_edit_draft_operation_path(
+            "visual edit scene draft operation sceneEditPath",
+            &self.scene_edit_path,
+        )?;
+        if let Some(summary) = &self.summary {
+            require_text("visual edit scene draft operation summary", summary)?;
         }
         Ok(())
     }
@@ -22894,6 +22948,10 @@ scenarios:
                 "examples/visual-edit-draft-v1/valid/asset-reference.visual-edit-draft.json",
                 VisualEditDraftTargetType::AssetReference,
             ),
+            (
+                "examples/visual-edit-draft-v1/valid/scene-operations.visual-edit-draft.json",
+                VisualEditDraftTargetType::Scene,
+            ),
         ] {
             let input = read_visual_edit_draft_fixture(fixture);
             let draft: VisualEditDraftArtifact = serde_json::from_str(&input)
@@ -22915,6 +22973,49 @@ scenarios:
                 serde_json::from_str(&serialized).expect("serialized draft parses");
             assert_eq!(round_trip, draft);
         }
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_round_trips_bounded_scene_operation_catalog() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/scene-operations.visual-edit-draft.json",
+        );
+        let draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("scene operation catalog parses");
+        draft.validate().expect("scene operation catalog validates");
+
+        let scene_operations: Vec<_> = draft
+            .proposed_operations
+            .iter()
+            .map(|operation| {
+                operation
+                    .scene_operation
+                    .as_ref()
+                    .expect("operation has typed scene operation")
+                    .kind
+                    .clone()
+            })
+            .collect();
+
+        assert_eq!(
+            scene_operations,
+            vec![
+                VisualEditSceneDraftOperationKind::TransformMove,
+                VisualEditSceneDraftOperationKind::SpriteColorChange,
+                VisualEditSceneDraftOperationKind::SpriteFrameChange,
+                VisualEditSceneDraftOperationKind::ColliderToggle,
+                VisualEditSceneDraftOperationKind::ColliderSizeChange,
+                VisualEditSceneDraftOperationKind::TriggerConfigChange,
+                VisualEditSceneDraftOperationKind::HudTextChange,
+                VisualEditSceneDraftOperationKind::HudValueChange,
+                VisualEditSceneDraftOperationKind::CameraTargetSelection,
+            ]
+        );
+
+        let serialized = serde_json::to_string_pretty(&draft).expect("catalog serializes");
+        let round_trip: VisualEditDraftArtifact =
+            serde_json::from_str(&serialized).expect("serialized catalog parses");
+        assert_eq!(round_trip, draft);
     }
 
     #[test]

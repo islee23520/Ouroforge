@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-scene-operation-catalog",
+  "target": {
+    "type": "scene",
+    "path": "scenes/collect-and-exit.scene.json",
+    "id": "collect-and-exit"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-transform-move",
+      "kind": "update",
+      "path": "entities.player.components.transform",
+      "summary": "Move the player start position as a typed scene draft operation.",
+      "value": { "x": 48, "y": 96 },
+      "sceneOperation": {
+        "kind": "transform_move",
+        "entityId": "player",
+        "sceneEditPath": "components.transform.x",
+        "value": 48,
+        "summary": "Preview moving the player along the x axis."
+      }
+    },
+    {
+      "id": "op-sprite-color",
+      "kind": "update",
+      "path": "entities.player.sprite.color",
+      "summary": "Change sprite color through a typed scene draft operation.",
+      "value": "#ffcc00",
+      "sceneOperation": {
+        "kind": "sprite_color_change",
+        "entityId": "player",
+        "sceneEditPath": "sprite.color",
+        "value": "#ffcc00"
+      }
+    },
+    {
+      "id": "op-sprite-frame",
+      "kind": "update",
+      "path": "entities.player.sprite.frame",
+      "summary": "Describe a sprite frame draft for later scene-specific validation.",
+      "value": { "frame": "idle-2" },
+      "sceneOperation": {
+        "kind": "sprite_frame_change",
+        "entityId": "player",
+        "sceneEditPath": "sprite.frame",
+        "value": "idle-2"
+      }
+    },
+    {
+      "id": "op-collider-toggle",
+      "kind": "update",
+      "path": "entities.player.components.collider.enabled",
+      "summary": "Toggle collider participation as a bounded draft.",
+      "value": true,
+      "sceneOperation": {
+        "kind": "collider_toggle",
+        "entityId": "player",
+        "sceneEditPath": "components.collider.enabled",
+        "value": true
+      }
+    },
+    {
+      "id": "op-collider-size",
+      "kind": "update",
+      "path": "entities.player.components.collider.size",
+      "summary": "Resize collider as a bounded draft.",
+      "value": { "width": 16, "height": 24 },
+      "sceneOperation": {
+        "kind": "collider_size_change",
+        "entityId": "player",
+        "sceneEditPath": "components.size.width",
+        "value": 16
+      }
+    },
+    {
+      "id": "op-trigger-config",
+      "kind": "update",
+      "path": "entities.goal.components.trigger.flag",
+      "summary": "Draft a trigger or flag configuration change.",
+      "value": { "flag": "goal_reached", "enabled": true },
+      "sceneOperation": {
+        "kind": "trigger_config_change",
+        "entityId": "goal",
+        "sceneEditPath": "components.trigger.flag",
+        "value": "goal_reached"
+      }
+    },
+    {
+      "id": "op-hud-text",
+      "kind": "update",
+      "path": "entities.hud.components.uiText.text",
+      "summary": "Draft a HUD text change.",
+      "value": "Collect all coins",
+      "sceneOperation": {
+        "kind": "hud_text_change",
+        "entityId": "hud",
+        "sceneEditPath": "components.uiText.text",
+        "value": "Collect all coins"
+      }
+    },
+    {
+      "id": "op-hud-value",
+      "kind": "update",
+      "path": "entities.hud.components.status.hitPoints",
+      "summary": "Draft a HUD value change.",
+      "value": 3,
+      "sceneOperation": {
+        "kind": "hud_value_change",
+        "entityId": "hud",
+        "sceneEditPath": "components.status.hitPoints",
+        "value": 3
+      }
+    },
+    {
+      "id": "op-camera-target",
+      "kind": "update",
+      "path": "entities.camera.components.cameraTarget.weight",
+      "summary": "Draft camera target selection metadata.",
+      "value": 2,
+      "sceneOperation": {
+        "kind": "camera_target_selection",
+        "entityId": "camera",
+        "sceneEditPath": "components.cameraTarget.weight",
+        "value": 2
+      }
+    }
+  ],
+  "beforeHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+  "expectedAfterSummary": "Scene draft operation catalog can be parsed before later validation or transaction preview work.",
+  "linkedEvidence": ["runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "author": { "type": "agent", "id": "visual-authoring-assistant", "source": "draft-json" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}
