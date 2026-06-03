@@ -96,3 +96,99 @@ This rollback contract does not authorize:
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. This document does not close, replace, or narrow either issue.
+
+## Audit trail contract
+
+A future source mutation workflow must be auditable before any apply path is
+considered. Audit records must explain what was proposed, what evidence supported
+it, who reviewed it, what tests were expected or run, what rollback context
+exists, and whether generated/local state stayed outside source control.
+
+This audit contract is design-only. It does not add ledger event implementations,
+journal writers, source mutation events, or source apply behavior.
+
+## Ledger event requirements
+
+A future implementation milestone should define ledger events for source patch
+preview and review lifecycle transitions. At minimum, the design should account
+for these event kinds:
+
+| Event | Required references |
+| --- | --- |
+| `source_patch_preview_created` | preview id, proposal id, base ref, patch artifact hash, target file hashes, file classes, risk ids. |
+| `source_patch_review_held` | preview id, reviewer context, hold reasons, missing evidence, stale refs, restricted classes. |
+| `source_patch_review_rejected` | preview id, reviewer context, rejection reasons, evidence refs, generated-state audit ref. |
+| `source_patch_review_accepted_for_later_apply_consideration` | preview id, reviewer context, evidence refs, test plan, rollback plan, explicit note that apply remains blocked. |
+| `source_patch_rollback_context_recorded` | preview id, rollback plan hash, before hashes, rollback hashes, revert context, cleanup expectations. |
+| `source_patch_generated_state_audited` | preview id, audit command/context, ignored roots, untracked roots, source-like fixture exceptions. |
+
+Every event should be append-only, timestamped, linked to stable artifacts, and
+safe to render in read-only Studio/dashboard surfaces without creating trusted
+write authority.
+
+## Journal entry requirements
+
+Future journal/read-model entries should summarize source patch preview state for
+humans without implying apply readiness. A journal entry should include:
+
+- preview id and proposal id;
+- current review state (`hold`, `reject`, or accepted for later apply
+  consideration);
+- source mutation apply status, which remains blocked under this design gate;
+- linked failing/passing evidence;
+- target file classes and risk IDs;
+- test plan summary and known gaps;
+- rollback/audit readiness summary;
+- generated-state audit result; and
+- #1/#23 governance anchor status when closing design-gate issues.
+
+The journal must distinguish trusted Rust-generated artifacts from browser/CDP
+observations and must expose missing or malformed evidence as warnings rather
+than inferred passes.
+
+## Test evidence requirements
+
+Audit records for future source patch reviews should link test evidence rather
+than merely naming commands. The expected evidence includes:
+
+1. command text and working directory;
+2. command authority/trust boundary;
+3. exit status and timestamp;
+4. targeted behavior or file class covered;
+5. known gaps or skipped commands;
+6. generated-state audit result after tests; and
+7. stale evidence warning if base refs or target hashes changed after the test.
+
+Browser or Studio displays may copy commands and show evidence summaries, but
+must not execute tests.
+
+## Generated-state audit requirements
+
+A generated-state audit should be recorded for each future source patch review.
+The audit should identify:
+
+- ignored local roots such as `.omx/`, `.omc/`, `.claude/`, `.openchrome/`,
+  `runs/`, and `target/`;
+- newly untracked files;
+- deterministic source-like fixtures intentionally added by the current issue;
+- build outputs, caches, screenshots, evidence bundles, and run artifacts that
+  must remain untracked;
+- any generated-origin file promoted to source-like status, with rationale; and
+- final source-control state before closure.
+
+Generated-state audit records do not authorize committing ignored/local state.
+
+## Audit closure constraints
+
+A future source mutation-related issue cannot close unless its final evidence
+comment or equivalent audit record states:
+
+- merged PRs in required order;
+- artifacts changed;
+- verification commands and results;
+- linked test evidence or known gaps;
+- no-apply/no-source-mutation audit;
+- rollback/audit readiness or explicit out-of-scope note;
+- generated-state audit;
+- non-goal/over-engineering/drift audit; and
+- #1 and #23 remain open.
