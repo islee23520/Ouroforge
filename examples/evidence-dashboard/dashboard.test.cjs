@@ -50,6 +50,21 @@ const run = {
       { field: 'scene entity ghost audio event spawn asset', assetId: 'missing_audio', kind: 'missing_asset_ref', message: 'unknown project asset id' },
     ],
   },
+  asset_loading: {
+    present: true,
+    empty_state: '',
+    attempt_count: 2,
+    loaded_count: 1,
+    failed_count: 1,
+    rejected_count: 0,
+    fallback_count: 0,
+    evidence_refs: ['evidence/scenarios/scaffold-smoke/asset-load-evidence.json'],
+    boundary: 'Read-only runtime loading evidence; dashboard never fetches remote assets or writes trusted state.',
+    records: [
+      { attemptId: 'load-player-sprite', assetId: 'player_sprite', path: 'assets/sprites/player.png', status: 'loaded', loadDurationMs: 8, width: 16, height: 16 },
+      { attemptId: 'load-missing-audio', assetId: 'missing_audio', path: 'assets/audio/missing.ogg', status: 'failed', loadDurationMs: 5, failureReason: 'Image load failed' },
+    ],
+  },
   probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
   engine_summaries: {
     present: true,
@@ -565,9 +580,14 @@ replayState = dashboard.jumpReplayToCheckpoint(run, replayState, 1);
 assert.equal(dashboard.currentReplayView(run, replayState).frame, 4);
 assert.match(dashboard.renderReplayControls(run, replayState), /Current tick/);
 assert.match(dashboard.renderAssetIntegrity(run), /Asset reference|Warnings|stale_asset_hash/);
+assert.match(dashboard.renderAssetLoading(run), /Runtime asset loading evidence refs/);
+assert.match(dashboard.renderAssetLoading(run), /player_sprite/);
+assert.match(dashboard.renderAssetLoading(run), /Image load failed/);
 assert.match(dashboard.renderRunDetail(run), /Asset reference integrity/);
+assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
+assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, empty_state: 'No loading evidence' } }), /No loading evidence/);
 
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {
@@ -578,6 +598,7 @@ const xssRun = {
   regression_promotions: [{ id: '<script>', scenarioId: '<img>', target: { scenarioPackId: '<svg>', scenarioPackPath: '<b>' }, beforeHash: { value: '<before>' }, afterHash: { value: '<after>' }, recordPath: '<record>' }],
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
   asset_integrity: { present: true, warning_count: 1, stale_hash_count: 1, missing_ref_count: 0, invalid_type_count: 0, evidence_refs: ['javascript:alert(1)'], warnings: [{ kind: '<script>alert(1)</script>', assetId: '<img src=x onerror=alert(1)>', message: '<script>alert(1)</script>', path: '<b>bad</b>' }] },
+  asset_loading: { present: true, attempt_count: 1, loaded_count: 0, failed_count: 1, rejected_count: 0, fallback_count: 0, evidence_refs: ['javascript:alert(1)'], boundary: '<script>boundary</script>', records: [{ attemptId: '<script>attempt</script>', assetId: '<img src=x onerror=alert(1)>', path: '<b>bad</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
   comparison: { present: true, empty_state: '', artifacts: [{ id: '<img>', path: 'mutation/<script>.json', exists: true, read_error: '<script>alert(1)</script>', before_run_id: '<script>', after_run_id: '<img>', classification: '<script>', deltas: { '<script>': '<img>' }, evidence_refs: ['javascript:alert(1)', '<script>'], unsupported: ['<script>alert(1)</script>'], value: { unsafe: '<script>alert(1)</script>' } }] },
   verdict: {}, journal: '<script>alert(1)</script>',
@@ -589,6 +610,8 @@ assert.ok(!xssDetail.includes('<img>'), 'journal headings must be escaped');
 assert.ok(!xssDetail.includes('<script>worker</script>'), 'artifact metadata must be escaped');
 assert.ok(!xssDetail.includes('<img src=x onerror=alert(1)>'), 'artifact session metadata must be escaped');
 assert.ok(!xssDetail.includes('<script>hint</script>'), 'command context hints must be escaped');
+assert.ok(!xssDetail.includes('<script>reason</script>'), 'asset loading reason must be escaped');
+assert.ok(!xssDetail.includes('<script>boundary</script>'), 'asset loading boundary must be escaped');
 assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'), 'run id markup must be escaped');
 
 const rawMalformedCommandContextRun = {

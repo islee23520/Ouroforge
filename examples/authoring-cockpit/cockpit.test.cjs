@@ -165,6 +165,19 @@ const run = {
     openchrome_cdp: { id: 'openchrome_cdp', label: 'Openchrome/CDP evidence', status: 'partial', summary: '1 screenshot, 1 console log, 0 performance metric, 1 CDP trace summary.', observed_count: 3, missing_count: 1, warnings: ['Missing performance metrics.'], evidence_refs: ['evidence/shot.png', 'evidence/console.json'] },
     command_context: { id: 'command_context', label: 'Reproducible command context', status: 'present', summary: '4 workers, seed seeds/platformer.yaml.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: [] },
   },
+  asset_loading: {
+    present: true,
+    attempt_count: 2,
+    loaded_count: 1,
+    failed_count: 1,
+    rejected_count: 0,
+    fallback_count: 0,
+    boundary: 'Read-only runtime loading evidence; cockpit never fetches remote assets or writes trusted state.',
+    records: [
+      { attemptId: 'load-player-sprite', assetId: 'player_sprite', path: 'assets/sprites/player.png', status: 'loaded', loadDurationMs: 8 },
+      { attemptId: 'load-missing-audio', assetId: 'missing_audio', path: 'assets/audio/missing.ogg', status: 'failed', failureReason: 'Image load failed' },
+    ],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -328,7 +341,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 15);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 16);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -600,6 +613,9 @@ assert.ok(!cockpit.renderEvidencePane(xssRun).includes('<script>alert(1)</script
 assert.ok(!cockpit.renderProjectRunSurface(xssRun).includes('<script>hint</script>'), 'command context hints must be escaped');
 const xssFidelity = { summary: { id: 'x' }, evidence_fidelity: { transaction: { label: '<script>tx</script>', status: '<script>bad</script>', summary: '<script>summary</script>', warnings: ['<script>warn</script>'], evidence_refs: ['<script>ref</script>'] } } };
 assert.ok(!cockpit.renderEvidenceFidelitySurface(xssFidelity).includes('<script>warn</script>'), 'fidelity warnings must be escaped');
+const xssAssetLoading = { asset_loading: { present: true, boundary: '<script>boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', attemptId: '<script>attempt</script>', path: '<b>bad</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] } };
+assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<script>reason</script>'), 'asset loading rows must be escaped');
+assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<script>boundary</script>'), 'asset loading boundary must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
@@ -666,6 +682,11 @@ assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<cockpit-loop>
 assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<button/i);
 assert.match(cockpit.renderStudioLoopCockpitSurface({ loop_cockpit: { schemaVersion: '<schema>', loops: '<bad>' } }), /Malformed loop cockpit read-model/);
 assert.match(cockpit.renderStudioLoopCockpitSurface({}), /No loop cockpit read-model/);
+assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /Runtime asset loading/);
+assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /player_sprite/);
+assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /Image load failed/);
+assert.match(cockpit.renderRuntimeAssetLoadingSurface({}), /No runtime asset loading evidence/);
+assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);

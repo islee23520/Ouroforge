@@ -62,7 +62,7 @@ Follow-up Asset Pipeline v1 issues should be implemented in this order:
    tilemap, and scenario references against manifest ids and hashes.
 5. **Runtime Asset Loading Evidence v1** — record generated evidence that runtime
    loading resolved declared local assets without remote fetches or browser
-   authority.
+   authority (see `docs/runtime-asset-loading-evidence-v1.md`).
 6. **Asset Preview Evidence v1** — generate bounded preview evidence for sprites,
    atlases, tilesets, tilemaps, audio metadata, and missing/malformed refs.
 7. **Studio Asset Inspector v1** — render exported asset/preview/reference state
@@ -111,7 +111,8 @@ Generated evidence should record enough provenance for review:
 - manifest hash and observed file hash;
 - command/run id that produced the evidence;
 - missing/malformed/unsupported state when applicable;
-- runtime/preview status and bounded diagnostics; and
+- runtime/preview status and bounded diagnostics;
+- runtime load attempt/success/failure/rejection evidence with worker/scenario correlation; and
 - cleanup/generated-state expectations.
 
 ## Rust-trusted / browser-read-only boundary

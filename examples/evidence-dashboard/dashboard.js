@@ -245,6 +245,36 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">Read-only Rust validation evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.</p>`;
   }
 
+  function renderAssetLoading(run = {}) {
+    const loading = run.asset_loading || run.assetLoading || {};
+    if (!loading.present) {
+      return `<p class="empty-state">${escapeText(loading.empty_state || 'No runtime asset loading evidence is available for this run.')}</p>`;
+    }
+    const records = Array.isArray(loading.records) ? loading.records : [];
+    const refs = Array.isArray(loading.evidence_refs || loading.evidenceRefs) ? (loading.evidence_refs || loading.evidenceRefs) : [];
+    const rows = [
+      ['Attempts', loading.attempt_count ?? loading.attemptCount ?? records.length],
+      ['Loaded', loading.loaded_count ?? loading.loadedCount ?? records.filter((record) => record.status === 'loaded').length],
+      ['Failed', loading.failed_count ?? loading.failedCount ?? records.filter((record) => record.status === 'failed').length],
+      ['Rejected', loading.rejected_count ?? loading.rejectedCount ?? records.filter((record) => record.status === 'rejected').length],
+      ['Fallback', loading.fallback_count ?? loading.fallbackCount ?? records.filter((record) => record.status === 'fallback').length],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const recordRows = records.length
+      ? records.slice(0, 10).map((record) => {
+          const assetId = record.assetId || record.asset_id || record.id || 'unknown asset';
+          const status = record.status || 'unknown';
+          const size = record.width && record.height ? ` · ${record.width}×${record.height}` : '';
+          const duration = record.loadDurationMs || record.load_duration_ms ? ` · ${record.loadDurationMs ?? record.load_duration_ms}ms` : '';
+          const reason = record.failureReason || record.failure_reason ? ` · ${record.failureReason ?? record.failure_reason}` : '';
+          return `<li><strong>${escapeText(assetId)}</strong>: <span class="${statusClass(status)}">${escapeText(status)}</span>${escapeText(size)}${escapeText(duration)}${escapeText(reason)}<br><small>${escapeText(record.path || 'no path')} · ${escapeText(record.attemptId || record.attempt_id || 'attempt')}</small></li>`;
+        }).join('')
+      : '<li>No parsed runtime asset load records are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <ul class="run-meta-list">${recordRows}</ul>
+      ${renderRefLinks('Runtime asset loading evidence refs', refs, run)}
+      <p class="run-meta">${escapeText(loading.boundary || 'Read-only runtime loading evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.')}</p>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -1012,6 +1042,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Tilemap authoring evidence</h3>${renderTilemapSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
+      <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1088,7 +1119,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
