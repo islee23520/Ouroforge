@@ -423,6 +423,15 @@ pub struct JsonPathAssertion {
         skip_serializing_if = "Option::is_none"
     )]
     pub count_less_than: Option<u64>,
+    /// Assert the array at `path` contains at least one element whose `type`
+    /// field equals this value. Lets event-bearing evidence assert a concrete
+    /// event type instead of only counting unrelated events.
+    #[serde(
+        default,
+        rename = "containsType",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub contains_type: Option<String>,
 }
 
 /// Reject scenario `steps`/`assertions` entries that carry more than one key.
@@ -1273,6 +1282,7 @@ fn json_path_assertion_from_result(
         count_equals: None,
         count_greater_than: None,
         count_less_than: None,
+        contains_type: None,
     };
     match operator {
         "equals" => assertion.equals = Some(expected),
@@ -1299,6 +1309,16 @@ fn json_path_assertion_from_result(
             assertion.count_less_than = Some(expected.as_u64().ok_or_else(|| {
                 anyhow!("regression promotion countLessThan expected value must be integer")
             })?)
+        }
+        "containsType" => {
+            assertion.contains_type = Some(
+                expected
+                    .as_str()
+                    .ok_or_else(|| {
+                        anyhow!("regression promotion containsType expected value must be a string")
+                    })?
+                    .to_string(),
+            )
         }
         _ => {
             return Err(anyhow!(
@@ -5929,6 +5949,7 @@ impl JsonPathAssertion {
             self.count_equals.is_some(),
             self.count_greater_than.is_some(),
             self.count_less_than.is_some(),
+            self.contains_type.is_some(),
         ]
         .into_iter()
         .filter(|present| *present)
@@ -5958,6 +5979,15 @@ impl JsonPathAssertion {
                     "scenarios[{scenario_index}].assertions[{assertion_index}].{operator} must be numeric"
                 ));
             }
+        }
+        if self
+            .contains_type
+            .as_ref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(anyhow!(
+                "scenarios[{scenario_index}].assertions[{assertion_index}].containsType must not be empty"
+            ));
         }
         Ok(())
     }
@@ -22142,6 +22172,54 @@ scenarios:
     }
 
     #[test]
+    fn accepts_contains_type_event_assertion_and_rejects_empty() {
+        let valid = r#"
+id: assertion-model.v1
+title: Assertion Model Fixture
+goal: Accept a typed event assertion.
+constraints:
+  target: file-harness
+acceptance:
+  - Accept containsType assertions.
+scenarios:
+  - id: assertion-smoke
+    description: Assert a concrete runtime event type.
+    assertions:
+      - runtime_events:
+          path: events
+          containsType: runtime.animation.state
+"#;
+        let seed = Seed::from_yaml_str(valid).expect("containsType assertion validates");
+        let assertion = &seed.scenarios[0].assertions[0];
+        let ScenarioAssertion::RuntimeEvents { runtime_events } = assertion else {
+            panic!("expected runtime_events assertion");
+        };
+        assert_eq!(
+            runtime_events.contains_type.as_deref(),
+            Some("runtime.animation.state")
+        );
+
+        let empty = r#"
+id: assertion-model.v1
+title: Assertion Model Fixture
+goal: Reject an empty typed event assertion.
+constraints:
+  target: file-harness
+acceptance:
+  - Reject empty containsType assertions.
+scenarios:
+  - id: assertion-smoke
+    description: Reject an empty event type.
+    assertions:
+      - runtime_events:
+          path: events
+          containsType: "  "
+"#;
+        let error = Seed::from_yaml_str(empty).expect_err("empty containsType fails");
+        assert!(error.to_string().contains("containsType must not be empty"));
+    }
+
+    #[test]
     fn parses_visual_checkpoint_step_schema() {
         let valid = r#"
 id: visual-hooks.v1
@@ -28097,6 +28175,7 @@ scenarios:
                         less_than: None,
                         count_equals: None,
                         count_greater_than: None,
+                        contains_type: None,
                         count_less_than: None,
                     },
                 }],
@@ -31849,6 +31928,7 @@ scenarios:
             count_equals: None,
             count_greater_than: None,
             count_less_than: None,
+            contains_type: None,
         };
         configure(&mut assertion);
         assertion

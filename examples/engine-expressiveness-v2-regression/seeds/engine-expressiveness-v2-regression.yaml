@@ -113,7 +113,7 @@ scenarios:
           exists: true
       - runtime_events:
           path: events
-          countGreaterThan: 1
+          containsType: runtime.animation.state
   - id: audio-event-v1-regression
     description: Assert audio checks remain intent-only evidence and do not require real playback.
     assertions:

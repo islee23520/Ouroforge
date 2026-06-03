@@ -58,6 +58,9 @@ function evaluateAssertion(evidence, assertion) {
   if (Object.prototype.hasOwnProperty.call(contract, 'contains')) {
     return String(actual).includes(String(contract.contains));
   }
+  if (Object.prototype.hasOwnProperty.call(contract, 'containsType')) {
+    return Array.isArray(actual) && actual.some((item) => item && item.type === contract.containsType);
+  }
   throw new Error(`unsupported smoke operator in ${JSON.stringify(assertion)}`);
 }
 

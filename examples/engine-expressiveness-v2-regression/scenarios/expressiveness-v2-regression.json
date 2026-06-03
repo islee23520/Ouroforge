@@ -222,7 +222,7 @@
             {
               "runtime_events": {
                 "path": "events",
-                "countGreaterThan": 1
+                "containsType": "runtime.animation.state"
               }
             }
           ]
