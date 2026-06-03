@@ -1901,6 +1901,19 @@ pub struct AuthoringLoopStatusTransition {
     pub to: AuthoringLoopStepStatus,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopStepStatusUpdate {
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub kind: String,
+    pub from: String,
+    pub to: String,
+    pub outcome: String,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AuthoringLoopArtifactRef {
@@ -2063,6 +2076,52 @@ impl AuthoringLoopPlan {
             }
         }
         Ok(())
+    }
+
+    pub fn update_step_status(
+        &self,
+        step_id: &str,
+        next_status: AuthoringLoopStepStatus,
+    ) -> Result<(Self, AuthoringLoopStepStatusUpdate)> {
+        validate_path_component("authoring loop step id", step_id)?;
+        let step_index = self
+            .steps
+            .iter()
+            .position(|step| step.id == step_id)
+            .ok_or_else(|| anyhow!("authoring loop plan step not found: {step_id}"))?;
+        let current_status = self.steps[step_index].status;
+        if !current_status.can_transition_to(next_status) {
+            return Err(anyhow!(
+                "authoring loop step {step_id} cannot transition from {:?} to {:?}",
+                current_status,
+                next_status
+            ));
+        }
+
+        let mut updated = self.clone();
+        let updated_step = &mut updated.steps[step_index];
+        updated_step.status = next_status;
+        updated_step.status_transition = Some(AuthoringLoopStatusTransition {
+            from: current_status,
+            to: next_status,
+        });
+        updated.validate_schema()?;
+
+        let outcome = if current_status == next_status {
+            "unchanged"
+        } else {
+            "updated"
+        };
+        let summary = AuthoringLoopStepStatusUpdate {
+            loop_id: updated.loop_id.clone(),
+            step_id: updated.steps[step_index].id.clone(),
+            kind: updated.steps[step_index].kind.as_str().to_string(),
+            from: current_status.as_str().to_string(),
+            to: next_status.as_str().to_string(),
+            outcome: outcome.to_string(),
+            boundary: "state-machine only; does not execute commands, write plan files, mutate scenes, record decisions, promote regressions, or update source code".to_string(),
+        };
+        Ok((updated, summary))
     }
 }
 
@@ -16078,6 +16137,76 @@ scenarios:
         );
         assert!(
             !AuthoringLoopStepStatus::Pending.can_transition_to(AuthoringLoopStepStatus::Completed)
+        );
+    }
+
+    #[test]
+    fn loop_step_runner_state_machine_updates_status_without_execution() {
+        let plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/pending.json"
+        ))
+        .expect("pending loop plan validates");
+
+        let (updated, summary) = plan
+            .update_step_status("run-baseline", AuthoringLoopStepStatus::Running)
+            .expect("pending step can become running");
+
+        let step = updated
+            .steps
+            .iter()
+            .find(|step| step.id == "run-baseline")
+            .expect("updated step present");
+        assert_eq!(step.status, AuthoringLoopStepStatus::Running);
+        assert_eq!(
+            step.status_transition,
+            Some(AuthoringLoopStatusTransition {
+                from: AuthoringLoopStepStatus::Pending,
+                to: AuthoringLoopStepStatus::Running,
+            })
+        );
+        assert_eq!(summary.loop_id, "fixture-loop-pending");
+        assert_eq!(summary.step_id, "run-baseline");
+        assert_eq!(summary.kind, "run-scenario-pack");
+        assert_eq!(summary.from, "pending");
+        assert_eq!(summary.to, "running");
+        assert_eq!(summary.outcome, "updated");
+        assert!(summary.boundary.contains("does not execute commands"));
+    }
+
+    #[test]
+    fn loop_step_runner_state_machine_blocks_invalid_or_unsafe_transitions() {
+        let pending = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/pending.json"
+        ))
+        .expect("pending loop plan validates");
+
+        let direct_complete = pending
+            .update_step_status("run-baseline", AuthoringLoopStepStatus::Completed)
+            .expect_err("pending cannot complete without running");
+        assert!(direct_complete.to_string().contains("cannot transition"));
+
+        let unmet_dependency = pending
+            .update_step_status("summarize", AuthoringLoopStepStatus::Running)
+            .expect_err("dependent step cannot run before dependency completes");
+        assert!(unmet_dependency.to_string().contains("before dependency"));
+
+        let partial = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/partial.json"
+        ))
+        .expect("partial loop plan validates");
+        let (completed, summary) = partial
+            .update_step_status("compare-runs", AuthoringLoopStepStatus::Completed)
+            .expect("running step can complete");
+        assert_eq!(summary.from, "running");
+        assert_eq!(summary.to, "completed");
+        assert_eq!(
+            completed
+                .steps
+                .iter()
+                .find(|step| step.id == "compare-runs")
+                .expect("compare step")
+                .status,
+            AuthoringLoopStepStatus::Completed
         );
     }
 
