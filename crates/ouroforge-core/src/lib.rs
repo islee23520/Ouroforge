@@ -5897,6 +5897,45 @@ pub enum ProjectTilemapLayerKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct ProjectTilemapAuthoringExtractionReport {
+    pub tilemaps: Vec<ProjectTilemapExtraction>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilemapExtraction {
+    #[serde(rename = "tilemapAssetId")]
+    pub tilemap_asset_id: String,
+    #[serde(rename = "tilesetAssetId")]
+    pub tileset_asset_id: String,
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "collisionCells")]
+    pub collision_cells: Vec<ProjectTilemapExtractedCell>,
+    #[serde(rename = "triggerCells")]
+    pub trigger_cells: Vec<ProjectTilemapExtractedCell>,
+    #[serde(rename = "hazardCells")]
+    pub hazard_cells: Vec<ProjectTilemapExtractedCell>,
+    #[serde(rename = "goalCells")]
+    pub goal_cells: Vec<ProjectTilemapExtractedCell>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilemapExtractedCell {
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub index: usize,
+    #[serde(rename = "tileId")]
+    pub tile_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ProjectAssetManifestValidationReport {
     pub manifest_id: String,
     pub assets: usize,
@@ -6001,6 +6040,7 @@ impl ProjectAssetManifest {
         }
 
         self.validate_sprite_atlases()?;
+        self.validate_tilemaps()?;
 
         Ok(ProjectAssetManifestValidationReport {
             manifest_id: self.id.clone(),
@@ -6055,6 +6095,87 @@ impl ProjectAssetManifest {
             atlas.validate_integrity(&atlas_asset.id, dimensions)?;
         }
         Ok(())
+    }
+
+    fn validate_tilemaps(&self) -> Result<()> {
+        let assets_by_id: BTreeMap<&str, &ProjectAssetManifestEntry> = self
+            .assets
+            .iter()
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect();
+        for tileset_asset in self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::Tileset)
+        {
+            if let Some(tileset) = &tileset_asset.tileset {
+                tileset.validate_integrity(&tileset_asset.id)?;
+            }
+        }
+        for tilemap_asset in self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::Tilemap)
+        {
+            let Some(tilemap) = &tilemap_asset.tilemap else {
+                continue;
+            };
+            let tileset_asset = assets_by_id
+                .get(tilemap.tileset_asset_id.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "tilemap {} tilesetAssetId references unknown asset {}",
+                        tilemap_asset.id,
+                        tilemap.tileset_asset_id
+                    )
+                })?;
+            if tileset_asset.asset_type != ProjectAssetType::Tileset {
+                return Err(anyhow!(
+                    "tilemap {} tilesetAssetId {} must reference a tileset asset",
+                    tilemap_asset.id,
+                    tilemap.tileset_asset_id
+                ));
+            }
+            let tileset = tileset_asset.tileset.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "tilemap {} tilesetAssetId {} must reference a tileset payload",
+                    tilemap_asset.id,
+                    tilemap.tileset_asset_id
+                )
+            })?;
+            tilemap.validate_integrity(&tilemap_asset.id, tileset)?;
+        }
+        Ok(())
+    }
+
+    pub fn extract_tilemap_authoring(&self) -> Result<ProjectTilemapAuthoringExtractionReport> {
+        self.validate_schema()?;
+        self.validate_tilemaps()?;
+        let tilesets_by_id: BTreeMap<&str, &ProjectAssetManifestEntry> = self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::Tileset)
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect();
+        let mut tilemaps = Vec::new();
+        for tilemap_asset in self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::Tilemap)
+        {
+            let Some(tilemap) = &tilemap_asset.tilemap else {
+                continue;
+            };
+            let tileset_asset = tilesets_by_id
+                .get(tilemap.tileset_asset_id.as_str())
+                .expect("validated tileset exists");
+            let tileset = tileset_asset
+                .tileset
+                .as_ref()
+                .expect("validated tileset payload");
+            tilemaps.push(tilemap.extract(&tilemap_asset.id, tileset));
+        }
+        Ok(ProjectTilemapAuthoringExtractionReport { tilemaps })
     }
 }
 
@@ -6356,6 +6477,33 @@ impl ProjectTilesetManifest {
         }
         Ok(())
     }
+
+    fn validate_integrity(&self, tileset_asset_id: &str) -> Result<()> {
+        let mut tile_ids = BTreeSet::new();
+        let mut indexes = BTreeSet::new();
+        for tile in &self.tiles {
+            if !tile_ids.insert(tile.id.as_str()) {
+                return Err(anyhow!(
+                    "tileset {tileset_asset_id} duplicate tile id: {}",
+                    tile.id
+                ));
+            }
+            if !indexes.insert(tile.index) {
+                return Err(anyhow!(
+                    "tileset {tileset_asset_id} duplicate tile index: {}",
+                    tile.index
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn tiles_by_id(&self) -> BTreeMap<&str, &ProjectTilesetTile> {
+        self.tiles
+            .iter()
+            .map(|tile| (tile.id.as_str(), tile))
+            .collect()
+    }
 }
 
 impl ProjectTilesetTile {
@@ -6388,6 +6536,80 @@ impl ProjectTilemapManifest {
         }
         Ok(())
     }
+
+    fn validate_integrity(
+        &self,
+        tilemap_asset_id: &str,
+        tileset: &ProjectTilesetManifest,
+    ) -> Result<()> {
+        let expected_cells = (self.width as usize)
+            .checked_mul(self.height as usize)
+            .ok_or_else(|| anyhow!("tilemap {tilemap_asset_id} dimensions overflow"))?;
+        let tiles_by_id = tileset.tiles_by_id();
+        let mut layer_ids = BTreeSet::new();
+        for layer in &self.layers {
+            if !layer_ids.insert(layer.id.as_str()) {
+                return Err(anyhow!(
+                    "tilemap {tilemap_asset_id} duplicate layer id: {}",
+                    layer.id
+                ));
+            }
+            layer.validate_integrity(tilemap_asset_id, expected_cells, &tiles_by_id)?;
+        }
+        Ok(())
+    }
+
+    fn extract(
+        &self,
+        tilemap_asset_id: &str,
+        tileset: &ProjectTilesetManifest,
+    ) -> ProjectTilemapExtraction {
+        let tiles_by_id = tileset.tiles_by_id();
+        let mut collision_cells = Vec::new();
+        let mut trigger_cells = Vec::new();
+        let mut hazard_cells = Vec::new();
+        let mut goal_cells = Vec::new();
+        for layer in &self.layers {
+            for (index, tile_id) in layer.data.iter().enumerate() {
+                let Some(tile_id) = tile_id else {
+                    continue;
+                };
+                let Some(tile) = tiles_by_id.get(tile_id.as_str()) else {
+                    continue;
+                };
+                let cell = ProjectTilemapExtractedCell {
+                    layer_id: layer.id.clone(),
+                    x: (index as u32) % self.width,
+                    y: (index as u32) / self.width,
+                    index,
+                    tile_id: tile.id.clone(),
+                    trigger: tile.trigger.clone(),
+                };
+                if tile.solid || layer.kind == ProjectTilemapLayerKind::Collision {
+                    collision_cells.push(cell.clone());
+                }
+                if tile.trigger.is_some() || layer.kind == ProjectTilemapLayerKind::Trigger {
+                    trigger_cells.push(cell.clone());
+                }
+                if tile.hazard {
+                    hazard_cells.push(cell.clone());
+                }
+                if tile.goal {
+                    goal_cells.push(cell);
+                }
+            }
+        }
+        ProjectTilemapExtraction {
+            tilemap_asset_id: tilemap_asset_id.to_string(),
+            tileset_asset_id: self.tileset_asset_id.clone(),
+            width: self.width,
+            height: self.height,
+            collision_cells,
+            trigger_cells,
+            hazard_cells,
+            goal_cells,
+        }
+    }
 }
 
 impl ProjectTilemapLayer {
@@ -6404,6 +6626,29 @@ impl ProjectTilemapLayer {
         for (key, value) in &self.metadata {
             require_text(&format!("{field}.metadata key"), key)?;
             require_text(&format!("{field}.metadata.{key}"), value)?;
+        }
+        Ok(())
+    }
+
+    fn validate_integrity(
+        &self,
+        tilemap_asset_id: &str,
+        expected_cells: usize,
+        tiles_by_id: &BTreeMap<&str, &ProjectTilesetTile>,
+    ) -> Result<()> {
+        if self.data.len() != expected_cells {
+            return Err(anyhow!(
+                "tilemap {tilemap_asset_id} layer {} data length must equal width*height ({expected_cells})",
+                self.id
+            ));
+        }
+        for tile_id in self.data.iter().flatten() {
+            if !tiles_by_id.contains_key(tile_id.as_str()) {
+                return Err(anyhow!(
+                    "tilemap {tilemap_asset_id} layer {} references unknown tile id: {tile_id}",
+                    self.id
+                ));
+            }
         }
         Ok(())
     }
@@ -22487,6 +22732,156 @@ scenarios:
         assert!(serialized.contains("\"type\":\"tileset\""));
         assert!(serialized.contains("\"type\":\"tilemap\""));
         assert!(serialized.contains("\"tilesetAssetId\":\"ground_tileset\""));
+    }
+
+    #[test]
+    fn tilemap_authoring_v2_validates_tile_refs_and_extracts_collision_trigger_cells() {
+        let root = unique_temp_dir("tilemap-authoring-v2-validates");
+        fs::create_dir_all(root.join("assets/tilesets")).expect("tileset dir");
+        fs::create_dir_all(root.join("assets/tilemaps")).expect("tilemap dir");
+        fs::write(
+            root.join("assets/tilesets/ground.tileset.json"),
+            b"tileset fixture",
+        )
+        .expect("tileset file");
+        fs::write(
+            root.join("assets/tilemaps/demo.tilemap.json"),
+            b"tilemap fixture",
+        )
+        .expect("tilemap file");
+        let tileset_hash =
+            hash_project_asset_file(root.join("assets/tilesets/ground.tileset.json"))
+                .expect("tileset hash");
+        let tilemap_hash = hash_project_asset_file(root.join("assets/tilemaps/demo.tilemap.json"))
+            .expect("tilemap hash");
+
+        let manifest_with =
+            |tiles: serde_json::Value, tileset_asset_id: &str, layers: serde_json::Value| {
+                ProjectAssetManifest::from_json_str(
+                    &json!({
+                        "schemaVersion": "asset-manifest-v1",
+                        "id": "tilemap_authoring_validation_fixture",
+                        "assets": [
+                            {
+                                "id": "ground_tileset",
+                                "type": "tileset",
+                                "path": "assets/tilesets/ground.tileset.json",
+                                "contentHash": tileset_hash.clone(),
+                                "classification": "source_like",
+                                "tileset": {
+                                    "tileWidth": 16,
+                                    "tileHeight": 16,
+                                    "tiles": tiles
+                                }
+                            },
+                            {
+                                "id": "demo_tilemap",
+                                "type": "tilemap",
+                                "path": "assets/tilemaps/demo.tilemap.json",
+                                "contentHash": tilemap_hash.clone(),
+                                "classification": "source_like",
+                                "tilemap": {
+                                    "tilesetAssetId": tileset_asset_id,
+                                    "width": 3,
+                                    "height": 2,
+                                    "layers": layers
+                                }
+                            }
+                        ]
+                    })
+                    .to_string(),
+                )
+                .expect("manifest parses")
+            };
+
+        let valid_tiles = json!([
+            { "id": "empty", "index": 0 },
+            { "id": "solid_ground", "index": 1, "solid": true },
+            { "id": "coin_trigger", "index": 2, "trigger": "coin_collected" },
+            { "id": "spike_hazard", "index": 3, "hazard": true },
+            { "id": "exit_goal", "index": 4, "goal": true }
+        ]);
+        let valid_layers = json!([
+            { "id": "terrain", "kind": "visual", "data": ["solid_ground", "empty", "exit_goal", "solid_ground", "coin_trigger", "spike_hazard"] },
+            { "id": "collision", "kind": "collision", "data": ["solid_ground", null, null, "solid_ground", null, null] },
+            { "id": "triggers", "kind": "trigger", "data": [null, null, null, null, "coin_trigger", null] }
+        ]);
+
+        let valid = manifest_with(valid_tiles.clone(), "ground_tileset", valid_layers.clone());
+        valid
+            .validate_assets(&root)
+            .expect("tilemap authoring validates");
+        let extraction = valid
+            .extract_tilemap_authoring()
+            .expect("tilemap extraction succeeds");
+        assert_eq!(extraction.tilemaps.len(), 1);
+        let extracted = &extraction.tilemaps[0];
+        assert_eq!(extracted.tilemap_asset_id, "demo_tilemap");
+        assert_eq!(extracted.collision_cells.len(), 4);
+        assert!(extracted
+            .collision_cells
+            .iter()
+            .any(|cell| cell.tile_id == "solid_ground" && cell.x == 0 && cell.y == 0));
+        assert!(extracted
+            .trigger_cells
+            .iter()
+            .any(|cell| cell.trigger.as_deref() == Some("coin_collected")));
+        assert_eq!(extracted.hazard_cells[0].tile_id, "spike_hazard");
+        assert_eq!(extracted.goal_cells[0].tile_id, "exit_goal");
+
+        let duplicate_tile_id = manifest_with(
+            json!([
+                { "id": "solid_ground", "index": 1, "solid": true },
+                { "id": "solid_ground", "index": 2 }
+            ]),
+            "ground_tileset",
+            json!([{ "id": "terrain", "kind": "visual", "data": ["solid_ground", null, null, null, null, null] }]),
+        );
+        let rejected = duplicate_tile_id
+            .validate_assets(&root)
+            .expect_err("duplicate tile id rejected");
+        assert!(rejected.to_string().contains("duplicate tile id"));
+
+        let duplicate_tile_index = manifest_with(
+            json!([
+                { "id": "solid_ground", "index": 1, "solid": true },
+                { "id": "coin_trigger", "index": 1, "trigger": "coin_collected" }
+            ]),
+            "ground_tileset",
+            json!([{ "id": "terrain", "kind": "visual", "data": ["solid_ground", null, null, null, null, null] }]),
+        );
+        let rejected = duplicate_tile_index
+            .validate_assets(&root)
+            .expect_err("duplicate tile index rejected");
+        assert!(rejected.to_string().contains("duplicate tile index"));
+
+        let unknown_tile_ref = manifest_with(
+            valid_tiles.clone(),
+            "ground_tileset",
+            json!([{ "id": "terrain", "kind": "visual", "data": ["missing_tile", null, null, null, null, null] }]),
+        );
+        let rejected = unknown_tile_ref
+            .validate_assets(&root)
+            .expect_err("unknown tile ref rejected");
+        assert!(rejected.to_string().contains("unknown tile id"));
+
+        let bad_layer_len = manifest_with(
+            valid_tiles.clone(),
+            "ground_tileset",
+            json!([{ "id": "terrain", "kind": "visual", "data": ["solid_ground"] }]),
+        );
+        let rejected = bad_layer_len
+            .validate_assets(&root)
+            .expect_err("layer data length rejected");
+        assert!(rejected.to_string().contains("width*height"));
+
+        let unknown_tileset = manifest_with(valid_tiles, "missing_tileset", valid_layers);
+        let rejected = unknown_tileset
+            .validate_assets(&root)
+            .expect_err("unknown tileset ref rejected");
+        assert!(rejected.to_string().contains("unknown asset"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
