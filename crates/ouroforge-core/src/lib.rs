@@ -5720,6 +5720,8 @@ Generated artifacts such as `runs/`, `target/`, and dashboard exports are local 
 const MINIMAL_2D_PROJECT_GITIGNORE: &str = "# Ouroforge generated/local state\nruns/\ntarget/\ndashboard-data/\n.openchrome/\n.omc/\n.omx/\n.claude/\n";
 
 pub const PROJECT_ASSET_MANIFEST_SCHEMA_VERSION: &str = "asset-manifest-v1";
+pub const PROJECT_ASSET_CONTENT_HASH_ALGORITHM: &str = "fnv1a64-file-v1";
+const PROJECT_ASSET_SOURCE_GENERATED_ROOTS: &[&str] = &["runs", "target", "dashboard-data"];
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -5790,11 +5792,41 @@ pub struct ProjectAssetDimensions {
     pub height: u32,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetManifestValidationReport {
+    pub manifest_id: String,
+    pub assets: usize,
+    pub source_like_assets: usize,
+    pub generated_assets: usize,
+    pub asset_types: BTreeMap<ProjectAssetType, usize>,
+}
+
 impl ProjectAssetManifest {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let manifest: ProjectAssetManifest =
             serde_json::from_str(input).context("failed to parse Project Asset Manifest JSON")?;
         manifest.validate_schema()?;
+        Ok(manifest)
+    }
+
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let input = fs::read_to_string(path)
+            .with_context(|| format!("failed to read project asset manifest {}", path.display()))?;
+        let manifest = Self::from_json_str(&input).with_context(|| {
+            format!("failed to parse project asset manifest {}", path.display())
+        })?;
+        let base_dir = match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent,
+            _ => Path::new("."),
+        };
+        manifest.validate_assets(base_dir).with_context(|| {
+            format!(
+                "project asset manifest {} references invalid assets",
+                path.display()
+            )
+        })?;
         Ok(manifest)
     }
 
@@ -5815,6 +5847,50 @@ impl ProjectAssetManifest {
             asset.validate_schema(index)?;
         }
         Ok(())
+    }
+
+    pub fn validate_assets(&self, base_dir: &Path) -> Result<ProjectAssetManifestValidationReport> {
+        self.validate_schema()?;
+        let base = base_dir.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve project asset manifest base {}",
+                base_dir.display()
+            )
+        })?;
+        let mut ids = BTreeSet::new();
+        let mut paths = BTreeSet::new();
+        let mut asset_types = BTreeMap::new();
+        let mut source_like_assets = 0;
+        let mut generated_assets = 0;
+
+        for (index, asset) in self.assets.iter().enumerate() {
+            asset.validate_integrity(index, base_dir, &base)?;
+            if !ids.insert(asset.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate project asset manifest asset id: {}",
+                    asset.id
+                ));
+            }
+            if !paths.insert(asset.path.clone()) {
+                return Err(anyhow!(
+                    "duplicate project asset manifest asset path: {}",
+                    asset.path
+                ));
+            }
+            *asset_types.entry(asset.asset_type).or_insert(0) += 1;
+            match asset.classification {
+                ProjectAssetClassification::SourceLike => source_like_assets += 1,
+                ProjectAssetClassification::Generated => generated_assets += 1,
+            }
+        }
+
+        Ok(ProjectAssetManifestValidationReport {
+            manifest_id: self.id.clone(),
+            assets: self.assets.len(),
+            source_like_assets,
+            generated_assets,
+            asset_types,
+        })
     }
 }
 
@@ -5865,12 +5941,70 @@ impl ProjectAssetManifestEntry {
         }
         Ok(())
     }
+
+    fn validate_integrity(&self, index: usize, base_dir: &Path, base: &Path) -> Result<()> {
+        self.validate_schema(index)?;
+        validate_project_asset_path(
+            &format!("project asset manifest assets[{index}].path"),
+            &self.path,
+            self.asset_type,
+            self.classification,
+        )?;
+        let path = base_dir.join(&self.path);
+        if !path.is_file() {
+            return Err(anyhow!(
+                "project asset manifest asset {} missing file: {}",
+                self.id,
+                self.path
+            ));
+        }
+        let resolved = path.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve project asset manifest asset {} path {}",
+                self.id, self.path
+            )
+        })?;
+        if !resolved.starts_with(base) {
+            return Err(anyhow!(
+                "project asset manifest asset {} must stay inside the project root",
+                self.id
+            ));
+        }
+        let observed = hash_project_asset_file(&path)?;
+        if self.content_hash.algorithm != observed.algorithm
+            || self.content_hash.value != observed.value
+        {
+            return Err(anyhow!(
+                "project asset manifest asset {} contentHash mismatch: expected {}:{}, observed {}:{}",
+                self.id,
+                self.content_hash.algorithm,
+                self.content_hash.value,
+                observed.algorithm,
+                observed.value
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl ProjectAssetContentHash {
     fn validate_schema(&self, field: &str) -> Result<()> {
         require_text(&format!("{field}.algorithm"), &self.algorithm)?;
-        require_text(&format!("{field}.value"), &self.value)
+        require_text(&format!("{field}.value"), &self.value)?;
+        if self.algorithm != PROJECT_ASSET_CONTENT_HASH_ALGORITHM {
+            return Err(anyhow!(
+                "{field}.algorithm must be {PROJECT_ASSET_CONTENT_HASH_ALGORITHM}"
+            ));
+        }
+        if self.value.len() != 16 || !self.value.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(anyhow!(
+                "{field}.value must be a 16-character lowercase hex content hash"
+            ));
+        }
+        if self.value.chars().any(|ch| ch.is_ascii_uppercase()) {
+            return Err(anyhow!("{field}.value must use lowercase hex"));
+        }
+        Ok(())
     }
 }
 
@@ -5880,6 +6014,57 @@ impl ProjectAssetDimensions {
             return Err(anyhow!("{field} width and height must be positive"));
         }
         Ok(())
+    }
+}
+
+pub fn hash_project_asset_file(path: impl AsRef<Path>) -> Result<ProjectAssetContentHash> {
+    let path = path.as_ref();
+    let bytes = fs::read(path)
+        .with_context(|| format!("failed to read project asset file {}", path.display()))?;
+    Ok(ProjectAssetContentHash {
+        algorithm: PROJECT_ASSET_CONTENT_HASH_ALGORITHM.to_string(),
+        value: format!("{:016x}", fnv1a64(&bytes)),
+    })
+}
+
+fn validate_project_asset_path(
+    field: &str,
+    value: &str,
+    asset_type: ProjectAssetType,
+    classification: ProjectAssetClassification,
+) -> Result<()> {
+    validate_project_manifest_path(field, value)?;
+    if classification == ProjectAssetClassification::SourceLike {
+        for generated_root in PROJECT_ASSET_SOURCE_GENERATED_ROOTS {
+            if project_manifest_paths_overlap(value, generated_root) {
+                return Err(anyhow!(
+                    "{field} for source-like assets must not overlap generated root {generated_root}"
+                ));
+            }
+        }
+    }
+    let extension = Path::new(value)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let supported = match asset_type {
+        ProjectAssetType::Image => {
+            matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "svg" | "webp")
+        }
+        ProjectAssetType::SpriteAtlas | ProjectAssetType::Tileset | ProjectAssetType::Tilemap => {
+            extension == "json"
+        }
+        ProjectAssetType::Audio => matches!(extension.as_str(), "ogg" | "mp3" | "wav"),
+        ProjectAssetType::Font => matches!(extension.as_str(), "ttf" | "otf" | "woff" | "woff2"),
+    };
+    if supported {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "{field} has unsupported extension for project asset type {:?}",
+            asset_type
+        ))
     }
 }
 
@@ -21653,7 +21838,7 @@ scenarios:
                 "id": "sprite",
                 "type": "image",
                 "path": "assets/sprite.png",
-                "contentHash": { "algorithm": "sha256", "value": "abc" },
+                "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "0000000000000000" },
                 "classification": "source_like",
                 "dimensions": { "width": 0, "height": 16 }
             }]
@@ -21661,6 +21846,238 @@ scenarios:
         let rejected = ProjectAssetManifest::from_json_str(&zero_dimensions.to_string())
             .expect_err("zero dimensions rejected");
         assert!(rejected.to_string().contains("width and height"));
+    }
+
+    #[test]
+    fn project_asset_manifest_v1_validates_paths_files_and_hashes() {
+        let root = unique_temp_dir("project-asset-manifest-valid");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio dir");
+        fs::write(root.join("assets/sprites/player.png"), b"png fixture").expect("sprite");
+        fs::write(root.join("assets/audio/pickup.ogg"), b"ogg fixture").expect("audio");
+        let sprite_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("sprite hashes");
+        let audio_hash =
+            hash_project_asset_file(root.join("assets/audio/pickup.ogg")).expect("audio hashes");
+
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "asset_integrity_fixture",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": sprite_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "pickup_sound",
+                        "type": "audio",
+                        "path": "assets/audio/pickup.ogg",
+                        "contentHash": audio_hash,
+                        "classification": "source_like",
+                        "durationMs": 240
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+
+        let report = manifest
+            .validate_assets(&root)
+            .expect("asset integrity validates");
+        assert_eq!(report.manifest_id, "asset_integrity_fixture");
+        assert_eq!(report.assets, 2);
+        assert_eq!(report.source_like_assets, 2);
+        assert_eq!(report.generated_assets, 0);
+        assert_eq!(report.asset_types.get(&ProjectAssetType::Image), Some(&1));
+        assert_eq!(report.asset_types.get(&ProjectAssetType::Audio), Some(&1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn project_asset_manifest_v1_rejects_invalid_paths_roots_extensions_and_hashes() {
+        let root = unique_temp_dir("project-asset-manifest-invalid");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("runs/previews")).expect("runs dir");
+        fs::write(root.join("assets/sprites/player.png"), b"png fixture").expect("sprite");
+        fs::write(root.join("runs/previews/player.png"), b"generated fixture").expect("generated");
+        let sprite_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("sprite hashes");
+        let generated_hash = hash_project_asset_file(root.join("runs/previews/player.png"))
+            .expect("generated hashes");
+
+        let manifest_with_path =
+            |path: &str,
+             asset_type: ProjectAssetType,
+             hash: ProjectAssetContentHash,
+             classification: ProjectAssetClassification| {
+                ProjectAssetManifest::from_json_str(
+                    &json!({
+                        "schemaVersion": "asset-manifest-v1",
+                        "id": "invalid_asset_fixture",
+                        "assets": [{
+                            "id": "asset",
+                            "type": asset_type,
+                            "path": path,
+                            "contentHash": hash,
+                            "classification": classification
+                        }]
+                    })
+                    .to_string(),
+                )
+                .expect("manifest parses")
+            };
+
+        let absolute = manifest_with_path(
+            "/tmp/player.png",
+            ProjectAssetType::Image,
+            sprite_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = absolute
+            .validate_assets(&root)
+            .expect_err("absolute path rejected");
+        assert!(rejected.to_string().contains("must be relative"));
+
+        let escape = manifest_with_path(
+            "../player.png",
+            ProjectAssetType::Image,
+            sprite_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = escape
+            .validate_assets(&root)
+            .expect_err("path escape rejected");
+        assert!(rejected.to_string().contains("project root"));
+
+        let hidden = manifest_with_path(
+            ".omx/player.png",
+            ProjectAssetType::Image,
+            sprite_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = hidden
+            .validate_assets(&root)
+            .expect_err("hidden root rejected");
+        assert!(rejected.to_string().contains("hidden"));
+
+        let generated_source = manifest_with_path(
+            "runs/previews/player.png",
+            ProjectAssetType::Image,
+            generated_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = generated_source
+            .validate_assets(&root)
+            .expect_err("source generated root rejected");
+        assert!(rejected.to_string().contains("generated root runs"));
+
+        let unsupported = manifest_with_path(
+            "assets/sprites/player.txt",
+            ProjectAssetType::Image,
+            sprite_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = unsupported
+            .validate_assets(&root)
+            .expect_err("unsupported extension rejected");
+        assert!(rejected.to_string().contains("unsupported extension"));
+
+        let missing = manifest_with_path(
+            "assets/sprites/missing.png",
+            ProjectAssetType::Image,
+            sprite_hash.clone(),
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = missing
+            .validate_assets(&root)
+            .expect_err("missing rejected");
+        assert!(rejected.to_string().contains("missing file"));
+
+        let mut stale_hash = sprite_hash.clone();
+        stale_hash.value = "0000000000000000".to_string();
+        let stale = manifest_with_path(
+            "assets/sprites/player.png",
+            ProjectAssetType::Image,
+            stale_hash,
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = stale
+            .validate_assets(&root)
+            .expect_err("stale hash rejected");
+        assert!(rejected.to_string().contains("contentHash mismatch"));
+
+        let generated = manifest_with_path(
+            "runs/previews/player.png",
+            ProjectAssetType::Image,
+            generated_hash,
+            ProjectAssetClassification::Generated,
+        );
+        generated
+            .validate_assets(&root)
+            .expect("generated classified asset may live under generated root");
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn project_asset_manifest_v1_rejects_duplicate_ids_and_paths() {
+        let root = unique_temp_dir("project-asset-manifest-duplicates");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::write(root.join("assets/sprites/player.png"), b"png fixture").expect("sprite");
+        fs::write(root.join("assets/sprites/player-copy.png"), b"png fixture").expect("copy");
+        let player_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("player hashes");
+        let copy_hash = hash_project_asset_file(root.join("assets/sprites/player-copy.png"))
+            .expect("copy hashes");
+
+        let duplicate_id = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "duplicate_id_fixture",
+                "assets": [
+                    { "id": "player", "type": "image", "path": "assets/sprites/player.png", "contentHash": player_hash, "classification": "source_like" },
+                    { "id": "player", "type": "image", "path": "assets/sprites/player-copy.png", "contentHash": copy_hash, "classification": "source_like" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let rejected = duplicate_id
+            .validate_assets(&root)
+            .expect_err("duplicate id rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate project asset manifest asset id"));
+
+        let path_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("path hashes");
+        let duplicate_path = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "duplicate_path_fixture",
+                "assets": [
+                    { "id": "player", "type": "image", "path": "assets/sprites/player.png", "contentHash": path_hash, "classification": "source_like" },
+                    { "id": "player_copy", "type": "image", "path": "assets/sprites/player.png", "contentHash": path_hash, "classification": "source_like" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let rejected = duplicate_path
+            .validate_assets(&root)
+            .expect_err("duplicate path rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate project asset manifest asset path"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     fn transition_test_scene(scene_id: &str, transitions: serde_json::Value) -> serde_json::Value {

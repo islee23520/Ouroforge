@@ -7,8 +7,8 @@
       "type": "image",
       "path": "assets/sprites/player.png",
       "contentHash": {
-        "algorithm": "sha256",
-        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+        "algorithm": "fnv1a64-file-v1",
+        "value": "0000000000000000"
       },
       "classification": "source_like"
     }

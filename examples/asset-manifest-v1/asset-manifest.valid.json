@@ -8,8 +8,8 @@
       "type": "image",
       "path": "assets/sprites/player.png",
       "contentHash": {
-        "algorithm": "sha256",
-        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+        "algorithm": "fnv1a64-file-v1",
+        "value": "0000000000000000"
       },
       "classification": "source_like",
       "dimensions": {
@@ -27,8 +27,8 @@
       "type": "audio",
       "path": "assets/audio/pickup.ogg",
       "contentHash": {
-        "algorithm": "sha256",
-        "value": "1111111111111111111111111111111111111111111111111111111111111111"
+        "algorithm": "fnv1a64-file-v1",
+        "value": "1111111111111111"
       },
       "classification": "source_like",
       "durationMs": 240,
@@ -40,8 +40,8 @@
       "type": "image",
       "path": "runs/asset-previews/player.png",
       "contentHash": {
-        "algorithm": "sha256",
-        "value": "2222222222222222222222222222222222222222222222222222222222222222"
+        "algorithm": "fnv1a64-file-v1",
+        "value": "2222222222222222"
       },
       "classification": "generated",
       "dimensions": {
