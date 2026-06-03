@@ -2601,8 +2601,16 @@ fn validate_authoring_loop_bundle_ref_path(
         // does not reject a plan location the runner just executed against.
         return validate_authoring_loop_generated_root(field, value);
     }
-    validate_authoring_loop_generated_root(field, value)?;
-    let path = Path::new(value);
+    validate_authoring_loop_generated_artifact_path(field, Path::new(value), generated_roots)
+}
+
+fn validate_authoring_loop_generated_artifact_path(
+    field: &str,
+    path: &Path,
+    generated_roots: &[String],
+) -> Result<()> {
+    let value = path.to_string_lossy();
+    validate_authoring_loop_generated_root(field, &value)?;
     let under_generated_root = generated_roots.iter().any(|root| {
         let root = Path::new(root);
         path == root || path.starts_with(root)
@@ -3669,6 +3677,12 @@ pub fn write_agent_handoff_contract_from_path(
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
+    let relative_output_path = output_path.strip_prefix(base_dir).unwrap_or(output_path);
+    validate_authoring_loop_generated_artifact_path(
+        "agent handoff output path",
+        relative_output_path,
+        &plan.generated_state.roots,
+    )?;
     let handoff = build_agent_handoff_contract(&plan, base_dir, plan_path, output_path)?;
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).with_context(|| {
@@ -18676,6 +18690,33 @@ scenarios:
                 .exists(),
             "handoff generation reads bundle state in memory but does not create bundle artifacts"
         );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn agent_handoff_generation_rejects_non_generated_output_paths() {
+        let root = unique_temp_dir("agent-handoff-output-policy");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        let baseline_path = root.join("runs/baseline/run.json");
+        fs::create_dir_all(baseline_path.parent().expect("baseline parent")).expect("baseline dir");
+        fs::write(&baseline_path, "{}\n").expect("baseline artifact");
+
+        let source_like_path = root.join("source/handoff.json");
+        let rejected = write_agent_handoff_contract_from_path(&plan_path, &source_like_path)
+            .expect_err("source-like handoff output path is rejected");
+
+        assert!(rejected.to_string().contains("configured generated roots"));
+        assert!(
+            !source_like_path.exists(),
+            "rejected handoff output must not be written"
+        );
+
+        let generated_path = root.join("runs/agent-handoffs/temp-loop/handoff.json");
+        write_agent_handoff_contract_from_path(&plan_path, &generated_path)
+            .expect("generated-root handoff output path writes");
+        assert!(generated_path.is_file());
 
         fs::remove_dir_all(root).ok();
     }
