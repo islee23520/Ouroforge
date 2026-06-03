@@ -35,6 +35,21 @@ const run = {
   },
   evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
   probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
+  engine_summaries: {
+    present: true,
+    source_world_state: 'evidence/world.json',
+    gameplay: {
+      present: true,
+      declaredFlagCount: 2,
+      worldFlagCount: 3,
+      trueFlagCount: 2,
+      falseFlagCount: 1,
+      triggerEntityCount: 1,
+      goalFlagEntityCount: 1,
+      triggerCollisionEventCount: 1,
+      trueFlags: ['coin_collected', 'door_open'],
+    },
+  },
 
   loop_dry_run: {
     schemaVersion: 'authoring-loop-dry-run-v1',
@@ -374,6 +389,8 @@ assert.match(detail, /Scenario results/);
 assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
+assert.match(detail, /Gameplay trigger\/flags/);
+assert.match(detail, /coin_collected, door_open/);
 assert.match(detail, /Regression Promotions/);
 assert.match(detail, /promoted-smoke-regression/);
 assert.match(detail, /scenario promote &lt;draft-json&gt; --project ouroforge\.project\.json --scenario-pack smoke --dry-run/);
@@ -462,6 +479,9 @@ assert.match(detail, /bad json/);
 assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /Frame\/performance metrics/);
 assert.match(dashboard.renderProbeContractStatus(run.probe_contract_status), /present/);
 assert.match(dashboard.renderProbeContractStatus({ status: 'malformed', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 1, missing_count: 1, malformed_count: 1, evidence_refs: ['evidence/failure.json'] }), /1 malformed/);
+assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
+assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);
+assert.match(dashboard.renderGameplaySummary({}), /No trigger\/flag world-state summary/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);

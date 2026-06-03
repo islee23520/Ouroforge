@@ -9805,7 +9805,9 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         };
     let comparison = read_dashboard_comparison(run_dir);
     let regression_promotions = read_regression_promotion_records(run_dir);
-    let mut journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
+    let mut journal = render_journal(
+        run_dir, &seed, &evidence, &ledger, &verdict, &proposals, &run,
+    );
     journal.push_str(&render_authoring_governance_journal_section(
         &proposals,
         &reviews,
@@ -9827,6 +9829,7 @@ pub fn show_journal(run_dir: impl AsRef<Path>) -> Result<String> {
 }
 
 fn render_journal(
+    run_dir: &Path,
     seed: &Seed,
     evidence: &EvidenceIndex,
     ledger: &[serde_json::Value],
@@ -9996,6 +9999,47 @@ fn render_journal(
         legacy_replay_count, scenario_replay_count
     ));
 
+    out.push_str("## Gameplay Trigger/Flag Evidence\n\n");
+    match journal_gameplay_summary(run_dir, evidence) {
+        Some((source, gameplay)) => {
+            out.push_str(&format!("- Source world-state: `{source}`\n"));
+            out.push_str(&format!(
+                "- Declared flags: `{}`; observed world flags: `{}` (`{}` true, `{}` false)\n",
+                gameplay["declaredFlagCount"].as_u64().unwrap_or(0),
+                gameplay["worldFlagCount"].as_u64().unwrap_or(0),
+                gameplay["trueFlagCount"].as_u64().unwrap_or(0),
+                gameplay["falseFlagCount"].as_u64().unwrap_or(0)
+            ));
+            out.push_str(&format!(
+                "- Trigger components: `{}`; goalFlag components: `{}`; trigger collision events: `{}`\n",
+                gameplay["triggerEntityCount"].as_u64().unwrap_or(0),
+                gameplay["goalFlagEntityCount"].as_u64().unwrap_or(0),
+                gameplay["triggerCollisionEventCount"].as_u64().unwrap_or(0)
+            ));
+            let true_flags = gameplay["trueFlags"]
+                .as_array()
+                .map(|flags| {
+                    flags
+                        .iter()
+                        .filter_map(|flag| flag.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "- True flags: {}\n\n",
+                if true_flags.is_empty() {
+                    "none".to_string()
+                } else {
+                    format!("`{true_flags}`")
+                }
+            ));
+        }
+        None => {
+            out.push_str("- No readable world-state trigger/flag evidence was available.\n\n");
+        }
+    }
+
     out.push_str("## Evidence\n\n");
     if evidence.artifacts.is_empty() {
         out.push_str("- No evidence artifacts indexed.\n");
@@ -10065,6 +10109,26 @@ fn render_journal(
         }
     }
     out
+}
+
+fn journal_gameplay_summary(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+) -> Option<(String, serde_json::Value)> {
+    let world_states = select_dashboard_artifacts(
+        run_dir,
+        &evidence.artifacts,
+        dashboard_artifact_is_world_state,
+    )
+    .ok()?;
+    let artifact = world_states.iter().find(|artifact| {
+        artifact.exists && artifact.read_error.is_none() && artifact.value.is_some()
+    })?;
+    let world_state = artifact.value.as_ref()?;
+    Some((
+        artifact.path.clone(),
+        dashboard_gameplay_summary(world_state),
+    ))
 }
 
 fn render_authoring_governance_journal_section(
@@ -16305,6 +16369,7 @@ pub struct RunDashboardEngineSummaries {
     pub animation: serde_json::Value,
     pub audio: serde_json::Value,
     pub physics: serde_json::Value,
+    pub gameplay: serde_json::Value,
     pub reload: serde_json::Value,
     pub composition: serde_json::Value,
 }
@@ -17321,6 +17386,7 @@ fn read_dashboard_engine_summaries(
             animation: json!({}),
             audio: json!({}),
             physics: json!({}),
+            gameplay: json!({}),
             reload: json!({}),
             composition: json!({}),
         };
@@ -17365,6 +17431,7 @@ fn read_dashboard_engine_summaries(
             "collisionEventCount": dashboard_array_len(world_state.get("collisionEvents")),
             "colliderEntityCount": dashboard_entities_with_component(world_state, "collider")
         }),
+        gameplay: dashboard_gameplay_summary(world_state),
         reload: json!({
             "reloadCount": dashboard_array_len(world_state.get("reloads")),
             "lastStatus": world_state.get("reloads")
@@ -17384,6 +17451,63 @@ fn read_dashboard_engine_summaries(
                 .unwrap_or(0)
         }),
     }
+}
+
+fn dashboard_gameplay_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let flag_entries = world_state
+        .get("goalFlags")
+        .and_then(|value| value.as_object())
+        .map(|flags| {
+            let mut entries = flags
+                .iter()
+                .map(|(id, value)| json!({ "id": id, "value": value.as_bool().unwrap_or(false) }))
+                .collect::<Vec<_>>();
+            entries.sort_by(|left, right| {
+                left.get("id")
+                    .and_then(|value| value.as_str())
+                    .cmp(&right.get("id").and_then(|value| value.as_str()))
+            });
+            entries
+        })
+        .unwrap_or_default();
+    let true_flags = flag_entries
+        .iter()
+        .filter(|entry| entry.get("value").and_then(|value| value.as_bool()) == Some(true))
+        .filter_map(|entry| entry.get("id").and_then(|value| value.as_str()))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let declared_flag_count = dashboard_array_len(world_state.pointer("/gameplayRules/flags"));
+    let trigger_collision_event_count = world_state
+        .get("collisionEvents")
+        .and_then(|events| events.as_array())
+        .map(|events| {
+            events
+                .iter()
+                .filter(|event| {
+                    event.get("type").and_then(|value| value.as_str())
+                        == Some("runtime.collision.trigger")
+                })
+                .count()
+        })
+        .unwrap_or(0);
+    json!({
+        "present": world_state.get("goalFlags").is_some()
+            || world_state.get("gameplayRules").is_some()
+            || world_state.get("componentModel").is_some(),
+        "declaredFlagCount": declared_flag_count,
+        "worldFlagCount": flag_entries.len(),
+        "trueFlagCount": true_flags.len(),
+        "falseFlagCount": flag_entries.len().saturating_sub(true_flags.len()),
+        "triggerEntityCount": world_state.pointer("/componentModel/counts/trigger")
+            .cloned()
+            .unwrap_or_else(|| json!(dashboard_entities_with_component(world_state, "trigger"))),
+        "goalFlagEntityCount": world_state.pointer("/componentModel/counts/goalFlag")
+            .cloned()
+            .unwrap_or_else(|| json!(dashboard_entities_with_component(world_state, "goalFlag"))),
+        "triggerCollisionEventCount": trigger_collision_event_count,
+        "trueFlags": true_flags,
+        "flags": flag_entries
+    })
 }
 
 fn read_dashboard_comparison(run_dir: &Path) -> RunDashboardComparison {
@@ -23758,6 +23882,7 @@ scenarios:
 
         for status in ["passed", "failed", "pending"] {
             let journal = render_journal(
+                Path::new("."),
                 &seed,
                 &evidence,
                 &ledger,
@@ -24018,6 +24143,7 @@ scenarios:
         });
 
         let journal = render_journal(
+            Path::new("."),
             &seed,
             &evidence,
             &ledger,
@@ -24036,6 +24162,7 @@ scenarios:
         );
 
         let malformed = render_journal(
+            Path::new("."),
             &seed,
             &evidence,
             &ledger,
@@ -29556,6 +29683,7 @@ scenarios:
             }
         });
         let journal = render_journal(
+            Path::new("."),
             &seed,
             &evidence,
             &[],
@@ -29570,6 +29698,7 @@ scenarios:
         assert!(journal.contains("Browser boundary: `openchrome_cdp` / `chrome_devtools_protocol`"));
 
         let malformed = render_journal(
+            Path::new("."),
             &seed,
             &evidence,
             &[],
@@ -29637,6 +29766,9 @@ scenarios:
                 "audioEvents": [{ "name": "player_spawn" }],
                 "collisions": [{ "pairId": "goal:player" }],
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
+                "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
+                "goalFlags": { "coin_collected": true, "door_open": true, "player_alive": true },
+                "componentModel": { "counts": { "trigger": 1, "goalFlag": 1 } },
                 "reloads": [{ "status": "succeeded" }],
                 "composition": { "entities": [{ "entityId": "player", "parent": null }] }
             }))
@@ -29681,10 +29813,27 @@ scenarios:
             json!(1)
         );
         assert_eq!(
+            model.engine_summaries.gameplay["declaredFlagCount"],
+            json!(2)
+        );
+        assert_eq!(model.engine_summaries.gameplay["worldFlagCount"], json!(3));
+        assert_eq!(model.engine_summaries.gameplay["trueFlagCount"], json!(3));
+        assert_eq!(
+            model.engine_summaries.gameplay["triggerCollisionEventCount"],
+            json!(1)
+        );
+        assert_eq!(
             model.engine_summaries.reload["lastStatus"],
             json!("succeeded")
         );
         assert_eq!(model.engine_summaries.composition["entityCount"], json!(1));
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+        assert!(journal.contains("## Gameplay Trigger/Flag Evidence"));
+        assert!(journal.contains("Declared flags: `2`; observed world flags: `3`"));
+        assert!(journal.contains(
+            "Trigger components: `1`; goalFlag components: `1`; trigger collision events: `1`"
+        ));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

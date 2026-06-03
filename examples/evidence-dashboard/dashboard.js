@@ -169,6 +169,25 @@ const OuroforgeDashboard = (() => {
     </article>`;
   }
 
+  function renderGameplaySummary(summary = {}) {
+    const gameplay = summary?.gameplay || {};
+    if (!summary?.present || !gameplay.present) {
+      return '<p class="empty-state">No trigger/flag world-state summary is available.</p>';
+    }
+    const trueFlags = Array.isArray(gameplay.trueFlags) && gameplay.trueFlags.length
+      ? gameplay.trueFlags.join(', ')
+      : 'none';
+    const rows = [
+      ['Declared flags', gameplay.declaredFlagCount ?? 0],
+      ['World flags', `${gameplay.worldFlagCount ?? 0} (${gameplay.trueFlagCount ?? 0} true / ${gameplay.falseFlagCount ?? 0} false)`],
+      ['Trigger components', gameplay.triggerEntityCount ?? 0],
+      ['Goal flag components', gameplay.goalFlagEntityCount ?? 0],
+      ['Trigger collision events', gameplay.triggerCollisionEventCount ?? 0],
+      ['True flags', trueFlags],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    return `<div class="field-grid">${rows}</div><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -933,6 +952,7 @@ const OuroforgeDashboard = (() => {
       </div>
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
+      <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1009,7 +1029,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

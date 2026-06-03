@@ -250,15 +250,16 @@ const run = {
   engine_summaries: {
     present: true,
     source_world_state: 'evidence/world.json',
-    scene: { sceneId: 'foundation-scene', entityCount: 3, tick: 4 },
+    scene: { sceneId: 'trigger-flags-v1-fixture', entityCount: 3, tick: 1 },
     renderer: { version: '1', renderedEntities: 3, camera: { x: 0, y: 0 } },
-    tilemaps: { tilemapCount: 1, layerCount: 4 },
-    assets: { manifestId: 'runtime-v1-assets', assetCount: 3 },
-    animation: { animatedEntityCount: 1 },
-    audio: { audioEntityCount: 1, audioEventCount: 1 },
-    physics: { colliderEntityCount: 3, collisionEventCount: 1 },
-    reload: { reloadCount: 1, lastStatus: 'succeeded' },
-    composition: { entityCount: 3, parentedEntityCount: 1 },
+    tilemaps: { tilemapCount: 0, layerCount: 0 },
+    assets: { manifestId: null, assetCount: 0 },
+    animation: { animatedEntityCount: 0 },
+    audio: { audioEntityCount: 0, audioEventCount: 0 },
+    physics: { colliderEntityCount: 2, collisionEventCount: 1 },
+    gameplay: { worldFlagCount: 3, trueFlagCount: 2, triggerCollisionEventCount: 1 },
+    reload: { reloadCount: 0, lastStatus: null },
+    composition: { entityCount: 3, parentedEntityCount: 0 },
   },
 };
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
@@ -448,8 +449,9 @@ assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { proj
 assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { project: '<bad>' } } }), /No project comparison fields/);
 assert.match(cockpit.renderSemanticComparisonSummary({ semantic: { reasons: [{ kind: '<script>', severity: '<img>', summary: '<bad>' }], warnings: ['<warn>'] } }), /&lt;bad&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
-assert.match(cockpit.renderEngineExpansionSurface(run), /foundation-scene/);
-assert.match(cockpit.renderEngineExpansionSurface(run), /runtime-v1-assets/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay flags/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);

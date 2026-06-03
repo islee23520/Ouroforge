@@ -63,6 +63,19 @@ node examples/game-runtime/components-v2.test.cjs
 
 See `docs/scene-component-model-v2.md` for the supported fields, edit paths, runtime/probe evidence shape, and explicit non-goals.
 
+## Gameplay Trigger and Flag System v1 fixture
+
+`trigger-flags-v1.json` is the focused source-like fixture for declared gameplay flags and trigger outcomes. It declares `gameplayRules.flags`, validates trigger/goal/HUD flag references, initializes runtime `goalFlags`, and supports `world_flags` scenario assertions plus read-only dashboard, journal, and Studio summaries.
+
+Run the focused checks with:
+
+```bash
+cargo run -p ouroforge-cli -- scene validate examples/game-runtime/trigger-flags-v1.json
+node examples/game-runtime/components-v2.test.cjs
+```
+
+See `docs/gameplay-trigger-flags-v1.md` for the evidence summary fields, assertion targets, read-only surface boundary, and explicit non-goals.
+
 ## Collision and Physics Rules v2 fixture
 
 `physics-rules-v2.json` is the focused fixture for collision layer catalogs plus deterministic gravity/jump behavior. It declares opt-in `collisionRules`, a dynamic player, and a static floor. Runtime evidence exposes `getWorldState().physics.grounded`, `getWorldState().collisions`, and captured `getEvents()` runtime events for bounded scenario assertions.
