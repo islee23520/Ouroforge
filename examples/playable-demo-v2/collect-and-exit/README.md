@@ -28,3 +28,5 @@ node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
 
 The smoke intentionally leaves `runs/`, `dashboard-data/`, screenshots, and other
 generated artifacts untracked.
+
+Canonical documentation: `docs/playable-demo-v2-collect-and-exit.md`.
