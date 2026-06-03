@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1",
+  "id": "engine-expressiveness-v2-regression-scene",
+  "bounds": { "width": 320, "height": 180 },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      { "id": "player_alive", "initial": true, "label": "Player alive" },
+      { "id": "key_collected", "initial": false, "label": "Key collected" },
+      { "id": "door_open", "initial": false, "label": "Door open" },
+      { "id": "exit_reached", "initial": false, "label": "Exit reached" }
+    ]
+  },
+  "collisionRules": { "defaultLayer": "default" },
+  "metadata": {
+    "fixture": "engine-expressiveness-v2-regression",
+    "sourceOnly": true,
+    "notes": [
+      "Scenario Coverage v3 aggregates deterministic evidence contracts only.",
+      "Generated runs and dashboard exports remain untracked."
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 32, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["player_alive"], "states": ["grounded"] },
+        "input": { "scheme": "keyboard", "moveSpeed": 3, "allowedActions": ["move", "jump"] },
+        "cameraTarget": { "weight": 2, "deadZone": { "width": 64, "height": 32 } },
+        "collider": { "shape": "aabb", "body": "dynamic", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 16 }, "collisionGroup": "player", "collisionMask": ["terrain", "triggers"] },
+        "animation": {
+          "mode": "sprite_frame",
+          "frameDuration": 2,
+          "loop": true,
+          "frames": [{ "color": "#5eead4" }, { "color": "#2dd4bf" }],
+          "clips": [{ "id": "idle", "frameDuration": 2, "loop": true, "frames": [{ "color": "#5eead4" }, { "color": "#2dd4bf" }] }],
+          "currentClip": "idle"
+        },
+        "audio": { "onSceneLoaded": [{ "name": "player_spawn", "action": "play", "muted": true }] }
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "key",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 96, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 12, "height": 12 }, "trigger": true, "collisionGroup": "triggers" },
+        "trigger": {
+          "id": "collect_key",
+          "kind": "overlap",
+          "targetFlag": "key_collected",
+          "onEnter": [
+            { "kind": "setFlag", "flag": "key_collected", "value": true },
+            { "kind": "setFlag", "flag": "door_open", "value": true },
+            { "kind": "hideEntity", "entityId": "key" }
+          ]
+        },
+        "goalFlag": { "flag": "key_collected", "label": "Key collected" }
+      },
+      "tags": ["collectible"]
+    },
+    {
+      "id": "exit",
+      "sprite": { "color": "#a78bfa" },
+      "components": {
+        "transform": { "x": 220, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 24 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 24 }, "trigger": true, "collisionGroup": "triggers" },
+        "trigger": { "id": "enter_exit", "kind": "overlap", "targetFlag": "exit_reached", "requiredFlags": ["door_open"], "onEnter": [{ "kind": "setFlag", "flag": "exit_reached", "value": true }] },
+        "goalFlag": { "flag": "exit_reached", "label": "Exit reached" }
+      },
+      "tags": ["exit"]
+    },
+    {
+      "id": "hud_goal",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 8 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 128, "height": 12 },
+        "uiText": { "text": "Goal: collect key and exit", "role": "hud", "bindFlag": "exit_reached" },
+        "hudValue": { "kind": "goal", "label": "Goal", "value": "Collect key and exit", "bindFlag": "exit_reached" }
+      },
+      "tags": ["hud"]
+    },
+    {
+      "id": "floor",
+      "sprite": { "color": "#64748b" },
+      "components": {
+        "transform": { "x": 0, "y": 96 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 320, "height": 16 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 320, "height": 16 }, "collisionGroup": "terrain" }
+      },
+      "tags": ["terrain"]
+    }
+  ]
+}

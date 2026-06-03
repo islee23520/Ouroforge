@@ -21027,6 +21027,50 @@ scenarios:
     }
 
     #[test]
+    fn validates_engine_expressiveness_v2_regression_seed_and_pack() {
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../examples/engine-expressiveness-v2-regression/seeds/engine-expressiveness-v2-regression.yaml"
+        ))
+        .expect("engine expressiveness v2 regression seed validates");
+        let scenario_ids: Vec<_> = seed
+            .scenarios
+            .iter()
+            .map(|scenario| scenario.id.as_str())
+            .collect();
+        assert_eq!(
+            scenario_ids,
+            vec![
+                "component-schema-v2-regression",
+                "trigger-flags-v1-regression",
+                "multi-scene-transition-v1-contract",
+                "hud-values-v1-regression",
+                "collision-layers-v2-regression",
+                "animation-event-v1-regression",
+                "audio-event-v1-regression",
+                "playable-demo-loop-v2-regression",
+            ]
+        );
+
+        let pack = ScenarioPack::from_path(repo_fixture_path(
+            "examples/engine-expressiveness-v2-regression/scenarios/expressiveness-v2-regression.json",
+        ))
+        .expect("engine expressiveness v2 scenario pack validates");
+        assert_eq!(pack.id, "expressiveness-v2-regression");
+        assert_eq!(pack.scenario_groups.len(), 2);
+        let packed_count: usize = pack
+            .scenario_groups
+            .iter()
+            .map(|group| group.scenarios.len())
+            .sum();
+        assert_eq!(packed_count, seed.scenarios.len());
+
+        ProjectManifest::from_path(repo_fixture_path(
+            "examples/engine-expressiveness-v2-regression/ouroforge.project.json",
+        ))
+        .expect("engine expressiveness v2 project manifest validates");
+    }
+
+    #[test]
     fn parses_valid_scenario_dsl() {
         let valid = r#"
 id: platformer.v0

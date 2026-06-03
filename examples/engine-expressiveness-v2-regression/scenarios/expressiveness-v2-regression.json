@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "expressiveness-v2-regression",
+  "description": "Feature-focused Engine Expressiveness v2 regression scenarios and evidence contracts.",
+  "seed": "seeds/engine-expressiveness-v2-regression.yaml",
+  "scenes": ["scenes/expressiveness-v2.scene.json"],
+  "scenarioGroups": [
+    {
+      "id": "component-and-trigger-contracts",
+      "description": "Component schema, trigger/flag, and transition evidence contracts.",
+      "scenarios": [
+        {
+          "id": "component-schema-v2-regression",
+          "description": "Assert component schema probe counts and typed component read-model paths.",
+          "steps": [{ "wait": { "frames": 1 } }],
+          "assertions": [
+            { "world_state": { "path": "componentModel.version", "equals": "2" } },
+            { "world_state": { "path": "componentModel.counts.status", "greaterThan": 0 } },
+            { "world_state": { "path": "componentModel.counts.input", "greaterThan": 0 } },
+            { "world_state": { "path": "componentModel.counts.trigger", "greaterThan": 0 } },
+            { "world_state": { "path": "componentModel.counts.cameraTarget", "greaterThan": 0 } }
+          ]
+        },
+        {
+          "id": "trigger-flags-v1-regression",
+          "description": "Assert trigger-set flag evidence through existing bounded goal-flag state.",
+          "steps": [{ "replay": { "schemaVersion": "1", "id": "trigger-flags-v1-regression", "events": [{ "frame": 0, "key": "right", "pressed": true }, { "frame": 40, "key": "right", "pressed": false }] } }],
+          "assertions": [
+            { "world_state": { "path": "componentModel.goalFlags.key_collected", "equals": true } },
+            { "world_state": { "path": "componentModel.goalFlags.door_open", "equals": true } },
+            { "runtime_events": { "path": "events", "exists": true } }
+          ]
+        },
+        {
+          "id": "multi-scene-transition-v1-contract",
+          "description": "Track the multi-scene transition evidence contract without adding scene-loading behavior in this suite.",
+          "assertions": [
+            { "world_state": { "path": "sceneId", "exists": true } },
+            { "runtime_events": { "path": "events", "exists": true } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "runtime-evidence-contracts",
+      "description": "HUD, collision, animation, audio, and playable-loop evidence contracts.",
+      "scenarios": [
+        {
+          "id": "hud-values-v1-regression",
+          "description": "Assert HUD values remain observable as read-only component-model evidence.",
+          "assertions": [
+            { "world_state": { "path": "componentModel.counts.hudValue", "greaterThan": 0 } },
+            { "world_state": { "path": "componentModel.hudValues.0.kind", "equals": "goal" } },
+            { "world_state": { "path": "componentModel.hudValues.0.text", "contains": "Goal" } }
+          ]
+        },
+        {
+          "id": "collision-layers-v2-regression",
+          "description": "Assert layered collision/contact evidence remains deterministic.",
+          "steps": [{ "replay": { "schemaVersion": "1", "id": "collision-layers-v2-regression", "events": [{ "frame": 0, "key": "right", "pressed": true }, { "frame": 90, "key": "right", "pressed": false }] } }],
+          "assertions": [
+            { "world_state": { "path": "collisionRules.defaultLayer", "equals": "default" } },
+            { "world_state": { "path": "physics.grounded.player", "equals": true } },
+            { "collision_evidence": { "path": "contacts", "exists": true } }
+          ]
+        },
+        {
+          "id": "animation-event-v1-regression",
+          "description": "Assert sprite-frame animation evidence remains linked to deterministic runtime state.",
+          "steps": [{ "wait": { "frames": 4 } }],
+          "assertions": [
+            { "animation_evidence": { "path": "0.mode", "equals": "sprite_frame" } },
+            { "world_state": { "path": "entities.0.components.animation.state.frameIndex", "exists": true } }
+          ]
+        },
+        {
+          "id": "audio-event-v1-regression",
+          "description": "Assert audio checks remain intent-only evidence and do not require real playback.",
+          "assertions": [
+            { "audio_evidence": { "path": "0.name", "equals": "player_spawn" } },
+            { "audio_evidence": { "path": "0.playback", "equals": "intent" } }
+          ]
+        },
+        {
+          "id": "playable-demo-loop-v2-regression",
+          "description": "Assert collect-key, door-open, and exit-reached evidence for the one-screen playable loop.",
+          "steps": [{ "replay": { "schemaVersion": "1", "id": "playable-demo-loop-v2-regression", "events": [{ "frame": 0, "key": "right", "pressed": true }, { "frame": 90, "key": "right", "pressed": false }] } }],
+          "assertions": [
+            { "world_state": { "path": "componentModel.goalFlags.key_collected", "equals": true } },
+            { "world_state": { "path": "componentModel.goalFlags.exit_reached", "equals": true } },
+            { "world_state": { "path": "componentModel.hudValues", "exists": true } }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "engine_expressiveness_v2_regression",
+    "name": "Engine Expressiveness v2 Regression Suite"
+  },
+  "scenes": [
+    {
+      "id": "expressiveness-v2",
+      "path": "scenes/expressiveness-v2.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "engine-expressiveness-v2-regression",
+      "path": "seeds/engine-expressiveness-v2-regression.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "expressiveness-v2-regression",
+      "path": "scenarios/expressiveness-v2-regression.json"
+    }
+  ],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": ["runs", "target", "dashboard-data"]
+  }
+}
