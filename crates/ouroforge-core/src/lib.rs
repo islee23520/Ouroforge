@@ -4262,8 +4262,20 @@ pub fn append_mutation_review_decision(
                 input.patch_draft_id
             )
         })?;
+    let proposals = read_mutation_proposals(run_dir)?;
+    let proposal_ids = proposals
+        .proposals
+        .iter()
+        .map(|proposal| proposal.id.as_str())
+        .collect::<std::collections::HashSet<_>>();
     let proposal_id = match input.proposal_id {
         Some(proposal_id) => {
+            if !proposal_ids.contains(proposal_id.as_str()) {
+                return Err(anyhow!(
+                    "mutation review proposal id not found: {}",
+                    proposal_id
+                ));
+            }
             if proposal_id.as_str() != draft.proposal_id.as_str() {
                 return Err(anyhow!(
                     "mutation review proposal_id {} does not match patch draft {} proposal_id {}",
@@ -4297,12 +4309,6 @@ pub fn append_mutation_review_decision(
         .drafts
         .iter()
         .map(|draft| draft.id.as_str())
-        .collect::<std::collections::HashSet<_>>();
-    let proposals = read_mutation_proposals(run_dir)?;
-    let proposal_ids = proposals
-        .proposals
-        .iter()
-        .map(|proposal| proposal.id.as_str())
         .collect::<std::collections::HashSet<_>>();
     decision.validate(&draft_ids, &proposal_ids)?;
     artifact.decisions.push(decision.clone());
@@ -9127,6 +9133,12 @@ pub struct SceneOnlyMutationOperation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectSceneMutationContext>,
     pub edit: SceneEdit,
+    #[serde(
+        rename = "reviewDecisionId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_decision_id: Option<String>,
     #[serde(rename = "expectedBeforeSceneHash")]
     pub expected_before_scene_hash: SceneHash,
     #[serde(rename = "validationRequired")]
@@ -9159,6 +9171,12 @@ pub struct SceneOnlyMutationValidation {
     pub before_scene_hash: SceneHash,
     #[serde(rename = "allowedPath")]
     pub allowed_path: bool,
+    #[serde(
+        rename = "reviewDecisionId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_decision_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectSceneMutationContext>,
 }
@@ -9171,6 +9189,12 @@ pub struct SceneOnlyMutationApplicationRecord {
     pub proposal_id: String,
     #[serde(rename = "transactionId")]
     pub transaction_id: String,
+    #[serde(
+        rename = "reviewDecisionId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_decision_id: Option<String>,
     #[serde(rename = "targetScenePath")]
     pub target_scene_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -9192,6 +9216,110 @@ pub struct SceneOnlyMutationApplicationRecord {
 #[serde(deny_unknown_fields)]
 pub struct SceneOnlyMutationApplicationIndex {
     pub applications: Vec<SceneOnlyMutationApplicationRecord>,
+}
+
+fn canonical_json_digest(value: serde_json::Value) -> Result<String> {
+    let bytes = serde_json::to_vec(&canonical_json_value(value))
+        .context("failed to serialize canonical JSON for digest")?;
+    Ok(format!("{:016x}", fnv1a64(&bytes)))
+}
+
+fn validate_review_gated_scene_apply_decision(
+    run_dir: &Path,
+    operation: &SceneOnlyMutationOperation,
+) -> Result<Option<String>> {
+    let Some(decision_id) = operation.review_decision_id.as_deref() else {
+        return Ok(None);
+    };
+    require_text("scene-only mutation reviewDecisionId", decision_id)?;
+    let review = read_mutation_review_artifact(run_dir)?;
+    let decision = review
+        .decisions
+        .iter()
+        .find(|decision| decision.id == decision_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "review-gated scene apply decision id not found: {}",
+                decision_id
+            )
+        })?;
+    if decision.state != MutationReviewState::Accepted
+        || decision.decision_status.as_ref() != Some(&MutationReviewState::Accepted)
+    {
+        return Err(anyhow!(
+            "review-gated scene apply requires an accepted decision; found {:?}",
+            decision.decision_status.as_ref().unwrap_or(&decision.state)
+        ));
+    }
+    if decision.proposal_id.as_deref() != Some(operation.proposal_id.as_str()) {
+        return Err(anyhow!(
+            "review-gated scene apply decision {} is not linked to proposal {}",
+            decision_id,
+            operation.proposal_id
+        ));
+    }
+    if decision.evidence_refs.is_empty() {
+        return Err(anyhow!(
+            "review-gated scene apply decision {} requires evidence refs",
+            decision_id
+        ));
+    }
+    let checklist = decision.guardrail_checklist.as_ref().ok_or_else(|| {
+        anyhow!(
+            "review-gated scene apply decision {} requires a guardrail checklist",
+            decision_id
+        )
+    })?;
+    checklist.validate()?;
+    if let Some(expected_hashes) = &decision.expected_hashes {
+        if let Some(expected) = expected_hashes.proposal_index_hash.as_deref() {
+            let actual = canonical_json_digest(json!(read_mutation_proposals(run_dir)?))?;
+            if expected != actual {
+                return Err(anyhow!(
+                    "review-gated scene apply decision {} proposal index hash mismatch; expected {}, found {}",
+                    decision_id, expected, actual
+                ));
+            }
+        }
+        if let Some(expected) = expected_hashes.patch_draft_hash.as_deref() {
+            let actual = canonical_json_digest(json!(read_patch_draft_artifact(run_dir)?))?;
+            if expected != actual {
+                return Err(anyhow!(
+                    "review-gated scene apply decision {} patch draft hash mismatch; expected {}, found {}",
+                    decision_id, expected, actual
+                ));
+            }
+        }
+        if let Some(expected) = expected_hashes.evidence_index_hash.as_deref() {
+            let actual = canonical_json_digest(json!(read_evidence_index(run_dir)?))?;
+            if expected != actual {
+                return Err(anyhow!(
+                    "review-gated scene apply decision {} evidence index hash mismatch; expected {}, found {}",
+                    decision_id, expected, actual
+                ));
+            }
+        }
+    }
+    let applications = read_scene_only_mutation_applications(run_dir)?;
+    if applications
+        .applications
+        .iter()
+        .any(|application| application.review_decision_id.as_deref() == Some(decision_id))
+    {
+        return Err(anyhow!(
+            "review-gated scene apply decision {} was already used",
+            decision_id
+        ));
+    }
+    if applications.applications.iter().any(|application| {
+        application.proposal_id == operation.proposal_id && application.status == "applied"
+    }) {
+        return Err(anyhow!(
+            "review-gated scene apply proposal {} already has an applied scene mutation",
+            operation.proposal_id
+        ));
+    }
+    Ok(Some(decision_id.to_string()))
 }
 
 fn validate_project_scene_mutation_context(
@@ -9327,6 +9455,7 @@ pub fn validate_scene_only_mutation_operation(
     let scene = read_scene(&operation.target_scene_path)?;
     let before_scene_hash = hash_scene_document(&scene)?;
     let project = validate_project_scene_mutation_context(operation, &before_scene_hash)?;
+    let review_decision_id = validate_review_gated_scene_apply_decision(run_dir, operation)?;
     if before_scene_hash != operation.expected_before_scene_hash {
         return Err(anyhow!(
             "scene-only mutation before hash mismatch; expected {}, found {}",
@@ -9343,6 +9472,7 @@ pub fn validate_scene_only_mutation_operation(
         target_scene_path: operation.target_scene_path.clone(),
         before_scene_hash,
         allowed_path: true,
+        review_decision_id,
         project,
     })
 }
@@ -9561,6 +9691,7 @@ pub fn apply_scene_only_mutation_operation(
     let scene = read_scene(&operation.target_scene_path)?;
     let before_scene_hash = hash_scene_document(&scene)?;
     let project = validate_project_scene_mutation_context(operation, &before_scene_hash)?;
+    let review_decision_id = validate_review_gated_scene_apply_decision(run_dir, operation)?;
     if before_scene_hash != operation.expected_before_scene_hash {
         return Err(anyhow!(
             "scene-only mutation before hash mismatch; expected {}, found {}",
@@ -9599,6 +9730,7 @@ pub fn apply_scene_only_mutation_operation(
         "mutation-cli",
         json!({
             "proposal_id": operation.proposal_id,
+            "decision_id": review_decision_id,
             "application_id": application.id,
             "transaction_id": transaction.id,
             "transaction_artifact_path": transaction_output.to_string_lossy(),
@@ -9627,6 +9759,7 @@ fn append_scene_only_mutation_application(
         ),
         proposal_id: operation.proposal_id.clone(),
         transaction_id: transaction.id.clone(),
+        review_decision_id: operation.review_decision_id.clone(),
         target_scene_path: operation.target_scene_path.clone(),
         project: operation.project.clone(),
         transaction_artifact_path: transaction_output.to_string_lossy().to_string(),
@@ -16041,17 +16174,14 @@ scenarios:
         )
         .expect_err("mismatched proposal id fails");
 
-        assert!(error
-            .to_string()
-            .contains("does not match patch draft"));
+        assert!(error.to_string().contains("does not match patch draft"));
         let artifact =
             read_mutation_review_artifact(&artifacts.run_dir).expect("review artifact reads");
         assert!(artifact.decisions.is_empty());
-        let ledger = read_ledger(&artifacts.run_dir).expect("ledger reads");
+        let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
         assert!(!ledger
-            .events
             .iter()
-            .any(|event| event.kind == "mutation.review_decision"));
+            .any(|event| event["event"] == "mutation.review_decision"));
         fs::remove_dir_all(root).ok();
     }
 
@@ -17933,6 +18063,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash.clone(),
             validation_required: true,
         };
@@ -17965,6 +18096,7 @@ scenarios:
                 path: "metadata.debug.mode".to_string(),
                 value: json!("unsafe"),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash,
             validation_required: true,
         };
@@ -17974,6 +18106,7 @@ scenarios:
         assert!(forbidden_error.to_string().contains("not allowed"));
 
         let stale = SceneOnlyMutationOperation {
+            review_decision_id: None,
             expected_before_scene_hash: SceneHash {
                 algorithm: "fnv1a64-canonical-json-v1".to_string(),
                 value: "0000000000000000".to_string(),
@@ -18017,6 +18150,7 @@ scenarios:
                 path: "components.size.width".to_string(),
                 value: json!(0),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash,
             validation_required: true,
         };
@@ -18047,6 +18181,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash.clone(),
             validation_required: true,
         };
@@ -18082,6 +18217,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash.clone(),
             validation_required: true,
         };
@@ -18146,6 +18282,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: outside_scene_hash,
             validation_required: true,
         };
@@ -18165,6 +18302,7 @@ scenarios:
                 scene_path: "scenes/other.scene.json".to_string(),
                 ..project_context.clone()
             }),
+            review_decision_id: None,
             expected_before_scene_hash: before_hash.clone(),
             ..outside_target.clone()
         };
@@ -18219,6 +18357,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash,
             validation_required: true,
         };
@@ -18395,6 +18534,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash,
             validation_required: true,
         };
@@ -18436,6 +18576,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash,
             validation_required: true,
         };
@@ -18474,6 +18615,7 @@ scenarios:
                 path: "components.transform.x".to_string(),
                 value: json!(48),
             },
+            review_decision_id: None,
             expected_before_scene_hash: before_hash.clone(),
             validation_required: true,
         };
@@ -18525,6 +18667,7 @@ scenarios:
                 path: "components.size.width".to_string(),
                 value: json!(0),
             },
+            review_decision_id: None,
             expected_before_scene_hash: hash_scene_document(
                 &read_scene(&scene_path).expect("updated scene reads"),
             )
@@ -18546,6 +18689,181 @@ scenarios:
                 .width,
             16
         );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn review_gated_scene_apply_requires_accepted_decision_and_records_linkage() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("review-gated-scene-apply-success");
+        let draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let expected_hashes = MutationReviewExpectedHashes {
+            proposal_index_hash: Some(
+                canonical_json_digest(json!(read_mutation_proposals(&artifacts.run_dir).unwrap()))
+                    .unwrap(),
+            ),
+            patch_draft_hash: Some(
+                canonical_json_digest(
+                    json!(read_patch_draft_artifact(&artifacts.run_dir).unwrap()),
+                )
+                .unwrap(),
+            ),
+            evidence_index_hash: Some(
+                canonical_json_digest(json!(read_evidence_index(&artifacts.run_dir).unwrap()))
+                    .unwrap(),
+            ),
+        };
+        let decision = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &draft,
+            &proposal,
+            Some(expected_hashes),
+        );
+        let operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash,
+            Some(decision.id.clone()),
+        );
+        let validation = validate_scene_only_mutation_operation(&artifacts.run_dir, &operation)
+            .expect("review-gated operation validates");
+        assert_eq!(
+            validation.review_decision_id.as_deref(),
+            Some(decision.id.as_str())
+        );
+
+        let transaction_path = root.join("transactions/review-gated-apply.json");
+        apply_scene_only_mutation_operation(&artifacts.run_dir, &operation, &transaction_path)
+            .expect("review-gated apply succeeds");
+
+        let applications =
+            read_json_value(artifacts.run_dir.join("mutation/scene-applications.json"))
+                .expect("scene applications reads");
+        assert_eq!(applications["applications"][0]["proposalId"], proposal.id);
+        assert_eq!(
+            applications["applications"][0]["reviewDecisionId"],
+            decision.id
+        );
+        let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(ledger.iter().any(|event| {
+            event["event"] == "mutation.scene_applied"
+                && event["payload"]["decision_id"] == decision.id
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn review_gated_scene_apply_rejects_missing_rejected_stale_and_duplicate_before_write() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("review-gated-scene-apply-rejects");
+        let draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+        let missing_transaction = root.join("transactions/missing-decision.json");
+        let missing_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash.clone(),
+            Some("missing-decision".to_string()),
+        );
+        let missing = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &missing_operation,
+            &missing_transaction,
+        )
+        .expect_err("missing decision rejects");
+        assert!(missing.to_string().contains("decision id not found"));
+        assert!(!missing_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+
+        let rejected = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: draft.drafts[0].id.clone(),
+                proposal_id: Some(proposal.id.clone()),
+                state: MutationReviewState::Rejected,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "manual review rejected scene-only mutation".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect("rejected decision appends");
+        let rejected_transaction = root.join("transactions/rejected-decision.json");
+        let rejected_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash.clone(),
+            Some(rejected.id),
+        );
+        let rejected_error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &rejected_operation,
+            &rejected_transaction,
+        )
+        .expect_err("rejected decision rejects");
+        assert!(rejected_error
+            .to_string()
+            .contains("requires an accepted decision"));
+        assert!(!rejected_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+
+        let stale_decision = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &draft,
+            &proposal,
+            Some(MutationReviewExpectedHashes {
+                proposal_index_hash: Some("stale-proposal-index".to_string()),
+                patch_draft_hash: None,
+                evidence_index_hash: None,
+            }),
+        );
+        let stale_transaction = root.join("transactions/stale-decision.json");
+        let stale_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash.clone(),
+            Some(stale_decision.id),
+        );
+        let stale_error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &stale_operation,
+            &stale_transaction,
+        )
+        .expect_err("stale decision rejects");
+        assert!(stale_error
+            .to_string()
+            .contains("proposal index hash mismatch"));
+        assert!(!stale_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+
+        let accepted = accepted_scene_apply_decision(&artifacts.run_dir, &draft, &proposal, None);
+        let first_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash,
+            Some(accepted.id.clone()),
+        );
+        let first_transaction = root.join("transactions/first-accepted.json");
+        apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &first_operation,
+            &first_transaction,
+        )
+        .expect("first accepted apply succeeds");
+        let after_first = fs::read_to_string(&scene_path).expect("scene after first reads");
+        let duplicate_transaction = root.join("transactions/duplicate-accepted.json");
+        let duplicate = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &first_operation,
+            &duplicate_transaction,
+        )
+        .expect_err("duplicate decision rejects");
+        assert!(duplicate.to_string().contains("already used"));
+        assert!(!duplicate_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), after_first);
         fs::remove_dir_all(root).ok();
     }
 
@@ -21799,6 +22117,75 @@ scenarios:
         let scene = read_scene(&scene_path).expect("scene reads");
         let before_hash = hash_scene_document(&scene).expect("scene hashes");
         (root, artifacts, proposal, scene_path, before_hash)
+    }
+
+    fn write_scene_mutation_patch_draft(
+        run_dir: &Path,
+        proposal: &MutationProposal,
+    ) -> PatchDraftArtifact {
+        let run = read_json_value(run_dir.join("run.json")).expect("run reads");
+        let run_id = json_string(&run, "id").unwrap_or_else(|| "run-review-gated".to_string());
+        let artifact = PatchDraftArtifact {
+            schema_version: "1".to_string(),
+            run_id,
+            drafts: vec![PatchDraft {
+                id: "patch-draft-scene-apply-1".to_string(),
+                proposal_id: proposal.id.clone(),
+                classification_id: "classification-scene-apply-1".to_string(),
+                lifecycle_state: PatchDraftState::Drafted,
+                target_path: "scenes/review-gated-apply.scene.json".to_string(),
+                rationale: "scene-only mutation draft reviewed before apply".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                draft_text: "scene-only edit draft; no source patch apply".to_string(),
+            }],
+        };
+        write_patch_draft_artifact(run_dir, &artifact).expect("patch draft writes");
+        artifact
+    }
+
+    fn scene_apply_operation(
+        proposal: &MutationProposal,
+        scene_path: &Path,
+        before_hash: SceneHash,
+        review_decision_id: Option<String>,
+    ) -> SceneOnlyMutationOperation {
+        SceneOnlyMutationOperation {
+            schema_version: "scene-only-mutation-v1".to_string(),
+            proposal_id: proposal.id.clone(),
+            target_scene_path: scene_path.to_string_lossy().to_string(),
+            project: None,
+            edit: SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.transform.x".to_string(),
+                value: json!(48),
+            },
+            review_decision_id,
+            expected_before_scene_hash: before_hash,
+            validation_required: true,
+        }
+    }
+
+    fn accepted_scene_apply_decision(
+        run_dir: &Path,
+        draft: &PatchDraftArtifact,
+        proposal: &MutationProposal,
+        expected_hashes: Option<MutationReviewExpectedHashes>,
+    ) -> MutationReviewDecision {
+        append_mutation_review_decision(
+            run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: draft.drafts[0].id.clone(),
+                proposal_id: Some(proposal.id.clone()),
+                state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "manual review accepted scene-only mutation application".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect("accepted decision appends")
     }
 
     fn create_project_scene_only_mutation_fixture(
