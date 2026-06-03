@@ -36,6 +36,7 @@ The cockpit composes completed local surfaces only:
 - run/evidence browser from generated dashboard data;
 - journal viewer when journal data exists;
 - mutation review lifecycle state and manual command hints when artifacts exist;
+- Studio Review Cockpit v1 proposal/review/application cards from exported lifecycle state;
 - project-scoped scene-only mutation proposal/application lifecycle state when artifacts exist;
 - regression promotion records and display-only dry-run commands when artifacts exist;
 - regression run matrix status from generated dashboard data when project-bound runs exist;
@@ -45,7 +46,7 @@ The cockpit composes completed local surfaces only:
 - transaction-bound QA command generation;
 - semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist.
 
-Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, command bridge, or mutation acceptance/application from the browser. Studio v3 verification evidence is recorded in `../../docs/studio-v3-project-workspace-cockpit.md`; Studio v2 evidence remains in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
+Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, command bridge, or mutation acceptance/application from the browser. Studio Review Cockpit v1 review/regression boundaries are documented in `../../docs/studio-review-cockpit-v1.md`. Studio v3 verification evidence is recorded in `../../docs/studio-v3-project-workspace-cockpit.md`; Studio v2 evidence remains in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
 
 ## QA and evidence loop
 
@@ -61,7 +62,7 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs \
   --output examples/evidence-dashboard/dashboard-data.json
 ```
 
-After exporting dashboard data, refresh the cockpit to view project workspace context, latest project-bound run evidence, authoring provenance, semantic project comparison, project-scoped scene-only mutation lifecycle, regression promotion records, regression run matrix status, and journal panes. The browser still does not execute commands or mutate files directly.
+After exporting dashboard data, refresh the cockpit to view project workspace context, latest project-bound run evidence, authoring provenance, semantic project comparison, Studio review cockpit lifecycle cards, project-scoped scene-only mutation lifecycle, regression promotion records, regression run matrix status, and journal panes. The browser still does not execute commands or mutate files directly.
 
 ## Live preview controls
 
@@ -110,6 +111,12 @@ copyable command, seed path, workers, scenario pack, and Openchrome/CDP boundary
 but it must not execute, rerun, bridge, or persist that command. See
 `docs/reproducible-run-command-context-v1.md`.
 
+
+Studio Review Cockpit v1 shows proposal/review/application/promotion/matrix
+status as escaped display-only cards from exported `review_cockpit`,
+`mutation_lifecycle`, `regression_promotions`, and `regression_matrix` data. It
+must not accept, apply, promote, rerun, write files, or execute displayed CLI
+commands. See `../../docs/studio-review-cockpit-v1.md`.
 
 Regression Run Matrix v1 is shown as escaped display-only project/scenario-pack
 status from exported `regression_matrix` data. The cockpit may show current
