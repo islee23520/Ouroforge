@@ -22,7 +22,7 @@ use ouroforge_core::{
     write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
     MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectAssetManifest,
     ProjectAssetType, ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, WorkerId,
+    SceneOnlyMutationOperation, Seed, VisualEditDraftArtifact, VisualEditDraftTargetType, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -104,6 +104,10 @@ enum Commands {
     Scene {
         #[command(subcommand)]
         command: SceneCommand,
+    },
+    Edit {
+        #[command(subcommand)]
+        command: EditCommand,
     },
     Loop {
         #[command(subcommand)]
@@ -213,6 +217,15 @@ enum SceneCommand {
         value: String,
         #[arg(long, value_name = "PATH")]
         transaction_output: Option<PathBuf>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum EditCommand {
+    DraftPreview {
+        draft_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project: PathBuf,
     },
 }
 
@@ -957,6 +970,16 @@ fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&scene)?);
             }
         }
+        Commands::Edit {
+            command:
+                EditCommand::DraftPreview {
+                    draft_path,
+                    project,
+                },
+        } => {
+            let preview = preview_visual_edit_draft_cli(&draft_path, &project)?;
+            println!("{}", serde_json::to_string_pretty(&preview)?);
+        }
     }
 
     Ok(())
@@ -1067,6 +1090,95 @@ fn bind_project_context_to_scene_mutation_operation(
         operation.project = Some(context);
     }
     Ok(operation)
+}
+
+fn preview_visual_edit_draft_cli(
+    draft_path: &Path,
+    project_root_or_manifest: &Path,
+) -> Result<serde_json::Value> {
+    let draft_input = std::fs::read_to_string(draft_path)
+        .with_context(|| format!("failed to read visual edit draft {}", draft_path.display()))?;
+    let draft: VisualEditDraftArtifact = serde_json::from_str(&draft_input)
+        .with_context(|| format!("failed to parse visual edit draft {}", draft_path.display()))?;
+    let manifest_path = resolve_project_manifest_path(project_root_or_manifest);
+    let manifest = ProjectManifest::from_path(&manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    match draft.target.target_type {
+        VisualEditDraftTargetType::Scene => {
+            let scene_ref = resolve_visual_edit_scene_target(&draft, &manifest)?;
+            let scene_path = project_root.join(&scene_ref.path);
+            let previews = draft
+                .preview_scene_edit_transactions(&scene_path)
+                .with_context(|| {
+                    format!(
+                        "failed to preview scene visual edit draft {} against {}",
+                        draft_path.display(),
+                        scene_path.display()
+                    )
+                })?;
+            Ok(serde_json::json!({
+                "schemaVersion": "visual-edit-draft-preview-cli-v1",
+                "draftId": draft.draft_id,
+                "projectId": manifest.project.id,
+                "manifestPath": manifest_path.to_string_lossy(),
+                "target": {
+                    "type": "scene",
+                    "path": scene_ref.path,
+                    "id": scene_ref.id,
+                },
+                "previewKind": "scene_edit_transactions",
+                "previews": previews,
+                "guardrail": "preview only; no scene writes, transaction output writes, browser trusted writes, or apply behavior",
+            }))
+        }
+        VisualEditDraftTargetType::Tilemap | VisualEditDraftTargetType::AssetReference => {
+            Err(anyhow!(
+                "edit draft-preview VA1.6.1 supports scene drafts only; {:?} draft targets are reserved for later #348 PR units",
+                draft.target.target_type
+            ))
+        }
+    }
+}
+
+fn resolve_visual_edit_scene_target<'a>(
+    draft: &VisualEditDraftArtifact,
+    manifest: &'a ProjectManifest,
+) -> Result<&'a ouroforge_core::ProjectManifestPathRef> {
+    let by_path = manifest
+        .scenes
+        .iter()
+        .find(|scene_ref| scene_ref.path == draft.target.path);
+    let by_id = draft.target.id.as_ref().and_then(|target_id| {
+        manifest
+            .scenes
+            .iter()
+            .find(|scene_ref| &scene_ref.id == target_id)
+    });
+    match (by_path, by_id) {
+        (Some(path_match), Some(id_match)) if path_match.id == id_match.id => Ok(path_match),
+        (Some(path_match), None) if draft.target.id.is_none() => Ok(path_match),
+        (Some(_), Some(_)) => Err(anyhow!(
+            "visual edit draft scene target path {} and id {:?} refer to different project scenes",
+            draft.target.path,
+            draft.target.id
+        )),
+        (Some(path_match), None) => Err(anyhow!(
+            "visual edit draft scene target id {:?} is not declared in project manifest",
+            draft.target.id
+        ))
+        .with_context(|| format!("matched scene path {}", path_match.path)),
+        (None, Some(_)) => Err(anyhow!(
+            "visual edit draft scene target path {} is not declared in project manifest",
+            draft.target.path
+        )),
+        (None, None) => Err(anyhow!(
+            "visual edit draft scene target {} is not declared in project manifest",
+            draft.target.path
+        )),
+    }
 }
 
 fn try_handle_evolve_sandbox_command() -> Result<bool> {
