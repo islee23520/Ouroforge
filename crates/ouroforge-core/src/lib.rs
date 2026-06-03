@@ -2507,6 +2507,9 @@ pub fn execute_authoring_loop_step(
         AuthoringLoopStepKind::RunScenarioPack
             | AuthoringLoopStepKind::CompareRuns
             | AuthoringLoopStepKind::GenerateProposal
+            | AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+            | AuthoringLoopStepKind::Rerun
+            | AuthoringLoopStepKind::PromoteRegression
     ) {
         blocked_reasons.push(format!(
             "step kind {} is reserved for a later #306 PR unit",
@@ -2560,11 +2563,16 @@ pub fn execute_authoring_loop_step(
         AuthoringLoopStepKind::GenerateProposal => {
             execute_authoring_loop_proposal_step(&step, base_dir)?
         }
-        AuthoringLoopStepKind::RecordReviewDecision
-        | AuthoringLoopStepKind::ApplyAcceptedSceneMutation
-        | AuthoringLoopStepKind::Rerun
-        | AuthoringLoopStepKind::PromoteRegression
-        | AuthoringLoopStepKind::Summarize => {
+        AuthoringLoopStepKind::ApplyAcceptedSceneMutation => {
+            execute_authoring_loop_apply_step(&step, base_dir)?
+        }
+        AuthoringLoopStepKind::Rerun => {
+            execute_authoring_loop_rerun_step(&running, &step, base_dir)?
+        }
+        AuthoringLoopStepKind::PromoteRegression => {
+            execute_authoring_loop_promotion_step(&step, base_dir)?
+        }
+        AuthoringLoopStepKind::RecordReviewDecision | AuthoringLoopStepKind::Summarize => {
             unreachable!("unsupported kinds are blocked before execution")
         }
     };
@@ -2959,6 +2967,252 @@ fn execute_authoring_loop_proposal_step(
         ));
     }
     Ok(artifacts)
+}
+
+fn execute_authoring_loop_apply_step(
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    let operation_path = find_input_parseable_as::<SceneOnlyMutationOperation>(step, base_dir)
+        .ok_or_else(|| {
+            anyhow!(
+                "apply-accepted-scene-mutation step {} requires a scene mutation operation input",
+                step.id
+            )
+        })?;
+    let operation_input = fs::read_to_string(&operation_path)
+        .with_context(|| format!("failed to read operation {}", operation_path.display()))?;
+    let operation: SceneOnlyMutationOperation = serde_json::from_str(&operation_input)
+        .with_context(|| format!("failed to parse operation {}", operation_path.display()))?;
+    if operation.review_decision_id.is_none() {
+        return Err(anyhow!(
+            "apply-accepted-scene-mutation step {} requires reviewDecisionId before writes",
+            step.id
+        ));
+    }
+    let run_dir = find_run_dir_for_step(step, base_dir)?;
+    let transaction_output = step
+        .expected_artifacts
+        .first()
+        .map(|artifact| base_dir.join(&artifact.path))
+        .ok_or_else(|| {
+            anyhow!(
+                "apply-accepted-scene-mutation step {} requires a transaction expected artifact",
+                step.id
+            )
+        })?;
+    reject_transaction_output_target_collision(
+        &transaction_output,
+        &base_dir.join(&operation.target_scene_path),
+    )?;
+    let transaction =
+        apply_scene_only_mutation_operation(&run_dir, &operation, &transaction_output)?;
+    Ok(vec![AuthoringLoopGeneratedArtifact {
+        id: step
+            .expected_artifacts
+            .first()
+            .map(|artifact| artifact.id.clone())
+            .unwrap_or_else(|| "transaction".to_string()),
+        path: relative_to_base(base_dir, &transaction_output)?,
+        kind: format!("scene-edit-transaction:{}", transaction.id),
+    }])
+}
+
+fn execute_authoring_loop_rerun_step(
+    plan: &AuthoringLoopPlan,
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    let transaction_path = step
+        .inputs
+        .iter()
+        .map(|input| base_dir.join(&input.path))
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.contains("transaction") && name.ends_with(".json"))
+        })
+        .ok_or_else(|| anyhow!("rerun step {} requires a transaction input", step.id))?;
+    let seed_path = base_dir.join(&plan.seed.path);
+    let runs_root = base_dir.join("runs");
+    reject_generated_artifact_source_collision(&runs_root, "authoring loop rerun step")?;
+    let artifacts = create_run(&seed_path, &runs_root)?;
+    let provenance = bind_run_transaction_provenance(&artifacts.run_dir, &transaction_path)
+        .with_context(|| "rerun step could not bind transaction provenance")?;
+    let manifest_path = base_dir.join(&plan.project.manifest_path);
+    let mut project_metadata = project_run_metadata_from_manifest(
+        &manifest_path,
+        &seed_path,
+        Some(plan.scenario_pack.id.as_str()),
+    )?;
+    project_metadata.transaction_id = Some(provenance.transaction_id.clone());
+    let bound_project = bind_run_project_metadata(&artifacts.run_dir, project_metadata)?;
+    let command_context = run_command_context_for_run(
+        &seed_path,
+        &runs_root,
+        1,
+        Some(&bound_project),
+        Some(&transaction_path),
+    );
+    bind_run_command_context(&artifacts.run_dir, command_context)?;
+    append_ledger_event(
+        &artifacts.run_dir,
+        "authoring_loop.rerun_step",
+        "loop-step-runner",
+        json!({
+            "loop_step_id": step.id,
+            "transaction_id": provenance.transaction_id,
+            "boundary": "created transaction-bound rerun artifacts only; browser execution is not invoked by this step"
+        }),
+    )?;
+    Ok(vec![AuthoringLoopGeneratedArtifact {
+        id: step
+            .expected_artifacts
+            .first()
+            .map(|artifact| artifact.id.clone())
+            .unwrap_or_else(|| "after-run".to_string()),
+        path: relative_to_base(base_dir, &artifacts.run_dir.join("run.json"))?,
+        kind: "rerun".to_string(),
+    }])
+}
+
+fn execute_authoring_loop_promotion_step(
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    if !step_has_accepted_decision(
+        step,
+        base_dir,
+        AuthoringLoopDecisionKind::RegressionPromotion,
+    )? {
+        return Err(anyhow!(
+            "promote-regression step {} requires an accepted regression promotion decision before writes",
+            step.id
+        ));
+    }
+    let draft_path = find_input_parseable_as::<RegressionPromotionDraft>(step, base_dir)
+        .ok_or_else(|| {
+            anyhow!(
+                "promote-regression step {} requires a regression promotion draft input",
+                step.id
+            )
+        })?;
+    let draft = RegressionPromotionDraft::from_path(&draft_path)?;
+    let result = promote_regression_draft_to_scenario_pack(
+        &draft_path,
+        base_dir.join(&draft.target.project_manifest_path),
+        &draft.target.scenario_pack_id,
+        false,
+    )?;
+    let record_path = result.record_path.clone().ok_or_else(|| {
+        anyhow!(
+            "promote-regression step {} completed without a promotion record",
+            step.id
+        )
+    })?;
+    Ok(vec![AuthoringLoopGeneratedArtifact {
+        id: step
+            .expected_artifacts
+            .first()
+            .map(|artifact| artifact.id.clone())
+            .unwrap_or_else(|| "promotion".to_string()),
+        path: format!("{}/{}", draft.source_run.run_dir, record_path),
+        kind: "regression-promotion".to_string(),
+    }])
+}
+
+fn find_input_parseable_as<T>(step: &AuthoringLoopStep, base_dir: &Path) -> Option<PathBuf>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    step.inputs.iter().find_map(|input| {
+        let path = base_dir.join(&input.path);
+        let input = fs::read_to_string(&path).ok()?;
+        serde_json::from_str::<T>(&input).ok()?;
+        Some(path)
+    })
+}
+
+fn find_run_dir_for_step(step: &AuthoringLoopStep, base_dir: &Path) -> Result<PathBuf> {
+    for input in &step.inputs {
+        let mut current = base_dir.join(&input.path);
+        if current.is_file() {
+            current.pop();
+        }
+        loop {
+            if current.join("run.json").is_file() {
+                return Ok(current);
+            }
+            if !current.pop() {
+                break;
+            }
+        }
+    }
+    Err(anyhow!(
+        "step {} requires an input inside a run directory",
+        step.id
+    ))
+}
+
+fn step_has_accepted_decision(
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+    expected_kind: AuthoringLoopDecisionKind,
+) -> Result<bool> {
+    let required_ids = step
+        .required_decisions
+        .iter()
+        .filter(|decision| decision.kind == expected_kind)
+        .map(|decision| decision.id.as_str())
+        .collect::<Vec<_>>();
+    if required_ids.is_empty() {
+        return Ok(false);
+    }
+    for input in &step.inputs {
+        let path = base_dir.join(&input.path);
+        if !path.is_file() {
+            continue;
+        }
+        let value = match fs::read_to_string(&path)
+            .ok()
+            .and_then(|input| serde_json::from_str::<serde_json::Value>(&input).ok())
+        {
+            Some(value) => value,
+            None => continue,
+        };
+        for required_id in &required_ids {
+            if json_value_contains_accepted_decision(&value, required_id) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn json_value_contains_accepted_decision(value: &serde_json::Value, required_id: &str) -> bool {
+    match value {
+        serde_json::Value::Object(map) => {
+            let id_matches = map
+                .get("id")
+                .and_then(|value| value.as_str())
+                .is_none_or(|id| id == required_id);
+            let accepted = ["state", "decision_status", "decisionStatus", "status"]
+                .iter()
+                .any(|key| {
+                    map.get(*key)
+                        .and_then(|value| value.as_str())
+                        .is_some_and(|state| state == "accepted")
+                });
+            (id_matches && accepted)
+                || map
+                    .values()
+                    .any(|value| json_value_contains_accepted_decision(value, required_id))
+        }
+        serde_json::Value::Array(values) => values
+            .iter()
+            .any(|value| json_value_contains_accepted_decision(value, required_id)),
+        _ => false,
+    }
 }
 
 fn remap_authoring_loop_artifact_paths(
@@ -17061,7 +17315,7 @@ scenarios:
             fs::write(path, "{}\n").expect("artifact");
         }
 
-        let summary = execute_authoring_loop_step_from_path(&plan_path, "apply-mutation")
+        let summary = execute_authoring_loop_step_from_path(&plan_path, "record-review")
             .expect("unsupported kind records blocked state");
         assert_eq!(summary.status, "blocked");
         assert!(summary
@@ -17072,13 +17326,159 @@ scenarios:
         assert_eq!(
             plan.steps
                 .iter()
-                .find(|step| step.id == "apply-mutation")
-                .expect("apply step")
+                .find(|step| step.id == "record-review")
+                .expect("record-review step")
                 .status,
             AuthoringLoopStepStatus::Blocked
         );
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn loop_step_runner_applies_scene_mutation_only_with_accepted_decision() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("loop-step-runner-apply-accepted");
+        let draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let decision = accepted_scene_apply_decision(&artifacts.run_dir, &draft, &proposal, None);
+        let operation = SceneOnlyMutationOperation {
+            project: Some(project_context),
+            ..scene_apply_operation(
+                &proposal,
+                &scene_path,
+                before_hash,
+                Some(decision.id.clone()),
+            )
+        };
+        let operation_path = root.join("runs/apply-operation.json");
+        write_json(&operation_path, &json!(operation)).expect("operation writes");
+        let decision_rel = artifacts
+            .run_dir
+            .join("mutation/review-decisions.json")
+            .strip_prefix(&root)
+            .expect("decision relative")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let operation_rel = operation_path
+            .strip_prefix(&root)
+            .expect("operation relative")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let plan_path = root.join("loop-apply-plan.json");
+        fs::write(
+            &plan_path,
+            format!(
+                r#"{{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "temp-loop-apply",
+  "project": {{ "projectId": "minimal_2d", "manifestPath": "project/ouroforge.project.json" }},
+  "seed": {{ "id": "platformer", "path": "seeds/platformer.yaml" }},
+  "scenarioPack": {{ "id": "smoke", "path": "scenarios/smoke.scenario-pack.json" }},
+  "steps": [
+    {{ "id": "run-before", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{{ "id": "baseline-run", "path": "{}" }}] }},
+    {{ "id": "generate-proposal", "kind": "generate-proposal", "status": "completed", "dependsOn": ["run-before"], "inputs": [{{ "id": "baseline-run", "path": "{}" }}], "expectedArtifacts": [{{ "id": "proposal", "path": "runs/proposal.json" }}] }},
+    {{ "id": "record-review", "kind": "record-review-decision", "status": "completed", "dependsOn": ["generate-proposal"], "inputs": [{{ "id": "proposal", "path": "runs/proposal.json" }}], "requiredDecisions": [{{ "id": "{}", "kind": "accepted-mutation" }}], "expectedArtifacts": [{{ "id": "{}", "path": "{}" }}, {{ "id": "operation", "path": "{}" }}] }},
+    {{ "id": "apply-mutation", "kind": "apply-accepted-scene-mutation", "status": "pending", "dependsOn": ["record-review"], "inputs": [{{ "id": "{}", "path": "{}" }}, {{ "id": "operation", "path": "{}" }}], "requiredDecisions": [{{ "id": "{}", "kind": "accepted-mutation" }}], "rollbackRefs": [{{ "id": "before-scene", "path": "{}" }}], "expectedArtifacts": [{{ "id": "transaction", "path": "runs/transactions/loop-apply-transaction.json" }}] }}
+  ],
+  "generatedState": {{ "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }}
+}}"#,
+                artifacts.run_dir.join("run.json").strip_prefix(&root).expect("run relative").to_string_lossy().replace('\\', "/"),
+                artifacts.run_dir.join("run.json").strip_prefix(&root).expect("run relative").to_string_lossy().replace('\\', "/"),
+                decision.id,
+                decision.id,
+                decision_rel,
+                operation_rel,
+                decision.id,
+                decision_rel,
+                operation_rel,
+                decision.id,
+                scene_path.strip_prefix(&root).expect("scene relative").to_string_lossy().replace('\\', "/")
+            ),
+        )
+        .expect("apply plan");
+
+        let summary = execute_authoring_loop_step_from_path(&plan_path, "apply-mutation")
+            .expect("accepted apply executes");
+        assert_eq!(summary.status, "completed", "{summary:#?}");
+        assert!(root
+            .join("runs/transactions/loop-apply-transaction.json")
+            .is_file());
+        let scene_after = read_scene(&scene_path).expect("scene remains valid");
+        let player = scene_after
+            .entities
+            .iter()
+            .find(|entity| entity.id == "player")
+            .expect("player exists");
+        assert_eq!(player.components.transform.x, 48);
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn loop_step_runner_rejects_apply_before_write_without_accepted_decision() {
+        let (root, artifacts, proposal, scene_path, before_hash, project_context) =
+            create_project_scene_only_mutation_fixture("loop-step-runner-apply-reject");
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+        let operation = SceneOnlyMutationOperation {
+            project: Some(project_context),
+            ..scene_apply_operation(&proposal, &scene_path, before_hash, None)
+        };
+        let operation_path = root.join("runs/apply-operation.json");
+        write_json(&operation_path, &json!(operation)).expect("operation writes");
+        let operation_rel = operation_path
+            .strip_prefix(&root)
+            .expect("operation relative")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let plan_path = root.join("loop-apply-blocked-plan.json");
+        fs::write(
+            &plan_path,
+            format!(
+                r#"{{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "temp-loop-apply-blocked",
+  "project": {{ "projectId": "minimal_2d", "manifestPath": "project/ouroforge.project.json" }},
+  "seed": {{ "id": "platformer", "path": "seeds/platformer.yaml" }},
+  "scenarioPack": {{ "id": "smoke", "path": "scenarios/smoke.scenario-pack.json" }},
+  "steps": [
+    {{ "id": "run-before", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{{ "id": "baseline-run", "path": "{}" }}] }},
+    {{ "id": "generate-proposal", "kind": "generate-proposal", "status": "completed", "dependsOn": ["run-before"], "inputs": [{{ "id": "baseline-run", "path": "{}" }}], "expectedArtifacts": [{{ "id": "proposal", "path": "runs/proposal.json" }}] }},
+    {{ "id": "record-review", "kind": "record-review-decision", "status": "completed", "dependsOn": ["generate-proposal"], "inputs": [{{ "id": "proposal", "path": "runs/proposal.json" }}], "requiredDecisions": [{{ "id": "accepted-review", "kind": "accepted-mutation" }}], "expectedArtifacts": [{{ "id": "operation", "path": "{}" }}] }},
+    {{ "id": "apply-mutation", "kind": "apply-accepted-scene-mutation", "status": "pending", "dependsOn": ["record-review"], "inputs": [{{ "id": "operation", "path": "{}" }}], "requiredDecisions": [{{ "id": "accepted-review", "kind": "accepted-mutation" }}], "rollbackRefs": [{{ "id": "before-scene", "path": "{}" }}], "expectedArtifacts": [{{ "id": "transaction", "path": "runs/transactions/blocked-transaction.json" }}] }}
+  ],
+  "generatedState": {{ "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }}
+}}"#,
+                artifacts.run_dir.join("run.json").strip_prefix(&root).expect("run relative").to_string_lossy().replace('\\', "/"),
+                artifacts.run_dir.join("run.json").strip_prefix(&root).expect("run relative").to_string_lossy().replace('\\', "/"),
+                operation_rel,
+                operation_rel,
+                scene_path.strip_prefix(&root).expect("scene relative").to_string_lossy().replace('\\', "/")
+            ),
+        )
+        .expect("blocked apply plan");
+
+        let summary = execute_authoring_loop_step_from_path(&plan_path, "apply-mutation")
+            .expect("missing decision blocks without applying");
+        assert_eq!(summary.status, "blocked");
+        assert!(!root
+            .join("runs/transactions/blocked-transaction.json")
+            .exists());
+        assert_eq!(
+            fs::read_to_string(&scene_path).expect("scene after reads"),
+            before_contents
+        );
+        assert_eq!(
+            read_loop_plan_from_path(&plan_path)
+                .steps
+                .iter()
+                .find(|step| step.id == "apply-mutation")
+                .expect("apply step")
+                .status,
+            AuthoringLoopStepStatus::Blocked
+        );
+        assert!(artifacts.run_dir.join("run.json").is_file());
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
