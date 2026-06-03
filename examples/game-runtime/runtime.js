@@ -348,7 +348,7 @@
     const inputComponent = entity.components.input || {};
     const allowedActions = Array.isArray(inputComponent.allowedActions) ? inputComponent.allowedActions : [];
     const canMove = allowedActions.length === 0 || allowedActions.includes('move');
-    const canJump = allowedActions.includes('jump') && Number.isFinite(inputComponent.jumpImpulse);
+    const canJump = (allowedActions.length === 0 || allowedActions.includes('jump')) && Number.isFinite(inputComponent.jumpImpulse);
     const speed = canMove ? (Number.isFinite(inputComponent.moveSpeed) ? inputComponent.moveSpeed : 2) : 0;
     velocity.x = ((input.right ? 1 : 0) - (input.left ? 1 : 0)) * speed;
     if (canJump) {

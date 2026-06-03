@@ -26,6 +26,40 @@ function createRuntime() {
   return context.__OUROFORGE__;
 }
 
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function sceneWithPlayerInput(input) {
+  const scene = clone(platformerScene);
+  scene.entities[0].components.input = input;
+  return scene;
+}
+
+function settleOnFloor(api, scene) {
+  api.setInput({ left: false, right: false, up: false, down: false });
+  let state = api.loadScene(scene);
+  state = api.step(1);
+  const player = state.entities.find((entity) => entity.id === 'player');
+  assert.equal(player.components.transform.y, 64, 'solid floor resolves the one-frame gravity overlap');
+  assert.equal(player.components.velocity.y, 0, 'ground contact zeroes downward velocity');
+  assert.equal(state.physics.grounded.player, true);
+  return state;
+}
+
+function assertGroundedJump(api, scene, message) {
+  settleOnFloor(api, scene);
+  api.setInput({ up: true });
+  const state = api.step(1);
+  const player = state.entities.find((entity) => entity.id === 'player');
+  assert.equal(player.components.velocity.y, -5, message);
+  assert.equal(player.components.transform.y, 59);
+  assert.equal(state.physics.grounded.player, false);
+  assert.ok(api.getEvents().some((event) => event.type === 'runtime.physics.jump'));
+  api.setInput({ up: false });
+  return state;
+}
+
 const platformerScene = {
   schemaVersion: '1',
   id: 'physics-runtime-rules',
@@ -75,11 +109,8 @@ let state = api.loadScene(platformerScene);
 assert.equal(state.physics.gravity, 1);
 assert.equal(state.physics.grounded.player, false);
 
-state = api.step(1);
+state = settleOnFloor(api, platformerScene);
 let player = state.entities.find((entity) => entity.id === 'player');
-assert.equal(player.components.transform.y, 64, 'solid floor resolves the one-frame gravity overlap');
-assert.equal(player.components.velocity.y, 0, 'ground contact zeroes downward velocity');
-assert.equal(state.physics.grounded.player, true);
 assert.ok(state.collisions.some((event) => event.type === 'runtime.collision.contact' && event.normal.y === -1));
 
 api.setInput({ up: true });
@@ -94,3 +125,28 @@ state = api.step(1);
 player = state.entities.find((entity) => entity.id === 'player');
 assert.equal(player.components.velocity.y, -4);
 assert.equal(player.components.transform.y, 55);
+
+assertGroundedJump(
+  api,
+  sceneWithPlayerInput({ scheme: 'keyboard', moveSpeed: 3, jumpImpulse: 6 }),
+  'omitted allowedActions permits jump when jumpImpulse is finite',
+);
+
+assertGroundedJump(
+  api,
+  sceneWithPlayerInput({ scheme: 'keyboard', moveSpeed: 3, jumpImpulse: 6, allowedActions: [] }),
+  'empty allowedActions permits jump when jumpImpulse is finite',
+);
+
+settleOnFloor(
+  api,
+  sceneWithPlayerInput({ scheme: 'keyboard', moveSpeed: 3, jumpImpulse: 6, allowedActions: ['attack'] }),
+);
+const jumpEventCount = api.getEvents().filter((event) => event.type === 'runtime.physics.jump').length;
+api.setInput({ up: true });
+state = api.step(1);
+player = state.entities.find((entity) => entity.id === 'player');
+assert.equal(player.components.velocity.y, 0, 'non-empty allowedActions without jump disables jump');
+assert.equal(player.components.transform.y, 64);
+assert.equal(state.physics.grounded.player, true);
+assert.equal(api.getEvents().filter((event) => event.type === 'runtime.physics.jump').length, jumpEventCount);
