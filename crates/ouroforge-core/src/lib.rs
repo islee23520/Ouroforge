@@ -6277,6 +6277,128 @@ impl AssetPreviewWarning {
     }
 }
 
+pub fn generate_asset_preview_evidence(
+    manifest: &ProjectAssetManifest,
+    manifest_base_dir: impl AsRef<Path>,
+    run_id: Option<String>,
+    generated_at_unix_ms: u128,
+) -> Result<AssetPreviewEvidence> {
+    let manifest_base_dir = manifest_base_dir.as_ref();
+    let manifest_base = manifest_base_dir.canonicalize().with_context(|| {
+        format!(
+            "failed to resolve project asset manifest base {}",
+            manifest_base_dir.display()
+        )
+    })?;
+    let mut previews = Vec::new();
+    let mut warnings = Vec::new();
+    for asset in &manifest.assets {
+        if let Some(warning) =
+            preview_warning_from_integrity(asset, manifest_base_dir, &manifest_base)
+        {
+            warnings.push(warning);
+        }
+        previews.push(AssetPreviewRecord {
+            asset_id: asset.id.clone(),
+            asset_type: asset.asset_type,
+            source_path: asset.path.clone(),
+            preview_kind: preview_kind_for_asset(asset),
+            preview_path: None,
+            preview_classification: None,
+            image: asset
+                .dimensions
+                .as_ref()
+                .map(|dimensions| AssetPreviewImageMetadata {
+                    width: dimensions.width,
+                    height: dimensions.height,
+                }),
+            atlas_frames: asset
+                .atlas
+                .as_ref()
+                .map(|atlas| {
+                    atlas
+                        .frames
+                        .iter()
+                        .map(|frame| AssetPreviewAtlasFrame {
+                            frame_id: frame.id.clone(),
+                            rect: frame.rect.clone(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            tilemap: asset
+                .tilemap
+                .as_ref()
+                .map(|tilemap| AssetPreviewTilemapMetadata {
+                    tileset_asset_id: tilemap.tileset_asset_id.clone(),
+                    width: tilemap.width,
+                    height: tilemap.height,
+                    layer_count: tilemap.layers.len(),
+                    tile_count: tilemap
+                        .layers
+                        .iter()
+                        .flat_map(|layer| layer.data.iter())
+                        .filter(|tile| tile.is_some())
+                        .count(),
+                }),
+            audio: (asset.asset_type == ProjectAssetType::Audio).then(|| {
+                AssetPreviewAudioMetadata {
+                    duration_ms: asset.duration_ms.map(u64::from),
+                    channels: asset
+                        .metadata
+                        .get("channels")
+                        .and_then(|value| value.parse::<u8>().ok()),
+                }
+            }),
+            font: (asset.asset_type == ProjectAssetType::Font).then(|| AssetPreviewFontMetadata {
+                family: asset.metadata.get("family").cloned(),
+                style: asset.metadata.get("style").cloned(),
+            }),
+            warnings: Vec::new(),
+        });
+    }
+    let evidence = AssetPreviewEvidence {
+        schema_version: ASSET_PREVIEW_EVIDENCE_SCHEMA_VERSION.to_string(),
+        run_id,
+        manifest_id: manifest.id.clone(),
+        generated_at_unix_ms,
+        previews,
+        warnings,
+        boundary: "Read-only local asset preview metadata; generated previews remain local/untracked and browser surfaces must not upload, write, fetch remote assets, or execute commands.".to_string(),
+    };
+    evidence.validate()?;
+    Ok(evidence)
+}
+
+fn preview_kind_for_asset(asset: &ProjectAssetManifestEntry) -> AssetPreviewKind {
+    match asset.asset_type {
+        ProjectAssetType::Image | ProjectAssetType::SpriteAtlas => AssetPreviewKind::Thumbnail,
+        ProjectAssetType::Tileset
+        | ProjectAssetType::Tilemap
+        | ProjectAssetType::Audio
+        | ProjectAssetType::Font => AssetPreviewKind::Metadata,
+    }
+}
+
+fn preview_warning_from_integrity(
+    asset: &ProjectAssetManifestEntry,
+    manifest_base_dir: &Path,
+    manifest_base: &Path,
+) -> Option<AssetPreviewWarning> {
+    project_asset_entry_file_integrity_warning(
+        asset,
+        manifest_base_dir,
+        manifest_base,
+        "asset preview evidence source asset",
+    )
+    .map(|warning| AssetPreviewWarning {
+        asset_id: Some(warning.asset_id),
+        kind: warning.kind,
+        message: warning.message,
+        path: warning.path,
+    })
+}
+
 fn validate_asset_preview_path(
     field: &str,
     value: &str,
@@ -24007,6 +24129,101 @@ scenarios:
             .to_string(),
         );
         assert!(empty.is_err());
+    }
+
+    #[test]
+    fn generate_asset_preview_evidence_exports_manifest_metadata_and_warnings() {
+        let root = unique_temp_dir("asset-preview-generation");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprite dir");
+        fs::create_dir_all(root.join("assets/atlases")).expect("atlas dir");
+        fs::create_dir_all(root.join("assets/tilemaps")).expect("tilemap dir");
+        let sprite_path = root.join("assets/sprites/player.png");
+        let atlas_path = root.join("assets/atlases/player.atlas.json");
+        let tilemap_path = root.join("assets/tilemaps/level.json");
+        fs::write(&sprite_path, b"deterministic sprite").expect("sprite written");
+        fs::write(&atlas_path, br#"{"frames":["idle_0"]}"#).expect("atlas written");
+        fs::write(&tilemap_path, br#"{"layers":["terrain"]}"#).expect("tilemap written");
+        let sprite_hash = hash_project_asset_file(&sprite_path).expect("sprite hash");
+        let atlas_hash = hash_project_asset_file(&atlas_path).expect("atlas hash");
+        let tilemap_hash = hash_project_asset_file(&tilemap_path).expect("tilemap hash");
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "preview_manifest",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": sprite_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "player_atlas",
+                        "type": "sprite_atlas",
+                        "path": "assets/atlases/player.atlas.json",
+                        "contentHash": atlas_hash,
+                        "classification": "source_like",
+                        "atlas": {
+                            "imageAssetId": "player_sprite",
+                            "frames": [{ "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } }]
+                        }
+                    },
+                    {
+                        "id": "level_tilemap",
+                        "type": "tilemap",
+                        "path": "assets/tilemaps/level.json",
+                        "contentHash": tilemap_hash,
+                        "classification": "source_like",
+                        "tilemap": {
+                            "tilesetAssetId": "terrain_tiles",
+                            "width": 2,
+                            "height": 2,
+                            "layers": [{ "id": "terrain", "kind": "visual", "data": ["solid", null, "solid", null] }]
+                        }
+                    },
+                    {
+                        "id": "missing_audio",
+                        "type": "audio",
+                        "path": "assets/audio/missing.ogg",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "0000000000000000" },
+                        "classification": "source_like",
+                        "durationMs": 250,
+                        "metadata": { "channels": "2" }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+
+        let evidence =
+            generate_asset_preview_evidence(&manifest, &root, Some("run_1".to_string()), 1234)
+                .expect("preview evidence generated");
+
+        assert_eq!(evidence.schema_version, "asset-preview-evidence-v1");
+        assert_eq!(evidence.manifest_id, "preview_manifest");
+        assert_eq!(evidence.previews.len(), 4);
+        assert_eq!(
+            evidence.previews[0].preview_kind,
+            AssetPreviewKind::Thumbnail
+        );
+        assert_eq!(evidence.previews[0].image.as_ref().unwrap().width, 16);
+        assert_eq!(evidence.previews[1].atlas_frames[0].frame_id, "idle_0");
+        assert_eq!(evidence.previews[2].tilemap.as_ref().unwrap().tile_count, 2);
+        assert_eq!(
+            evidence.previews[3].audio.as_ref().unwrap().channels,
+            Some(2)
+        );
+        assert_eq!(evidence.warnings.len(), 1);
+        assert_eq!(
+            evidence.warnings[0].asset_id.as_deref(),
+            Some("missing_audio")
+        );
+        assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
