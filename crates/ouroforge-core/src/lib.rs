@@ -1810,6 +1810,12 @@ pub struct AuthoringLoopStep {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub rollback_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "statusTransition",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub status_transition: Option<AuthoringLoopStatusTransition>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -1833,6 +1839,13 @@ pub enum AuthoringLoopStepStatus {
     Blocked,
     Failed,
     Completed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopStatusTransition {
+    pub from: AuthoringLoopStepStatus,
+    pub to: AuthoringLoopStepStatus,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -1896,6 +1909,177 @@ impl AuthoringLoopPlan {
             step.validate_schema(index)?;
         }
         self.generated_state.validate()?;
+        self.validate_step_rules()?;
+        Ok(())
+    }
+
+    fn validate_step_rules(&self) -> Result<()> {
+        let mut step_ids = BTreeSet::new();
+        let mut produced_artifacts = BTreeSet::new();
+        let mut previous_rank = None;
+        let mut completed_steps = BTreeSet::new();
+
+        for step in &self.steps {
+            if !step_ids.insert(step.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate authoring loop plan step id: {}",
+                    step.id
+                ));
+            }
+
+            let rank = step.kind.order_rank();
+            if previous_rank.is_some_and(|previous| rank < previous) {
+                return Err(anyhow!(
+                    "authoring loop plan step {} kind {:?} is out of order",
+                    step.id,
+                    step.kind
+                ));
+            }
+            previous_rank = Some(rank);
+
+            for dependency in &step.depends_on {
+                if !step_ids.contains(dependency) {
+                    return Err(anyhow!(
+                        "authoring loop plan step {} dependsOn {} must reference an earlier step",
+                        step.id,
+                        dependency
+                    ));
+                }
+                if matches!(
+                    step.status,
+                    AuthoringLoopStepStatus::Running | AuthoringLoopStepStatus::Completed
+                ) && !completed_steps.contains(dependency)
+                {
+                    return Err(anyhow!(
+                        "authoring loop plan step {} cannot be {:?} before dependency {} is completed",
+                        step.id,
+                        step.status,
+                        dependency
+                    ));
+                }
+            }
+
+            if step.kind.requires_input_artifact() && step.inputs.is_empty() {
+                return Err(anyhow!(
+                    "authoring loop plan step {} kind {:?} requires at least one input artifact",
+                    step.id,
+                    step.kind
+                ));
+            }
+            if step.kind.requires_decision() && step.required_decisions.is_empty() {
+                return Err(anyhow!(
+                    "authoring loop plan step {} kind {:?} requires at least one decision reference",
+                    step.id,
+                    step.kind
+                ));
+            }
+            if step.kind == AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+                && step.rollback_refs.is_empty()
+            {
+                return Err(anyhow!(
+                    "authoring loop plan step {} kind {:?} requires rollbackRefs",
+                    step.id,
+                    step.kind
+                ));
+            }
+
+            for input in &step.inputs {
+                if !produced_artifacts.contains(&input.id) {
+                    return Err(anyhow!(
+                        "authoring loop plan step {} input {} must reference an earlier expected artifact",
+                        step.id,
+                        input.id
+                    ));
+                }
+            }
+
+            if let Some(transition) = &step.status_transition {
+                transition.validate(&step.id, step.status)?;
+            }
+
+            for artifact in &step.expected_artifacts {
+                if !produced_artifacts.insert(artifact.id.clone()) {
+                    return Err(anyhow!(
+                        "duplicate authoring loop plan artifact id: {}",
+                        artifact.id
+                    ));
+                }
+            }
+            if step.status == AuthoringLoopStepStatus::Completed {
+                completed_steps.insert(step.id.clone());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopStepKind {
+    fn order_rank(self) -> u8 {
+        match self {
+            AuthoringLoopStepKind::RunScenarioPack => 0,
+            AuthoringLoopStepKind::CompareRuns => 1,
+            AuthoringLoopStepKind::GenerateProposal => 2,
+            AuthoringLoopStepKind::RecordReviewDecision => 3,
+            AuthoringLoopStepKind::ApplyAcceptedSceneMutation => 4,
+            AuthoringLoopStepKind::Rerun => 5,
+            AuthoringLoopStepKind::PromoteRegression => 6,
+            AuthoringLoopStepKind::Summarize => 7,
+        }
+    }
+
+    fn requires_input_artifact(self) -> bool {
+        matches!(
+            self,
+            AuthoringLoopStepKind::CompareRuns
+                | AuthoringLoopStepKind::GenerateProposal
+                | AuthoringLoopStepKind::RecordReviewDecision
+                | AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+                | AuthoringLoopStepKind::Rerun
+                | AuthoringLoopStepKind::PromoteRegression
+                | AuthoringLoopStepKind::Summarize
+        )
+    }
+
+    fn requires_decision(self) -> bool {
+        matches!(
+            self,
+            AuthoringLoopStepKind::RecordReviewDecision
+                | AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+                | AuthoringLoopStepKind::PromoteRegression
+        )
+    }
+}
+
+impl AuthoringLoopStepStatus {
+    pub fn can_transition_to(self, next: Self) -> bool {
+        match (self, next) {
+            (current, next) if current == next => true,
+            (AuthoringLoopStepStatus::Pending, AuthoringLoopStepStatus::Running) => true,
+            (AuthoringLoopStepStatus::Pending, AuthoringLoopStepStatus::Blocked) => true,
+            (AuthoringLoopStepStatus::Running, AuthoringLoopStepStatus::Blocked) => true,
+            (AuthoringLoopStepStatus::Running, AuthoringLoopStepStatus::Failed) => true,
+            (AuthoringLoopStepStatus::Running, AuthoringLoopStepStatus::Completed) => true,
+            (AuthoringLoopStepStatus::Blocked, AuthoringLoopStepStatus::Pending) => true,
+            (AuthoringLoopStepStatus::Failed, AuthoringLoopStepStatus::Pending) => true,
+            _ => false,
+        }
+    }
+}
+
+impl AuthoringLoopStatusTransition {
+    fn validate(&self, step_id: &str, status: AuthoringLoopStepStatus) -> Result<()> {
+        if self.to != status {
+            return Err(anyhow!(
+                "authoring loop plan step {step_id} statusTransition.to must match status"
+            ));
+        }
+        if !self.from.can_transition_to(self.to) {
+            return Err(anyhow!(
+                "authoring loop plan step {step_id} invalid status transition {:?} -> {:?}",
+                self.from,
+                self.to
+            ));
+        }
         Ok(())
     }
 }
@@ -15431,6 +15615,44 @@ scenarios:
         ))
         .expect_err("unsupported field rejected");
         assert!(unsupported_field.to_string().contains("failed to parse"));
+    }
+
+    #[test]
+    fn authoring_loop_plan_validation_rejects_invalid_rules() {
+        for (fixture, expected) in [
+            (
+                "examples/authoring-loop-plan-fixtures/invalid/duplicate-step-id.json",
+                "duplicate authoring loop plan step id",
+            ),
+            (
+                "examples/authoring-loop-plan-fixtures/invalid/out-of-order-step.json",
+                "out of order",
+            ),
+            (
+                "examples/authoring-loop-plan-fixtures/invalid/missing-input-artifact.json",
+                "must reference an earlier expected artifact",
+            ),
+            (
+                "examples/authoring-loop-plan-fixtures/invalid/invalid-status-transition.json",
+                "invalid status transition",
+            ),
+        ] {
+            let input = fs::read_to_string(repo_fixture_path(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} reads: {error:#}"));
+            let rejected =
+                AuthoringLoopPlan::from_json_str(&input).expect_err(&format!("{fixture} rejected"));
+            assert!(
+                rejected.to_string().contains(expected),
+                "{fixture} error {rejected:#} did not contain {expected}"
+            );
+        }
+
+        assert!(
+            AuthoringLoopStepStatus::Pending.can_transition_to(AuthoringLoopStepStatus::Running)
+        );
+        assert!(
+            !AuthoringLoopStepStatus::Pending.can_transition_to(AuthoringLoopStepStatus::Completed)
+        );
     }
 
     #[test]

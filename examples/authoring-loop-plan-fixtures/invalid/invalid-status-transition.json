@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-invalid-transition",
+  "project": { "projectId": "project_workspace_fixture", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    {
+      "id": "run-baseline",
+      "kind": "run-scenario-pack",
+      "status": "completed",
+      "statusTransition": { "from": "pending", "to": "completed" },
+      "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }]
+    }
+  ],
+  "generatedState": { "roots": ["runs"], "trackedFixtureOnly": true }
+}

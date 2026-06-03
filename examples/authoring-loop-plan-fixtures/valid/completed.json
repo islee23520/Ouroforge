@@ -5,95 +5,197 @@
     "projectId": "project_workspace_fixture",
     "manifestPath": "ouroforge.project.json"
   },
-  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
-  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "seed": {
+    "id": "smoke",
+    "path": "seeds/smoke.yaml"
+  },
+  "scenarioPack": {
+    "id": "regression",
+    "path": "scenarios/regression.json"
+  },
   "steps": [
     {
       "id": "run-baseline",
       "kind": "run-scenario-pack",
       "status": "completed",
       "expectedArtifacts": [
-        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+        {
+          "id": "baseline-run",
+          "path": "runs/baseline/run.json"
+        }
       ]
     },
     {
       "id": "compare-runs",
       "kind": "compare-runs",
       "status": "completed",
-      "dependsOn": ["run-baseline"],
+      "dependsOn": [
+        "run-baseline"
+      ],
       "inputs": [
-        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+        {
+          "id": "baseline-run",
+          "path": "runs/baseline/run.json"
+        }
       ],
       "expectedArtifacts": [
-        { "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }
+        {
+          "id": "comparison",
+          "path": "runs/baseline/comparisons/run-comparison.json"
+        }
       ]
     },
     {
       "id": "generate-proposal",
       "kind": "generate-proposal",
       "status": "completed",
-      "dependsOn": ["compare-runs"],
+      "dependsOn": [
+        "compare-runs"
+      ],
       "expectedArtifacts": [
-        { "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }
+        {
+          "id": "proposal",
+          "path": "runs/baseline/mutation/proposal.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "comparison",
+          "path": "runs/baseline/comparisons/run-comparison.json"
+        }
       ]
     },
     {
       "id": "record-review",
       "kind": "record-review-decision",
       "status": "completed",
-      "dependsOn": ["generate-proposal"],
+      "dependsOn": [
+        "generate-proposal"
+      ],
       "requiredDecisions": [
-        { "id": "accepted-review", "kind": "accepted-mutation" }
+        {
+          "id": "accepted-review",
+          "kind": "accepted-mutation"
+        }
       ],
       "expectedArtifacts": [
-        { "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }
+        {
+          "id": "decision",
+          "path": "runs/baseline/mutation/review-decision-ledger.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "proposal",
+          "path": "runs/baseline/mutation/proposal.json"
+        }
       ]
     },
     {
       "id": "apply-mutation",
       "kind": "apply-accepted-scene-mutation",
       "status": "completed",
-      "dependsOn": ["record-review"],
+      "dependsOn": [
+        "record-review"
+      ],
       "rollbackRefs": [
-        { "id": "before-scene", "path": "runs/baseline/mutation/before.scene.json" }
+        {
+          "id": "before-scene",
+          "path": "runs/baseline/mutation/before.scene.json"
+        }
       ],
       "expectedArtifacts": [
-        { "id": "transaction", "path": "runs/baseline/mutation/transaction.json" }
+        {
+          "id": "transaction",
+          "path": "runs/baseline/mutation/transaction.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "decision",
+          "path": "runs/baseline/mutation/review-decision-ledger.json"
+        }
+      ],
+      "requiredDecisions": [
+        {
+          "id": "accepted-review",
+          "kind": "accepted-mutation"
+        }
       ]
     },
     {
       "id": "rerun",
       "kind": "rerun",
       "status": "completed",
-      "dependsOn": ["apply-mutation"],
+      "dependsOn": [
+        "apply-mutation"
+      ],
       "expectedArtifacts": [
-        { "id": "after-run", "path": "runs/after/run.json" }
+        {
+          "id": "after-run",
+          "path": "runs/after/run.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "transaction",
+          "path": "runs/baseline/mutation/transaction.json"
+        }
       ]
     },
     {
       "id": "promote-regression",
       "kind": "promote-regression",
       "status": "completed",
-      "dependsOn": ["rerun"],
+      "dependsOn": [
+        "rerun"
+      ],
       "requiredDecisions": [
-        { "id": "promotion-review", "kind": "regression-promotion" }
+        {
+          "id": "promotion-review",
+          "kind": "regression-promotion"
+        }
       ],
       "expectedArtifacts": [
-        { "id": "promotion", "path": "runs/after/regression-promotions/promotion.json" }
+        {
+          "id": "promotion",
+          "path": "runs/after/regression-promotions/promotion.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "after-run",
+          "path": "runs/after/run.json"
+        }
       ]
     },
     {
       "id": "summarize",
       "kind": "summarize",
       "status": "completed",
-      "dependsOn": ["promote-regression"],
+      "dependsOn": [
+        "promote-regression"
+      ],
       "expectedArtifacts": [
-        { "id": "summary", "path": "runs/after/loop-summary.json" }
+        {
+          "id": "summary",
+          "path": "runs/after/loop-summary.json"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "promotion",
+          "path": "runs/after/regression-promotions/promotion.json"
+        }
       ]
     }
   ],
   "generatedState": {
-    "roots": ["runs", "target", "dashboard-data"],
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ],
     "trackedFixtureOnly": true
   }
 }

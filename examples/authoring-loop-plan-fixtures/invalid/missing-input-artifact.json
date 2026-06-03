@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-missing-input",
+  "project": { "projectId": "project_workspace_fixture", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "inputs": [{ "id": "missing-run", "path": "runs/missing/run.json" }] }
+  ],
+  "generatedState": { "roots": ["runs"], "trackedFixtureOnly": true }
+}
