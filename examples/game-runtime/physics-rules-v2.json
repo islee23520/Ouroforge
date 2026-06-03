@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1",
+  "id": "physics-runtime-rules-v2",
+  "bounds": { "width": 160, "height": 96 },
+  "collisionRules": {
+    "version": "2",
+    "defaultLayer": "world",
+    "layers": [
+      { "id": "world", "solid": true, "collidesWith": ["actors"] },
+      { "id": "actors", "solid": true, "collidesWith": ["world"] }
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 16, "y": 64 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "input": { "scheme": "keyboard", "moveSpeed": 3, "jumpImpulse": 6, "allowedActions": ["move", "jump"] },
+        "collider": {
+          "shape": "aabb",
+          "body": "dynamic",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "width": 16, "height": 16 },
+          "collisionGroup": "actors",
+          "collisionMask": ["world"]
+        }
+      }
+    },
+    {
+      "id": "floor",
+      "sprite": { "color": "#475569" },
+      "components": {
+        "transform": { "x": 0, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 160, "height": 16 },
+        "controllable": false,
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "width": 160, "height": 16 },
+          "collisionGroup": "world"
+        }
+      }
+    }
+  ],
+  "metadata": { "fixture": "physics-rules-v2" }
+}

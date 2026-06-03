@@ -26,6 +26,7 @@ function createRuntime() {
   return context.__OUROFORGE__;
 }
 
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -60,49 +61,8 @@ function assertGroundedJump(api, scene, message) {
   return state;
 }
 
-const platformerScene = {
-  schemaVersion: '1',
-  id: 'physics-runtime-rules',
-  bounds: { width: 160, height: 96 },
-  entities: [
-    {
-      id: 'player',
-      sprite: { color: '#5eead4' },
-      components: {
-        transform: { x: 16, y: 64 },
-        velocity: { x: 0, y: 0 },
-        size: { width: 16, height: 16 },
-        controllable: true,
-        input: { scheme: 'keyboard', moveSpeed: 3, jumpImpulse: 6, allowedActions: ['move', 'jump'] },
-        collider: {
-          shape: 'aabb',
-          body: 'dynamic',
-          offset: { x: 0, y: 0 },
-          size: { width: 16, height: 16 },
-          collisionGroup: 'actors',
-          collisionMask: ['world'],
-        },
-      },
-    },
-    {
-      id: 'floor',
-      sprite: { color: '#475569' },
-      components: {
-        transform: { x: 0, y: 80 },
-        velocity: { x: 0, y: 0 },
-        size: { width: 160, height: 16 },
-        controllable: false,
-        collider: {
-          shape: 'aabb',
-          body: 'static',
-          offset: { x: 0, y: 0 },
-          size: { width: 160, height: 16 },
-          collisionGroup: 'world',
-        },
-      },
-    },
-  ],
-};
+const platformerScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'physics-rules-v2.json'), 'utf8'));
+
 
 const defaultLayerScene = {
   schemaVersion: '1',
