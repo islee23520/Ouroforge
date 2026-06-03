@@ -30,8 +30,8 @@ The source fixture lives in `examples/engine-expressiveness-v2-regression/`:
 | Multi-scene transition | `multi-scene-transition-v1-contract` | `world_state.sceneId`, `runtime_events.events` | Contract is visible as evidence-compatible state only. | Runtime transition behavior remains design-blocked by #318. |
 | HUD values | `hud-values-v1-regression` | `world_state.componentModel.hudValues.*` | Dashboard/cockpit render HUD read-model state as escaped read-only data. | None. |
 | Collision layers | `collision-layers-v2-regression` | `world_state.collisionRules.*`, `collision_evidence.contacts` | Contact evidence remains linked from verdicts. | None. |
-| Animation event | `animation-event-v1-regression` | `animation_evidence.*`, animation state in `world_state` | Animation evidence is data-only; no visual AI judgment. | #317 still owns expanded animation-event design. |
-| Audio event | `audio-event-v1-regression` | `audio_evidence.*` intent records | Audio evidence remains intent-only; no playback assertion. | #317 still owns expanded audio-event design. |
+| Animation event | `animation-event-v1-regression` | `animation_evidence.*`, `runtime_events.events` animation state records | Animation evidence is data-only; no visual AI judgment. | No animation graph/editor scope. |
+| Audio event | `audio-event-v1-regression` | `audio_evidence.*` request metadata and intent records | Audio evidence remains intent-only; no playback assertion. | No audio engine/playback controls. |
 | Playable loop | `playable-demo-loop-v2-regression` | key, door, exit, and HUD world-state evidence | Scenario verdicts link to generated evidence paths without committing runs. | None. |
 
 ## Verification

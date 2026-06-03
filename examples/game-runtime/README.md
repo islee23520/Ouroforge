@@ -37,18 +37,21 @@ Animation v1 chooses a bounded `sprite_frame` mode: each animated entity owns
 named clips, fixed per-clip `frameDuration`, loop policy, and optional
 manifest-backed frame asset IDs. The browser runtime advances the current frame
 strictly by fixed simulation ticks and exposes `currentClip`, `elapsedFrames`,
-and `frameIndex` through `window.__OUROFORGE__.getWorldState()`. This keeps
-animation replay-deterministic and probe-observable without timelines, skeletal
-rigs, blend trees, graphs, editor tooling, wall-clock playback, or asset import
-complexity.
+and `frameIndex` through `window.__OUROFORGE__.getWorldState()`. Each fixed-step
+state advance also emits a bounded `runtime.animation.state` entry from
+`getEvents()` with `sceneId`, `entityId`, and before/after animation state. This
+keeps animation replay-deterministic and probe-observable without timelines,
+skeletal rigs, blend trees, graphs, editor tooling, wall-clock playback, or asset
+import complexity.
 Audio v1 is evidence-first and headless-safe: scene entities may declare named
 `scene_loaded` audio intent events with manifest-backed asset IDs and `play` or
-`stop` actions. The browser runtime records bounded intent entries in
-`getWorldState().audioEvents` with `playback: "intent"` and `muted: true` by
-default. Automated QA verifies those event records only; speaker output,
-browser audio device access, and audible playback are not required for
-acceptance. No mixer, DSP, spatial audio, timeline, streaming, native backend,
-or audio editor subsystem is introduced.
+`stop` actions. The browser runtime records bounded request entries in
+`getWorldState().audioEvents` with `kind: "audio_request"`, deterministic
+`requestId`, `sceneId`, `playback: "intent"`, and `muted: true` by default.
+Automated QA verifies those event records only; speaker output, browser audio
+device access, and audible playback are not required for acceptance. No mixer,
+DSP, spatial audio, timeline, streaming, native backend, or audio editor
+subsystem is introduced.
 
 ## Scene Component Model v2 fixture
 

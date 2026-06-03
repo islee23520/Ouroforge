@@ -51,6 +51,10 @@ function evaluateAssertion(evidence, assertion) {
   if (Object.prototype.hasOwnProperty.call(contract, 'greaterThan')) {
     return typeof actual === 'number' && actual > contract.greaterThan;
   }
+  if (Object.prototype.hasOwnProperty.call(contract, 'countGreaterThan')) {
+    const count = Array.isArray(actual) ? actual.length : actual && typeof actual === 'object' ? Object.keys(actual).length : null;
+    return typeof count === 'number' && count > contract.countGreaterThan;
+  }
   if (Object.prototype.hasOwnProperty.call(contract, 'contains')) {
     return String(actual).includes(String(contract.contains));
   }
@@ -74,7 +78,7 @@ const evidence = {
   collision_evidence: { contacts: state.collisions, events: state.collisionEvents },
   animation_evidence: state.entities
     .filter((entity) => entity.components && entity.components.animation)
-    .map((entity) => ({ entityId: entity.id, ...entity.components.animation })),
+    .map((entity) => ({ entityId: entity.id, components: { animation: entity.components.animation } })),
   audio_evidence: state.audioEvents,
   comparison: {
     schemaVersion: 'scenario-coverage-v3-smoke',
@@ -88,6 +92,7 @@ assert.equal(state.componentModel.goalFlags.key_collected, true);
 assert.equal(state.componentModel.goalFlags.door_open, true);
 assert.equal(state.componentModel.goalFlags.exit_reached, true);
 assert.ok(evidence.runtime_events.events.some((event) => event.type === 'runtime.trigger.entered'));
+assert.ok(evidence.runtime_events.events.some((event) => event.type === 'runtime.animation.state'));
 
 const verdicts = scenarios.map((scenario) => ({
   scenarioId: scenario.id,

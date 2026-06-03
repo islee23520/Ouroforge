@@ -103,20 +103,32 @@ scenarios:
           frames: 4
     assertions:
       - animation_evidence:
-          path: 0.mode
+          path: 0.components.animation.mode
           equals: sprite_frame
-      - world_state:
-          path: entities.0.components.animation.state.frameIndex
+      - animation_evidence:
+          path: 0.components.animation.state.frameIndex
           exists: true
+      - runtime_events:
+          path: events
+          countGreaterThan: 1
   - id: audio-event-v1-regression
     description: Assert audio checks remain intent-only evidence and do not require real playback.
     assertions:
+      - audio_evidence:
+          path: 0.kind
+          equals: audio_request
+      - audio_evidence:
+          path: 0.requestId
+          equals: audio-0-1
       - audio_evidence:
           path: 0.name
           equals: player_spawn
       - audio_evidence:
           path: 0.playback
           equals: intent
+      - audio_evidence:
+          path: 0.sceneId
+          exists: true
   - id: playable-demo-loop-v2-regression
     description: Assert collect-key, door-open, and exit-reached evidence for the one-screen playable loop.
     steps:
