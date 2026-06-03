@@ -42,14 +42,17 @@ cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
   --operation <operation.json> \
   --transaction-output <transaction.json>
 
-# Project-scoped variant:
+# Project-scoped review-gated variant:
 cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
   --project <project-root-or-ouroforge.project.json> \
   --operation <operation.json> \
+  --decision <accepted-review-decision-id> \
   --transaction-output <transaction.json>
 ```
 
-The command prints the transaction id, transaction path, before/after scene hashes, and a manual next QA command. The caller remains responsible for running QA and reviewing results.
+When `--decision` is present, the Rust core requires a matching accepted review decision before any write. The preflight validates proposal linkage, decision status, evidence refs, guardrails, optional expected artifact hashes, target scene hash, and duplicate decision/application use. Rejected, deferred, stale, missing, or already-used decisions fail before transaction output or scene writes.
+
+The command prints the transaction id, transaction path, optional review decision id, before/after scene hashes, and a manual next QA command. The caller remains responsible for running QA and reviewing results. Legacy/manual scene-only apply without `--decision` remains supported for existing fixtures but is not the review-gated flow.
 
 ## AL2.6.4 integration evidence
 

@@ -88,7 +88,7 @@ const run = {
     stages: [
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'human', reviewer: 'manual-reviewer', reason: '<b>accepted</b>', evidence_refs: ['mutation/rerun-orchestration.json'] }] },
       { id: 'proposed', label: 'Proposed', state: 'proposed', artifact_path: 'mutation/proposals.json', record_count: 1, records: [{ id: 'proposal-1', evidence_id: 'verdict-1' }] },
-      { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'examples/project/ouroforge.project.json', scenePath: 'scenes/main.scene.json' }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' } }, status: 'applied' }] },
+      { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', reviewDecisionId: 'review-decision-1', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'examples/project/ouroforge.project.json', scenePath: 'scenes/main.scene.json' }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' } }, status: 'applied' }] },
     ],
   },
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
@@ -219,9 +219,11 @@ assert.match(cockpit.renderMutationReviewSurface(run), /--project examples\/proj
 assert.match(cockpit.renderMutationReviewSurface(run), /project validate examples\/project\/ouroforge\.project\.json/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped applications/);
 assert.match(cockpit.renderMutationReviewSurface(run), /rollback/);
+assert.match(cockpit.renderMutationReviewSurface(run), /review-decision-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /does not apply, accept, reject, rollback, or merge/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /proposal-1/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /1 record\(s\)/);
+assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /review decision review-decision-1/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'legacy-run' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: 'applied', record_count: 1, records: [{ id: 'legacy-application', status: 'applied', proposalId: 'proposal-legacy', transactionId: 'scene-edit-legacy', beforeSceneHash: { value: 'before' }, afterSceneHash: { value: 'after' } }] }] } }), /legacy\/no project mutation context recorded/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'run-empty' }, mutation_lifecycle: { stages: [] } }), /No scene-safe proposal records loaded/);
 assert.equal(
@@ -231,6 +233,10 @@ assert.equal(
 assert.equal(
   cockpit.sceneMutationApplyCommand('runs/run-1', 'mutation/scene-operation.json', 'mutation/scene-edit.json', 'ouroforge.project.json'),
   'cargo run -p ouroforge-cli -- mutation apply-scene runs/run-1 --project ouroforge.project.json --operation mutation/scene-operation.json --transaction-output mutation/scene-edit.json'
+);
+assert.equal(
+  cockpit.sceneMutationApplyCommand('runs/run-1', 'mutation/scene-operation.json', 'mutation/scene-edit.json', 'ouroforge.project.json', 'review-decision-1'),
+  'cargo run -p ouroforge-cli -- mutation apply-scene runs/run-1 --project ouroforge.project.json --operation mutation/scene-operation.json --decision review-decision-1 --transaction-output mutation/scene-edit.json'
 );
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: '<script>' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: '<bad>', records: [{ id: '<script>', status: '<img>', proposalId: '<p>', transactionId: '<t>', beforeSceneHash: { value: '<b>' }, afterSceneHash: { value: '<a>' }, project: { projectId: '<project>', manifestPath: '<manifest>', scenePath: '<scene>' }, rollback: { scenePath: '<rollback>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: '<script>' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: '<bad>', records: [{ id: '<script>', status: '<img>', proposalId: '<p>', transactionId: '<t>', beforeSceneHash: { value: '<b>' }, afterSceneHash: { value: '<a>' }, project: { projectId: '<project>', manifestPath: '<manifest>', scenePath: '<scene>' }, rollback: { scenePath: '<rollback>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;manifest&gt;/);

@@ -540,7 +540,8 @@ const OuroforgeDashboard = (() => {
     if (!record || typeof record !== 'object') return '';
     const project = record.project && typeof record.project === 'object' ? record.project : null;
     const rollback = record.rollback && typeof record.rollback === 'object' ? record.rollback : null;
-    if (!project && !rollback) return '';
+    const decisionId = typeof record.reviewDecisionId === 'string' && record.reviewDecisionId.trim() ? record.reviewDecisionId : null;
+    if (!project && !rollback && !decisionId) return '';
     return `<div class="project-mutation-context">
       <strong>Project-scoped scene mutation</strong>
       <dl>
@@ -549,6 +550,7 @@ const OuroforgeDashboard = (() => {
         <dt>Manifest hash</dt><dd>${escapeText(project?.manifestHash?.algorithm || '')}:${escapeText(project?.manifestHash?.value || 'unavailable')}</dd>
         <dt>Scene</dt><dd>${escapeText(project?.scenePath || record.targetScenePath || 'unavailable')}</dd>
         <dt>Scene hash</dt><dd>${escapeText(project?.sceneHash?.algorithm || '')}:${escapeText(project?.sceneHash?.value || 'unavailable')}</dd>
+        <dt>Review decision</dt><dd>${escapeText(decisionId || 'legacy/no review decision linkage recorded')}</dd>
         <dt>Rollback</dt><dd>${escapeText(rollback?.scenePath || 'unavailable')} → ${escapeText(rollback?.restoreHash?.value || 'unavailable')}</dd>
       </dl>
     </div>`;

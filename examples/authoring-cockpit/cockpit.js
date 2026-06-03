@@ -131,9 +131,10 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output ${output}`;
   }
 
-  function sceneMutationApplyCommand(runDir = 'runs/run-1', operationPath = 'mutation/scene-operation.json', transactionPath = 'mutation/scene-transaction.json', projectPath = null) {
+  function sceneMutationApplyCommand(runDir = 'runs/run-1', operationPath = 'mutation/scene-operation.json', transactionPath = 'mutation/scene-transaction.json', projectPath = null, decisionId = null) {
     const projectFlag = projectPath ? ` --project ${projectPath}` : '';
-    return `cargo run -p ouroforge-cli -- mutation apply-scene ${runDir}${projectFlag} --operation ${operationPath} --transaction-output ${transactionPath}`;
+    const decisionFlag = decisionId ? ` --decision ${decisionId}` : '';
+    return `cargo run -p ouroforge-cli -- mutation apply-scene ${runDir}${projectFlag} --operation ${operationPath}${decisionFlag} --transaction-output ${transactionPath}`;
   }
 
   function sceneValidateCommand(scenePath = DEFAULT_SCENE_PATH) {
@@ -602,9 +603,13 @@ const OuroforgeCockpit = (() => {
       const rollbackLine = record.rollback
         ? `<br><small>rollback ${escapeText(rollback.scenePath || 'unknown')} → ${escapeText(rollback.restoreHash?.value || 'unknown')}</small>`
         : '';
-      return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
+      const decisionLine = record.reviewDecisionId
+        ? `<br><small>review decision ${escapeText(record.reviewDecisionId)}</small>`
+        : '<br><small>legacy/no review decision linkage recorded</small>';
+      return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small>${decisionLine}<br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
     }).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
-    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath);
+    const decisionId = firstApplication.reviewDecisionId || null;
+    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath, decisionId);
     const projectCommand = projectPath ? `<code>${escapeText(projectValidateCommand(projectPath))}</code>` : '';
     return `<div class="scene-mutation-lifecycle"><h3>Project-scoped scene mutation lifecycle</h3>
       <p class="hint">Scene-only project mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, rollback, or merge anything.</p>

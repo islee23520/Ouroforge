@@ -86,19 +86,24 @@ not receive manifest authorization or project provenance.
 cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
   --project <project-root-or-ouroforge.project.json> \
   --operation <operation.json> \
+  --decision <accepted-review-decision-id> \
   --transaction-output <transaction.json>
 ```
 
-Successful output prints:
+Successful review-gated output prints:
 
 - transaction id;
 - transaction artifact path;
+- accepted review decision id;
 - before scene hash;
 - after scene hash;
 - a manual next QA command.
 
 The command does not run QA, compare runs, accept mutations, merge patches, or
-write review decisions.
+write review decisions. It only consumes an existing accepted decision, validates
+that decision before writes, and records the decision linkage in the application
+record. Legacy/manual apply without `--decision` remains available but does not
+represent the review-gated flow.
 
 ## Application record and rollback metadata
 
@@ -110,6 +115,7 @@ Successful project-scoped applications are recorded in
   "id": "scene-application-...",
   "proposalId": "mutation-...",
   "transactionId": "scene-edit-...",
+  "reviewDecisionId": "review-decision-...",
   "targetScenePath": "/path/project/scenes/main.scene.json",
   "project": {
     "projectId": "minimal_2d",

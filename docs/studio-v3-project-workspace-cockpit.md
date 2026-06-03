@@ -24,8 +24,9 @@ The cockpit at `examples/authoring-cockpit/` now includes:
 - **Engine Expansion state** — read-only world-state-derived engine summaries.
 - **Journal viewer** — generated run journal summary and refs.
 - **Project-scoped scene mutation lifecycle** — proposal/application records,
-  project-scoped application count, rollback metadata, and display-only project
-  validate / scene validate / apply-scene / dashboard export commands.
+  project-scoped application count, accepted review decision linkage, rollback
+  metadata, and display-only project validate / scene validate / review-gated
+  apply-scene / dashboard export commands.
 - **Replay controls and live preview controls** — ephemeral browser state only.
 - **Run comparison** — existing comparison artifacts with Project Comparison v1
   semantic fields and display-only compare command strings.
@@ -47,11 +48,13 @@ cargo run -p ouroforge-cli -- compare <before-run> <after-run> \
 cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> \
   --project <project>/ouroforge.project.json \
   --operation <operation.json> \
+  --decision <accepted-review-decision-id> \
   --transaction-output <transaction.json>
 ```
 
-The cockpit may show these commands as copyable text. JavaScript does not run
-or schedule them.
+The cockpit may show these commands as copyable text, including the accepted
+review decision id when application records provide one. JavaScript does not run,
+accept, apply, rollback, merge, or schedule them.
 
 ## Guardrails
 
