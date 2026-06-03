@@ -505,28 +505,67 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function assetInspectorAssetId(asset) {
+    return asset.assetId || asset.asset_id || asset.id || 'unknown asset';
+  }
+
   function renderStudioAssetInspectorSurface(run) {
     const inspector = run?.asset_inspector || run?.assetInspector || {};
     if (!inspector.present) {
       return `<section id="studio-asset-inspector" class="panel"><h2>Asset inspector</h2><p class="empty">${escapeText(inspector.empty_state || 'No asset inspector data is available for this run.')}</p><p class="hint">Read-only Studio surface. The browser does not upload assets, write manifests, fetch remote assets, or execute commands.</p></section>`;
     }
     const assets = Array.isArray(inspector.assets) ? inspector.assets : [];
+    const preview = run?.asset_preview || run?.assetPreview || {};
+    const previewRecords = Array.isArray(preview.records) ? preview.records : [];
+    const loading = run?.asset_loading || run?.assetLoading || {};
+    const loadRecords = Array.isArray(loading.records) ? loading.records : [];
     const refs = Array.isArray(inspector.evidence_refs || inspector.evidenceRefs) ? (inspector.evidence_refs || inspector.evidenceRefs) : [];
     const cards = [
       ['Status', inspector.status || 'unknown'],
       ['Assets', inspector.asset_count ?? inspector.assetCount ?? assets.length],
       ['Warnings', inspector.warning_count ?? inspector.warningCount ?? 0],
       ['Preview records', inspector.preview_count ?? inspector.previewCount ?? 0],
+      ['Atlas frames', inspector.atlas_frame_count ?? inspector.atlasFrameCount ?? 0],
+      ['Tilemaps', inspector.tilemap_count ?? inspector.tilemapCount ?? 0],
+      ['Runtime attempts', inspector.runtime_attempt_count ?? inspector.runtimeAttemptCount ?? loadRecords.length],
+      ['Loaded / failed', `${inspector.loaded_count ?? inspector.loadedCount ?? loading.loaded_count ?? loading.loadedCount ?? 0} / ${inspector.failed_count ?? inspector.failedCount ?? loading.failed_count ?? loading.failedCount ?? 0}`],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const rows = assets.slice(0, 12).map((asset) => {
+      const runtimeStatuses = Array.isArray(asset.runtime_statuses || asset.runtimeStatuses) ? (asset.runtime_statuses || asset.runtimeStatuses).join(' | ') : '';
       const warnings = Array.isArray(asset.warnings) && asset.warnings.length ? ` · warnings ${asset.warnings.join(' | ')}` : '';
+      const runtime = runtimeStatuses ? ` · runtime ${runtimeStatuses}` : '';
+      const atlasFrames = asset.atlas_frame_count ?? asset.atlasFrameCount ?? 0;
+      const tilemap = asset.tilemap ? ` · tilemap ${asset.tilemap.width ?? '?'}×${asset.tilemap.height ?? '?'}` : '';
       const hash = asset.contentHash || asset.content_hash || asset.hash || 'hash unrecorded in inspector row';
-      return `<div class="surface-row"><strong>${escapeText(asset.assetId || asset.asset_id || 'unknown asset')}</strong> ${surfaceState(true, asset.assetType || asset.asset_type || 'unknown')}<br><small>path ${escapeText(asset.sourcePath || asset.source_path || 'unrecorded')} · hash ${escapeText(hash)}${escapeText(warnings)}</small></div>`;
+      return `<div class="surface-row"><strong>${escapeText(assetInspectorAssetId(asset))}</strong> ${surfaceState(true, asset.assetType || asset.asset_type || 'unknown')}<br><small>path ${escapeText(asset.sourcePath || asset.source_path || 'unrecorded')} · hash ${escapeText(hash)} · atlas frames ${escapeText(atlasFrames)}${escapeText(tilemap)}${escapeText(runtime)}${escapeText(warnings)}</small></div>`;
     }).join('') || '<div class="surface-row">No asset rows exported.</div>';
+    const atlasRows = previewRecords.flatMap((record) => {
+      const frames = Array.isArray(record.atlasFrames || record.atlas_frames) ? (record.atlasFrames || record.atlas_frames) : [];
+      return frames.slice(0, 8).map((frame) => {
+        const rect = frame.rect || {};
+        return `<div class="surface-row"><strong>${escapeText(record.assetId || record.asset_id || 'atlas asset')}</strong> frame ${escapeText(frame.frameId || frame.frame_id || 'frame')}<br><small>rect ${escapeText(rect.x ?? '?')},${escapeText(rect.y ?? '?')} ${escapeText(rect.width ?? '?')}×${escapeText(rect.height ?? '?')}</small></div>`;
+      });
+    }).slice(0, 12).join('') || '<div class="surface-row">No atlas frame evidence exported.</div>';
+    const tilemapRows = previewRecords.filter((record) => record.tilemap).slice(0, 8).map((record) => {
+      const tilemap = record.tilemap || {};
+      const tileset = tilemap.tilesetAssetId || tilemap.tileset_asset_id || 'unknown tileset';
+      const layers = tilemap.layerCount ?? tilemap.layer_count ?? 0;
+      const tiles = tilemap.tileCount ?? tilemap.tile_count ?? 0;
+      return `<div class="surface-row"><strong>${escapeText(record.assetId || record.asset_id || 'tilemap asset')}</strong> ${surfaceState(true, 'tilemap')}<br><small>${escapeText(tilemap.width ?? '?')}×${escapeText(tilemap.height ?? '?')} · ${escapeText(layers)} layer(s) · ${escapeText(tiles)} tile(s) · tileset ${escapeText(tileset)}</small></div>`;
+    }).join('') || '<div class="surface-row">No tilemap summary evidence exported.</div>';
+    const loadRows = loadRecords.slice(0, 10).map((record) => {
+      const status = record.status || 'unknown';
+      const duration = record.loadDurationMs || record.load_duration_ms ? ` · ${record.loadDurationMs ?? record.load_duration_ms}ms` : '';
+      const reason = record.failureReason || record.failure_reason ? ` · ${record.failureReason ?? record.failure_reason}` : '';
+      return `<div class="surface-row"><strong>${escapeText(record.assetId || record.asset_id || 'runtime asset')}</strong> ${surfaceState(Boolean(status), status)}<br><small>${escapeText(record.path || 'no path')} · attempt ${escapeText(record.attemptId || record.attempt_id || 'unknown')}${escapeText(duration)}${escapeText(reason)}</small></div>`;
+    }).join('') || '<div class="surface-row">No runtime load evidence exported.</div>';
     const refText = refs.length ? refs.slice(0, 6).join(' · ') : 'No inspector evidence refs recorded.';
     return `<section id="studio-asset-inspector" class="panel"><h2>Asset inspector</h2>
       <p class="hint">Read-only manifest/status panel from Rust-exported dashboard data. Copy commands manually if needed; this panel has no upload, write, fetch, or execute controls.</p>
       <div class="field-grid">${cards}</div>${rows}
+      <h3>Atlas frame evidence</h3>${atlasRows}
+      <h3>Tilemap evidence</h3>${tilemapRows}
+      <h3>Runtime load evidence</h3>${loadRows}
       <p class="hint">Evidence refs: ${escapeText(refText)}</p>
       <p class="hint">${escapeText(inspector.boundary || 'Asset inspector data is display-only.')}</p>
     </section>`;

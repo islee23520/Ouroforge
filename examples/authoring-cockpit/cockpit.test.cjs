@@ -180,30 +180,37 @@ const run = {
   },
   asset_preview: {
     present: true,
-    preview_count: 2,
+    preview_count: 3,
     warning_count: 1,
     image_count: 1,
     atlas_frame_count: 1,
-    tilemap_count: 0,
+    tilemap_count: 1,
     boundary: 'Read-only asset preview evidence; cockpit never fetches remote assets or writes trusted state.',
     records: [
       { assetId: 'player_sprite', assetType: 'image', sourcePath: 'assets/sprites/player.png', previewKind: 'thumbnail', image: { width: 16, height: 16 } },
       { assetId: 'player_atlas', assetType: 'sprite_atlas', sourcePath: 'assets/atlases/player.atlas.json', previewKind: 'thumbnail', atlasFrames: [{ frameId: 'idle_0', rect: { x: 0, y: 0, width: 16, height: 16 } }] },
+      { assetId: 'level_tilemap', assetType: 'tilemap', sourcePath: 'assets/tilemaps/level.json', previewKind: 'metadata', tilemap: { tilesetAssetId: 'terrain_tiles', width: 4, height: 3, layerCount: 2, tileCount: 12 } },
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
   asset_inspector: {
     present: true,
     status: 'warning',
-    asset_count: 3,
+    asset_count: 4,
     warning_count: 1,
-    preview_count: 2,
+    runtime_attempt_count: 2,
+    loaded_count: 1,
+    failed_count: 1,
+    preview_count: 3,
+    atlas_frame_count: 1,
+    tilemap_count: 1,
     boundary: 'Read-only Studio asset inspector; browser cannot upload assets, write manifests, fetch remote assets, or execute commands.',
     evidence_refs: ['asset-integrity.json', 'asset-loading.json', 'asset-preview.json'],
     assets: [
-      { assetId: 'player_sprite', assetType: 'image', sourcePath: 'assets/sprites/player.png', contentHash: 'hash-player', warnings: [] },
-      { assetId: 'player_atlas', assetType: 'sprite_atlas', sourcePath: 'assets/atlases/player.atlas.json', contentHash: 'hash-atlas', warnings: [] },
-      { assetId: 'missing_audio', assetType: 'audio', sourcePath: 'assets/audio/missing.ogg', contentHash: 'hash-missing', warnings: ['missing_asset_file'] },
+      { assetId: 'player_sprite', assetType: 'image', sourcePath: 'assets/sprites/player.png', contentHash: 'hash-player', runtimeStatuses: ['Loaded'], warnings: [] },
+      { assetId: 'player_atlas', assetType: 'sprite_atlas', sourcePath: 'assets/atlases/player.atlas.json', contentHash: 'hash-atlas', atlasFrameCount: 1, warnings: [] },
+      { assetId: 'level_tilemap', assetType: 'tilemap', sourcePath: 'assets/tilemaps/level.json', contentHash: 'hash-tilemap', tilemap: { tilesetAssetId: 'terrain_tiles', width: 4, height: 3, layerCount: 2, tileCount: 12 }, warnings: [] },
+      { assetId: 'missing_audio', assetType: 'audio', sourcePath: 'assets/audio/missing.ogg', contentHash: 'hash-missing', runtimeStatuses: ['Failed'], warnings: ['missing_asset_file'] },
     ],
   },
   project: {
@@ -647,11 +654,15 @@ assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<
 const xssAssetPreview = { asset_preview: { present: true, boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>' }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>' }] } };
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview reason</script>'), 'asset preview rows must be escaped');
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview-boundary</script>'), 'asset preview boundary must be escaped');
-const xssAssetInspector = { asset_inspector: { present: true, status: '<script>status</script>', boundary: '<script>inspector-boundary</script>', evidence_refs: ['<script>ref</script>'], assets: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', contentHash: '<script>hash</script>', warnings: ['<script>warning</script>'] }] } };
+const xssAssetInspector = { asset_inspector: { present: true, status: '<script>status</script>', boundary: '<script>inspector-boundary</script>', evidence_refs: ['<script>ref</script>'], assets: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', contentHash: '<script>hash</script>', runtimeStatuses: ['<script>runtime</script>'], tilemap: { tilesetAssetId: '<script>tileset</script>', width: '<b>', height: '<i>' }, warnings: ['<script>warning</script>'] }] }, asset_preview: { present: true, records: [{ assetId: '<script>atlas</script>', atlasFrames: [{ frameId: '<script>frame</script>', rect: { x: '<b>', y: '<i>', width: '<svg>', height: '<img>' } }], tilemap: { tilesetAssetId: '<script>tileset</script>', width: '<b>', height: '<i>', layerCount: '<svg>', tileCount: '<img>' } }] }, asset_loading: { present: true, records: [{ assetId: '<script>load</script>', attemptId: '<script>attempt</script>', path: '<b>path</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] } };
 const xssAssetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(xssAssetInspector);
 assert.ok(!xssAssetInspectorMarkup.includes('<script>inspector-boundary</script>'), 'asset inspector boundary must be escaped');
 assert.ok(!xssAssetInspectorMarkup.includes('<script>warning</script>'), 'asset inspector warnings must be escaped');
 assert.ok(!xssAssetInspectorMarkup.includes('<img src=x onerror=alert(1)>'), 'asset inspector asset id must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<script>runtime</script>'), 'asset inspector runtime statuses must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<script>reason</script>'), 'asset inspector runtime evidence must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<script>frame</script>'), 'asset inspector atlas frames must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<script>tileset</script>'), 'asset inspector tilemaps must be escaped');
 assert.match(xssAssetInspectorMarkup, /&lt;script&gt;status&lt;\/script&gt;/);
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
@@ -731,10 +742,20 @@ const assetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(run);
 assert.match(assetInspectorMarkup, /Asset inspector/);
 assert.match(assetInspectorMarkup, /player_sprite/);
 assert.match(assetInspectorMarkup, /player_atlas/);
+assert.match(assetInspectorMarkup, /level_tilemap/);
 assert.match(assetInspectorMarkup, /missing_audio/);
 assert.match(assetInspectorMarkup, /warning/);
 assert.match(assetInspectorMarkup, /missing_asset_file/);
-assert.match(assetInspectorMarkup, /3/);
+assert.match(assetInspectorMarkup, /Atlas frame evidence/);
+assert.match(assetInspectorMarkup, /idle_0/);
+assert.match(assetInspectorMarkup, /rect 0,0 16×16/);
+assert.match(assetInspectorMarkup, /Tilemap evidence/);
+assert.match(assetInspectorMarkup, /terrain_tiles/);
+assert.match(assetInspectorMarkup, /2 layer\(s\)/);
+assert.match(assetInspectorMarkup, /Runtime load evidence/);
+assert.match(assetInspectorMarkup, /load-player-sprite/);
+assert.match(assetInspectorMarkup, /Image load failed/);
+assert.match(assetInspectorMarkup, /4/);
 assert.match(assetInspectorMarkup, /asset-integrity\.json/);
 assert.match(assetInspectorMarkup, /no upload, write, fetch, or execute controls/);
 assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifests, fetch remote assets, or execute commands/);
