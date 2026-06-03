@@ -87,7 +87,8 @@ trusted persistence or command boundary.
 Follow-up Visual Authoring v1 issues should be completed in this order:
 
 1. **Visual Edit Draft Model v1** — define the data-only draft schema, ids,
-   operation categories, provenance, diagnostics, and fixture policy.
+   operation categories, provenance, diagnostics, fixture policy, and read-model
+   compatibility notes (see `docs/visual-edit-draft-model-v1.md`).
 2. **Scene Visual Edit Draft v1** — support draft descriptions for scene entity,
    component, trigger, HUD, animation/audio event, and transition edits within
    the draft model.
