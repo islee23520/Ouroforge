@@ -462,6 +462,10 @@ assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No revie
 assert.match(cockpit.renderLoopDryRunSurface(run), /Authoring loop dry-run/);
 assert.match(cockpit.renderLoopDryRunSurface(run), /blocked/);
 assert.match(cockpit.renderLoopDryRunSurface(run), /&lt;loop-1&gt;/);
+assert.match(cockpit.renderLoopDryRunSurface(run), /Expected artifacts: decision:runs\/review-decision\.json/);
+const escapedLoopDryRun = cockpit.renderLoopDryRunSurface({ loop_dry_run: { steps: [{ id: 's', expectedArtifacts: [{ id: '<artifact>', path: '<script>alert(1)</script>' }] }] } });
+assert.match(escapedLoopDryRun, /&lt;artifact&gt;:&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+assert.doesNotMatch(escapedLoopDryRun, /<script>alert/);
 assert.doesNotMatch(cockpit.renderLoopDryRunSurface(run), /<loop-1>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop dry-run/);
 assert.match(cockpit.renderLoopDryRunSurface({ summary: { id: 'run-no-loop' } }), /No dry-run summary/);

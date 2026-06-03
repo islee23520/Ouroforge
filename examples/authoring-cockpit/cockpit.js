@@ -921,10 +921,15 @@ const OuroforgeCockpit = (() => {
     const rows = steps.length ? steps.map((step) => {
       const stepMissing = Array.isArray(step.missingPrerequisites) ? step.missingPrerequisites : [];
       const prerequisites = Array.isArray(step.prerequisites) ? step.prerequisites : [];
+      const expectedArtifacts = Array.isArray(step.expectedArtifacts) ? step.expectedArtifacts : [];
+      const expectedText = expectedArtifacts
+        .map((artifact) => `${artifact?.id || 'artifact'}:${artifact?.path || 'unknown'}`)
+        .join(' · ');
       return `<div class="surface-row"><strong>${escapeText(step.id || 'step')}</strong> ${surfaceState(step.readiness !== 'blocked', step.readiness || 'unknown')} <span>${escapeText(step.readiness || 'unknown')}</span><br>
         <small>${escapeText(step.kind || 'unknown')} · plan ${escapeText(step.status || 'unknown')}</small>
         <div class="command-list"><code>${escapeText(step.commandText || '')}</code></div>
         ${prerequisites.length ? `<small>Prerequisites: ${escapeText(prerequisites.join(' · '))}</small>` : '<small>No prerequisites recorded.</small>'}
+        ${expectedArtifacts.length ? `<small>Expected artifacts: ${escapeText(expectedText)}</small>` : '<small>No expected artifacts recorded.</small>'}
         ${stepMissing.length ? `<div class="hint">Missing: ${escapeText(stepMissing.join(' · '))}</div>` : ''}
       </div>`;
     }).join('') : '<p class="empty">No dry-run steps recorded.</p>';

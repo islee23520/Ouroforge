@@ -2621,10 +2621,11 @@ fn build_authoring_loop_dry_run_summary_with_inspection(
     base_dir: Option<&Path>,
 ) -> Result<AuthoringLoopDryRunSummary> {
     plan.validate_schema()?;
+    let artifact_base_dir = base_dir.map(|base_dir| dry_run_project_artifact_root(plan, base_dir));
     let steps = plan
         .steps
         .iter()
-        .map(|step| AuthoringLoopDryRunStep::from_plan_step(step, base_dir))
+        .map(|step| AuthoringLoopDryRunStep::from_plan_step(step, artifact_base_dir.as_deref()))
         .collect::<Vec<_>>();
     let mut missing_prerequisites = base_dir
         .map(|base_dir| dry_run_global_missing_prerequisites(plan, base_dir))
@@ -2655,6 +2656,15 @@ fn build_authoring_loop_dry_run_summary_with_inspection(
         ],
         boundary: "Dry-run summary is inert local data; it does not execute, mutate scenes, promote regressions, or bridge browser output to commands.".to_string(),
     })
+}
+
+fn dry_run_project_artifact_root(plan: &AuthoringLoopPlan, base_dir: &Path) -> PathBuf {
+    let manifest_path = base_dir.join(&plan.project.manifest_path);
+    manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| base_dir.to_path_buf())
 }
 
 impl AuthoringLoopDryRunStep {
@@ -14146,9 +14156,9 @@ fn dashboard_scenario_result_observations(
             // broken result artifact exists. Derive the scenario id from the
             // artifact path (evidence/scenarios/<id>/scenario-result*.json).
             if let Some(scenario_id) = scenario_id_from_scenario_result_path(&artifact.path) {
-                observations
-                    .entry(scenario_id)
-                    .or_insert_with(|| RegressionRunMatrixObservation {
+                observations.insert(
+                    scenario_id,
+                    RegressionRunMatrixObservation {
                         run_id: run.summary.id.clone(),
                         run_dir: run.summary.run_dir.to_string_lossy().to_string(),
                         created_at_unix_ms: run.summary.created_at_unix_ms,
@@ -14156,7 +14166,8 @@ fn dashboard_scenario_result_observations(
                         scenario_result_path: Some(artifact.path.clone()),
                         verdict_status: run.summary.verdict_status.clone(),
                         evidence_refs: vec![artifact.path.clone()],
-                    });
+                    },
+                );
             }
             continue;
         };
@@ -17503,6 +17514,53 @@ scenarios:
             fs::write(path, "{}\n").expect("artifact");
         }
         let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+
+        let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)
+            .expect("ready dry-run summary");
+
+        assert_eq!(summary.status, "ready");
+        assert!(summary.missing_prerequisites.is_empty());
+        assert!(summary.steps.iter().all(|step| step.readiness == "ready"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn loop_dry_run_prerequisite_inspection_resolves_artifacts_from_project_root() {
+        let root = unique_temp_dir("loop-dry-run-nested-project-root");
+        let project_root = root.join("project");
+        write_loop_dry_run_project(&project_root);
+        for path in [
+            "runs/baseline/run.json",
+            "runs/baseline/comparisons/run-comparison.json",
+            "runs/baseline/mutation/proposal.json",
+            "runs/baseline/mutation/review-decision-ledger.json",
+            "runs/baseline/mutation/before.scene.json",
+        ] {
+            let path = project_root.join(path);
+            fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
+            fs::write(path, "{}\n").expect("artifact");
+        }
+        let plan_path = root.join("nested-loop-plan.json");
+        fs::write(
+            &plan_path,
+            r#"{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "temp-loop-nested",
+  "project": { "projectId": "loop_project", "manifestPath": "project/ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }] },
+    { "id": "generate-proposal", "kind": "generate-proposal", "status": "pending", "dependsOn": ["compare-runs"], "inputs": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }], "expectedArtifacts": [{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }] },
+    { "id": "record-review", "kind": "record-review-decision", "status": "pending", "dependsOn": ["generate-proposal"], "inputs": [{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }], "requiredDecisions": [{ "id": "human-review", "kind": "human-review" }], "expectedArtifacts": [{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }] },
+    { "id": "apply-mutation", "kind": "apply-accepted-scene-mutation", "status": "pending", "dependsOn": ["record-review"], "inputs": [{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }], "requiredDecisions": [{ "id": "human-review", "kind": "accepted-mutation" }], "rollbackRefs": [{ "id": "before-scene", "path": "runs/baseline/mutation/before.scene.json" }], "expectedArtifacts": [{ "id": "transaction", "path": "runs/baseline/mutation/transaction.json" }] }
+  ],
+  "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }
+}"#,
+        )
+        .expect("plan");
 
         let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)
             .expect("ready dry-run summary");
@@ -25702,6 +25760,40 @@ scenarios:
         assert_eq!(
             smoke.runs[0].scenario_result_path.as_deref(),
             Some("evidence/scenarios/bootstrap-smoke/scenario-result.json")
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_matrix_uses_later_unreadable_scenario_result_observation() {
+        let root = unique_temp_dir("regression-matrix-later-unreadable");
+        fs::create_dir_all(&root).expect("temp root exists");
+        let run = create_project_test_run(&root, &["bootstrap-smoke"]);
+        write_fixture_scenario_result(&run.run_dir, "bootstrap-smoke", "passed");
+        add_evidence_artifact(
+            &run.run_dir,
+            "fixture-scenario-result-bootstrap-smoke-unreadable",
+            "application/json",
+            "evidence/scenarios/bootstrap-smoke/scenario-result-1.json",
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("later missing result indexed");
+
+        let matrix = build_regression_run_matrix(root.join("runs")).expect("matrix builds");
+        let smoke = matrix.projects[0].scenario_packs[0]
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "bootstrap-smoke")
+            .expect("smoke scenario present");
+
+        assert_eq!(smoke.current_status, "unknown");
+        assert!(smoke.last_pass.is_none());
+        assert_eq!(smoke.runs.len(), 1);
+        assert_eq!(smoke.runs[0].status, "unknown");
+        assert_eq!(
+            smoke.runs[0].scenario_result_path.as_deref(),
+            Some("evidence/scenarios/bootstrap-smoke/scenario-result-1.json")
         );
 
         fs::remove_dir_all(root).expect("fixture removed");
