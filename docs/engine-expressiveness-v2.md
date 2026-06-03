@@ -11,10 +11,10 @@ project's local-first trust boundary.
 Status: the implemented subset is complete through the expressive Studio
 inspection work and this #322 governance refresh. Completion covers additive
 scene components, deterministic collision/trigger/HUD evidence, the
+animation/audio gameplay event surface, manifest-declared scene transitions, the
 collect-and-exit playable demo fixture, regression scenario coverage, and
-read-only Studio inspection. Animation/audio gameplay events (#317) and
-multi-scene transitions (#318) remain separate design-blocked candidates and are
-not included in the completed milestone claim.
+read-only Studio inspection. These are bounded local evidence contracts, not
+production editor/runtime compatibility claims.
 
 ## Completed baseline
 
@@ -44,6 +44,9 @@ contracts and fixtures:
   explicit missing/malformed reporting.
 - `docs/gameplay-trigger-flags-v1.md` for trigger/flag state used by goals,
   pickups, exits, and scenario evidence.
+- `docs/scene-transitions-v1.md` for manifest-declared scene transition schema,
+  runtime probe fields, scenario assertions, and read-only dashboard/Studio
+  summaries.
 - `docs/playable-demo-v2-collect-and-exit.md` plus
   `examples/playable-demo-v2/collect-and-exit/` for the local collect-and-exit
   fixture.
@@ -67,8 +70,8 @@ richer scene components
   -> gameplay triggers and flags
   -> HUD/state feedback
   -> collision/physics rules
-  -> animation/audio gameplay events (design-blocked #317)
-  -> manifest-declared scene transitions (design-blocked #318)
+  -> animation/audio gameplay events
+  -> manifest-declared scene transitions
   -> playable collect-and-exit demo
   -> scenario regression coverage
   -> Studio read-only inspection
@@ -76,8 +79,8 @@ richer scene components
 
 The target is not a production engine. The completed subset provides enough
 expressive structure to make small playable game states inspectable, testable,
-and reviewable through the existing evidence-native loop while leaving #317 and
-#318 out of completion claims.
+and reviewable through the existing evidence-native loop without implying
+public compatibility, native export, plugin, hosted, or production-editor scope.
 
 ## Dependency order
 
@@ -94,12 +97,11 @@ blocker and replacement ordering:
    explicit evidence inputs for goals, pickups, exits, and state changes.
 4. **UI/HUD Entities v1** — expose small HUD/state feedback entities without
    turning Studio into a production UI editor.
-5. **Animation and Audio Gameplay Events v2** — design-blocked (#317); add
-   bounded event declarations and evidence hooks only after its design gate is
-   resolved.
-6. **Multi-Scene and Level Transition v1** — design-blocked (#318); allow
-   manifest-declared scene transitions only after deterministic validation and
-   scenario-evidence design are resolved.
+5. **Animation and Audio Gameplay Events v2** — completed as bounded event
+   declarations and evidence hooks for local runtime/scenario observation.
+6. **Multi-Scene and Level Transition v1** — completed as manifest-declared
+   scene references, bounded runtime transition events, scenario evidence, and
+   read-only summaries.
 7. **Playable Demo v2** — create a one-screen collect-and-exit demo that exercises
    the new component/rule surface.
 8. **Scenario Coverage v3** — add regression scenarios for expressiveness

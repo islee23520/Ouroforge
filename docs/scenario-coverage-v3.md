@@ -27,7 +27,7 @@ The source fixture lives in `examples/engine-expressiveness-v2-regression/`:
 | --- | --- | --- | --- | --- |
 | Component schema | `component-schema-v2-regression` | `world_state.componentModel.*` counts and version | Existing dashboard/cockpit world-state links stay read-only. | None. |
 | Triggers/flags | `trigger-flags-v1-regression` | `world_state.componentModel.goalFlags.*`, `runtime_events.events` | Runtime events link to verdict evidence without browser-side commands. | None. |
-| Multi-scene transition | `multi-scene-transition-v1-contract` | `world_state.sceneId`, `runtime_events.events` | Contract is visible as evidence-compatible state only. | Runtime transition behavior remains design-blocked by #318. |
+| Multi-scene transition | `multi-scene-transition-v1-contract` | `world_state.sceneId`, `runtime_events.events`, `transition_evidence.*` | Transition evidence remains manifest-bounded and read-only in dashboard/cockpit summaries. | No arbitrary scene loading, streaming, or editor transition graph scope. |
 | HUD values | `hud-values-v1-regression` | `world_state.componentModel.hudValues.*` | Dashboard/cockpit render HUD read-model state as escaped read-only data. | None. |
 | Collision layers | `collision-layers-v2-regression` | `world_state.collisionRules.*`, `collision_evidence.contacts` | Contact evidence remains linked from verdicts. | None. |
 | Animation event | `animation-event-v1-regression` | `animation_evidence.*`, `runtime_events.events` animation state records | Animation evidence is data-only; no visual AI judgment. | No animation graph/editor scope. |

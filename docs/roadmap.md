@@ -72,6 +72,7 @@ The current implementation has completed these documented milestone surfaces:
   `docs/scene-component-model-v2.md`,
   `docs/collision-physics-v2.md`,
   `docs/gameplay-trigger-flags-v1.md`,
+  `docs/scene-transitions-v1.md`,
   `docs/playable-demo-v2-collect-and-exit.md`,
   `docs/scenario-coverage-v3.md`,
   `docs/studio-authoring-surface-v2-expressive-inspection.md`)
@@ -81,10 +82,9 @@ Generated run evidence remains ignored local state unless an issue explicitly
 scopes a tiny deterministic fixture as tracked source-like data.
 
 Engine Expressiveness v2 completion covers the implemented local playable demo,
-component, collision, trigger, HUD, regression, and Studio-inspection surfaces.
-Animation/audio gameplay events (#317) and multi-scene transitions (#318)
-remain separate design-blocked candidates and are not implied by this completed
-milestone evidence.
+component, collision, trigger, HUD, animation/audio event, manifest-declared
+transition, regression, and Studio-inspection surfaces. These are bounded local
+evidence contracts, not broad editor/runtime compatibility claims.
 
 Source Mutation Preview v1 is scoped as a preview-only control contract in
 `docs/source-mutation-preview-v1.md`. Its implementation slices remain future
@@ -92,10 +92,9 @@ work and do not authorize source patch application.
 
 ## Near-term governance and public-readiness work
 
-Issue #322 is the current roadmap/#1 governance refresh after the implemented
-Engine Expressiveness v2 surfaces. Its purpose is to keep top-level docs and #1
-aligned with the completed playable-authoring milestone while preserving
-conservative public wording and leaving #1/#23 open.
+This roadmap/#1 governance refresh records the completed Engine Expressiveness
+v2 playable-authoring milestone while preserving conservative public wording and
+leaving #1/#23 open.
 
 After #322, the next milestone candidates should stay inside the same
 local-first, Rust-trusted, browser-read-only boundary. Recommended candidates
@@ -123,9 +122,9 @@ code path.
 - Keep browser surfaces static/read-only for trusted state: display exported
   data, preview runtime state, and show copyable CLI commands only.
 - Expand runtime/scenario coverage only when backed by concrete issues and
-  tests, and keep design-blocked expressive surfaces such as animation/audio
-  events (#317) and multi-scene transitions (#318) out of completion claims
-  until their design gates are resolved.
+  tests; keep each expressive surface tied to its bounded evidence contract and
+  do not infer broader production-engine/editor capabilities from completed
+  animation/audio or transition slices.
 - Keep authoring actions connected to QA evidence, semantic comparison,
   journals, rollback metadata, explicit mutation review, and regression
   promotion/matrix context.
