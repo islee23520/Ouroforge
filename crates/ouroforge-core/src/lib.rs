@@ -1869,6 +1869,8 @@ pub struct AuthoringLoopStep {
         skip_serializing_if = "Option::is_none"
     )]
     pub status_transition: Option<AuthoringLoopStatusTransition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<AuthoringLoopStepRecovery>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -1899,6 +1901,88 @@ pub enum AuthoringLoopStepStatus {
 pub struct AuthoringLoopStatusTransition {
     pub from: AuthoringLoopStepStatus,
     pub to: AuthoringLoopStepStatus,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopStepRecovery {
+    pub failure: AuthoringLoopFailureMetadata,
+    pub retryability: AuthoringLoopRetryability,
+    #[serde(rename = "manualAction")]
+    pub manual_action: AuthoringLoopManualAction,
+    #[serde(
+        rename = "rollbackRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub rollback_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "resumeCommand",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resume_command: Option<AuthoringLoopResumeCommandContext>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopFailureMetadata {
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<AuthoringLoopFailureCategory>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopFailureCategory {
+    MissingPrerequisite,
+    FailedPreflight,
+    ManualGate,
+    ExecutionError,
+    StaleState,
+    RollbackRequired,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopRetryability {
+    Retryable,
+    NonRetryable,
+    ManualActionRequired,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopManualAction {
+    pub kind: AuthoringLoopManualActionKind,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopManualActionKind {
+    InspectFailure,
+    ProvideDecision,
+    RestoreRollbackRef,
+    RepairMissingArtifact,
+    RefreshStaleState,
+    NoManualAction,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopResumeCommandContext {
+    pub command: String,
+    pub argv: Vec<String>,
+    pub boundary: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -2350,7 +2434,57 @@ impl AuthoringLoopStep {
                 "authoring loop plan steps[{index}].rollbackRefs[{rollback_index}]"
             ))?;
         }
+        if let Some(recovery) = &self.recovery {
+            recovery.validate(&format!("authoring loop plan steps[{index}].recovery"))?;
+        }
         Ok(())
+    }
+}
+
+impl AuthoringLoopStepRecovery {
+    fn validate(&self, field: &str) -> Result<()> {
+        self.failure.validate(&format!("{field}.failure"))?;
+        self.manual_action
+            .validate(&format!("{field}.manualAction"))?;
+        for (rollback_index, rollback_ref) in self.rollback_refs.iter().enumerate() {
+            rollback_ref.validate(&format!("{field}.rollbackRefs[{rollback_index}]"))?;
+        }
+        for (evidence_index, evidence_ref) in self.evidence_refs.iter().enumerate() {
+            evidence_ref.validate(&format!("{field}.evidenceRefs[{evidence_index}]"))?;
+        }
+        if let Some(resume_command) = &self.resume_command {
+            resume_command.validate(&format!("{field}.resumeCommand"))?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopFailureMetadata {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.reason"), &self.reason)?;
+        if let Some(detail) = &self.detail {
+            require_text(&format!("{field}.detail"), detail)?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopManualAction {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.description"), &self.description)
+    }
+}
+
+impl AuthoringLoopResumeCommandContext {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.command"), &self.command)?;
+        if self.argv.is_empty() {
+            return Err(anyhow!("{field}.argv must not be empty"));
+        }
+        for (index, arg) in self.argv.iter().enumerate() {
+            require_text(&format!("{field}.argv[{index}]"), arg)?;
+        }
+        require_text(&format!("{field}.boundary"), &self.boundary)
     }
 }
 
@@ -3246,6 +3380,18 @@ fn remap_authoring_loop_artifact_paths(
             for rollback_ref in &mut step.rollback_refs {
                 if rollback_ref.id == generated.id {
                     rollback_ref.path = generated.path.clone();
+                }
+            }
+            if let Some(recovery) = &mut step.recovery {
+                for rollback_ref in &mut recovery.rollback_refs {
+                    if rollback_ref.id == generated.id {
+                        rollback_ref.path = generated.path.clone();
+                    }
+                }
+                for evidence_ref in &mut recovery.evidence_refs {
+                    if evidence_ref.id == generated.id {
+                        evidence_ref.path = generated.path.clone();
+                    }
                 }
             }
         }
@@ -16953,6 +17099,115 @@ scenarios:
                 .expect("compare step")
                 .status,
             AuthoringLoopStepStatus::Completed
+        );
+    }
+
+    #[test]
+    fn loop_recovery_metadata_serializes_and_preserves_existing_plan_compatibility() {
+        let existing = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/pending.json"
+        ))
+        .expect("existing plan without recovery remains compatible");
+        assert!(existing.steps.iter().all(|step| step.recovery.is_none()));
+
+        let mut recovered = existing.clone();
+        recovered.steps[1].status = AuthoringLoopStepStatus::Blocked;
+        recovered.steps[1].status_transition = Some(AuthoringLoopStatusTransition {
+            from: AuthoringLoopStepStatus::Pending,
+            to: AuthoringLoopStepStatus::Blocked,
+        });
+        recovered.steps[1].recovery = Some(AuthoringLoopStepRecovery {
+            failure: AuthoringLoopFailureMetadata {
+                reason: "missing accepted review decision".to_string(),
+                category: Some(AuthoringLoopFailureCategory::ManualGate),
+                detail: Some("human review must be recorded before resume".to_string()),
+            },
+            retryability: AuthoringLoopRetryability::ManualActionRequired,
+            manual_action: AuthoringLoopManualAction {
+                kind: AuthoringLoopManualActionKind::ProvideDecision,
+                description: "Record an accepted or rejected review decision, then rerun explicit resume preflight.".to_string(),
+            },
+            rollback_refs: vec![AuthoringLoopArtifactRef {
+                id: "baseline-run".to_string(),
+                path: "runs/baseline/run.json".to_string(),
+                description: Some("last safe run before blocked step".to_string()),
+            }],
+            evidence_refs: vec![AuthoringLoopArtifactRef {
+                id: "recovery-evidence".to_string(),
+                path: "runs/baseline/ledger.jsonl".to_string(),
+                description: Some("loop ledger evidence".to_string()),
+            }],
+            resume_command: Some(AuthoringLoopResumeCommandContext {
+                command: "cargo run -p ouroforge-cli -- loop resume loop-plan.json --step summarize".to_string(),
+                argv: vec![
+                    "cargo".to_string(),
+                    "run".to_string(),
+                    "-p".to_string(),
+                    "ouroforge-cli".to_string(),
+                    "--".to_string(),
+                    "loop".to_string(),
+                    "resume".to_string(),
+                    "loop-plan.json".to_string(),
+                    "--step".to_string(),
+                    "summarize".to_string(),
+                ],
+                boundary: "explicit CLI-only resume preflight; browser surfaces display only".to_string(),
+            }),
+        });
+        recovered
+            .validate_schema()
+            .expect("recovery metadata validates");
+
+        let rendered = serde_json::to_string_pretty(&recovered).expect("recovery serializes");
+        assert!(rendered.contains("\"recovery\""));
+        assert!(rendered.contains("manual-action-required"));
+        assert!(rendered.contains("provide-decision"));
+
+        let reparsed = AuthoringLoopPlan::from_json_str(&rendered).expect("recovery reparses");
+        assert_eq!(reparsed, recovered);
+    }
+
+    #[test]
+    fn loop_recovery_metadata_rejects_empty_reason_or_resume_context() {
+        let mut plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/pending.json"
+        ))
+        .expect("pending plan validates");
+        plan.steps[0].recovery = Some(AuthoringLoopStepRecovery {
+            failure: AuthoringLoopFailureMetadata {
+                reason: "".to_string(),
+                category: Some(AuthoringLoopFailureCategory::ExecutionError),
+                detail: None,
+            },
+            retryability: AuthoringLoopRetryability::Retryable,
+            manual_action: AuthoringLoopManualAction {
+                kind: AuthoringLoopManualActionKind::InspectFailure,
+                description: "Inspect failure evidence".to_string(),
+            },
+            rollback_refs: Vec::new(),
+            evidence_refs: Vec::new(),
+            resume_command: Some(AuthoringLoopResumeCommandContext {
+                command:
+                    "cargo run -p ouroforge-cli -- loop resume loop-plan.json --step run-baseline"
+                        .to_string(),
+                argv: Vec::new(),
+                boundary: "explicit CLI-only resume preflight".to_string(),
+            }),
+        });
+
+        let error = plan
+            .validate_schema()
+            .expect_err("empty recovery reason fails");
+        assert!(error.to_string().contains("is required"), "{error:#}");
+
+        let recovery = plan.steps[0].recovery.as_mut().expect("recovery present");
+        recovery.failure.reason = "transient preflight failure".to_string();
+        let error = plan
+            .validate_schema()
+            .expect_err("empty resume argv fails after reason fixed");
+        assert!(
+            error.to_string().contains("argv must not be empty"),
+            "{error:#}"
         );
     }
 
