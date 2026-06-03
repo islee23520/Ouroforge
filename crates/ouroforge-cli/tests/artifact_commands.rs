@@ -160,6 +160,115 @@ fn project_validate_reports_manifest_summary_and_rejects_invalid_manifest() {
 }
 
 #[test]
+fn asset_validate_reports_manifest_summary_and_rejects_invalid_assets() {
+    let temp = unique_temp_dir("ouroforge-cli-asset-validate-test");
+    fs::create_dir_all(temp.join("assets/sprites")).expect("sprite dir");
+    fs::create_dir_all(temp.join("runs/previews")).expect("generated dir");
+    fs::write(temp.join("assets/sprites/player.png"), b"png fixture").expect("sprite writes");
+    fs::write(
+        temp.join("runs/previews/player.png"),
+        b"generated png fixture",
+    )
+    .expect("generated writes");
+    let sprite_hash = fnv1a64_hex(b"png fixture");
+    let generated_hash = fnv1a64_hex(b"generated png fixture");
+    let manifest_path = temp.join("asset-manifest.json");
+    fs::write(
+        &manifest_path,
+        format!(
+            r#"{{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "cli_asset_fixture",
+  "assets": [
+    {{
+      "id": "player_sprite",
+      "type": "image",
+      "path": "assets/sprites/player.png",
+      "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{sprite_hash}" }},
+      "classification": "source_like",
+      "dimensions": {{ "width": 16, "height": 16 }}
+    }},
+    {{
+      "id": "generated_preview",
+      "type": "image",
+      "path": "runs/previews/player.png",
+      "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{generated_hash}" }},
+      "classification": "generated",
+      "dimensions": {{ "width": 64, "height": 64 }}
+    }}
+  ]
+}}"#
+        ),
+    )
+    .expect("manifest writes");
+
+    let by_root = run_cli(&temp, &["asset", "validate", temp.to_str().unwrap()]);
+    assert!(by_root.contains("Asset manifest valid: cli_asset_fixture"));
+    assert!(by_root.contains("Assets: 2"));
+    assert!(by_root.contains("Source-like assets: 1"));
+    assert!(by_root.contains("Generated assets: 1"));
+    assert!(by_root.contains("Asset types: image=2"));
+
+    let by_file = run_cli(
+        &temp,
+        &["asset", "validate", manifest_path.to_str().unwrap()],
+    );
+    assert!(by_file.contains("Asset manifest valid: cli_asset_fixture"));
+
+    let stale_manifest = temp.join("asset-manifest.stale.json");
+    fs::write(
+        &stale_manifest,
+        r#"{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "cli_stale_asset_fixture",
+  "assets": [{
+    "id": "player_sprite",
+    "type": "image",
+    "path": "assets/sprites/player.png",
+    "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "0000000000000000" },
+    "classification": "source_like"
+  }]
+}"#,
+    )
+    .expect("stale manifest writes");
+    let stale = run_cli_expect_failure(
+        &temp,
+        &["asset", "validate", stale_manifest.to_str().unwrap()],
+    );
+    assert!(stale.contains("contentHash mismatch"));
+
+    let generated_source_manifest = temp.join("asset-manifest.generated-source.json");
+    fs::write(
+        &generated_source_manifest,
+        format!(
+            r#"{{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "cli_generated_source_fixture",
+  "assets": [{{
+    "id": "generated_source",
+    "type": "image",
+    "path": "runs/previews/player.png",
+    "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{generated_hash}" }},
+    "classification": "source_like"
+  }}]
+}}"#
+        ),
+    )
+    .expect("generated source manifest writes");
+    let generated_source = run_cli_expect_failure(
+        &temp,
+        &[
+            "asset",
+            "validate",
+            generated_source_manifest.to_str().unwrap(),
+        ],
+    );
+    assert!(generated_source.contains("generated root runs"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn project_init_creates_valid_minimal_workspace_and_rejects_unsafe_destinations() {
     let temp = unique_temp_dir("ouroforge-cli-project-init-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
@@ -2083,6 +2192,15 @@ fn run_dir_from_output(root: &Path, output: &str) -> PathBuf {
         .find(|line| line.starts_with("Run created: "))
         .expect("run created line present");
     root.join(line.strip_prefix("Run created: ").unwrap())
+}
+
+fn fnv1a64_hex(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
 }
 
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {

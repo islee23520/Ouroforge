@@ -20,9 +20,9 @@ use ouroforge_core::{
     update_journal, validate_scene_reload, write_agent_handoff_contract_from_path,
     write_regression_promotion_draft, write_run_comparison_artifact,
     write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
-    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    WorkerId,
+    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectAssetManifest,
+    ProjectAssetType, ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -45,6 +45,10 @@ enum Commands {
     Project {
         #[command(subcommand)]
         command: ProjectCommand,
+    },
+    Asset {
+        #[command(subcommand)]
+        command: AssetCommand,
     },
     Run {
         seed_path: PathBuf,
@@ -147,6 +151,11 @@ enum ProjectCommand {
         #[arg(long, default_value = "minimal-2d")]
         template: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum AssetCommand {
+    Validate { project_root_or_manifest: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -427,6 +436,29 @@ fn main() -> Result<()> {
             println!("Scenario packs: {}", report.scenario_packs);
             println!("Runs root: {}", report.runs_root);
             println!("Generated roots: {}", report.generated_roots.join(","));
+        }
+        Commands::Asset {
+            command:
+                AssetCommand::Validate {
+                    project_root_or_manifest,
+                },
+        } => {
+            let manifest_path = resolve_project_asset_manifest_path(&project_root_or_manifest);
+            let manifest = ProjectAssetManifest::from_path(&manifest_path)?;
+            let base_dir = match manifest_path.parent() {
+                Some(parent) if !parent.as_os_str().is_empty() => parent,
+                _ => Path::new("."),
+            };
+            let report = manifest.validate_assets(base_dir)?;
+            println!("Asset manifest valid: {}", report.manifest_id);
+            println!("Manifest: {}", manifest_path.display());
+            println!("Assets: {}", report.assets);
+            println!("Source-like assets: {}", report.source_like_assets);
+            println!("Generated assets: {}", report.generated_assets);
+            println!(
+                "Asset types: {}",
+                format_asset_type_counts(&report.asset_types)
+            );
         }
         Commands::Project {
             command:
@@ -922,6 +954,47 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_project_asset_manifest_path(project_root_or_manifest: &Path) -> PathBuf {
+    if project_root_or_manifest.is_dir() {
+        project_root_or_manifest.join("asset-manifest.json")
+    } else if project_root_or_manifest
+        .file_name()
+        .and_then(|name| name.to_str())
+        == Some("ouroforge.project.json")
+    {
+        project_root_or_manifest
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join("asset-manifest.json")
+    } else {
+        project_root_or_manifest.to_path_buf()
+    }
+}
+
+fn format_asset_type_counts(
+    counts: &std::collections::BTreeMap<ProjectAssetType, usize>,
+) -> String {
+    if counts.is_empty() {
+        return "none".to_string();
+    }
+    counts
+        .iter()
+        .map(|(asset_type, count)| format!("{}={count}", project_asset_type_label(*asset_type)))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn project_asset_type_label(asset_type: ProjectAssetType) -> &'static str {
+    match asset_type {
+        ProjectAssetType::Image => "image",
+        ProjectAssetType::SpriteAtlas => "sprite_atlas",
+        ProjectAssetType::Tileset => "tileset",
+        ProjectAssetType::Tilemap => "tilemap",
+        ProjectAssetType::Audio => "audio",
+        ProjectAssetType::Font => "font",
+    }
 }
 
 fn resolve_project_manifest_path(project_root_or_manifest: &Path) -> PathBuf {

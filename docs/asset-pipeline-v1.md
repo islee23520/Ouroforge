@@ -49,7 +49,8 @@ The milestone should answer:
 Follow-up Asset Pipeline v1 issues should be implemented in this order:
 
 1. **Asset Manifest v1** — define project-local asset manifest schema, asset ids,
-   relative paths, file types, integrity hashes, and fixture policy.
+   relative paths, file types, integrity hashes, CLI validation, and fixture policy
+   (see `docs/asset-manifest-v1.md`).
 2. **Sprite Atlas Manifest v1** — define sprite atlas metadata, frame regions,
    animation frame refs, deterministic ordering, and validation boundaries.
 3. **Tileset and Tilemap Authoring v2** — extend tilemap authoring around
