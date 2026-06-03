@@ -88,6 +88,11 @@
     tilemaps: [],
     assetManifest: null,
     goalFlags: {},
+    physics: {
+      gravity: 1,
+      maxFallSpeed: 8,
+      grounded: {},
+    },
   };
   let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
 
@@ -341,9 +346,51 @@
     const inputComponent = entity.components.input || {};
     const allowedActions = Array.isArray(inputComponent.allowedActions) ? inputComponent.allowedActions : [];
     const canMove = allowedActions.length === 0 || allowedActions.includes('move');
+    const canJump = allowedActions.includes('jump') && Number.isFinite(inputComponent.jumpImpulse);
     const speed = canMove ? (Number.isFinite(inputComponent.moveSpeed) ? inputComponent.moveSpeed : 2) : 0;
     velocity.x = ((input.right ? 1 : 0) - (input.left ? 1 : 0)) * speed;
-    velocity.y = ((input.down ? 1 : 0) - (input.up ? 1 : 0)) * speed;
+    if (canJump) {
+      if (input.up && world.physics.grounded[entity.id]) {
+        velocity.y = -inputComponent.jumpImpulse;
+        world.physics.grounded[entity.id] = false;
+        record('runtime.physics.jump', { entityId: entity.id, impulse: inputComponent.jumpImpulse });
+      }
+    } else {
+      velocity.y = ((input.down ? 1 : 0) - (input.up ? 1 : 0)) * speed;
+    }
+  }
+
+  function isDynamicPhysicsEntity(entity) {
+    return Boolean(entity
+      && entity.components
+      && entity.components.collider
+      && entity.components.collider.body === 'dynamic');
+  }
+
+  function applyGravity() {
+    for (const entity of world.entities) {
+      if (!isDynamicPhysicsEntity(entity)) continue;
+      const velocity = entity.components.velocity;
+      velocity.y = Math.min(world.physics.maxFallSpeed, (velocity.y || 0) + world.physics.gravity);
+    }
+  }
+
+  function refreshGroundedState(collisionEvents) {
+    const grounded = {};
+    for (const entity of world.entities) {
+      if (isDynamicPhysicsEntity(entity)) grounded[entity.id] = false;
+    }
+    for (const event of collisionEvents) {
+      if (event.type !== 'runtime.collision.contact') continue;
+      if (event.movingEntityId && event.normal && event.normal.y === -1) {
+        grounded[event.movingEntityId] = true;
+        const entity = entityById(event.movingEntityId);
+        if (entity && entity.components && entity.components.velocity) {
+          entity.components.velocity.y = Math.min(0, entity.components.velocity.y || 0);
+        }
+      }
+    }
+    world.physics.grounded = grounded;
   }
 
   function entityById(entityId) {
@@ -395,6 +442,7 @@
 
   function stepOne() {
     applyInput();
+    applyGravity();
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
     if (typeof collision.stepAabbPhysics === 'function') {
@@ -414,6 +462,7 @@
       if (world.collisionEvents.length > 64) world.collisionEvents.shift();
       record(event.type, event);
     }
+    refreshGroundedState(world.collisions);
     processTriggerEvents(world.collisions);
   }
 
@@ -441,6 +490,10 @@
     world.tilemaps = clone(normalized.tilemaps);
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     world.goalFlags = {};
+    world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };
+    for (const entity of world.entities) {
+      if (isDynamicPhysicsEntity(entity)) world.physics.grounded[entity.id] = false;
+    }
     for (const entity of world.entities) {
       const goalFlag = entity.components && entity.components.goalFlag;
       if (goalFlag && goalFlag.flag) world.goalFlags[goalFlag.flag] = false;
