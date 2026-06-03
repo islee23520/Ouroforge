@@ -62,6 +62,10 @@ function assertGroundedJump(api, scene, message) {
 }
 
 const platformerScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'physics-rules-v2.json'), 'utf8'));
+const floorCollider = platformerScene.entities.find((entity) => entity.id === 'floor').components.collider;
+const worldLayer = platformerScene.collisionRules.layers.find((layer) => layer.id === 'world');
+assert.deepEqual(floorCollider.collisionMask, ['actors'], 'floor collider must not rely on wildcard masks');
+assert.deepEqual(worldLayer.collidesWith, ['actors'], 'world layer declares actor contact for the floor fixture');
 
 
 const defaultLayerScene = {

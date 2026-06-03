@@ -43,7 +43,8 @@
           "body": "static",
           "offset": { "x": 0, "y": 0 },
           "size": { "width": 160, "height": 16 },
-          "collisionGroup": "world"
+          "collisionGroup": "world",
+          "collisionMask": ["actors"]
         }
       }
     }
