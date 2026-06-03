@@ -10,9 +10,9 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 
 Open <http://127.0.0.1:8000/examples/authoring-cockpit/>.
 
-The inspector updates scene data in memory and shows the validated `ouroforge scene edit` command for writing through Rust-side validation. Direct browser file writes are intentionally not supported.
+The inspector exposes inline edit controls for a subset of scalar fields and shows the validated `ouroforge scene edit` command for writing through Rust-side validation. Direct browser file writes are intentionally not supported.
 
-Supported Rust-validated scalar scene edit fields:
+Cockpit inline-editable scalar fields:
 
 - `sprite.color`
 - `components.transform.x`
@@ -22,6 +22,11 @@ Supported Rust-validated scalar scene edit fields:
 - `components.size.width`
 - `components.size.height`
 - `components.controllable`
+
+Additional Rust-validated scalar scene edit paths — validated by the
+`ouroforge scene edit` command and preflightable as Scene Visual Edit Draft v1
+`sceneOperation` records, but not surfaced as cockpit inline edit controls:
+
 - `components.status.hitPoints`
 - `components.status.maxHitPoints`
 - `components.input.moveSpeed`
