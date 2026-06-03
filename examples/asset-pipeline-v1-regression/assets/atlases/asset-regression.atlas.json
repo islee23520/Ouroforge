@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "asset-regression-atlas-fixture-v1",
+  "image": "assets/sprites/asset-regression-sheet.png",
+  "frames": [
+    {
+      "id": "idle_0",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "idle_1",
+      "rect": {
+        "x": 16,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "missing_marker",
+      "rect": {
+        "x": 32,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "exit_marker",
+      "rect": {
+        "x": 48,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "ground",
+      "rect": {
+        "x": 0,
+        "y": 16,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "hazard",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "width": 16,
+        "height": 16
+      }
+    }
+  ],
+  "animations": [
+    {
+      "id": "idle",
+      "frames": [
+        {
+          "frameId": "idle_0",
+          "durationMs": 120
+        },
+        {
+          "frameId": "idle_1",
+          "durationMs": 120
+        }
+      ]
+    }
+  ]
+}

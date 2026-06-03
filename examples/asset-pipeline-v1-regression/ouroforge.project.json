@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "asset_pipeline_v1_regression",
+    "name": "Asset Pipeline v1 Regression Fixture"
+  },
+  "scenes": [
+    {
+      "id": "asset-pipeline-regression",
+      "path": "scenes/asset-pipeline-regression.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "asset-pipeline-regression",
+      "path": "seeds/asset-pipeline-regression.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "asset-pipeline-v1-regression",
+      "path": "scenarios/asset-pipeline-v1-regression.json"
+    }
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ]
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "1",
+  "id": "asset-pipeline-regression-scene",
+  "bounds": {
+    "width": 128,
+    "height": 96
+  },
+  "metadata": {
+    "fixture": "scenario-coverage-v4-asset-pipeline",
+    "scope": "source-like local asset regression fixture; generated evidence remains untracked"
+  },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      {
+        "id": "missing_asset_observed",
+        "initial": false
+      },
+      {
+        "id": "asset_exit_reached",
+        "initial": false
+      }
+    ]
+  },
+  "entities": [
+    {
+      "id": "asset_probe_player",
+      "sprite": {
+        "color": "#5eead4",
+        "asset": "asset_regression_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 16
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "controllable": true,
+        "animation": {
+          "mode": "sprite_frame",
+          "frameDuration": 2,
+          "currentClip": "idle",
+          "clips": [
+            {
+              "id": "idle",
+              "frameDuration": 2,
+              "loop": true,
+              "frames": [
+                {
+                  "color": "#5eead4",
+                  "asset": "asset_regression_sheet"
+                },
+                {
+                  "color": "#2dd4bf",
+                  "asset": "asset_regression_sheet"
+                }
+              ]
+            }
+          ]
+        },
+        "audio": {
+          "events": [
+            {
+              "name": "asset_probe_spawn",
+              "trigger": "scene_loaded",
+              "action": "play",
+              "asset": "asset_regression_audio"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "tilemaps": [
+    {
+      "id": "asset_regression_tilemap",
+      "tileSize": {
+        "width": 16,
+        "height": 16
+      },
+      "grid": {
+        "width": 4,
+        "height": 3
+      },
+      "tiles": [
+        {
+          "id": "empty",
+          "color": "#0f172a"
+        },
+        {
+          "id": "ground",
+          "color": "#64748b",
+          "asset": "asset_regression_atlas",
+          "solid": true
+        },
+        {
+          "id": "missing_marker",
+          "color": "#facc15",
+          "asset": "asset_regression_atlas",
+          "trigger": "missing_asset_observed"
+        },
+        {
+          "id": "exit_marker",
+          "color": "#22c55e",
+          "asset": "asset_regression_atlas",
+          "goal": true
+        },
+        {
+          "id": "hazard",
+          "color": "#ef4444",
+          "asset": "asset_regression_atlas",
+          "hazard": true
+        }
+      ],
+      "layers": [
+        {
+          "id": "terrain",
+          "kind": "visual",
+          "data": [
+            "empty",
+            "missing_marker",
+            "exit_marker",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "hazard",
+            "empty",
+            "empty",
+            "ground",
+            "empty"
+          ]
+        },
+        {
+          "id": "collision",
+          "kind": "collision",
+          "data": [
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "hazard",
+            "empty",
+            "empty",
+            "ground",
+            "empty"
+          ]
+        },
+        {
+          "id": "triggers",
+          "kind": "trigger",
+          "data": [
+            "empty",
+            "missing_marker",
+            "exit_marker",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty"
+          ]
+        }
+      ]
+    }
+  ],
+  "assetManifest": {
+    "schemaVersion": "runtime-asset-manifest-v1",
+    "id": "asset-pipeline-regression-runtime-assets",
+    "assets": [
+      {
+        "id": "asset_regression_sheet",
+        "kind": "sprite",
+        "path": "assets/sprites/asset-regression-sheet.png"
+      },
+      {
+        "id": "asset_regression_audio",
+        "kind": "audio",
+        "path": "assets/audio/asset-regression.ogg"
+      }
+    ],
+    "notes": "Runtime-observable local asset ids only; no remote fetch or browser writes."
+  }
+}

@@ -25977,6 +25977,138 @@ scenarios:
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
+    #[test]
+    fn asset_pipeline_v1_regression_fixtures_validate_feature_matrix() {
+        let root = repo_fixture_path("examples/asset-pipeline-v1-regression");
+        let project = ProjectManifest::from_path(root.join(PROJECT_MANIFEST_FILE_NAME))
+            .expect("asset pipeline regression project manifest validates");
+        assert_eq!(project.project.id, "asset_pipeline_v1_regression");
+        assert_eq!(project.scenario_packs.len(), 1);
+        assert_eq!(project.asset_roots, vec!["assets".to_string()]);
+        assert_eq!(
+            project.generated.roots,
+            vec![
+                "runs".to_string(),
+                "target".to_string(),
+                "dashboard-data".to_string(),
+            ]
+        );
+
+        let seed = Seed::from_path(root.join("seeds/asset-pipeline-regression.yaml"))
+            .expect("asset pipeline regression seed validates");
+        assert_eq!(seed.id, "asset-pipeline.v1-regression");
+        assert!(seed
+            .acceptance
+            .iter()
+            .any(|item| item.contains("hash mismatch")));
+
+        let pack =
+            ScenarioPack::from_path(root.join("scenarios/asset-pipeline-v1-regression.json"))
+                .expect("asset pipeline regression scenario pack validates");
+        assert_eq!(pack.id, "asset-pipeline-v1-regression");
+        assert_eq!(
+            pack.ordered_scenario_ids(),
+            vec![
+                "manifest-validation".to_string(),
+                "hash-mismatch-regression".to_string(),
+                "missing-asset-regression".to_string(),
+                "atlas-frame-validation".to_string(),
+                "tile-collision-extraction".to_string(),
+                "runtime-asset-load-evidence".to_string(),
+                "studio-read-model-compatibility".to_string(),
+            ]
+        );
+
+        let manifest = ProjectAssetManifest::from_path(root.join("asset-manifest.json"))
+            .expect("asset pipeline regression asset manifest validates");
+        let report = manifest
+            .validate_assets(&root)
+            .expect("asset regression fixture assets validate");
+        assert_eq!(report.manifest_id, "asset_pipeline_v1_regression_assets");
+        assert_eq!(report.assets, 5);
+        assert_eq!(report.source_like_assets, 5);
+        assert_eq!(report.generated_assets, 0);
+        assert_eq!(report.sprite_atlases, 1);
+        assert_eq!(report.sprite_atlas_frames, 6);
+        assert_eq!(
+            report.asset_types.get(&ProjectAssetType::Image).copied(),
+            Some(1)
+        );
+        assert_eq!(
+            report
+                .asset_types
+                .get(&ProjectAssetType::SpriteAtlas)
+                .copied(),
+            Some(1)
+        );
+        assert_eq!(
+            report.asset_types.get(&ProjectAssetType::Tileset).copied(),
+            Some(1)
+        );
+        assert_eq!(
+            report.asset_types.get(&ProjectAssetType::Tilemap).copied(),
+            Some(1)
+        );
+        assert_eq!(
+            report.asset_types.get(&ProjectAssetType::Audio).copied(),
+            Some(1)
+        );
+
+        let tilemaps = manifest
+            .extract_tilemap_authoring()
+            .expect("tilemap authoring extraction validates");
+        let tilemap = tilemaps
+            .tilemaps
+            .first()
+            .expect("regression tilemap extracted");
+        assert_eq!(tilemap.tilemap_asset_id, "asset_regression_tilemap");
+        assert!(tilemap
+            .collision_cells
+            .iter()
+            .any(|cell| cell.tile_id == "ground"));
+        assert!(tilemap
+            .trigger_cells
+            .iter()
+            .any(|cell| cell.trigger.as_deref() == Some("missing_asset_observed")));
+        assert!(tilemap
+            .goal_cells
+            .iter()
+            .any(|cell| cell.tile_id == "exit_marker"));
+        assert!(tilemap
+            .hazard_cells
+            .iter()
+            .any(|cell| cell.tile_id == "hazard"));
+    }
+
+    #[test]
+    fn asset_pipeline_v1_regression_invalid_fixtures_fail_explicitly() {
+        let root = repo_fixture_path("examples/asset-pipeline-v1-regression");
+        let invalid_manifest = |relative: &str| {
+            let input = fs::read_to_string(root.join(relative)).expect("invalid fixture readable");
+            ProjectAssetManifest::from_json_str(&input).expect("invalid fixture schema parses")
+        };
+
+        let hash_mismatch = invalid_manifest("invalid/hash-mismatch.asset-manifest.json")
+            .validate_assets(&root)
+            .expect_err("hash mismatch fixture must fail validation");
+        assert!(hash_mismatch.to_string().contains("contentHash mismatch"));
+
+        let missing = invalid_manifest("invalid/missing-asset.asset-manifest.json")
+            .validate_assets(&root)
+            .expect_err("missing asset fixture must fail validation");
+        assert!(missing.to_string().contains("missing file"));
+
+        let atlas = invalid_manifest("invalid/atlas-frame-out-of-bounds.asset-manifest.json")
+            .validate_assets(&root)
+            .expect_err("out-of-bounds atlas frame fixture must fail validation");
+        assert!(atlas.to_string().contains("outside atlas image bounds"));
+
+        let tilemap = invalid_manifest("invalid/tilemap-unknown-tile.asset-manifest.json")
+            .validate_assets(&root)
+            .expect_err("unknown tile fixture must fail validation");
+        assert!(tilemap.to_string().contains("references unknown tile id"));
+    }
+
     fn transition_test_scene(scene_id: &str, transitions: serde_json::Value) -> serde_json::Value {
         let mut scene = json!({
             "schemaVersion": "1",
