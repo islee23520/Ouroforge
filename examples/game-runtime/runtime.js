@@ -18,7 +18,22 @@
       metadata: () => [],
       imageFor: () => null,
     }),
-  }).createAssetTracker({ onChange: () => renderCanvas() });
+  }).createAssetTracker({
+    onChange: () => renderCanvas(),
+    onEvent: (asset) => record(`runtime.asset.${asset.status}`, {
+      attemptId: asset.attemptId,
+      assetId: asset.id,
+      assetType: asset.kind,
+      path: asset.path,
+      status: asset.status,
+      startedAtUnixMs: asset.startedAtUnixMs,
+      endedAtUnixMs: asset.endedAtUnixMs,
+      loadDurationMs: asset.loadDurationMs,
+      width: asset.width,
+      height: asset.height,
+      failureReason: asset.failureReason,
+    }),
+  });
   const animation = window.OuroforgeAnimation || {
     normalizeAnimation: () => null,
     advanceAnimations: () => {},
