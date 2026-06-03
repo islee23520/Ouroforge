@@ -491,6 +491,20 @@ assert.match(cockpit.renderLoopExecutionSurface(run), /Authoring loop execution/
 assert.match(cockpit.renderLoopExecutionSurface(run), /completed/);
 assert.match(cockpit.renderLoopExecutionSurface(run), /&lt;transaction&gt;/);
 assert.doesNotMatch(cockpit.renderLoopExecutionSurface(run), /<transaction>/);
+const blockedLoopExecution = cockpit.renderLoopExecutionSurface({
+  loop_execution: {
+    loopId: '<loop-blocked>',
+    stepId: '<step-blocked>',
+    kind: 'apply-accepted-scene-mutation',
+    status: '<blocked>',
+    ledgerPath: '<ledger>',
+    blockedReasons: ['<missing decision>'],
+  },
+});
+assert.match(blockedLoopExecution, /&lt;blocked&gt;/);
+assert.match(blockedLoopExecution, /Blocked by: &lt;missing decision&gt;/);
+assert.doesNotMatch(blockedLoopExecution, /gap \/ unavailable/);
+assert.doesNotMatch(blockedLoopExecution, /<blocked>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop execution/);
 assert.match(cockpit.renderLoopExecutionSurface({ summary: { id: 'run-no-loop' } }), /No loop execution summary/);
 assert.match(cockpit.renderLoopRecoverySurface(run), /Authoring loop recovery/);

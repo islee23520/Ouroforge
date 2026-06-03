@@ -289,7 +289,11 @@ const OuroforgeCockpit = (() => {
   }
 
   function surfaceState(present, label = 'available') {
-    return present ? `<span class="status-ok">${escapeText(label)}</span>` : '<span class="status-idle">gap / unavailable</span>';
+    if (present) return `<span class="status-ok">${escapeText(label)}</span>`;
+    const fallback = label === undefined || label === null || label === '' || label === 'available'
+      ? 'gap / unavailable'
+      : label;
+    return `<span class="status-idle">${escapeText(fallback)}</span>`;
   }
 
   function studioSurfaceSummary(run) {

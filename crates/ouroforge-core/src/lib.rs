@@ -3252,7 +3252,7 @@ pub fn execute_authoring_loop_step(
                 execute_authoring_loop_rerun_step(&running, &step, base_dir)?
             }
             AuthoringLoopStepKind::PromoteRegression => {
-                execute_authoring_loop_promotion_step(&step, base_dir)?
+                execute_authoring_loop_promotion_step(&running, &step, base_dir)?
             }
             AuthoringLoopStepKind::RecordReviewDecision | AuthoringLoopStepKind::Summarize => {
                 unreachable!("unsupported kinds are blocked before execution")
@@ -3302,7 +3302,6 @@ pub fn execute_authoring_loop_step(
             return Err(error);
         }
     };
-
     let summary = authoring_loop_step_execution_summary(
         &completed,
         &step,
@@ -3869,6 +3868,7 @@ fn execute_authoring_loop_rerun_step(
 }
 
 fn execute_authoring_loop_promotion_step(
+    plan: &AuthoringLoopPlan,
     step: &AuthoringLoopStep,
     base_dir: &Path,
 ) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
@@ -3890,9 +3890,10 @@ fn execute_authoring_loop_promotion_step(
             )
         })?;
     let draft = RegressionPromotionDraft::from_path(&draft_path)?;
+    let project_root = dry_run_project_artifact_root(plan, base_dir);
     let result = promote_regression_draft_to_scenario_pack(
         &draft_path,
-        base_dir.join(&draft.target.project_manifest_path),
+        project_root.join(&draft.target.project_manifest_path),
         &draft.target.scenario_pack_id,
         false,
     )?;
@@ -3987,7 +3988,7 @@ fn json_value_contains_accepted_decision(value: &serde_json::Value, required_id:
             let id_matches = map
                 .get("id")
                 .and_then(|value| value.as_str())
-                .is_none_or(|id| id == required_id);
+                .is_some_and(|id| id == required_id);
             let accepted = ["state", "decision_status", "decisionStatus", "status"]
                 .iter()
                 .any(|key| {
@@ -4098,6 +4099,7 @@ fn relative_to_base(base_dir: &Path, path: &Path) -> Result<String> {
 const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "project-manifest-v1";
 const PROJECT_MANIFEST_FILE_NAME: &str = "ouroforge.project.json";
 const LOCAL_TOOL_ROOTS: &[&str] = &[".claude", ".git", ".omc", ".omx", ".openchrome"];
+const AUTHORING_LOOP_GENERATED_ROOTS: &[&str] = &[".claude", ".omc", ".omx", ".openchrome"];
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -4459,7 +4461,8 @@ fn validate_authoring_loop_generated_root(field: &str, value: &str) -> Result<()
                 // The leading component may be a known hidden generated root;
                 // any other hidden component is rejected to keep traversal and
                 // stray hidden state out of the plan.
-                let is_allowed_generated_root = index == 0 && LOCAL_TOOL_ROOTS.contains(&component);
+                let is_allowed_generated_root =
+                    index == 0 && AUTHORING_LOOP_GENERATED_ROOTS.contains(&component);
                 if component.starts_with('.') && !is_allowed_generated_root {
                     return Err(anyhow!(
                         "{field} must not use hidden path components other than known generated roots"
@@ -18171,7 +18174,14 @@ scenarios:
                 .unwrap_or_else(|error| panic!("{root} should be allowed: {error:#}"));
         }
         // Unknown hidden roots, hidden subcomponents, and traversal stay rejected.
-        for bad in [".secret", "runs/.hidden", "../escape", ".omx/../etc"] {
+        for bad in [
+            ".git",
+            ".git/objects",
+            ".secret",
+            "runs/.hidden",
+            "../escape",
+            ".omx/../etc",
+        ] {
             assert!(
                 validate_authoring_loop_generated_root("generatedState.roots", bad).is_err(),
                 "{bad} should be rejected"
@@ -25132,6 +25142,150 @@ scenarios:
         )
         .expect("record parses");
         assert_eq!(record.record_path.as_deref(), Some(record_path));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_promotion_decision_requires_explicit_matching_id() {
+        assert!(!json_value_contains_accepted_decision(
+            &json!({ "status": "accepted" }),
+            "required-promotion"
+        ));
+        assert!(!json_value_contains_accepted_decision(
+            &json!({ "id": "other-promotion", "status": "accepted" }),
+            "required-promotion"
+        ));
+        assert!(json_value_contains_accepted_decision(
+            &json!({ "decisions": [{ "id": "required-promotion", "status": "accepted" }] }),
+            "required-promotion"
+        ));
+    }
+
+    #[test]
+    fn loop_promotion_step_resolves_manifest_from_nested_project_root() {
+        let root = unique_temp_dir("loop-promotion-nested-project-root");
+        let project_root = root.join("project");
+        fs::create_dir_all(project_root.join("scenarios")).expect("scenario dir");
+        fs::create_dir_all(project_root.join("scenes")).expect("scene dir");
+        fs::create_dir_all(project_root.join("seeds")).expect("seed dir");
+        fs::create_dir_all(project_root.join("assets")).expect("asset dir");
+        fs::create_dir_all(project_root.join("runs/run-1")).expect("run dir");
+        fs::write(
+            project_root.join("runs/run-1/run.json"),
+            serde_json::to_vec(&json!({ "id": "run-1" })).expect("run.json bytes"),
+        )
+        .expect("source run.json");
+        fs::write(
+            project_root.join("ouroforge.project.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/ouroforge.project.json"
+            ),
+        )
+        .expect("manifest fixture");
+        fs::write(
+            project_root.join("scenarios/regression.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/scenarios/regression.json"
+            ),
+        )
+        .expect("scenario pack fixture");
+        fs::write(
+            project_root.join("scenes/main.scene.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/scenes/main.scene.json"
+            ),
+        )
+        .expect("scene fixture");
+        fs::write(
+            project_root.join("seeds/smoke.yaml"),
+            include_str!("../../../examples/project-workspace-fixtures/valid/seeds/smoke.yaml"),
+        )
+        .expect("seed fixture");
+
+        let mut draft = valid_regression_promotion_draft();
+        draft.id = "regression-draft-nested-project".to_string();
+        draft.source_run.run_dir = "runs/run-1".to_string();
+        draft.source_evidence.scenario_id = "nested-project-promotion".to_string();
+        draft.source_evidence.scenario_result_path =
+            "evidence/scenarios/nested-project-promotion/scenario-result-1.json".to_string();
+        draft.source_evidence.evidence_refs =
+            vec!["evidence/scenarios/nested-project-promotion/scenario-result-1.json".to_string()];
+        draft.source_evidence.replay_artifact_path = None;
+        draft.source_evidence.evidence_ids = vec!["scenario-result".to_string()];
+        draft.proposed_scenario.id = "nested-project-promotion".to_string();
+        draft.proposed_scenario.description =
+            "Promoted deterministic regression from nested project evidence.".to_string();
+        let draft_path = root.join("regression-draft.json");
+        write_json_atomic(&draft_path, &json!(draft)).expect("draft written");
+        let decision_path = root.join("promotion-decision.json");
+        write_json_atomic(
+            &decision_path,
+            &json!({ "id": "required-promotion", "status": "accepted" }),
+        )
+        .expect("decision written");
+        let plan = AuthoringLoopPlan {
+            schema_version: AUTHORING_LOOP_PLAN_SCHEMA_VERSION.to_string(),
+            loop_id: "temp-loop-promotion".to_string(),
+            project: AuthoringLoopProjectContext {
+                project_id: "minimal_2d".to_string(),
+                manifest_path: "project/ouroforge.project.json".to_string(),
+            },
+            seed: AuthoringLoopPathRef {
+                id: "smoke".to_string(),
+                path: "project/seeds/smoke.yaml".to_string(),
+            },
+            scenario_pack: AuthoringLoopPathRef {
+                id: "regression".to_string(),
+                path: "project/scenarios/regression.json".to_string(),
+            },
+            steps: Vec::new(),
+            generated_state: AuthoringLoopGeneratedStatePolicy {
+                roots: vec!["runs".to_string()],
+                tracked_fixture_only: true,
+            },
+        };
+        let step = AuthoringLoopStep {
+            id: "promote-regression".to_string(),
+            kind: AuthoringLoopStepKind::PromoteRegression,
+            status: AuthoringLoopStepStatus::Running,
+            depends_on: Vec::new(),
+            inputs: vec![
+                AuthoringLoopArtifactRef {
+                    id: "required-promotion".to_string(),
+                    path: "promotion-decision.json".to_string(),
+                    description: None,
+                },
+                AuthoringLoopArtifactRef {
+                    id: "draft".to_string(),
+                    path: "regression-draft.json".to_string(),
+                    description: None,
+                },
+            ],
+            expected_artifacts: vec![AuthoringLoopArtifactRef {
+                id: "promotion".to_string(),
+                path: "runs/run-1/regression-promotions/promotion.json".to_string(),
+                description: None,
+            }],
+            required_decisions: vec![AuthoringLoopDecisionRef {
+                id: "required-promotion".to_string(),
+                kind: AuthoringLoopDecisionKind::RegressionPromotion,
+                description: None,
+            }],
+            rollback_refs: Vec::new(),
+            status_transition: None,
+        };
+
+        let artifacts =
+            execute_authoring_loop_promotion_step(&plan, &step, &root).expect("promotion writes");
+
+        assert!(artifacts
+            .iter()
+            .any(|artifact| artifact.path.starts_with("runs/run-1/regression-promotions/")));
+        assert!(project_root
+            .join("runs/run-1/regression-promotions")
+            .is_dir());
+        assert!(!root.join("runs/run-1/regression-promotions").exists());
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
