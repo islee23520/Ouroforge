@@ -35,3 +35,14 @@ each scenario-pack assertion against in-memory evidence, writes a temporary
 verdict file under the OS temp directory, then deletes it. Evidence references in
 that verdict are relative `evidence/...` paths so dashboard/read-model exporters
 can link them without browser-side trusted writes or command execution.
+
+
+## Coverage matrix and dashboard audit
+
+Canonical coverage matrix: `docs/scenario-coverage-v3.md`.
+
+The scenario pack and smoke verdict shape intentionally use existing evidence
+keys (`world_state`, `frame_stats`, `runtime_events`, `collision_evidence`,
+`animation_evidence`, `audio_evidence`, and `comparison`) so dashboard and Studio
+read-model surfaces can link exported evidence without computing browser-side
+comparisons, running commands, writing trusted files, or mutating source.
