@@ -754,6 +754,8 @@ const OuroforgeCockpit = (() => {
       renderReviewCockpitStageCard(reviewCockpitStage(run, 'proposals', 'proposed'), run),
       renderReviewCockpitStageCard(reviewCockpitStage(run, 'decisions', 'reviewed'), run),
       renderReviewCockpitStageCard(reviewCockpitStage(run, 'applications', 'scene_applied'), run),
+      renderReviewCockpitStageCard(reviewCockpitStage(run, 'comparisons', 'compared'), run),
+      renderReviewCockpitStageCard(reviewCockpitStage(run, 'promotions', 'promoted'), run),
     ].join('');
     const hints = commandHints.length ? commandHints.map((hint) => `<code>${escapeText(hint)}</code>`).join('') : '<p class="empty compact">No inert manual review command hints exported.</p>';
     return `<div class="studio-review-cockpit"><h3>Studio review cockpit</h3><p class="hint">${escapeText(boundary)}. Schema ${escapeText(schema)}. Terminal state: ${escapeText(terminal)}.</p><div class="surface-list">${cards}</div><h4>Inert copyable review commands</h4><div class="command-list">${hints}</div></div>`;
@@ -788,7 +790,7 @@ const OuroforgeCockpit = (() => {
     const skipped = Array.isArray(matrix.skippedRuns) ? matrix.skippedRuns : Array.isArray(matrix.skipped_runs) ? matrix.skipped_runs : [];
     const skippedText = skipped.length ? `${skipped.length} legacy/malformed run(s) skipped` : 'all matrix inputs project-bound';
     if (!projects.length) {
-      return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No project-bound scenario runs available.</p><p class="hint">${escapeText(skippedText)}</p></section>`;
+      return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No project-bound scenario runs available.</p><p class="hint">${escapeText(skippedText)}</p>${matrixSummary}</section>`;
     }
     const rows = projects.flatMap((project) => {
       const packs = Array.isArray(project.scenarioPacks) ? project.scenarioPacks : Array.isArray(project.scenario_packs) ? project.scenario_packs : [];

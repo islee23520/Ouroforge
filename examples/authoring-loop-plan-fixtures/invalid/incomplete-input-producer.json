@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-incomplete-input-producer",
+  "project": { "projectId": "project_workspace_fixture", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "failed", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "completed", "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }] }
+  ],
+  "generatedState": { "roots": ["runs"], "trackedFixtureOnly": true }
+}

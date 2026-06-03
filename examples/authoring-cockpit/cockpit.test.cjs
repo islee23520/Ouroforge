@@ -246,6 +246,9 @@ assert.match(cockpit.renderMutationReviewSurface(run), /Inert copyable review co
 assert.doesNotMatch(cockpit.renderMutationReviewSurface(run), /<button/i);
 assert.match(cockpit.renderStudioReviewCockpitCards({ review_cockpit: { schemaVersion: '<script>', terminalState: '<bad>', boundary: '<img>', commandHints: ['<script>alert(1)</script>'], proposals: { label: '<proposal>', state: 'malformed', readError: '<b>bad</b>', recordIds: ['<id>'], evidenceRefs: ['<ref>'] }, decisions: '<script>', applications: { label: 'Applications', state: 'missing', recordIds: [], evidenceRefs: [] } } }), /&lt;script&gt;/);
 assert.match(cockpit.renderStudioReviewCockpitCards({ review_cockpit: { proposals: { label: 'Proposals', state: 'missing', recordIds: [], evidenceRefs: [] }, decisions: { label: 'Decisions', state: 'missing', recordIds: [], evidenceRefs: [] }, applications: { label: 'Applications', state: 'missing', recordIds: [], evidenceRefs: [] } } }), /No record ids exported/);
+// Studio review cockpit must render the exported comparisons and promotions stages too, not only proposals/decisions/applications.
+assert.match(cockpit.renderStudioReviewCockpitCards(run), /Rerun comparisons/);
+assert.match(cockpit.renderStudioReviewCockpitCards(run), /Regression promotions/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /Regression promotions/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /promoted-smoke-regression/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /Regression promotions/);
@@ -260,6 +263,9 @@ assert.match(cockpit.renderRegressionMatrixSurface(run), /regression_matrix/);
 assert.match(cockpit.renderRegressionMatrixSurface(run), /scaffold-smoke/);
 assert.match(cockpit.renderRegressionMatrixSurface(run), /does not schedule CI/);
 assert.match(cockpit.renderRegressionMatrixSurface({ regression_matrix: { projects: [{ projectId: '<script>', scenarioPacks: [{ scenarioPackId: '<pack>', scenarios: [{ scenarioId: '<scenario>', currentStatus: '<bad>', runs: [], context: {} }] }] }], skippedRuns: [] } }), /&lt;script&gt;/);
+// An empty-projects matrix export (e.g. all runs skipped) still surfaces the matrix stage summary status/readError.
+assert.match(cockpit.renderRegressionMatrixSurface({ regression_matrix: { projects: [], skippedRuns: [] }, review_cockpit: { matrix: { label: 'Regression matrix', state: 'export_level', readError: '<empty matrix note>', recordIds: [], evidenceRefs: [] } } }), /No project-bound scenario runs available/);
+assert.match(cockpit.renderRegressionMatrixSurface({ regression_matrix: { projects: [], skippedRuns: [] }, review_cockpit: { matrix: { label: 'Regression matrix', state: 'export_level', readError: '<empty matrix note>', recordIds: [], evidenceRefs: [] } } }), /&lt;empty matrix note&gt;/);
 assert.match(cockpit.renderRegressionMatrixSurface({ review_cockpit: { matrix: { label: '<matrix>', state: 'malformed', readError: '<bad matrix>', recordIds: ['<scenario>'], evidenceRefs: [] } } }), /&lt;bad matrix&gt;/);
 assert.match(cockpit.renderRegressionMatrixSurface({}), /No regression matrix export/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Proposal rationale/);

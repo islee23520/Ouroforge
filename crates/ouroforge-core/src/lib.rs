@@ -2012,6 +2012,7 @@ impl AuthoringLoopPlan {
     fn validate_step_rules(&self) -> Result<()> {
         let mut step_ids = BTreeSet::new();
         let mut produced_artifacts = BTreeSet::new();
+        let mut completed_artifacts = BTreeSet::new();
         let mut previous_rank = None;
         let mut completed_steps = BTreeSet::new();
 
@@ -2087,6 +2088,22 @@ impl AuthoringLoopPlan {
                         input.id
                     ));
                 }
+                // A running or completed step consumes real input artifacts, so
+                // each input must have been produced by a step that actually
+                // completed. Otherwise a plan could mark compare-runs completed
+                // while consuming a baseline-run artifact whose producer failed.
+                if matches!(
+                    step.status,
+                    AuthoringLoopStepStatus::Running | AuthoringLoopStepStatus::Completed
+                ) && !completed_artifacts.contains(&input.id)
+                {
+                    return Err(anyhow!(
+                        "authoring loop plan step {} cannot be {:?} while input {} is not produced by a completed step",
+                        step.id,
+                        step.status,
+                        input.id
+                    ));
+                }
             }
 
             if let Some(transition) = &step.status_transition {
@@ -2103,6 +2120,9 @@ impl AuthoringLoopPlan {
             }
             if step.status == AuthoringLoopStepStatus::Completed {
                 completed_steps.insert(step.id.clone());
+                for artifact in &step.expected_artifacts {
+                    completed_artifacts.insert(artifact.id.clone());
+                }
             }
         }
         Ok(())
@@ -2373,7 +2393,10 @@ impl AuthoringLoopGeneratedStatePolicy {
                 "authoring loop plan generatedState.roots must not be empty"
             ));
         }
-        validate_project_path_list("authoring loop plan generatedState.roots", &self.roots)
+        validate_authoring_loop_generated_roots(
+            "authoring loop plan generatedState.roots",
+            &self.roots,
+        )
     }
 }
 
@@ -2775,6 +2798,15 @@ fn dry_run_prerequisites(step: &AuthoringLoopStep) -> Vec<String> {
         step.inputs
             .iter()
             .map(|input| format!("artifact:{}:{}", input.id, input.path)),
+    );
+    // Rollback refs are a required gate for apply-accepted-scene-mutation steps,
+    // so the dry-run prerequisite list must surface them too; otherwise reviewers
+    // see a mutation step as fully inspectable while the rollback/provenance
+    // artifact that makes the trusted mutation safe is omitted.
+    prerequisites.extend(
+        step.rollback_refs
+            .iter()
+            .map(|rollback| format!("rollback:{}:{}", rollback.id, rollback.path)),
     );
     prerequisites.extend(
         step.required_decisions
@@ -3324,6 +3356,61 @@ fn validate_project_path_list(field: &str, values: &[String]) -> Result<()> {
         validate_project_manifest_path(&format!("{field}[{index}]"), value)?;
         if !paths.insert(value.clone()) {
             return Err(anyhow!("duplicate {field} path: {value}"));
+        }
+    }
+    Ok(())
+}
+
+/// Validate authoring loop plan `generatedState.roots`. Like
+/// [`validate_project_path_list`] it blocks traversal and absolute paths and
+/// rejects hidden path components, but it permits a known local-tool/generated
+/// root (e.g. `.omx`, `.omc`, `.claude`, `.openchrome`) as the *leading*
+/// component, since loop plans must be able to model that ignored generated
+/// state. Deeper hidden components are still rejected.
+fn validate_authoring_loop_generated_roots(field: &str, values: &[String]) -> Result<()> {
+    let mut paths = BTreeSet::new();
+    for (index, value) in values.iter().enumerate() {
+        validate_authoring_loop_generated_root(&format!("{field}[{index}]"), value)?;
+        if !paths.insert(value.clone()) {
+            return Err(anyhow!("duplicate {field} path: {value}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_authoring_loop_generated_root(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '-' | '_'))
+    {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '/', '.', '-' or '_'"
+        ));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for (index, component) in path.components().enumerate() {
+        match component {
+            Component::Normal(component) => {
+                let Some(component) = component.to_str() else {
+                    return Err(anyhow!("{field} must be valid UTF-8"));
+                };
+                // The leading component may be a known hidden generated root;
+                // any other hidden component is rejected to keep traversal and
+                // stray hidden state out of the plan.
+                let is_allowed_generated_root =
+                    index == 0 && LOCAL_TOOL_ROOTS.contains(&component);
+                if component.starts_with('.') && !is_allowed_generated_root {
+                    return Err(anyhow!(
+                        "{field} must not use hidden path components other than known generated roots"
+                    ));
+                }
+            }
+            Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must stay inside the project root")),
         }
     }
     Ok(())
@@ -15492,11 +15579,15 @@ fn dashboard_review_cockpit(
     let comparisons =
         dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "compared", "Rerun comparisons");
     let promotions = dashboard_review_cockpit_promotion_stage(promotions);
+    // Report the furthest lifecycle stage reached. The progression is
+    // proposed -> reviewed -> scene_applied -> compared -> promoted, so a run
+    // that has been promoted must surface "promoted" even when earlier
+    // review/rerun artifacts are also present.
     let terminal_state = [
+        &promotions,
+        &comparisons,
         &applications,
         &decisions,
-        &comparisons,
-        &promotions,
         &proposals,
     ]
     .into_iter()
@@ -16505,6 +16596,10 @@ scenarios:
                 "must reference an earlier expected artifact",
             ),
             (
+                "examples/authoring-loop-plan-fixtures/invalid/incomplete-input-producer.json",
+                "is not produced by a completed step",
+            ),
+            (
                 "examples/authoring-loop-plan-fixtures/invalid/invalid-status-transition.json",
                 "invalid status transition",
             ),
@@ -16664,6 +16759,89 @@ scenarios:
             .prerequisites
             .iter()
             .any(|prerequisite| prerequisite.contains("decision:human-review")));
+    }
+
+    #[test]
+    fn loop_dry_run_prerequisites_include_rollback_refs_for_scene_mutation() {
+        let plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-dry-run-fixtures/ready/loop-plan.json"
+        ))
+        .expect("ready loop plan validates");
+        let summary = build_authoring_loop_dry_run_summary(&plan).expect("dry-run summary builds");
+        let apply = summary
+            .steps
+            .iter()
+            .find(|step| step.id == "apply-mutation")
+            .expect("apply step present");
+        // The rollback ref is a required gate for the mutation step, so the
+        // dry-run prerequisites must surface it for reviewers.
+        assert!(
+            apply
+                .prerequisites
+                .iter()
+                .any(|prerequisite| prerequisite == "rollback:before-scene:runs/baseline/mutation/before.scene.json"),
+            "apply step prerequisites missing rollback ref: {:?}",
+            apply.prerequisites
+        );
+    }
+
+    #[test]
+    fn authoring_loop_generated_roots_allow_known_hidden_roots_only() {
+        // Known generated / local-tool roots are permitted as leading components,
+        // alongside ordinary generated directories.
+        for root in [".omx", ".omc", ".claude", ".openchrome", "runs", "target/cache"] {
+            validate_authoring_loop_generated_root("generatedState.roots", root)
+                .unwrap_or_else(|error| panic!("{root} should be allowed: {error:#}"));
+        }
+        // Unknown hidden roots, hidden subcomponents, and traversal stay rejected.
+        for bad in [".secret", "runs/.hidden", "../escape", ".omx/../etc"] {
+            assert!(
+                validate_authoring_loop_generated_root("generatedState.roots", bad).is_err(),
+                "{bad} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn review_cockpit_terminal_state_prioritizes_promoted_runs() {
+        let applied_stage = RunDashboardMutationLifecycleStage {
+            id: "scene_applied".to_string(),
+            label: "Review-gated applications".to_string(),
+            state: "applied".to_string(),
+            artifact_path: None,
+            record_count: 1,
+            evidence_refs: Vec::new(),
+            records: Vec::new(),
+            read_error: None,
+        };
+        let lifecycle = RunDashboardMutationLifecycle {
+            terminal_state: "applied".to_string(),
+            stages: vec![applied_stage],
+            command_hints: Vec::new(),
+        };
+
+        let draft = valid_regression_promotion_draft();
+        let promotion = RegressionPromotionPackResult {
+            schema_version: "regression-promotion-result-v1".to_string(),
+            id: "regression-promotion-terminal".to_string(),
+            draft_id: draft.id.clone(),
+            scenario_id: draft.proposed_scenario.id.clone(),
+            source_run: draft.source_run.clone(),
+            target: draft.target.clone(),
+            dry_run: false,
+            created_group: false,
+            before_hash: artifact_hash_from_bytes(b"before"),
+            after_hash: artifact_hash_from_bytes(b"after"),
+            changes: vec!["added_scenario:terminal".to_string()],
+            record_path: Some("regression-promotions/regression-promotion-terminal.json".to_string()),
+        };
+
+        // A promoted run surfaces "promoted" even with an earlier applied stage.
+        let promoted = dashboard_review_cockpit(&lifecycle, std::slice::from_ref(&promotion));
+        assert_eq!(promoted.terminal_state, "promoted");
+        // Without a promotion the applied stage remains terminal.
+        let not_promoted = dashboard_review_cockpit(&lifecycle, &[]);
+        assert_eq!(not_promoted.terminal_state, "applied");
     }
 
     fn write_loop_dry_run_project(root: &Path) {
@@ -26168,7 +26346,10 @@ scenarios:
             .contains(&"mutation/rerun-orchestration.json".to_string())));
         let cockpit = &model.review_cockpit;
         assert_eq!(cockpit.schema_version, "ouroforge-studio-review-cockpit-v1");
-        assert_eq!(cockpit.terminal_state, "accepted");
+        // This run carries a regression promotion record, so the terminal state
+        // must surface the furthest lifecycle stage ("promoted") rather than the
+        // earlier accepted review decision.
+        assert_eq!(cockpit.terminal_state, "promoted");
         assert_eq!(cockpit.proposals.record_count, 1);
         assert!(cockpit.proposals.record_ids.contains(&proposal.id));
         assert_eq!(cockpit.decisions.state, "accepted");
