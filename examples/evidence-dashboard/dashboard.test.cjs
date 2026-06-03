@@ -35,6 +35,26 @@ const run = {
   },
   evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
   probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
+
+  loop_dry_run: {
+    schemaVersion: 'authoring-loop-dry-run-v1',
+    loopId: '<loop-1>',
+    status: 'blocked',
+    missingPrerequisites: ['record-review:missing decision:<human-review>'],
+    boundary: 'Dry-run summary is inert local data; it does not execute commands.',
+    steps: [{
+      id: '<step-1>',
+      kind: 'record-review-decision',
+      status: 'pending',
+      readiness: 'blocked',
+      commandText: 'cargo run -p ouroforge-cli -- mutation review <run> --accept',
+      prerequisites: ['artifact:proposal:runs/proposal.json'],
+      missingPrerequisites: ['missing decision:<human-review>:human-review'],
+      expectedArtifacts: [{ id: 'decision', path: 'runs/review-decision.json' }],
+      requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+      safetyGates: ['inert command text only'],
+    }],
+  },
   command_context: {
     schemaVersion: 'run-command-context-v1',
     command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
@@ -452,3 +472,10 @@ const rawMalformedCommandContextDetail = dashboard.renderRunDetail(rawMalformedC
 assert.match(rawMalformedCommandContextDetail, /No run command context is recorded/);
 assert.ok(!rawMalformedCommandContextDetail.includes('untrusted raw command'), 'raw malformed run_command_context must not render');
 console.log('dashboard smoke test passed');
+
+assert.match(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /Authoring loop dry-run/);
+assert.match(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /blocked/);
+assert.match(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /&lt;loop-1&gt;/);
+assert.doesNotMatch(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /<loop-1>/);
+assert.match(dashboard.renderRunDetail(run), /Authoring loop dry-run/);
+assert.match(dashboard.renderLoopDryRunSummary(null), /No dry-run summary/);

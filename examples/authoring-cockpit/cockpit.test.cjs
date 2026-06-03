@@ -53,6 +53,26 @@ const run = {
     cdpTransport: 'chrome_devtools_protocol',
     environmentHints: ['The cockpit does not execute commands'],
   },
+
+  loop_dry_run: {
+    schemaVersion: 'authoring-loop-dry-run-v1',
+    loopId: '<loop-1>',
+    status: 'blocked',
+    missingPrerequisites: ['record-review:missing decision:<human-review>'],
+    boundary: 'Dry-run summary is inert local data; it does not execute commands.',
+    steps: [{
+      id: '<step-1>',
+      kind: 'record-review-decision',
+      status: 'pending',
+      readiness: 'blocked',
+      commandText: 'cargo run -p ouroforge-cli -- mutation review <run> --accept',
+      prerequisites: ['artifact:proposal:runs/proposal.json'],
+      missingPrerequisites: ['missing decision:<human-review>:human-review'],
+      expectedArtifacts: [{ id: 'decision', path: 'runs/review-decision.json' }],
+      requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+      safetyGates: ['inert command text only'],
+    }],
+  },
   evidence_fidelity: {
     transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
     runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
@@ -421,3 +441,10 @@ assert.match(cockpit.renderMutationReviewSurface(run), /review-decision-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /manual-reviewer/);
 assert.ok(!cockpit.renderMutationReviewSurface(run).includes('<b>accepted</b>'));
 assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No review decisions recorded/);
+
+assert.match(cockpit.renderLoopDryRunSurface(run), /Authoring loop dry-run/);
+assert.match(cockpit.renderLoopDryRunSurface(run), /blocked/);
+assert.match(cockpit.renderLoopDryRunSurface(run), /&lt;loop-1&gt;/);
+assert.doesNotMatch(cockpit.renderLoopDryRunSurface(run), /<loop-1>/);
+assert.match(cockpit.renderEvidencePane(run), /Authoring loop dry-run/);
+assert.match(cockpit.renderLoopDryRunSurface({ summary: { id: 'run-no-loop' } }), /No dry-run summary/);

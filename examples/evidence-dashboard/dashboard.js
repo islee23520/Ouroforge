@@ -755,6 +755,37 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+
+  function renderLoopDryRunSummary(summary = null) {
+    if (!summary || typeof summary !== 'object') {
+      return '<section class="panel"><h3>Authoring loop dry-run</h3><p class="empty-state">No dry-run summary is attached to this dashboard data.</p></section>';
+    }
+    const steps = Array.isArray(summary.steps) ? summary.steps : [];
+    const missing = Array.isArray(summary.missingPrerequisites) ? summary.missingPrerequisites : [];
+    const stepCards = steps.length
+      ? steps.map((step) => {
+        const prerequisites = Array.isArray(step.prerequisites) ? step.prerequisites : [];
+        const stepMissing = Array.isArray(step.missingPrerequisites) ? step.missingPrerequisites : [];
+        const artifacts = Array.isArray(step.expectedArtifacts) ? step.expectedArtifacts : [];
+        return `<article class="artifact loop-dry-run-step">
+          <h4>${escapeText(step.id || 'step')}</h4>
+          <div class="run-meta">${escapeText(step.kind || 'unknown')} · <span class="${statusClass(step.readiness || 'unknown')}">${escapeText(step.readiness || 'unknown')}</span> · plan ${escapeText(step.status || 'unknown')}</div>
+          <pre>${escapeText(step.commandText || '')}</pre>
+          ${prerequisites.length ? `<div class="run-meta">Prerequisites: ${escapeText(prerequisites.join(' · '))}</div>` : '<div class="run-meta">No prerequisites recorded.</div>'}
+          ${artifacts.length ? `<div class="run-meta">Expected: ${escapeText(artifacts.map((artifact) => `${artifact.id || 'artifact'}:${artifact.path || ''}`).join(' · '))}</div>` : ''}
+          ${stepMissing.length ? `<div class="artifact-warning">Missing: ${escapeText(stepMissing.join(' · '))}</div>` : ''}
+        </article>`;
+      }).join('')
+      : '<p class="empty-state compact">No dry-run steps recorded.</p>';
+    return `<section class="panel loop-dry-run-summary"><h3>Authoring loop dry-run</h3>
+      <p class="run-meta">Loop ${escapeText(summary.loopId || 'unknown')} · <span class="${statusClass(summary.status || 'unknown')}">${escapeText(summary.status || 'unknown')}</span></p>
+      <p class="run-meta">Read-only inert summary. The browser does not execute command text or write trusted state.</p>
+      ${missing.length ? `<div class="artifact-warning">Blocked by: ${escapeText(missing.join(' · '))}</div>` : '<div class="run-meta">No missing prerequisites reported.</div>'}
+      <div class="artifact-grid">${stepCards}</div>
+      ${summary.boundary ? `<p class="run-meta">${escapeText(summary.boundary)}</p>` : ''}
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null);
   }
@@ -780,6 +811,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
+      ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderRegressionPromotions(run)}
@@ -849,7 +881,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

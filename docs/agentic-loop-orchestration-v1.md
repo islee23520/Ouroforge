@@ -45,7 +45,7 @@ Make the evidence-native loop itself inspectable and resumable through local
 artifacts:
 
 - loop plan model: what steps are intended and why (`docs/authoring-loop-plan-v1.md`);
-- dry-run sequencer: what would run, with no trusted/project-state writes;
+- dry-run sequencer: what would run, with no trusted/project-state writes (`docs/authoring-loop-dry-run-v1.md`);
 - Rust-trusted step runner: explicit execution for allowed local steps;
 - resume/failure recovery: visible incomplete/failed state;
 - evidence bundle: portable summary of run, review, comparison, and promotion
@@ -133,6 +133,18 @@ future fixture-scoped issue explicitly authorizes a tiny deterministic fixture.
 Dry-run previews may write explicitly scoped local generated preview artifacts
 under ignored/untracked generated-state paths, but they must not execute trusted
 actions or write trusted/project state.
+
+## Authoring Loop Dry-Run v1
+
+#305 adds the inert dry-run sequencer (`docs/authoring-loop-dry-run-v1.md`).
+`ouroforge loop dry-run <plan>` validates a plan, prints ordered step summaries,
+shows prerequisite labels, reports missing project/run/proposal/decision/rollback
+artifacts, and displays command text as copyable inert data. Dashboard and Studio
+surfaces may render attached `loop_dry_run` data read-only; browser UI does not
+execute command text or write trusted state.
+
+Dry-run reports are generated local artifacts unless explicitly fixture-scoped.
+The checked-in ready/blocked dry-run examples are deterministic fixtures only.
 
 ## Explicit step execution policy
 

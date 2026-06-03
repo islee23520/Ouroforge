@@ -908,6 +908,32 @@ const OuroforgeCockpit = (() => {
     return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="hint">Displays existing comparison artifacts only; no browser-side comparison algorithm runs here.</p>${artifacts}<h3>Display-only compare command</h3><div class="command-list"><code>${escapeText(compareRunsCommand(beforeRun, afterRun, `${afterRun}/comparisons`))}</code></div></section>`;
   }
 
+
+  function renderLoopDryRunSurface(run) {
+    const summary = run?.loop_dry_run || run?.loopDryRun || null;
+    if (!summary || typeof summary !== 'object') {
+      return '<section id="loop-dry-run" class="panel"><h2>Authoring loop dry-run</h2><p class="empty">No dry-run summary is attached to dashboard-data.json. Run the Rust CLI dry-run command and keep generated reports untracked.</p></section>';
+    }
+    const steps = Array.isArray(summary.steps) ? summary.steps : [];
+    const missing = Array.isArray(summary.missingPrerequisites) ? summary.missingPrerequisites : [];
+    const rows = steps.length ? steps.map((step) => {
+      const stepMissing = Array.isArray(step.missingPrerequisites) ? step.missingPrerequisites : [];
+      const prerequisites = Array.isArray(step.prerequisites) ? step.prerequisites : [];
+      return `<div class="surface-row"><strong>${escapeText(step.id || 'step')}</strong> ${surfaceState(step.readiness !== 'blocked', step.readiness || 'unknown')} <span>${escapeText(step.readiness || 'unknown')}</span><br>
+        <small>${escapeText(step.kind || 'unknown')} · plan ${escapeText(step.status || 'unknown')}</small>
+        <div class="command-list"><code>${escapeText(step.commandText || '')}</code></div>
+        ${prerequisites.length ? `<small>Prerequisites: ${escapeText(prerequisites.join(' · '))}</small>` : '<small>No prerequisites recorded.</small>'}
+        ${stepMissing.length ? `<div class="hint">Missing: ${escapeText(stepMissing.join(' · '))}</div>` : ''}
+      </div>`;
+    }).join('') : '<p class="empty">No dry-run steps recorded.</p>';
+    return `<section id="loop-dry-run" class="panel"><h2>Authoring loop dry-run</h2>
+      <p class="hint">Read-only inert summary. Command text is copyable display data only; the browser does not execute commands or write trusted state.</p>
+      <div class="surface-row"><strong>${escapeText(summary.loopId || 'unknown')}</strong> ${surfaceState(summary.status !== 'blocked', summary.status || 'unknown')} <span>${escapeText(summary.status || 'unknown')}</span><br><small>${escapeText(summary.boundary || '')}</small></div>
+      ${missing.length ? `<div class="hint">Blocked by: ${escapeText(missing.join(' · '))}</div>` : '<p class="hint">No missing prerequisites reported.</p>'}
+      ${rows}
+    </section>`;
+  }
+
   function renderStudioGaps() {
     return `<section class="panel"><h2>Known demo gaps</h2><ul>
       <li>No production editor, native shell, hosted studio, collaboration, plugin marketplace, or visual scripting.</li>
@@ -917,7 +943,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -996,7 +1022,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

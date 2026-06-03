@@ -130,3 +130,8 @@ and reproducible command context from exported dashboard data. Missing or
 malformed evidence is displayed as warning/empty state. The cockpit remains
 read-only and must not write files, execute commands, rerun QA, or apply
 mutations. See `docs/studio-evidence-fidelity-surfaces.md`.
+
+
+## Authoring Loop Dry-Run v1
+
+When exported dashboard data includes `loop_dry_run`, the cockpit displays it as escaped read-only state with inert command text. The browser never executes dry-run command text, writes plan files, creates reports, mutates scenes, records decisions, or promotes regressions. See `../../docs/authoring-loop-dry-run-v1.md`.
