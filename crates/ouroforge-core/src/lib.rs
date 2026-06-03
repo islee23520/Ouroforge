@@ -6422,8 +6422,19 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let run = read_json_value(run_dir.join("run.json"))?;
     let proposals = read_mutation_proposals(run_dir)?.proposals;
     let reviews = read_mutation_review_artifact(run_dir)?.decisions;
+    let applications = read_scene_only_mutation_applications(run_dir)
+        .unwrap_or_default()
+        .applications;
+    let comparison = read_dashboard_comparison(run_dir);
     let regression_promotions = read_regression_promotion_records(run_dir);
     let mut journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
+    journal.push_str(&render_authoring_governance_journal_section(
+        &proposals,
+        &reviews,
+        &applications,
+        &comparison,
+        &regression_promotions,
+    ));
     journal.push_str(&render_review_decision_journal_section(&reviews));
     journal.push_str(&render_regression_promotion_journal_section(
         &regression_promotions,
@@ -6675,6 +6686,250 @@ fn render_journal(
         }
     }
     out
+}
+
+fn render_authoring_governance_journal_section(
+    proposals: &[MutationProposal],
+    reviews: &[MutationReviewDecision],
+    applications: &[SceneOnlyMutationApplicationRecord],
+    comparison: &RunDashboardComparison,
+    promotions: &[RegressionPromotionPackResult],
+) -> String {
+    let mut out = String::new();
+    out.push_str(
+        "
+## Authoring Governance Lifecycle
+
+",
+    );
+    out.push_str(
+        "- Schema: `journal-authoring-governance-v2`
+",
+    );
+    out.push_str("- Boundary: deterministic local evidence only; no AI/network summary, mutation application, browser write, command bridge, or hosted audit service.
+
+");
+
+    out.push_str(
+        "### Proposal Quality
+
+",
+    );
+    if proposals.is_empty() {
+        out.push_str(
+            "- No mutation proposals recorded.
+",
+        );
+    } else {
+        for proposal in proposals {
+            out.push_str(&format!(
+                "- `{}`: status `{}` target `{}` path `{}` evidence `{}` verdict `{}`
+",
+                proposal.id,
+                proposal.status,
+                proposal.target,
+                proposal.path,
+                proposal.evidence_id,
+                proposal.verdict_status
+            ));
+            if let Some(rationale) = &proposal.rationale {
+                out.push_str(&format!(
+                    "  - Rationale: `{}`; expected effect: {}; allowed mutation: `{:?}`; confidence: `{:?}`
+",
+                    rationale.failure_classification,
+                    rationale.expected_effect,
+                    rationale.allowed_mutation_type,
+                    rationale.confidence
+                ));
+                out.push_str(&format!(
+                    "  - Evidence refs: artifacts {}; scenarios {}; verdicts {}
+",
+                    join_or_none(&rationale.evidence_artifact_ids),
+                    join_or_none(&rationale.scenario_result_refs),
+                    join_or_none(&rationale.verdict_refs)
+                ));
+            } else {
+                out.push_str(
+                    "  - Rationale: missing; proposal quality evidence has not been attached.
+",
+                );
+            }
+        }
+    }
+
+    out.push_str(
+        "
+### Review Decisions
+
+",
+    );
+    if reviews.is_empty() {
+        out.push_str(
+            "- No review decisions recorded; accepted/rejected/deferred status is unavailable.
+",
+        );
+    } else {
+        for decision in reviews {
+            let status = decision.decision_status.as_ref().unwrap_or(&decision.state);
+            out.push_str(&format!(
+                "- `{}`: `{:?}` proposal `{}` patch draft `{}` reviewer `{}` (`{:?}`)
+",
+                decision.id,
+                status,
+                decision.proposal_id.as_deref().unwrap_or("unlinked"),
+                decision.patch_draft_id,
+                decision.reviewer,
+                decision
+                    .reviewer_type
+                    .as_ref()
+                    .unwrap_or(&MutationReviewReviewerType::Human)
+            ));
+            out.push_str(&format!(
+                "  - Reason: {}
+",
+                decision.reason
+            ));
+            out.push_str(&format!(
+                "  - Evidence refs: {}
+",
+                join_or_none(&decision.evidence_refs)
+            ));
+            if let Some(checklist) = &decision.guardrail_checklist {
+                out.push_str(&format!(
+                    "  - Guardrails: record_only={} accepted_does_not_apply={} browser_read_only={} evidence_refs_checked={}
+",
+                    checklist.proposal_is_record_only,
+                    checklist.accepted_does_not_apply,
+                    checklist.browser_read_only,
+                    checklist.evidence_refs_checked
+                ));
+            }
+        }
+    }
+
+    out.push_str(
+        "
+### Review-Gated Applications
+
+",
+    );
+    if applications.is_empty() {
+        out.push_str(
+            "- No review-gated scene applications recorded.
+",
+        );
+    } else {
+        for application in applications {
+            out.push_str(&format!(
+                "- `{}`: status `{}` proposal `{}` decision `{}` transaction `{}` target `{}`
+",
+                application.id,
+                application.status,
+                application.proposal_id,
+                application
+                    .review_decision_id
+                    .as_deref()
+                    .unwrap_or("unreviewed"),
+                application.transaction_id,
+                application.target_scene_path
+            ));
+            out.push_str(&format!(
+                "  - Transaction artifact: `{}`; before `{}`; after `{}`
+",
+                application.transaction_artifact_path,
+                application.before_scene_hash.value,
+                application.after_scene_hash.value
+            ));
+            if let Some(project) = &application.project {
+                out.push_str(&format!(
+                    "  - Project: `{}` manifest `{}` scene `{}`
+",
+                    project.project_id, project.manifest_path, project.scene_path
+                ));
+            }
+        }
+    }
+
+    out.push_str(
+        "
+### Rerun and Compare
+
+",
+    );
+    if !comparison.present {
+        out.push_str(&format!("- {}\n", comparison.empty_state));
+    } else if comparison.artifacts.is_empty() {
+        out.push_str(
+            "- Comparison read model is present but contains no artifacts.
+",
+        );
+    } else {
+        for artifact in &comparison.artifacts {
+            out.push_str(&format!(
+                "- `{}`: classification `{}` before `{}` after `{}` path `{}`
+",
+                artifact.id,
+                artifact.classification.as_deref().unwrap_or("unknown"),
+                artifact.before_run_id.as_deref().unwrap_or("unknown"),
+                artifact.after_run_id.as_deref().unwrap_or("unknown"),
+                artifact.path
+            ));
+            if let Some(error) = &artifact.read_error {
+                out.push_str(&format!("  - Read error: {}\n", error));
+            }
+            out.push_str(&format!(
+                "  - Evidence refs: {}; unsupported: {}
+",
+                join_or_none(&artifact.evidence_refs),
+                join_or_none(&artifact.unsupported)
+            ));
+        }
+    }
+
+    out.push_str(
+        "
+### Regression Promotion Status
+
+",
+    );
+    if promotions.is_empty() {
+        out.push_str(
+            "- No regression promotions recorded.
+",
+        );
+    } else {
+        for promotion in promotions {
+            out.push_str(&format!(
+                "- `{}`: scenario `{}` pack `{}` dry-run `{}` record `{}`
+",
+                promotion.id,
+                promotion.scenario_id,
+                promotion.target.scenario_pack_id,
+                promotion.dry_run,
+                promotion
+                    .record_path
+                    .as_deref()
+                    .unwrap_or("dry-run/no record")
+            ));
+            out.push_str(&format!(
+                "  - Source run `{}` verdict `{}`; before `{}`; after `{}`
+",
+                promotion.source_run.run_id,
+                promotion.source_run.verdict_path,
+                promotion.before_hash.value,
+                promotion.after_hash.value
+            ));
+        }
+    }
+    out
+}
+
+fn join_or_none(values: &[String]) -> String {
+    if values.is_empty() {
+        "none".to_string()
+    } else {
+        values.join(", ")
+    }
 }
 
 fn render_review_decision_journal_section(reviews: &[MutationReviewDecision]) -> String {
@@ -17712,6 +17967,166 @@ scenarios:
             assert!(journal.contains("`artifact-1`"));
             assert!(journal.contains("## Next Mutation"));
         }
+    }
+
+    #[test]
+    fn journal_authoring_governance_lifecycle_renders_complete_links() {
+        let proposal = MutationProposal {
+            id: "proposal-1".to_string(),
+            reason: "player did not reach goal".to_string(),
+            evidence_id: "evidence-1".to_string(),
+            target: "seeds/platformer.yaml".to_string(),
+            path: "scenarios.smoke.assertions".to_string(),
+            from: "goal=false".to_string(),
+            to: "goal=true".to_string(),
+            confidence: "medium".to_string(),
+            status: "proposed".to_string(),
+            verdict_status: "failed".to_string(),
+            created_at_unix_ms: 1,
+            rationale: Some(MutationProposalRationale {
+                schema_version: "1".to_string(),
+                failure_classification: "scenario_assertion_failure".to_string(),
+                evidence_artifact_ids: vec!["evidence-1".to_string()],
+                scenario_result_refs: vec!["evidence/scenario-result.json".to_string()],
+                verdict_refs: vec!["verdict.json".to_string()],
+                expected_effect: "goal flag becomes true".to_string(),
+                confidence: MutationProposalRationaleConfidence::High,
+                reasoning_summary: "failed goal assertion".to_string(),
+                allowed_mutation_type: MutationProposalAllowedMutationType::ProjectSceneOnly,
+            }),
+        };
+        let decision = MutationReviewDecision {
+            id: "review-1".to_string(),
+            patch_draft_id: "patch-draft-1".to_string(),
+            proposal_id: Some("proposal-1".to_string()),
+            state: MutationReviewState::Accepted,
+            decision_status: Some(MutationReviewState::Accepted),
+            reviewer_type: Some(MutationReviewReviewerType::Agent),
+            reason: "rerun evidence supports scene-only change".to_string(),
+            evidence_refs: vec!["mutation/rerun-orchestration.json".to_string()],
+            reviewer: "agent-reviewer".to_string(),
+            expected_hashes: None,
+            guardrail_checklist: Some(Default::default()),
+            decided_at_unix_ms: 2,
+        };
+        let application = SceneOnlyMutationApplicationRecord {
+            id: "scene-application-1".to_string(),
+            proposal_id: "proposal-1".to_string(),
+            transaction_id: "scene-edit-1".to_string(),
+            review_decision_id: Some("review-1".to_string()),
+            target_scene_path: "examples/project/scenes/main.scene.json".to_string(),
+            project: Some(ProjectSceneMutationContext {
+                project_id: "minimal_2d".to_string(),
+                manifest_path: "examples/project/ouroforge.project.json".to_string(),
+                manifest_hash: ProjectArtifactHash {
+                    algorithm: "fnv1a64-file-v1".to_string(),
+                    value: "manifesthash".to_string(),
+                },
+                scene_path: "scenes/main.scene.json".to_string(),
+                scene_hash: SceneHash {
+                    algorithm: "fnv1a64-canonical-json-v1".to_string(),
+                    value: "beforehash".to_string(),
+                },
+            }),
+            transaction_artifact_path: "mutation/scene-edit.json".to_string(),
+            before_scene_hash: SceneHash {
+                algorithm: "fnv1a64-canonical-json-v1".to_string(),
+                value: "beforehash".to_string(),
+            },
+            after_scene_hash: SceneHash {
+                algorithm: "fnv1a64-canonical-json-v1".to_string(),
+                value: "afterhash".to_string(),
+            },
+            rollback: None,
+            status: "applied".to_string(),
+            created_at_unix_ms: 3,
+        };
+        let comparison = RunDashboardComparison {
+            present: true,
+            empty_state: String::new(),
+            artifacts: vec![RunDashboardComparisonArtifact {
+                id: "run-comparison-before-after".to_string(),
+                path: "mutation/run-comparison-before-after.json".to_string(),
+                exists: true,
+                read_error: None,
+                before_run_id: Some("before-run".to_string()),
+                after_run_id: Some("after-run".to_string()),
+                classification: Some("improved".to_string()),
+                deltas: json!({}),
+                semantic: json!({}),
+                evidence_refs: vec![
+                    "runs/before/verdict.json".to_string(),
+                    "runs/after/verdict.json".to_string(),
+                ],
+                unsupported: Vec::new(),
+                value: None,
+            }],
+        };
+        let promotion = RegressionPromotionPackResult {
+            schema_version: "regression-promotion-result-v1".to_string(),
+            id: "regression-promotion-1".to_string(),
+            draft_id: "regression-draft-1".to_string(),
+            scenario_id: "promoted-smoke".to_string(),
+            source_run: RegressionPromotionSourceRun {
+                run_id: "after-run".to_string(),
+                run_dir: "runs/after-run".to_string(),
+                verdict_path: "verdict.json".to_string(),
+            },
+            target: RegressionPromotionTarget {
+                project_manifest_path: "ouroforge.project.json".to_string(),
+                scenario_pack_id: "smoke".to_string(),
+                scenario_pack_path: "scenarios/smoke.scenario-pack.json".to_string(),
+                scenario_group_id: "promoted-regressions".to_string(),
+            },
+            dry_run: false,
+            created_group: true,
+            before_hash: ProjectArtifactHash {
+                algorithm: "fnv1a64-file-v1".to_string(),
+                value: "beforepack".to_string(),
+            },
+            after_hash: ProjectArtifactHash {
+                algorithm: "fnv1a64-file-v1".to_string(),
+                value: "afterpack".to_string(),
+            },
+            changes: vec!["added_scenario:promoted-smoke".to_string()],
+            record_path: Some("regression-promotions/regression-promotion-1.json".to_string()),
+        };
+
+        let journal = render_authoring_governance_journal_section(
+            &[proposal],
+            &[decision],
+            &[application],
+            &comparison,
+            &[promotion],
+        );
+
+        assert!(journal.contains("journal-authoring-governance-v2"));
+        assert!(journal.contains("proposal-1"));
+        assert!(journal.contains("scenario_assertion_failure"));
+        assert!(journal.contains("review-1"));
+        assert!(journal.contains("scene-application-1"));
+        assert!(journal.contains("run-comparison-before-after"));
+        assert!(journal.contains("classification `improved`"));
+        assert!(journal.contains("regression-promotion-1"));
+        assert!(journal.contains("promoted-smoke"));
+        assert!(journal.contains("no AI/network summary"));
+    }
+
+    #[test]
+    fn journal_authoring_governance_lifecycle_marks_legacy_missing_sections() {
+        let comparison = RunDashboardComparison {
+            present: false,
+            empty_state: "No run comparison artifacts were found for this run.".to_string(),
+            artifacts: Vec::new(),
+        };
+
+        let journal = render_authoring_governance_journal_section(&[], &[], &[], &comparison, &[]);
+
+        assert!(journal.contains("No mutation proposals recorded"));
+        assert!(journal.contains("No review decisions recorded"));
+        assert!(journal.contains("No review-gated scene applications recorded"));
+        assert!(journal.contains("No run comparison artifacts were found"));
+        assert!(journal.contains("No regression promotions recorded"));
     }
 
     #[test]
