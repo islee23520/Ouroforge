@@ -10330,6 +10330,127 @@ pub struct VisualEditDraftAuthor {
     pub source: Option<String>,
 }
 
+impl VisualEditDraftArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != VISUAL_EDIT_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "visual edit draft schemaVersion must be {VISUAL_EDIT_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("visual edit draft draftId", &self.draft_id)?;
+        self.target.validate()?;
+        validate_visual_edit_draft_hash("visual edit draft beforeHash", &self.before_hash)?;
+        require_text(
+            "visual edit draft expectedAfterSummary",
+            &self.expected_after_summary,
+        )?;
+        self.author.validate()?;
+        if self.proposed_operations.is_empty() {
+            return Err(anyhow!(
+                "visual edit draft proposedOperations must include at least one operation"
+            ));
+        }
+        let mut operation_ids = BTreeSet::new();
+        for operation in &self.proposed_operations {
+            operation.validate()?;
+            if !operation_ids.insert(operation.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual edit draft operation id: {}",
+                    operation.id
+                ));
+            }
+        }
+        for evidence_ref in &self.linked_evidence {
+            validate_project_manifest_path("visual edit draft linkedEvidence", evidence_ref)?;
+        }
+        match self.validation_status {
+            VisualEditDraftValidationStatus::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "blocked visual edit draft requires at least one blocked reason"
+                    ));
+                }
+            }
+            VisualEditDraftValidationStatus::Unvalidated => {
+                if !self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "unvalidated visual edit draft must not include blocked reasons"
+                    ));
+                }
+            }
+            VisualEditDraftValidationStatus::Partial => {}
+        }
+        for reason in &self.blocked_reasons {
+            require_text("visual edit draft blockedReasons", reason)?;
+        }
+        Ok(())
+    }
+}
+
+impl VisualEditDraftTarget {
+    pub fn validate(&self) -> Result<()> {
+        validate_project_manifest_path("visual edit draft target.path", &self.path)?;
+        if let Some(id) = &self.id {
+            validate_path_component("visual edit draft target.id", id)?;
+        }
+        Ok(())
+    }
+}
+
+impl VisualEditDraftOperation {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("visual edit draft operation id", &self.id)?;
+        validate_visual_edit_draft_operation_path("visual edit draft operation path", &self.path)?;
+        if let Some(summary) = &self.summary {
+            require_text("visual edit draft operation summary", summary)?;
+        }
+        if self.value.is_none() && self.summary.is_none() {
+            return Err(anyhow!(
+                "visual edit draft operation must include summary or value"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualEditDraftAuthor {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("visual edit draft author.id", &self.id)?;
+        if let Some(source) = &self.source {
+            require_text("visual edit draft author.source", source)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_visual_edit_draft_hash(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let Some(hash) = value.strip_prefix("sha256:") else {
+        return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
+    };
+    if hash.len() != 64 || !hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
+    }
+    Ok(())
+}
+
+fn validate_visual_edit_draft_operation_path(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if !value.chars().all(|ch| {
+        ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_' | '[' | ']' | ',' | '/')
+    }) {
+        return Err(anyhow!(
+            "{field} may only contain ASCII letters, numbers, '.', '-', '_', '[', ']', ',' or '/'"
+        ));
+    }
+    if value.contains("..") || value.starts_with('/') || value.starts_with('.') {
+        return Err(anyhow!(
+            "{field} must stay inside the target draft address space"
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MutationReviewState {
@@ -22781,6 +22902,9 @@ scenarios:
                 VisualEditDraftValidationStatus::Unvalidated
             );
             assert!(!draft.proposed_operations.is_empty());
+            draft
+                .validate()
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
 
             let serialized = serde_json::to_string_pretty(&draft).expect("draft serializes");
             let round_trip: VisualEditDraftArtifact =
@@ -22808,6 +22932,9 @@ scenarios:
             assert_eq!(draft.schema_version, VISUAL_EDIT_DRAFT_SCHEMA_VERSION);
             assert_eq!(draft.validation_status, expected_status);
             assert!(!draft.blocked_reasons.is_empty());
+            draft
+                .validate()
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
         }
     }
 
@@ -22827,6 +22954,93 @@ scenarios:
                 "{fixture} error was {error}"
             );
         }
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_validation_rejects_unsafe_paths_and_missing_hashes() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/scene.visual-edit-draft.json",
+        );
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+
+        draft.before_hash.clear();
+        let error = draft.validate().expect_err("missing hash fails");
+        assert!(error.to_string().contains("beforeHash is required"));
+
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        draft.target.path = "../scenes/main.scene.json".to_string();
+        let error = draft.validate().expect_err("unsafe target path fails");
+        assert!(error
+            .to_string()
+            .contains("must stay inside the project root"));
+
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        draft.proposed_operations[0].path = "../entities.player".to_string();
+        let error = draft.validate().expect_err("unsafe operation path fails");
+        assert!(error.to_string().contains("target draft address space"));
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_validation_rejects_duplicate_or_malformed_operations() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/scene.visual-edit-draft.json",
+        );
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        draft
+            .proposed_operations
+            .push(draft.proposed_operations[0].clone());
+
+        let error = draft.validate().expect_err("duplicate operation fails");
+
+        assert!(error
+            .to_string()
+            .contains("duplicate visual edit draft operation id"));
+
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        draft.proposed_operations[0].summary = None;
+        draft.proposed_operations[0].value = None;
+        let error = draft.validate().expect_err("malformed operation fails");
+        assert!(error.to_string().contains("summary or value"));
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_validation_rejects_inconsistent_blocked_reasons() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/blocked/unsupported-target.visual-edit-draft.json",
+        );
+        let mut blocked: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("blocked draft parses");
+        blocked.blocked_reasons.clear();
+
+        let error = blocked
+            .validate()
+            .expect_err("blocked draft without reason fails");
+
+        assert!(error
+            .to_string()
+            .contains("requires at least one blocked reason"));
+
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/scene.visual-edit-draft.json",
+        );
+        let mut unvalidated: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        unvalidated
+            .blocked_reasons
+            .push("should not be present before validation".to_string());
+
+        let error = unvalidated
+            .validate()
+            .expect_err("unvalidated draft with blocked reasons fails");
+
+        assert!(error
+            .to_string()
+            .contains("must not include blocked reasons"));
     }
 
     #[test]
