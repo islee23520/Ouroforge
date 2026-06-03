@@ -10283,6 +10283,16 @@ pub enum VisualEditTilemapDraftOperationKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum VisualEditAssetReferenceDraftOperationKind {
+    SpriteAssetReference,
+    SpriteFrameReference,
+    AudioEventAssetReference,
+    FontAssetReference,
+    TilemapTilesetReference,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum VisualEditDraftValidationStatus {
     Unvalidated,
     Partial,
@@ -10361,6 +10371,12 @@ pub struct VisualEditDraftOperation {
         skip_serializing_if = "Option::is_none"
     )]
     pub tilemap_operation: Option<VisualEditTilemapDraftOperation>,
+    #[serde(
+        rename = "assetReferenceOperation",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub asset_reference_operation: Option<VisualEditAssetReferenceDraftOperation>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10401,6 +10417,36 @@ pub struct VisualEditTilemapDraftOperation {
     pub tileset_asset_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible: Option<bool>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditAssetReferenceDraftOperation {
+    pub kind: VisualEditAssetReferenceDraftOperationKind,
+    #[serde(rename = "targetReferencePath")]
+    pub target_reference_path: String,
+    #[serde(rename = "replacementAssetId")]
+    pub replacement_asset_id: String,
+    #[serde(
+        rename = "expectedAssetType",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expected_asset_type: Option<ProjectAssetType>,
+    #[serde(
+        rename = "expectedContentHash",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expected_content_hash: Option<ProjectAssetContentHash>,
+    #[serde(rename = "frameId", default, skip_serializing_if = "Option::is_none")]
+    pub frame_id: Option<String>,
+    #[serde(rename = "eventId", default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -10750,6 +10796,9 @@ impl VisualEditDraftOperation {
         if let Some(tilemap_operation) = &self.tilemap_operation {
             tilemap_operation.validate()?;
         }
+        if let Some(asset_reference_operation) = &self.asset_reference_operation {
+            asset_reference_operation.validate()?;
+        }
         if self.value.is_none() && self.summary.is_none() {
             return Err(anyhow!(
                 "visual edit draft operation must include summary or value"
@@ -11045,6 +11094,53 @@ impl VisualEditTilemapDraftOperation {
                 )
             }
         }
+    }
+}
+
+impl VisualEditAssetReferenceDraftOperation {
+    pub fn validate(&self) -> Result<()> {
+        validate_visual_edit_draft_operation_path(
+            "visual edit asset reference draft operation targetReferencePath",
+            &self.target_reference_path,
+        )?;
+        validate_path_component(
+            "visual edit asset reference draft operation replacementAssetId",
+            &self.replacement_asset_id,
+        )?;
+        if let Some(expected_content_hash) = &self.expected_content_hash {
+            expected_content_hash.validate_schema(
+                "visual edit asset reference draft operation expectedContentHash",
+            )?;
+        }
+        if let Some(frame_id) = &self.frame_id {
+            validate_path_component(
+                "visual edit asset reference draft operation frameId",
+                frame_id,
+            )?;
+        }
+        if let Some(event_id) = &self.event_id {
+            validate_path_component(
+                "visual edit asset reference draft operation eventId",
+                event_id,
+            )?;
+        }
+        for (key, value) in &self.metadata {
+            require_text(
+                "visual edit asset reference draft operation metadata key",
+                key,
+            )?;
+            require_text(
+                &format!("visual edit asset reference draft operation metadata.{key}"),
+                value,
+            )?;
+        }
+        if let Some(summary) = &self.summary {
+            require_text(
+                "visual edit asset reference draft operation summary",
+                summary,
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -23683,6 +23779,10 @@ scenarios:
                 VisualEditDraftTargetType::AssetReference,
             ),
             (
+                "examples/visual-edit-draft-v1/valid/asset-reference-operations.visual-edit-draft.json",
+                VisualEditDraftTargetType::AssetReference,
+            ),
+            (
                 "examples/visual-edit-draft-v1/valid/scene-operations.visual-edit-draft.json",
                 VisualEditDraftTargetType::Scene,
             ),
@@ -23777,6 +23877,7 @@ scenarios:
                         summary: None,
                     }),
                     tilemap_operation: None,
+                    asset_reference_operation: None,
                 },
                 VisualEditDraftOperation {
                     id: "op-player-color".to_string(),
@@ -23794,6 +23895,7 @@ scenarios:
                         summary: None,
                     }),
                     tilemap_operation: None,
+                    asset_reference_operation: None,
                 },
             ],
             before_hash: format!("{}:{}", before_hash.algorithm, before_hash.value),
@@ -23990,6 +24092,59 @@ scenarios:
                 VisualEditTilemapDraftOperationKind::CollisionPreview,
                 VisualEditTilemapDraftOperationKind::TriggerPreview,
             ]
+        );
+
+        let serialized = serde_json::to_string_pretty(&draft).expect("catalog serializes");
+        let round_trip: VisualEditDraftArtifact =
+            serde_json::from_str(&serialized).expect("serialized catalog parses");
+        assert_eq!(round_trip, draft);
+    }
+
+    #[test]
+    fn visual_edit_asset_reference_draft_v1_round_trips_bounded_operation_catalog() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/asset-reference-operations.visual-edit-draft.json",
+        );
+        let draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("asset reference operation catalog parses");
+        draft
+            .validate()
+            .expect("asset reference operation catalog validates");
+
+        let asset_reference_operations: Vec<_> = draft
+            .proposed_operations
+            .iter()
+            .map(|operation| {
+                operation
+                    .asset_reference_operation
+                    .as_ref()
+                    .expect("operation has typed asset reference operation")
+                    .kind
+                    .clone()
+            })
+            .collect();
+
+        assert_eq!(
+            asset_reference_operations,
+            vec![
+                VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference,
+                VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::FontAssetReference,
+                VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference,
+            ]
+        );
+
+        assert_eq!(
+            draft.proposed_operations[0]
+                .asset_reference_operation
+                .as_ref()
+                .expect("asset reference operation")
+                .expected_content_hash
+                .as_ref()
+                .expect("expected hash")
+                .algorithm,
+            PROJECT_ASSET_CONTENT_HASH_ALGORITHM
         );
 
         let serialized = serde_json::to_string_pretty(&draft).expect("catalog serializes");

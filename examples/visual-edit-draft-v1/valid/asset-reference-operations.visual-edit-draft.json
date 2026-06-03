@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-asset-reference-operation-catalog",
+  "target": {
+    "type": "asset-reference",
+    "path": "asset-manifest.json",
+    "id": "collect-and-exit-asset-refs"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-sprite-asset-ref",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.entities.player.sprite.assetId",
+      "summary": "Draft a player sprite image reference.",
+      "value": { "replacementAssetId": "player_sprite", "expectedAssetType": "image" },
+      "assetReferenceOperation": {
+        "kind": "sprite_asset_reference",
+        "targetReferencePath": "scenes.collect-and-exit.entities.player.sprite.assetId",
+        "replacementAssetId": "player_sprite",
+        "expectedAssetType": "image",
+        "expectedContentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+        "summary": "Preview linking a sprite asset reference."
+      }
+    },
+    {
+      "id": "op-sprite-frame-ref",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.entities.player.sprite.frameId",
+      "summary": "Draft a sprite atlas frame reference.",
+      "value": { "replacementAssetId": "player_atlas", "frameId": "idle_0" },
+      "assetReferenceOperation": {
+        "kind": "sprite_frame_reference",
+        "targetReferencePath": "scenes.collect-and-exit.entities.player.sprite.frameId",
+        "replacementAssetId": "player_atlas",
+        "expectedAssetType": "sprite_atlas",
+        "frameId": "idle_0",
+        "summary": "Preview selecting an atlas frame reference."
+      }
+    },
+    {
+      "id": "op-audio-event-ref",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.audio.events.pickup.assetId",
+      "summary": "Draft an audio event asset reference.",
+      "value": { "replacementAssetId": "pickup_audio", "eventId": "pickup" },
+      "assetReferenceOperation": {
+        "kind": "audio_event_asset_reference",
+        "targetReferencePath": "scenes.collect-and-exit.audio.events.pickup.assetId",
+        "replacementAssetId": "pickup_audio",
+        "expectedAssetType": "audio",
+        "eventId": "pickup",
+        "summary": "Preview linking an audio event to a manifest audio asset."
+      }
+    },
+    {
+      "id": "op-font-ref",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.hud.score.fontAssetId",
+      "summary": "Draft a HUD font reference.",
+      "value": { "replacementAssetId": "hud_font" },
+      "assetReferenceOperation": {
+        "kind": "font_asset_reference",
+        "targetReferencePath": "scenes.collect-and-exit.hud.score.fontAssetId",
+        "replacementAssetId": "hud_font",
+        "expectedAssetType": "font",
+        "summary": "Preview linking HUD text to a manifest font asset."
+      }
+    },
+    {
+      "id": "op-tilemap-tileset-ref",
+      "kind": "link_asset",
+      "path": "tilemaps.collect-and-exit.tilesetAssetId",
+      "summary": "Draft a tilemap tileset reference.",
+      "value": { "replacementAssetId": "ground_tileset" },
+      "assetReferenceOperation": {
+        "kind": "tilemap_tileset_reference",
+        "targetReferencePath": "tilemaps.collect-and-exit.tilesetAssetId",
+        "replacementAssetId": "ground_tileset",
+        "expectedAssetType": "tileset",
+        "metadata": { "tilemapAssetId": "collect_and_exit_tilemap" },
+        "summary": "Preview linking a tilemap to a manifest tileset asset."
+      }
+    }
+  ],
+  "beforeHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "expectedAfterSummary": "Asset reference draft operation catalog can be parsed before later manifest validation or preview work.",
+  "linkedEvidence": ["runs/demo/evidence/assets/asset-reference-preview.json"],
+  "author": { "type": "agent", "id": "visual-authoring-assistant", "source": "draft-json" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

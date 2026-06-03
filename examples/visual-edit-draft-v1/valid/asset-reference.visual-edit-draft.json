@@ -12,7 +12,15 @@
       "kind": "link_asset",
       "path": "scenes.collect-and-exit.entities.player.sprite.assetId",
       "summary": "Draft a manifest-backed player sprite reference.",
-      "value": { "assetId": "player-sprite", "expectedType": "sprite" }
+      "value": { "replacementAssetId": "player_sprite", "expectedAssetType": "image" },
+      "assetReferenceOperation": {
+        "kind": "sprite_asset_reference",
+        "targetReferencePath": "scenes.collect-and-exit.entities.player.sprite.assetId",
+        "replacementAssetId": "player_sprite",
+        "expectedAssetType": "image",
+        "expectedContentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+        "summary": "Preview linking the player sprite to a manifest image asset."
+      }
     }
   ],
   "beforeHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
