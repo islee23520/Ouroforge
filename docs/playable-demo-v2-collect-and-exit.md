@@ -17,6 +17,9 @@ Rust-trusted, and browser-observable.
   plus HUD, animation, and audio evidence.
 - `e2e-smoke.test.cjs` drives the runtime in-process and deletes temporary smoke
   evidence before exit.
+- `asset-evidence-smoke.test.cjs` verifies the asset-backed demo evidence shape
+  against dashboard and Studio asset inspector renderers while keeping generated
+  dashboard data in a temporary directory.
 
 ## Runtime smoke
 
@@ -25,6 +28,7 @@ Run the focused Node checks:
 ```bash
 node examples/game-runtime/playable-demo-v2.test.cjs
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+node examples/playable-demo-v2/collect-and-exit/asset-evidence-smoke.test.cjs
 ```
 
 The runtime can also be inspected manually by serving the repository root:
