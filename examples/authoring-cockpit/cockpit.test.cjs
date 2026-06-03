@@ -193,6 +193,36 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  tilemap_draft_preview: {
+    present: true,
+    preview_count: 2,
+    status: 'preview-only',
+    boundary: 'Tilemap draft previews are read-only; browser cannot write tilemaps, execute commands, or apply reviews.',
+    records: [
+      {
+        operationId: 'op-collision-preview',
+        kind: 'collision_preview',
+        layerId: 'collision',
+        affectedCells: 1,
+        beforeTilemapHash: { algorithm: 'fnv1a64-file-v1', value: 'beforehash' },
+        afterTilemapHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash' },
+        summary: 'Preview collision metadata for one tile.',
+        collisionCells: [{ layerId: 'collision', x: 0, y: 1, index: 3, tileId: 'solid_ground' }],
+        triggerCells: [],
+      },
+      {
+        operationId: 'op-trigger-preview',
+        kind: 'trigger_preview',
+        layerId: 'terrain',
+        affectedCells: 1,
+        beforeTilemapHash: { algorithm: 'fnv1a64-file-v1', value: 'beforehash' },
+        afterTilemapHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash2' },
+        summary: 'Preview trigger metadata for one tile.',
+        collisionCells: [],
+        triggerCells: [{ layerId: 'terrain', x: 1, y: 1, index: 4, tileId: 'coin_trigger', trigger: 'coin_collected' }],
+      },
+    ],
+  },
   asset_inspector: {
     present: true,
     status: 'warning',
@@ -654,6 +684,10 @@ assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<
 const xssAssetPreview = { asset_preview: { present: true, boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>' }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>' }] } };
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview reason</script>'), 'asset preview rows must be escaped');
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview-boundary</script>'), 'asset preview boundary must be escaped');
+const xssTilemapDraft = { tilemap_draft_preview: { present: true, boundary: '<script>tilemap-boundary</script>', records: [{ operationId: '<img src=x onerror=alert(1)>', kind: '<script>kind</script>', layerId: '<b>layer</b>', summary: '<script>summary</script>', beforeTilemapHash: { algorithm: '<script>before</script>', value: '<b>hash</b>' }, afterTilemapHash: { algorithm: '<script>after</script>', value: '<b>hash</b>' }, collisionCells: ['<script>cell</script>'], triggerCells: [] }] } };
+assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>summary</script>'), 'tilemap draft preview summary must be escaped');
+assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>tilemap-boundary</script>'), 'tilemap draft preview boundary must be escaped');
+assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<img src=x onerror=alert(1)>'), 'tilemap draft preview operation id must be escaped');
 const xssAssetInspector = { asset_inspector: { present: true, status: '<script>status</script>', boundary: '<script>inspector-boundary</script>', evidence_refs: ['<script>ref</script>'], assets: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', contentHash: '<script>hash</script>', runtimeStatuses: ['<script>runtime</script>'], tilemap: { tilesetAssetId: '<script>tileset</script>', width: '<b>', height: '<i>' }, warnings: ['<script>warning</script>'] }] }, asset_preview: { present: true, records: [{ assetId: '<script>atlas</script>', atlasFrames: [{ frameId: '<script>frame</script>', rect: { x: '<b>', y: '<i>', width: '<svg>', height: '<img>' } }], tilemap: { tilesetAssetId: '<script>tileset</script>', width: '<b>', height: '<i>', layerCount: '<svg>', tileCount: '<img>' } }] }, asset_loading: { present: true, records: [{ assetId: '<script>load</script>', attemptId: '<script>attempt</script>', path: '<b>path</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] } };
 const xssAssetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(xssAssetInspector);
 assert.ok(!xssAssetInspectorMarkup.includes('<script>inspector-boundary</script>'), 'asset inspector boundary must be escaped');
@@ -738,6 +772,15 @@ assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /Asset preview evid
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /player_atlas/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /missing_asset_file/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface({}), /No asset preview evidence/);
+const tilemapDraftPreviewMarkup = cockpit.renderTilemapDraftPreviewSurface(run);
+assert.match(tilemapDraftPreviewMarkup, /Tilemap draft previews/);
+assert.match(tilemapDraftPreviewMarkup, /op-collision-preview/);
+assert.match(tilemapDraftPreviewMarkup, /collision_preview/);
+assert.match(tilemapDraftPreviewMarkup, /op-trigger-preview/);
+assert.match(tilemapDraftPreviewMarkup, /coin_trigger|trigger 1/);
+assert.match(tilemapDraftPreviewMarkup, /browser cannot write tilemaps, execute commands, or apply reviews/);
+assert.doesNotMatch(tilemapDraftPreviewMarkup, /<button/i);
+assert.match(cockpit.renderTilemapDraftPreviewSurface({}), /No tilemap draft preview read model/);
 const assetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(run);
 assert.match(assetInspectorMarkup, /Asset inspector/);
 assert.match(assetInspectorMarkup, /player_sprite/);
@@ -762,6 +805,7 @@ assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifest
 assert.match(cockpit.renderStudioAssetInspectorSurface({}), /No asset inspector data/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
+assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 

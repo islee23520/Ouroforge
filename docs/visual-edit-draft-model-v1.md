@@ -21,7 +21,7 @@ A draft artifact uses `schemaVersion: "visual-edit-draft-v1"` and includes:
 | `target.type` | Bounded target enum: `scene`, `tilemap`, or `asset-reference`. |
 | `target.path` / `target.id` | Project-relative target path and optional manifest/read-model id. |
 | `proposedOperations[]` | Inert operation envelopes with id, kind, path, optional summary, optional JSON value, and optional target-specific metadata such as `sceneOperation`. |
-| `beforeHash` | Expected hash for stale-draft detection. Generic fixtures may use `sha256:<64 hex>`; scene preflight uses the trusted scene hash form `fnv1a64-canonical-json-v1:<16 hex>`. |
+| `beforeHash` | Expected hash for stale-draft detection. Generic fixtures may use `sha256:<64 hex>`; scene preflight uses the trusted scene hash form `fnv1a64-canonical-json-v1:<16 hex>`; tilemap preflight may use `fnv1a64-file-v1:<16 hex>` when checking the current asset file hash. |
 | `expectedAfterSummary` | Human-readable summary of the intended after state. |
 | `linkedEvidence[]` | Project-relative evidence refs that justify or explain the draft. |
 | `author` | Human/agent/Studio/system source metadata. |
@@ -45,6 +45,9 @@ VA1.2 defines the artifact and generic validation. VA1.3 adds scene-specific
 operation metadata, scene hash preflight, and preview-only transaction generation
 for currently supported scalar scene edits. It still does not authorize trusted
 writes, visual diff rendering, review-gated apply, or Studio authoring UI.
+VA1.4 adds tilemap-specific operation metadata, Rust-owned preflight, and
+preview-only summaries/collision/trigger metadata for bounded tilemap draft
+operations. It still does not authorize tilemap file writes or browser apply.
 
 ## Read-model compatibility
 
@@ -102,6 +105,35 @@ preview or apply commands from browser JavaScript. Unsupported scene categories
 such as sprite frame changes, collider toggles, and trigger/flag configuration
 are intentionally visible as draft categories but fail closed until separately
 supported by the Rust transaction model.
+
+## Tilemap Visual Edit Draft v1 compatibility
+
+Tilemap drafts may include a `tilemapOperation` object on each operation:
+
+| Field | Purpose |
+| --- | --- |
+| `tilemapOperation.kind` | Bounded tilemap draft category: `tile_set`, `tile_remove`, `rectangle_fill`, `layer_visibility_change`, `layer_config_change`, `tile_property_reference_change`, `collision_preview`, or `trigger_preview`. |
+| `tilemapOperation.layerId` | Existing tilemap layer id. Missing layers fail preflight before preview output. |
+| `tilemapOperation.x` / `y` | Cell coordinate for point operations and rectangle origin. Coordinates must be inside the tilemap bounds. |
+| `tilemapOperation.width` / `height` | Rectangle size for rectangle fills. Sizes must be non-zero, in bounds, and within the Rust operation cell limit. |
+| `tilemapOperation.tileId` | Existing tileset tile id where an operation needs a tile reference. Unknown tile ids fail preflight. |
+| `tilemapOperation.tilesetAssetId` | Optional expected tileset asset id. If present, it must match the tilemap's tileset reference. |
+| `tilemapOperation.visible` / `metadata` | Draft-only visibility/config/property metadata for preview summaries. |
+
+Tilemap draft preflight is Rust-owned and side-effect-free: it checks the draft
+shape, target type/id, current before hash, tilemap schema/integrity, layer ids,
+tile ids, point/rectangle bounds, and operation size limits before returning
+preview records. Tilemap preview records are inert read-model data with operation
+ids, affected-cell counts, before/after preview hashes, summaries, and
+collision/trigger cell metadata. Preview generation mutates only cloned
+in-memory tilemap manifests and does not write tilemap files, execute browser
+commands, create transaction artifacts, or apply reviews.
+
+Read-only dashboards, journals, and Studio surfaces may display tilemap preview
+summaries, affected cell counts, hashes, and collision/trigger metadata as
+escaped diagnostics. They must not claim that a tilemap draft has been applied or
+reviewed, and they must not execute preview/apply commands from browser
+JavaScript. Review-gated apply remains a separate trusted CLI flow.
 
 ## Generated-state policy
 

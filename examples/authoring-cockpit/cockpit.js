@@ -604,6 +604,42 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderTilemapDraftPreviewSurface(run) {
+    const preview = run?.tilemap_draft_preview || run?.tilemapDraftPreview || {};
+    if (!preview.present) {
+      return `<section id="tilemap-draft-preview" class="panel"><h2>Tilemap draft previews</h2><p class="empty">${escapeText(preview.empty_state || 'No tilemap draft preview read model is available for this run.')}</p><p class="hint">Read-only Studio surface. The browser does not write tilemaps, execute commands, or apply draft previews.</p></section>`;
+    }
+    const records = Array.isArray(preview.records) ? preview.records : [];
+    const collisionCount = records.reduce((total, record) => {
+      const cells = record.collisionCells || record.collision_cells || [];
+      return total + (Array.isArray(cells) ? cells.length : 0);
+    }, 0);
+    const triggerCount = records.reduce((total, record) => {
+      const cells = record.triggerCells || record.trigger_cells || [];
+      return total + (Array.isArray(cells) ? cells.length : 0);
+    }, 0);
+    const cards = [
+      ['Previews', preview.preview_count ?? preview.previewCount ?? records.length],
+      ['Collision cells', preview.collision_cell_count ?? preview.collisionCellCount ?? collisionCount],
+      ['Trigger cells', preview.trigger_cell_count ?? preview.triggerCellCount ?? triggerCount],
+      ['Status', preview.status || 'preview-only'],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const rows = records.slice(0, 10).map((record) => {
+      const collisionCells = record.collisionCells || record.collision_cells || [];
+      const triggerCells = record.triggerCells || record.trigger_cells || [];
+      const beforeHash = record.beforeTilemapHash || record.before_tilemap_hash || {};
+      const afterHash = record.afterTilemapHash || record.after_tilemap_hash || {};
+      const beforeText = beforeHash.algorithm && beforeHash.value ? `${beforeHash.algorithm}:${beforeHash.value}` : 'before hash unrecorded';
+      const afterText = afterHash.algorithm && afterHash.value ? `${afterHash.algorithm}:${afterHash.value}` : 'after hash unrecorded';
+      return `<div class="surface-row"><strong>${escapeText(record.operationId || record.operation_id || 'tilemap operation')}</strong> ${surfaceState(true, record.kind || 'preview')}<br><small>layer ${escapeText(record.layerId || record.layer_id || 'unknown')} · affected ${escapeText(record.affectedCells ?? record.affected_cells ?? 0)} cell(s) · collision ${escapeText(Array.isArray(collisionCells) ? collisionCells.length : 0)} · trigger ${escapeText(Array.isArray(triggerCells) ? triggerCells.length : 0)}<br>${escapeText(record.summary || 'No summary recorded.')}<br>${escapeText(beforeText)} → ${escapeText(afterText)}</small></div>`;
+    }).join('') || '<div class="surface-row">No tilemap draft preview records exported.</div>';
+    return `<section id="tilemap-draft-preview" class="panel"><h2>Tilemap draft previews</h2>
+      <p class="hint">Escaped read-only tilemap draft preview data from Rust-exported evidence. This panel cannot write tilemaps, execute local commands, apply reviews, or persist browser state.</p>
+      <div class="field-grid">${cards}</div>${rows}
+      <p class="hint">${escapeText(preview.boundary || 'Tilemap draft previews are display-only and must stay review-gated before apply.')}</p>
+    </section>`;
+  }
+
   function projectContext(run) {
     const project = run?.project || run?.summary?.project || null;
     return project && typeof project === 'object' && !Array.isArray(project) ? project : null;
@@ -1375,7 +1411,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1460,7 +1496,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

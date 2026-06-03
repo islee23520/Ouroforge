@@ -1,6 +1,6 @@
 # Studio v3 Project Workspace Cockpit
 
-Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, Asset Pipeline v1 inspector panels, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
+Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, Asset Pipeline v1 inspector panels, tilemap draft preview read models, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -40,6 +40,13 @@ without applying writes. All other scene fields remain read-only in the cockpit
 and are rejected before trusted writes. The browser still does not execute
 commands, write files, persist trusted draft state, or apply previews.
 
+Tilemap Visual Edit Draft v1 may describe bounded `tilemapOperation` records and
+Rust can preflight them into inert preview summaries with affected-cell counts,
+before/after preview hashes, and collision/trigger metadata. When
+`dashboard-data.json` includes `tilemap_draft_preview`, the cockpit displays that
+read model as escaped diagnostics only. It does not write tilemaps, persist draft
+state, execute preview/apply commands, or treat preview metadata as review
+approval.
 
 ## Studio v3 demo surfaces
 
@@ -58,6 +65,8 @@ The cockpit composes completed local surfaces only:
 - regression run matrix status from generated dashboard data when project-bound runs exist;
 - replay evidence surface when replay artifacts exist;
 - live preview controls through the existing runtime probe;
+- tilemap draft preview summaries, affected-cell counts, hashes, and
+  collision/trigger metadata from Rust-exported read models;
 - scene edit command generation for Rust-validated fields;
 - transaction-bound QA command generation;
 - semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist;
