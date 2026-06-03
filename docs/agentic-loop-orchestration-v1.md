@@ -45,7 +45,7 @@ Make the evidence-native loop itself inspectable and resumable through local
 artifacts:
 
 - loop plan model: what steps are intended and why;
-- dry-run sequencer: what would run, with no trusted writes;
+- dry-run sequencer: what would run, with no trusted/project-state writes;
 - Rust-trusted step runner: explicit execution for allowed local steps;
 - resume/failure recovery: visible incomplete/failed state;
 - evidence bundle: portable summary of run, review, comparison, and promotion
@@ -80,7 +80,7 @@ It does not widen trusted authority.
 Allowed in follow-up issues when explicitly scoped:
 
 - create local loop-plan artifacts;
-- preview a sequence of local steps without writes;
+- preview a sequence of local steps without trusted/project-state writes;
 - execute only Rust-owned, allowlisted local steps;
 - record step state, failure state, and resume metadata;
 - collect evidence refs into a generated bundle;
@@ -114,6 +114,9 @@ preview representation before execution is added. A dry-run must show:
 
 Dry-run artifacts are generated state and should remain untracked unless a
 future fixture-scoped issue explicitly authorizes a tiny deterministic fixture.
+Dry-run previews may write explicitly scoped local generated preview artifacts
+under ignored/untracked generated-state paths, but they must not execute trusted
+actions or write trusted/project state.
 
 ## Explicit step execution policy
 
