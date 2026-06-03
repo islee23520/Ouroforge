@@ -226,6 +226,8 @@ enum EditCommand {
         draft_path: PathBuf,
         #[arg(long, value_name = "PATH")]
         project: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        transaction_output: Option<PathBuf>,
     },
 }
 
@@ -975,9 +977,14 @@ fn main() -> Result<()> {
                 EditCommand::DraftPreview {
                     draft_path,
                     project,
+                    transaction_output,
                 },
         } => {
-            let preview = preview_visual_edit_draft_cli(&draft_path, &project)?;
+            let preview = preview_visual_edit_draft_cli(
+                &draft_path,
+                &project,
+                transaction_output.as_deref(),
+            )?;
             println!("{}", serde_json::to_string_pretty(&preview)?);
         }
     }
@@ -1095,6 +1102,7 @@ fn bind_project_context_to_scene_mutation_operation(
 fn preview_visual_edit_draft_cli(
     draft_path: &Path,
     project_root_or_manifest: &Path,
+    transaction_output: Option<&Path>,
 ) -> Result<serde_json::Value> {
     let draft_input = std::fs::read_to_string(draft_path)
         .with_context(|| format!("failed to read visual edit draft {}", draft_path.display()))?;
@@ -1119,6 +1127,14 @@ fn preview_visual_edit_draft_cli(
                         scene_path.display()
                     )
                 })?;
+            let transaction_output_preflight = match transaction_output {
+                Some(output_path) => Some(preflight_visual_edit_transaction_output(
+                    output_path,
+                    &scene_path,
+                    previews.len(),
+                )?),
+                None => None,
+            };
             Ok(serde_json::json!({
                 "schemaVersion": "visual-edit-draft-preview-cli-v1",
                 "draftId": draft.draft_id,
@@ -1131,16 +1147,88 @@ fn preview_visual_edit_draft_cli(
                 },
                 "previewKind": "scene_edit_transactions",
                 "previews": previews,
+                "projectPreflight": {
+                    "status": "passed",
+                    "manifestHash": hash_project_manifest_file(&manifest_path)?,
+                    "scenePath": scene_ref.path,
+                    "sceneDeclaredInManifest": true,
+                    "hashValidation": "passed",
+                },
+                "transactionOutputPreflight": transaction_output_preflight,
                 "guardrail": "preview only; no scene writes, transaction output writes, browser trusted writes, or apply behavior",
             }))
         }
-        VisualEditDraftTargetType::Tilemap | VisualEditDraftTargetType::AssetReference => {
-            Err(anyhow!(
-                "edit draft-preview VA1.6.1 supports scene drafts only; {:?} draft targets are reserved for later #348 PR units",
-                draft.target.target_type
-            ))
+        VisualEditDraftTargetType::AssetReference => {
+            if transaction_output.is_some() {
+                return Err(anyhow!(
+                    "edit draft-preview --transaction-output is only valid for scene transaction previews"
+                ));
+            }
+            let asset_manifest_path = resolve_project_asset_manifest_path(project_root_or_manifest);
+            let asset_manifest = ProjectAssetManifest::from_path(&asset_manifest_path)?;
+            let asset_manifest_base = asset_manifest_path
+                .parent()
+                .filter(|path| !path.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            let previews = draft
+                .preview_asset_reference_drafts(&asset_manifest, asset_manifest_base)
+                .with_context(|| {
+                    format!(
+                        "failed to preview asset-reference visual edit draft {} against {}",
+                        draft_path.display(),
+                        asset_manifest_path.display()
+                    )
+                })?;
+            Ok(serde_json::json!({
+                "schemaVersion": "visual-edit-draft-preview-cli-v1",
+                "draftId": draft.draft_id,
+                "projectId": manifest.project.id,
+                "manifestPath": manifest_path.to_string_lossy(),
+                "target": {
+                    "type": "asset-reference",
+                    "path": draft.target.path,
+                    "id": draft.target.id,
+                },
+                "previewKind": "asset_reference_drafts",
+                "previews": previews,
+                "projectPreflight": {
+                    "status": "passed",
+                    "manifestHash": hash_project_manifest_file(&manifest_path)?,
+                    "assetManifestPath": asset_manifest_path.to_string_lossy(),
+                    "assetManifestId": asset_manifest.id,
+                    "assetReferencesValidated": true,
+                },
+                "transactionOutputPreflight": null,
+                "guardrail": "preview only; no asset file writes, transaction output writes, browser trusted writes, remote fetches, or apply behavior",
+            }))
         }
+        VisualEditDraftTargetType::Tilemap => Err(anyhow!(
+            "edit draft-preview reserves {:?} draft targets for later #348 PR units",
+            draft.target.target_type
+        )),
     }
+}
+
+fn preflight_visual_edit_transaction_output(
+    output_path: &Path,
+    scene_path: &Path,
+    preview_count: usize,
+) -> Result<serde_json::Value> {
+    if preview_count != 1 {
+        return Err(anyhow!(
+            "edit draft-preview --transaction-output requires exactly one scene transaction preview; found {preview_count}"
+        ));
+    }
+    reject_transaction_output_target_collision(output_path, scene_path)?;
+    Ok(serde_json::json!({
+        "status": "passed",
+        "path": output_path.to_string_lossy(),
+        "checked": [
+            "single-preview-output",
+            "not-target-scene-path-or-alias"
+        ],
+        "guardrail": "preflight only; transaction output is not written by draft-preview",
+    }))
 }
 
 fn resolve_visual_edit_scene_target<'a>(
