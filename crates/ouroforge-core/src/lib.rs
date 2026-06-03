@@ -2258,6 +2258,13 @@ impl AuthoringLoopEvidenceBundle {
                 "completed authoring loop evidence bundle must not include missingRefs"
             ));
         }
+        if self.status == AuthoringLoopEvidenceBundleStatus::Completed
+            && self.steps.iter().any(|step| !step.missing_refs.is_empty())
+        {
+            return Err(anyhow!(
+                "completed authoring loop evidence bundle must not include step missingRefs"
+            ));
+        }
         Ok(())
     }
 
@@ -18078,6 +18085,19 @@ scenarios:
             .contains("must not include missingRefs"));
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn loop_evidence_bundle_schema_rejects_completed_step_missing_refs() {
+        let mut missing_step = loop_evidence_bundle_value("completed", Vec::new());
+        missing_step["steps"][0]["missingRefs"] = json!(["comparison missing"]);
+        let rejected_step_missing_refs = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&missing_step).expect("bundle json"),
+        )
+        .expect_err("completed bundle cannot declare step missing refs");
+        assert!(rejected_step_missing_refs
+            .to_string()
+            .contains("must not include step missingRefs"));
     }
 
     #[test]
