@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-ready-dry-run",
+  "project": { "projectId": "loop_project", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }] },
+    { "id": "generate-proposal", "kind": "generate-proposal", "status": "pending", "dependsOn": ["compare-runs"], "inputs": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }], "expectedArtifacts": [{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }] },
+    { "id": "record-review", "kind": "record-review-decision", "status": "pending", "dependsOn": ["generate-proposal"], "inputs": [{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }], "requiredDecisions": [{ "id": "human-review", "kind": "human-review" }], "expectedArtifacts": [{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }] },
+    { "id": "apply-mutation", "kind": "apply-accepted-scene-mutation", "status": "pending", "dependsOn": ["record-review"], "inputs": [{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }], "requiredDecisions": [{ "id": "human-review", "kind": "accepted-mutation" }], "rollbackRefs": [{ "id": "before-scene", "path": "runs/baseline/mutation/before.scene.json" }], "expectedArtifacts": [{ "id": "transaction", "path": "runs/baseline/mutation/transaction.json" }] }
+  ],
+  "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }
+}

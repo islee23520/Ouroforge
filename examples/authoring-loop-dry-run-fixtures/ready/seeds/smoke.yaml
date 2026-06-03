@@ -1,0 +1,10 @@
+id: loop-project.smoke
+title: Loop Project Smoke
+goal: Validate dry-run fixture.
+constraints:
+  target: file-harness
+acceptance:
+  - Dry-run fixture validates.
+scenarios:
+  - id: smoke
+    description: Smoke.

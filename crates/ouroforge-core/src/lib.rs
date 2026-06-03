@@ -2247,7 +2247,10 @@ pub struct AuthoringLoopDryRunSummary {
     pub seed: AuthoringLoopPathRef,
     #[serde(rename = "scenarioPack")]
     pub scenario_pack: AuthoringLoopPathRef,
+    pub status: String,
     pub steps: Vec<AuthoringLoopDryRunStep>,
+    #[serde(rename = "missingPrerequisites")]
+    pub missing_prerequisites: Vec<String>,
     #[serde(rename = "safetyGates")]
     pub safety_gates: Vec<String>,
     pub boundary: String,
@@ -2258,9 +2261,12 @@ pub struct AuthoringLoopDryRunStep {
     pub id: String,
     pub kind: String,
     pub status: String,
+    pub readiness: String,
     #[serde(rename = "commandText")]
     pub command_text: String,
     pub prerequisites: Vec<String>,
+    #[serde(rename = "missingPrerequisites")]
+    pub missing_prerequisites: Vec<String>,
     #[serde(rename = "expectedArtifacts")]
     pub expected_artifacts: Vec<AuthoringLoopArtifactRef>,
     #[serde(rename = "requiredDecisions")]
@@ -2281,25 +2287,58 @@ pub fn build_authoring_loop_dry_run_summary_from_path(
             plan_path.display()
         )
     })?;
-    build_authoring_loop_dry_run_summary(&plan)
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    build_authoring_loop_dry_run_summary_with_base(&plan, base_dir)
 }
 
 pub fn build_authoring_loop_dry_run_summary(
     plan: &AuthoringLoopPlan,
 ) -> Result<AuthoringLoopDryRunSummary> {
+    build_authoring_loop_dry_run_summary_with_inspection(plan, None)
+}
+
+pub fn build_authoring_loop_dry_run_summary_with_base(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+) -> Result<AuthoringLoopDryRunSummary> {
+    build_authoring_loop_dry_run_summary_with_inspection(plan, Some(base_dir.as_ref()))
+}
+
+fn build_authoring_loop_dry_run_summary_with_inspection(
+    plan: &AuthoringLoopPlan,
+    base_dir: Option<&Path>,
+) -> Result<AuthoringLoopDryRunSummary> {
     plan.validate_schema()?;
     let steps = plan
         .steps
         .iter()
-        .map(AuthoringLoopDryRunStep::from_plan_step)
-        .collect();
+        .map(|step| AuthoringLoopDryRunStep::from_plan_step(step, base_dir))
+        .collect::<Vec<_>>();
+    let mut missing_prerequisites = base_dir
+        .map(|base_dir| dry_run_global_missing_prerequisites(plan, base_dir))
+        .unwrap_or_default();
+    missing_prerequisites.extend(steps.iter().flat_map(|step| {
+        step.missing_prerequisites
+            .iter()
+            .map(|missing| format!("{}:{missing}", step.id))
+    }));
+    let status = if missing_prerequisites.is_empty() {
+        "ready"
+    } else {
+        "blocked"
+    };
     Ok(AuthoringLoopDryRunSummary {
         schema_version: AUTHORING_LOOP_DRY_RUN_SCHEMA_VERSION.to_string(),
         loop_id: plan.loop_id.clone(),
         project: plan.project.clone(),
         seed: plan.seed.clone(),
         scenario_pack: plan.scenario_pack.clone(),
+        status: status.to_string(),
         steps,
+        missing_prerequisites,
         safety_gates: vec![
             "dry-run only: no commands executed".to_string(),
             "dry-run only: no trusted files written".to_string(),
@@ -2310,18 +2349,141 @@ pub fn build_authoring_loop_dry_run_summary(
 }
 
 impl AuthoringLoopDryRunStep {
-    fn from_plan_step(step: &AuthoringLoopStep) -> Self {
+    fn from_plan_step(step: &AuthoringLoopStep, base_dir: Option<&Path>) -> Self {
+        let prerequisites = dry_run_prerequisites(step);
+        let missing_prerequisites = base_dir
+            .map(|base_dir| dry_run_missing_prerequisites(step, base_dir))
+            .unwrap_or_default();
+        let readiness = if missing_prerequisites.is_empty() {
+            "ready"
+        } else {
+            "blocked"
+        };
         Self {
             id: step.id.clone(),
             kind: step.kind.as_str().to_string(),
             status: step.status.as_str().to_string(),
+            readiness: readiness.to_string(),
             command_text: step.kind.inert_command_text(),
-            prerequisites: dry_run_prerequisites(step),
+            prerequisites,
+            missing_prerequisites,
             expected_artifacts: step.expected_artifacts.clone(),
             required_decisions: step.required_decisions.clone(),
             safety_gates: step.kind.safety_gates(),
         }
     }
+}
+
+fn dry_run_global_missing_prerequisites(plan: &AuthoringLoopPlan, base_dir: &Path) -> Vec<String> {
+    let mut missing = Vec::new();
+    let manifest_path = base_dir.join(&plan.project.manifest_path);
+    if !manifest_path.is_file() {
+        missing.push(format!(
+            "missing project manifest:{}",
+            plan.project.manifest_path
+        ));
+    } else {
+        match ProjectManifest::from_path(&manifest_path) {
+            Ok(manifest) => {
+                if manifest.project.id != plan.project.project_id {
+                    missing.push(format!(
+                        "stale project context:expected {} found {}",
+                        plan.project.project_id, manifest.project.id
+                    ));
+                }
+                let project_root = manifest_path
+                    .parent()
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .unwrap_or(base_dir);
+                let seed_declared = manifest.seeds.iter().any(|reference| {
+                    reference.id == plan.seed.id && reference.path == plan.seed.path
+                });
+                if !seed_declared {
+                    missing.push(format!(
+                        "missing seed declaration:{}:{}",
+                        plan.seed.id, plan.seed.path
+                    ));
+                }
+                let scenario_pack_declared = manifest.scenario_packs.iter().any(|reference| {
+                    reference.id == plan.scenario_pack.id
+                        && reference.path == plan.scenario_pack.path
+                });
+                if !scenario_pack_declared {
+                    missing.push(format!(
+                        "missing scenario pack declaration:{}:{}",
+                        plan.scenario_pack.id, plan.scenario_pack.path
+                    ));
+                }
+                for (label, reference) in
+                    [("seed", &plan.seed), ("scenario pack", &plan.scenario_pack)]
+                {
+                    if !project_root.join(&reference.path).is_file() {
+                        missing.push(format!(
+                            "missing {label} file:{}:{}",
+                            reference.id, reference.path
+                        ));
+                    }
+                }
+            }
+            Err(error) => missing.push(format!(
+                "invalid project manifest:{}:{error}",
+                plan.project.manifest_path
+            )),
+        }
+    }
+    missing
+}
+
+fn dry_run_missing_prerequisites(step: &AuthoringLoopStep, base_dir: &Path) -> Vec<String> {
+    let mut missing = Vec::new();
+    for input in &step.inputs {
+        if !base_dir.join(&input.path).exists() {
+            missing.push(format!("missing artifact:{}:{}", input.id, input.path));
+        }
+    }
+    for rollback_ref in &step.rollback_refs {
+        if !base_dir.join(&rollback_ref.path).exists() {
+            missing.push(format!(
+                "missing rollback:{}:{}",
+                rollback_ref.id, rollback_ref.path
+            ));
+        }
+    }
+    for decision in &step.required_decisions {
+        if !dry_run_decision_is_satisfied(step, decision, base_dir) {
+            missing.push(format!(
+                "missing decision:{}:{}",
+                decision.id,
+                decision.kind.as_str()
+            ));
+        }
+    }
+    if step.status == AuthoringLoopStepStatus::Completed {
+        for artifact in &step.expected_artifacts {
+            if !base_dir.join(&artifact.path).exists() {
+                missing.push(format!(
+                    "missing completed output:{}:{}",
+                    artifact.id, artifact.path
+                ));
+            }
+        }
+    }
+    missing
+}
+
+fn dry_run_decision_is_satisfied(
+    step: &AuthoringLoopStep,
+    decision: &AuthoringLoopDecisionRef,
+    base_dir: &Path,
+) -> bool {
+    step.inputs
+        .iter()
+        .chain(step.expected_artifacts.iter())
+        .any(|artifact| {
+            artifact.id == decision.id
+                || artifact.path.contains(&decision.id)
+                || (base_dir.join(&artifact.path).exists() && artifact.path.contains("decision"))
+        })
 }
 
 fn dry_run_prerequisites(step: &AuthoringLoopStep) -> Vec<String> {
@@ -15900,6 +16062,160 @@ scenarios:
             .prerequisites
             .iter()
             .any(|prerequisite| prerequisite.contains("decision:human-review")));
+    }
+
+    fn write_loop_dry_run_project(root: &Path) {
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::create_dir_all(root.join("scenarios")).expect("scenario dir");
+        fs::create_dir_all(root.join("scenes")).expect("scene dir");
+        fs::create_dir_all(root.join("assets")).expect("asset dir");
+        fs::write(
+            root.join("ouroforge.project.json"),
+            r#"{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "loop_project", "name": "Loop Project" },
+  "scenes": [{ "id": "main", "path": "scenes/main.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [{ "id": "regression", "path": "scenarios/regression.json" }],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs", "target", "dashboard-data"] }
+}"#,
+        )
+        .expect("manifest");
+        fs::write(
+            root.join("seeds/smoke.yaml"),
+            r#"id: loop-project.smoke
+title: Loop Project Smoke
+goal: Validate dry-run fixture.
+constraints:
+  target: file-harness
+acceptance:
+  - Dry-run fixture validates.
+scenarios:
+  - id: smoke
+    description: Smoke.
+"#,
+        )
+        .expect("seed");
+        fs::write(
+            root.join("scenes/main.scene.json"),
+            r#"{"schemaVersion":"1","id":"main"}"#,
+        )
+        .expect("scene");
+        fs::write(
+            root.join("scenarios/regression.json"),
+            r#"{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "regression",
+  "description": "Regression pack.",
+  "seed": "seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    { "id": "smoke", "description": "Smoke", "scenarios": [{ "id": "smoke", "description": "Smoke" }] }
+  ]
+}"#,
+        )
+        .expect("scenario pack");
+    }
+
+    fn write_loop_dry_run_plan(root: &Path, project_id: &str) -> PathBuf {
+        let plan_path = root.join("loop-plan.json");
+        fs::write(
+            &plan_path,
+            format!(
+                r#"{{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "temp-loop",
+  "project": {{ "projectId": "{project_id}", "manifestPath": "ouroforge.project.json" }},
+  "seed": {{ "id": "smoke", "path": "seeds/smoke.yaml" }},
+  "scenarioPack": {{ "id": "regression", "path": "scenarios/regression.json" }},
+  "steps": [
+    {{ "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{{ "id": "baseline-run", "path": "runs/baseline/run.json" }}] }},
+    {{ "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{{ "id": "baseline-run", "path": "runs/baseline/run.json" }}], "expectedArtifacts": [{{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }}] }},
+    {{ "id": "generate-proposal", "kind": "generate-proposal", "status": "pending", "dependsOn": ["compare-runs"], "inputs": [{{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }}], "expectedArtifacts": [{{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }}] }},
+    {{ "id": "record-review", "kind": "record-review-decision", "status": "pending", "dependsOn": ["generate-proposal"], "inputs": [{{ "id": "proposal", "path": "runs/baseline/mutation/proposal.json" }}], "requiredDecisions": [{{ "id": "human-review", "kind": "human-review" }}], "expectedArtifacts": [{{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }}] }},
+    {{ "id": "apply-mutation", "kind": "apply-accepted-scene-mutation", "status": "pending", "dependsOn": ["record-review"], "inputs": [{{ "id": "decision", "path": "runs/baseline/mutation/review-decision-ledger.json" }}], "requiredDecisions": [{{ "id": "human-review", "kind": "accepted-mutation" }}], "rollbackRefs": [{{ "id": "before-scene", "path": "runs/baseline/mutation/before.scene.json" }}], "expectedArtifacts": [{{ "id": "transaction", "path": "runs/baseline/mutation/transaction.json" }}] }}
+  ],
+  "generatedState": {{ "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }}
+}}"#
+            ),
+        )
+        .expect("plan");
+        plan_path
+    }
+
+    #[test]
+    fn loop_dry_run_prerequisite_inspection_reports_ready_when_artifacts_exist() {
+        let root = unique_temp_dir("loop-dry-run-ready");
+        write_loop_dry_run_project(&root);
+        for path in [
+            "runs/baseline/run.json",
+            "runs/baseline/comparisons/run-comparison.json",
+            "runs/baseline/mutation/proposal.json",
+            "runs/baseline/mutation/review-decision-ledger.json",
+            "runs/baseline/mutation/before.scene.json",
+        ] {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
+            fs::write(path, "{}\n").expect("artifact");
+        }
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+
+        let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)
+            .expect("ready dry-run summary");
+
+        assert_eq!(summary.status, "ready");
+        assert!(summary.missing_prerequisites.is_empty());
+        assert!(summary.steps.iter().all(|step| step.readiness == "ready"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn loop_dry_run_prerequisite_inspection_reports_blockers() {
+        let root = unique_temp_dir("loop-dry-run-blocked");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "stale_project");
+
+        let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)
+            .expect("blocked dry-run summary");
+
+        assert_eq!(summary.status, "blocked");
+        assert!(summary
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("stale project context")));
+        assert!(summary
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("missing completed output:baseline-run")));
+        assert!(summary
+            .steps
+            .iter()
+            .find(|step| step.id == "generate-proposal")
+            .expect("proposal step")
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("missing artifact:comparison")));
+        assert!(summary
+            .steps
+            .iter()
+            .find(|step| step.id == "record-review")
+            .expect("review step")
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("missing decision:human-review")));
+        assert!(summary
+            .steps
+            .iter()
+            .find(|step| step.id == "apply-mutation")
+            .expect("apply step")
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("missing rollback:before-scene")));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]

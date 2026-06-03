@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "regression",
+  "description": "Regression pack.",
+  "seed": "seeds/smoke.yaml",
+  "scenes": ["scenes/main.scene.json"],
+  "scenarioGroups": [
+    { "id": "smoke", "description": "Smoke", "scenarios": [{ "id": "smoke", "description": "Smoke" }] }
+  ]
+}

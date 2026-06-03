@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": { "id": "loop_project", "name": "Loop Project" },
+  "scenes": [{ "id": "main", "path": "scenes/main.scene.json" }],
+  "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+  "scenarioPacks": [{ "id": "regression", "path": "scenarios/regression.json" }],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": { "roots": ["runs", "target", "dashboard-data"] }
+}
