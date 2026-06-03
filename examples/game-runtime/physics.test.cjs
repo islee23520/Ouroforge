@@ -104,6 +104,53 @@ const platformerScene = {
   ],
 };
 
+const defaultLayerScene = {
+  schemaVersion: '1',
+  id: 'physics-runtime-default-layer',
+  bounds: { width: 64, height: 32 },
+  collisionRules: { defaultLayer: 'terrain' },
+  entities: [
+    {
+      id: 'player',
+      sprite: { color: '#5eead4' },
+      components: {
+        transform: { x: 0, y: 0 },
+        velocity: { x: 0, y: 0 },
+        size: { width: 16, height: 16 },
+        controllable: false,
+        input: { scheme: 'keyboard', moveSpeed: 24, allowedActions: ['move'] },
+        collider: {
+          shape: 'aabb',
+          body: 'dynamic',
+          offset: { x: 0, y: 0 },
+          size: { width: 16, height: 16 },
+        },
+      },
+    },
+    {
+      id: 'wall',
+      sprite: { color: '#475569' },
+      components: {
+        transform: { x: 20, y: 0 },
+        velocity: { x: 0, y: 0 },
+        size: { width: 16, height: 16 },
+        controllable: false,
+        collider: {
+          shape: 'aabb',
+          body: 'static',
+          offset: { x: 0, y: 0 },
+          size: { width: 16, height: 16 },
+          collisionMask: ['terrain'],
+        },
+      },
+    },
+  ],
+};
+
+const explicitGroupScene = clone(defaultLayerScene);
+explicitGroupScene.id = 'physics-runtime-explicit-layer';
+explicitGroupScene.entities[0].components.collider.collisionGroup = 'actors';
+
 const api = createRuntime();
 let state = api.loadScene(platformerScene);
 assert.equal(state.physics.gravity, 1);
@@ -150,3 +197,19 @@ assert.equal(player.components.velocity.y, 0, 'non-empty allowedActions without 
 assert.equal(player.components.transform.y, 64);
 assert.equal(state.physics.grounded.player, true);
 assert.equal(api.getEvents().filter((event) => event.type === 'runtime.physics.jump').length, jumpEventCount);
+
+api.setInput({ left: false, right: false, up: false, down: false });
+state = api.loadScene(defaultLayerScene);
+api.setInput({ right: true });
+state = api.step(1);
+player = state.entities.find((entity) => entity.id === 'player');
+assert.equal(player.components.transform.x, 4, 'ungrouped dynamic collider uses collisionRules.defaultLayer for masks');
+assert.ok(state.collisions.some((event) => event.type === 'runtime.collision.contact' && event.pairId === 'player:wall'));
+assert.equal(state.collisionRules.defaultLayer, 'terrain');
+
+state = api.loadScene(explicitGroupScene);
+api.setInput({ right: true });
+state = api.step(1);
+player = state.entities.find((entity) => entity.id === 'player');
+assert.equal(player.components.transform.x, 24, 'explicit collisionGroup is not replaced by collisionRules.defaultLayer');
+assert.equal(state.collisions.length, 0);

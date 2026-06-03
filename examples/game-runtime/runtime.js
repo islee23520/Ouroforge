@@ -83,6 +83,7 @@
     metadata: clone(defaultScene.metadata),
     collisions: [],
     collisionEvents: [],
+    collisionRules: { defaultLayer: 'default' },
     audioEvents: [],
     reloads: [],
     tilemaps: [],
@@ -276,6 +277,13 @@
     };
   }
 
+  function normalizeCollisionRules(collisionRules = {}) {
+    const source = collisionRules && typeof collisionRules === 'object' ? collisionRules : {};
+    return {
+      defaultLayer: typeof source.defaultLayer === 'string' && source.defaultLayer ? source.defaultLayer : 'default',
+    };
+  }
+
   function resolveComposition(entities) {
     const byId = new Map(entities.map((entity) => [entity.id, entity]));
     const resolving = new Set();
@@ -325,6 +333,7 @@
       bounds,
       renderer: renderer.normalizeRenderer(scene.renderer, bounds),
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
+      collisionRules: normalizeCollisionRules(scene.collisionRules),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       metadata: objectValue(scene.metadata),
       componentDefaults,
@@ -448,7 +457,7 @@
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
     if (typeof collision.stepAabbPhysics === 'function') {
-      world.collisions = collision.stepAabbPhysics(world.entities, world.bounds, world.tick).events;
+      world.collisions = collision.stepAabbPhysics(world.entities, world.bounds, world.tick, world.collisionRules).events;
     } else {
       for (const entity of world.entities) {
         const transform = entity.components.transform;
@@ -457,7 +466,7 @@
         transform.x = Math.max(0, Math.min(world.bounds.width - size.width, transform.x + velocity.x));
         transform.y = Math.max(0, Math.min(world.bounds.height - size.height, transform.y + velocity.y));
       }
-      world.collisions = collision.detectAabbCollisions(world.entities, world.tick);
+      world.collisions = collision.detectAabbCollisions(world.entities, world.tick, world.collisionRules);
     }
     for (const event of world.collisions) {
       world.collisionEvents.push(event);
@@ -490,6 +499,7 @@
     world.entities = clone(normalized.entities);
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
+    world.collisionRules = clone(normalized.collisionRules);
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     world.goalFlags = {};
     world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };

@@ -40,16 +40,22 @@
     return [a.entityId, b.entityId].sort().join(':');
   }
 
-  function groupFor(rect) {
-    return rect.collisionGroup || 'default';
+  function defaultLayerFor(options) {
+    return options && typeof options.defaultLayer === 'string' && options.defaultLayer
+      ? options.defaultLayer
+      : 'default';
   }
 
-  function maskAllows(source, target) {
-    return source.collisionMask.length === 0 || source.collisionMask.includes(groupFor(target));
+  function groupFor(rect, options) {
+    return rect.collisionGroup || defaultLayerFor(options);
   }
 
-  function pairAllowed(a, b) {
-    return maskAllows(a, b) && maskAllows(b, a);
+  function maskAllows(source, target, options) {
+    return source.collisionMask.length === 0 || source.collisionMask.includes(groupFor(target, options));
+  }
+
+  function pairAllowed(a, b, options) {
+    return maskAllows(a, b, options) && maskAllows(b, a, options);
   }
 
   function stableRects(entities) {
@@ -91,7 +97,7 @@
     return overlapTop <= overlapBottom ? { x: 0, y: -1 } : { x: 0, y: 1 };
   }
 
-  function detectAabbCollisions(entities, tick) {
+  function detectAabbCollisions(entities, tick, options = {}) {
     const colliders = stableRects(entities).map((entry) => entry.rect);
     const activeColliders = colliders.filter((collider) => collider.body === 'dynamic' || collider.body === 'kinematic');
     const seen = new Set();
@@ -101,7 +107,7 @@
       for (const other of colliders) {
         if (active.entityId === other.entityId) continue;
         const id = pairId(active, other);
-        if (seen.has(id) || !pairAllowed(active, other) || !overlaps(active, other)) continue;
+        if (seen.has(id) || !pairAllowed(active, other, options) || !overlaps(active, other)) continue;
         seen.add(id);
         const trigger = active.trigger || other.trigger;
         events.push(eventFor({
@@ -134,7 +140,7 @@
     return entry.rect;
   }
 
-  function resolveAxis({ entry, others, bounds, axis, tick, events, seen }) {
+  function resolveAxis({ entry, others, bounds, axis, tick, events, seen, options }) {
     const entity = entry.entity;
     const transform = entity.components.transform;
     const velocity = entity.components.velocity || { x: 0, y: 0 };
@@ -147,7 +153,7 @@
 
     for (const otherEntry of others) {
       const other = refreshRect(otherEntry);
-      if (!other || active.entityId === other.entityId || other.trigger || !pairAllowed(active, other) || !overlaps(active, other)) continue;
+      if (!other || active.entityId === other.entityId || other.trigger || !pairAllowed(active, other, options) || !overlaps(active, other)) continue;
       const id = `${pairId(active, other)}:contact:${axis}`;
       const normal = axis === 'x'
         ? { x: delta >= 0 ? -1 : 1, y: 0 }
@@ -171,7 +177,7 @@
     }
   }
 
-  function stepAabbPhysics(entities, bounds, tick) {
+  function stepAabbPhysics(entities, bounds, tick, options = {}) {
     const worldBounds = bounds || { width: 320, height: 180 };
     const entries = stableRects(entities);
     const entryById = new Map(entries.map((entry) => [entry.rect.entityId, entry]));
@@ -188,12 +194,12 @@
           continue;
         }
         const others = entries.filter((candidate) => candidate !== entry);
-        resolveAxis({ entry, others, bounds: worldBounds, axis: 'x', tick, events, seen });
-        resolveAxis({ entry, others, bounds: worldBounds, axis: 'y', tick, events, seen });
+        resolveAxis({ entry, others, bounds: worldBounds, axis: 'x', tick, events, seen, options });
+        resolveAxis({ entry, others, bounds: worldBounds, axis: 'y', tick, events, seen, options });
       }
     }
 
-    const triggers = detectAabbCollisions(entities, tick)
+    const triggers = detectAabbCollisions(entities, tick, options)
       .filter((event) => event.trigger)
       .filter((event) => {
         const id = `${event.pairId}:trigger`;
