@@ -14038,6 +14038,25 @@ fn run_scenario<T: CdpTransport>(
         &world_state,
     )?;
     prior_evidence_paths.push(world_state_path.clone());
+    let mut asset_load_paths = Vec::new();
+    if let Some(asset_load_evidence) = runtime_asset_load_evidence_from_world_state(
+        config,
+        scenario,
+        &world_state,
+        unix_millis()?,
+    )? {
+        let path = write_scenario_json_artifact(
+            config,
+            scenario,
+            &scenario_dir,
+            "asset-load-evidence",
+            "runtime_asset_load_evidence",
+            unix_millis()?,
+            &json!(asset_load_evidence),
+        )?;
+        prior_evidence_paths.push(path.clone());
+        asset_load_paths.push(path);
+    }
     let frame_stats = match evaluate_runtime_probe_object(
         client,
         "getFrameStats",
@@ -14315,6 +14334,7 @@ fn run_scenario<T: CdpTransport>(
                 "visual_checkpoints": visual_checkpoint_paths.clone(),
                 "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
                 "transition_evidence": transition_path.clone(),
+                "asset_load_evidence": asset_load_paths.clone(),
                 "console_logs": console_paths.clone(),
                 "performance_metrics": performance_paths.clone(),
                 "cdp_trace_summaries": trace_paths.clone()
@@ -14345,6 +14365,7 @@ fn run_scenario<T: CdpTransport>(
             "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
             "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
             "transition_evidence_path": transition_path.clone(),
+            "asset_load_evidence_paths": asset_load_paths.clone(),
             "console_log_paths": console_paths.clone(),
             "performance_metric_paths": performance_paths.clone(),
             "cdp_trace_summary_paths": trace_paths.clone(),
@@ -14357,6 +14378,7 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(visual_checkpoint_screenshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(transition_path);
+    evidence_paths.extend(asset_load_paths);
     evidence_paths.push(frame_stats_path);
     evidence_paths.extend(console_paths);
     evidence_paths.extend(performance_paths);
@@ -14601,6 +14623,182 @@ fn json_type_name(value: &serde_json::Value) -> &'static str {
         serde_json::Value::String(_) => "string",
         serde_json::Value::Array(_) => "array",
         serde_json::Value::Object(_) => "object",
+    }
+}
+
+fn runtime_asset_load_evidence_from_world_state(
+    config: &ScenarioRunConfig,
+    scenario: &Scenario,
+    world_state: &serde_json::Value,
+    recorded_at_unix_ms: u128,
+) -> Result<Option<RuntimeAssetLoadEvidence>> {
+    let Some(assets) = world_state.get("assets").and_then(|value| value.as_array()) else {
+        return Ok(None);
+    };
+    if assets.is_empty() {
+        return Ok(None);
+    }
+    let mut loads = Vec::new();
+    for (index, asset) in assets.iter().enumerate() {
+        let Some(asset_object) = asset.as_object() else {
+            continue;
+        };
+        let raw_id = asset_object
+            .get("id")
+            .and_then(|value| value.as_str())
+            .unwrap_or("asset");
+        let asset_id = runtime_asset_evidence_component(raw_id, &format!("asset-{index}"));
+        let attempt_id = asset_object
+            .get("attemptId")
+            .or_else(|| asset_object.get("attempt_id"))
+            .and_then(|value| value.as_str())
+            .map(|value| runtime_asset_evidence_component(value, &format!("load-{index}")))
+            .unwrap_or_else(|| format!("load-{asset_id}-{index}"));
+        let asset_type = runtime_asset_type_from_kind(
+            asset_object
+                .get("kind")
+                .and_then(|value| value.as_str())
+                .unwrap_or("image"),
+        );
+        let mut path = asset_object
+            .get("path")
+            .and_then(|value| value.as_str())
+            .map(ToString::to_string);
+        let path_rejected = path.as_ref().is_some_and(|path| {
+            validate_project_asset_path(
+                "runtime asset load evidence path",
+                path,
+                asset_type,
+                ProjectAssetClassification::SourceLike,
+            )
+            .is_err()
+        });
+        if path_rejected {
+            path = None;
+        }
+        let raw_status = asset_object
+            .get("status")
+            .and_then(|value| value.as_str())
+            .unwrap_or("attempted");
+        let mut status = runtime_asset_status_from_str(raw_status);
+        let mut failure_reason = asset_object
+            .get("failureReason")
+            .or_else(|| asset_object.get("failure_reason"))
+            .and_then(|value| value.as_str())
+            .map(ToString::to_string);
+        if path_rejected {
+            status = RuntimeAssetLoadStatus::Rejected;
+            failure_reason
+                .get_or_insert_with(|| "asset path rejected by Rust evidence model".to_string());
+        }
+        if matches!(
+            status,
+            RuntimeAssetLoadStatus::Failed
+                | RuntimeAssetLoadStatus::Rejected
+                | RuntimeAssetLoadStatus::Fallback
+        ) && failure_reason.is_none()
+        {
+            failure_reason = Some(format!("runtime reported {raw_status} without reason"));
+        }
+        let started_at_unix_ms = asset_object
+            .get("startedAtUnixMs")
+            .or_else(|| asset_object.get("started_at_unix_ms"))
+            .and_then(|value| value.as_u64())
+            .map(u128::from)
+            .unwrap_or(recorded_at_unix_ms);
+        let ended_at_unix_ms = asset_object
+            .get("endedAtUnixMs")
+            .or_else(|| asset_object.get("ended_at_unix_ms"))
+            .and_then(|value| value.as_u64())
+            .map(u128::from);
+        loads.push(RuntimeAssetLoadRecord {
+            attempt_id,
+            asset_id,
+            asset_type,
+            path,
+            status,
+            started_at_unix_ms,
+            ended_at_unix_ms,
+            load_duration_ms: asset_object
+                .get("loadDurationMs")
+                .or_else(|| asset_object.get("load_duration_ms"))
+                .and_then(|value| value.as_u64()),
+            width: asset_object
+                .get("width")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u32::try_from(value).ok()),
+            height: asset_object
+                .get("height")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u32::try_from(value).ok()),
+            media_duration_ms: asset_object
+                .get("mediaDurationMs")
+                .or_else(|| asset_object.get("media_duration_ms"))
+                .and_then(|value| value.as_u64()),
+            failure_reason,
+        });
+    }
+    if loads.is_empty() {
+        return Ok(None);
+    }
+    let evidence = RuntimeAssetLoadEvidence {
+        schema_version: RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION.to_string(),
+        run_id: runtime_asset_evidence_component(&run_id_from_run_dir(&config.run_dir), "run"),
+        worker_id: "scenario-runner".to_string(),
+        worker_session_id: format!(
+            "{}:{}",
+            run_id_from_run_dir(&config.run_dir),
+            "scenario-runner"
+        ),
+        scenario_id: Some(scenario.id.clone()),
+        manifest_id: world_state
+            .pointer("/assetManifest/id")
+            .and_then(|value| value.as_str())
+            .map(|value| runtime_asset_evidence_component(value, "asset-manifest")),
+        recorded_at_unix_ms,
+        loads,
+    };
+    evidence.validate()?;
+    Ok(Some(evidence))
+}
+
+fn runtime_asset_evidence_component(value: &str, fallback: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    if sanitized.is_empty() {
+        fallback.to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn runtime_asset_type_from_kind(kind: &str) -> ProjectAssetType {
+    match kind {
+        "audio" => ProjectAssetType::Audio,
+        "font" => ProjectAssetType::Font,
+        "sprite_atlas" => ProjectAssetType::SpriteAtlas,
+        "tilemap" => ProjectAssetType::Tilemap,
+        _ => ProjectAssetType::Image,
+    }
+}
+
+fn runtime_asset_status_from_str(status: &str) -> RuntimeAssetLoadStatus {
+    match status {
+        "loaded" => RuntimeAssetLoadStatus::Loaded,
+        "failed" => RuntimeAssetLoadStatus::Failed,
+        "rejected" | "unresolved" | "unavailable" => RuntimeAssetLoadStatus::Rejected,
+        "fallback" => RuntimeAssetLoadStatus::Fallback,
+        _ => RuntimeAssetLoadStatus::Attempted,
     }
 }
 
@@ -23309,6 +23507,69 @@ scenarios:
         let serialized = serde_json::to_string(&summary).expect("summary serializes");
         assert!(serialized.contains("loadedAssetIds"));
         assert!(serialized.contains("workerSessionId"));
+    }
+
+    #[test]
+    fn runtime_asset_load_evidence_from_world_state_adds_scenario_worker_correlation() {
+        let (root, artifacts) = create_test_run("runtime-asset-load-world-state-evidence");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8000")
+            .expect("scenario config");
+        let scenario = Scenario {
+            id: "asset-smoke".to_string(),
+            description: "asset smoke".to_string(),
+            steps: Vec::new(),
+            assertions: Vec::new(),
+        };
+        let evidence = runtime_asset_load_evidence_from_world_state(
+            &config,
+            &scenario,
+            &json!({
+                "assetManifest": { "id": "runtime_assets" },
+                "assets": [
+                    {
+                        "attemptId": "load-player",
+                        "id": "player_sprite",
+                        "kind": "image",
+                        "path": "assets/sprites/player.png",
+                        "status": "loaded",
+                        "startedAtUnixMs": 1000,
+                        "endedAtUnixMs": 1016,
+                        "loadDurationMs": 16,
+                        "width": 16,
+                        "height": 16
+                    },
+                    {
+                        "attemptId": "load-remote",
+                        "id": "remote_sprite",
+                        "kind": "image",
+                        "path": "https://example.com/player.png",
+                        "status": "failed",
+                        "startedAtUnixMs": 1020
+                    }
+                ]
+            }),
+            2000,
+        )
+        .expect("asset evidence builds")
+        .expect("asset evidence present");
+
+        assert_eq!(evidence.scenario_id.as_deref(), Some("asset-smoke"));
+        assert_eq!(evidence.worker_id, "scenario-runner");
+        assert!(evidence.worker_session_id.contains("scenario-runner"));
+        assert_eq!(evidence.manifest_id.as_deref(), Some("runtime_assets"));
+        let summary = evidence.summary();
+        assert_eq!(summary.loaded_asset_ids, vec!["player_sprite".to_string()]);
+        assert_eq!(
+            summary.rejected_asset_ids,
+            vec!["remote_sprite".to_string()]
+        );
+        assert_eq!(evidence.loads[1].path, None);
+        assert_eq!(
+            evidence.loads[1].failure_reason.as_deref(),
+            Some("asset path rejected by Rust evidence model")
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]

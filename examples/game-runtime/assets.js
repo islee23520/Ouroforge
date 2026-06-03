@@ -114,6 +114,8 @@
   function createAssetTracker(options = {}) {
     const ImageCtor = options.ImageCtor || root.Image;
     const onChange = typeof options.onChange === 'function' ? options.onChange : null;
+    const onEvent = typeof options.onEvent === 'function' ? options.onEvent : null;
+    const now = typeof options.now === 'function' ? options.now : () => Date.now();
     let manifest = normalizeManifest(options.manifest);
     const records = new Map();
     const unresolvedRefs = new Set();
@@ -135,6 +137,16 @@
       };
     }
 
+    function emit(record) {
+      if (onEvent) onEvent({ ...record, image: undefined });
+      if (onChange) onChange(record);
+    }
+
+    function durationSince(startedAtUnixMs, endedAtUnixMs) {
+      const duration = Math.max(0, Math.round(endedAtUnixMs - startedAtUnixMs));
+      return duration > 0 ? duration : 1;
+    }
+
     function entryFor(ref) {
       if (!manifest.enabled) {
         return safeLocalAssetPath(ref) ? { id: ref, kind: 'image', path: ref, metadata: {} } : null;
@@ -150,23 +162,46 @@
       }
       if (entry.kind === 'audio') return null;
       if (records.has(entry.id)) return records.get(entry.id);
-      const record = { id: entry.id, path: entry.path, kind: entry.kind === 'sprite' ? 'image' : entry.kind, status: 'pending', width: null, height: null, image: null };
+      const startedAtUnixMs = now();
+      const record = {
+        attemptId: `load-${entry.id}`,
+        id: entry.id,
+        path: entry.path,
+        kind: entry.kind === 'sprite' ? 'image' : entry.kind,
+        status: 'attempted',
+        startedAtUnixMs,
+        endedAtUnixMs: null,
+        loadDurationMs: null,
+        failureReason: null,
+        width: null,
+        height: null,
+        image: null,
+      };
       records.set(entry.id, record);
       if (typeof ImageCtor !== 'function') {
-        record.status = 'unavailable';
+        record.status = 'rejected';
+        record.endedAtUnixMs = now();
+        record.loadDurationMs = durationSince(record.startedAtUnixMs, record.endedAtUnixMs);
+        record.failureReason = 'Image constructor unavailable';
+        emit(record);
         return record;
       }
       const image = new ImageCtor();
       record.image = image;
       image.onload = () => {
         record.status = 'loaded';
+        record.endedAtUnixMs = now();
+        record.loadDurationMs = durationSince(record.startedAtUnixMs, record.endedAtUnixMs);
         record.width = image.naturalWidth || image.width || null;
         record.height = image.naturalHeight || image.height || null;
-        if (onChange) onChange(record);
+        emit(record);
       };
       image.onerror = () => {
         record.status = 'failed';
-        if (onChange) onChange(record);
+        record.endedAtUnixMs = now();
+        record.loadDurationMs = durationSince(record.startedAtUnixMs, record.endedAtUnixMs);
+        record.failureReason = 'Image load failed';
+        emit(record);
       };
       image.src = entry.path;
       return record;
@@ -183,14 +218,31 @@
       const loaded = Array.from(records.values())
         .sort((a, b) => compareCodeUnits(a.id, b.id) || compareCodeUnits(a.path, b.path))
         .map((record) => ({
+          attemptId: record.attemptId,
           id: record.id,
           path: record.path,
           kind: record.kind,
           status: record.status,
+          startedAtUnixMs: record.startedAtUnixMs,
+          endedAtUnixMs: record.endedAtUnixMs,
+          loadDurationMs: record.loadDurationMs,
+          failureReason: record.failureReason,
           width: record.width,
           height: record.height,
         }));
-      const unresolved = Array.from(unresolvedRefs).sort().map((ref) => ({ id: ref, path: null, kind: 'unknown', status: 'unresolved', width: null, height: null }));
+      const unresolved = Array.from(unresolvedRefs).sort().map((ref) => ({
+        attemptId: `reject-${String(ref).replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'asset'}`,
+        id: ref,
+        path: null,
+        kind: 'image',
+        status: 'rejected',
+        startedAtUnixMs: now(),
+        endedAtUnixMs: now(),
+        loadDurationMs: 1,
+        failureReason: 'Asset reference unresolved',
+        width: null,
+        height: null,
+      }));
       return loaded.concat(unresolved);
     }
 
