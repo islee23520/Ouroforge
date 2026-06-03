@@ -134,6 +134,10 @@ Dry-run previews may write explicitly scoped local generated preview artifacts
 under ignored/untracked generated-state paths, but they must not execute trusted
 actions or write trusted/project state.
 
+## Authoring Loop Execution v1
+
+#306 adds the CLI-only Rust trusted step runner. It executes one explicit validated step at a time, records generated loop ledger evidence, and stops at review/manual gates. Browser surfaces may render attached execution summaries read-only, but they do not execute commands or write trusted state.
+
 ## Authoring Loop Dry-Run v1
 
 #305 adds the inert dry-run sequencer (`docs/authoring-loop-dry-run-v1.md`).

@@ -73,6 +73,17 @@ const run = {
       safetyGates: ['inert command text only'],
     }],
   },
+  loop_execution: {
+    schemaVersion: 'authoring-loop-step-execution-v1',
+    loopId: '<loop-1>',
+    stepId: '<step-1>',
+    kind: 'apply-accepted-scene-mutation',
+    status: 'completed',
+    ledgerPath: '<ledger>',
+    generatedArtifacts: [{ id: '<transaction>', kind: 'scene-edit-transaction', path: 'runs/tx.json' }],
+    blockedReasons: [],
+    boundary: 'CLI-only Rust trusted step runner; browser does not execute.',
+  },
   evidence_fidelity: {
     transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
     runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
@@ -454,3 +465,9 @@ assert.match(cockpit.renderLoopDryRunSurface(run), /&lt;loop-1&gt;/);
 assert.doesNotMatch(cockpit.renderLoopDryRunSurface(run), /<loop-1>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop dry-run/);
 assert.match(cockpit.renderLoopDryRunSurface({ summary: { id: 'run-no-loop' } }), /No dry-run summary/);
+assert.match(cockpit.renderLoopExecutionSurface(run), /Authoring loop execution/);
+assert.match(cockpit.renderLoopExecutionSurface(run), /completed/);
+assert.match(cockpit.renderLoopExecutionSurface(run), /&lt;transaction&gt;/);
+assert.doesNotMatch(cockpit.renderLoopExecutionSurface(run), /<transaction>/);
+assert.match(cockpit.renderEvidencePane(run), /Authoring loop execution/);
+assert.match(cockpit.renderLoopExecutionSurface({ summary: { id: 'run-no-loop' } }), /No loop execution summary/);

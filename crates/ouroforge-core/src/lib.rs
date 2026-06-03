@@ -3655,8 +3655,7 @@ fn validate_authoring_loop_generated_root(field: &str, value: &str) -> Result<()
                 // The leading component may be a known hidden generated root;
                 // any other hidden component is rejected to keep traversal and
                 // stray hidden state out of the plan.
-                let is_allowed_generated_root =
-                    index == 0 && LOCAL_TOOL_ROOTS.contains(&component);
+                let is_allowed_generated_root = index == 0 && LOCAL_TOOL_ROOTS.contains(&component);
                 if component.starts_with('.') && !is_allowed_generated_root {
                     return Err(anyhow!(
                         "{field} must not use hidden path components other than known generated roots"
@@ -17030,10 +17029,8 @@ scenarios:
         // The rollback ref is a required gate for the mutation step, so the
         // dry-run prerequisites must surface it for reviewers.
         assert!(
-            apply
-                .prerequisites
-                .iter()
-                .any(|prerequisite| prerequisite == "rollback:before-scene:runs/baseline/mutation/before.scene.json"),
+            apply.prerequisites.iter().any(|prerequisite| prerequisite
+                == "rollback:before-scene:runs/baseline/mutation/before.scene.json"),
             "apply step prerequisites missing rollback ref: {:?}",
             apply.prerequisites
         );
@@ -17043,7 +17040,14 @@ scenarios:
     fn authoring_loop_generated_roots_allow_known_hidden_roots_only() {
         // Known generated / local-tool roots are permitted as leading components,
         // alongside ordinary generated directories.
-        for root in [".omx", ".omc", ".claude", ".openchrome", "runs", "target/cache"] {
+        for root in [
+            ".omx",
+            ".omc",
+            ".claude",
+            ".openchrome",
+            "runs",
+            "target/cache",
+        ] {
             validate_authoring_loop_generated_root("generatedState.roots", root)
                 .unwrap_or_else(|error| panic!("{root} should be allowed: {error:#}"));
         }
@@ -17087,7 +17091,9 @@ scenarios:
             before_hash: artifact_hash_from_bytes(b"before"),
             after_hash: artifact_hash_from_bytes(b"after"),
             changes: vec!["added_scenario:terminal".to_string()],
-            record_path: Some("regression-promotions/regression-promotion-terminal.json".to_string()),
+            record_path: Some(
+                "regression-promotions/regression-promotion-terminal.json".to_string(),
+            ),
         };
 
         // A promoted run surfaces "promoted" even with an earlier applied stage.

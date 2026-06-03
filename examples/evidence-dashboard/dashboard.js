@@ -786,6 +786,26 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderLoopExecutionSummary(summary = null) {
+    if (!summary || typeof summary !== 'object') {
+      return '<section class="panel"><h3>Authoring loop execution</h3><p class="empty-state">No loop execution summary is attached to this dashboard data.</p></section>';
+    }
+    const artifacts = Array.isArray(summary.generatedArtifacts) ? summary.generatedArtifacts : [];
+    const blocked = Array.isArray(summary.blockedReasons) ? summary.blockedReasons : [];
+    const artifactRows = artifacts.length
+      ? artifacts.map((artifact) => `<li><code>${escapeText(artifact.id || 'artifact')}</code> ${escapeText(artifact.kind || 'unknown')} · ${escapeText(artifact.path || '')}</li>`).join('')
+      : '<li>No generated artifacts recorded.</li>';
+    return `<section class="panel loop-execution-summary"><h3>Authoring loop execution</h3>
+      <p class="run-meta">Loop ${escapeText(summary.loopId || 'unknown')} · step ${escapeText(summary.stepId || 'unknown')} · <span class="${statusClass(summary.status || 'unknown')}">${escapeText(summary.status || 'unknown')}</span></p>
+      <p class="run-meta">Read-only execution evidence. The browser displays Rust CLI output and never executes loop steps.</p>
+      <div class="run-meta">Kind: ${escapeText(summary.kind || 'unknown')}</div>
+      ${summary.ledgerPath ? `<div class="run-meta">Ledger: ${escapeText(summary.ledgerPath)}</div>` : ''}
+      ${blocked.length ? `<div class="artifact-warning">Blocked by: ${escapeText(blocked.join(' · '))}</div>` : '<div class="run-meta">No blocked reasons reported.</div>'}
+      <ul>${artifactRows}</ul>
+      ${summary.boundary ? `<p class="run-meta">${escapeText(summary.boundary)}</p>` : ''}
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null);
   }
@@ -812,6 +832,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
+      ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderRegressionPromotions(run)}
@@ -881,7 +902,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

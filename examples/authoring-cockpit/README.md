@@ -135,3 +135,7 @@ mutations. See `docs/studio-evidence-fidelity-surfaces.md`.
 ## Authoring Loop Dry-Run v1
 
 When exported dashboard data includes `loop_dry_run`, the cockpit displays it as escaped read-only state with inert command text. The browser never executes dry-run command text, writes plan files, creates reports, mutates scenes, records decisions, or promotes regressions. See `../../docs/authoring-loop-dry-run-v1.md`.
+
+## Authoring Loop Execution v1
+
+When exported dashboard data includes `loop_execution`, the cockpit displays the Rust CLI step summary as escaped read-only evidence. The browser never runs loop steps, applies mutations, records decisions, promotes regressions, or writes trusted plan state. See `../../docs/authoring-loop-execution-v1.md`.

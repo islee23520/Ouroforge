@@ -55,6 +55,18 @@ const run = {
       safetyGates: ['inert command text only'],
     }],
   },
+  loop_execution: {
+    schemaVersion: 'authoring-loop-step-execution-v1',
+    loopId: '<loop-1>',
+    stepId: '<step-1>',
+    kind: 'apply-accepted-scene-mutation',
+    status: 'completed',
+    planPath: '<plan>',
+    ledgerPath: '<ledger>',
+    generatedArtifacts: [{ id: '<transaction>', kind: 'scene-edit-transaction', path: 'runs/tx.json' }],
+    blockedReasons: [],
+    boundary: 'CLI-only Rust trusted step runner; browser does not execute.',
+  },
   command_context: {
     schemaVersion: 'run-command-context-v1',
     command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
@@ -479,3 +491,9 @@ assert.match(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /&lt;loop-1&gt
 assert.doesNotMatch(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /<loop-1>/);
 assert.match(dashboard.renderRunDetail(run), /Authoring loop dry-run/);
 assert.match(dashboard.renderLoopDryRunSummary(null), /No dry-run summary/);
+assert.match(dashboard.renderLoopExecutionSummary(run.loop_execution), /Authoring loop execution/);
+assert.match(dashboard.renderLoopExecutionSummary(run.loop_execution), /completed/);
+assert.match(dashboard.renderLoopExecutionSummary(run.loop_execution), /&lt;transaction&gt;/);
+assert.doesNotMatch(dashboard.renderLoopExecutionSummary(run.loop_execution), /<transaction>/);
+assert.match(dashboard.renderRunDetail(run), /Authoring loop execution/);
+assert.match(dashboard.renderLoopExecutionSummary(null), /No loop execution summary/);

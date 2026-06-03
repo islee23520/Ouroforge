@@ -936,6 +936,23 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderLoopExecutionSurface(run) {
+    const summary = run?.loop_execution || run?.loopExecution || null;
+    if (!summary || typeof summary !== 'object') {
+      return '<section id="loop-execution" class="panel"><h2>Authoring loop execution</h2><p class="empty">No loop execution summary is attached to dashboard-data.json. The cockpit remains read-only and does not run loop steps.</p></section>';
+    }
+    const artifacts = Array.isArray(summary.generatedArtifacts) ? summary.generatedArtifacts : [];
+    const blocked = Array.isArray(summary.blockedReasons) ? summary.blockedReasons : [];
+    const rows = artifacts.length ? artifacts.map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.id || 'artifact')}</strong> ${escapeText(artifact.kind || 'unknown')}<br><small>${escapeText(artifact.path || '')}</small></div>`).join('') : '<p class="empty">No generated artifacts recorded.</p>';
+    return `<section id="loop-execution" class="panel"><h2>Authoring loop execution</h2>
+      <p class="hint">Read-only execution evidence from the Rust CLI. The browser never executes loop steps, writes trusted state, applies mutations, or promotes regressions.</p>
+      <div class="surface-row"><strong>${escapeText(summary.loopId || 'unknown')}</strong> step <strong>${escapeText(summary.stepId || 'unknown')}</strong> ${surfaceState(summary.status === 'completed', summary.status || 'unknown')}<br><small>${escapeText(summary.kind || 'unknown')} · ledger ${escapeText(summary.ledgerPath || 'unrecorded')}</small></div>
+      ${blocked.length ? `<div class="hint">Blocked by: ${escapeText(blocked.join(' · '))}</div>` : '<p class="hint">No blocked reasons reported.</p>'}
+      ${rows}
+      ${summary.boundary ? `<p class="hint">${escapeText(summary.boundary)}</p>` : ''}
+    </section>`;
+  }
+
   function renderStudioGaps() {
     return `<section class="panel"><h2>Known demo gaps</h2><ul>
       <li>No production editor, native shell, hosted studio, collaboration, plugin marketplace, or visual scripting.</li>
@@ -945,7 +962,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1024,7 +1041,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
