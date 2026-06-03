@@ -107,3 +107,19 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output example
 The template seed has two scenarios: `bootstrap-smoke` checks renderer/tilemap/assets/animation/audio/composition/default observability, and `objective-contact` checks goal trigger plus wall contact evidence. Dashboard and compare surfaces are inspect-only: they read generated artifacts and do not mutate runs, execute browser-side comparisons, or infer semantic game quality.
 
 Known gaps are deliberate: one screen only, no enemy AI, no campaign, no native export, no plugin system, no marketplace assets, no multiplayer, no monetization/publishing workflow, and no production/public-launch claim. Generated `runs/` evidence remains local and untracked.
+
+## Playable Demo v2 collect-and-exit fixture
+
+The runtime can load the source-only collect-and-exit fixture from issue #319 by
+serving the repository root and passing a bounded local JSON scene path:
+
+```bash
+python3 -m http.server 8771 --bind 127.0.0.1
+# open http://127.0.0.1:8771/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json
+node examples/game-runtime/playable-demo-v2.test.cjs
+```
+
+The query parameter accepts only local JSON scene paths and falls back to
+`scene.json` for protocols, traversal, or unsupported paths. This keeps the demo
+observable through the existing runtime probe without adding browser-side writes,
+command execution, generated evidence commits, or broader engine systems.

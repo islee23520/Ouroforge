@@ -711,6 +711,7 @@
     };
   }
 
+  let sceneReady = Promise.resolve();
   const api = Object.freeze({
     getWorldState() {
       const state = clone(world);
@@ -752,6 +753,9 @@
     restore,
     loadScene,
     reload,
+    whenReady() {
+      return sceneReady;
+    },
   });
 
   window.addEventListener('keydown', (event) => {
@@ -767,15 +771,33 @@
     if (event.key === 'ArrowDown') setInput({ down: false });
   });
 
+  function sceneSourceFromLocation(locationValue = globalThis.location) {
+    const fallback = 'scene.json';
+    try {
+      if (!locationValue || typeof locationValue.search !== 'string') return fallback;
+      const params = new URLSearchParams(locationValue.search);
+      const requested = params.get('scene');
+      if (!requested) return fallback;
+      if (requested.includes('..') || requested.includes('\\')) return fallback;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(requested)) return fallback;
+      if (!requested.endsWith('.json')) return fallback;
+      if (requested.startsWith('/examples/')) return requested;
+      if (/^[A-Za-z0-9_./-]+$/.test(requested) && !requested.startsWith('/')) return requested;
+      return fallback;
+    } catch (_error) {
+      return fallback;
+    }
+  }
+
   record('runtime.loaded', { api: Object.keys(api) });
   renderDebug();
-  const sceneReady = fetch('scene.json')
+  const sceneSource = sceneSourceFromLocation();
+  sceneReady = fetch(sceneSource)
     .then((response) => response.json())
     .then((scene) => loadScene(scene))
-    .catch((error) => record('runtime.scene.load_failed', { error: String(error) }));
+    .catch((error) => record('runtime.scene.load_failed', { sceneSource, error: String(error) }));
   // Expose a readiness accessor so harnesses can await the fetched scene before
   // reading world state (otherwise they observe the synchronous fallback scene
   // and a late loadScene would reset the steps they executed in the interim).
-  api.whenReady = () => sceneReady;
   window.__OUROFORGE__ = api;
 })();

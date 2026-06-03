@@ -1,7 +1,10 @@
 {
   "schemaVersion": "1",
   "id": "collect-and-exit-scene",
-  "bounds": { "width": 320, "height": 180 },
+  "bounds": {
+    "width": 320,
+    "height": 180
+  },
   "metadata": {
     "fixture": "playable-demo-v2-collect-and-exit",
     "scope": "one-screen source fixture; generated run evidence is intentionally untracked"
@@ -9,140 +12,472 @@
   "gameplayRules": {
     "version": "1",
     "flags": [
-      { "id": "key_collected", "initial": false, "label": "Key collected" },
-      { "id": "door_open", "initial": false, "label": "Door open" },
-      { "id": "exit_reached", "initial": false, "label": "Exit reached" },
-      { "id": "player_alive", "initial": true, "label": "Player alive" }
+      {
+        "id": "key_collected",
+        "initial": false,
+        "label": "Key collected"
+      },
+      {
+        "id": "door_open",
+        "initial": false,
+        "label": "Door open"
+      },
+      {
+        "id": "exit_reached",
+        "initial": false,
+        "label": "Exit reached"
+      },
+      {
+        "id": "player_alive",
+        "initial": true,
+        "label": "Player alive"
+      }
     ]
   },
   "componentDefaults": {
-    "velocity": { "x": 0, "y": 0 },
-    "size": { "width": 16, "height": 16 },
+    "velocity": {
+      "x": 0,
+      "y": 0
+    },
+    "size": {
+      "width": 16,
+      "height": 16
+    },
     "controllable": false,
-    "status": { "hitPoints": 1, "maxHitPoints": 1, "flags": [], "states": [] }
+    "status": {
+      "hitPoints": 1,
+      "maxHitPoints": 1,
+      "flags": [],
+      "states": []
+    }
   },
   "entities": [
     {
       "id": "player",
-      "sprite": { "color": "#5eead4", "layer": "actors", "order": 0 },
+      "sprite": {
+        "color": "#5eead4",
+        "layer": "actors",
+        "order": 0
+      },
       "components": {
-        "transform": { "x": 32, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 16, "height": 16 },
+        "transform": {
+          "x": 32,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
         "controllable": true,
-        "collider": { "shape": "aabb", "body": "dynamic", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 16 }, "sensor": false },
-        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["player_alive"], "states": ["grounded"] },
-        "input": { "scheme": "keyboard", "moveSpeed": 3, "jumpImpulse": 8, "allowedActions": ["move", "jump"] },
-        "cameraTarget": { "weight": 1, "deadZone": { "width": 64, "height": 32 } },
+        "collider": {
+          "shape": "aabb",
+          "body": "dynamic",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 16
+          },
+          "sensor": false
+        },
+        "status": {
+          "hitPoints": 3,
+          "maxHitPoints": 3,
+          "flags": [
+            "player_alive"
+          ],
+          "states": [
+            "grounded"
+          ]
+        },
+        "input": {
+          "scheme": "keyboard",
+          "moveSpeed": 3,
+          "jumpImpulse": 8,
+          "allowedActions": [
+            "move",
+            "jump"
+          ]
+        },
+        "cameraTarget": {
+          "weight": 1,
+          "deadZone": {
+            "width": 64,
+            "height": 32
+          }
+        },
         "animation": {
           "mode": "sprite_frame",
           "frameDuration": 2,
           "currentClip": "idle",
           "clips": [
-            { "id": "idle", "frameDuration": 2, "loop": true, "frames": [{ "color": "#5eead4" }, { "color": "#2dd4bf" }] }
+            {
+              "id": "idle",
+              "frameDuration": 2,
+              "loop": true,
+              "frames": [
+                {
+                  "color": "#5eead4"
+                },
+                {
+                  "color": "#2dd4bf"
+                }
+              ]
+            }
           ],
-          "state": { "currentClip": "idle", "elapsedFrames": 0, "frameIndex": 0 }
+          "state": {
+            "currentClip": "idle",
+            "elapsedFrames": 0,
+            "frameIndex": 0
+          }
         },
-        "audio": { "events": [{ "name": "player_spawn", "trigger": "scene_loaded", "action": "play" }] }
+        "audio": {
+          "events": [
+            {
+              "name": "player_spawn",
+              "trigger": "scene_loaded",
+              "action": "play"
+            }
+          ]
+        }
       },
-      "tags": ["player", "controllable"]
+      "tags": [
+        "player",
+        "controllable"
+      ]
     },
     {
       "id": "key",
-      "sprite": { "color": "#facc15", "layer": "actors", "order": 5 },
+      "sprite": {
+        "color": "#facc15",
+        "layer": "actors",
+        "order": 5
+      },
       "components": {
-        "transform": { "x": 128, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 12, "height": 12 },
-        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 12, "height": 12 }, "sensor": true },
+        "transform": {
+          "x": 128,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 12,
+          "height": 12
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 12,
+            "height": 12
+          },
+          "sensor": true
+        },
         "trigger": {
           "id": "collect_key",
           "kind": "overlap",
           "targetFlag": "key_collected",
           "onEnter": [
-            { "kind": "setFlag", "flag": "key_collected", "value": true },
-            { "kind": "setFlag", "flag": "door_open", "value": true },
-            { "kind": "hideEntity", "entityId": "key" }
+            {
+              "kind": "setFlag",
+              "flag": "key_collected",
+              "value": true
+            },
+            {
+              "kind": "setFlag",
+              "flag": "door_open",
+              "value": true
+            },
+            {
+              "kind": "hideEntity",
+              "entityId": "key"
+            }
           ]
         },
-        "goalFlag": { "flag": "key_collected", "label": "Collect key" }
+        "goalFlag": {
+          "flag": "key_collected",
+          "label": "Collect key"
+        }
       },
-      "tags": ["collectible", "key"]
+      "tags": [
+        "collectible",
+        "key"
+      ]
     },
     {
       "id": "door",
-      "sprite": { "color": "#a78bfa", "layer": "actors", "order": 6 },
+      "sprite": {
+        "color": "#a78bfa",
+        "layer": "actors",
+        "order": 6
+      },
       "components": {
-        "transform": { "x": 256, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 16, "height": 24 },
-        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 24 }, "sensor": true },
+        "transform": {
+          "x": 256,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 24
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 24
+          },
+          "sensor": true
+        },
         "trigger": {
           "id": "enter_exit",
           "kind": "overlap",
           "targetFlag": "exit_reached",
-          "requiresFlags": ["door_open"],
-          "onEnter": [{ "kind": "setFlag", "flag": "exit_reached", "value": true }]
+          "requiredFlags": [
+            "door_open"
+          ],
+          "onEnter": [
+            {
+              "kind": "setFlag",
+              "flag": "exit_reached",
+              "value": true
+            }
+          ]
         },
-        "goalFlag": { "flag": "exit_reached", "label": "Exit through door" }
+        "goalFlag": {
+          "flag": "exit_reached",
+          "label": "Exit through door"
+        }
       },
-      "tags": ["exit", "door"]
+      "tags": [
+        "exit",
+        "door"
+      ]
     },
     {
       "id": "wall",
-      "sprite": { "color": "#64748b", "layer": "actors", "order": 20 },
-      "components": {
-        "transform": { "x": 304, "y": 72 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 16, "height": 32 },
-        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 32 }, "sensor": false }
+      "sprite": {
+        "color": "#64748b",
+        "layer": "actors",
+        "order": 20
       },
-      "tags": ["wall", "solid"]
+      "components": {
+        "transform": {
+          "x": 304,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 32
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 32
+          },
+          "sensor": false
+        }
+      },
+      "tags": [
+        "wall",
+        "solid"
+      ]
     },
     {
       "id": "hud_goal",
-      "sprite": { "color": "#ffffff", "visible": false, "layer": "hud", "order": 0 },
-      "components": {
-        "transform": { "x": 8, "y": 8 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 128, "height": 12 },
-        "uiText": { "text": "Goal: collect key and exit", "role": "hud", "bindFlag": "exit_reached" },
-        "hudValue": { "kind": "goal", "label": "Goal", "value": "Collect key and exit", "bindFlag": "exit_reached" }
+      "sprite": {
+        "color": "#ffffff",
+        "visible": false,
+        "layer": "hud",
+        "order": 0
       },
-      "tags": ["hud"]
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 8
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 128,
+          "height": 12
+        },
+        "uiText": {
+          "text": "Goal: collect key and exit",
+          "role": "hud",
+          "bindFlag": "exit_reached"
+        },
+        "hudValue": {
+          "kind": "goal",
+          "label": "Goal",
+          "value": "Collect key and exit",
+          "bindFlag": "exit_reached"
+        }
+      },
+      "tags": [
+        "hud"
+      ]
     },
     {
       "id": "hud_key",
-      "sprite": { "color": "#ffffff", "visible": false, "layer": "hud", "order": 1 },
-      "components": {
-        "transform": { "x": 8, "y": 24 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 96, "height": 12 },
-        "hudValue": { "kind": "key_count", "label": "Key", "value": "0/1", "bindFlag": "key_collected" }
+      "sprite": {
+        "color": "#ffffff",
+        "visible": false,
+        "layer": "hud",
+        "order": 1
       },
-      "tags": ["hud"]
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 24
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 12
+        },
+        "hudValue": {
+          "kind": "key_count",
+          "label": "Key",
+          "value": "0/1",
+          "bindFlag": "key_collected"
+        }
+      },
+      "tags": [
+        "hud"
+      ]
     },
     {
       "id": "hud_health",
-      "sprite": { "color": "#ffffff", "visible": false, "layer": "hud", "order": 2 },
-      "components": {
-        "transform": { "x": 8, "y": 40 },
-        "velocity": { "x": 0, "y": 0 },
-        "size": { "width": 64, "height": 12 },
-        "hudValue": { "kind": "health", "label": "HP", "value": "3/3", "bindFlag": "player_alive" }
+      "sprite": {
+        "color": "#ffffff",
+        "visible": false,
+        "layer": "hud",
+        "order": 2
       },
-      "tags": ["hud"]
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 40
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 64,
+          "height": 12
+        },
+        "hudValue": {
+          "kind": "health",
+          "label": "HP",
+          "value": "3/3",
+          "bindFlag": "player_alive"
+        }
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "id": "floor",
+      "sprite": {
+        "color": "#334155",
+        "layer": "actors",
+        "order": 19
+      },
+      "components": {
+        "transform": {
+          "x": 0,
+          "y": 96
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 320,
+          "height": 16
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 320,
+            "height": 16
+          },
+          "sensor": false
+        }
+      },
+      "tags": [
+        "floor",
+        "solid"
+      ]
     }
   ],
   "renderer": {
     "version": "1",
-    "camera": { "x": 0, "y": 0 },
-    "viewport": { "width": 320, "height": 180 },
+    "camera": {
+      "x": 0,
+      "y": 0
+    },
+    "viewport": {
+      "width": 320,
+      "height": 180
+    },
     "background": "#172532",
     "layers": [
-      { "id": "background", "order": -10 },
-      { "id": "actors", "order": 0 },
-      { "id": "hud", "order": 10 }
+      {
+        "id": "background",
+        "order": -10
+      },
+      {
+        "id": "actors",
+        "order": 0
+      },
+      {
+        "id": "hud",
+        "order": 10
+      }
     ]
   }
 }
