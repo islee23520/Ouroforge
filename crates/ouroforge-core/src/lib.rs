@@ -10266,6 +10266,19 @@ pub enum VisualEditSceneDraftOperationKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum VisualEditTilemapDraftOperationKind {
+    TileSet,
+    TileRemove,
+    RectangleFill,
+    LayerVisibilityChange,
+    LayerConfigChange,
+    TilePropertyReferenceChange,
+    CollisionPreview,
+    TriggerPreview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum VisualEditDraftValidationStatus {
     Unvalidated,
     Partial,
@@ -10338,6 +10351,12 @@ pub struct VisualEditDraftOperation {
         skip_serializing_if = "Option::is_none"
     )]
     pub scene_operation: Option<VisualEditSceneDraftOperation>,
+    #[serde(
+        rename = "tilemapOperation",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub tilemap_operation: Option<VisualEditTilemapDraftOperation>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10350,6 +10369,36 @@ pub struct VisualEditSceneDraftOperation {
     pub scene_edit_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditTilemapDraftOperation {
+    pub kind: VisualEditTilemapDraftOperationKind,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(rename = "tileId", default, skip_serializing_if = "Option::is_none")]
+    pub tile_id: Option<String>,
+    #[serde(
+        rename = "tilesetAssetId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub tileset_asset_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 }
@@ -10510,10 +10559,42 @@ impl VisualEditDraftOperation {
         if let Some(scene_operation) = &self.scene_operation {
             scene_operation.validate()?;
         }
+        if let Some(tilemap_operation) = &self.tilemap_operation {
+            tilemap_operation.validate()?;
+        }
         if self.value.is_none() && self.summary.is_none() {
             return Err(anyhow!(
                 "visual edit draft operation must include summary or value"
             ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualEditTilemapDraftOperation {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "visual edit tilemap draft operation layerId",
+            &self.layer_id,
+        )?;
+        if let Some(tile_id) = &self.tile_id {
+            validate_path_component("visual edit tilemap draft operation tileId", tile_id)?;
+        }
+        if let Some(tileset_asset_id) = &self.tileset_asset_id {
+            validate_path_component(
+                "visual edit tilemap draft operation tilesetAssetId",
+                tileset_asset_id,
+            )?;
+        }
+        for (key, value) in &self.metadata {
+            require_text("visual edit tilemap draft operation metadata key", key)?;
+            require_text(
+                &format!("visual edit tilemap draft operation metadata.{key}"),
+                value,
+            )?;
+        }
+        if let Some(summary) = &self.summary {
+            require_text("visual edit tilemap draft operation summary", summary)?;
         }
         Ok(())
     }
@@ -23072,6 +23153,10 @@ scenarios:
                 VisualEditDraftTargetType::Tilemap,
             ),
             (
+                "examples/visual-edit-draft-v1/valid/tilemap-operations.visual-edit-draft.json",
+                VisualEditDraftTargetType::Tilemap,
+            ),
+            (
                 "examples/visual-edit-draft-v1/valid/asset-reference.visual-edit-draft.json",
                 VisualEditDraftTargetType::AssetReference,
             ),
@@ -23169,6 +23254,7 @@ scenarios:
                         value: Some(json!(48)),
                         summary: None,
                     }),
+                    tilemap_operation: None,
                 },
                 VisualEditDraftOperation {
                     id: "op-player-color".to_string(),
@@ -23185,6 +23271,7 @@ scenarios:
                         value: Some(json!("#ffcc00")),
                         summary: None,
                     }),
+                    tilemap_operation: None,
                 },
             ],
             before_hash: format!("{}:{}", before_hash.algorithm, before_hash.value),
@@ -23343,6 +23430,50 @@ scenarios:
         assert!(error
             .to_string()
             .contains("unsupported visual edit scene draft path"));
+    }
+
+    #[test]
+    fn visual_edit_tilemap_draft_v1_round_trips_bounded_operation_catalog() {
+        let input = read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/tilemap-operations.visual-edit-draft.json",
+        );
+        let draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("tilemap operation catalog parses");
+        draft
+            .validate()
+            .expect("tilemap operation catalog validates");
+
+        let tilemap_operations: Vec<_> = draft
+            .proposed_operations
+            .iter()
+            .map(|operation| {
+                operation
+                    .tilemap_operation
+                    .as_ref()
+                    .expect("operation has typed tilemap operation")
+                    .kind
+                    .clone()
+            })
+            .collect();
+
+        assert_eq!(
+            tilemap_operations,
+            vec![
+                VisualEditTilemapDraftOperationKind::TileSet,
+                VisualEditTilemapDraftOperationKind::TileRemove,
+                VisualEditTilemapDraftOperationKind::RectangleFill,
+                VisualEditTilemapDraftOperationKind::LayerVisibilityChange,
+                VisualEditTilemapDraftOperationKind::LayerConfigChange,
+                VisualEditTilemapDraftOperationKind::TilePropertyReferenceChange,
+                VisualEditTilemapDraftOperationKind::CollisionPreview,
+                VisualEditTilemapDraftOperationKind::TriggerPreview,
+            ]
+        );
+
+        let serialized = serde_json::to_string_pretty(&draft).expect("catalog serializes");
+        let round_trip: VisualEditDraftArtifact =
+            serde_json::from_str(&serialized).expect("serialized catalog parses");
+        assert_eq!(round_trip, draft);
     }
 
     #[test]

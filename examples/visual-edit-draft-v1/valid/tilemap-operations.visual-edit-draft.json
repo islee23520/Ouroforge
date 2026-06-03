@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-tilemap-operation-catalog",
+  "target": {
+    "type": "tilemap",
+    "path": "assets/tilemaps/demo.tilemap.json",
+    "id": "demo_tilemap"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-set-tile",
+      "kind": "update",
+      "path": "layers.terrain.tiles[1,0]",
+      "summary": "Set one tile in the terrain layer.",
+      "value": { "tileId": "solid_ground", "x": 1, "y": 0 },
+      "tilemapOperation": {
+        "kind": "tile_set",
+        "layerId": "terrain",
+        "x": 1,
+        "y": 0,
+        "tileId": "solid_ground",
+        "tilesetAssetId": "ground_tileset",
+        "summary": "Preview setting one terrain tile."
+      }
+    },
+    {
+      "id": "op-remove-tile",
+      "kind": "remove",
+      "path": "layers.terrain.tiles[2,0]",
+      "summary": "Remove one tile from the terrain layer.",
+      "value": { "x": 2, "y": 0 },
+      "tilemapOperation": {
+        "kind": "tile_remove",
+        "layerId": "terrain",
+        "x": 2,
+        "y": 0,
+        "summary": "Preview clearing one terrain tile."
+      }
+    },
+    {
+      "id": "op-rectangle-fill",
+      "kind": "update",
+      "path": "layers.terrain.rect[0,1,3,1]",
+      "summary": "Fill a small rectangle with a ground tile.",
+      "value": { "tileId": "solid_ground", "x": 0, "y": 1, "width": 3, "height": 1 },
+      "tilemapOperation": {
+        "kind": "rectangle_fill",
+        "layerId": "terrain",
+        "x": 0,
+        "y": 1,
+        "width": 3,
+        "height": 1,
+        "tileId": "solid_ground",
+        "tilesetAssetId": "ground_tileset"
+      }
+    },
+    {
+      "id": "op-layer-visibility",
+      "kind": "update",
+      "path": "layers.collision.visible",
+      "summary": "Draft a layer visibility toggle.",
+      "value": false,
+      "tilemapOperation": {
+        "kind": "layer_visibility_change",
+        "layerId": "collision",
+        "visible": false
+      }
+    },
+    {
+      "id": "op-layer-config",
+      "kind": "update",
+      "path": "layers.collision.metadata.authoringMode",
+      "summary": "Draft a layer metadata/config update.",
+      "value": { "authoringMode": "review-only" },
+      "tilemapOperation": {
+        "kind": "layer_config_change",
+        "layerId": "collision",
+        "metadata": { "authoringMode": "review-only" }
+      }
+    },
+    {
+      "id": "op-tile-property-ref",
+      "kind": "update",
+      "path": "tiles.spike_hazard.properties.collisionTag",
+      "summary": "Draft a tile property reference change.",
+      "value": { "tileId": "spike_hazard", "collisionTag": "hazard" },
+      "tilemapOperation": {
+        "kind": "tile_property_reference_change",
+        "layerId": "terrain",
+        "tileId": "spike_hazard",
+        "metadata": { "collisionTag": "hazard" }
+      }
+    },
+    {
+      "id": "op-collision-preview",
+      "kind": "update",
+      "path": "layers.collision.tiles[0,1]",
+      "summary": "Draft collision preview metadata for one tile.",
+      "value": { "tileId": "solid_ground", "collision": true },
+      "tilemapOperation": {
+        "kind": "collision_preview",
+        "layerId": "collision",
+        "x": 0,
+        "y": 1,
+        "tileId": "solid_ground"
+      }
+    },
+    {
+      "id": "op-trigger-preview",
+      "kind": "update",
+      "path": "layers.terrain.tiles[1,1].trigger",
+      "summary": "Draft trigger preview metadata for one tile.",
+      "value": { "tileId": "coin_trigger", "trigger": "coin_collected" },
+      "tilemapOperation": {
+        "kind": "trigger_preview",
+        "layerId": "terrain",
+        "x": 1,
+        "y": 1,
+        "tileId": "coin_trigger",
+        "metadata": { "trigger": "coin_collected" }
+      }
+    }
+  ],
+  "beforeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expectedAfterSummary": "Tilemap draft operation catalog can be parsed before later bounds validation or preview work.",
+  "linkedEvidence": ["runs/demo/evidence/tilemaps/demo-tilemap-authoring.json"],
+  "author": { "type": "agent", "id": "visual-authoring-assistant", "source": "draft-json" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}
