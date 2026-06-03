@@ -652,12 +652,18 @@
   }
 
   function safeTransitionPath(path) {
+    // Apply the strict character allowlist to every target, including absolute
+    // `/examples/` paths. The allowlist excludes `%`, so percent-encoded dot
+    // segments (e.g. `/examples/%2e%2e/secret.scene.json`) are rejected before
+    // they can be normalized back into a parent-directory escape by fetch/URL
+    // handling. Legitimate relative and `/examples/` scene paths already match
+    // the allowlist, so no bounded target loses access.
     return typeof path === 'string'
       && path.endsWith('.json')
       && !path.includes('..')
       && !path.includes('\\')
       && !/^[a-z][a-z0-9+.-]*:/i.test(path)
-      && (/^[A-Za-z0-9_./-]+$/.test(path) || path.startsWith('/examples/'));
+      && /^[A-Za-z0-9_./-]+$/.test(path);
   }
 
   function recordTransitionOutcome(outcome) {

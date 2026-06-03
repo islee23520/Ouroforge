@@ -110,4 +110,18 @@ function createRuntime(fetchScenes = {}) {
   );
   assert.equal(unsafeApi.getWorldState().sceneId, 'unsafe-transition-start');
   assert.equal(unsafeApi.getWorldState().transitionEvents[0].status, 'failed');
+
+  // Percent-encoded parent-directory traversal must be rejected too: a literal
+  // `..` check alone would let `/examples/%2e%2e/secret.scene.json` through and
+  // fetch/URL handling could normalize it back into a parent escape.
+  const encodedApi = createRuntime({});
+  encodedApi.loadScene(scene('encoded-transition-start', {
+    sceneTransitions: [{ id: 'escape', toScene: '/examples/%2e%2e/secret.scene.json' }],
+  }));
+  await assert.rejects(
+    () => encodedApi.transition('escape'),
+    /target is not a bounded scene path/,
+  );
+  assert.equal(encodedApi.getWorldState().sceneId, 'encoded-transition-start');
+  assert.equal(encodedApi.getWorldState().transitionEvents[0].status, 'failed');
 })();
