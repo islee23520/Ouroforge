@@ -135,6 +135,17 @@
         context.font = '10px ui-monospace, monospace';
         context.fillText(components.uiText.text, x, y + Math.max(10, entitySize.height));
       }
+      if (components.hudValue && typeof components.hudValue === 'object') {
+        const label = typeof components.hudValue.label === 'string' ? components.hudValue.label : '';
+        const value = typeof components.hudValue.value === 'string' ? components.hudValue.value : '';
+        const hudText = label ? `${label}: ${value}` : value;
+        if (hudText) {
+          context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
+          context.font = '10px ui-monospace, monospace';
+          const lineOffset = components.uiText && typeof components.uiText.text === 'string' ? 22 : Math.max(10, entitySize.height);
+          context.fillText(hudText, x, y + lineOffset);
+        }
+      }
       if (activeRenderer.debug.showEntityIds) {
         context.fillStyle = '#f2f6f8';
         context.font = '10px ui-monospace, monospace';

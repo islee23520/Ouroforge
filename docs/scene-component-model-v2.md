@@ -25,6 +25,7 @@ The fixture covers:
 - `goalFlag`: named objective flag plus optional display label
 - `cameraTarget`: numeric weight plus optional dead-zone size
 - `uiText`: bounded display text with optional role and flag binding
+- `hudValue`: minimal HUD label/value metadata for score, health, inventory/key count, goal, flag, or text displays
 
 Component defaults may provide `status` and `input`. Runtime normalization applies those defaults to entities that omit the component, just like existing transform/velocity/size defaults.
 
@@ -58,11 +59,14 @@ Those paths edit existing optional components only. They do not create missing c
 ```json
 {
   "version": "2",
-  "counts": { "status": 3, "input": 3, "trigger": 1, "goalFlag": 1, "cameraTarget": 1, "uiText": 1 },
+  "counts": { "status": 3, "input": 3, "trigger": 1, "goalFlag": 1, "cameraTarget": 1, "uiText": 1, "hudValue": 1 },
   "entities": [
     { "entityId": "player", "components": { "status": {}, "input": {}, "cameraTarget": {} } }
   ],
-  "goalFlags": { "alive": true, "coin_collected": false }
+  "goalFlags": { "alive": true, "coin_collected": false },
+  "hudValues": [
+    { "entityId": "hud_goal", "kind": "goal", "label": "Goal", "value": "Collect coin", "bindFlag": "coin_collected", "flagValue": false, "text": "Goal: Collect coin" }
+  ]
 }
 ```
 
@@ -71,7 +75,10 @@ Runtime behavior stays intentionally small and evidence-first:
 - player movement uses `components.input.moveSpeed` when `allowedActions` permits `move`
 - collision trigger events may set/clear goal flags or hide entities according to bounded `onEnter` actions
 - `components.uiText.text` is rendered as simple canvas text when the owning sprite/layer is visible
-- `status`, `goalFlag`, and `cameraTarget` are preserved for probe/debug evidence
+- `components.hudValue` is rendered as simple label/value canvas text and exposed through `componentModel.hudValues`
+- `status`, `goalFlag`, `cameraTarget`, and HUD metadata are preserved for probe/debug evidence
+
+`hudValue` is intentionally a minimal HUD surface, not a UI framework. It carries static display text plus an optional `bindFlag` so scenarios and evidence can correlate visible HUD state with trusted Rust-validated gameplay flags.
 
 ## Non-goals and guardrails
 

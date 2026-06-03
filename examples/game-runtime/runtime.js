@@ -209,6 +209,17 @@
     };
   }
 
+  function hudValueComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    const allowedKinds = new Set(['score', 'health', 'inventory', 'key_count', 'goal', 'flag', 'text']);
+    return {
+      kind: typeof source.kind === 'string' && allowedKinds.has(source.kind) ? source.kind : 'text',
+      label: typeof source.label === 'string' ? source.label : '',
+      value: typeof source.value === 'string' ? source.value : '',
+      bindFlag: typeof source.bindFlag === 'string' ? source.bindFlag : null,
+    };
+  }
+
   function normalizeEntity(entity = {}, index = 0, componentDefaults = {}) {
     const components = entity.components || {};
     const sprite = entity.sprite || {};
@@ -241,6 +252,7 @@
     if (components.goalFlag) normalized.components.goalFlag = goalFlagComponent(components.goalFlag);
     if (components.cameraTarget) normalized.components.cameraTarget = cameraTargetComponent(components.cameraTarget);
     if (components.uiText) normalized.components.uiText = uiTextComponent(components.uiText);
+    if (components.hudValue) normalized.components.hudValue = hudValueComponent(components.hudValue);
     if (components.audio && Array.isArray(components.audio.events)) {
       normalized.components.audio = {
         events: components.audio.events
@@ -665,8 +677,9 @@
   }
 
   function componentModelDebugState(entities) {
-    const names = ['status', 'input', 'trigger', 'goalFlag', 'cameraTarget', 'uiText'];
+    const names = ['status', 'input', 'trigger', 'goalFlag', 'cameraTarget', 'uiText', 'hudValue'];
     const counts = Object.fromEntries(names.map((name) => [name, 0]));
+    const hudValues = [];
     const entityComponents = entities.map((entity) => {
       const components = {};
       for (const name of names) {
@@ -675,6 +688,18 @@
           components[name] = clone(entity.components[name]);
         }
       }
+      if (entity.components && entity.components.hudValue) {
+        const hudValue = entity.components.hudValue;
+        hudValues.push({
+          entityId: entity.id,
+          kind: hudValue.kind,
+          label: hudValue.label,
+          value: hudValue.value,
+          bindFlag: hudValue.bindFlag,
+          flagValue: hudValue.bindFlag ? Boolean(world.goalFlags[hudValue.bindFlag]) : null,
+          text: hudValue.label ? `${hudValue.label}: ${hudValue.value}` : hudValue.value,
+        });
+      }
       return { entityId: entity.id, components };
     });
     return {
@@ -682,6 +707,7 @@
       counts,
       entities: entityComponents,
       goalFlags: clone(world.goalFlags),
+      hudValues,
     };
   }
 

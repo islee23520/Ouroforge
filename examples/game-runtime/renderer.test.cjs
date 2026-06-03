@@ -120,3 +120,27 @@ drawRuntime({
   animation: { activeSpriteFrame: () => null },
 });
 assert.ok(uiContext.calls.some((call) => call[0] === 'fillText' && call[2] === 'Coin: 0/1'));
+
+const hudValueContext = createContext();
+drawRuntime({
+  canvas: { width: 320, height: 180 },
+  context: hudValueContext,
+  renderer,
+  world: {
+    sceneId: 'renderer-hud-value-test',
+    tick: 5,
+    bounds: { width: 320, height: 180 },
+    entities: [{
+      id: 'hud_health',
+      sprite: { color: '#ffffff', layer: 'actors', order: 6 },
+      components: {
+        transform: { x: 8, y: 24 },
+        size: { width: 64, height: 12 },
+        hudValue: { kind: 'health', label: 'HP', value: '3/3', bindFlag: 'player_alive' },
+      },
+    }],
+  },
+  assets: { imageFor: () => null },
+  animation: { activeSpriteFrame: () => null },
+});
+assert.ok(hudValueContext.calls.some((call) => call[0] === 'fillText' && call[2] === 'HP: 3/3'));

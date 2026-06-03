@@ -28,6 +28,7 @@ function createRuntime() {
 
 const scene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'scene-components-v2.json'), 'utf8'));
 const triggerFlagsScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'trigger-flags-v1.json'), 'utf8'));
+const hudScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'hud-entities-v1.json'), 'utf8'));
 const api = createRuntime();
 let state = api.loadScene(scene);
 
@@ -50,6 +51,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(state.componentModel.counts)), {
   goalFlag: 1,
   cameraTarget: 1,
   uiText: 1,
+  hudValue: 0,
 });
 assert.equal(state.componentModel.goalFlags.alive, true);
 assert.equal(state.componentModel.goalFlags.coin_collected, false);
@@ -180,3 +182,29 @@ assert.ok(declaredTriggerEvent);
 assert.equal(declaredTriggerEvent.payload.targetFlag, 'coin_collected');
 assert.equal(declaredTriggerEvent.payload.targetValue, true);
 assert.equal(declaredTriggerEvent.payload.flags.door_open, true);
+
+state = api.loadScene(hudScene);
+assert.equal(state.componentModel.counts.hudValue, 2);
+assert.equal(state.componentModel.counts.uiText, 1);
+assert.deepEqual(JSON.parse(JSON.stringify(state.componentModel.hudValues.map((hud) => ({
+  entityId: hud.entityId,
+  kind: hud.kind,
+  text: hud.text,
+  bindFlag: hud.bindFlag,
+  flagValue: hud.flagValue,
+})))), [
+  {
+    entityId: 'hud_goal',
+    kind: 'goal',
+    text: 'Goal: Collect coin',
+    bindFlag: 'coin_collected',
+    flagValue: false,
+  },
+  {
+    entityId: 'hud_health',
+    kind: 'health',
+    text: 'HP: 3/3',
+    bindFlag: 'player_alive',
+    flagValue: true,
+  },
+]);
