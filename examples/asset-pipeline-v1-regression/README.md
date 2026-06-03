@@ -27,7 +27,10 @@ exit:
 
 ```bash
 node examples/asset-pipeline-v1-regression/evidence-smoke.test.cjs
+node examples/asset-pipeline-v1-regression/dashboard-compatibility-smoke.test.cjs
 ```
+
+Coverage matrix documentation: `docs/scenario-coverage-v4-asset-pipeline.md`.
 
 Invalid manifests under `invalid/` are deliberate regression fixtures and should
 continue to fail with explicit Rust validation errors.
