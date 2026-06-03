@@ -955,7 +955,7 @@ const OuroforgeCockpit = (() => {
     const rows = artifacts.length ? artifacts.map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.id || 'artifact')}</strong> ${escapeText(artifact.kind || 'unknown')}<br><small>${escapeText(artifact.path || '')}</small></div>`).join('') : '<p class="empty">No generated artifacts recorded.</p>';
     return `<section id="loop-execution" class="panel"><h2>Authoring loop execution</h2>
       <p class="hint">Read-only execution evidence from the Rust CLI. The browser never executes loop steps, writes trusted state, applies mutations, or promotes regressions.</p>
-      <div class="surface-row"><strong>${escapeText(summary.loopId || 'unknown')}</strong> step <strong>${escapeText(summary.stepId || 'unknown')}</strong> ${surfaceState(summary.status === 'completed', summary.status || 'unknown')}<br><small>${escapeText(summary.kind || 'unknown')} · ledger ${escapeText(summary.ledgerPath || 'unrecorded')}</small></div>
+      <div class="surface-row"><strong>${escapeText(summary.loopId || 'unknown')}</strong> step <strong>${escapeText(summary.stepId || 'unknown')}</strong> ${surfaceState(Boolean(summary.status) && summary.status !== 'missing', summary.status || 'unknown')}<br><small>${escapeText(summary.kind || 'unknown')} · ledger ${escapeText(summary.ledgerPath || 'unrecorded')}</small></div>
       ${blocked.length ? `<div class="hint">Blocked by: ${escapeText(blocked.join(' · '))}</div>` : '<p class="hint">No blocked reasons reported.</p>'}
       ${rows}
       ${summary.boundary ? `<p class="hint">${escapeText(summary.boundary)}</p>` : ''}

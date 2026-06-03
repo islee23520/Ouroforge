@@ -507,6 +507,10 @@ assert.doesNotMatch(blockedLoopExecution, /gap \/ unavailable/);
 assert.doesNotMatch(blockedLoopExecution, /<blocked>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop execution/);
 assert.match(cockpit.renderLoopExecutionSurface({ summary: { id: 'run-no-loop' } }), /No loop execution summary/);
+// A non-completed loop execution status (e.g. blocked) must surface its actual label, not "gap / unavailable".
+const blockedExec = cockpit.renderLoopExecutionSurface({ loop_execution: { loopId: 'l', stepId: 's', status: 'blocked', kind: 'compare-runs' } });
+assert.doesNotMatch(blockedExec, /gap \/ unavailable/);
+assert.match(blockedExec, /status-ok">blocked</);
 assert.match(cockpit.renderLoopRecoverySurface(run), /Authoring loop recovery/);
 assert.match(cockpit.renderLoopRecoverySurface(run), /needs-recovery/);
 assert.match(cockpit.renderLoopRecoverySurface(run), /&lt;missing comparison&gt;/);

@@ -3087,6 +3087,21 @@ impl AuthoringLoopStep {
             ))?;
         }
         if let Some(recovery) = &self.recovery {
+            // Recovery metadata describes how to recover an interrupted step, so
+            // it is only coherent on a blocked or failed step. Rejecting it on
+            // pending/running/completed steps prevents a resumed step from being
+            // serialized as completed while still advertising stale recovery
+            // instructions (status updates clone the whole step and only change
+            // the status field).
+            if !matches!(
+                self.status,
+                AuthoringLoopStepStatus::Blocked | AuthoringLoopStepStatus::Failed
+            ) {
+                return Err(anyhow!(
+                    "authoring loop plan steps[{index}].recovery is only allowed on blocked or failed steps, found {:?}",
+                    self.status
+                ));
+            }
             recovery.validate(&format!("authoring loop plan steps[{index}].recovery"))?;
         }
         Ok(())
@@ -3280,11 +3295,17 @@ pub fn build_authoring_loop_status(
 ) -> Result<AuthoringLoopStatusSummary> {
     plan.validate_schema()?;
     let base_dir = base_dir.as_ref();
+    // Top-level prerequisites (project manifest, seed, scenario pack) gate every
+    // step, so include them in each step's missing list — otherwise status can
+    // report a pending step as executable while dry-run/resume would block on the
+    // missing global prerequisites.
+    let global_missing = dry_run_global_missing_prerequisites(plan, base_dir);
     let steps = plan
         .steps
         .iter()
         .map(|step| {
-            let missing = dry_run_missing_prerequisites(step, base_dir);
+            let mut missing = global_missing.clone();
+            missing.extend(dry_run_missing_prerequisites(step, base_dir));
             AuthoringLoopStatusStep {
                 id: step.id.clone(),
                 kind: step.kind.as_str().to_string(),
@@ -3357,6 +3378,19 @@ pub fn build_authoring_loop_resume_preflight(
         .ok_or_else(|| anyhow!("authoring loop plan step not found: {step_id}"))?;
     let mut blocked_reasons = dry_run_global_missing_prerequisites(plan, base_dir);
     blocked_reasons.extend(dry_run_missing_prerequisites(step, base_dir));
+    // A resume drives a pending->running transition, which plan validation
+    // rejects while any dependency is still incomplete. Surface that here so the
+    // preflight does not advertise a "ready" resume that the runner will reject.
+    for dependency in &step.depends_on {
+        if !plan.steps.iter().any(|candidate| {
+            candidate.id == *dependency
+                && candidate.status == AuthoringLoopStepStatus::Completed
+        }) {
+            blocked_reasons.push(format!(
+                "dependency {dependency} is not completed; resume would fail the running transition"
+            ));
+        }
+    }
     match step.status {
         AuthoringLoopStepStatus::Completed => blocked_reasons
             .push("step is already completed; resume would be a hidden rerun".to_string()),
@@ -3366,8 +3400,19 @@ pub fn build_authoring_loop_resume_preflight(
         _ => {}
     }
     if let Some(recovery) = &step.recovery {
-        if recovery.retryability == AuthoringLoopRetryability::NonRetryable {
-            blocked_reasons.push("recovery metadata marks this step non-retryable".to_string());
+        // Both non-retryable and manual-action-required recoveries must block a
+        // resume until the operator resolves them (clearing the recovery
+        // metadata once the manual action is complete); otherwise the preflight
+        // reports "ready" for a step that still requires manual intervention.
+        if matches!(
+            recovery.retryability,
+            AuthoringLoopRetryability::NonRetryable
+                | AuthoringLoopRetryability::ManualActionRequired
+        ) {
+            blocked_reasons.push(format!(
+                "recovery metadata marks this step {} before resume",
+                recovery.retryability.as_str()
+            ));
         }
         for rollback_ref in &recovery.rollback_refs {
             if !base_dir.join(&rollback_ref.path).exists() {
@@ -4267,6 +4312,9 @@ fn step_has_accepted_decision(
 fn json_value_contains_accepted_decision(value: &serde_json::Value, required_id: &str) -> bool {
     match value {
         serde_json::Value::Object(map) => {
+            // Require an explicit id equal to the required decision id. Treating a
+            // missing id as a match would let any nested `{status: "accepted"}`
+            // object authorize a promotion for an unapproved decision.
             let id_matches = map
                 .get("id")
                 .and_then(|value| value.as_str())
@@ -18283,6 +18331,8 @@ scenarios:
             "../../../examples/authoring-loop-plan-fixtures/valid/pending.json"
         ))
         .expect("pending plan validates");
+        // Recovery metadata is only valid on a blocked or failed step.
+        plan.steps[0].status = AuthoringLoopStepStatus::Failed;
         plan.steps[0].recovery = Some(AuthoringLoopStepRecovery {
             failure: AuthoringLoopFailureMetadata {
                 reason: "".to_string(),
@@ -18319,6 +18369,52 @@ scenarios:
             error.to_string().contains("argv must not be empty"),
             "{error:#}"
         );
+
+        // Recovery metadata is rejected on a non-blocked/failed step even when its
+        // own fields are valid.
+        plan.steps[0]
+            .recovery
+            .as_mut()
+            .expect("recovery present")
+            .resume_command
+            .as_mut()
+            .expect("resume command")
+            .argv = vec!["loop".to_string(), "resume".to_string()];
+        plan.steps[0].status = AuthoringLoopStepStatus::Pending;
+        let error = plan
+            .validate_schema()
+            .expect_err("recovery on pending step rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("only allowed on blocked or failed steps"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn accepted_decision_match_requires_explicit_matching_id() {
+        let required = "review-decision-1";
+        // Matching id plus an accepted state authorizes the decision.
+        assert!(json_value_contains_accepted_decision(
+            &json!({ "id": required, "state": "accepted" }),
+            required
+        ));
+        // An accepted state with no id must NOT be treated as a match.
+        assert!(!json_value_contains_accepted_decision(
+            &json!({ "status": "accepted" }),
+            required
+        ));
+        // An accepted state with a different id must not match.
+        assert!(!json_value_contains_accepted_decision(
+            &json!({ "id": "other", "decisionStatus": "accepted" }),
+            required
+        ));
+        // A nested accepted decision carrying the matching id still matches.
+        assert!(json_value_contains_accepted_decision(
+            &json!({ "decisions": [{ "id": required, "state": "accepted" }] }),
+            required
+        ));
     }
 
     #[test]
@@ -18372,6 +18468,12 @@ scenarios:
             .blocked_reasons
             .iter()
             .any(|reason| reason.contains("missing artifact")));
+        // A manual-action-required recovery must itself block the resume until the
+        // operator resolves it, independent of any missing artifact.
+        assert!(preflight
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("manual-action-required")));
         assert!(preflight.boundary.contains("does not execute"));
 
         fs::remove_dir_all(root).ok();
