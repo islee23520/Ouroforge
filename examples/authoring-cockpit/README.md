@@ -148,6 +148,11 @@ When exported dashboard data includes `loop_recovery` or `loop_status`, the cock
 
 When exported dashboard data includes `loop_evidence_bundles`, the cockpit displays bundle status, artifact counts, step states, and missing refs as escaped read-only evidence. The browser never writes bundle data, packages artifacts, executes commands, repairs references, applies mutations, or promotes regressions. See `../../docs/authoring-loop-evidence-bundle-v1.md`.
 
+
+## Studio Loop Cockpit v1
+
+When exported dashboard data includes `loop_cockpit`, the cockpit displays a static Loop Cockpit panel with the loop plan/status timeline, current step, blockers, required decisions, next safe action, inert allowed command text, forbidden actions, evidence refs, missing bundle refs, and trust-boundary notices. Missing or malformed cockpit data is shown as an empty/warning state. The browser never executes loop commands, writes files, resumes loops, applies mutations, promotes regressions, repairs references, or merges changes; all trusted actions remain Rust CLI/manual terminal actions.
+
 ## Agent Handoff Contract v1
 
 When exported dashboard data includes `agent_handoffs`, the cockpit displays a read-only Handoff Studio surface with the next safe action, blockers, required decisions, inert allowed command text, forbidden actions, evidence refs, guardrails, and boundary. The browser never creates command buttons, executes handoff commands, grants authority, applies mutations, repairs references, or merges changes. See `../../docs/agent-handoff-contract-v1.md`.

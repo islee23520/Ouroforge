@@ -117,7 +117,7 @@ worker screenshots, console logs, performance metrics, and CDP trace summaries.
 The dashboard displays metadata produced by Rust/openchrome CDP workers, including
 `worker_id`, `worker_session_id`, `run_id`, `execution_boundary`, and
 `cdp_transport`; it does not compute browser-side comparisons, rerun workers,
-write files, or execute commands. Agent handoffs exported as `agent_handoffs` are rendered as escaped read-only evidence; the dashboard displays allowed command text but never creates command buttons, executes commands, grants authority, applies mutations, or merges changes. Remove generated `dashboard-data.json` before
+write files, or execute commands. Agent handoffs exported as `agent_handoffs` and the normalized Studio loop cockpit read-model exported as `loop_cockpit` are rendered as escaped read-only evidence; command and next-action text remains inert and never becomes a browser command button, command bridge, write path, apply/promote/merge control, or authority grant. Remove generated `dashboard-data.json` before
 committing. See `docs/openchrome-cdp-evidence-fidelity-v2.md`.
 
 
