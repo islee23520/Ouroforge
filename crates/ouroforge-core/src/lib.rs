@@ -10230,6 +10230,8 @@ pub struct PatchDraftArtifact {
 }
 
 pub const VISUAL_EDIT_DRAFT_SCHEMA_VERSION: &str = "visual-edit-draft-v1";
+pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS: usize = 128;
+pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS: u32 = 4096;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -10405,6 +10407,18 @@ pub struct VisualEditTilemapDraftOperation {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct VisualEditTilemapDraftPreflight {
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub kind: VisualEditTilemapDraftOperationKind,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    #[serde(rename = "affectedCells")]
+    pub affected_cells: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct VisualEditDraftAuthor {
     #[serde(rename = "type")]
     pub author_type: VisualEditDraftAuthorType,
@@ -10537,6 +10551,86 @@ impl VisualEditDraftArtifact {
             .map(|edit| preview_scene_edit_transaction(scene_path, edit))
             .collect()
     }
+
+    pub fn validate_tilemap_preflight(
+        &self,
+        tilemap_asset_id: &str,
+        tilemap: &ProjectTilemapManifest,
+        tileset: &ProjectTilesetManifest,
+        observed_hash: &ProjectAssetContentHash,
+    ) -> Result<Vec<VisualEditTilemapDraftPreflight>> {
+        self.validate()?;
+        if self.target.target_type != VisualEditDraftTargetType::Tilemap {
+            return Err(anyhow!(
+                "visual edit tilemap draft preflight requires target type tilemap"
+            ));
+        }
+        if let Some(target_id) = &self.target.id {
+            if target_id != tilemap_asset_id {
+                return Err(anyhow!(
+                    "visual edit tilemap draft target id mismatch: expected {}, found {}",
+                    target_id,
+                    tilemap_asset_id
+                ));
+            }
+        }
+        tilemap
+            .validate_schema("visual edit tilemap draft target.tilemap")
+            .context("visual edit tilemap draft target tilemap schema is invalid")?;
+        tilemap
+            .validate_integrity(tilemap_asset_id, tileset)
+            .context("visual edit tilemap draft target tilemap integrity is invalid")?;
+        let (expected_algorithm, expected_before_hash) =
+            parse_visual_edit_draft_hash("visual edit draft beforeHash", &self.before_hash)?;
+        if observed_hash.algorithm != expected_algorithm
+            || observed_hash.value != expected_before_hash
+        {
+            return Err(anyhow!(
+                "visual edit tilemap draft beforeHash mismatch: expected {}:{}, found {}:{}",
+                expected_algorithm,
+                expected_before_hash,
+                observed_hash.algorithm,
+                observed_hash.value
+            ));
+        }
+        if self.proposed_operations.len() > VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS {
+            return Err(anyhow!(
+                "visual edit tilemap draft proposedOperations exceeds limit of {}",
+                VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS
+            ));
+        }
+
+        let layers_by_id: BTreeMap<&str, &ProjectTilemapLayer> = tilemap
+            .layers
+            .iter()
+            .map(|layer| (layer.id.as_str(), layer))
+            .collect();
+        let tiles_by_id = tileset.tiles_by_id();
+        let mut preflights = Vec::new();
+        for operation in &self.proposed_operations {
+            let Some(tilemap_operation) = &operation.tilemap_operation else {
+                return Err(anyhow!(
+                    "visual edit tilemap draft operation {} requires tilemapOperation",
+                    operation.id
+                ));
+            };
+            if operation.scene_operation.is_some() {
+                return Err(anyhow!(
+                    "visual edit tilemap draft operation {} must not include sceneOperation",
+                    operation.id
+                ));
+            }
+            let affected_cells =
+                tilemap_operation.validate_preflight(tilemap, &layers_by_id, &tiles_by_id)?;
+            preflights.push(VisualEditTilemapDraftPreflight {
+                operation_id: operation.id.clone(),
+                kind: tilemap_operation.kind.clone(),
+                layer_id: tilemap_operation.layer_id.clone(),
+                affected_cells,
+            });
+        }
+        Ok(preflights)
+    }
 }
 
 impl VisualEditDraftTarget {
@@ -10598,6 +10692,162 @@ impl VisualEditTilemapDraftOperation {
         }
         Ok(())
     }
+
+    fn validate_preflight(
+        &self,
+        tilemap: &ProjectTilemapManifest,
+        layers_by_id: &BTreeMap<&str, &ProjectTilemapLayer>,
+        tiles_by_id: &BTreeMap<&str, &ProjectTilesetTile>,
+    ) -> Result<u32> {
+        self.validate()?;
+        layers_by_id.get(self.layer_id.as_str()).ok_or_else(|| {
+            anyhow!(
+                "visual edit tilemap draft layerId references unknown layer: {}",
+                self.layer_id
+            )
+        })?;
+        if let Some(tileset_asset_id) = &self.tileset_asset_id {
+            if tileset_asset_id != &tilemap.tileset_asset_id {
+                return Err(anyhow!(
+                    "visual edit tilemap draft tilesetAssetId mismatch: expected {}, found {}",
+                    tilemap.tileset_asset_id,
+                    tileset_asset_id
+                ));
+            }
+        }
+
+        match self.kind {
+            VisualEditTilemapDraftOperationKind::TileSet
+            | VisualEditTilemapDraftOperationKind::CollisionPreview
+            | VisualEditTilemapDraftOperationKind::TriggerPreview => {
+                self.require_point_in_bounds(tilemap)?;
+                self.require_known_tile(tiles_by_id)?;
+                Ok(1)
+            }
+            VisualEditTilemapDraftOperationKind::TileRemove => {
+                self.require_point_in_bounds(tilemap)?;
+                if let Some(tile_id) = &self.tile_id {
+                    require_known_tile_id(tile_id, tiles_by_id)?;
+                }
+                Ok(1)
+            }
+            VisualEditTilemapDraftOperationKind::RectangleFill => {
+                self.require_known_tile(tiles_by_id)?;
+                self.require_rectangle_in_bounds(tilemap)
+            }
+            VisualEditTilemapDraftOperationKind::LayerVisibilityChange => {
+                self.visible.ok_or_else(|| {
+                    anyhow!("visual edit tilemap draft layer visibility change requires visible")
+                })?;
+                Ok(0)
+            }
+            VisualEditTilemapDraftOperationKind::LayerConfigChange => {
+                if self.metadata.is_empty() {
+                    return Err(anyhow!(
+                        "visual edit tilemap draft layer config change requires metadata"
+                    ));
+                }
+                Ok(0)
+            }
+            VisualEditTilemapDraftOperationKind::TilePropertyReferenceChange => {
+                self.require_known_tile(tiles_by_id)?;
+                if self.metadata.is_empty() {
+                    return Err(anyhow!(
+                        "visual edit tilemap draft tile property reference change requires metadata"
+                    ));
+                }
+                Ok(0)
+            }
+        }
+    }
+
+    fn require_point_in_bounds(&self, tilemap: &ProjectTilemapManifest) -> Result<()> {
+        let x = self.x.ok_or_else(|| {
+            anyhow!(
+                "visual edit tilemap draft operation {:?} requires x",
+                self.kind
+            )
+        })?;
+        let y = self.y.ok_or_else(|| {
+            anyhow!(
+                "visual edit tilemap draft operation {:?} requires y",
+                self.kind
+            )
+        })?;
+        if x >= tilemap.width || y >= tilemap.height {
+            return Err(anyhow!(
+                "visual edit tilemap draft coordinates ({x},{y}) are outside tilemap bounds {}x{}",
+                tilemap.width,
+                tilemap.height
+            ));
+        }
+        Ok(())
+    }
+
+    fn require_rectangle_in_bounds(&self, tilemap: &ProjectTilemapManifest) -> Result<u32> {
+        let x = self
+            .x
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle fill requires x"))?;
+        let y = self
+            .y
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle fill requires y"))?;
+        let width = self
+            .width
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle fill requires width"))?;
+        let height = self
+            .height
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle fill requires height"))?;
+        if width == 0 || height == 0 {
+            return Err(anyhow!(
+                "visual edit tilemap draft rectangle width and height must be greater than zero"
+            ));
+        }
+        let end_x = x
+            .checked_add(width)
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle x + width overflows"))?;
+        let end_y = y
+            .checked_add(height)
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle y + height overflows"))?;
+        if end_x > tilemap.width || end_y > tilemap.height {
+            return Err(anyhow!(
+                "visual edit tilemap draft rectangle ({x},{y},{width},{height}) is outside tilemap bounds {}x{}",
+                tilemap.width,
+                tilemap.height
+            ));
+        }
+        let area = width
+            .checked_mul(height)
+            .ok_or_else(|| anyhow!("visual edit tilemap draft rectangle cell count overflows"))?;
+        if area > VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS {
+            return Err(anyhow!(
+                "visual edit tilemap draft rectangle affects {area} cells, above limit {}",
+                VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS
+            ));
+        }
+        Ok(area)
+    }
+
+    fn require_known_tile(&self, tiles_by_id: &BTreeMap<&str, &ProjectTilesetTile>) -> Result<()> {
+        let tile_id = self.tile_id.as_ref().ok_or_else(|| {
+            anyhow!(
+                "visual edit tilemap draft operation {:?} requires tileId",
+                self.kind
+            )
+        })?;
+        require_known_tile_id(tile_id, tiles_by_id)
+    }
+}
+
+fn require_known_tile_id(
+    tile_id: &str,
+    tiles_by_id: &BTreeMap<&str, &ProjectTilesetTile>,
+) -> Result<()> {
+    if !tiles_by_id.contains_key(tile_id) {
+        return Err(anyhow!(
+            "visual edit tilemap draft tileId references unknown tile: {tile_id}"
+        ));
+    }
+    Ok(())
 }
 
 impl VisualEditSceneDraftOperation {
@@ -10695,8 +10945,20 @@ fn parse_visual_edit_draft_hash(field: &str, value: &str) -> Result<(String, Str
             "{field} must use fnv1a64-canonical-json-v1:<16 lowercase hex>"
         ));
     }
+    if let Some(hash) = value.strip_prefix("fnv1a64-file-v1:") {
+        if hash.len() == 16
+            && hash
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, 'a'..='f'))
+        {
+            return Ok(("fnv1a64-file-v1".to_string(), hash.to_string()));
+        }
+        return Err(anyhow!(
+            "{field} must use fnv1a64-file-v1:<16 lowercase hex>"
+        ));
+    }
     Err(anyhow!(
-        "{field} must use sha256:<64 lowercase hex> or fnv1a64-canonical-json-v1:<16 lowercase hex>"
+        "{field} must use sha256:<64 lowercase hex>, fnv1a64-canonical-json-v1:<16 lowercase hex>, or fnv1a64-file-v1:<16 lowercase hex>"
     ))
 }
 
@@ -23474,6 +23736,135 @@ scenarios:
         let round_trip: VisualEditDraftArtifact =
             serde_json::from_str(&serialized).expect("serialized catalog parses");
         assert_eq!(round_trip, draft);
+    }
+
+    fn tilemap_authoring_fixture_parts() -> (
+        ProjectAssetManifestEntry,
+        ProjectTilemapManifest,
+        ProjectTilesetManifest,
+        ProjectAssetContentHash,
+    ) {
+        let fixture =
+            include_str!("../../../examples/tilemap-authoring-v2/asset-manifest.valid.json");
+        let manifest =
+            ProjectAssetManifest::from_json_str(fixture).expect("tilemap manifest fixture parses");
+        let tilemap_asset = manifest
+            .assets
+            .iter()
+            .find(|asset| asset.id == "demo_tilemap")
+            .expect("demo tilemap asset")
+            .clone();
+        let tileset = manifest
+            .assets
+            .iter()
+            .find(|asset| asset.id == "ground_tileset")
+            .and_then(|asset| asset.tileset.clone())
+            .expect("ground tileset payload");
+        let tilemap = tilemap_asset.tilemap.clone().expect("demo tilemap payload");
+        let hash = tilemap_asset.content_hash.clone();
+        (tilemap_asset, tilemap, tileset, hash)
+    }
+
+    fn valid_tilemap_visual_edit_draft_for_fixture() -> VisualEditDraftArtifact {
+        let (tilemap_asset, _tilemap, _tileset, hash) = tilemap_authoring_fixture_parts();
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&read_visual_edit_draft_fixture(
+                "examples/visual-edit-draft-v1/valid/tilemap-operations.visual-edit-draft.json",
+            ))
+            .expect("tilemap operation catalog parses");
+        draft.target.path = tilemap_asset.path;
+        draft.target.id = Some(tilemap_asset.id);
+        draft.before_hash = format!("{}:{}", hash.algorithm, hash.value);
+        draft
+    }
+
+    #[test]
+    fn visual_edit_tilemap_draft_v1_preflights_bounds_layers_tiles_and_hash_without_writes() {
+        let (tilemap_asset, tilemap, tileset, hash) = tilemap_authoring_fixture_parts();
+        let draft = valid_tilemap_visual_edit_draft_for_fixture();
+
+        let preflight = draft
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect("tilemap draft preflights");
+
+        assert_eq!(preflight.len(), 8);
+        assert_eq!(preflight[0].operation_id, "op-set-tile");
+        assert_eq!(preflight[0].affected_cells, 1);
+        assert_eq!(
+            preflight[2].kind,
+            VisualEditTilemapDraftOperationKind::RectangleFill
+        );
+        assert_eq!(preflight[2].affected_cells, 3);
+        assert_eq!(tilemap.layers[0].data[1].as_deref(), Some("empty"));
+    }
+
+    #[test]
+    fn visual_edit_tilemap_draft_v1_rejects_stale_hash_unknown_refs_and_bounds() {
+        let (tilemap_asset, tilemap, tileset, hash) = tilemap_authoring_fixture_parts();
+
+        let mut stale = valid_tilemap_visual_edit_draft_for_fixture();
+        stale.before_hash = "fnv1a64-file-v1:9999999999999999".to_string();
+        let error = stale
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect_err("stale hash fails");
+        assert!(error.to_string().contains("beforeHash mismatch"));
+
+        let mut missing_layer = valid_tilemap_visual_edit_draft_for_fixture();
+        missing_layer.proposed_operations[0]
+            .tilemap_operation
+            .as_mut()
+            .expect("tilemap operation")
+            .layer_id = "missing_layer".to_string();
+        let error = missing_layer
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect_err("missing layer fails");
+        assert!(error.to_string().contains("unknown layer"));
+
+        let mut unknown_tile = valid_tilemap_visual_edit_draft_for_fixture();
+        unknown_tile.proposed_operations[0]
+            .tilemap_operation
+            .as_mut()
+            .expect("tilemap operation")
+            .tile_id = Some("missing_tile".to_string());
+        let error = unknown_tile
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect_err("unknown tile fails");
+        assert!(error.to_string().contains("unknown tile"));
+
+        let mut outside_bounds = valid_tilemap_visual_edit_draft_for_fixture();
+        outside_bounds.proposed_operations[0]
+            .tilemap_operation
+            .as_mut()
+            .expect("tilemap operation")
+            .x = Some(tilemap.width);
+        let error = outside_bounds
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect_err("outside bounds fails");
+        assert!(error.to_string().contains("outside tilemap bounds"));
+
+        let mut oversized_tilemap = tilemap.clone();
+        oversized_tilemap.width = VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS + 1;
+        oversized_tilemap.height = 1;
+        oversized_tilemap.layers = vec![ProjectTilemapLayer {
+            id: "terrain".to_string(),
+            kind: ProjectTilemapLayerKind::Visual,
+            data: vec![None; oversized_tilemap.width as usize],
+            metadata: BTreeMap::new(),
+        }];
+        let mut oversized_rect = valid_tilemap_visual_edit_draft_for_fixture();
+        oversized_rect.proposed_operations = vec![oversized_rect.proposed_operations[2].clone()];
+        let rect = oversized_rect.proposed_operations[0]
+            .tilemap_operation
+            .as_mut()
+            .expect("rectangle operation");
+        rect.x = Some(0);
+        rect.y = Some(0);
+        rect.width = Some(VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS + 1);
+        rect.height = Some(1);
+        let error = oversized_rect
+            .validate_tilemap_preflight(&tilemap_asset.id, &oversized_tilemap, &tileset, &hash)
+            .expect_err("oversized rectangle fails");
+        assert!(error.to_string().contains("above limit"));
     }
 
     #[test]
