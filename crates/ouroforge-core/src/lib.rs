@@ -2028,6 +2028,54 @@ pub struct AuthoringLoopGeneratedArtifact {
     pub kind: String,
 }
 
+pub const AUTHORING_LOOP_STATUS_SCHEMA_VERSION: &str = "authoring-loop-status-v1";
+pub const AUTHORING_LOOP_RESUME_PREFLIGHT_SCHEMA_VERSION: &str =
+    "authoring-loop-resume-preflight-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopStatusSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    pub status: String,
+    pub steps: Vec<AuthoringLoopStatusStep>,
+    #[serde(rename = "nextSafeAction")]
+    pub next_safe_action: String,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopStatusStep {
+    pub id: String,
+    pub kind: String,
+    pub status: String,
+    pub recovery: Option<AuthoringLoopStepRecovery>,
+    #[serde(rename = "missingPrerequisites")]
+    pub missing_prerequisites: Vec<String>,
+    #[serde(rename = "nextSafeAction")]
+    pub next_safe_action: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopResumePreflight {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub status: String,
+    pub retryability: String,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "requiredManualAction")]
+    pub required_manual_action: Option<AuthoringLoopManualAction>,
+    #[serde(rename = "resumeCommand")]
+    pub resume_command: AuthoringLoopResumeCommandContext,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AuthoringLoopArtifactRef {
@@ -2488,6 +2536,16 @@ impl AuthoringLoopResumeCommandContext {
     }
 }
 
+impl AuthoringLoopRetryability {
+    fn as_str(self) -> &'static str {
+        match self {
+            AuthoringLoopRetryability::Retryable => "retryable",
+            AuthoringLoopRetryability::NonRetryable => "non-retryable",
+            AuthoringLoopRetryability::ManualActionRequired => "manual-action-required",
+        }
+    }
+}
+
 impl AuthoringLoopArtifactRef {
     fn validate(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field} id"), &self.id)?;
@@ -2591,6 +2649,167 @@ pub fn build_authoring_loop_dry_run_summary_from_path(
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     build_authoring_loop_dry_run_summary_with_base(&plan, base_dir)
+}
+
+pub fn build_authoring_loop_status_from_path(
+    plan_path: impl AsRef<Path>,
+) -> Result<AuthoringLoopStatusSummary> {
+    let plan_path = plan_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    build_authoring_loop_status(&plan, base_dir)
+}
+
+pub fn build_authoring_loop_status(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+) -> Result<AuthoringLoopStatusSummary> {
+    plan.validate_schema()?;
+    let base_dir = base_dir.as_ref();
+    let steps = plan
+        .steps
+        .iter()
+        .map(|step| {
+            let missing = dry_run_missing_prerequisites(step, base_dir);
+            AuthoringLoopStatusStep {
+                id: step.id.clone(),
+                kind: step.kind.as_str().to_string(),
+                status: step.status.as_str().to_string(),
+                recovery: step.recovery.clone(),
+                next_safe_action: next_safe_action_for_step(step, &missing),
+                missing_prerequisites: missing,
+            }
+        })
+        .collect::<Vec<_>>();
+    let status = if steps
+        .iter()
+        .any(|step| matches!(step.status.as_str(), "failed" | "blocked"))
+    {
+        "needs-recovery"
+    } else if steps.iter().all(|step| step.status == "completed") {
+        "completed"
+    } else {
+        "in-progress"
+    };
+    let next_safe_action = steps
+        .iter()
+        .find(|step| matches!(step.status.as_str(), "failed" | "blocked" | "pending"))
+        .map(|step| step.next_safe_action.clone())
+        .unwrap_or_else(|| "No pending recovery action; loop is complete.".to_string());
+    Ok(AuthoringLoopStatusSummary {
+        schema_version: AUTHORING_LOOP_STATUS_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        status: status.to_string(),
+        steps,
+        next_safe_action,
+        boundary: "Status is read-only inspection; it does not execute, retry, apply mutations, promote regressions, or write trusted state.".to_string(),
+    })
+}
+
+pub fn build_authoring_loop_resume_preflight_from_path(
+    plan_path: impl AsRef<Path>,
+    step_id: &str,
+) -> Result<AuthoringLoopResumePreflight> {
+    let plan_path = plan_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    build_authoring_loop_resume_preflight(&plan, base_dir, plan_path, step_id)
+}
+
+pub fn build_authoring_loop_resume_preflight(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+    plan_path: impl AsRef<Path>,
+    step_id: &str,
+) -> Result<AuthoringLoopResumePreflight> {
+    plan.validate_schema()?;
+    validate_path_component("authoring loop step id", step_id)?;
+    let base_dir = base_dir.as_ref();
+    let plan_path = plan_path.as_ref();
+    let step = plan
+        .steps
+        .iter()
+        .find(|step| step.id == step_id)
+        .ok_or_else(|| anyhow!("authoring loop plan step not found: {step_id}"))?;
+    let mut blocked_reasons = dry_run_global_missing_prerequisites(plan, base_dir);
+    blocked_reasons.extend(dry_run_missing_prerequisites(step, base_dir));
+    match step.status {
+        AuthoringLoopStepStatus::Completed => blocked_reasons
+            .push("step is already completed; resume would be a hidden rerun".to_string()),
+        AuthoringLoopStepStatus::Running => blocked_reasons.push(
+            "step is still marked running; inspect or mark failure before resume".to_string(),
+        ),
+        _ => {}
+    }
+    if let Some(recovery) = &step.recovery {
+        if recovery.retryability == AuthoringLoopRetryability::NonRetryable {
+            blocked_reasons.push("recovery metadata marks this step non-retryable".to_string());
+        }
+        for rollback_ref in &recovery.rollback_refs {
+            if !base_dir.join(&rollback_ref.path).exists() {
+                blocked_reasons.push(format!(
+                    "missing recovery rollback:{}:{}",
+                    rollback_ref.id, rollback_ref.path
+                ));
+            }
+        }
+        for evidence_ref in &recovery.evidence_refs {
+            if !base_dir.join(&evidence_ref.path).exists() {
+                blocked_reasons.push(format!(
+                    "missing recovery evidence:{}:{}",
+                    evidence_ref.id, evidence_ref.path
+                ));
+            }
+        }
+    }
+    let retryability = step
+        .recovery
+        .as_ref()
+        .map(|recovery| recovery.retryability.as_str().to_string())
+        .unwrap_or_else(|| "retryable".to_string());
+    let status = if blocked_reasons.is_empty() {
+        "ready"
+    } else {
+        "blocked"
+    };
+    Ok(AuthoringLoopResumePreflight {
+        schema_version: AUTHORING_LOOP_RESUME_PREFLIGHT_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        step_id: step.id.clone(),
+        status: status.to_string(),
+        retryability,
+        blocked_reasons,
+        required_manual_action: step
+            .recovery
+            .as_ref()
+            .map(|recovery| recovery.manual_action.clone()),
+        resume_command: step
+            .recovery
+            .as_ref()
+            .and_then(|recovery| recovery.resume_command.clone())
+            .unwrap_or_else(|| default_resume_command(plan_path, &step.id)),
+        boundary: "Resume preflight is explicit CLI inspection only; it does not execute, retry, apply mutations, promote regressions, or write trusted state.".to_string(),
+    })
 }
 
 pub fn execute_authoring_loop_step_from_path(
@@ -2966,6 +3185,76 @@ fn dry_run_prerequisites(step: &AuthoringLoopStep) -> Vec<String> {
             .map(|decision| format!("decision:{}:{}", decision.id, decision.kind.as_str())),
     );
     prerequisites
+}
+
+fn next_safe_action_for_step(step: &AuthoringLoopStep, missing: &[String]) -> String {
+    if let Some(recovery) = &step.recovery {
+        if recovery.retryability == AuthoringLoopRetryability::NonRetryable {
+            return format!(
+                "Do not resume automatically; {}",
+                recovery.manual_action.description
+            );
+        }
+        if !missing.is_empty() {
+            return format!(
+                "Resolve missing prerequisites before resume: {}",
+                missing.join(" · ")
+            );
+        }
+        return recovery
+            .resume_command
+            .as_ref()
+            .map(|command| format!("Resume preflight can inspect `{}`.", command.command))
+            .unwrap_or_else(|| {
+                format!(
+                    "Run explicit resume preflight for step `{}` before any execution.",
+                    step.id
+                )
+            });
+    }
+    if !missing.is_empty() {
+        return format!(
+            "Resolve missing prerequisites before step execution: {}",
+            missing.join(" · ")
+        );
+    }
+    match step.status {
+        AuthoringLoopStepStatus::Completed => "No action needed; step is complete.".to_string(),
+        AuthoringLoopStepStatus::Running => {
+            "Inspect running state before resume; no hidden retry is allowed.".to_string()
+        }
+        AuthoringLoopStepStatus::Failed | AuthoringLoopStepStatus::Blocked => {
+            "Add recovery metadata or run explicit resume preflight before retry.".to_string()
+        }
+        AuthoringLoopStepStatus::Pending => {
+            format!(
+                "Step `{}` is pending and can be explicitly executed.",
+                step.id
+            )
+        }
+    }
+}
+
+fn default_resume_command(plan_path: &Path, step_id: &str) -> AuthoringLoopResumeCommandContext {
+    let plan = plan_path.display().to_string();
+    AuthoringLoopResumeCommandContext {
+        command: format!("cargo run -p ouroforge-cli -- loop resume {plan} --step {step_id}"),
+        argv: vec![
+            "cargo".to_string(),
+            "run".to_string(),
+            "-p".to_string(),
+            "ouroforge-cli".to_string(),
+            "--".to_string(),
+            "loop".to_string(),
+            "resume".to_string(),
+            plan,
+            "--step".to_string(),
+            step_id.to_string(),
+        ],
+        boundary:
+            "explicit CLI-only resume preflight; browser surfaces may display but not execute"
+                .to_string(),
+    }
 }
 
 fn execute_authoring_loop_run_step(
@@ -17209,6 +17498,88 @@ scenarios:
             error.to_string().contains("argv must not be empty"),
             "{error:#}"
         );
+    }
+
+    #[test]
+    fn loop_recovery_status_and_resume_preflight_report_next_safe_action() {
+        let root = unique_temp_dir("loop-recovery-status");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        let mut plan = read_loop_plan_from_path(&plan_path);
+        plan.steps[1].status = AuthoringLoopStepStatus::Blocked;
+        plan.steps[1].status_transition = Some(AuthoringLoopStatusTransition {
+            from: AuthoringLoopStepStatus::Pending,
+            to: AuthoringLoopStepStatus::Blocked,
+        });
+        plan.steps[1].recovery = Some(AuthoringLoopStepRecovery {
+            failure: AuthoringLoopFailureMetadata {
+                reason: "comparison artifact is missing".to_string(),
+                category: Some(AuthoringLoopFailureCategory::MissingPrerequisite),
+                detail: None,
+            },
+            retryability: AuthoringLoopRetryability::ManualActionRequired,
+            manual_action: AuthoringLoopManualAction {
+                kind: AuthoringLoopManualActionKind::RepairMissingArtifact,
+                description: "Regenerate the comparison artifact before resume.".to_string(),
+            },
+            rollback_refs: Vec::new(),
+            evidence_refs: Vec::new(),
+            resume_command: None,
+        });
+        write_json(&plan_path, &json!(plan)).expect("recovery plan writes");
+
+        let status = build_authoring_loop_status_from_path(&plan_path).expect("status builds");
+        assert_eq!(status.schema_version, AUTHORING_LOOP_STATUS_SCHEMA_VERSION);
+        assert_eq!(status.status, "needs-recovery");
+        assert!(status
+            .steps
+            .iter()
+            .find(|step| step.id == "compare-runs")
+            .expect("compare status")
+            .next_safe_action
+            .contains("Resolve missing prerequisites"));
+        assert!(status.boundary.contains("read-only inspection"));
+
+        let preflight = build_authoring_loop_resume_preflight_from_path(&plan_path, "compare-runs")
+            .expect("resume preflight builds");
+        assert_eq!(
+            preflight.schema_version,
+            AUTHORING_LOOP_RESUME_PREFLIGHT_SCHEMA_VERSION
+        );
+        assert_eq!(preflight.status, "blocked");
+        assert!(preflight
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("missing artifact")));
+        assert!(preflight.boundary.contains("does not execute"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn loop_recovery_resume_preflight_allows_ready_pending_step_without_execution() {
+        let root = unique_temp_dir("loop-recovery-ready");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        for path in ["runs/baseline/run.json"] {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
+            fs::write(path, "{}\n").expect("artifact");
+        }
+
+        let preflight = build_authoring_loop_resume_preflight_from_path(&plan_path, "compare-runs")
+            .expect("resume preflight builds");
+        assert_eq!(preflight.status, "ready");
+        assert!(preflight.blocked_reasons.is_empty());
+        assert!(preflight.resume_command.command.contains("loop resume"));
+        assert!(
+            !root
+                .join("runs/authoring-loop-ledgers/temp-loop/ledger.jsonl")
+                .exists(),
+            "resume preflight must not execute or write loop ledgers"
+        );
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]

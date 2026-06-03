@@ -5,6 +5,7 @@ use ouroforge_core::{
     append_mutation_review_decision_for_proposal_from_path, apply_patch_sandbox_from_path,
     apply_scene_only_mutation_operation, bind_run_command_context, bind_run_project_metadata,
     bind_run_transaction_provenance, build_authoring_loop_dry_run_summary_from_path,
+    build_authoring_loop_resume_preflight_from_path, build_authoring_loop_status_from_path,
     build_regression_promotion_draft_from_run, build_regression_run_matrix,
     create_minimal_2d_project_scaffold, create_mutation_proposal, create_run, edit_scene,
     evaluate_run, evolve_run, execute_authoring_loop_step_from_path, hash_project_manifest_file,
@@ -108,6 +109,14 @@ enum Commands {
 enum LoopCommand {
     DryRun {
         plan_path: PathBuf,
+    },
+    Status {
+        plan_path: PathBuf,
+    },
+    Resume {
+        plan_path: PathBuf,
+        #[arg(long)]
+        step: String,
     },
     Step {
         plan_path: PathBuf,
@@ -357,6 +366,18 @@ fn main() -> Result<()> {
             command: LoopCommand::DryRun { plan_path },
         } => {
             let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::Loop {
+            command: LoopCommand::Status { plan_path },
+        } => {
+            let summary = build_authoring_loop_status_from_path(&plan_path)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::Loop {
+            command: LoopCommand::Resume { plan_path, step },
+        } => {
+            let summary = build_authoring_loop_resume_preflight_from_path(&plan_path, &step)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Commands::Loop {
