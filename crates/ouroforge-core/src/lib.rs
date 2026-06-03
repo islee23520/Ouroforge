@@ -350,6 +350,9 @@ pub enum ScenarioAssertion {
     RuntimeEvents {
         runtime_events: JsonPathAssertion,
     },
+    PhysicsEvidence {
+        physics_evidence: JsonPathAssertion,
+    },
     PerformanceMetrics {
         performance_metrics: JsonPathAssertion,
     },
@@ -1208,6 +1211,9 @@ fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<Sce
         }),
         "runtime_events" => Ok(ScenarioAssertion::RuntimeEvents {
             runtime_events: json_path_assertion,
+        }),
+        "physics_evidence" => Ok(ScenarioAssertion::PhysicsEvidence {
+            physics_evidence: json_path_assertion,
         }),
         "performance_metrics" => Ok(ScenarioAssertion::PerformanceMetrics {
             performance_metrics: json_path_assertion,
@@ -5827,6 +5833,7 @@ impl ScenarioAssertion {
             ScenarioAssertion::WorldState { world_state } => world_state,
             ScenarioAssertion::FrameStats { frame_stats } => frame_stats,
             ScenarioAssertion::RuntimeEvents { runtime_events } => runtime_events,
+            ScenarioAssertion::PhysicsEvidence { physics_evidence } => physics_evidence,
             ScenarioAssertion::PerformanceMetrics {
                 performance_metrics,
             } => performance_metrics,
@@ -12227,6 +12234,27 @@ fn run_scenario<T: CdpTransport>(
         unix_millis()?,
         &frame_stats,
     )?;
+    let mut runtime_event_paths = Vec::new();
+    let runtime_event_source = match evaluate_runtime_probe_object(
+        client,
+        "getEvents",
+        "({ events: window.__OUROFORGE__.getEvents() })",
+    ) {
+        Ok(value) => {
+            let path = write_scenario_json_artifact(
+                config,
+                scenario,
+                &scenario_dir,
+                "runtime-events",
+                "runtime_events",
+                unix_millis()?,
+                &value,
+            )?;
+            runtime_event_paths.push(path);
+            value
+        }
+        Err(_) => json!({ "events": [] }),
+    };
     let mut console_paths = Vec::new();
     let mut performance_paths = Vec::new();
     let mut trace_paths = Vec::new();
@@ -12307,10 +12335,18 @@ fn run_scenario<T: CdpTransport>(
         "steps": &scenario.steps,
         "stepCount": scenario.steps.len(),
         "inputReplays": &replay_paths,
-        "snapshots": &snapshot_paths
+        "snapshots": &snapshot_paths,
+        "events": runtime_event_source
+            .get("events")
+            .cloned()
+            .unwrap_or_else(|| json!([]))
     });
     let collision_source = world_state
         .get("collisions")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let physics_source = world_state
+        .get("physics")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
     // The runtime exposes audio under `audioEvents` and animation per-entity
@@ -12337,7 +12373,13 @@ fn run_scenario<T: CdpTransport>(
         },
         runtime_events: AssertionSource {
             value: &runtime_events,
-            evidence_ref: &trace_path,
+            evidence_ref: runtime_event_paths
+                .first()
+                .map_or(trace_path.as_str(), String::as_str),
+        },
+        physics_evidence: AssertionSource {
+            value: &physics_source,
+            evidence_ref: &world_state_path,
         },
         performance_metrics: AssertionSource {
             value: &performance_source,
@@ -12405,6 +12447,7 @@ fn run_scenario<T: CdpTransport>(
             "evidence": {
                 "world_state": world_state_path,
                 "frame_stats": frame_stats_path,
+                "runtime_events": runtime_event_paths.clone(),
                 "input_replays": replay_paths.clone(),
                 "scenario_input_replays": deterministic_replay_paths.clone(),
                 "snapshots": snapshot_paths.clone(),
@@ -12728,6 +12771,7 @@ struct ScenarioAssertionSources<'a> {
     world_state: AssertionSource<'a>,
     frame_stats: AssertionSource<'a>,
     runtime_events: AssertionSource<'a>,
+    physics_evidence: AssertionSource<'a>,
     performance_metrics: AssertionSource<'a>,
     console_errors: AssertionSource<'a>,
     collision_evidence: AssertionSource<'a>,
@@ -12877,6 +12921,11 @@ fn evaluate_scenario_assertions(
                 ScenarioAssertion::RuntimeEvents { runtime_events } => {
                     ("runtime_events", runtime_events, sources.runtime_events)
                 }
+                ScenarioAssertion::PhysicsEvidence { physics_evidence } => (
+                    "physics_evidence",
+                    physics_evidence,
+                    sources.physics_evidence,
+                ),
                 ScenarioAssertion::PerformanceMetrics {
                     performance_metrics,
                 } => (
@@ -21112,6 +21161,9 @@ scenarios:
       - runtime_events:
           path: events
           countGreaterThan: 0
+      - physics_evidence:
+          path: grounded.player
+          equals: true
       - frame_stats:
           path: fixedDeltaMs
           lessThan: 33
@@ -21134,7 +21186,7 @@ scenarios:
 
         let seed = Seed::from_yaml_str(valid).expect("richer assertion schema parses");
 
-        assert_eq!(seed.scenarios[0].assertions.len(), 8);
+        assert_eq!(seed.scenarios[0].assertions.len(), 9);
     }
 
     #[test]
@@ -24537,6 +24589,14 @@ scenarios:
                         assertion.count_equals = Some(1);
                     }),
                 },
+                ScenarioAssertion::RuntimeEvents {
+                    runtime_events: json_path_assertion("events", |assertion| {
+                        assertion.count_greater_than = Some(0);
+                    }),
+                },
+                ScenarioAssertion::PhysicsEvidence {
+                    physics_evidence: json_path_equals("grounded.player", json!(true)),
+                },
                 ScenarioAssertion::ConsoleErrors {
                     console_errors: json_path_assertion("logs", |assertion| {
                         assertion.count_equals = Some(0);
@@ -24552,10 +24612,12 @@ scenarios:
         let world_state = json!({
             "tick": 2,
             "object": { "id": "probe-square" },
-            "collisions": [{ "pairId": "goal:player" }]
+            "collisions": [{ "pairId": "goal:player" }],
+            "physics": { "grounded": { "player": true } }
         });
         let frame_stats = json!({ "fixedDeltaMs": 16 });
-        let runtime_events = json!({ "stepCount": 0 });
+        let runtime_events =
+            json!({ "stepCount": 0, "events": [{ "type": "runtime.physics.jump" }] });
         let performance_metrics = json!({ "ScriptDuration": 2.5 });
         let console_errors = json!({ "logs": [], "count": 0 });
         let none = serde_json::Value::Null;
@@ -24563,6 +24625,7 @@ scenarios:
             &world_state,
             &frame_stats,
             &runtime_events,
+            &world_state["physics"],
             &performance_metrics,
             &console_errors,
             &world_state["collisions"],
@@ -24572,7 +24635,7 @@ scenarios:
 
         let assertions = evaluate_scenario_assertions(&scenario, &sources);
 
-        assert_eq!(assertions.len(), 7);
+        assert_eq!(assertions.len(), 9);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
@@ -24582,6 +24645,9 @@ scenarios:
         assert_eq!(assertions[4]["evidence_ref"], "evidence/world-state.json");
         assert_eq!(assertions[5]["passed"], true);
         assert_eq!(assertions[6]["passed"], true);
+        assert_eq!(assertions[6]["target"], "physics_evidence");
+        assert_eq!(assertions[7]["passed"], true);
+        assert_eq!(assertions[8]["passed"], true);
     }
 
     #[test]
@@ -30485,6 +30551,7 @@ scenarios:
         world_state: &'a serde_json::Value,
         frame_stats: &'a serde_json::Value,
         runtime_events: &'a serde_json::Value,
+        physics_evidence: &'a serde_json::Value,
         performance_metrics: &'a serde_json::Value,
         console_errors: &'a serde_json::Value,
         collision_evidence: &'a serde_json::Value,
@@ -30503,6 +30570,10 @@ scenarios:
             runtime_events: AssertionSource {
                 value: runtime_events,
                 evidence_ref: "evidence/cdp-trace-summary.json",
+            },
+            physics_evidence: AssertionSource {
+                value: physics_evidence,
+                evidence_ref: "evidence/world-state.json",
             },
             performance_metrics: AssertionSource {
                 value: performance_metrics,
