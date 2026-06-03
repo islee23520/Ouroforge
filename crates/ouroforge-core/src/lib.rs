@@ -12141,6 +12141,7 @@ pub struct RunDashboardReadModel {
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
+    pub review_cockpit: RunDashboardReviewCockpit,
     pub regression_promotions: Vec<RegressionPromotionPackResult>,
     pub replay: RunDashboardReplay,
     pub comparison: RunDashboardComparison,
@@ -12192,6 +12193,40 @@ pub struct RunDashboardMutationLifecycleStage {
     pub record_count: usize,
     pub evidence_refs: Vec<String>,
     pub records: Vec<serde_json::Value>,
+    pub read_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReviewCockpit {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "terminalState")]
+    pub terminal_state: String,
+    pub proposals: RunDashboardReviewCockpitStage,
+    pub decisions: RunDashboardReviewCockpitStage,
+    pub applications: RunDashboardReviewCockpitStage,
+    pub comparisons: RunDashboardReviewCockpitStage,
+    pub promotions: RunDashboardReviewCockpitStage,
+    pub matrix: RunDashboardReviewCockpitStage,
+    #[serde(rename = "commandHints")]
+    pub command_hints: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardReviewCockpitStage {
+    pub id: String,
+    pub label: String,
+    pub state: String,
+    #[serde(rename = "artifactPath", skip_serializing_if = "Option::is_none")]
+    pub artifact_path: Option<String>,
+    #[serde(rename = "recordCount")]
+    pub record_count: usize,
+    #[serde(rename = "recordIds")]
+    pub record_ids: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(rename = "readError", skip_serializing_if = "Option::is_none")]
     pub read_error: Option<String>,
 }
 
@@ -12575,6 +12610,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let regression_promotions = read_regression_promotion_records(run_dir);
+    let review_cockpit = dashboard_review_cockpit(&mutation_lifecycle, &regression_promotions);
     let replay = read_dashboard_replay(run_dir, &evidence)?;
     let comparison = read_dashboard_comparison(run_dir);
     let transaction_provenance = read_dashboard_transaction_provenance(&run);
@@ -12625,6 +12661,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results,
         mutation_artifacts,
         mutation_lifecycle,
+        review_cockpit,
         regression_promotions,
         replay,
         comparison,
@@ -14147,6 +14184,133 @@ fn read_dashboard_mutation_lifecycle(
         stages,
         command_hints,
     }
+}
+
+fn dashboard_review_cockpit(
+    lifecycle: &RunDashboardMutationLifecycle,
+    promotions: &[RegressionPromotionPackResult],
+) -> RunDashboardReviewCockpit {
+    let proposals =
+        dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "proposed", "Proposals");
+    let decisions =
+        dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "reviewed", "Review decisions");
+    let applications = dashboard_review_cockpit_stage_from_lifecycle(
+        lifecycle,
+        "scene_applied",
+        "Review-gated applications",
+    );
+    let comparisons =
+        dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "compared", "Rerun comparisons");
+    let promotions = dashboard_review_cockpit_promotion_stage(promotions);
+    let terminal_state = [
+        &applications,
+        &decisions,
+        &comparisons,
+        &promotions,
+        &proposals,
+    ]
+    .into_iter()
+    .find(|stage| stage.state != "missing")
+    .map(|stage| stage.state.clone())
+    .unwrap_or_else(|| "missing".to_string());
+    RunDashboardReviewCockpit {
+        schema_version: "ouroforge-studio-review-cockpit-v1".to_string(),
+        terminal_state,
+        proposals,
+        decisions,
+        applications,
+        comparisons,
+        promotions,
+        matrix: RunDashboardReviewCockpitStage {
+            id: "matrix".to_string(),
+            label: "Regression matrix".to_string(),
+            state: "export_level".to_string(),
+            artifact_path: Some("regression_matrix".to_string()),
+            record_count: 0,
+            record_ids: Vec::new(),
+            evidence_refs: Vec::new(),
+            read_error: None,
+        },
+        command_hints: lifecycle.command_hints.clone(),
+        boundary: "read-only exported evidence; commands are inert text only".to_string(),
+    }
+}
+
+fn dashboard_review_cockpit_stage_from_lifecycle(
+    lifecycle: &RunDashboardMutationLifecycle,
+    stage_id: &str,
+    fallback_label: &str,
+) -> RunDashboardReviewCockpitStage {
+    match lifecycle.stages.iter().find(|stage| stage.id == stage_id) {
+        Some(stage) => RunDashboardReviewCockpitStage {
+            id: stage.id.clone(),
+            label: stage.label.clone(),
+            state: stage.state.clone(),
+            artifact_path: stage.artifact_path.clone(),
+            record_count: stage.record_count,
+            record_ids: stage
+                .records
+                .iter()
+                .filter_map(dashboard_json_record_id)
+                .collect(),
+            evidence_refs: stage.evidence_refs.clone(),
+            read_error: stage.read_error.clone(),
+        },
+        None => RunDashboardReviewCockpitStage {
+            id: stage_id.to_string(),
+            label: fallback_label.to_string(),
+            state: "missing".to_string(),
+            artifact_path: None,
+            record_count: 0,
+            record_ids: Vec::new(),
+            evidence_refs: Vec::new(),
+            read_error: Some("lifecycle stage missing from exported read model".to_string()),
+        },
+    }
+}
+
+fn dashboard_review_cockpit_promotion_stage(
+    promotions: &[RegressionPromotionPackResult],
+) -> RunDashboardReviewCockpitStage {
+    RunDashboardReviewCockpitStage {
+        id: "promotions".to_string(),
+        label: "Regression promotions".to_string(),
+        state: if promotions.is_empty() {
+            "missing".to_string()
+        } else {
+            "promoted".to_string()
+        },
+        artifact_path: Some("regression-promotions/*.json".to_string()),
+        record_count: promotions.len(),
+        record_ids: promotions
+            .iter()
+            .map(|promotion| promotion.id.clone())
+            .collect(),
+        evidence_refs: promotions
+            .iter()
+            .flat_map(|promotion| {
+                [
+                    Some(promotion.source_run.verdict_path.clone()),
+                    promotion.record_path.clone(),
+                ]
+                .into_iter()
+                .flatten()
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect(),
+        read_error: None,
+    }
+}
+
+fn dashboard_json_record_id(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("id")
+        .or_else(|| value.get("proposalId"))
+        .or_else(|| value.get("decisionId"))
+        .or_else(|| value.get("applicationId"))
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
 }
 
 fn read_regression_promotion_records(run_dir: &Path) -> Vec<RegressionPromotionPackResult> {
@@ -23970,6 +24134,36 @@ scenarios:
             },
         )
         .expect("review accepted");
+        fs::create_dir_all(artifacts.run_dir.join("regression-promotions")).expect("promotion dir");
+        write_json(
+            &artifacts
+                .run_dir
+                .join("regression-promotions/regression-promotion-fixture.json"),
+            &json!({
+                "schemaVersion": "regression-promotion-result-v1",
+                "id": "regression-promotion-fixture",
+                "draftId": "regression-draft-fixture",
+                "scenarioId": "bootstrap-smoke",
+                "sourceRun": {
+                    "runId": "run-fixture",
+                    "runDir": "runs/run-fixture",
+                    "verdictPath": "verdict.json"
+                },
+                "target": {
+                    "projectManifestPath": "ouroforge.project.json",
+                    "scenarioPackId": "smoke",
+                    "scenarioPackPath": "scenarios/smoke.scenario-pack.json",
+                    "scenarioGroupId": "promoted-regressions"
+                },
+                "dryRun": false,
+                "createdGroup": true,
+                "beforeHash": { "algorithm": "fnv1a64-file-v1", "value": "before" },
+                "afterHash": { "algorithm": "fnv1a64-file-v1", "value": "after" },
+                "changes": ["created_group:promoted-regressions", "added_scenario:bootstrap-smoke"],
+                "recordPath": "regression-promotions/regression-promotion-fixture.json"
+            }),
+        )
+        .expect("promotion record written");
 
         let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
         let lifecycle = &model.mutation_lifecycle;
@@ -24005,6 +24199,29 @@ scenarios:
         assert!(lifecycle.stages.iter().any(|stage| stage
             .evidence_refs
             .contains(&"mutation/rerun-orchestration.json".to_string())));
+        let cockpit = &model.review_cockpit;
+        assert_eq!(cockpit.schema_version, "ouroforge-studio-review-cockpit-v1");
+        assert_eq!(cockpit.terminal_state, "accepted");
+        assert_eq!(cockpit.proposals.record_count, 1);
+        assert!(cockpit.proposals.record_ids.contains(&proposal.id));
+        assert_eq!(cockpit.decisions.state, "accepted");
+        assert!(cockpit
+            .decisions
+            .evidence_refs
+            .contains(&"mutation/rerun-orchestration.json".to_string()));
+        assert_eq!(cockpit.applications.state, "missing");
+        assert_eq!(cockpit.comparisons.state, "compared");
+        assert_eq!(cockpit.promotions.state, "promoted");
+        assert!(cockpit
+            .promotions
+            .record_ids
+            .contains(&"regression-promotion-fixture".to_string()));
+        assert_eq!(cockpit.matrix.state, "export_level");
+        assert!(cockpit.boundary.contains("read-only"));
+        assert!(cockpit
+            .command_hints
+            .iter()
+            .any(|hint| hint.contains("--accept")));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
@@ -24020,6 +24237,13 @@ scenarios:
             .stages
             .iter()
             .all(|stage| stage.state == "missing"));
+        assert_eq!(model.review_cockpit.terminal_state, "missing");
+        assert_eq!(model.review_cockpit.proposals.state, "missing");
+        assert_eq!(model.review_cockpit.promotions.record_count, 0);
+        assert_eq!(
+            model.review_cockpit.matrix.artifact_path.as_deref(),
+            Some("regression_matrix")
+        );
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
