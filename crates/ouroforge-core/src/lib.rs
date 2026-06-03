@@ -10232,6 +10232,8 @@ pub struct PatchDraftArtifact {
 pub const VISUAL_EDIT_DRAFT_SCHEMA_VERSION: &str = "visual-edit-draft-v1";
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS: usize = 128;
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS: u32 = 4096;
+pub const VISUAL_EDIT_TILEMAP_DRAFT_PREVIEW_SCHEMA_VERSION: &str =
+    "visual-edit-tilemap-draft-preview-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -10415,6 +10417,40 @@ pub struct VisualEditTilemapDraftPreflight {
     pub layer_id: String,
     #[serde(rename = "affectedCells")]
     pub affected_cells: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditTilemapDraftPreview {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "targetTilemapAssetId")]
+    pub target_tilemap_asset_id: String,
+    pub kind: VisualEditTilemapDraftOperationKind,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    #[serde(rename = "affectedCells")]
+    pub affected_cells: u32,
+    #[serde(rename = "beforeTilemapHash")]
+    pub before_tilemap_hash: ProjectAssetContentHash,
+    #[serde(rename = "afterTilemapHash")]
+    pub after_tilemap_hash: ProjectAssetContentHash,
+    pub summary: String,
+    #[serde(
+        rename = "collisionCells",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub collision_cells: Vec<ProjectTilemapExtractedCell>,
+    #[serde(
+        rename = "triggerCells",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub trigger_cells: Vec<ProjectTilemapExtractedCell>,
+    pub guardrail: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10631,6 +10667,64 @@ impl VisualEditDraftArtifact {
         }
         Ok(preflights)
     }
+
+    pub fn preview_tilemap_edit_transactions(
+        &self,
+        tilemap_asset_id: &str,
+        tilemap: &ProjectTilemapManifest,
+        tileset: &ProjectTilesetManifest,
+        observed_hash: &ProjectAssetContentHash,
+    ) -> Result<Vec<VisualEditTilemapDraftPreview>> {
+        let preflights =
+            self.validate_tilemap_preflight(tilemap_asset_id, tilemap, tileset, observed_hash)?;
+        let preflights_by_id: BTreeMap<&str, &VisualEditTilemapDraftPreflight> = preflights
+            .iter()
+            .map(|preflight| (preflight.operation_id.as_str(), preflight))
+            .collect();
+        let mut previews = Vec::new();
+        for operation in &self.proposed_operations {
+            let tilemap_operation = operation
+                .tilemap_operation
+                .as_ref()
+                .expect("tilemap operation was validated");
+            let preflight = preflights_by_id
+                .get(operation.id.as_str())
+                .expect("preflight was validated");
+            let mut candidate = tilemap.clone();
+            let affected_indexes =
+                tilemap_operation.apply_to_tilemap_preview(&mut candidate, tilemap)?;
+            candidate
+                .validate_integrity(tilemap_asset_id, tileset)
+                .with_context(|| {
+                    format!(
+                        "visual edit tilemap draft operation {} produced invalid tilemap preview",
+                        operation.id
+                    )
+                })?;
+            let extraction = candidate.extract(tilemap_asset_id, tileset);
+            let collision_cells =
+                affected_extracted_cells(&extraction.collision_cells, &affected_indexes);
+            let trigger_cells =
+                affected_extracted_cells(&extraction.trigger_cells, &affected_indexes);
+            previews.push(VisualEditTilemapDraftPreview {
+                schema_version: VISUAL_EDIT_TILEMAP_DRAFT_PREVIEW_SCHEMA_VERSION.to_string(),
+                operation_id: operation.id.clone(),
+                target_tilemap_asset_id: tilemap_asset_id.to_string(),
+                kind: preflight.kind.clone(),
+                layer_id: preflight.layer_id.clone(),
+                affected_cells: preflight.affected_cells,
+                before_tilemap_hash: observed_hash.clone(),
+                after_tilemap_hash: hash_project_tilemap_manifest(&candidate)?,
+                summary: tilemap_operation.preview_summary(preflight.affected_cells),
+                collision_cells,
+                trigger_cells,
+                guardrail:
+                    "preview only; no tilemap file writes, browser trusted writes, or apply behavior"
+                        .to_string(),
+            });
+        }
+        Ok(previews)
+    }
 }
 
 impl VisualEditDraftTarget {
@@ -10836,6 +10930,122 @@ impl VisualEditTilemapDraftOperation {
         })?;
         require_known_tile_id(tile_id, tiles_by_id)
     }
+
+    fn apply_to_tilemap_preview(
+        &self,
+        candidate: &mut ProjectTilemapManifest,
+        original: &ProjectTilemapManifest,
+    ) -> Result<BTreeSet<usize>> {
+        let mut affected_indexes = BTreeSet::new();
+        match self.kind {
+            VisualEditTilemapDraftOperationKind::TileSet
+            | VisualEditTilemapDraftOperationKind::CollisionPreview
+            | VisualEditTilemapDraftOperationKind::TriggerPreview => {
+                let index = tilemap_cell_index(original, self.x, self.y)?;
+                let layer = candidate_layer_mut(candidate, &self.layer_id)?;
+                layer.data[index] = self.tile_id.clone();
+                affected_indexes.insert(index);
+            }
+            VisualEditTilemapDraftOperationKind::TileRemove => {
+                let index = tilemap_cell_index(original, self.x, self.y)?;
+                let layer = candidate_layer_mut(candidate, &self.layer_id)?;
+                layer.data[index] = None;
+                affected_indexes.insert(index);
+            }
+            VisualEditTilemapDraftOperationKind::RectangleFill => {
+                let x = self.x.expect("rectangle x validated");
+                let y = self.y.expect("rectangle y validated");
+                let width = self.width.expect("rectangle width validated");
+                let height = self.height.expect("rectangle height validated");
+                let tile_id = self.tile_id.clone();
+                let map_width = original.width;
+                let layer = candidate_layer_mut(candidate, &self.layer_id)?;
+                for dy in 0..height {
+                    for dx in 0..width {
+                        let index = ((y + dy) * map_width + (x + dx)) as usize;
+                        layer.data[index] = tile_id.clone();
+                        affected_indexes.insert(index);
+                    }
+                }
+            }
+            VisualEditTilemapDraftOperationKind::LayerVisibilityChange => {
+                let visible = self.visible.expect("visible validated");
+                let layer = candidate_layer_mut(candidate, &self.layer_id)?;
+                layer
+                    .metadata
+                    .insert("visible".to_string(), visible.to_string());
+            }
+            VisualEditTilemapDraftOperationKind::LayerConfigChange => {
+                let layer = candidate_layer_mut(candidate, &self.layer_id)?;
+                for (key, value) in &self.metadata {
+                    layer.metadata.insert(key.clone(), value.clone());
+                }
+            }
+            VisualEditTilemapDraftOperationKind::TilePropertyReferenceChange => {
+                for (index, tile_id) in original
+                    .layers
+                    .iter()
+                    .flat_map(|layer| layer.data.iter())
+                    .enumerate()
+                {
+                    if tile_id.as_deref() == self.tile_id.as_deref() {
+                        affected_indexes.insert(index);
+                    }
+                }
+            }
+        }
+        Ok(affected_indexes)
+    }
+
+    fn preview_summary(&self, affected_cells: u32) -> String {
+        match self.kind {
+            VisualEditTilemapDraftOperationKind::TileSet => {
+                format!(
+                    "Set tile on layer `{}`; {affected_cells} cell affected.",
+                    self.layer_id
+                )
+            }
+            VisualEditTilemapDraftOperationKind::TileRemove => {
+                format!(
+                    "Remove tile on layer `{}`; {affected_cells} cell affected.",
+                    self.layer_id
+                )
+            }
+            VisualEditTilemapDraftOperationKind::RectangleFill => {
+                format!(
+                    "Fill rectangle on layer `{}`; {affected_cells} cells affected.",
+                    self.layer_id
+                )
+            }
+            VisualEditTilemapDraftOperationKind::LayerVisibilityChange => {
+                format!(
+                    "Preview layer `{}` visibility metadata change.",
+                    self.layer_id
+                )
+            }
+            VisualEditTilemapDraftOperationKind::LayerConfigChange => {
+                format!("Preview layer `{}` config metadata change.", self.layer_id)
+            }
+            VisualEditTilemapDraftOperationKind::TilePropertyReferenceChange => {
+                format!(
+                    "Preview tile property reference change for tile `{}`.",
+                    self.tile_id.as_deref().unwrap_or("<missing>")
+                )
+            }
+            VisualEditTilemapDraftOperationKind::CollisionPreview => {
+                format!(
+                    "Preview collision metadata on layer `{}`; {affected_cells} cell affected.",
+                    self.layer_id
+                )
+            }
+            VisualEditTilemapDraftOperationKind::TriggerPreview => {
+                format!(
+                    "Preview trigger metadata on layer `{}`; {affected_cells} cell affected.",
+                    self.layer_id
+                )
+            }
+        }
+    }
 }
 
 fn require_known_tile_id(
@@ -10848,6 +11058,56 @@ fn require_known_tile_id(
         ));
     }
     Ok(())
+}
+
+fn candidate_layer_mut<'a>(
+    tilemap: &'a mut ProjectTilemapManifest,
+    layer_id: &str,
+) -> Result<&'a mut ProjectTilemapLayer> {
+    tilemap
+        .layers
+        .iter_mut()
+        .find(|layer| layer.id == layer_id)
+        .ok_or_else(|| anyhow!("visual edit tilemap draft preview missing layer: {layer_id}"))
+}
+
+fn tilemap_cell_index(
+    tilemap: &ProjectTilemapManifest,
+    x: Option<u32>,
+    y: Option<u32>,
+) -> Result<usize> {
+    let x = x.ok_or_else(|| anyhow!("visual edit tilemap draft preview requires x"))?;
+    let y = y.ok_or_else(|| anyhow!("visual edit tilemap draft preview requires y"))?;
+    if x >= tilemap.width || y >= tilemap.height {
+        return Err(anyhow!(
+            "visual edit tilemap draft preview coordinates ({x},{y}) are outside tilemap bounds {}x{}",
+            tilemap.width,
+            tilemap.height
+        ));
+    }
+    Ok((y * tilemap.width + x) as usize)
+}
+
+fn affected_extracted_cells(
+    cells: &[ProjectTilemapExtractedCell],
+    affected_indexes: &BTreeSet<usize>,
+) -> Vec<ProjectTilemapExtractedCell> {
+    cells
+        .iter()
+        .filter(|cell| affected_indexes.contains(&cell.index))
+        .cloned()
+        .collect()
+}
+
+pub fn hash_project_tilemap_manifest(
+    tilemap: &ProjectTilemapManifest,
+) -> Result<ProjectAssetContentHash> {
+    let value = canonical_json_value(json!(tilemap));
+    let bytes = serde_json::to_vec(&value).context("failed to serialize canonical tilemap JSON")?;
+    Ok(ProjectAssetContentHash {
+        algorithm: "fnv1a64-canonical-json-v1".to_string(),
+        value: format!("{:016x}", fnv1a64(&bytes)),
+    })
 }
 
 impl VisualEditSceneDraftOperation {
@@ -23865,6 +24125,76 @@ scenarios:
             .validate_tilemap_preflight(&tilemap_asset.id, &oversized_tilemap, &tileset, &hash)
             .expect_err("oversized rectangle fails");
         assert!(error.to_string().contains("above limit"));
+    }
+
+    #[test]
+    fn visual_edit_tilemap_draft_v1_generates_preview_summaries_without_apply() {
+        let (tilemap_asset, tilemap, tileset, hash) = tilemap_authoring_fixture_parts();
+        let before_tilemap = tilemap.clone();
+        let before_hash = hash_project_tilemap_manifest(&tilemap).expect("tilemap hashes");
+        let draft = valid_tilemap_visual_edit_draft_for_fixture();
+
+        let previews = draft
+            .preview_tilemap_edit_transactions(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect("tilemap draft previews");
+
+        assert_eq!(previews.len(), 8);
+        assert!(previews.iter().all(|preview| {
+            preview.schema_version == VISUAL_EDIT_TILEMAP_DRAFT_PREVIEW_SCHEMA_VERSION
+                && preview.target_tilemap_asset_id == "demo_tilemap"
+                && preview.guardrail.contains("no tilemap file writes")
+        }));
+        assert_eq!(previews[0].operation_id, "op-set-tile");
+        assert_eq!(previews[0].affected_cells, 1);
+        assert_eq!(previews[0].before_tilemap_hash, hash);
+        assert_ne!(previews[0].after_tilemap_hash, before_hash);
+        assert!(previews
+            .iter()
+            .any(|preview| preview.summary.contains("Fill rectangle")));
+        assert_eq!(
+            tilemap, before_tilemap,
+            "preview must not mutate input tilemap"
+        );
+    }
+
+    #[test]
+    fn visual_edit_tilemap_draft_v1_preview_reports_collision_and_trigger_cells() {
+        let (tilemap_asset, tilemap, tileset, hash) = tilemap_authoring_fixture_parts();
+        let mut draft = valid_tilemap_visual_edit_draft_for_fixture();
+        draft.proposed_operations.retain(|operation| {
+            matches!(
+                operation
+                    .tilemap_operation
+                    .as_ref()
+                    .expect("tilemap operation")
+                    .kind,
+                VisualEditTilemapDraftOperationKind::CollisionPreview
+                    | VisualEditTilemapDraftOperationKind::TriggerPreview
+            )
+        });
+
+        let previews = draft
+            .preview_tilemap_edit_transactions(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect("collision/trigger previews");
+
+        let collision = previews
+            .iter()
+            .find(|preview| preview.kind == VisualEditTilemapDraftOperationKind::CollisionPreview)
+            .expect("collision preview");
+        assert!(collision
+            .collision_cells
+            .iter()
+            .any(|cell| cell.layer_id == "collision" && cell.tile_id == "solid_ground"));
+
+        let trigger = previews
+            .iter()
+            .find(|preview| preview.kind == VisualEditTilemapDraftOperationKind::TriggerPreview)
+            .expect("trigger preview");
+        assert!(trigger.trigger_cells.iter().any(|cell| {
+            cell.layer_id == "terrain"
+                && cell.tile_id == "coin_trigger"
+                && cell.trigger.as_deref() == Some("coin_collected")
+        }));
     }
 
     #[test]
