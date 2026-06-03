@@ -210,6 +210,58 @@ fn artifact_write_dashboard_export_allows_generated_dashboard_data_overwrite() {
 }
 
 #[test]
+fn dashboard_export_includes_regression_run_matrix_read_model() {
+    let temp = unique_temp_dir("ouroforge-cli-dashboard-regression-matrix");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let (_project_dir, run_dir) = create_project_bound_run(&temp);
+    write_failed_regression_evidence(&temp, &run_dir, "scaffold-smoke", true);
+    let output = temp.join("dashboard-data/dashboard-data.json");
+
+    let exported = run_cli(
+        &temp,
+        &[
+            "dashboard",
+            "export",
+            "--runs-root",
+            temp.join("runs").to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ],
+    );
+
+    assert!(exported.contains("Dashboard data exported"));
+    let payload: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&output).expect("dashboard output reads"))
+            .expect("dashboard output parses");
+    assert_eq!(payload["schema"], "ouroforge-dashboard-v1");
+    assert_eq!(
+        payload["regression_matrix"]["schemaVersion"],
+        "ouroforge-regression-run-matrix-v1"
+    );
+    assert_eq!(
+        payload["regression_matrix"]["projects"][0]["projectId"],
+        "minimal_2d"
+    );
+    let scenarios = payload["regression_matrix"]["projects"][0]["scenarioPacks"][0]["scenarios"]
+        .as_array()
+        .expect("matrix scenarios array");
+    let scaffold = scenarios
+        .iter()
+        .find(|scenario| scenario["scenarioId"] == "scaffold-smoke")
+        .expect("scaffold scenario in matrix");
+    assert_eq!(scaffold["currentStatus"], "failed");
+    assert_eq!(
+        scaffold["lastFail"]["scenarioResultPath"],
+        "evidence/scenarios/scaffold-smoke/scenario-result.json"
+    );
+    assert!(payload["regression_matrix"]["skippedRuns"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn ledger_and_evidence_commands_operate_on_run_artifacts() {
     let temp = unique_temp_dir("ouroforge-cli-artifacts-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

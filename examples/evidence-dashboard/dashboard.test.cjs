@@ -86,6 +86,29 @@ const run = {
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'agent', reviewer: 'agent-reviewer', reason: '<script>accepted</script>', evidence_refs: ['mutation/rerun-orchestration.json'], guardrail_checklist: { proposal_is_record_only: true, accepted_does_not_apply: true, browser_read_only: true, evidence_refs_checked: true } }] },
     ],
   },
+  regression_matrix: {
+    schemaVersion: 'ouroforge-regression-run-matrix-v1',
+    skippedRuns: [{ runId: 'legacy-run', runDir: 'runs/legacy-run', reason: 'missing_or_malformed_project_context' }],
+    projects: [{
+      projectId: 'minimal_2d',
+      projectName: 'Minimal 2D Ouroforge Project',
+      scenarioPacks: [{
+        scenarioPackId: 'smoke',
+        scenarioPackPath: 'scenarios/smoke.scenario-pack.json',
+        scenarios: [{
+          scenarioId: 'scaffold-smoke',
+          currentStatus: 'failed',
+          lastPass: { runId: 'run-pass', runDir: 'runs/run-pass', createdAtUnixMs: 1, status: 'passed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'passed', evidenceRefs: ['evidence/scenarios/scaffold-smoke/scenario-result.json'] },
+          lastFail: { runId: 'run-1', runDir: 'runs/run-1', createdAtUnixMs: 2, status: 'failed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'failed', evidenceRefs: ['evidence/scenarios/scaffold-smoke/scenario-result.json'] },
+          runs: [
+            { runId: 'run-pass', runDir: 'runs/run-pass', createdAtUnixMs: 1, status: 'passed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'passed', evidenceRefs: [] },
+            { runId: 'run-1', runDir: 'runs/run-1', createdAtUnixMs: 2, status: 'failed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'failed', evidenceRefs: [] },
+          ],
+          context: { mutationIds: ['mutation-1'], reviewDecisionIds: ['review-decision-1'], promotionIds: ['regression-promotion-1'] },
+        }],
+      }],
+    }],
+  },
   regression_promotions: [{
     schemaVersion: 'regression-promotion-result-v1',
     id: 'regression-promotion-1',
@@ -350,6 +373,13 @@ assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);
 assert.match(dashboard.renderRegressionPromotions({ regression_promotions: [] }), /No regression promotion records/);
 assert.match(dashboard.renderRegressionPromotions({ regression_promotions: [{ id: '<script>', scenarioId: '<img>', target: { scenarioPackId: '<svg>', scenarioPackPath: '<b>' }, beforeHash: { value: '<before>' }, afterHash: { value: '<after>' }, recordPath: '<record>' }] }), /&lt;script&gt;/);
+assert.match(detail, /Regression Run Matrix/);
+assert.match(detail, /scaffold-smoke/);
+assert.match(detail, /legacy or malformed run\(s\) skipped/);
+assert.ok(detail.includes('../../runs/run-1/evidence/scenarios/scaffold-smoke/scenario-result.json'));
+assert.match(dashboard.renderRegressionMatrix(run.regression_matrix), /Read-only local evidence projection/);
+assert.match(dashboard.renderRegressionMatrix({ projects: [{ projectId: '<script>', projectName: '<img>', scenarioPacks: [{ scenarioPackId: '<svg>', scenarioPackPath: '<b>', scenarios: [{ scenarioId: '<scenario>', currentStatus: '<bad>', runs: [], context: { mutationIds: ['<m>'], reviewDecisionIds: [], promotionIds: [] } }] }] }], skippedRuns: [] }), /&lt;script&gt;/);
+assert.match(dashboard.renderRegressionMatrix(null), /No regression matrix export/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);

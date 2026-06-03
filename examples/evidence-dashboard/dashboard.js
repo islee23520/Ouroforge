@@ -563,6 +563,78 @@ const OuroforgeDashboard = (() => {
     return `<section class="panel"><h3>Regression Promotions</h3><p class="run-meta">Inspect-only manual promotion records. Browser UI does not dry-run, promote, mutate scenario packs, or execute commands.</p><div class="lifecycle-grid">${cards}</div></section>`;
   }
 
+  function renderRegressionMatrix(matrix) {
+    if (!matrix || typeof matrix !== 'object') {
+      return '<section class="panel"><h3>Regression Run Matrix</h3><p class="empty-state">No regression matrix export is available yet. Run the dashboard export command on latest CLI output.</p></section>';
+    }
+    const projects = Array.isArray(matrix.projects) ? matrix.projects : [];
+    const skipped = Array.isArray(matrix.skippedRuns) ? matrix.skippedRuns : Array.isArray(matrix.skipped_runs) ? matrix.skipped_runs : [];
+    const skippedNote = skipped.length
+      ? `<p class="artifact-warning">${escapeText(skipped.length)} legacy or malformed run(s) skipped without inference.</p>`
+      : '<p class="run-meta">All matrix inputs had project and scenario-pack context.</p>';
+    if (!projects.length) {
+      return `<section class="panel"><h3>Regression Run Matrix</h3><p class="empty-state">No project-bound scenario runs are available for the matrix.</p>${skippedNote}</section>`;
+    }
+    const projectSections = projects.map((project) => {
+      const packs = Array.isArray(project.scenarioPacks) ? project.scenarioPacks : Array.isArray(project.scenario_packs) ? project.scenario_packs : [];
+      const packSections = packs.map((pack) => {
+        const scenarios = Array.isArray(pack.scenarios) ? pack.scenarios : [];
+        const rows = scenarios.length ? scenarios.map((scenario) => renderRegressionMatrixScenarioRow(scenario)).join('') : '<tr><td colspan="6" class="empty-state compact">No scenarios recorded for this pack.</td></tr>';
+        return `<article class="review-decision-card regression-matrix-pack">
+          <h4>${escapeText(pack.scenarioPackId || pack.scenario_pack_id || 'unknown-pack')}</h4>
+          <p class="run-meta">${escapeText(pack.scenarioPackPath || pack.scenario_pack_path || 'unknown path')}</p>
+          <div class="table-scroll"><table class="regression-matrix-table">
+            <thead><tr><th>Scenario</th><th>Current</th><th>Last pass</th><th>Last fail</th><th>Runs</th><th>Context</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </article>`;
+      }).join('');
+      return `<section class="panel regression-matrix-project">
+        <h4>${escapeText(project.projectName || project.project_name || project.projectId || project.project_id || 'unknown project')}</h4>
+        <p class="run-meta">Project id: ${escapeText(project.projectId || project.project_id || 'unknown')}</p>
+        ${packSections || '<p class="empty-state compact">No scenario packs are available for this project.</p>'}
+      </section>`;
+    }).join('');
+    return `<section class="panel" id="regression-run-matrix"><h3>Regression Run Matrix</h3>
+      <p class="run-meta">Read-only local evidence projection. This browser surface does not schedule CI, rerun scenarios, promote scenarios, or write files.</p>
+      ${skippedNote}
+      ${projectSections}
+    </section>`;
+  }
+
+  function renderRegressionMatrixScenarioRow(scenario) {
+    const current = scenario.currentStatus || scenario.current_status || 'unknown';
+    const runs = Array.isArray(scenario.runs) ? scenario.runs : [];
+    const context = scenario.context || {};
+    const lastPass = scenario.lastPass || scenario.last_pass || null;
+    const lastFail = scenario.lastFail || scenario.last_fail || null;
+    const contextBits = [
+      ['mutations', context.mutationIds || context.mutation_ids],
+      ['reviews', context.reviewDecisionIds || context.review_decision_ids],
+      ['promotions', context.promotionIds || context.promotion_ids],
+    ].map(([label, values]) => `${label} ${(Array.isArray(values) ? values.length : 0)}`);
+    return `<tr>
+      <td>${escapeText(scenario.scenarioId || scenario.scenario_id || 'unknown')}</td>
+      <td><span class="${statusClass(current)}">${escapeText(current)}</span></td>
+      <td>${renderRegressionMatrixObservation(lastPass)}</td>
+      <td>${renderRegressionMatrixObservation(lastFail)}</td>
+      <td>${escapeText(runs.length)}</td>
+      <td>${escapeText(contextBits.join(' · '))}</td>
+    </tr>`;
+  }
+
+  function renderRegressionMatrixObservation(observation) {
+    if (!observation) return '<span class="empty-state compact">none</span>';
+    const runId = observation.runId || observation.run_id || 'unknown-run';
+    const runDir = observation.runDir || observation.run_dir || '';
+    const path = observation.scenarioResultPath || observation.scenario_result_path || '';
+    const label = `${runId} · ${observation.status || 'unknown'}`;
+    if (runDir && path) {
+      return `<a class="ref-chip" href="${escapeText(`../../${runDir}/${path}`)}" target="_blank" rel="noreferrer">${escapeText(label)}</a>`;
+    }
+    return `<span class="ref-chip">${escapeText(label)}</span>`;
+  }
+
   function renderProjectMutationRecord(record) {
     if (!record || typeof record !== 'object') return '';
     const project = record.project && typeof record.project === 'object' ? record.project : null;
@@ -684,10 +756,10 @@ const OuroforgeDashboard = (() => {
   }
 
   function renderRunDetail(run) {
-    return renderRunDetailWithState(run, createReplayState(run));
+    return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null);
   }
 
-  function renderRunDetailWithState(run, replayState) {
+  function renderRunDetailWithState(run, replayState, regressionMatrix = null) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
     const summary = summarizeRun(run);
@@ -711,6 +783,7 @@ const OuroforgeDashboard = (() => {
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderRegressionPromotions(run)}
+      ${renderRegressionMatrix(regressionMatrix)}
       ${renderProjectContext(run)}
       ${renderTransactionProvenance(run)}
       ${renderReplayControls(run, replayState)}
@@ -743,7 +816,7 @@ const OuroforgeDashboard = (() => {
       };
       const paint = () => {
         listEl.innerHTML = renderRunList(runs, selected && selected.summary.id);
-        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected));
+        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null);
         listEl.querySelectorAll('[data-run-id]').forEach((button) => {
           button.addEventListener('click', () => {
             selected = runs.find((run) => run.summary.id === button.dataset.runId) || null;
@@ -776,7 +849,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

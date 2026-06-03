@@ -91,6 +91,29 @@ const run = {
       { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', reviewDecisionId: 'review-decision-1', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'examples/project/ouroforge.project.json', scenePath: 'scenes/main.scene.json' }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' } }, status: 'applied' }] },
     ],
   },
+  regression_matrix: {
+    schemaVersion: 'ouroforge-regression-run-matrix-v1',
+    skippedRuns: [{ runId: 'legacy-run', runDir: 'runs/legacy-run', reason: 'missing_or_malformed_project_context' }],
+    projects: [{
+      projectId: 'minimal_2d',
+      projectName: 'Minimal 2D Ouroforge Project',
+      scenarioPacks: [{
+        scenarioPackId: 'smoke',
+        scenarioPackPath: 'scenarios/smoke.scenario-pack.json',
+        scenarios: [{
+          scenarioId: 'scaffold-smoke',
+          currentStatus: 'failed',
+          lastPass: { runId: 'run-pass', runDir: 'runs/run-pass', createdAtUnixMs: 1, status: 'passed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'passed', evidenceRefs: ['evidence/scenarios/scaffold-smoke/scenario-result.json'] },
+          lastFail: { runId: 'run-1', runDir: 'runs/run-1', createdAtUnixMs: 2, status: 'failed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'failed', evidenceRefs: ['evidence/scenarios/scaffold-smoke/scenario-result.json'] },
+          runs: [
+            { runId: 'run-pass', runDir: 'runs/run-pass', createdAtUnixMs: 1, status: 'passed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'passed', evidenceRefs: [] },
+            { runId: 'run-1', runDir: 'runs/run-1', createdAtUnixMs: 2, status: 'failed', scenarioResultPath: 'evidence/scenarios/scaffold-smoke/scenario-result.json', verdictStatus: 'failed', evidenceRefs: [] },
+          ],
+          context: { mutationIds: ['mutation-1'], reviewDecisionIds: ['review-decision-1'], promotionIds: ['regression-promotion-1'] },
+        }],
+      }],
+    }],
+  },
   regression_promotions: [{
     schemaVersion: 'regression-promotion-result-v1',
     id: 'regression-promotion-1',
@@ -136,7 +159,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 11);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 12);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -186,6 +209,11 @@ assert.match(cockpit.renderRegressionPromotionSurface(run), /Regression promotio
 assert.match(cockpit.renderRegressionPromotionSurface(run), /promoted-smoke-regression/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /scenario promote &lt;draft-json&gt; --project examples\/project\/ouroforge\.project\.json --scenario-pack smoke --dry-run/);
 assert.match(cockpit.renderRegressionPromotionSurface({ regression_promotions: [] }), /No regression promotion records/);
+assert.match(cockpit.renderRegressionMatrixSurface(run), /Regression run matrix/);
+assert.match(cockpit.renderRegressionMatrixSurface(run), /scaffold-smoke/);
+assert.match(cockpit.renderRegressionMatrixSurface(run), /does not schedule CI/);
+assert.match(cockpit.renderRegressionMatrixSurface({ regression_matrix: { projects: [{ projectId: '<script>', scenarioPacks: [{ scenarioPackId: '<pack>', scenarios: [{ scenarioId: '<scenario>', currentStatus: '<bad>', runs: [], context: {} }] }] }], skippedRuns: [] } }), /&lt;script&gt;/);
+assert.match(cockpit.renderRegressionMatrixSurface({}), /No regression matrix export/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Proposal rationale/);
 assert.match(cockpit.renderMutationReviewSurface(run), /scenario_assertion_failure/);
 assert.match(cockpit.renderMutationReviewSurface(run), /player reaches the goal/);

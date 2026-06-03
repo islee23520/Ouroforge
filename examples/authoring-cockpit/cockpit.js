@@ -301,6 +301,7 @@ const OuroforgeCockpit = (() => {
       { id: 'run-browser', label: 'Run/evidence browser', present: hasRun && Array.isArray(run.evidence), detail: hasRun ? `${run.evidence.length} evidence artifact(s)` : 'dashboard data not loaded' },
       { id: 'journal-viewer', label: 'Journal viewer', present: Boolean(run?.journal_view?.exists || run?.journal), detail: run?.journal_view?.summary || 'journal artifact unavailable' },
       { id: 'mutation-review', label: 'Mutation review state', present: Boolean(run?.mutation_lifecycle), detail: run?.mutation_lifecycle?.terminal_state || 'no lifecycle read model' },
+      { id: 'regression-matrix', label: 'Regression run matrix', present: Boolean(run?.regression_matrix?.projects?.length), detail: run?.regression_matrix ? `${(run.regression_matrix.projects || []).length} project(s)` : 'matrix export unavailable' },
       { id: 'replay-controls', label: 'Replay controls', present: Boolean(run?.replay?.present), detail: `${(run?.replay?.sequences || []).length} sequence(s)` },
       { id: 'live-preview', label: 'Live preview controls', present: true, detail: 'ephemeral probe controls' },
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
@@ -725,6 +726,50 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderRegressionMatrixSurface(run) {
+    const matrix = run?.regression_matrix || run?.regressionMatrix || null;
+    if (!matrix || typeof matrix !== 'object') {
+      return '<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No regression matrix export loaded. Run dashboard export with the latest Rust CLI.</p></section>';
+    }
+    const projects = Array.isArray(matrix.projects) ? matrix.projects : [];
+    const skipped = Array.isArray(matrix.skippedRuns) ? matrix.skippedRuns : Array.isArray(matrix.skipped_runs) ? matrix.skipped_runs : [];
+    const skippedText = skipped.length ? `${skipped.length} legacy/malformed run(s) skipped` : 'all matrix inputs project-bound';
+    if (!projects.length) {
+      return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No project-bound scenario runs available.</p><p class="hint">${escapeText(skippedText)}</p></section>`;
+    }
+    const rows = projects.flatMap((project) => {
+      const packs = Array.isArray(project.scenarioPacks) ? project.scenarioPacks : Array.isArray(project.scenario_packs) ? project.scenario_packs : [];
+      return packs.flatMap((pack) => {
+        const scenarios = Array.isArray(pack.scenarios) ? pack.scenarios : [];
+        return scenarios.map((scenario) => renderRegressionMatrixSurfaceRow(project, pack, scenario));
+      });
+    }).join('') || '<div class="surface-row">No scenario rows in matrix.</div>';
+    return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2>
+      <p class="hint">Read-only local run history. The cockpit does not schedule CI, rerun scenarios, promote scenarios, execute commands, or write scenario packs from this matrix.</p>
+      <p class="hint">${escapeText(skippedText)}</p>
+      <div class="surface-list">${rows}</div>
+    </section>`;
+  }
+
+  function renderRegressionMatrixSurfaceRow(project, pack, scenario) {
+    const current = scenario.currentStatus || scenario.current_status || 'unknown';
+    const lastPass = scenario.lastPass || scenario.last_pass || null;
+    const lastFail = scenario.lastFail || scenario.last_fail || null;
+    const context = scenario.context || {};
+    const mutationIds = context.mutationIds || context.mutation_ids || [];
+    const reviewIds = context.reviewDecisionIds || context.review_decision_ids || [];
+    const promotionIds = context.promotionIds || context.promotion_ids || [];
+    return `<div class="surface-row"><strong>${escapeText(scenario.scenarioId || scenario.scenario_id || 'unknown scenario')}</strong> ${surfaceState(true, current)}<br>
+      <small>project ${escapeText(project.projectId || project.project_id || 'unknown')} · pack ${escapeText(pack.scenarioPackId || pack.scenario_pack_id || 'unknown')} · runs ${escapeText((scenario.runs || []).length)}</small><br>
+      <small>last pass ${escapeText(regressionMatrixObservationLabel(lastPass))} · last fail ${escapeText(regressionMatrixObservationLabel(lastFail))}</small><br>
+      <small>context mutations ${escapeText(Array.isArray(mutationIds) ? mutationIds.length : 0)} · reviews ${escapeText(Array.isArray(reviewIds) ? reviewIds.length : 0)} · promotions ${escapeText(Array.isArray(promotionIds) ? promotionIds.length : 0)}</small></div>`;
+  }
+
+  function regressionMatrixObservationLabel(observation) {
+    if (!observation) return 'none';
+    return `${observation.runId || observation.run_id || 'unknown-run'} (${observation.status || 'unknown'})`;
+  }
+
   function renderRegressionPromotionSurface(run) {
     const records = Array.isArray(run?.regression_promotions) ? run.regression_promotions : [];
     const context = run?.command_context || run?.summary?.command_context || {};
@@ -817,7 +862,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -842,6 +887,9 @@ const OuroforgeCockpit = (() => {
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
+      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix)) {
+        latest = { ...latest, regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix };
+      }
     } catch (_) {
       latest = null;
     }
@@ -893,7 +941,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
