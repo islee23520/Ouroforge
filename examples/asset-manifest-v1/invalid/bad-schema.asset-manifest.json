@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "asset-manifest-v2",
+  "id": "bad_schema_fixture",
+  "assets": [
+    {
+      "id": "player_sprite",
+      "type": "image",
+      "path": "assets/sprites/player.png",
+      "contentHash": {
+        "algorithm": "sha256",
+        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "classification": "source_like"
+    }
+  ]
+}

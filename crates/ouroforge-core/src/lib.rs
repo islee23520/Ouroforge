@@ -5719,6 +5719,170 @@ Generated artifacts such as `runs/`, `target/`, and dashboard exports are local 
 
 const MINIMAL_2D_PROJECT_GITIGNORE: &str = "# Ouroforge generated/local state\nruns/\ntarget/\ndashboard-data/\n.openchrome/\n.omc/\n.omx/\n.claude/\n";
 
+pub const PROJECT_ASSET_MANIFEST_SCHEMA_VERSION: &str = "asset-manifest-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetManifest {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub id: String,
+    pub assets: Vec<ProjectAssetManifestEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetManifestEntry {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub asset_type: ProjectAssetType,
+    pub path: String,
+    #[serde(rename = "contentHash")]
+    pub content_hash: ProjectAssetContentHash,
+    pub classification: ProjectAssetClassification,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<ProjectAssetDimensions>,
+    #[serde(
+        rename = "durationMs",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub duration_ms: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectAssetType {
+    Image,
+    SpriteAtlas,
+    Tileset,
+    Tilemap,
+    Audio,
+    Font,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectAssetClassification {
+    SourceLike,
+    Generated,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetContentHash {
+    pub algorithm: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetDimensions {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl ProjectAssetManifest {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let manifest: ProjectAssetManifest =
+            serde_json::from_str(input).context("failed to parse Project Asset Manifest JSON")?;
+        manifest.validate_schema()?;
+        Ok(manifest)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != PROJECT_ASSET_MANIFEST_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "project asset manifest schemaVersion must be {PROJECT_ASSET_MANIFEST_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("project asset manifest id", &self.id)?;
+        if self.assets.is_empty() {
+            return Err(anyhow!("project asset manifest assets must not be empty"));
+        }
+        if let Some(notes) = &self.notes {
+            require_text("project asset manifest notes", notes)?;
+        }
+        for (index, asset) in self.assets.iter().enumerate() {
+            asset.validate_schema(index)?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectAssetManifestEntry {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("project asset manifest assets[{index}].id"),
+            &self.id,
+        )?;
+        require_text(
+            &format!("project asset manifest assets[{index}].path"),
+            &self.path,
+        )?;
+        self.content_hash.validate_schema(&format!(
+            "project asset manifest assets[{index}].contentHash"
+        ))?;
+        if let Some(dimensions) = &self.dimensions {
+            dimensions.validate_schema(&format!(
+                "project asset manifest assets[{index}].dimensions"
+            ))?;
+        }
+        if self.duration_ms == Some(0) {
+            return Err(anyhow!(
+                "project asset manifest assets[{index}].durationMs must be positive when present"
+            ));
+        }
+        if let Some(license) = &self.license {
+            require_text(
+                &format!("project asset manifest assets[{index}].license"),
+                license,
+            )?;
+        }
+        if let Some(source) = &self.source {
+            require_text(
+                &format!("project asset manifest assets[{index}].source"),
+                source,
+            )?;
+        }
+        for (key, value) in &self.metadata {
+            require_text(
+                &format!("project asset manifest assets[{index}].metadata key"),
+                key,
+            )?;
+            require_text(
+                &format!("project asset manifest assets[{index}].metadata.{key}"),
+                value,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectAssetContentHash {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.algorithm"), &self.algorithm)?;
+        require_text(&format!("{field}.value"), &self.value)
+    }
+}
+
+impl ProjectAssetDimensions {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!("{field} width and height must be positive"));
+        }
+        Ok(())
+    }
+}
+
 const ASSET_MANIFEST_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -21417,6 +21581,86 @@ scenarios:
         let rejected = format!("{rejected:#}");
         assert!(rejected.contains("missing file"));
         assert!(rejected.to_string().contains("scenes/missing.scene.json"));
+    }
+
+    #[test]
+    fn project_asset_manifest_v1_accepts_schema_fixture() {
+        let fixture = include_str!("../../../examples/asset-manifest-v1/asset-manifest.valid.json");
+        let manifest =
+            ProjectAssetManifest::from_json_str(fixture).expect("asset manifest fixture parses");
+
+        assert_eq!(
+            manifest.schema_version,
+            PROJECT_ASSET_MANIFEST_SCHEMA_VERSION
+        );
+        assert_eq!(manifest.id, "asset_manifest_v1_fixture");
+        assert_eq!(manifest.assets.len(), 3);
+        assert_eq!(manifest.assets[0].id, "player_sprite");
+        assert_eq!(manifest.assets[0].asset_type, ProjectAssetType::Image);
+        assert_eq!(
+            manifest.assets[0].classification,
+            ProjectAssetClassification::SourceLike
+        );
+        assert_eq!(
+            manifest.assets[0].dimensions,
+            Some(ProjectAssetDimensions {
+                width: 16,
+                height: 16
+            })
+        );
+        assert_eq!(manifest.assets[1].duration_ms, Some(240));
+        assert_eq!(
+            manifest.assets[2].classification,
+            ProjectAssetClassification::Generated
+        );
+
+        let serialized = serde_json::to_string(&manifest).expect("manifest serializes");
+        assert!(serialized.contains("\"schemaVersion\":\"asset-manifest-v1\""));
+        assert!(serialized.contains("\"type\":\"image\""));
+        assert!(serialized.contains("\"classification\":\"source_like\""));
+        assert!(serialized.contains("\"durationMs\":240"));
+    }
+
+    #[test]
+    fn project_asset_manifest_v1_rejects_schema_level_invalid_fixtures() {
+        let bad_schema = include_str!(
+            "../../../examples/asset-manifest-v1/invalid/bad-schema.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(bad_schema)
+            .expect_err("bad schema version rejected");
+        assert!(rejected.to_string().contains("schemaVersion"));
+
+        let unknown_field = include_str!(
+            "../../../examples/asset-manifest-v1/invalid/unknown-field.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(unknown_field)
+            .expect_err("unknown authority field rejected");
+        assert!(format!("{rejected:#}").contains("unknown field"));
+
+        let empty_assets = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "empty_assets",
+            "assets": []
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&empty_assets.to_string())
+            .expect_err("empty assets rejected");
+        assert!(rejected.to_string().contains("assets must not be empty"));
+
+        let zero_dimensions = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "zero_dimensions",
+            "assets": [{
+                "id": "sprite",
+                "type": "image",
+                "path": "assets/sprite.png",
+                "contentHash": { "algorithm": "sha256", "value": "abc" },
+                "classification": "source_like",
+                "dimensions": { "width": 0, "height": 16 }
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&zero_dimensions.to_string())
+            .expect_err("zero dimensions rejected");
+        assert!(rejected.to_string().contains("width and height"));
     }
 
     fn transition_test_scene(scene_id: &str, transitions: serde_json::Value) -> serde_json::Value {

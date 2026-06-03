@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "asset_manifest_v1_fixture",
+  "notes": "Tiny deterministic source-like fixture manifest for Asset Pipeline v1 schema tests.",
+  "assets": [
+    {
+      "id": "player_sprite",
+      "type": "image",
+      "path": "assets/sprites/player.png",
+      "contentHash": {
+        "algorithm": "sha256",
+        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "classification": "source_like",
+      "dimensions": {
+        "width": 16,
+        "height": 16
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture",
+      "metadata": {
+        "purpose": "schema-test"
+      }
+    },
+    {
+      "id": "pickup_sound",
+      "type": "audio",
+      "path": "assets/audio/pickup.ogg",
+      "contentHash": {
+        "algorithm": "sha256",
+        "value": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "classification": "source_like",
+      "durationMs": 240,
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture"
+    },
+    {
+      "id": "generated_preview",
+      "type": "image",
+      "path": "runs/asset-previews/player.png",
+      "contentHash": {
+        "algorithm": "sha256",
+        "value": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "classification": "generated",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      }
+    }
+  ]
+}
