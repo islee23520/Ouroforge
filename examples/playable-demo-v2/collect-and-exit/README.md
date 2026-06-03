@@ -26,6 +26,15 @@ before exit:
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
 ```
 
+AP1.9.3 adds an asset evidence compatibility smoke that runs the asset-backed
+demo in-process, writes temporary dashboard data outside the repository, renders
+dashboard and Studio asset panels against that generated payload, and deletes the
+temporary output before exit:
+
+```bash
+node examples/playable-demo-v2/collect-and-exit/asset-evidence-smoke.test.cjs
+```
+
 The smoke intentionally leaves `runs/`, `dashboard-data/`, screenshots, and other
 generated artifacts untracked.
 
