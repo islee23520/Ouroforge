@@ -13307,6 +13307,10 @@ pub struct SceneComponentDefaults {
     pub size: Option<SceneSize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub controllable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<SceneStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<SceneInputController>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -13319,11 +13323,133 @@ pub struct SceneComponents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collider: Option<SceneCollider>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<SceneTrigger>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<SceneStatus>,
+    #[serde(default, rename = "goalFlag", skip_serializing_if = "Option::is_none")]
+    pub goal_flag: Option<SceneGoalFlag>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<SceneInputController>,
+    #[serde(
+        default,
+        rename = "cameraTarget",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub camera_target: Option<SceneCameraTarget>,
+    #[serde(default, rename = "uiText", skip_serializing_if = "Option::is_none")]
+    pub ui_text: Option<SceneUiText>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animation: Option<SceneAnimation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<SceneAudio>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTrigger {
+    pub id: String,
+    pub kind: String,
+    #[serde(
+        default,
+        rename = "targetFlag",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub target_flag: Option<String>,
+    #[serde(
+        default,
+        rename = "requiredFlags",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub required_flags: Vec<String>,
+    #[serde(default, rename = "onEnter", skip_serializing_if = "Vec::is_empty")]
+    pub on_enter: Vec<SceneTriggerAction>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTriggerAction {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<bool>,
+    #[serde(default, rename = "entityId", skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneStatus {
+    #[serde(default, rename = "hitPoints", skip_serializing_if = "Option::is_none")]
+    pub hit_points: Option<i64>,
+    #[serde(
+        default,
+        rename = "maxHitPoints",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_hit_points: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub states: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGoalFlag {
+    pub flag: String,
+    #[serde(default = "default_goal_flag_value")]
+    pub value: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneInputController {
+    pub scheme: String,
+    #[serde(default, rename = "moveSpeed", skip_serializing_if = "Option::is_none")]
+    pub move_speed: Option<i64>,
+    #[serde(
+        default,
+        rename = "jumpImpulse",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub jump_impulse: Option<i64>,
+    #[serde(
+        default,
+        rename = "allowedActions",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub allowed_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCameraTarget {
+    #[serde(default = "default_camera_target_weight")]
+    pub weight: i64,
+    #[serde(default, rename = "deadZone", skip_serializing_if = "Option::is_none")]
+    pub dead_zone: Option<SceneSize>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneUiText {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(default, rename = "bindFlag", skip_serializing_if = "Option::is_none")]
+    pub bind_flag: Option<String>,
+}
+
+fn default_goal_flag_value() -> bool {
+    true
+}
+
+fn default_camera_target_weight() -> i64 {
+    1
+}
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ScenePoint {
@@ -25811,6 +25937,98 @@ scenarios:
         let audio = scene.entities[0].components.audio.as_ref().unwrap();
         assert_eq!(audio.events[0].name, "player_spawn");
         assert_eq!(audio.events[0].trigger, "scene_loaded");
+    }
+
+    #[test]
+    fn scene_component_model_v2_fixture_round_trips_additive_components() {
+        let fixture = include_str!("../../../examples/game-runtime/scene-components-v2.json");
+        let scene: SceneDocument =
+            serde_json::from_str(fixture).expect("v2 component fixture parses");
+
+        assert_eq!(scene.schema_version, "1");
+        assert_eq!(scene.id, "scene-components-v2-fixture");
+        assert_eq!(scene.entities.len(), 3);
+        assert_eq!(
+            scene
+                .component_defaults
+                .as_ref()
+                .and_then(|defaults| defaults.status.as_ref())
+                .and_then(|status| status.hit_points),
+            Some(1)
+        );
+
+        let player = &scene.entities[0].components;
+        assert_eq!(
+            player.status.as_ref().expect("player status").states,
+            vec!["grounded".to_string()]
+        );
+        assert_eq!(
+            player.input.as_ref().expect("player input").allowed_actions,
+            vec!["move".to_string(), "jump".to_string()]
+        );
+        assert_eq!(
+            player
+                .camera_target
+                .as_ref()
+                .expect("camera target")
+                .dead_zone
+                .as_ref()
+                .expect("dead zone")
+                .width,
+            64
+        );
+
+        let coin = &scene.entities[1].components;
+        assert_eq!(
+            coin.trigger.as_ref().expect("coin trigger").on_enter[0].kind,
+            "setFlag"
+        );
+        assert_eq!(
+            coin.goal_flag.as_ref().expect("coin goal flag").flag,
+            "coin_collected"
+        );
+
+        let hud = &scene.entities[2].components;
+        assert_eq!(
+            hud.ui_text.as_ref().expect("hud text").bind_flag.as_deref(),
+            Some("coin_collected")
+        );
+
+        let serialized = serde_json::to_value(&scene).expect("scene serializes");
+        assert_eq!(
+            serialized["entities"][0]["components"]["cameraTarget"]["weight"],
+            2
+        );
+        assert_eq!(
+            serialized["entities"][1]["components"]["goalFlag"]["value"],
+            true
+        );
+        assert_eq!(
+            serialized["entities"][2]["components"]["uiText"]["text"],
+            "Coin: 0/1"
+        );
+    }
+
+    #[test]
+    fn scene_component_model_v2_rejects_unknown_component_fields_by_schema() {
+        let rejected = serde_json::from_value::<SceneDocument>(json!({
+            "schemaVersion": "1",
+            "id": "bad-v2-component-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "status": { "hitPoints": 3, "mana": 10 }
+                }
+            }]
+        }))
+        .expect_err("unknown v2 component field rejected");
+        assert!(rejected.to_string().contains("mana"));
     }
 
     #[test]

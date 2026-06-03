@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1",
+  "id": "scene-components-v2-fixture",
+  "bounds": { "width": 320, "height": 180 },
+  "componentDefaults": {
+    "transform": { "x": 0, "y": 0 },
+    "velocity": { "x": 0, "y": 0 },
+    "size": { "width": 16, "height": 16 },
+    "controllable": false,
+    "status": { "hitPoints": 1, "maxHitPoints": 1, "flags": [], "states": [] },
+    "input": { "scheme": "keyboard", "moveSpeed": 2, "allowedActions": ["move"] }
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 32, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "collider": {
+          "shape": "aabb",
+          "body": "dynamic",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "width": 16, "height": 16 },
+          "sensor": false
+        },
+        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["alive"], "states": ["grounded"] },
+        "input": { "scheme": "keyboard", "moveSpeed": 3, "jumpImpulse": 8, "allowedActions": ["move", "jump"] },
+        "cameraTarget": { "weight": 2, "deadZone": { "width": 64, "height": 32 } }
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "coin",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 160, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "controllable": false,
+        "trigger": {
+          "id": "collect_coin",
+          "kind": "overlap",
+          "targetFlag": "coin_collected",
+          "onEnter": [
+            { "kind": "setFlag", "flag": "coin_collected", "value": true },
+            { "kind": "hideEntity", "entityId": "coin" }
+          ]
+        },
+        "goalFlag": { "flag": "coin_collected", "label": "Collect coin" }
+      },
+      "tags": ["collectible"]
+    },
+    {
+      "id": "hud_coin",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 8 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 64, "height": 12 },
+        "controllable": false,
+        "uiText": { "text": "Coin: 0/1", "role": "hud", "bindFlag": "coin_collected" }
+      },
+      "tags": ["hud"]
+    }
+  ],
+  "metadata": { "fixture": "scene-components-v2" }
+}
