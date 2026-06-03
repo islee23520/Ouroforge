@@ -148,6 +148,13 @@ const run = {
       ],
       blockers: ['missing <comparison>'],
       requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+      nextSafeAction: 'Copy <status> command manually',
+      allowedCommands: [{ command: 'cargo run -p ouroforge-cli -- loop status <plan>', boundary: 'inert display text only' }],
+      forbiddenActions: ['Do not click <run> controls'],
+      evidenceRefs: [{ id: '<bundle>', path: 'runs/<bundle>/bundle.json' }],
+      bundleStatus: 'partial',
+      handoffStatus: 'blocked',
+      bundleMissingRefs: ['comparison:<missing>'],
       boundary: 'Display-only cockpit row; does not execute commands.',
     }],
   },
@@ -572,6 +579,11 @@ assert.match(cockpit.renderStudioLoopCockpitSurface(run), /&lt;cockpit-loop&gt;/
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /&lt;step-current&gt;/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Blockers: missing &lt;comparison&gt;/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Required decisions: &lt;human-review&gt;:human-review/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Next safe action: Copy &lt;status&gt; command manually/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Allowed command text: cargo run -p ouroforge-cli -- loop status &lt;plan&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Forbidden actions: Do not click &lt;run&gt; controls/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Evidence refs: &lt;bundle&gt;:runs\/&lt;bundle&gt;\/bundle\.json/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Missing\/stale bundle refs: comparison:&lt;missing&gt;/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /No browser authority|does not execute commands/);
 assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<cockpit-loop>/);
 assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<button/i);

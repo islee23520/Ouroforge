@@ -999,14 +999,25 @@ const OuroforgeCockpit = (() => {
     const rows = cockpit.loops.map((loop) => {
       const blockers = Array.isArray(loop.blockers) ? loop.blockers : [];
       const decisions = Array.isArray(loop.requiredDecisions) ? loop.requiredDecisions : [];
+      const allowed = Array.isArray(loop.allowedCommands) ? loop.allowedCommands : [];
+      const forbidden = Array.isArray(loop.forbiddenActions) ? loop.forbiddenActions : [];
+      const evidence = Array.isArray(loop.evidenceRefs) ? loop.evidenceRefs : [];
+      const missing = Array.isArray(loop.bundleMissingRefs) ? loop.bundleMissingRefs : [];
       const current = loop.currentStep && typeof loop.currentStep === 'object' ? loop.currentStep : null;
       const status = loop.status || loop.bundleStatus || loop.handoffStatus || 'unknown';
+      const commandText = allowed.map((command) => command.command || '').filter(Boolean).join(' · ');
+      const evidenceText = evidence.map((ref) => `${ref.id || 'ref'}:${ref.path || 'missing'}`).join(' · ');
       return `<div class="surface-row"><strong>${escapeText(loop.loopId || 'unknown-loop')}</strong> ${surfaceState(Boolean(status), status)}<br>
-        <small>Plan: ${escapeText(loop.planPath || 'unrecorded')}</small>
+        <small>Plan: ${escapeText(loop.planPath || 'unrecorded')} · bundle ${escapeText(loop.bundleStatus || 'unknown')} · handoff ${escapeText(loop.handoffStatus || 'unknown')}</small>
         <div class="hint">Current step: ${escapeText(current?.stepId || 'none')} · ${escapeText(current?.kind || 'unknown')} · ${escapeText(current?.status || 'unknown')}</div>
         ${renderLoopCockpitTimeline(loop)}
+        <div class="hint">Next safe action: ${escapeText(loop.nextSafeAction || 'unrecorded')}</div>
         ${blockers.length ? `<div class="hint">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="hint">No blockers reported.</div>'}
         ${decisions.length ? `<div class="hint">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="hint">No required decisions reported.</div>'}
+        <div class="hint">Allowed command text: ${escapeText(commandText || 'none')}</div>
+        <div class="hint">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
+        <div class="hint">Evidence refs: ${escapeText(evidenceText || 'none')}</div>
+        ${missing.length ? `<div class="hint">Missing/stale bundle refs: ${escapeText(missing.join(' · '))}</div>` : '<div class="hint">No missing bundle refs reported.</div>'}
         <small>${escapeText(loop.boundary || 'Display-only loop cockpit row; no browser authority.')}</small>
       </div>`;
     }).join('');
