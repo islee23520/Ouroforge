@@ -18784,6 +18784,7 @@ pub struct RunDashboardReadModel {
     pub asset_integrity: RunDashboardAssetIntegrity,
     pub asset_loading: RunDashboardAssetLoading,
     pub asset_preview: RunDashboardAssetPreview,
+    pub asset_inspector: RunDashboardAssetInspector,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -18990,6 +18991,37 @@ pub struct RunDashboardAssetPreview {
     pub warnings: Vec<AssetPreviewWarning>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardAssetInspector {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub asset_count: usize,
+    pub warning_count: usize,
+    pub runtime_attempt_count: usize,
+    pub loaded_count: usize,
+    pub failed_count: usize,
+    pub preview_count: usize,
+    pub atlas_frame_count: usize,
+    pub tilemap_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub assets: Vec<RunDashboardAssetInspectorAsset>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardAssetInspectorAsset {
+    pub asset_id: String,
+    pub asset_type: String,
+    pub source_path: Option<String>,
+    pub preview_kind: Option<String>,
+    pub image: Option<AssetPreviewImageMetadata>,
+    pub atlas_frame_count: usize,
+    pub tilemap: Option<AssetPreviewTilemapMetadata>,
+    pub runtime_statuses: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -19329,6 +19361,8 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let asset_integrity = read_dashboard_asset_integrity(run_dir, &evidence)?;
     let asset_loading = read_dashboard_asset_loading(run_dir, &evidence)?;
     let asset_preview = read_dashboard_asset_preview(run_dir, &evidence)?;
+    let asset_inspector =
+        dashboard_asset_inspector(&asset_integrity, &asset_loading, &asset_preview);
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -19382,6 +19416,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         asset_integrity,
         asset_loading,
         asset_preview,
+        asset_inspector,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -19699,6 +19734,150 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_asset_inspector(
+    integrity: &RunDashboardAssetIntegrity,
+    loading: &RunDashboardAssetLoading,
+    preview: &RunDashboardAssetPreview,
+) -> RunDashboardAssetInspector {
+    let present = integrity.present || loading.present || preview.present;
+    let boundary = "Read-only Studio asset inspector data assembled from Rust-exported dashboard evidence; browser surfaces must not upload, write, fetch remote assets, edit manifests, or execute commands.".to_string();
+    if !present {
+        return RunDashboardAssetInspector {
+            present: false,
+            empty_state: "No asset inspector evidence is available for this run.".to_string(),
+            status: "missing".to_string(),
+            asset_count: 0,
+            warning_count: 0,
+            runtime_attempt_count: 0,
+            loaded_count: 0,
+            failed_count: 0,
+            preview_count: 0,
+            atlas_frame_count: 0,
+            tilemap_count: 0,
+            evidence_refs: Vec::new(),
+            assets: Vec::new(),
+            boundary,
+        };
+    }
+
+    let mut assets: BTreeMap<String, RunDashboardAssetInspectorAsset> = BTreeMap::new();
+    for record in &preview.records {
+        let entry = assets.entry(record.asset_id.clone()).or_insert_with(|| {
+            RunDashboardAssetInspectorAsset {
+                asset_id: record.asset_id.clone(),
+                asset_type: format!("{:?}", record.asset_type),
+                source_path: Some(record.source_path.clone()),
+                preview_kind: Some(format!("{:?}", record.preview_kind)),
+                image: record.image.clone(),
+                atlas_frame_count: record.atlas_frames.len(),
+                tilemap: record.tilemap.clone(),
+                runtime_statuses: Vec::new(),
+                warnings: Vec::new(),
+            }
+        });
+        entry.asset_type = format!("{:?}", record.asset_type);
+        entry.source_path = Some(record.source_path.clone());
+        entry.preview_kind = Some(format!("{:?}", record.preview_kind));
+        entry.image = record.image.clone();
+        entry.atlas_frame_count = record.atlas_frames.len();
+        entry.tilemap = record.tilemap.clone();
+        for warning in &record.warnings {
+            entry
+                .warnings
+                .push(format!("{}: {}", warning.kind, warning.message));
+        }
+    }
+    for warning in &preview.warnings {
+        if let Some(asset_id) = &warning.asset_id {
+            assets
+                .entry(asset_id.clone())
+                .or_insert_with(|| RunDashboardAssetInspectorAsset {
+                    asset_id: asset_id.clone(),
+                    asset_type: "unknown".to_string(),
+                    source_path: warning.path.clone(),
+                    preview_kind: None,
+                    image: None,
+                    atlas_frame_count: 0,
+                    tilemap: None,
+                    runtime_statuses: Vec::new(),
+                    warnings: Vec::new(),
+                })
+                .warnings
+                .push(format!("{}: {}", warning.kind, warning.message));
+        }
+    }
+    for warning in &integrity.warnings {
+        assets
+            .entry(warning.asset_id.clone())
+            .or_insert_with(|| RunDashboardAssetInspectorAsset {
+                asset_id: warning.asset_id.clone(),
+                asset_type: warning
+                    .observed_type
+                    .map(|asset_type| format!("{:?}", asset_type))
+                    .unwrap_or_else(|| "unknown".to_string()),
+                source_path: warning.path.clone(),
+                preview_kind: None,
+                image: None,
+                atlas_frame_count: 0,
+                tilemap: None,
+                runtime_statuses: Vec::new(),
+                warnings: Vec::new(),
+            })
+            .warnings
+            .push(format!("{}: {}", warning.kind, warning.message));
+    }
+    for load in &loading.records {
+        assets
+            .entry(load.asset_id.clone())
+            .or_insert_with(|| RunDashboardAssetInspectorAsset {
+                asset_id: load.asset_id.clone(),
+                asset_type: format!("{:?}", load.asset_type),
+                source_path: load.path.clone(),
+                preview_kind: None,
+                image: load
+                    .width
+                    .zip(load.height)
+                    .map(|(width, height)| AssetPreviewImageMetadata { width, height }),
+                atlas_frame_count: 0,
+                tilemap: None,
+                runtime_statuses: Vec::new(),
+                warnings: Vec::new(),
+            })
+            .runtime_statuses
+            .push(format!("{:?}", load.status));
+    }
+
+    let mut evidence_refs = Vec::new();
+    evidence_refs.extend(integrity.evidence_refs.clone());
+    evidence_refs.extend(loading.evidence_refs.clone());
+    evidence_refs.extend(preview.evidence_refs.clone());
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let warning_count = integrity.warning_count + preview.warning_count;
+    let status = if warning_count > 0 || loading.failed_count > 0 || loading.rejected_count > 0 {
+        "warnings"
+    } else {
+        "ready"
+    };
+    let assets = assets.into_values().collect::<Vec<_>>();
+    RunDashboardAssetInspector {
+        present,
+        empty_state: String::new(),
+        status: status.to_string(),
+        asset_count: assets.len(),
+        warning_count,
+        runtime_attempt_count: loading.attempt_count,
+        loaded_count: loading.loaded_count,
+        failed_count: loading.failed_count,
+        preview_count: preview.preview_count,
+        atlas_frame_count: preview.atlas_frame_count,
+        tilemap_count: preview.tilemap_count,
+        evidence_refs,
+        assets,
+        boundary,
+    }
 }
 
 fn read_dashboard_asset_preview(
@@ -24251,6 +24430,104 @@ scenarios:
             .to_string(),
         );
         assert!(empty.is_err());
+    }
+
+    #[test]
+    fn dashboard_asset_inspector_combines_preview_integrity_and_loading() {
+        let integrity = RunDashboardAssetIntegrity {
+            present: true,
+            empty_state: String::new(),
+            warning_count: 1,
+            stale_hash_count: 1,
+            missing_ref_count: 0,
+            invalid_type_count: 0,
+            evidence_refs: vec!["evidence/assets/integrity.json".to_string()],
+            warnings: vec![ProjectAssetReferenceIntegrityWarning {
+                field: "scene sprite".to_string(),
+                asset_id: "player_sprite".to_string(),
+                kind: "stale_asset_hash".to_string(),
+                message: "hash mismatch".to_string(),
+                expected_types: vec![ProjectAssetType::Image],
+                observed_type: Some(ProjectAssetType::Image),
+                path: Some("assets/sprites/player.png".to_string()),
+            }],
+            artifacts: Vec::new(),
+        };
+        let loading = RunDashboardAssetLoading {
+            present: true,
+            empty_state: String::new(),
+            attempt_count: 2,
+            loaded_count: 1,
+            failed_count: 1,
+            rejected_count: 0,
+            fallback_count: 0,
+            evidence_refs: vec!["evidence/assets/load.json".to_string()],
+            records: vec![RuntimeAssetLoadRecord {
+                attempt_id: "load-player".to_string(),
+                asset_id: "player_sprite".to_string(),
+                asset_type: ProjectAssetType::Image,
+                path: Some("assets/sprites/player.png".to_string()),
+                status: RuntimeAssetLoadStatus::Loaded,
+                started_at_unix_ms: 1,
+                ended_at_unix_ms: Some(2),
+                load_duration_ms: Some(1),
+                width: Some(16),
+                height: Some(16),
+                media_duration_ms: None,
+                failure_reason: None,
+            }],
+            artifacts: Vec::new(),
+            boundary: "loading boundary".to_string(),
+        };
+        let preview = RunDashboardAssetPreview {
+            present: true,
+            empty_state: String::new(),
+            preview_count: 1,
+            warning_count: 0,
+            image_count: 1,
+            atlas_frame_count: 2,
+            tilemap_count: 0,
+            audio_count: 0,
+            font_count: 0,
+            evidence_refs: vec!["evidence/assets/preview.json".to_string()],
+            records: vec![AssetPreviewRecord {
+                asset_id: "player_sprite".to_string(),
+                asset_type: ProjectAssetType::Image,
+                source_path: "assets/sprites/player.png".to_string(),
+                preview_kind: AssetPreviewKind::Thumbnail,
+                preview_path: None,
+                preview_classification: None,
+                image: Some(AssetPreviewImageMetadata {
+                    width: 16,
+                    height: 16,
+                }),
+                atlas_frames: Vec::new(),
+                tilemap: None,
+                audio: None,
+                font: None,
+                warnings: Vec::new(),
+            }],
+            warnings: Vec::new(),
+            artifacts: Vec::new(),
+            boundary: "preview boundary".to_string(),
+        };
+
+        let inspector = dashboard_asset_inspector(&integrity, &loading, &preview);
+        assert!(inspector.present);
+        assert_eq!(inspector.status, "warnings");
+        assert_eq!(inspector.asset_count, 1);
+        assert_eq!(inspector.warning_count, 1);
+        assert_eq!(inspector.runtime_attempt_count, 2);
+        assert_eq!(inspector.preview_count, 1);
+        assert_eq!(inspector.atlas_frame_count, 2);
+        assert_eq!(inspector.evidence_refs.len(), 3);
+        assert_eq!(inspector.assets[0].asset_id, "player_sprite");
+        assert_eq!(
+            inspector.assets[0].runtime_statuses,
+            vec!["Loaded".to_string()]
+        );
+        assert!(inspector.assets[0].warnings[0].contains("stale_asset_hash"));
+        assert!(inspector.boundary.contains("must not upload"));
     }
 
     #[test]
