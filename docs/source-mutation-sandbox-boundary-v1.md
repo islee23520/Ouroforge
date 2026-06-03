@@ -144,3 +144,66 @@ its allowed commands:
 
 If any acknowledgement cannot be made, the evaluation is held for separate
 review instead of broadening the allowlist implicitly.
+
+## Failure and cleanup policy
+
+A future sandbox evaluation must fail closed. Any failed preflight, rejected
+command, stale hash, missing evidence artifact, unexpected source-like write,
+credential/network/install-script requirement, or cleanup ambiguity stops the
+evaluation and records a reviewer-facing failure instead of retrying with a
+broader boundary.
+
+### Failure handling expectations
+
+| Failure class | Required response |
+| --- | --- |
+| Dirty or ambiguous worktree | Stop before evaluation; record status output and conflicting paths. |
+| Stale base commit or target hash | Stop before evaluation; record expected and observed refs/hashes. |
+| Disallowed command request | Stop before execution; record the rejected command and policy reason. |
+| Network, credential, or install-script requirement | Stop before execution; record the blocked requirement without reading secrets or contacting services. |
+| Test/check failure | Preserve bounded logs and generated evidence; do not auto-apply, auto-revert source, or broaden the command allowlist. |
+| Unexpected source-like write | Stop and quarantine evidence; record touched paths and require reviewer decision before cleanup or retry. |
+| Cleanup failure | Preserve enough state for diagnosis; do not silently delete evidence or continue with a contaminated worktree. |
+
+Failures must be terminal for that evaluation attempt unless a reviewer creates a
+new explicit evaluation record with updated scope. Retrying in place, editing the
+primary checkout, or switching to a more permissive shell path is prohibited.
+
+### Cleanup expectations
+
+Before evaluation begins, the design must state which generated artifacts are
+retained for evidence and which temporary directories may be removed. Cleanup is
+limited to the isolated worktree and generated evidence roots declared in the
+preflight record. It must not remove or rewrite primary-repository source files,
+ignored local configuration, credentials, dependency caches, browser profiles, or
+unrelated generated runs.
+
+A cleanup record should capture:
+
+1. evaluation id and patch preview id;
+2. isolated worktree path and branch/ref;
+3. generated evidence roots retained;
+4. temporary paths removed, if any;
+5. paths intentionally retained for reviewer inspection;
+6. cleanup command text or manual action description; and
+7. cleanup result, including any remaining contaminated state.
+
+If cleanup is unsafe or incomplete, the final state is `failed_cleanup_required`
+or equivalent reviewer-visible status, not `passed`.
+
+### Evidence capture expectations
+
+A future sandbox evaluation should capture a bounded evidence bundle containing:
+
+- preflight repository/worktree/ref/hash/status evidence;
+- allowed command policy acknowledgement and command list;
+- command outputs, exit statuses, and bounded logs for check-only evaluation;
+- generated artifact inventory before and after evaluation;
+- failure classification and blocked reason when evaluation does not pass;
+- cleanup plan and cleanup result; and
+- explicit confirmation that source mutation apply, arbitrary patch apply,
+  browser trusted writes, hidden command execution, credentials, network access,
+  install scripts, CI/workflow mutation, and dependency mutation remained blocked.
+
+The evidence bundle is review material only. It does not authorize merge,
+auto-accept, source mutation application, or closure of #1 or #23.
