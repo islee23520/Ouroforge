@@ -3383,8 +3383,7 @@ pub fn build_authoring_loop_resume_preflight(
     // preflight does not advertise a "ready" resume that the runner will reject.
     for dependency in &step.depends_on {
         if !plan.steps.iter().any(|candidate| {
-            candidate.id == *dependency
-                && candidate.status == AuthoringLoopStepStatus::Completed
+            candidate.id == *dependency && candidate.status == AuthoringLoopStepStatus::Completed
         }) {
             blocked_reasons.push(format!(
                 "dependency {dependency} is not completed; resume would fail the running transition"
