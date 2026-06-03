@@ -169,6 +169,33 @@ const OuroforgeDashboard = (() => {
     </article>`;
   }
 
+
+  function renderTilemapSummary(summary = {}) {
+    const tilemaps = summary?.tilemaps || {};
+    if (!summary?.present || !tilemaps.present) {
+      return '<p class="empty-state">No tilemap world-state summary is available.</p>';
+    }
+    const authoring = tilemaps.authoring || {};
+    const rows = [
+      ['Tilemaps', tilemaps.tilemapCount ?? 0],
+      ['Layer order entries', tilemaps.layerCount ?? 0],
+      ['Collision cells', authoring.collisionCellCount ?? 0],
+      ['Trigger cells', authoring.triggerCellCount ?? 0],
+      ['Hazard cells', authoring.hazardCellCount ?? 0],
+      ['Goal cells', authoring.goalCellCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const tilemapRows = Array.isArray(tilemaps.tilemaps) && tilemaps.tilemaps.length
+      ? tilemaps.tilemaps.slice(0, 4).map((tilemap) => {
+          const localAuthoring = tilemap?.authoring || {};
+          const grid = tilemap?.grid && typeof tilemap.grid === 'object'
+            ? `${tilemap.grid.width ?? '?'}×${tilemap.grid.height ?? '?'}`
+            : 'unknown grid';
+          return `<li><strong>${escapeText(tilemap?.id || 'unknown')}</strong>: ${escapeText(grid)}, ${escapeText(tilemap?.layerCount ?? 0)} layer(s), ${escapeText(localAuthoring.collisionCellCount ?? 0)} collision / ${escapeText(localAuthoring.triggerCellCount ?? 0)} trigger / ${escapeText(localAuthoring.hazardCellCount ?? 0)} hazard / ${escapeText(localAuthoring.goalCellCount ?? 0)} goal cell(s)</li>`;
+        }).join('')
+      : '<li>No tilemap entries recorded.</li>';
+    return `<div class="field-grid">${rows}</div><ul class="run-meta-list">${tilemapRows}</ul><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}. Read-only: the dashboard displays exported evidence only and cannot edit tilemaps.</p>`;
+  }
+
   function renderGameplaySummary(summary = {}) {
     const gameplay = summary?.gameplay || {};
     if (!summary?.present || !gameplay.present) {
@@ -957,6 +984,7 @@ const OuroforgeDashboard = (() => {
       </div>
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
+      <section class="panel"><h3>Tilemap authoring evidence</h3>${renderTilemapSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
@@ -1034,7 +1062,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

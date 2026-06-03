@@ -18713,6 +18713,59 @@ fn dashboard_hud_summary(world_state: &serde_json::Value) -> serde_json::Value {
     })
 }
 
+fn dashboard_tilemap_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let tilemaps = world_state
+        .pointer("/tilemaps/tilemaps")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut collision_cells = 0usize;
+    let mut trigger_cells = 0usize;
+    let mut hazard_cells = 0usize;
+    let mut goal_cells = 0usize;
+    let mut summaries = Vec::new();
+    for tilemap in &tilemaps {
+        let authoring = tilemap.get("authoring").cloned().unwrap_or(json!({}));
+        let tilemap_collision_cells = dashboard_array_len(authoring.get("collisionCells"));
+        let tilemap_trigger_cells = dashboard_array_len(authoring.get("triggerCells"));
+        let tilemap_hazard_cells = dashboard_array_len(authoring.get("hazardCells"));
+        let tilemap_goal_cells = dashboard_array_len(authoring.get("goalCells"));
+        collision_cells += tilemap_collision_cells;
+        trigger_cells += tilemap_trigger_cells;
+        hazard_cells += tilemap_hazard_cells;
+        goal_cells += tilemap_goal_cells;
+        summaries.push(json!({
+            "id": tilemap.get("id").cloned().unwrap_or(json!(null)),
+            "grid": tilemap.get("grid").cloned().unwrap_or(json!({})),
+            "tileCount": tilemap.get("tileCount").cloned().unwrap_or(json!(0)),
+            "layerCount": dashboard_array_len(tilemap.get("layers")),
+            "authoring": {
+                "collisionCellCount": tilemap_collision_cells,
+                "triggerCellCount": tilemap_trigger_cells,
+                "hazardCellCount": tilemap_hazard_cells,
+                "goalCellCount": tilemap_goal_cells,
+                "collisionCells": authoring.get("collisionCells").cloned().unwrap_or(json!([])),
+                "triggerCells": authoring.get("triggerCells").cloned().unwrap_or(json!([])),
+                "hazardCells": authoring.get("hazardCells").cloned().unwrap_or(json!([])),
+                "goalCells": authoring.get("goalCells").cloned().unwrap_or(json!([]))
+            }
+        }));
+    }
+    json!({
+        "present": world_state.get("tilemaps").is_some(),
+        "tilemapCount": tilemaps.len(),
+        "layerCount": dashboard_array_len(world_state.pointer("/tilemaps/layerOrder")),
+        "authoring": {
+            "present": collision_cells > 0 || trigger_cells > 0 || hazard_cells > 0 || goal_cells > 0,
+            "collisionCellCount": collision_cells,
+            "triggerCellCount": trigger_cells,
+            "hazardCellCount": hazard_cells,
+            "goalCellCount": goal_cells
+        },
+        "tilemaps": summaries
+    })
+}
+
 fn dashboard_collision_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let rules_present = world_state.get("collisionRules").is_some();
     json!({
@@ -18868,11 +18921,7 @@ fn read_dashboard_engine_summaries(
             "renderedEntities": dashboard_array_len(world_state.pointer("/renderer/renderedEntities")),
             "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null))
         }),
-        tilemaps: json!({
-            "present": world_state.get("tilemaps").is_some(),
-            "tilemapCount": dashboard_array_len(world_state.pointer("/tilemaps/tilemaps")),
-            "layerCount": dashboard_array_len(world_state.pointer("/tilemaps/layerOrder"))
-        }),
+        tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
             "assetCount": dashboard_array_len(world_state.get("assets")),
@@ -32482,7 +32531,21 @@ scenarios:
                     }
                 }],
                 "renderer": { "version": "1", "camera": { "x": 0, "y": 0 }, "renderedEntities": [{ "entityId": "player" }] },
-                "tilemaps": { "tilemaps": [{ "id": "platformer-ground" }], "layerOrder": [{ "layerId": "background" }] },
+                "tilemaps": {
+                    "tilemaps": [{
+                        "id": "platformer-ground",
+                        "grid": { "width": 20, "height": 3 },
+                        "tileCount": 3,
+                        "layers": [{ "id": "ground" }],
+                        "authoring": {
+                            "collisionCells": [{ "tilemapId": "platformer-ground", "layerId": "ground", "tileId": "ground", "x": 0, "y": 1 }],
+                            "triggerCells": [{ "tilemapId": "platformer-ground", "layerId": "markers", "tileId": "coin", "x": 3, "y": 1, "trigger": "coin_collected" }],
+                            "hazardCells": [{ "tilemapId": "platformer-ground", "layerId": "hazards", "tileId": "spike", "x": 4, "y": 1 }],
+                            "goalCells": [{ "tilemapId": "platformer-ground", "layerId": "markers", "tileId": "exit", "x": 5, "y": 1 }]
+                        }
+                    }],
+                    "layerOrder": [{ "layerId": "background" }]
+                },
                 "assetManifest": { "id": "runtime-v1-assets", "assetCount": 3 },
                 "assets": [{ "id": "player-sprite", "status": "loaded" }],
                 "audioEvents": [{ "name": "player_spawn" }],
@@ -32538,6 +32601,18 @@ scenarios:
             json!("animation")
         );
         assert_eq!(model.engine_summaries.tilemaps["tilemapCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.tilemaps["authoring"]["collisionCellCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.tilemaps["authoring"]["triggerCellCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.tilemaps["tilemaps"][0]["authoring"]["goalCellCount"],
+            json!(1)
+        );
         assert_eq!(
             model.engine_summaries.assets["manifestId"],
             json!("runtime-v1-assets")

@@ -103,7 +103,7 @@ See `docs/collision-physics-v2.md` for collision layer validation, runtime rules
 
 ## Engine Expansion v1 playable template
 
-`scene.json` is the one-screen playable template used by `seeds/platformer.yaml`. It intentionally combines completed Engine Expansion v1 features without adding new engine behavior: renderer layers/camera, tilemap collision layers, manifest-backed sprite/audio assets, sprite-frame animation, headless-safe audio intents, bounded AABB physics/contact evidence, reload probe state, and scene composition (`player-badge` is parented to `player`).
+`scene.json` is the one-screen playable template used by `seeds/platformer.yaml`. Tilemap Authoring v2 evidence is documented in `docs/tileset-tilemap-authoring-v2.md`; runtime world state exposes read-only authoring cells and synthetic collision/trigger outcomes for scenario assertions without browser-side writes. It intentionally combines completed Engine Expansion v1 features without adding new engine behavior: renderer layers/camera, tilemap collision layers, manifest-backed sprite/audio assets, sprite-frame animation, headless-safe audio intents, bounded AABB physics/contact evidence, reload probe state, and scene composition (`player-badge` is parented to `player`).
 
 Run and inspect it with:
 

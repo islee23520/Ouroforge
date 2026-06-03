@@ -56,6 +56,8 @@ Follow-up Asset Pipeline v1 issues should be implemented in this order:
    `docs/sprite-atlas-manifest-v1.md`).
 3. **Tileset and Tilemap Authoring v2** — extend tilemap authoring around
    manifest-declared tilesets, layers, collision tags, and source-like fixtures.
+   See `docs/tileset-tilemap-authoring-v2.md` for the schema, runtime evidence,
+   dashboard read-model, and explicit non-goals.
 4. **Asset Reference Integrity v1** — validate scene, animation, audio, font,
    tilemap, and scenario references against manifest ids and hashes.
 5. **Runtime Asset Loading Evidence v1** — record generated evidence that runtime

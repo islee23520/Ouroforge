@@ -110,6 +110,10 @@ ignored unless a future issue explicitly scopes a tiny deterministic fixture.
 | `audio` | `ogg`, `mp3`, `wav` |
 | `font` | `ttf`, `otf`, `woff`, `woff2` |
 
+Tileset/tilemap payloads may include bounded authoring metadata used by
+`docs/tileset-tilemap-authoring-v2.md`; runtime/dashboard consumers treat the
+extracted cells as read-only evidence, not editor write authority.
+
 ## Boundary and non-goals
 
 Asset Manifest v1 keeps trusted validation in Rust and does not authorize:

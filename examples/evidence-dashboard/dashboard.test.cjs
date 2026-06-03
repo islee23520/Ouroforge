@@ -38,6 +38,19 @@ const run = {
   engine_summaries: {
     present: true,
     source_world_state: 'evidence/world.json',
+    tilemaps: {
+      present: true,
+      tilemapCount: 1,
+      layerCount: 2,
+      authoring: { present: true, collisionCellCount: 3, triggerCellCount: 1, hazardCellCount: 1, goalCellCount: 1 },
+      tilemaps: [{
+        id: '<platformer-ground>',
+        grid: { width: 20, height: 3 },
+        tileCount: 4,
+        layerCount: 2,
+        authoring: { collisionCellCount: 3, triggerCellCount: 1, hazardCellCount: 1, goalCellCount: 1 },
+      }],
+    },
     gameplay: {
       present: true,
       declaredFlagCount: 2,
@@ -484,6 +497,11 @@ assert.match(detail, /bad json/);
 assert.match(dashboard.renderCategorySummary(run.summary.evidence_categories), /Frame\/performance metrics/);
 assert.match(dashboard.renderProbeContractStatus(run.probe_contract_status), /present/);
 assert.match(dashboard.renderProbeContractStatus({ status: 'malformed', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 1, missing_count: 1, malformed_count: 1, evidence_refs: ['evidence/failure.json'] }), /1 malformed/);
+assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /Tilemaps/);
+assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /Collision cells/);
+assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /3 collision \/ 1 trigger \/ 1 hazard \/ 1 goal/);
+assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /&lt;platformer-ground&gt;/);
+assert.match(dashboard.renderTilemapSummary({}), /No tilemap world-state summary/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /HUD value components/);
