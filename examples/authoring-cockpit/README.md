@@ -1,6 +1,6 @@
 # Studio v3 Project Workspace Cockpit
 
-Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
+Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -34,6 +34,8 @@ The cockpit composes completed local surfaces only:
 - project workspace manifest/scene/seed/scenario pack context from generated dashboard data;
 - project-bound run summary and generated-state status;
 - run/evidence browser from generated dashboard data;
+- expressive scene inspection for Rust-exported component counts, entity components, triggers, flags, and HUD values;
+- collision/transition/event inspection for Rust-exported collision rules/events, scene transitions, animation state, and audio/runtime events;
 - journal viewer when journal data exists;
 - mutation review lifecycle state and manual command hints when artifacts exist;
 - Studio Review Cockpit v1 proposal/review/application cards from exported lifecycle state;
@@ -47,6 +49,21 @@ The cockpit composes completed local surfaces only:
 - semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist.
 
 Known gaps are intentionally visible: no production editor, hosted studio, native shell, collaboration, plugin/marketplace UI, visual scripting, direct browser file writes, browser-side comparison algorithms, command bridge, or mutation acceptance/application from the browser. Studio Review Cockpit v1 review/regression boundaries are documented in `../../docs/studio-review-cockpit-v1.md`. Studio v3 verification evidence is recorded in `../../docs/studio-v3-project-workspace-cockpit.md`; Studio v2 evidence remains in `../../docs/studio-v2-cockpit.md`; legacy Studio v1 evidence remains in `../../docs/studio-v1-demo.md`.
+
+## Expressive Scene Inspection v2
+
+When `dashboard-data.json` includes the Engine Expansion read model, the cockpit
+displays two read-only Studio Authoring Surface v2 panels:
+
+- **Expressive scene inspection**: component counts, entity components, trigger
+  bindings, required flags, and HUD values.
+- **Collision/transition/event inspection**: collision rules and events, scene
+  transitions/reload status, animation entities, and audio/runtime events.
+
+Both panels consume Rust-exported evidence only. They escape missing, malformed,
+or hostile data, and they must not execute commands, write files, persist browser
+state, own source scene truth, or replace Rust validation. Refresh exported
+`dashboard-data.json` after running `dashboard export` to inspect newer evidence.
 
 ## QA and evidence loop
 
@@ -97,7 +114,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 ```
 
 Then open <http://127.0.0.1:8000/examples/authoring-cockpit/> to inspect the
-static scene/entity/component view, Engine Expansion state panel, project
+static scene/entity/component view, Engine Expansion state panel, expressive scene inspection, collision/transition/event inspection, project
 workspace panels, and copyable Rust validation/run/compare/mutation/dashboard
 commands. The cockpit inspects exported data; it does not run seeds, compare
 runs, persist edits, apply mutations, or write files from browser JavaScript.
