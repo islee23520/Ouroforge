@@ -90,6 +90,12 @@ records and copyable `scenario promote --dry-run` commands as escaped text.
 It does not generate drafts, promote scenarios, mutate scenario packs, execute
 commands, or bridge to a shell from browser JavaScript.
 
+Regression Run Matrix v1 reads top-level `regression_matrix` from the generated
+dashboard export and displays project/scenario-pack scenario history with current
+status, last pass, last fail, and context counts. It is display-only: no browser
+reruns, scheduling, auto-promotion, source writes, or shell bridge. See
+`../../docs/regression-run-matrix-v1.md`.
+
 Replay Controls v1 renders deterministic replay evidence with local,
 in-memory step/reset/jump controls. It displays the current frame/tick,
 evidence links, and linked world-state snapshots from the generated export.

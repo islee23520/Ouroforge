@@ -175,6 +175,21 @@ scenario packs, or execute CLI commands.
 The milestone should prefer small deterministic fixtures and focused tests over
 large generated run artifacts.
 
+## Regression Run Matrix Boundary
+
+Regression Run Matrix v1 summarizes project-bound scenario outcomes from local
+generated run evidence. It groups by project, scenario pack, scenario id, and run
+id, then exposes current status, last pass, last fail, evidence refs, and
+available mutation/review/promotion context ids.
+
+The matrix is a read model only. It skips legacy or malformed runs with explicit
+reasons instead of inferring project context, and it treats missing scenario
+results for declared pack scenarios as `pending`. It must not schedule CI, rerun
+scenarios, promote scenarios, write scenario packs, add hosted analytics, or
+store remote run state. Browser surfaces may render the exported matrix as
+escaped read-only HTML only. Detailed semantics and generated-state policy are
+recorded in `docs/regression-run-matrix-v1.md`.
+
 ## Journal and Studio Boundary
 
 Journal and Studio surfaces may show proposal quality, review decisions,
