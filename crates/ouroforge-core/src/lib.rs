@@ -13360,8 +13360,9 @@ fn dashboard_scenario_result_observations(
             // broken result artifact exists. Derive the scenario id from the
             // artifact path (evidence/scenarios/<id>/scenario-result*.json).
             if let Some(scenario_id) = scenario_id_from_scenario_result_path(&artifact.path) {
-                observations.entry(scenario_id).or_insert_with(|| {
-                    RegressionRunMatrixObservation {
+                observations
+                    .entry(scenario_id)
+                    .or_insert_with(|| RegressionRunMatrixObservation {
                         run_id: run.summary.id.clone(),
                         run_dir: run.summary.run_dir.to_string_lossy().to_string(),
                         created_at_unix_ms: run.summary.created_at_unix_ms,
@@ -13369,8 +13370,7 @@ fn dashboard_scenario_result_observations(
                         scenario_result_path: Some(artifact.path.clone()),
                         verdict_status: run.summary.verdict_status.clone(),
                         evidence_refs: vec![artifact.path.clone()],
-                    }
-                });
+                    });
             }
             continue;
         };
@@ -22702,12 +22702,9 @@ scenarios:
             serde_json::to_vec(&json!({ "id": "unrelated" })).expect("run.json bytes"),
         )
         .expect("run.json written");
-        let error = resolve_regression_promotion_source_run_dir(
-            &root.join("other"),
-            "runs/run-8",
-            "run-8",
-        )
-        .expect_err("mismatched source run rejected");
+        let error =
+            resolve_regression_promotion_source_run_dir(&root.join("other"), "runs/run-8", "run-8")
+                .expect_err("mismatched source run rejected");
         assert!(
             error.to_string().contains("source run run-8 not found"),
             "unexpected error: {error}"
