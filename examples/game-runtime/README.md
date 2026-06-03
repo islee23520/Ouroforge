@@ -50,6 +50,19 @@ browser audio device access, and audible playback are not required for
 acceptance. No mixer, DSP, spatial audio, timeline, streaming, native backend,
 or audio editor subsystem is introduced.
 
+## Scene Component Model v2 fixture
+
+`scene-components-v2.json` is the canonical additive component v2 fixture. It keeps Runtime v1 scene shape while exercising optional `status`, `input`, `trigger`, `goalFlag`, `cameraTarget`, and `uiText` components. The Rust validator checks bounded values and deterministic hashing; the browser runtime preserves the component payloads in `window.__OUROFORGE__.getWorldState().componentModel`, applies input `moveSpeed`, records simple trigger goal-flag actions, and renders `uiText` as canvas text.
+
+Run the focused checks with:
+
+```bash
+cargo run -p ouroforge-cli -- scene validate examples/game-runtime/scene-components-v2.json
+node examples/game-runtime/components-v2.test.cjs
+```
+
+See `docs/scene-component-model-v2.md` for the supported fields, edit paths, runtime/probe evidence shape, and explicit non-goals.
+
 
 ## Engine Expansion v1 playable template
 
