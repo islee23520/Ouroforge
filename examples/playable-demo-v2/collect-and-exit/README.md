@@ -14,3 +14,17 @@ Suggested validation from a full Rust toolchain:
 cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/collect-and-exit/ouroforge.project.json
 cargo run -p ouroforge-cli -- seed validate examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml
 ```
+
+## Evidence smoke
+
+PR EE2.8.3 adds a source-controlled smoke harness that drives the runtime through
+key collection and exit completion, evaluates the scenario pack against bounded
+evidence paths, writes temporary evidence outside the repository, and removes it
+before exit:
+
+```bash
+node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+```
+
+The smoke intentionally leaves `runs/`, `dashboard-data/`, screenshots, and other
+generated artifacts untracked.

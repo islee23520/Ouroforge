@@ -10,7 +10,7 @@ acceptance:
   - Generated run/dashboard artifacts remain untracked.
 scenarios:
   - id: collect-and-exit-source-smoke
-    description: Source-level scenario contract for the collect-and-exit playable demo fixture.
+    description: End-to-end scenario contract for the collect-and-exit playable demo fixture.
     assertions:
       - world_state:
           path: sceneId
@@ -20,7 +20,10 @@ scenarios:
           greaterThan: 0
       - world_state:
           path: goalFlags.key_collected
-          equals: false
+          equals: true
+      - world_state:
+          path: goalFlags.exit_reached
+          equals: true
       - animation_evidence:
           path: "0.mode"
           equals: sprite_frame

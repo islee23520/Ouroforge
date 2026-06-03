@@ -3,7 +3,9 @@
   "id": "collect-and-exit",
   "description": "Playable Demo v2 collect-and-exit source fixture scenario pack.",
   "seed": "seeds/collect-and-exit.yaml",
-  "scenes": ["scenes/collect-and-exit.scene.json"],
+  "scenes": [
+    "scenes/collect-and-exit.scene.json"
+  ],
   "scenarioGroups": [
     {
       "id": "source-contract",
@@ -11,13 +13,44 @@
       "scenarios": [
         {
           "id": "collect-key-hud-contract",
-          "description": "The demo exposes key, door, HUD, animation, and audio intent through evidence paths.",
+          "description": "The demo reaches collected-key and exit evidence with HUD, animation, and audio intent.",
           "assertions": [
-            { "world_state": { "path": "sceneId", "equals": "collect-and-exit-scene" } },
-            { "world_state": { "path": "componentModel.hudValues", "exists": true } },
-            { "world_state": { "path": "goalFlags.key_collected", "equals": false } },
-            { "animation_evidence": { "path": "0.mode", "equals": "sprite_frame" } },
-            { "audio_evidence": { "path": "0.name", "equals": "player_spawn" } }
+            {
+              "world_state": {
+                "path": "sceneId",
+                "equals": "collect-and-exit-scene"
+              }
+            },
+            {
+              "world_state": {
+                "path": "componentModel.hudValues",
+                "exists": true
+              }
+            },
+            {
+              "world_state": {
+                "path": "goalFlags.key_collected",
+                "equals": true
+              }
+            },
+            {
+              "world_state": {
+                "path": "goalFlags.exit_reached",
+                "equals": true
+              }
+            },
+            {
+              "animation_evidence": {
+                "path": "0.mode",
+                "equals": "sprite_frame"
+              }
+            },
+            {
+              "audio_evidence": {
+                "path": "0.name",
+                "equals": "player_spawn"
+              }
+            }
           ]
         }
       ]
