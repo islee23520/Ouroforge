@@ -7,18 +7,19 @@ use ouroforge_core::{
     bind_run_transaction_provenance, build_authoring_loop_dry_run_summary_from_path,
     build_regression_promotion_draft_from_run, build_regression_run_matrix,
     create_minimal_2d_project_scaffold, create_mutation_proposal, create_run, edit_scene,
-    evaluate_run, evolve_run, hash_project_manifest_file, hash_scene_document, list_dashboard_runs,
-    list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
-    preview_scene_edit_transaction, project_run_metadata_from_manifest,
-    promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
-    read_ledger_events, read_scene, reject_generated_artifact_source_collision,
-    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
-    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_regression_promotion_draft,
-    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
-    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, WorkerId,
+    evaluate_run, evolve_run, execute_authoring_loop_step_from_path, hash_project_manifest_file,
+    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
+    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    project_run_metadata_from_manifest, promote_regression_draft_to_scenario_pack,
+    read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene,
+    reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
+    run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
+    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
+    validate_scene_reload, write_regression_promotion_draft, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
+    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -105,7 +106,14 @@ enum Commands {
 
 #[derive(Debug, Subcommand)]
 enum LoopCommand {
-    DryRun { plan_path: PathBuf },
+    DryRun {
+        plan_path: PathBuf,
+    },
+    Step {
+        plan_path: PathBuf,
+        #[arg(long)]
+        step: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -349,6 +357,12 @@ fn main() -> Result<()> {
             command: LoopCommand::DryRun { plan_path },
         } => {
             let summary = build_authoring_loop_dry_run_summary_from_path(&plan_path)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::Loop {
+            command: LoopCommand::Step { plan_path, step },
+        } => {
+            let summary = execute_authoring_loop_step_from_path(&plan_path, &step)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Commands::Seed {

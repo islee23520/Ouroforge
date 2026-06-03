@@ -1914,6 +1914,36 @@ pub struct AuthoringLoopStepStatusUpdate {
     pub boundary: String,
 }
 
+pub const AUTHORING_LOOP_STEP_EXECUTION_SCHEMA_VERSION: &str = "authoring-loop-step-execution-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopStepExecutionSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub kind: String,
+    pub status: String,
+    #[serde(rename = "planPath")]
+    pub plan_path: String,
+    #[serde(rename = "ledgerPath")]
+    pub ledger_path: String,
+    #[serde(rename = "generatedArtifacts")]
+    pub generated_artifacts: Vec<AuthoringLoopGeneratedArtifact>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopGeneratedArtifact {
+    pub id: String,
+    pub path: String,
+    pub kind: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AuthoringLoopArtifactRef {
@@ -2406,6 +2436,142 @@ pub fn build_authoring_loop_dry_run_summary_from_path(
     build_authoring_loop_dry_run_summary_with_base(&plan, base_dir)
 }
 
+pub fn execute_authoring_loop_step_from_path(
+    plan_path: impl AsRef<Path>,
+    step_id: &str,
+) -> Result<AuthoringLoopStepExecutionSummary> {
+    let plan_path = plan_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let (updated, summary) = execute_authoring_loop_step(&plan, base_dir, plan_path, step_id)?;
+    write_json_atomic(plan_path, &json!(updated))?;
+    Ok(summary)
+}
+
+pub fn execute_authoring_loop_step(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+    plan_path: impl AsRef<Path>,
+    step_id: &str,
+) -> Result<(AuthoringLoopPlan, AuthoringLoopStepExecutionSummary)> {
+    plan.validate_schema()?;
+    validate_path_component("authoring loop step id", step_id)?;
+    let base_dir = base_dir.as_ref();
+    let plan_path = plan_path.as_ref();
+    let step = plan
+        .steps
+        .iter()
+        .find(|step| step.id == step_id)
+        .ok_or_else(|| anyhow!("authoring loop plan step not found: {step_id}"))?
+        .clone();
+    let ledger_dir = ensure_authoring_loop_ledger_dir(base_dir, &plan.loop_id)?;
+    let ledger_path = ledger_dir.join("ledger.jsonl");
+
+    let mut blocked_reasons = dry_run_global_missing_prerequisites(plan, base_dir);
+    blocked_reasons.extend(dry_run_missing_prerequisites(&step, base_dir));
+    if !matches!(
+        step.kind,
+        AuthoringLoopStepKind::RunScenarioPack
+            | AuthoringLoopStepKind::CompareRuns
+            | AuthoringLoopStepKind::GenerateProposal
+    ) {
+        blocked_reasons.push(format!(
+            "step kind {} is reserved for a later #306 PR unit",
+            step.kind.as_str()
+        ));
+    }
+    if !blocked_reasons.is_empty() {
+        let (blocked, _) = plan.update_step_status(step_id, AuthoringLoopStepStatus::Blocked)?;
+        append_ledger_event(
+            &ledger_dir,
+            "authoring_loop.step.blocked",
+            "loop-step-runner",
+            json!({
+                "loop_id": plan.loop_id,
+                "step_id": step.id,
+                "kind": step.kind.as_str(),
+                "blocked_reasons": blocked_reasons,
+                "boundary": "no command executed because preflight or scope gate blocked the step"
+            }),
+        )?;
+        let summary = authoring_loop_step_execution_summary(
+            &blocked,
+            &step,
+            plan_path,
+            &ledger_path,
+            "blocked",
+            Vec::new(),
+            blocked_reasons,
+        );
+        return Ok((blocked, summary));
+    }
+
+    let (running, _) = plan.update_step_status(step_id, AuthoringLoopStepStatus::Running)?;
+    append_ledger_event(
+        &ledger_dir,
+        "authoring_loop.step.started",
+        "loop-step-runner",
+        json!({
+            "loop_id": running.loop_id,
+            "step_id": step.id,
+            "kind": step.kind.as_str(),
+            "boundary": "CLI-only Rust trusted step execution"
+        }),
+    )?;
+
+    let generated_artifacts = match step.kind {
+        AuthoringLoopStepKind::RunScenarioPack => {
+            execute_authoring_loop_run_step(&running, &step, base_dir)?
+        }
+        AuthoringLoopStepKind::CompareRuns => execute_authoring_loop_compare_step(&step, base_dir)?,
+        AuthoringLoopStepKind::GenerateProposal => {
+            execute_authoring_loop_proposal_step(&step, base_dir)?
+        }
+        AuthoringLoopStepKind::RecordReviewDecision
+        | AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+        | AuthoringLoopStepKind::Rerun
+        | AuthoringLoopStepKind::PromoteRegression
+        | AuthoringLoopStepKind::Summarize => {
+            unreachable!("unsupported kinds are blocked before execution")
+        }
+    };
+    let remapped = remap_authoring_loop_artifact_paths(running, &generated_artifacts)?;
+    let (completed, _) =
+        remapped.update_step_status(step_id, AuthoringLoopStepStatus::Completed)?;
+    append_ledger_event(
+        &ledger_dir,
+        "authoring_loop.step.completed",
+        "loop-step-runner",
+        json!({
+            "loop_id": completed.loop_id,
+            "step_id": step.id,
+            "kind": step.kind.as_str(),
+            "generated_artifacts": generated_artifacts,
+            "boundary": "bounded run/compare/proposal step completed without browser execution or source-code mutation"
+        }),
+    )?;
+    let summary = authoring_loop_step_execution_summary(
+        &completed,
+        &step,
+        plan_path,
+        &ledger_path,
+        "completed",
+        generated_artifacts,
+        Vec::new(),
+    );
+    Ok((completed, summary))
+}
+
 pub fn build_authoring_loop_dry_run_summary(
     plan: &AuthoringLoopPlan,
 ) -> Result<AuthoringLoopDryRunSummary> {
@@ -2616,6 +2782,227 @@ fn dry_run_prerequisites(step: &AuthoringLoopStep) -> Vec<String> {
             .map(|decision| format!("decision:{}:{}", decision.id, decision.kind.as_str())),
     );
     prerequisites
+}
+
+fn execute_authoring_loop_run_step(
+    plan: &AuthoringLoopPlan,
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    let seed_path = base_dir.join(&plan.seed.path);
+    let runs_root = base_dir.join("runs");
+    reject_generated_artifact_source_collision(&runs_root, "authoring loop run step")?;
+    let artifacts = create_run(&seed_path, &runs_root)?;
+    let manifest_path = base_dir.join(&plan.project.manifest_path);
+    let mut project_metadata = project_run_metadata_from_manifest(
+        &manifest_path,
+        &seed_path,
+        Some(plan.scenario_pack.id.as_str()),
+    )?;
+    project_metadata.transaction_id = None;
+    let bound_project = bind_run_project_metadata(&artifacts.run_dir, project_metadata)?;
+    let command_context =
+        run_command_context_for_run(&seed_path, &runs_root, 1, Some(&bound_project), None);
+    bind_run_command_context(&artifacts.run_dir, command_context)?;
+    append_ledger_event(
+        &artifacts.run_dir,
+        "authoring_loop.run_step",
+        "loop-step-runner",
+        json!({
+            "loop_step_id": step.id,
+            "loop_step_kind": step.kind.as_str(),
+            "scenario_pack": plan.scenario_pack.id,
+            "boundary": "created run artifacts only; scenario/browser execution is not invoked by this step"
+        }),
+    )?;
+    Ok(vec![AuthoringLoopGeneratedArtifact {
+        id: step
+            .expected_artifacts
+            .first()
+            .map(|artifact| artifact.id.clone())
+            .unwrap_or_else(|| "run".to_string()),
+        path: relative_to_base(base_dir, &artifacts.run_dir.join("run.json"))?,
+        kind: "run".to_string(),
+    }])
+}
+
+fn execute_authoring_loop_compare_step(
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    let run_inputs = step
+        .inputs
+        .iter()
+        .filter(|input| input.path.ends_with("/run.json") || input.path == "run.json")
+        .map(|input| base_dir.join(&input.path))
+        .collect::<Vec<_>>();
+    if run_inputs.len() < 2 {
+        return Err(anyhow!(
+            "compare-runs step {} requires at least two run.json input artifacts",
+            step.id
+        ));
+    }
+    let before_run_dir = run_inputs[0]
+        .parent()
+        .ok_or_else(|| anyhow!("compare-runs before input has no run directory"))?;
+    let after_run_dir = run_inputs[1]
+        .parent()
+        .ok_or_else(|| anyhow!("compare-runs after input has no run directory"))?;
+    let output_dir = step
+        .expected_artifacts
+        .first()
+        .and_then(|artifact| {
+            Path::new(&artifact.path)
+                .parent()
+                .map(|path| base_dir.join(path))
+        })
+        .unwrap_or_else(|| base_dir.join("runs/comparisons"));
+    reject_generated_artifact_source_collision(&output_dir, "authoring loop comparison")?;
+    let comparison_path = write_run_comparison_artifact(before_run_dir, after_run_dir, output_dir)?;
+    Ok(vec![AuthoringLoopGeneratedArtifact {
+        id: step
+            .expected_artifacts
+            .first()
+            .map(|artifact| artifact.id.clone())
+            .unwrap_or_else(|| "comparison".to_string()),
+        path: relative_to_base(base_dir, &comparison_path)?,
+        kind: "run-comparison".to_string(),
+    }])
+}
+
+fn execute_authoring_loop_proposal_step(
+    step: &AuthoringLoopStep,
+    base_dir: &Path,
+) -> Result<Vec<AuthoringLoopGeneratedArtifact>> {
+    let run_json = step
+        .inputs
+        .iter()
+        .find(|input| input.path.ends_with("/run.json") || input.path == "run.json")
+        .ok_or_else(|| {
+            anyhow!(
+                "generate-proposal step {} requires a run.json input artifact",
+                step.id
+            )
+        })?;
+    let run_json_path = base_dir.join(&run_json.path);
+    let run_dir = run_json_path
+        .parent()
+        .ok_or_else(|| anyhow!("generate-proposal input has no run directory"))?;
+    let summary = evolve_run(run_dir)?;
+    if summary.status != "proposed" {
+        return Err(anyhow!(
+            "generate-proposal step {} did not create a proposal: {}",
+            step.id,
+            summary.reason
+        ));
+    }
+    let mut artifacts = Vec::new();
+    for (id, path, kind) in [
+        ("proposal", "mutation/proposals.json", "mutation-proposals"),
+        (
+            "classification",
+            "mutation/classifications.json",
+            "mutation-classifications",
+        ),
+        ("patch-draft", "mutation/patch-drafts.json", "patch-drafts"),
+    ] {
+        let absolute = run_dir.join(path);
+        if absolute.is_file() {
+            artifacts.push(AuthoringLoopGeneratedArtifact {
+                id: step
+                    .expected_artifacts
+                    .iter()
+                    .find(|artifact| artifact.id == id || artifact.path.ends_with(path))
+                    .map(|artifact| artifact.id.clone())
+                    .unwrap_or_else(|| id.to_string()),
+                path: relative_to_base(base_dir, &absolute)?,
+                kind: kind.to_string(),
+            });
+        }
+    }
+    if artifacts.is_empty() {
+        return Err(anyhow!(
+            "generate-proposal step {} completed without proposal artifacts",
+            step.id
+        ));
+    }
+    Ok(artifacts)
+}
+
+fn remap_authoring_loop_artifact_paths(
+    mut plan: AuthoringLoopPlan,
+    artifacts: &[AuthoringLoopGeneratedArtifact],
+) -> Result<AuthoringLoopPlan> {
+    for generated in artifacts {
+        validate_path_component("authoring loop generated artifact id", &generated.id)?;
+        validate_project_manifest_path("authoring loop generated artifact path", &generated.path)?;
+        for step in &mut plan.steps {
+            for artifact in &mut step.expected_artifacts {
+                if artifact.id == generated.id {
+                    artifact.path = generated.path.clone();
+                }
+            }
+            for input in &mut step.inputs {
+                if input.id == generated.id {
+                    input.path = generated.path.clone();
+                }
+            }
+            for rollback_ref in &mut step.rollback_refs {
+                if rollback_ref.id == generated.id {
+                    rollback_ref.path = generated.path.clone();
+                }
+            }
+        }
+    }
+    plan.validate_schema()?;
+    Ok(plan)
+}
+
+fn authoring_loop_step_execution_summary(
+    plan: &AuthoringLoopPlan,
+    step: &AuthoringLoopStep,
+    plan_path: &Path,
+    ledger_path: &Path,
+    status: &str,
+    generated_artifacts: Vec<AuthoringLoopGeneratedArtifact>,
+    blocked_reasons: Vec<String>,
+) -> AuthoringLoopStepExecutionSummary {
+    AuthoringLoopStepExecutionSummary {
+        schema_version: AUTHORING_LOOP_STEP_EXECUTION_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        step_id: step.id.clone(),
+        kind: step.kind.as_str().to_string(),
+        status: status.to_string(),
+        plan_path: plan_path.display().to_string(),
+        ledger_path: ledger_path.display().to_string(),
+        generated_artifacts,
+        blocked_reasons,
+        boundary: "CLI-only Rust trusted step runner; no browser command bridge, source-code mutation, daemon, scheduler, hosted orchestration, or auto-merge behavior".to_string(),
+    }
+}
+
+fn ensure_authoring_loop_ledger_dir(base_dir: &Path, loop_id: &str) -> Result<PathBuf> {
+    validate_path_component("authoring loop id", loop_id)?;
+    let ledger_dir = base_dir.join("runs/authoring-loop-ledgers").join(loop_id);
+    fs::create_dir_all(&ledger_dir).with_context(|| {
+        format!(
+            "failed to create authoring loop ledger dir {}",
+            ledger_dir.display()
+        )
+    })?;
+    let ledger_path = ledger_dir.join("ledger.jsonl");
+    if !ledger_path.exists() {
+        write_ledger_created(&ledger_path, unix_millis()?)?;
+    }
+    Ok(ledger_dir)
+}
+
+fn relative_to_base(base_dir: &Path, path: &Path) -> Result<String> {
+    let relative = path.strip_prefix(base_dir).unwrap_or(path);
+    relative
+        .to_str()
+        .map(|path| path.replace('\\', "/"))
+        .ok_or_else(|| anyhow!("path is not valid UTF-8: {}", path.display()))
 }
 
 const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "project-manifest-v1";
@@ -16315,7 +16702,7 @@ scenarios:
         .expect("seed");
         fs::write(
             root.join("scenes/main.scene.json"),
-            r#"{"schemaVersion":"1","id":"main"}"#,
+            MINIMAL_2D_PROJECT_SCENE,
         )
         .expect("scene");
         fs::write(
@@ -16358,6 +16745,162 @@ scenarios:
         )
         .expect("plan");
         plan_path
+    }
+
+    fn write_loop_execution_plan(root: &Path) -> PathBuf {
+        let plan_path = root.join("loop-execution-plan.json");
+        fs::write(
+            &plan_path,
+            r#"{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "temp-loop-execution",
+  "project": { "projectId": "loop_project", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "pending", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
+    { "id": "run-after", "kind": "run-scenario-pack", "status": "pending", "expectedArtifacts": [{ "id": "after-run", "path": "runs/after/run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline", "run-after"], "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }, { "id": "after-run", "path": "runs/after/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/comparisons/run-comparison.json" }] },
+    { "id": "generate-proposal", "kind": "generate-proposal", "status": "pending", "dependsOn": ["run-after"], "inputs": [{ "id": "after-run", "path": "runs/after/run.json" }], "expectedArtifacts": [{ "id": "proposal", "path": "runs/after/mutation/proposals.json" }, { "id": "classification", "path": "runs/after/mutation/classifications.json" }, { "id": "patch-draft", "path": "runs/after/mutation/patch-drafts.json" }] }
+  ],
+  "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }
+}"#,
+        )
+        .expect("execution plan");
+        plan_path
+    }
+
+    fn read_loop_plan_from_path(path: &Path) -> AuthoringLoopPlan {
+        let input = fs::read_to_string(path).expect("plan file reads");
+        AuthoringLoopPlan::from_json_str(&input).expect("plan validates")
+    }
+
+    #[test]
+    fn loop_step_runner_executes_run_compare_and_proposal_steps() {
+        let root = unique_temp_dir("loop-step-runner-execution");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_execution_plan(&root);
+
+        let baseline = execute_authoring_loop_step_from_path(&plan_path, "run-baseline")
+            .expect("baseline run step executes");
+        assert_eq!(baseline.status, "completed");
+        assert_eq!(baseline.generated_artifacts[0].id, "baseline-run");
+        assert!(root.join(&baseline.generated_artifacts[0].path).is_file());
+
+        let after =
+            execute_authoring_loop_step_from_path(&plan_path, "run-after").expect("after run step");
+        let after_run_json = root.join(&after.generated_artifacts[0].path);
+        assert!(after_run_json.is_file());
+
+        let comparison = execute_authoring_loop_step_from_path(&plan_path, "compare-runs")
+            .expect("compare step executes");
+        assert_eq!(comparison.status, "completed");
+        assert_eq!(comparison.generated_artifacts[0].id, "comparison");
+        assert!(root.join(&comparison.generated_artifacts[0].path).is_file());
+
+        let after_run_dir = after_run_json.parent().expect("after run dir");
+        let failure_rel = "evidence/scenarios/loop-failure/scenario-result.json";
+        let failure_path = after_run_dir.join(failure_rel);
+        fs::create_dir_all(failure_path.parent().expect("failure parent"))
+            .expect("failure evidence dir");
+        write_json(
+            &failure_path,
+            &json!({
+                "schema_version": "1",
+                "artifact": "scenario_result",
+                "scenario_id": "loop-failure",
+                "status": "failed",
+                "failures": [{ "kind": "scenario_assertion_failure" }]
+            }),
+        )
+        .expect("failure evidence");
+        add_evidence_artifact(
+            after_run_dir,
+            "loop-failure-evidence",
+            "application/json",
+            failure_rel,
+            json!({ "artifact": "scenario_result", "scenario_id": "loop-failure" }),
+        )
+        .expect("evidence artifact linked");
+        write_json(
+            &after_run_dir.join("verdict.json"),
+            &json!({
+                "status": "failed",
+                "summary": "loop fixture failure",
+                "failures": [{ "kind": "scenario_assertion_failure", "path": failure_rel }],
+                "evidence_refs": [failure_rel]
+            }),
+        )
+        .expect("failed verdict");
+
+        let proposal = execute_authoring_loop_step_from_path(&plan_path, "generate-proposal")
+            .expect("proposal step executes");
+        assert_eq!(proposal.status, "completed");
+        assert!(proposal
+            .generated_artifacts
+            .iter()
+            .any(|artifact| artifact.kind == "mutation-proposals"));
+        assert!(after_run_dir.join("mutation/proposals.json").is_file());
+        assert!(after_run_dir
+            .join("mutation/classifications.json")
+            .is_file());
+        assert!(after_run_dir.join("mutation/patch-drafts.json").is_file());
+
+        let plan = read_loop_plan_from_path(&plan_path);
+        assert!(plan.steps.iter().all(|step| {
+            step.id == "generate-proposal" || step.status == AuthoringLoopStepStatus::Completed
+        }));
+        let after_input = plan
+            .steps
+            .iter()
+            .find(|step| step.id == "generate-proposal")
+            .expect("proposal step")
+            .inputs
+            .first()
+            .expect("proposal input");
+        assert!(after_input.path.starts_with("runs/run-"));
+        assert!(root
+            .join("runs/authoring-loop-ledgers/temp-loop-execution/ledger.jsonl")
+            .is_file());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn loop_step_runner_blocks_later_step_kinds_before_execution_prs() {
+        let root = unique_temp_dir("loop-step-runner-blocked-kind");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        for path in [
+            "runs/baseline/run.json",
+            "runs/baseline/comparisons/run-comparison.json",
+            "runs/baseline/mutation/proposal.json",
+            "runs/baseline/mutation/review-decision-ledger.json",
+            "runs/baseline/mutation/before.scene.json",
+        ] {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
+            fs::write(path, "{}\n").expect("artifact");
+        }
+
+        let summary = execute_authoring_loop_step_from_path(&plan_path, "apply-mutation")
+            .expect("unsupported kind records blocked state");
+        assert_eq!(summary.status, "blocked");
+        assert!(summary
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("reserved for a later #306 PR unit")));
+        let plan = read_loop_plan_from_path(&plan_path);
+        assert_eq!(
+            plan.steps
+                .iter()
+                .find(|step| step.id == "apply-mutation")
+                .expect("apply step")
+                .status,
+            AuthoringLoopStepStatus::Blocked
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
