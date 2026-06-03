@@ -178,7 +178,7 @@
     }
   ],
   "assetManifest": {
-    "schemaVersion": "runtime-asset-manifest-v1",
+    "schemaVersion": "1",
     "id": "asset-pipeline-regression-runtime-assets",
     "assets": [
       {

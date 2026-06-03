@@ -19,5 +19,15 @@ cargo run -p ouroforge-cli -- asset validate examples/asset-pipeline-v1-regressi
 cargo test asset_pipeline_v1_regression --lib
 ```
 
+
+AP1.10.2 adds a smoke that executes the fixture in-process, evaluates every
+scenario-pack assertion against bounded runtime evidence, writes temporary
+evidence/verdict-shaped output outside the repository, and deletes it before
+exit:
+
+```bash
+node examples/asset-pipeline-v1-regression/evidence-smoke.test.cjs
+```
+
 Invalid manifests under `invalid/` are deliberate regression fixtures and should
 continue to fail with explicit Rust validation errors.
