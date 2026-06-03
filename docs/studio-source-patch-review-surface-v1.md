@@ -79,3 +79,145 @@ Public and UI copy must use conservative terms such as "preview", "read-only",
 "review aid", "hold", "blocked", "copy command", and "evidence required". It
 must not claim production source mutation, safe auto-apply, code generation
 readiness, public launch readiness, or replacement for a production editor.
+
+## Read-only display data contract
+
+A future dashboard export or Studio read model may expose a `source_patch_review`
+object. The object is display-only and must be generated outside the browser by a
+trusted local command or by already-existing generated evidence export flows. The
+browser consumes it as inert JSON and renders escaped text; the browser must not
+repair, normalize into authority, write back, or execute any field.
+
+### Top-level shape
+
+| Field | Required | Meaning | Display behavior |
+| --- | --- | --- | --- |
+| `schema_version` | yes | Contract version, initially `source_patch_review.v1`. | Unknown versions render as `unsupported_contract`. |
+| `preview` | yes | Patch preview identity and artifact metadata. | Missing or malformed preview renders hold state. |
+| `risk` | yes | Risk level and reasons derived from review evidence. | Unknown risk renders as `hold`, not pass. |
+| `file_classes` | yes | Target file classes and allowed/disallowed status. | Forbidden/unknown classes render blocking warnings. |
+| `diff_summary` | yes | Bounded counts and summary text for display. | Escaped text only; no editable patch area. |
+| `evidence_links` | yes | Named generated evidence refs required for review. | Missing required refs render hold warnings. |
+| `required_tests` | yes | Copyable check-only commands and expected refs. | Commands render as inert text, never buttons that execute. |
+| `reviewer_checklist` | yes | Audit items the reviewer must verify. | Checklist does not write durable decisions. |
+| `forbidden_actions` | yes | Blocked actions and reasons. | Always visible; cannot be dismissed as review noise. |
+| `boundary_notice` | yes | Read-only/no-apply/no-command copy. | Render near heading and commands. |
+
+### Field requirements
+
+`preview` should include `preview_id`, `proposal_id`, `base_ref`,
+`base_commit`, `patch_artifact_ref`, `patch_artifact_hash`, `created_at`, and
+`stale_status`. `stale_status` is one of `current`, `stale`, `unknown`, or
+`missing`; anything except `current` holds review.
+
+`risk` should include `level` (`low`, `medium`, `high`, `critical`, or
+`unknown`), `reasons`, `requires_independent_review`, and `decision_state`
+(`not_reviewed`, `hold`, `rejected`, `accepted_for_future_evaluation`, or
+`unknown`). The display must avoid wording that implies accepted review applies a
+patch.
+
+`file_classes` entries should include `path`, `class`, `status` (`allowed`,
+`forbidden`, `unknown`, or `needs_governance`), `reason`, and `evidence_ref`.
+Forbidden, unknown, or needs-governance entries block readiness.
+
+`evidence_links` entries should include `kind`, `ref`, `required`, and `status`
+(`present`, `missing`, `malformed`, or `stale`). Required missing/malformed/stale
+links produce warning cards and keep the panel in hold state.
+
+`required_tests` entries should include `label`, `command_text`, `working_dir`,
+`allowed_by_policy_ref`, `expected_evidence_ref`, and `status`. `command_text` is
+copyable text only and may not become a trusted browser command or URL handler.
+
+`forbidden_actions` must include at least source patch apply, arbitrary patch
+apply, auto-merge, auto-apply, auto-accept, browser trusted writes, browser
+command bridge, hidden command execution, credentialed commands, network access,
+install scripts, CI/workflow mutation, dependency mutation, native export, plugin
+runtime, hosted/cloud/server/auth, public launch automation, Godot replacement
+claims, and closure/modification of #1 or #23.
+
+### Example display-only payload
+
+```json
+{
+  "schema_version": "source_patch_review.v1",
+  "preview": {
+    "preview_id": "preview-2026-06-03-example",
+    "proposal_id": "proposal-example",
+    "base_ref": "main",
+    "base_commit": "18ad4d8",
+    "patch_artifact_ref": "runs/source-patch-previews/example/patch.json",
+    "patch_artifact_hash": "sha256:example",
+    "created_at": "2026-06-03T00:00:00Z",
+    "stale_status": "unknown"
+  },
+  "risk": {
+    "level": "unknown",
+    "reasons": ["Example payload has no real evidence."],
+    "requires_independent_review": true,
+    "decision_state": "hold"
+  },
+  "file_classes": [
+    {
+      "path": "docs/example.md",
+      "class": "documentation",
+      "status": "allowed",
+      "reason": "Example display row only.",
+      "evidence_ref": "runs/source-patch-previews/example/classification.json"
+    }
+  ],
+  "diff_summary": {
+    "files_changed": 1,
+    "additions": 3,
+    "deletions": 0,
+    "summary_text": "Escaped display summary only; not an editable patch."
+  },
+  "evidence_links": [
+    {
+      "kind": "patch_preview",
+      "ref": "runs/source-patch-previews/example/patch.json",
+      "required": true,
+      "status": "missing"
+    }
+  ],
+  "required_tests": [
+    {
+      "label": "Rust tests",
+      "command_text": "cargo test",
+      "working_dir": ".",
+      "allowed_by_policy_ref": "docs/source-mutation-sandbox-boundary-v1.md",
+      "expected_evidence_ref": "runs/source-patch-previews/example/test-log.txt",
+      "status": "not_run"
+    }
+  ],
+  "reviewer_checklist": [
+    "No source mutation apply occurred.",
+    "Generated state remains untracked.",
+    "#1 and #23 remain open."
+  ],
+  "forbidden_actions": [
+    "source_patch_apply",
+    "browser_command_bridge",
+    "browser_trusted_write"
+  ],
+  "boundary_notice": "Read-only preview. Studio cannot apply, merge, write files, or execute commands."
+}
+```
+
+The example is intentionally incomplete and `hold`-oriented. It is a static
+contract illustration, not a fixture that grants evaluation authority.
+
+## Rendering rules for future prototypes
+
+If a later issue adds a tiny deterministic prototype, it must:
+
+1. render all fields as escaped text or inert links;
+2. show boundary notices near the heading and required tests;
+3. provide copy controls only if they copy plain command text to the clipboard,
+   never execute commands or call a local bridge;
+4. render forbidden actions and missing evidence as persistent warnings;
+5. avoid apply, merge, accept, reject, rerun, refresh, install, export, launch,
+   or write buttons; and
+6. keep generated dashboard data untracked and removable.
+
+Node/UI gates are required only when such UI files change. This contract-only
+section changes no browser implementation.
