@@ -85,6 +85,8 @@
     collisionEvents: [],
     collisionRules: { defaultLayer: 'default' },
     gameplayRules: { version: '1', flags: [] },
+    sceneTransitions: [],
+    transitionEvents: [],
     audioEvents: [],
     reloads: [],
     tilemaps: [],
@@ -321,6 +323,25 @@
     };
   }
 
+  function normalizeSceneTransitions(sceneTransitions = []) {
+    const seen = new Set();
+    return Array.isArray(sceneTransitions)
+      ? sceneTransitions
+        .filter((transition) => transition && typeof transition === 'object')
+        .filter((transition) => typeof transition.id === 'string' && transition.id && typeof transition.toScene === 'string' && transition.toScene)
+        .filter((transition) => {
+          if (seen.has(transition.id)) return false;
+          seen.add(transition.id);
+          return true;
+        })
+        .map((transition) => ({
+          id: transition.id,
+          toScene: transition.toScene,
+          label: typeof transition.label === 'string' ? transition.label : null,
+        }))
+      : [];
+  }
+
   function resolveComposition(entities) {
     const byId = new Map(entities.map((entity) => [entity.id, entity]));
     const resolving = new Set();
@@ -372,6 +393,7 @@
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
       collisionRules: normalizeCollisionRules(scene.collisionRules),
       gameplayRules: normalizeGameplayRules(scene.gameplayRules),
+      sceneTransitions: normalizeSceneTransitions(scene.sceneTransitions),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       metadata: objectValue(scene.metadata),
       componentDefaults,
@@ -590,6 +612,7 @@
     world.tilemaps = clone(normalized.tilemaps);
     world.collisionRules = clone(normalized.collisionRules);
     world.gameplayRules = normalized.gameplayRules ? clone(normalized.gameplayRules) : { version: '1', flags: [] };
+    world.sceneTransitions = clone(normalized.sceneTransitions);
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     world.goalFlags = {};
     for (const flag of world.gameplayRules.flags) {
@@ -618,11 +641,77 @@
       schemaVersion: world.schemaVersion,
       sceneId: world.sceneId,
       entityCount: world.entities.length,
+      sceneTransitionCount: world.sceneTransitions.length,
       assetCount: assetMetadata.length,
       gameplayFlagCount: world.gameplayRules.flags.length,
       assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
     });
     emitAudioEvents('scene_loaded');
+    renderDebug();
+    return api.getWorldState();
+  }
+
+  function safeTransitionPath(path) {
+    return typeof path === 'string'
+      && path.endsWith('.json')
+      && !path.includes('..')
+      && !path.includes('\\')
+      && !/^[a-z][a-z0-9+.-]*:/i.test(path)
+      && (/^[A-Za-z0-9_./-]+$/.test(path) || path.startsWith('/examples/'));
+  }
+
+  function recordTransitionOutcome(outcome) {
+    const entry = {
+      tick: world.tick,
+      ...clone(outcome),
+    };
+    world.transitionEvents.push(entry);
+    if (world.transitionEvents.length > 16) world.transitionEvents.shift();
+    record(`runtime.scene.transition.${entry.status}`, entry);
+    return entry;
+  }
+
+  async function transition(transitionId) {
+    if (typeof transitionId !== 'string' || !transitionId) {
+      const reason = 'transition id is required';
+      recordTransitionOutcome({ status: 'failed', reason, fromSceneId: world.sceneId });
+      throw new Error(reason);
+    }
+    const declared = world.sceneTransitions.find((candidate) => candidate.id === transitionId);
+    if (!declared) {
+      const reason = `transition ${transitionId} is not declared by current scene`;
+      recordTransitionOutcome({ status: 'failed', id: transitionId, reason, fromSceneId: world.sceneId });
+      throw new Error(reason);
+    }
+    if (!safeTransitionPath(declared.toScene)) {
+      const reason = `transition ${transitionId} target is not a bounded scene path`;
+      recordTransitionOutcome({ status: 'failed', id: transitionId, toScene: declared.toScene, reason, fromSceneId: world.sceneId });
+      throw new Error(reason);
+    }
+    const fromSceneId = world.sceneId;
+    try {
+      const response = await fetch(declared.toScene);
+      const scene = await response.json();
+      loadScene(scene);
+      recordTransitionOutcome({
+        status: 'succeeded',
+        id: declared.id,
+        label: declared.label,
+        fromSceneId,
+        toScene: declared.toScene,
+        toSceneId: world.sceneId,
+      });
+    } catch (error) {
+      recordTransitionOutcome({
+        status: 'failed',
+        id: declared.id,
+        label: declared.label,
+        fromSceneId,
+        toScene: declared.toScene,
+        reason: String(error && error.message ? error.message : error),
+      });
+      throw error;
+    }
     renderDebug();
     return api.getWorldState();
   }
@@ -800,6 +889,7 @@
     restore,
     loadScene,
     reload,
+    transition,
     whenReady() {
       return sceneReady;
     },
