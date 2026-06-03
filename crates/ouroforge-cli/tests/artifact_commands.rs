@@ -84,6 +84,22 @@ fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
     )
     .expect("dashboard parses");
     assert_eq!(dashboard["agent_handoffs"][0]["loopId"], "cli-handoff-loop");
+    assert_eq!(
+        dashboard["loop_cockpit"]["schemaVersion"],
+        "studio-loop-cockpit-v1"
+    );
+    assert_eq!(
+        dashboard["loop_cockpit"]["loops"][0]["loopId"],
+        "cli-handoff-loop"
+    );
+    assert_eq!(
+        dashboard["loop_cockpit"]["loops"][0]["currentStep"]["stepId"],
+        "compare-runs"
+    );
+    assert!(dashboard["loop_cockpit"]["boundary"]
+        .as_str()
+        .expect("cockpit boundary")
+        .contains("does not execute commands"));
     assert!(
         !temp.join("runs/comparisons/run-comparison.json").exists(),
         "allowed commands are not executed by handoff generation"

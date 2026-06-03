@@ -2141,6 +2141,17 @@ pub enum AgentHandoffStatus {
     Completed,
 }
 
+impl AgentHandoffStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentHandoffStatus::Ready => "ready",
+            AgentHandoffStatus::Blocked => "blocked",
+            AgentHandoffStatus::Failed => "failed",
+            AgentHandoffStatus::Completed => "completed",
+        }
+    }
+}
+
 impl AgentHandoffContract {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let handoff: AgentHandoffContract =
@@ -2335,6 +2346,16 @@ pub enum AuthoringLoopEvidenceBundleArtifactKind {
     RegressionPromotion,
     MatrixSnapshot,
     JournalSummary,
+}
+
+impl AuthoringLoopEvidenceBundleStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthoringLoopEvidenceBundleStatus::Completed => "completed",
+            AuthoringLoopEvidenceBundleStatus::Partial => "partial",
+            AuthoringLoopEvidenceBundleStatus::Failed => "failed",
+        }
+    }
 }
 
 impl AuthoringLoopEvidenceBundle {
@@ -2592,6 +2613,100 @@ fn validate_authoring_loop_bundle_ref_path(
         ));
     }
     Ok(())
+}
+
+pub const STUDIO_LOOP_COCKPIT_SCHEMA_VERSION: &str = "studio-loop-cockpit-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct StudioLoopCockpitReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub loops: Vec<StudioLoopCockpitLoop>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
+pub struct StudioLoopCockpitLoop {
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    pub status: String,
+    #[serde(rename = "planPath", skip_serializing_if = "Option::is_none")]
+    pub plan_path: Option<String>,
+    #[serde(rename = "currentStep", skip_serializing_if = "Option::is_none")]
+    pub current_step: Option<AgentHandoffStep>,
+    pub steps: Vec<AuthoringLoopEvidenceBundleStep>,
+    #[serde(rename = "nextSafeAction", skip_serializing_if = "Option::is_none")]
+    pub next_safe_action: Option<String>,
+    pub blockers: Vec<String>,
+    #[serde(rename = "requiredDecisions")]
+    pub required_decisions: Vec<AuthoringLoopDecisionRef>,
+    #[serde(rename = "allowedCommands")]
+    pub allowed_commands: Vec<AuthoringLoopResumeCommandContext>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "bundleStatus", skip_serializing_if = "Option::is_none")]
+    pub bundle_status: Option<String>,
+    #[serde(rename = "bundleMissingRefs")]
+    pub bundle_missing_refs: Vec<String>,
+    #[serde(rename = "handoffStatus", skip_serializing_if = "Option::is_none")]
+    pub handoff_status: Option<String>,
+    #[serde(rename = "driftGuardrails")]
+    pub drift_guardrails: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn build_studio_loop_cockpit_read_model(
+    bundles: &[AuthoringLoopEvidenceBundle],
+    handoffs: &[AgentHandoffContract],
+) -> StudioLoopCockpitReadModel {
+    let mut loops = BTreeMap::<String, StudioLoopCockpitLoop>::new();
+    for bundle in bundles {
+        let entry = loops.entry(bundle.loop_id.clone()).or_insert_with(|| StudioLoopCockpitLoop {
+            loop_id: bundle.loop_id.clone(),
+            status: bundle.status.as_str().to_string(),
+            boundary: "Read-only Studio loop cockpit data; browser displays only and does not execute commands or write files.".to_string(),
+            ..StudioLoopCockpitLoop::default()
+        });
+        entry.status = bundle.status.as_str().to_string();
+        entry.plan_path = Some(bundle.plan.path.clone());
+        entry.steps = bundle.steps.clone();
+        entry.bundle_status = Some(bundle.status.as_str().to_string());
+        entry.bundle_missing_refs = bundle.missing_refs.clone();
+        entry.boundary = format!("{} {}", entry.boundary, bundle.boundary);
+    }
+    for handoff in handoffs {
+        let entry = loops.entry(handoff.loop_id.clone()).or_insert_with(|| StudioLoopCockpitLoop {
+            loop_id: handoff.loop_id.clone(),
+            status: handoff.status.as_str().to_string(),
+            boundary: "Read-only Studio loop cockpit data; browser displays only and does not execute commands or write files.".to_string(),
+            ..StudioLoopCockpitLoop::default()
+        });
+        entry.status = handoff.status.as_str().to_string();
+        entry.current_step = handoff.current_step.clone();
+        entry.next_safe_action = Some(handoff.next_safe_action.clone());
+        entry.blockers = handoff.blockers.clone();
+        entry.required_decisions = handoff.required_decisions.clone();
+        entry.allowed_commands = handoff.allowed_commands.clone();
+        entry.forbidden_actions = handoff.forbidden_actions.clone();
+        entry.evidence_refs = handoff.evidence_refs.clone();
+        if entry.plan_path.is_none() {
+            entry.plan_path = handoff
+                .evidence_refs
+                .iter()
+                .find(|reference| reference.id == "loop-plan")
+                .map(|reference| reference.path.clone());
+        }
+        entry.handoff_status = Some(handoff.status.as_str().to_string());
+        entry.drift_guardrails = handoff.drift_guardrails.clone();
+        entry.boundary = format!("{} {}", entry.boundary, handoff.boundary);
+    }
+    StudioLoopCockpitReadModel {
+        schema_version: STUDIO_LOOP_COCKPIT_SCHEMA_VERSION.to_string(),
+        loops: loops.into_values().collect(),
+        boundary: "Read-only normalized loop cockpit read model; it does not execute commands, write files, apply mutations, promote regressions, or bridge browser UI to local CLI.".to_string(),
+    }
 }
 
 pub const AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME: &str = "bundle.json";
@@ -18529,6 +18644,32 @@ scenarios:
         let listed = list_agent_handoff_contracts(root.join("runs")).expect("handoffs list");
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].loop_id, "temp-loop");
+        let bundle = build_authoring_loop_evidence_bundle(
+            &read_loop_plan_from_path(&plan_path),
+            &root,
+            &plan_path,
+        )
+        .expect("bundle read-model builds");
+        let cockpit = build_studio_loop_cockpit_read_model(&[bundle], &listed);
+        assert_eq!(cockpit.schema_version, STUDIO_LOOP_COCKPIT_SCHEMA_VERSION);
+        assert_eq!(cockpit.loops.len(), 1);
+        assert_eq!(cockpit.loops[0].loop_id, "temp-loop");
+        assert_eq!(
+            cockpit.loops[0]
+                .current_step
+                .as_ref()
+                .expect("current step")
+                .step_id,
+            "compare-runs"
+        );
+        assert_eq!(cockpit.loops[0].handoff_status.as_deref(), Some("ready"));
+        assert_eq!(cockpit.loops[0].bundle_status.as_deref(), Some("partial"));
+        assert!(cockpit.loops[0]
+            .allowed_commands
+            .iter()
+            .all(|command| command.boundary.contains("inert")
+                || command.boundary.contains("does not execute")));
+        assert!(cockpit.boundary.contains("does not execute commands"));
         assert!(
             !root
                 .join("runs/authoring-loop-bundles/temp-loop/bundle.json")
