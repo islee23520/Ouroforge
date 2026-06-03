@@ -113,6 +113,12 @@
                 "path": "events",
                 "exists": true
               }
+            },
+            {
+              "transition_evidence": {
+                "path": "0.status",
+                "exists": false
+              }
             }
           ]
         }

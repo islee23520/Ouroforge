@@ -61,6 +61,9 @@ scenarios:
       - runtime_events:
           path: events
           exists: true
+      - transition_evidence:
+          path: 0.status
+          exists: false
   - id: hud-values-v1-regression
     description: Assert HUD values remain observable as read-only component-model evidence.
     assertions:

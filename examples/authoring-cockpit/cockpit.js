@@ -449,6 +449,9 @@ const OuroforgeCockpit = (() => {
     const transitionRows = Array.isArray(transition?.transitions) && transition.transitions.length
       ? transition.transitions.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'scene transition')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
       : '<p class="empty compact">No transition event rows exported.</p>';
+    const declaredTransitionRows = Array.isArray(transition?.declaredTransitions) && transition.declaredTransitions.length
+      ? transition.declaredTransitions.map((entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || 'declared transition')}</strong><br><small>${escapeText(compactJson(entry))}</small></div>`).join('')
+      : '<p class="empty compact">No manifest-validated declared transitions exported.</p>';
     const animationRows = Array.isArray(events?.animationEntities) && events.animationEntities.length
       ? events.animationEntities.map((entity) => `<li><strong>${escapeText(entity?.entityId || 'entity')}</strong> · ${escapeText(entity?.mode || 'mode unknown')} · clip ${escapeText(entity?.currentClip || 'none')} · frame ${escapeText(entity?.frameIndex ?? 'unknown')}</li>`).join('')
       : '<li>No animation event entity rows exported.</li>';
@@ -460,12 +463,13 @@ const OuroforgeCockpit = (() => {
       ${warnings.length ? `<div class="error">${escapeText(warnings.join(' · '))}</div>` : '<div class="hint">Collision/transition/event summaries loaded.</div>'}
       <div class="field-grid">
         <div><strong>Collision</strong><br>${escapeText(collision?.colliderEntityCount ?? 0)} collider(s), ${escapeText(collision?.collisionEventCount ?? 0)} event(s)</div>
-        <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.transitionEventCount ?? 0)} transition event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
+        <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.declaredTransitionCount ?? 0)} declared · ${escapeText(transition?.transitionEventCount ?? 0)} event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
         <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s)</div>
       </div>
       <h3>Collision rules</h3><div class="field-grid">${collisionRules}</div>
       <h3>Collision events</h3>${collisionRows}
-      <h3>Scene transitions</h3>${transitionRows}
+      <h3>Declared scene transitions</h3>${declaredTransitionRows}
+      <h3>Scene transition events</h3>${transitionRows}
       <h3>Animation entities</h3><ul>${animationRows}</ul>
       <h3>Audio events</h3>${audioRows}
     </section>`;

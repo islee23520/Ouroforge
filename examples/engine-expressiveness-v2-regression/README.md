@@ -41,8 +41,10 @@ can link them without browser-side trusted writes or command execution.
 
 Canonical coverage matrix: `docs/scenario-coverage-v3.md`.
 
-The scenario pack and smoke verdict shape intentionally use existing evidence
-keys (`world_state`, `frame_stats`, `runtime_events`, `collision_evidence`,
-`animation_evidence`, `audio_evidence`, and `comparison`) so dashboard and Studio
-read-model surfaces can link exported evidence without computing browser-side
-comparisons, running commands, writing trusted files, or mutating source.
+The scenario pack and smoke verdict shape intentionally use bounded evidence
+keys (`world_state`, `frame_stats`, `runtime_events`, `transition_evidence`,
+`collision_evidence`, `animation_evidence`, `audio_evidence`, and `comparison`)
+so dashboard and Studio read-model surfaces can link exported evidence without
+computing browser-side comparisons, running commands, writing trusted files, or
+mutating source. See `docs/scene-transitions-v1.md` for the transition schema,
+runtime probe fields, assertion target, and explicit non-goals.

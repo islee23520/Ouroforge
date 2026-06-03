@@ -57,8 +57,9 @@ displays two read-only Studio Authoring Surface v2 panels:
 
 - **Expressive scene inspection**: component counts, entity components, trigger
   bindings, required flags, and HUD values.
-- **Collision/transition/event inspection**: collision rules and events, scene
-  transitions/reload status, animation entities, and audio/runtime events.
+- **Collision/transition/event inspection**: collision rules and events,
+  manifest-validated declared scene transitions, transition event rows, reload
+  status, animation entities, and audio/runtime events.
 
 Both panels consume Rust-exported evidence only. They escape missing, malformed,
 or hostile data, and they must not execute commands, write files, persist browser

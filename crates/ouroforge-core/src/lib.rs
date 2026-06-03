@@ -17715,14 +17715,20 @@ fn dashboard_collision_summary(world_state: &serde_json::Value) -> serde_json::V
 fn dashboard_transition_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let transition_events = world_state
         .get("transitionEvents")
-        .or_else(|| world_state.get("sceneTransitions"))
+        .cloned()
+        .unwrap_or(json!([]));
+    let declared_transitions = world_state
+        .get("sceneTransitions")
         .cloned()
         .unwrap_or(json!([]));
     json!({
         "present": world_state.get("sceneId").is_some()
             || world_state.get("reloads").is_some()
-            || transition_events.as_array().is_some_and(|events| !events.is_empty()),
+            || transition_events.as_array().is_some_and(|events| !events.is_empty())
+            || declared_transitions.as_array().is_some_and(|transitions| !transitions.is_empty()),
         "currentSceneId": world_state.get("sceneId").cloned().unwrap_or(json!(null)),
+        "declaredTransitionCount": declared_transitions.as_array().map_or(0, Vec::len),
+        "declaredTransitions": declared_transitions,
         "transitionEventCount": transition_events.as_array().map_or(0, Vec::len),
         "transitions": transition_events,
         "reloadCount": dashboard_array_len(world_state.get("reloads")),
@@ -30616,6 +30622,8 @@ scenarios:
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
                 "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
                 "goalFlags": { "coin_collected": true, "door_open": true, "player_alive": true },
+                "sceneTransitions": [{ "id": "to_level_2", "toScene": "scenes/level-2.scene.json", "label": "Level 2" }],
+                "transitionEvents": [{ "status": "succeeded", "id": "to_level_2", "fromSceneId": "foundation-scene", "toSceneId": "level-2" }],
                 "componentModel": {
                     "counts": { "trigger": 1, "goalFlag": 1, "hudValue": 2 },
                     "hudValues": [
@@ -30708,6 +30716,22 @@ scenarios:
         assert_eq!(
             model.engine_summaries.transition["currentSceneId"],
             json!("foundation-scene")
+        );
+        assert_eq!(
+            model.engine_summaries.transition["declaredTransitionCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.transition["declaredTransitions"][0]["toScene"],
+            json!("scenes/level-2.scene.json")
+        );
+        assert_eq!(
+            model.engine_summaries.transition["transitionEventCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.transition["transitions"][0]["toSceneId"],
+            json!("level-2")
         );
         assert_eq!(
             model.engine_summaries.events["animationEntityCount"],

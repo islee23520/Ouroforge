@@ -75,6 +75,7 @@ const evidence = {
   world_state: state,
   frame_stats: { fixedDeltaMs: state.fixedDeltaMs, tick: state.tick },
   runtime_events: { events: api.getEvents() },
+  transition_evidence: state.transitionEvents || [],
   collision_evidence: { contacts: state.collisions, events: state.collisionEvents },
   animation_evidence: state.entities
     .filter((entity) => entity.components && entity.components.animation)
@@ -101,6 +102,7 @@ const verdicts = scenarios.map((scenario) => ({
     world_state: 'evidence/world-state.json',
     frame_stats: 'evidence/frame-stats.json',
     runtime_events: 'evidence/runtime-events.json',
+    transition_evidence: 'evidence/transition-evidence.json',
     collision_evidence: 'evidence/collision-evidence.json',
     animation_evidence: 'evidence/animation-evidence.json',
     audio_evidence: 'evidence/audio-evidence.json',
