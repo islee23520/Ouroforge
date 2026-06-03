@@ -17561,11 +17561,9 @@ scenarios:
         let root = unique_temp_dir("loop-recovery-ready");
         write_loop_dry_run_project(&root);
         let plan_path = write_loop_dry_run_plan(&root, "loop_project");
-        for path in ["runs/baseline/run.json"] {
-            let path = root.join(path);
-            fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
-            fs::write(path, "{}\n").expect("artifact");
-        }
+        let path = root.join("runs/baseline/run.json");
+        fs::create_dir_all(path.parent().expect("parent")).expect("artifact dir");
+        fs::write(path, "{}\n").expect("artifact");
 
         let preflight = build_authoring_loop_resume_preflight_from_path(&plan_path, "compare-runs")
             .expect("resume preflight builds");

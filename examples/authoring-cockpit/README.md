@@ -139,3 +139,7 @@ When exported dashboard data includes `loop_dry_run`, the cockpit displays it as
 ## Authoring Loop Execution v1
 
 When exported dashboard data includes `loop_execution`, the cockpit displays the Rust CLI step summary as escaped read-only evidence. The browser never runs loop steps, applies mutations, records decisions, promotes regressions, or writes trusted plan state. See `../../docs/authoring-loop-execution-v1.md`.
+
+## Authoring Loop Recovery v1
+
+When exported dashboard data includes `loop_recovery` or `loop_status`, the cockpit displays recovery state as escaped read-only evidence. The browser never resumes, retries, repairs artifacts, applies mutations, promotes regressions, or writes trusted plan state. See `../../docs/authoring-loop-recovery-v1.md`.

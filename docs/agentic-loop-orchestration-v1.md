@@ -134,6 +134,10 @@ Dry-run previews may write explicitly scoped local generated preview artifacts
 under ignored/untracked generated-state paths, but they must not execute trusted
 actions or write trusted/project state.
 
+## Loop Resume and Failure Recovery v1
+
+#307 adds explicit recovery metadata plus CLI status/resume preflight. Recovery is local and inspectable: status and resume preflight report blockers, retryability, manual action, rollback refs, evidence refs, and safe command context without hidden retries or browser execution.
+
 ## Authoring Loop Execution v1
 
 #306 adds the CLI-only Rust trusted step runner. It executes one explicit validated step at a time, records generated loop ledger evidence, and stops at review/manual gates. Browser surfaces may render attached execution summaries read-only, but they do not execute commands or write trusted state.

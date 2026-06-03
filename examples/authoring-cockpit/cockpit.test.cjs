@@ -84,6 +84,24 @@ const run = {
     blockedReasons: [],
     boundary: 'CLI-only Rust trusted step runner; browser does not execute.',
   },
+  loop_recovery: {
+    schemaVersion: 'authoring-loop-status-v1',
+    loopId: '<loop-1>',
+    status: 'needs-recovery',
+    nextSafeAction: 'Resolve <manual> action',
+    boundary: 'Status is read-only inspection.',
+    steps: [{
+      id: '<step-2>',
+      kind: 'compare-runs',
+      status: 'blocked',
+      recovery: {
+        failure: { reason: '<missing comparison>' },
+        manualAction: { description: 'Restore <comparison> artifact' },
+      },
+      missingPrerequisites: ['missing artifact:<comparison>'],
+      nextSafeAction: 'Restore <comparison> artifact',
+    }],
+  },
   evidence_fidelity: {
     transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
     runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
@@ -475,3 +493,9 @@ assert.match(cockpit.renderLoopExecutionSurface(run), /&lt;transaction&gt;/);
 assert.doesNotMatch(cockpit.renderLoopExecutionSurface(run), /<transaction>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop execution/);
 assert.match(cockpit.renderLoopExecutionSurface({ summary: { id: 'run-no-loop' } }), /No loop execution summary/);
+assert.match(cockpit.renderLoopRecoverySurface(run), /Authoring loop recovery/);
+assert.match(cockpit.renderLoopRecoverySurface(run), /needs-recovery/);
+assert.match(cockpit.renderLoopRecoverySurface(run), /&lt;missing comparison&gt;/);
+assert.doesNotMatch(cockpit.renderLoopRecoverySurface(run), /<missing comparison>/);
+assert.match(cockpit.renderEvidencePane(run), /Authoring loop recovery/);
+assert.match(cockpit.renderLoopRecoverySurface({ summary: { id: 'run-no-loop' } }), /No recovery status/);

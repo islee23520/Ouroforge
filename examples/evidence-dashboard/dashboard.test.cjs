@@ -67,6 +67,24 @@ const run = {
     blockedReasons: [],
     boundary: 'CLI-only Rust trusted step runner; browser does not execute.',
   },
+  loop_recovery: {
+    schemaVersion: 'authoring-loop-status-v1',
+    loopId: '<loop-1>',
+    status: 'needs-recovery',
+    nextSafeAction: 'Resolve <manual> action',
+    boundary: 'Status is read-only inspection.',
+    steps: [{
+      id: '<step-2>',
+      kind: 'compare-runs',
+      status: 'blocked',
+      recovery: {
+        failure: { reason: '<missing comparison>' },
+        manualAction: { description: 'Restore <comparison> artifact' },
+      },
+      missingPrerequisites: ['missing artifact:<comparison>'],
+      nextSafeAction: 'Restore <comparison> artifact',
+    }],
+  },
   command_context: {
     schemaVersion: 'run-command-context-v1',
     command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
@@ -497,3 +515,9 @@ assert.match(dashboard.renderLoopExecutionSummary(run.loop_execution), /&lt;tran
 assert.doesNotMatch(dashboard.renderLoopExecutionSummary(run.loop_execution), /<transaction>/);
 assert.match(dashboard.renderRunDetail(run), /Authoring loop execution/);
 assert.match(dashboard.renderLoopExecutionSummary(null), /No loop execution summary/);
+assert.match(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /Authoring loop recovery/);
+assert.match(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /needs-recovery/);
+assert.match(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /&lt;missing comparison&gt;/);
+assert.doesNotMatch(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /<missing comparison>/);
+assert.match(dashboard.renderRunDetail(run), /Authoring loop recovery/);
+assert.match(dashboard.renderLoopRecoveryStatus(null), /No recovery status/);

@@ -958,6 +958,32 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderLoopRecoverySurface(run) {
+    const summary = run?.loop_recovery || run?.loopRecovery || run?.loop_status || run?.loopStatus || null;
+    if (!summary || typeof summary !== 'object') {
+      return '<section id="loop-recovery" class="panel"><h2>Authoring loop recovery</h2><p class="empty">No recovery status is attached to dashboard-data.json. Use the Rust CLI status/resume preflight commands for local recovery inspection.</p></section>';
+    }
+    const steps = Array.isArray(summary.steps) ? summary.steps : [];
+    const rows = steps.length ? steps.map((step) => {
+      const recovery = step.recovery || {};
+      const manual = recovery.manualAction || {};
+      const missing = Array.isArray(step.missingPrerequisites) ? step.missingPrerequisites : [];
+      return `<div class="surface-row"><strong>${escapeText(step.id || 'step')}</strong> <span class="status-idle">${escapeText(step.status || 'unknown')}</span><br>
+        <small>${escapeText(step.kind || 'unknown')}</small>
+        ${recovery.failure ? `<div class="hint">Failure: ${escapeText(recovery.failure.reason || 'unspecified')}</div>` : ''}
+        ${manual.description ? `<div class="hint">Manual action: ${escapeText(manual.description)}</div>` : ''}
+        ${missing.length ? `<div class="hint">Missing: ${escapeText(missing.join(' · '))}</div>` : ''}
+        <small>Next safe action: ${escapeText(step.nextSafeAction || 'Inspect manually.')}</small>
+      </div>`;
+    }).join('') : '<p class="empty">No recovery steps recorded.</p>';
+    return `<section id="loop-recovery" class="panel"><h2>Authoring loop recovery</h2>
+      <p class="hint">Read-only recovery state. The browser does not resume, retry, repair, apply mutations, promote regressions, or write trusted state.</p>
+      <div class="surface-row"><strong>${escapeText(summary.loopId || 'unknown')}</strong> <span class="status-idle">${escapeText(summary.status || 'unknown')}</span><br><small>Next safe action: ${escapeText(summary.nextSafeAction || 'Inspect manually.')}</small></div>
+      ${rows}
+      ${summary.boundary ? `<p class="hint">${escapeText(summary.boundary)}</p>` : ''}
+    </section>`;
+  }
+
   function renderStudioGaps() {
     return `<section class="panel"><h2>Known demo gaps</h2><ul>
       <li>No production editor, native shell, hosted studio, collaboration, plugin marketplace, or visual scripting.</li>
@@ -967,7 +993,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1046,7 +1072,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

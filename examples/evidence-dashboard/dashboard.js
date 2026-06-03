@@ -806,6 +806,33 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderLoopRecoveryStatus(summary = null) {
+    if (!summary || typeof summary !== 'object') {
+      return '<section class="panel"><h3>Authoring loop recovery</h3><p class="empty-state">No recovery status is attached to this dashboard data.</p></section>';
+    }
+    const steps = Array.isArray(summary.steps) ? summary.steps : [];
+    const stepRows = steps.length ? steps.map((step) => {
+      const missing = Array.isArray(step.missingPrerequisites) ? step.missingPrerequisites : [];
+      const recovery = step.recovery || {};
+      const manual = recovery.manualAction || {};
+      return `<article class="artifact loop-recovery-step">
+        <h4>${escapeText(step.id || 'step')}</h4>
+        <div class="run-meta">${escapeText(step.kind || 'unknown')} · <span class="${statusClass(step.status || 'unknown')}">${escapeText(step.status || 'unknown')}</span></div>
+        ${recovery.failure ? `<div class="run-meta">Failure: ${escapeText(recovery.failure.reason || 'unspecified')}</div>` : '<div class="run-meta">No recovery failure metadata recorded.</div>'}
+        ${manual.description ? `<div class="run-meta">Manual action: ${escapeText(manual.description)}</div>` : ''}
+        ${missing.length ? `<div class="artifact-warning">Missing: ${escapeText(missing.join(' · '))}</div>` : ''}
+        <div class="run-meta">Next safe action: ${escapeText(step.nextSafeAction || 'Inspect manually.')}</div>
+      </article>`;
+    }).join('') : '<p class="empty-state compact">No recovery steps recorded.</p>';
+    return `<section class="panel loop-recovery-status"><h3>Authoring loop recovery</h3>
+      <p class="run-meta">Loop ${escapeText(summary.loopId || 'unknown')} · <span class="${statusClass(summary.status || 'unknown')}">${escapeText(summary.status || 'unknown')}</span></p>
+      <p class="run-meta">Read-only recovery status. The browser does not resume, retry, repair, apply, or promote loop steps.</p>
+      <div class="run-meta">Next safe action: ${escapeText(summary.nextSafeAction || 'Inspect manually.')}</div>
+      <div class="artifact-grid">${stepRows}</div>
+      ${summary.boundary ? `<p class="run-meta">${escapeText(summary.boundary)}</p>` : ''}
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null);
   }
@@ -833,6 +860,7 @@ const OuroforgeDashboard = (() => {
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
+      ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
       ${renderRegressionPromotions(run)}
@@ -902,7 +930,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
