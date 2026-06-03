@@ -132,3 +132,9 @@ Refresh the dashboard to inspect the escaped, display-only Reproducible Command
 Context panel. The panel is copied from Rust-authored `run.json` metadata and
 must not execute commands, rerun QA, write files, or start a command bridge. See
 `docs/reproducible-run-command-context-v1.md`.
+
+Evidence-Backed Journal v2 appears through the existing Journal Viewer when
+`journal.md` contains `Authoring Governance Lifecycle` /
+`journal-authoring-governance-v2`. The dashboard only displays escaped exported
+journal snippets and links; it does not generate summaries, apply mutations, or
+write journal files. See `../../docs/evidence-backed-journal-v2.md`.

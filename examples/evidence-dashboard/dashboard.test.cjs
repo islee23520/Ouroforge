@@ -248,7 +248,16 @@ const run = {
         mutation_refs: [],
       },
       {
-        id: 'journal-entry-2-verdict-summary',
+        id: 'journal-entry-2-authoring-governance-lifecycle',
+        heading: 'Authoring Governance Lifecycle',
+        category: 'mutation',
+        body: 'Schema `journal-authoring-governance-v2` links proposal `proposal-1` review `review-1` promotion `regression-promotion-1`.',
+        evidence_refs: ['mutation/rerun-orchestration.json'],
+        verdict_refs: [],
+        mutation_refs: ['proposal-1', 'review-1', 'regression-promotion-1'],
+      },
+      {
+        id: 'journal-entry-3-verdict-summary',
         heading: 'Verdict Summary',
         category: 'verdict',
         body: '<script>alert(1)</script>',
@@ -347,6 +356,9 @@ assert.match(detail, /mutation review runs\/run-1 --accept/);
 assert.match(detail, /No lifecycle records for this stage|patch-draft-1/);
 assert.match(detail, /fixture journal summary/);
 assert.match(detail, /Observations/);
+assert.match(detail, /Authoring Governance Lifecycle/);
+assert.match(detail, /journal-authoring-governance-v2/);
+assert.match(detail, /regression-promotion-1/);
 assert.match(detail, /Runtime probe contract/);
 assert.match(detail, /ouroforge-runtime-probe v2/);
 assert.match(detail, /observed 2/);

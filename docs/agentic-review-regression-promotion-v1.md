@@ -207,6 +207,12 @@ trusted state:
 Browser surfaces should display missing or malformed review/regression evidence
 as warnings, not inferred passes.
 
+Evidence-Backed Journal v2 adds the deterministic `journal-authoring-governance-v2`
+section to connect proposal quality, decisions, applications, comparisons, and
+regression promotions in generated `journal.md` files. See
+`docs/evidence-backed-journal-v2.md` for missing/partial/malformed data
+semantics and generated-state policy.
+
 ## Verification Policy for Follow-up Issues
 
 Every fixed PR unit in this milestone must include:

@@ -1450,9 +1450,18 @@ pub fn promote_regression_draft_to_scenario_pack(
         return Ok(result);
     }
     let record_path = format!("regression-promotions/{}.json", result.id);
-    let record_abs_path = project_root
-        .join(&draft.source_run.run_dir)
-        .join(&record_path);
+    let project_run_dir = project_root.join(&draft.source_run.run_dir);
+    let cwd_run_dir = std::env::current_dir()
+        .ok()
+        .map(|cwd| cwd.join(&draft.source_run.run_dir));
+    let source_run_dir = if project_run_dir.is_dir() {
+        project_run_dir
+    } else if let Some(cwd_run_dir) = cwd_run_dir.filter(|path| path.is_dir()) {
+        cwd_run_dir
+    } else {
+        project_run_dir
+    };
+    let record_abs_path = source_run_dir.join(&record_path);
     if let Some(parent) = record_abs_path.parent() {
         fs::create_dir_all(parent).with_context(|| {
             format!(
@@ -5271,8 +5280,9 @@ fn validate_mutation_review_ref(reference: &str) -> Result<()> {
 }
 
 /// Validate that a regression promotion `scenarioResultPath` actually anchors a
-/// scenario result artifact. Scenario results are always written under
-/// `evidence/scenarios/<scenario-id>/scenario-result-*.json`, so accepting any
+/// scenario result artifact. Scenario results are written under
+/// `evidence/scenarios/<scenario-id>/scenario-result.json` by legacy fixtures
+/// and `scenario-result-*.json` by current scenario runs, so accepting any
 /// `evidence/`, `mutation/`, or `sandbox/` ref (as the generic mutation review
 /// ref validator does) would let a draft pass while pointing at an unrelated
 /// artifact that downstream promotion/preview code cannot rely on.
@@ -5280,7 +5290,7 @@ fn validate_scenario_result_ref(reference: &str) -> Result<()> {
     validate_evidence_artifact_path(reference)?;
     if !is_scenario_result_artifact_path(reference) {
         return Err(anyhow!(
-            "regression promotion scenarioResultPath must reference a scenario result under evidence/scenarios/ (scenario-result-*.json)"
+            "regression promotion scenarioResultPath must reference a scenario result under evidence/scenarios/ (scenario-result.json or scenario-result-*.json)"
         ));
     }
     Ok(())
@@ -5292,7 +5302,8 @@ fn is_scenario_result_artifact_path(reference: &str) -> bool {
             .file_name()
             .and_then(|name| name.to_str())
             .is_some_and(|name| {
-                name.starts_with("scenario-result-") && name.ends_with(".json")
+                name == "scenario-result.json"
+                    || (name.starts_with("scenario-result-") && name.ends_with(".json"))
             })
 }
 
@@ -21071,8 +21082,8 @@ scenarios:
         let mut contains_result_filename = valid_regression_promotion_draft();
         contains_result_filename
             .source_evidence
-            .scenario_result_path = "evidence/scenarios/failed-smoke/not-scenario-result.json"
-            .to_string();
+            .scenario_result_path =
+            "evidence/scenarios/failed-smoke/not-scenario-result.json".to_string();
         assert!(contains_result_filename
             .validate()
             .expect_err("contains-result scenario filename rejected")
@@ -21095,8 +21106,7 @@ scenarios:
 
     #[test]
     fn regression_promotion_selects_only_documented_scenario_result_filenames() {
-        let (root, artifacts) =
-            create_test_run("regression-promotion-scenario-result-filename");
+        let (root, artifacts) = create_test_run("regression-promotion-scenario-result-filename");
         let run_dir = &artifacts.run_dir;
         fs::create_dir_all(run_dir.join("evidence/scenarios/failed-smoke"))
             .expect("scenario evidence dir");
@@ -21125,18 +21135,14 @@ scenarios:
                 "path": bad_path
             }]
         });
-        let rejected = select_failed_scenario_result_path(
-            run_dir,
-            &verdict,
-            &evidence,
-            "failed-smoke",
-        )
-        .expect_err("non-document scenario-result filename rejected");
+        let rejected =
+            select_failed_scenario_result_path(run_dir, &verdict, &evidence, "failed-smoke")
+                .expect_err("non-document scenario-result filename rejected");
         assert!(rejected
             .to_string()
             .contains("could not find failed scenario result"));
 
-        let valid_path = "evidence/scenarios/failed-smoke/scenario-result-1.json";
+        let valid_path = "evidence/scenarios/failed-smoke/scenario-result.json";
         fs::write(
             run_dir.join(valid_path),
             serde_json::to_string_pretty(&json!({
@@ -21164,6 +21170,9 @@ scenarios:
         .expect("valid metadata scenario result selected");
         assert_eq!(selected, valid_path);
 
+        let suffixed_path = "evidence/scenarios/failed-smoke/scenario-result-1.json";
+        assert!(is_scenario_result_artifact_path(suffixed_path));
+
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
@@ -21180,7 +21189,7 @@ scenarios:
                 "schemaVersion": SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION,
                 "scenarioId": "other-scenario",
                 "stepIndex": 0,
-                "action": { "kind": "key", "key": "Right", "pressed": true },
+                "action": { "kind": "key", "key": "right", "pressed": true },
                 "frame": 1,
                 "input": { "right": true }
             }))
@@ -21196,12 +21205,14 @@ scenarios:
         )
         .expect("replay indexed");
         let evidence = read_evidence_index(run_dir).expect("evidence reads");
-        let rejected =
-            scenario_step_from_replay_artifact(run_dir, path, &evidence, "failed-smoke")
-                .expect_err("cross-scenario replay rejected");
-        assert!(rejected
-            .to_string()
-            .contains("belongs to scenario other-scenario"));
+        let rejected = scenario_step_from_replay_artifact(run_dir, path, &evidence, "failed-smoke")
+            .expect_err("cross-scenario replay rejected");
+        assert!(
+            rejected
+                .to_string()
+                .contains("belongs to scenario other-scenario"),
+            "unexpected replay rejection: {rejected}"
+        );
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
@@ -21236,9 +21247,8 @@ scenarios:
         )
         .expect("legacy replay indexed");
         let evidence = read_evidence_index(run_dir).expect("evidence reads");
-        let rejected =
-            scenario_step_from_replay_artifact(run_dir, path, &evidence, "failed-smoke")
-                .expect_err("legacy replay metadata scenario mismatch rejected");
+        let rejected = scenario_step_from_replay_artifact(run_dir, path, &evidence, "failed-smoke")
+            .expect_err("legacy replay metadata scenario mismatch rejected");
         assert!(rejected
             .to_string()
             .contains("must be indexed with matching scenario_id failed-smoke"));
@@ -21256,17 +21266,23 @@ scenarios:
         fs::create_dir_all(root.join("runs/run-1")).expect("run dir");
         fs::write(
             root.join("ouroforge.project.json"),
-            include_str!("../../../examples/project-workspace-fixtures/valid/ouroforge.project.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/ouroforge.project.json"
+            ),
         )
         .expect("manifest fixture");
         fs::write(
             root.join("scenarios/regression.json"),
-            include_str!("../../../examples/project-workspace-fixtures/valid/scenarios/regression.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/scenarios/regression.json"
+            ),
         )
         .expect("scenario pack fixture");
         fs::write(
             root.join("scenes/main.scene.json"),
-            include_str!("../../../examples/project-workspace-fixtures/valid/scenes/main.scene.json"),
+            include_str!(
+                "../../../examples/project-workspace-fixtures/valid/scenes/main.scene.json"
+            ),
         )
         .expect("scene fixture");
         fs::write(
@@ -21281,9 +21297,8 @@ scenarios:
         draft.source_evidence.scenario_id = "promoted-record-hash".to_string();
         draft.source_evidence.scenario_result_path =
             "evidence/scenarios/promoted-record-hash/scenario-result-1.json".to_string();
-        draft.source_evidence.evidence_refs = vec![
-            "evidence/scenarios/promoted-record-hash/scenario-result-1.json".to_string(),
-        ];
+        draft.source_evidence.evidence_refs =
+            vec!["evidence/scenarios/promoted-record-hash/scenario-result-1.json".to_string()];
         draft.source_evidence.replay_artifact_path = None;
         draft.source_evidence.evidence_ids = vec!["scenario-result".to_string()];
         draft.proposed_scenario.id = "promoted-record-hash".to_string();
@@ -21303,10 +21318,10 @@ scenarios:
         assert_eq!(result.after_hash, artifact_hash_from_bytes(&pack_bytes));
         let record_path = result.record_path.as_deref().expect("record path");
         assert!(root.join("runs/run-1").join(record_path).is_file());
-        let record: RegressionPromotionPackResult =
-            serde_json::from_value(read_json_value(root.join("runs/run-1").join(record_path))
-                .expect("record reads"))
-            .expect("record parses");
+        let record: RegressionPromotionPackResult = serde_json::from_value(
+            read_json_value(root.join("runs/run-1").join(record_path)).expect("record reads"),
+        )
+        .expect("record parses");
         assert_eq!(record.record_path.as_deref(), Some(record_path));
 
         fs::remove_dir_all(root).expect("fixture removed");
