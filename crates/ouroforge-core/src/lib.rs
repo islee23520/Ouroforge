@@ -13164,6 +13164,12 @@ pub struct SceneDocument {
     pub tilemaps: Vec<SceneTilemap>,
     #[serde(
         default,
+        rename = "collisionRules",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub collision_rules: Option<SceneCollisionRules>,
+    #[serde(
+        default,
         rename = "assetManifest",
         skip_serializing_if = "Option::is_none"
     )]
@@ -13211,6 +13217,33 @@ pub struct SceneReloadAssetManifestReport {
 pub struct SceneBounds {
     pub width: i64,
     pub height: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCollisionRules {
+    #[serde(default = "collision_rules_v2")]
+    pub version: String,
+    #[serde(default = "default_collision_layer", rename = "defaultLayer")]
+    pub default_layer: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub layers: Vec<SceneCollisionLayer>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCollisionLayer {
+    pub id: String,
+    #[serde(default = "default_collision_layer_solid")]
+    pub solid: bool,
+    #[serde(default, rename = "triggerOnly")]
+    pub trigger_only: bool,
+    #[serde(
+        default,
+        rename = "collidesWith",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub collides_with: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -14610,6 +14643,18 @@ fn static_collider_body() -> String {
     "static".to_string()
 }
 
+fn collision_rules_v2() -> String {
+    "2".to_string()
+}
+
+fn default_collision_layer() -> String {
+    "default".to_string()
+}
+
+fn default_collision_layer_solid() -> bool {
+    true
+}
+
 fn default_animation_loop() -> bool {
     true
 }
@@ -14710,6 +14755,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             .validate()
             .context("scene assetManifest is invalid")?;
     }
+    let collision_layers = validate_scene_collision_rules(scene.collision_rules.as_ref())?;
     validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     if scene.entities.is_empty() {
@@ -14757,7 +14803,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             return Err(anyhow!("scene entity {} size must be positive", entity.id));
         }
         if let Some(collider) = &entity.components.collider {
-            validate_scene_collider(&entity.id, collider)?;
+            validate_scene_collider(&entity.id, collider, collision_layers.as_ref())?;
         }
         if let Some(trigger) = &entity.components.trigger {
             validate_scene_trigger(&entity.id, trigger)?;
@@ -15113,7 +15159,72 @@ fn validate_scene_asset_ref(
     }
 }
 
-fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<()> {
+fn validate_scene_collision_rules(
+    rules: Option<&SceneCollisionRules>,
+) -> Result<Option<std::collections::BTreeSet<String>>> {
+    let Some(rules) = rules else {
+        return Ok(None);
+    };
+    if rules.version != "2" {
+        return Err(anyhow!("scene collisionRules version must be 2"));
+    }
+    validate_path_component("scene collisionRules defaultLayer", &rules.default_layer)?;
+    if rules.layers.is_empty() {
+        return Err(anyhow!("scene collisionRules layers must not be empty"));
+    }
+    let mut layer_ids = std::collections::BTreeSet::new();
+    for layer in &rules.layers {
+        validate_path_component("scene collisionRules layer id", &layer.id)?;
+        if !layer_ids.insert(layer.id.clone()) {
+            return Err(anyhow!(
+                "duplicate scene collisionRules layer id: {}",
+                layer.id
+            ));
+        }
+        if !layer.solid && !layer.trigger_only {
+            return Err(anyhow!(
+                "scene collisionRules layer {} must be solid or triggerOnly",
+                layer.id
+            ));
+        }
+    }
+    if !layer_ids.contains(&rules.default_layer) {
+        return Err(anyhow!(
+            "scene collisionRules defaultLayer references unknown layer: {}",
+            rules.default_layer
+        ));
+    }
+    for layer in &rules.layers {
+        let mut collides_with = std::collections::BTreeSet::new();
+        for target in &layer.collides_with {
+            validate_path_component(
+                &format!("scene collisionRules layer {} collidesWith", layer.id),
+                target,
+            )?;
+            if !layer_ids.contains(target) {
+                return Err(anyhow!(
+                    "scene collisionRules layer {} collidesWith references unknown layer: {}",
+                    layer.id,
+                    target
+                ));
+            }
+            if !collides_with.insert(target) {
+                return Err(anyhow!(
+                    "duplicate scene collisionRules layer {} collidesWith: {}",
+                    layer.id,
+                    target
+                ));
+            }
+        }
+    }
+    Ok(Some(layer_ids))
+}
+
+fn validate_scene_collider(
+    entity_id: &str,
+    collider: &SceneCollider,
+    collision_layers: Option<&std::collections::BTreeSet<String>>,
+) -> Result<()> {
     if collider.shape != "aabb" {
         return Err(anyhow!(
             "scene entity {entity_id} collider shape must be aabb"
@@ -15134,6 +15245,13 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
             &format!("scene entity {entity_id} collider collisionGroup"),
             group,
         )?;
+        if let Some(layers) = collision_layers {
+            if !layers.contains(group) {
+                return Err(anyhow!(
+                    "scene entity {entity_id} collider collisionGroup references unknown collisionRules layer: {group}"
+                ));
+            }
+        }
     }
     let mut masks = std::collections::BTreeSet::new();
     for mask in &collider.collision_mask {
@@ -15141,6 +15259,13 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
             &format!("scene entity {entity_id} collider collisionMask"),
             mask,
         )?;
+        if let Some(layers) = collision_layers {
+            if !layers.contains(mask) {
+                return Err(anyhow!(
+                    "scene entity {entity_id} collider collisionMask references unknown collisionRules layer: {mask}"
+                ));
+            }
+        }
         if !masks.insert(mask) {
             return Err(anyhow!(
                 "duplicate scene entity {entity_id} collider collisionMask: {mask}"
@@ -27657,6 +27782,15 @@ scenarios:
             "schemaVersion": "1",
             "id": "physics-v2-scene",
             "bounds": { "width": 320, "height": 180 },
+            "collisionRules": {
+                "version": "2",
+                "defaultLayer": "world",
+                "layers": [
+                    { "id": "world", "solid": true, "collidesWith": ["actors"] },
+                    { "id": "actors", "solid": true, "collidesWith": ["world", "triggers"] },
+                    { "id": "triggers", "solid": false, "triggerOnly": true, "collidesWith": ["actors"] }
+                ]
+            },
             "entities": [
                 {
                     "id": "player",
@@ -27698,6 +27832,13 @@ scenarios:
         }))
         .expect("physics scene parses");
         validate_scene(&scene).expect("physics v2 collider schema validates");
+        let rules = scene.collision_rules.as_ref().expect("collision rules");
+        assert_eq!(rules.version, "2");
+        assert_eq!(rules.default_layer, "world");
+        assert!(rules
+            .layers
+            .iter()
+            .any(|layer| layer.id == "triggers" && layer.trigger_only && !layer.solid));
         let collider = scene.entities[0]
             .components
             .collider
@@ -27744,6 +27885,57 @@ scenarios:
             .collision_group = Some("../world".to_string());
         let rejected = validate_scene(&unsafe_group).expect_err("unsafe group rejected");
         assert!(rejected.to_string().contains("may only contain ASCII"));
+
+        let mut unknown_group = scene.clone();
+        unknown_group.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .collision_group = Some("ghosts".to_string());
+        let rejected = validate_scene(&unknown_group).expect_err("unknown group rejected");
+        assert!(rejected
+            .to_string()
+            .contains("collisionGroup references unknown collisionRules layer"));
+
+        let mut unknown_mask = scene.clone();
+        unknown_mask.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .collision_mask = vec!["world".to_string(), "ghosts".to_string()];
+        let rejected = validate_scene(&unknown_mask).expect_err("unknown mask rejected");
+        assert!(rejected
+            .to_string()
+            .contains("collisionMask references unknown collisionRules layer"));
+
+        let mut duplicate_layer = scene.clone();
+        duplicate_layer
+            .collision_rules
+            .as_mut()
+            .expect("rules")
+            .layers
+            .push(SceneCollisionLayer {
+                id: "world".to_string(),
+                solid: true,
+                trigger_only: false,
+                collides_with: vec![],
+            });
+        let rejected = validate_scene(&duplicate_layer).expect_err("duplicate layer rejected");
+        assert!(rejected
+            .to_string()
+            .contains("duplicate scene collisionRules layer id"));
+
+        let mut legacy_without_rules = scene.clone();
+        legacy_without_rules.collision_rules = None;
+        legacy_without_rules.entities[0]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .collision_group = Some("legacy-freeform".to_string());
+        validate_scene(&legacy_without_rules).expect("legacy freeform collision group accepted");
     }
 
     #[test]
