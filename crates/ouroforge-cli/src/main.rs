@@ -9,18 +9,18 @@ use ouroforge_core::{
     build_regression_promotion_draft_from_run, build_regression_run_matrix,
     create_minimal_2d_project_scaffold, create_mutation_proposal, create_run, edit_scene,
     evaluate_run, evolve_run, execute_authoring_loop_step_from_path, hash_project_manifest_file,
-    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
-    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
-    project_run_metadata_from_manifest, promote_regression_draft_to_scenario_pack,
-    read_cdp_targets, read_dashboard_run, read_ledger_events, read_scene,
-    reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
-    run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
-    validate_scene_reload, write_regression_promotion_draft, write_run_comparison_artifact,
-    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
-    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    WorkerId,
+    hash_scene_document, list_authoring_loop_evidence_bundles, list_dashboard_runs,
+    list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
+    preview_scene_edit_transaction, project_run_metadata_from_manifest,
+    promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
+    read_ledger_events, read_scene, reject_generated_artifact_source_collision,
+    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
+    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    update_journal, validate_scene_reload, write_regression_promotion_draft,
+    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
+    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -803,11 +803,13 @@ fn main() -> Result<()> {
                 .map(|summary| read_dashboard_run(&summary.run_dir))
                 .collect::<Result<Vec<_>>>()?;
             let regression_matrix = build_regression_run_matrix(&runs_root)?;
+            let loop_evidence_bundles = list_authoring_loop_evidence_bundles(&runs_root)?;
             let payload = serde_json::json!({
                 "schema": "ouroforge-dashboard-v1",
                 "runs_root": runs_root,
                 "runs": runs,
-                "regression_matrix": regression_matrix
+                "regression_matrix": regression_matrix,
+                "loop_evidence_bundles": loop_evidence_bundles
             });
             if let Some(parent) = output.parent() {
                 std::fs::create_dir_all(parent).with_context(|| {

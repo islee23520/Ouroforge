@@ -2264,10 +2264,14 @@ impl AuthoringLoopEvidenceBundle {
     pub fn validate_references(&self, base_dir: impl AsRef<Path>) -> Result<()> {
         self.validate_schema()?;
         let base_dir = base_dir.as_ref();
+        let known_missing_paths = self.known_missing_paths();
         let missing = self
             .all_artifact_refs()
             .into_iter()
-            .filter(|artifact| !base_dir.join(&artifact.path).exists())
+            .filter(|artifact| {
+                !known_missing_paths.contains(&artifact.path)
+                    && !base_dir.join(&artifact.path).exists()
+            })
             .map(|artifact| format!("{}:{}", artifact.id, artifact.path))
             .collect::<Vec<_>>();
         if missing.is_empty() {
@@ -2278,6 +2282,20 @@ impl AuthoringLoopEvidenceBundle {
                 missing.join(", ")
             ))
         }
+    }
+
+    fn known_missing_paths(&self) -> BTreeSet<String> {
+        let mut paths = BTreeSet::new();
+        for missing_ref in self
+            .missing_refs
+            .iter()
+            .chain(self.steps.iter().flat_map(|step| step.missing_refs.iter()))
+        {
+            if let Some((_, path)) = missing_ref.split_once(':') {
+                paths.insert(path.to_string());
+            }
+        }
+        paths
     }
 
     fn validate_refs(
@@ -2361,6 +2379,7 @@ impl AuthoringLoopEvidenceBundleArtifactRef {
         validate_path_component(&format!("{field}.id"), &self.id)?;
         validate_authoring_loop_bundle_ref_path(
             &format!("{field}.path"),
+            self.kind,
             &self.path,
             generated_roots,
         )?;
@@ -2382,9 +2401,13 @@ impl AuthoringLoopEvidenceBundleArtifactRef {
 
 fn validate_authoring_loop_bundle_ref_path(
     field: &str,
+    kind: AuthoringLoopEvidenceBundleArtifactKind,
     value: &str,
     generated_roots: &[String],
 ) -> Result<()> {
+    if kind == AuthoringLoopEvidenceBundleArtifactKind::LoopPlan {
+        return validate_project_manifest_path(field, value);
+    }
     validate_authoring_loop_generated_root(field, value)?;
     let path = Path::new(value);
     let under_generated_root = generated_roots.iter().any(|root| {
@@ -2397,6 +2420,257 @@ fn validate_authoring_loop_bundle_ref_path(
         ));
     }
     Ok(())
+}
+
+pub const AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME: &str = "bundle.json";
+
+pub fn write_authoring_loop_evidence_bundle_from_path(
+    plan_path: impl AsRef<Path>,
+) -> Result<AuthoringLoopEvidenceBundle> {
+    let plan_path = plan_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    write_authoring_loop_evidence_bundle(&plan, base_dir, plan_path)
+}
+
+pub fn write_authoring_loop_evidence_bundle(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+    plan_path: impl AsRef<Path>,
+) -> Result<AuthoringLoopEvidenceBundle> {
+    let base_dir = base_dir.as_ref();
+    let bundle = build_authoring_loop_evidence_bundle(plan, base_dir, plan_path)?;
+    let bundle_path = authoring_loop_evidence_bundle_path(base_dir, &bundle.loop_id)?;
+    if let Some(parent) = bundle_path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create authoring loop evidence bundle dir {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json_atomic(&bundle_path, &json!(bundle))?;
+    Ok(bundle)
+}
+
+pub fn build_authoring_loop_evidence_bundle(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+    plan_path: impl AsRef<Path>,
+) -> Result<AuthoringLoopEvidenceBundle> {
+    plan.validate_schema()?;
+    let base_dir = base_dir.as_ref();
+    let plan_path = plan_path.as_ref();
+    let plan_ref_path = relative_path_string(base_dir, plan_path)?;
+    let mut steps = Vec::new();
+    let mut runs = Vec::new();
+    let mut comparisons = Vec::new();
+    let mut proposals = Vec::new();
+    let mut review_decisions = Vec::new();
+    let mut transactions = Vec::new();
+    let mut regression_promotions = Vec::new();
+    let mut matrix_snapshots = Vec::new();
+    let mut journal_summaries = Vec::new();
+    let mut missing_refs = Vec::new();
+
+    for step in &plan.steps {
+        let mut outputs = Vec::new();
+        let mut step_missing_refs = Vec::new();
+        for artifact in &step.expected_artifacts {
+            let kind = bundle_artifact_kind_for_step(step.kind, artifact);
+            let missing = !base_dir.join(&artifact.path).exists();
+            if missing {
+                let missing_ref = format!("{}:{}", artifact.id, artifact.path);
+                missing_refs.push(missing_ref.clone());
+                step_missing_refs.push(missing_ref);
+            }
+            let category_ref = AuthoringLoopEvidenceBundleArtifactRef {
+                id: artifact.id.clone(),
+                kind,
+                path: artifact.path.clone(),
+                step_id: Some(step.id.clone()),
+                description: artifact.description.clone(),
+            };
+            let step_ref = AuthoringLoopEvidenceBundleArtifactRef {
+                id: format!("{}-{}", step.id, artifact.id),
+                kind: AuthoringLoopEvidenceBundleArtifactKind::StepOutput,
+                path: artifact.path.clone(),
+                step_id: Some(step.id.clone()),
+                description: artifact.description.clone(),
+            };
+            outputs.push(step_ref);
+            match kind {
+                AuthoringLoopEvidenceBundleArtifactKind::Run => runs.push(category_ref),
+                AuthoringLoopEvidenceBundleArtifactKind::Comparison => {
+                    comparisons.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::Proposal => proposals.push(category_ref),
+                AuthoringLoopEvidenceBundleArtifactKind::ReviewDecision => {
+                    review_decisions.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::Transaction => {
+                    transactions.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::RegressionPromotion => {
+                    regression_promotions.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::MatrixSnapshot => {
+                    matrix_snapshots.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::JournalSummary => {
+                    journal_summaries.push(category_ref)
+                }
+                AuthoringLoopEvidenceBundleArtifactKind::LoopPlan
+                | AuthoringLoopEvidenceBundleArtifactKind::StepOutput => {}
+            }
+        }
+        steps.push(AuthoringLoopEvidenceBundleStep {
+            step_id: step.id.clone(),
+            kind: step.kind.as_str().to_string(),
+            status: step.status.as_str().to_string(),
+            outputs,
+            missing_refs: step_missing_refs,
+        });
+    }
+
+    missing_refs.sort();
+    missing_refs.dedup();
+    let status = if plan
+        .steps
+        .iter()
+        .any(|step| step.status == AuthoringLoopStepStatus::Failed)
+    {
+        AuthoringLoopEvidenceBundleStatus::Failed
+    } else if !missing_refs.is_empty()
+        || !plan
+            .steps
+            .iter()
+            .all(|step| step.status == AuthoringLoopStepStatus::Completed)
+    {
+        AuthoringLoopEvidenceBundleStatus::Partial
+    } else {
+        AuthoringLoopEvidenceBundleStatus::Completed
+    };
+
+    let bundle = AuthoringLoopEvidenceBundle {
+        schema_version: AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        status,
+        plan: AuthoringLoopEvidenceBundleArtifactRef {
+            id: "loop-plan".to_string(),
+            kind: AuthoringLoopEvidenceBundleArtifactKind::LoopPlan,
+            path: plan_ref_path,
+            step_id: None,
+            description: Some("validated authoring loop plan".to_string()),
+        },
+        steps,
+        runs,
+        comparisons,
+        proposals,
+        review_decisions,
+        transactions,
+        regression_promotions,
+        matrix_snapshots,
+        journal_summaries,
+        missing_refs,
+        generated_state: plan.generated_state.clone(),
+        boundary: "Generated local evidence index only; does not move artifacts, mutate source state, serve files, add browser writes, or package/export artifacts.".to_string(),
+    };
+    bundle.validate_schema()?;
+    Ok(bundle)
+}
+
+pub fn list_authoring_loop_evidence_bundles(
+    runs_root: impl AsRef<Path>,
+) -> Result<Vec<AuthoringLoopEvidenceBundle>> {
+    let runs_root = runs_root.as_ref();
+    let bundle_root = runs_root.join("authoring-loop-bundles");
+    if !bundle_root.exists() {
+        return Ok(Vec::new());
+    }
+    let base_dir = runs_root
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut bundles = Vec::new();
+    for entry in fs::read_dir(&bundle_root)
+        .with_context(|| format!("failed to read bundle root {}", bundle_root.display()))?
+    {
+        let entry = entry.context("failed to read bundle root entry")?;
+        let path = entry.path().join(AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME);
+        if !path.is_file() {
+            continue;
+        }
+        let body = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read bundle {}", path.display()))?;
+        let bundle = AuthoringLoopEvidenceBundle::from_json_str_with_base(&body, base_dir)
+            .with_context(|| format!("failed to validate bundle {}", path.display()))?;
+        bundles.push(bundle);
+    }
+    bundles.sort_by(|left, right| left.loop_id.cmp(&right.loop_id));
+    Ok(bundles)
+}
+
+fn authoring_loop_evidence_bundle_path(base_dir: &Path, loop_id: &str) -> Result<PathBuf> {
+    validate_path_component("authoring loop id", loop_id)?;
+    Ok(base_dir
+        .join("runs/authoring-loop-bundles")
+        .join(loop_id)
+        .join(AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME))
+}
+
+fn relative_path_string(base_dir: &Path, path: &Path) -> Result<String> {
+    let relative = path.strip_prefix(base_dir).unwrap_or(path);
+    let value = relative.to_string_lossy().to_string();
+    validate_project_manifest_path("authoring loop evidence bundle relative path", &value)?;
+    Ok(value)
+}
+
+fn bundle_artifact_kind_for_step(
+    step_kind: AuthoringLoopStepKind,
+    artifact: &AuthoringLoopArtifactRef,
+) -> AuthoringLoopEvidenceBundleArtifactKind {
+    let id = artifact.id.as_str();
+    let path = artifact.path.as_str();
+    if id.contains("matrix") || path.contains("matrix") {
+        return AuthoringLoopEvidenceBundleArtifactKind::MatrixSnapshot;
+    }
+    if id.contains("journal")
+        || id.contains("summary")
+        || path.contains("journal")
+        || path.contains("summary")
+    {
+        return AuthoringLoopEvidenceBundleArtifactKind::JournalSummary;
+    }
+    match step_kind {
+        AuthoringLoopStepKind::RunScenarioPack | AuthoringLoopStepKind::Rerun => {
+            AuthoringLoopEvidenceBundleArtifactKind::Run
+        }
+        AuthoringLoopStepKind::CompareRuns => AuthoringLoopEvidenceBundleArtifactKind::Comparison,
+        AuthoringLoopStepKind::GenerateProposal => {
+            AuthoringLoopEvidenceBundleArtifactKind::Proposal
+        }
+        AuthoringLoopStepKind::RecordReviewDecision => {
+            AuthoringLoopEvidenceBundleArtifactKind::ReviewDecision
+        }
+        AuthoringLoopStepKind::ApplyAcceptedSceneMutation => {
+            AuthoringLoopEvidenceBundleArtifactKind::Transaction
+        }
+        AuthoringLoopStepKind::PromoteRegression => {
+            AuthoringLoopEvidenceBundleArtifactKind::RegressionPromotion
+        }
+        AuthoringLoopStepKind::Summarize => AuthoringLoopEvidenceBundleArtifactKind::JournalSummary,
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -3154,6 +3428,7 @@ pub fn execute_authoring_loop_step_from_path(
         .unwrap_or_else(|| Path::new("."));
     let (updated, summary) = execute_authoring_loop_step(&plan, base_dir, plan_path, step_id)?;
     write_json_atomic(plan_path, &json!(updated))?;
+    write_authoring_loop_evidence_bundle(&updated, base_dir, plan_path)?;
     Ok(summary)
 }
 
@@ -17721,6 +17996,45 @@ scenarios:
     }
 
     #[test]
+    fn loop_evidence_bundle_generation_writes_after_step_and_lists_for_dashboard() {
+        let root = unique_temp_dir("loop-evidence-bundle-generation");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_execution_plan(&root);
+
+        let baseline = execute_authoring_loop_step_from_path(&plan_path, "run-baseline")
+            .expect("baseline step executes and writes bundle");
+        assert_eq!(baseline.status, "completed");
+
+        let bundle_path = root
+            .join("runs/authoring-loop-bundles/temp-loop-execution")
+            .join(AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME);
+        assert!(
+            bundle_path.is_file(),
+            "bundle file is generated local state"
+        );
+        let bundle_json = fs::read_to_string(&bundle_path).expect("bundle reads");
+        let bundle = AuthoringLoopEvidenceBundle::from_json_str(&bundle_json)
+            .expect("generated bundle validates");
+        assert_eq!(bundle.status, AuthoringLoopEvidenceBundleStatus::Partial);
+        assert!(bundle
+            .runs
+            .iter()
+            .any(|artifact| artifact.id == "baseline-run"));
+        assert!(bundle
+            .missing_refs
+            .iter()
+            .any(|missing| missing.contains("comparison")));
+        assert!(root.join(&baseline.generated_artifacts[0].path).is_file());
+
+        let bundles = list_authoring_loop_evidence_bundles(root.join("runs"))
+            .expect("dashboard bundle reader includes partial bundle with explicit missing refs");
+        assert_eq!(bundles.len(), 1);
+        assert_eq!(bundles[0].loop_id, "temp-loop-execution");
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn loop_evidence_bundle_validation_reports_stale_and_unsafe_refs() {
         let root = unique_temp_dir("loop-evidence-bundle");
         let bundle_json = loop_evidence_bundle_value("completed", Vec::new());
@@ -17745,11 +18059,11 @@ scenarios:
             .expect("all generated refs exist");
 
         let mut unsafe_json = loop_evidence_bundle_value("completed", Vec::new());
-        unsafe_json["plan"]["path"] = json!("docs/loop-plan.json");
+        unsafe_json["runs"][0]["path"] = json!("docs/source-run.json");
         let unsafe_ref = AuthoringLoopEvidenceBundle::from_json_str(
             &serde_json::to_string_pretty(&unsafe_json).expect("bundle json"),
         )
-        .expect_err("source-like plan ref rejected");
+        .expect_err("source-like generated artifact ref rejected");
         assert!(unsafe_ref.to_string().contains("generated roots"));
 
         let mut missing_complete =
