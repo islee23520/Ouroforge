@@ -44,7 +44,7 @@ replacement decision exists.
 Make the evidence-native loop itself inspectable and resumable through local
 artifacts:
 
-- loop plan model: what steps are intended and why;
+- loop plan model: what steps are intended and why (`docs/authoring-loop-plan-v1.md`);
 - dry-run sequencer: what would run, with no trusted/project-state writes;
 - Rust-trusted step runner: explicit execution for allowed local steps;
 - resume/failure recovery: visible incomplete/failed state;
@@ -99,6 +99,22 @@ Not allowed in this milestone:
 - plugin runtime or marketplace;
 - distributed QA/Elixir implementation;
 - production editor, public launch automation, or Godot replacement claims.
+
+## Authoring Loop Plan Model v1
+
+#304 defines the first concrete artifact in this milestone: Authoring Loop Plan
+Model v1 (`docs/authoring-loop-plan-v1.md`). The plan is data-only. It records a
+single loop id, project/Seed/scenario-pack context, ordered bounded steps,
+expected artifacts, required decisions, rollback refs, per-step status, optional
+status transitions, and generated-state roots. Validation rejects duplicate ids,
+unknown step kinds, unsafe paths, invalid ordering, missing required inputs, and
+invalid status transitions before future orchestration layers can consume the
+plan.
+
+The plan model intentionally does not execute commands, mutate scenes, promote
+regressions, trigger browser actions, or add a Studio surface by itself. Runtime
+loop plans remain generated local state; only explicitly scoped deterministic
+fixtures under `examples/authoring-loop-plan-fixtures/` are tracked.
 
 ## Dry-run-first policy
 
