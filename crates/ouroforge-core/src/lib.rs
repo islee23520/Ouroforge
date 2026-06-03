@@ -30144,6 +30144,7 @@ scenarios:
                 "assetManifest": { "id": "runtime-v1-assets", "assetCount": 3 },
                 "assets": [{ "id": "player-sprite", "status": "loaded" }],
                 "audioEvents": [{ "name": "player_spawn" }],
+                "collisionRules": { "defaultLayer": "default" },
                 "collisions": [{ "pairId": "goal:player" }],
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
                 "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
