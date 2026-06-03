@@ -10475,6 +10475,19 @@ impl VisualEditDraftArtifact {
         }
         Ok(edits)
     }
+
+    pub fn preview_scene_edit_transactions(
+        &self,
+        scene_path: impl AsRef<Path>,
+    ) -> Result<Vec<SceneEditTransaction>> {
+        let scene_path = scene_path.as_ref();
+        let scene = read_scene(scene_path)?;
+        let edits = self.validate_scene_preflight(&scene)?;
+        edits
+            .into_iter()
+            .map(|edit| preview_scene_edit_transaction(scene_path, edit))
+            .collect()
+    }
 }
 
 impl VisualEditDraftTarget {
@@ -23266,6 +23279,70 @@ scenarios:
         assert!(error
             .to_string()
             .contains("not supported by scene edit transaction preflight yet"));
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_generates_transaction_previews_without_apply() {
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let before_bytes = fs::read(&scene_path).expect("scene bytes read before preview");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let before_hash = hash_scene_document(&scene).expect("scene hashes");
+        let draft = valid_scene_visual_edit_draft_for_scene(&scene);
+
+        let transactions = draft
+            .preview_scene_edit_transactions(&scene_path)
+            .expect("scene draft previews transactions");
+
+        assert_eq!(transactions.len(), 2);
+        for transaction in &transactions {
+            assert_eq!(
+                transaction.schema_version,
+                "ouroforge.scene-edit-transaction.v1"
+            );
+            assert_eq!(transaction.scene_path, scene_path.to_string_lossy());
+            assert_eq!(transaction.before_scene_hash, before_hash);
+            assert_eq!(transaction.validation_result.status, "passed");
+            assert!(transaction.after_scene_hash.is_some());
+            assert!(transaction.rollback.strategy.contains("beforeSceneHash"));
+        }
+        assert_eq!(transactions[0].edit.path, "components.transform.x");
+        assert_eq!(transactions[1].edit.path, "sprite.color");
+        assert_eq!(
+            fs::read(&scene_path).expect("scene bytes read after preview"),
+            before_bytes
+        );
+        let scene_after_preview = read_scene(&scene_path).expect("scene reads after preview");
+        assert_eq!(
+            hash_scene_document(&scene_after_preview).expect("scene hashes"),
+            before_hash
+        );
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_rejects_preview_before_transaction_output() {
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let scene = read_scene(&scene_path).expect("scene reads");
+
+        let mut stale = valid_scene_visual_edit_draft_for_scene(&scene);
+        stale.before_hash =
+            "sha256:9999999999999999999999999999999999999999999999999999999999999999".to_string();
+        let error = stale
+            .preview_scene_edit_transactions(&scene_path)
+            .expect_err("stale draft does not preview");
+        assert!(error.to_string().contains("beforeHash mismatch"));
+
+        let mut unsupported = valid_scene_visual_edit_draft_for_scene(&scene);
+        unsupported.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .scene_edit_path = "components.collider.sensor".to_string();
+        let error = unsupported
+            .preview_scene_edit_transactions(&scene_path)
+            .expect_err("unsupported draft does not preview");
+        assert!(error
+            .to_string()
+            .contains("unsupported visual edit scene draft path"));
     }
 
     #[test]
