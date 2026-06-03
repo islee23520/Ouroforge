@@ -719,6 +719,112 @@ fn scenario_promote_draft_rejects_missing_or_malformed_replay_evidence() {
 }
 
 #[test]
+fn scenario_promote_dry_run_and_apply_modify_only_authorized_pack_with_record() {
+    let temp = unique_temp_dir("ouroforge-cli-regression-promote-apply-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let (project_dir, run_dir) = create_project_bound_run(&temp);
+    write_failed_regression_evidence(&temp, &run_dir, "promoted-smoke-regression", true);
+    let draft_path = temp.join("runs/drafts/promoted-smoke-regression-draft.json");
+    run_cli(
+        &temp,
+        &[
+            "scenario",
+            "promote-draft",
+            run_dir.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario",
+            "promoted-smoke-regression",
+            "--output",
+            draft_path.to_str().unwrap(),
+        ],
+    );
+    let pack_path = project_dir.join("scenarios/smoke.scenario-pack.json");
+    let pack_before = fs::read_to_string(&pack_path).expect("pack reads before dry-run");
+
+    let dry_run = run_cli(
+        &temp,
+        &[
+            "scenario",
+            "promote",
+            draft_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+            "--dry-run",
+        ],
+    );
+    assert!(dry_run.contains("Regression promotion dry-run: promoted-smoke-regression"));
+    assert!(dry_run.contains(r#""dryRun": true"#));
+    assert_eq!(
+        fs::read_to_string(&pack_path).expect("pack reads after dry-run"),
+        pack_before,
+        "dry-run must not write scenario pack"
+    );
+
+    let promoted = run_cli(
+        &temp,
+        &[
+            "scenario",
+            "promote",
+            draft_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    assert!(promoted.contains("Regression promoted: promoted-smoke-regression"));
+    assert!(promoted.contains(r#""dryRun": false"#));
+    assert!(promoted.contains("Promotion record: regression-promotions/"));
+    let pack_after = fs::read_to_string(&pack_path).expect("pack reads after promote");
+    assert_ne!(pack_after, pack_before, "promotion must update target pack");
+    let pack_json: serde_json::Value = serde_json::from_str(&pack_after).expect("pack parses");
+    let promoted_group = pack_json["scenarioGroups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|group| group["id"] == "promoted-regressions")
+        .expect("promoted group created");
+    assert_eq!(
+        promoted_group["scenarios"][0]["id"],
+        "promoted-smoke-regression"
+    );
+    let result_json_start = promoted.find('{').expect("result json starts");
+    let result: serde_json::Value =
+        serde_json::from_str(&promoted[result_json_start..]).expect("result parses");
+    let record_path = result["recordPath"].as_str().expect("record path recorded");
+    let record: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(run_dir.join(record_path)).expect("record reads"))
+            .expect("record parses");
+    assert_eq!(record["scenarioId"], "promoted-smoke-regression");
+    assert_eq!(record["beforeHash"], result["beforeHash"]);
+    assert_eq!(record["afterHash"], result["afterHash"]);
+
+    let duplicate = run_cli_expect_failure(
+        &temp,
+        &[
+            "scenario",
+            "promote",
+            draft_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    assert!(duplicate.contains("scenario id already exists"));
+    assert_eq!(
+        fs::read_to_string(&pack_path).expect("pack reads after duplicate rejection"),
+        pack_after,
+        "duplicate rejection must happen before rewriting pack"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
     let temp = unique_temp_dir("ouroforge-cli-run-transaction-binding-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

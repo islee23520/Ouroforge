@@ -1281,6 +1281,167 @@ fn regression_promotion_run_dir_ref(run_dir: &Path) -> Result<String> {
     Ok(path)
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RegressionPromotionPackResult {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "sourceRun")]
+    pub source_run: RegressionPromotionSourceRun,
+    pub target: RegressionPromotionTarget,
+    #[serde(rename = "dryRun")]
+    pub dry_run: bool,
+    #[serde(rename = "createdGroup")]
+    pub created_group: bool,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: ProjectArtifactHash,
+    #[serde(rename = "afterHash")]
+    pub after_hash: ProjectArtifactHash,
+    pub changes: Vec<String>,
+    #[serde(rename = "recordPath", skip_serializing_if = "Option::is_none")]
+    pub record_path: Option<String>,
+}
+
+pub fn promote_regression_draft_to_scenario_pack(
+    draft_path: impl AsRef<Path>,
+    project_manifest_path: impl AsRef<Path>,
+    scenario_pack_id: &str,
+    dry_run: bool,
+) -> Result<RegressionPromotionPackResult> {
+    validate_path_component("regression promotion scenario pack id", scenario_pack_id)?;
+    let draft = RegressionPromotionDraft::from_path(&draft_path)?;
+    if draft.target.scenario_pack_id != scenario_pack_id {
+        return Err(anyhow!(
+            "regression promotion draft targets scenario pack {}, not {}",
+            draft.target.scenario_pack_id,
+            scenario_pack_id
+        ));
+    }
+    let manifest_path = project_manifest_path.as_ref();
+    let manifest = ProjectManifest::from_path(manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    manifest.validate_references(project_root)?;
+    if draft.target.project_manifest_path != project_relative_path(project_root, manifest_path)? {
+        return Err(anyhow!(
+            "regression promotion draft project manifest does not match requested project"
+        ));
+    }
+    let pack_ref = manifest
+        .scenario_packs
+        .iter()
+        .find(|reference| reference.id == scenario_pack_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "regression promotion scenario pack {scenario_pack_id} is not authorized by project manifest"
+            )
+        })?;
+    if pack_ref.path != draft.target.scenario_pack_path {
+        return Err(anyhow!(
+            "regression promotion draft scenario pack path does not match project manifest"
+        ));
+    }
+    let pack_path = project_root.join(&pack_ref.path);
+    let pack_input = fs::read(&pack_path)
+        .with_context(|| format!("failed to read scenario pack {}", pack_path.display()))?;
+    let before_hash = artifact_hash_from_bytes(&pack_input);
+    let mut pack = ScenarioPack::from_json_str(
+        std::str::from_utf8(&pack_input).context("scenario pack JSON is not UTF-8")?,
+    )?;
+    if pack.id != scenario_pack_id {
+        return Err(anyhow!(
+            "regression promotion scenario pack id mismatch: expected {}, found {}",
+            scenario_pack_id,
+            pack.id
+        ));
+    }
+    if pack
+        .ordered_scenario_ids()
+        .iter()
+        .any(|id| id == &draft.proposed_scenario.id)
+    {
+        return Err(anyhow!(
+            "regression promotion scenario id already exists in target scenario pack: {}",
+            draft.proposed_scenario.id
+        ));
+    }
+    let mut created_group = false;
+    match pack
+        .scenario_groups
+        .iter_mut()
+        .find(|group| group.id == draft.target.scenario_group_id)
+    {
+        Some(group) => group.scenarios.push(draft.proposed_scenario.clone()),
+        None => {
+            created_group = true;
+            pack.scenario_groups.push(ScenarioPackGroup {
+                id: draft.target.scenario_group_id.clone(),
+                description: "Promoted regression scenarios.".to_string(),
+                scenarios: vec![draft.proposed_scenario.clone()],
+            });
+        }
+    }
+    pack.validate()?;
+    let pack_json = serde_json::to_vec_pretty(&pack)
+        .context("failed to serialize promoted scenario pack candidate")?;
+    let after_hash = artifact_hash_from_bytes(&pack_json);
+    let mut changes = Vec::new();
+    if created_group {
+        changes.push(format!("created_group:{}", draft.target.scenario_group_id));
+    }
+    changes.push(format!("added_scenario:{}", draft.proposed_scenario.id));
+    let id = format!(
+        "regression-promotion-{}-{}",
+        draft.proposed_scenario.id,
+        unix_millis()?
+    );
+    let mut result = RegressionPromotionPackResult {
+        schema_version: "regression-promotion-result-v1".to_string(),
+        id,
+        draft_id: draft.id.clone(),
+        scenario_id: draft.proposed_scenario.id.clone(),
+        source_run: draft.source_run.clone(),
+        target: draft.target.clone(),
+        dry_run,
+        created_group,
+        before_hash,
+        after_hash,
+        changes,
+        record_path: None,
+    };
+    if dry_run {
+        return Ok(result);
+    }
+    write_json_atomic(&pack_path, &json!(pack))?;
+    let record_path = format!("regression-promotions/{}.json", result.id);
+    let record_abs_path = Path::new(&draft.source_run.run_dir).join(&record_path);
+    if let Some(parent) = record_abs_path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create regression promotion record directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    result.record_path = Some(record_path.clone());
+    write_json_atomic(&record_abs_path, &json!(result))?;
+    Ok(result)
+}
+
+fn artifact_hash_from_bytes(bytes: &[u8]) -> ProjectArtifactHash {
+    ProjectArtifactHash {
+        algorithm: "fnv1a64-file-v1".to_string(),
+        value: format!("{:016x}", fnv1a64(bytes)),
+    }
+}
+
 impl ScenarioPackGroup {
     fn validate(&self, group_index: usize, scenario_ids: &mut BTreeSet<String>) -> Result<()> {
         validate_path_component("scenario pack group id", &self.id)?;

@@ -8,8 +8,9 @@ use ouroforge_core::{
     create_minimal_2d_project_scaffold, create_mutation_proposal, create_run, edit_scene,
     evaluate_run, evolve_run, hash_project_manifest_file, hash_scene_document, list_dashboard_runs,
     list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
-    preview_scene_edit_transaction, project_run_metadata_from_manifest, read_cdp_targets,
-    read_dashboard_run, read_ledger_events, read_scene, reject_generated_artifact_source_collision,
+    preview_scene_edit_transaction, project_run_metadata_from_manifest,
+    promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
+    read_ledger_events, read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
     run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     update_journal, validate_scene_reload, write_regression_promotion_draft,
@@ -297,6 +298,15 @@ enum ScenarioCommand {
         #[arg(long, value_name = "PATH")]
         output: PathBuf,
     },
+    Promote {
+        draft_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project: PathBuf,
+        #[arg(long = "scenario-pack", value_name = "ID")]
+        scenario_pack: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -553,6 +563,35 @@ fn main() -> Result<()> {
                 println!("Replay artifact: {replay}");
             }
             println!("Target scenario pack: {}", draft.target.scenario_pack_id);
+        }
+        Commands::Scenario {
+            command:
+                ScenarioCommand::Promote {
+                    draft_path,
+                    project,
+                    scenario_pack,
+                    dry_run,
+                },
+        } => {
+            let manifest_path = resolve_project_manifest_path(&project);
+            let result = promote_regression_draft_to_scenario_pack(
+                &draft_path,
+                &manifest_path,
+                &scenario_pack,
+                dry_run,
+            )?;
+            if dry_run {
+                println!("Regression promotion dry-run: {}", result.scenario_id);
+            } else {
+                println!("Regression promoted: {}", result.scenario_id);
+            }
+            println!("Target scenario pack: {}", result.target.scenario_pack_id);
+            println!("Before hash: {}", result.before_hash.value);
+            println!("After hash: {}", result.after_hash.value);
+            if let Some(record_path) = &result.record_path {
+                println!("Promotion record: {record_path}");
+            }
+            println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Commands::Evaluate { run_dir } => {
             let verdict = evaluate_run(run_dir)?;
