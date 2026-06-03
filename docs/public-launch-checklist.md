@@ -1,6 +1,6 @@
 # Public launch checklist
 
-Status: **conditional go for a manual public-visibility decision after #217 refresh PRs merge**.
+Status: **conditional go for a manual public-visibility decision after #217 refresh PRs merge; unchanged by Asset Pipeline v1 completion**.
 
 This checklist is the handoff artifact for public-readiness review. It does not publish the repository, change visibility, announce a release, or promise compatibility.
 
@@ -76,7 +76,7 @@ Recorded during AL2.8.3 on 2026-06-02:
 - Public wording scan found conservative boundary language only: no Godot replacement, production readiness, hosted/cloud guarantee, compatibility stability, or automatic public-release claim was added.
 - Repository visibility was not changed.
 
-The final public visibility decision remains a manual maintainer action outside #217.
+The final public visibility decision remains a manual maintainer action outside #217. Asset Pipeline v1 completion after #342 adds local content-authoring evidence, but it does not publish the repository, approve launch, or change visibility.
 
 ## Launch wording boundaries
 
