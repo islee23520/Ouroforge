@@ -112,7 +112,10 @@ ignored unless a future issue explicitly scopes a tiny deterministic fixture.
 
 Tileset/tilemap payloads may include bounded authoring metadata used by
 `docs/tileset-tilemap-authoring-v2.md`; runtime/dashboard consumers treat the
-extracted cells as read-only evidence, not editor write authority.
+extracted cells as read-only evidence, not editor write authority. Asset
+Reference Integrity v1 is documented in
+`docs/asset-reference-integrity-v1.md`; it covers scene reference warning
+evidence for missing refs, stale hashes, invalid types, and unresolved ids.
 
 ## Boundary and non-goals
 
