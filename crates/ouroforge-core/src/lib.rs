@@ -1450,17 +1450,19 @@ pub fn promote_regression_draft_to_scenario_pack(
         return Ok(result);
     }
     let record_path = format!("regression-promotions/{}.json", result.id);
-    let project_run_dir = project_root.join(&draft.source_run.run_dir);
-    let cwd_run_dir = std::env::current_dir()
-        .ok()
-        .map(|cwd| cwd.join(&draft.source_run.run_dir));
-    let source_run_dir = if project_run_dir.is_dir() {
-        project_run_dir
-    } else if let Some(cwd_run_dir) = cwd_run_dir.filter(|path| path.is_dir()) {
-        cwd_run_dir
-    } else {
-        project_run_dir
-    };
+    // Resolve the source run directory and verify it is actually this draft's
+    // source run before writing anything. Prefer the project root that owns the
+    // scenario pack (the manifest declares runsRoot relative to itself); fall
+    // back to the process working directory only when it holds the *same* run.
+    // Selecting a runs/<id> directory merely because it exists could write the
+    // record into an unrelated project's run, corrupting its
+    // regression-promotions lifecycle while leaving the real source run without
+    // a record.
+    let source_run_dir = resolve_regression_promotion_source_run_dir(
+        project_root,
+        &draft.source_run.run_dir,
+        &draft.source_run.run_id,
+    )?;
     let record_abs_path = source_run_dir.join(&record_path);
     if let Some(parent) = record_abs_path.parent() {
         fs::create_dir_all(parent).with_context(|| {
@@ -1470,10 +1472,61 @@ pub fn promote_regression_draft_to_scenario_pack(
             )
         })?;
     }
-    write_json_atomic(&pack_path, &pack_value)?;
+    // Write the run-local promotion record before replacing the scenario pack so
+    // the pack can never be committed without its corresponding audit record.
     result.record_path = Some(record_path.clone());
     write_json_atomic(&record_abs_path, &json!(result))?;
+    write_json_atomic(&pack_path, &pack_value)?;
     Ok(result)
+}
+
+/// True when `run_dir/run.json` exists and identifies the run as `run_id`.
+///
+/// The run id is derived exactly as `build_regression_promotion_draft_from_run`
+/// does: the explicit JSON `id` when present, otherwise the run directory's name
+/// (legacy run.json files predating the `id` field). Mirroring that derivation
+/// keeps library-generated drafts promotable while still requiring run.json to
+/// exist, so an empty or unrelated directory is never accepted as the source run.
+fn regression_promotion_source_run_matches(run_dir: &Path, run_id: &str) -> bool {
+    let Ok(run) = read_json_value(run_dir.join("run.json")) else {
+        return false;
+    };
+    let effective_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    effective_id == run_id
+}
+
+/// Resolve a regression promotion's source run directory, verifying via
+/// `run.json` that the candidate really is the draft's source run. Prefers the
+/// project root that owns the scenario pack and only falls back to the process
+/// working directory when it holds the same run, so a promote invoked from an
+/// unrelated tree cannot write the record into someone else's run.
+fn resolve_regression_promotion_source_run_dir(
+    project_root: &Path,
+    run_dir_rel: &str,
+    run_id: &str,
+) -> Result<PathBuf> {
+    let project_run_dir = project_root.join(run_dir_rel);
+    if regression_promotion_source_run_matches(&project_run_dir, run_id) {
+        return Ok(project_run_dir);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        let cwd_run_dir = cwd.join(run_dir_rel);
+        if cwd_run_dir != project_run_dir
+            && regression_promotion_source_run_matches(&cwd_run_dir, run_id)
+        {
+            return Ok(cwd_run_dir);
+        }
+    }
+    Err(anyhow!(
+        "regression promotion source run {run_id} not found at {} (run.json id must match)",
+        project_run_dir.display()
+    ))
 }
 
 fn artifact_hash_from_bytes(bytes: &[u8]) -> ProjectArtifactHash {
@@ -6063,6 +6116,21 @@ fn is_scenario_result_artifact_path(reference: &str) -> bool {
                 name == "scenario-result.json"
                     || (name.starts_with("scenario-result-") && name.ends_with(".json"))
             })
+}
+
+/// Extract `<scenario-id>` from an `evidence/scenarios/<scenario-id>/scenario-result*.json`
+/// artifact path, used to surface unreadable scenario results in the regression
+/// matrix without needing to parse the (broken) result body.
+fn scenario_id_from_scenario_result_path(path: &str) -> Option<String> {
+    if !is_scenario_result_artifact_path(path) {
+        return None;
+    }
+    Path::new(path)
+        .strip_prefix("evidence/scenarios")
+        .ok()
+        .and_then(|rest| rest.components().next())
+        .and_then(|component| component.as_os_str().to_str())
+        .map(|id| id.to_string())
 }
 
 fn validate_patch_draft_target_path(target_path: &str) -> Result<()> {
@@ -13286,6 +13354,24 @@ fn dashboard_scenario_result_observations(
     let mut observations = BTreeMap::new();
     for artifact in &run.scenario_results {
         let Some(value) = &artifact.value else {
+            // An indexed scenario result that cannot be read or parsed must still
+            // be surfaced (as unknown) rather than dropped; otherwise the matrix
+            // falls back to a misleading "pending" with no evidence even though a
+            // broken result artifact exists. Derive the scenario id from the
+            // artifact path (evidence/scenarios/<id>/scenario-result*.json).
+            if let Some(scenario_id) = scenario_id_from_scenario_result_path(&artifact.path) {
+                observations.entry(scenario_id).or_insert_with(|| {
+                    RegressionRunMatrixObservation {
+                        run_id: run.summary.id.clone(),
+                        run_dir: run.summary.run_dir.to_string_lossy().to_string(),
+                        created_at_unix_ms: run.summary.created_at_unix_ms,
+                        status: "unknown".to_string(),
+                        scenario_result_path: Some(artifact.path.clone()),
+                        verdict_status: run.summary.verdict_status.clone(),
+                        evidence_refs: vec![artifact.path.clone()],
+                    }
+                });
+            }
             continue;
         };
         let Some(scenario_id) = value
@@ -22522,6 +22608,11 @@ scenarios:
         fs::create_dir_all(root.join("assets")).expect("asset dir");
         fs::create_dir_all(root.join("runs/run-1")).expect("run dir");
         fs::write(
+            root.join("runs/run-1/run.json"),
+            serde_json::to_vec(&json!({ "id": "run-1" })).expect("run.json bytes"),
+        )
+        .expect("source run.json");
+        fs::write(
             root.join("ouroforge.project.json"),
             include_str!(
                 "../../../examples/project-workspace-fixtures/valid/ouroforge.project.json"
@@ -22582,6 +22673,86 @@ scenarios:
         assert_eq!(record.record_path.as_deref(), Some(record_path));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_promotion_source_run_resolution_requires_matching_run_json() {
+        let root = unique_temp_dir("regression-promotion-resolve");
+
+        // The project root's run with a matching run.json id is selected.
+        fs::create_dir_all(root.join("project/runs/run-7")).expect("run dir");
+        fs::write(
+            root.join("project/runs/run-7/run.json"),
+            serde_json::to_vec(&json!({ "id": "run-7" })).expect("run.json bytes"),
+        )
+        .expect("run.json written");
+        let resolved = resolve_regression_promotion_source_run_dir(
+            &root.join("project"),
+            "runs/run-7",
+            "run-7",
+        )
+        .expect("matching project run resolves");
+        assert_eq!(resolved, root.join("project/runs/run-7"));
+
+        // A runs/<id> directory that exists but whose run.json id does not match
+        // the draft is rejected rather than silently written into.
+        fs::create_dir_all(root.join("other/runs/run-8")).expect("run dir");
+        fs::write(
+            root.join("other/runs/run-8/run.json"),
+            serde_json::to_vec(&json!({ "id": "unrelated" })).expect("run.json bytes"),
+        )
+        .expect("run.json written");
+        let error = resolve_regression_promotion_source_run_dir(
+            &root.join("other"),
+            "runs/run-8",
+            "run-8",
+        )
+        .expect_err("mismatched source run rejected");
+        assert!(
+            error.to_string().contains("source run run-8 not found"),
+            "unexpected error: {error}"
+        );
+
+        // Legacy run.json predating the `id` field: the draft builder derives the
+        // run id from the directory name, so resolution must accept it the same
+        // way (run.json present, no id, directory name matches the draft run id).
+        fs::create_dir_all(root.join("legacy/runs/legacy-run")).expect("run dir");
+        fs::write(
+            root.join("legacy/runs/legacy-run/run.json"),
+            serde_json::to_vec(&json!({ "status": "failed" })).expect("run.json bytes"),
+        )
+        .expect("run.json written");
+        let resolved_legacy = resolve_regression_promotion_source_run_dir(
+            &root.join("legacy"),
+            "runs/legacy-run",
+            "legacy-run",
+        )
+        .expect("legacy run without explicit id resolves via directory name");
+        assert_eq!(resolved_legacy, root.join("legacy/runs/legacy-run"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn scenario_id_is_derived_from_scenario_result_path() {
+        assert_eq!(
+            scenario_id_from_scenario_result_path(
+                "evidence/scenarios/bootstrap-smoke/scenario-result.json"
+            )
+            .as_deref(),
+            Some("bootstrap-smoke")
+        );
+        assert_eq!(
+            scenario_id_from_scenario_result_path(
+                "evidence/scenarios/feature-x/scenario-result-12.json"
+            )
+            .as_deref(),
+            Some("feature-x")
+        );
+        assert!(
+            scenario_id_from_scenario_result_path("mutation/proposals.json").is_none(),
+            "non scenario-result paths yield no scenario id"
+        );
     }
 
     #[test]
@@ -24244,6 +24415,40 @@ scenarios:
         assert_eq!(
             matrix.skipped_runs[0].reason,
             "missing_or_malformed_project_context"
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_matrix_surfaces_unreadable_scenario_result_as_unknown() {
+        let root = unique_temp_dir("regression-matrix-unreadable");
+        fs::create_dir_all(&root).expect("temp root exists");
+        let run = create_project_test_run(&root, &["bootstrap-smoke"]);
+        // Index a scenario result for the declared scenario, then corrupt its
+        // bytes so the dashboard read model records value: None with a read_error.
+        write_fixture_scenario_result(&run.run_dir, "bootstrap-smoke", "failed");
+        fs::write(
+            run.run_dir
+                .join("evidence/scenarios/bootstrap-smoke/scenario-result.json"),
+            b"{ this is not valid scenario-result json",
+        )
+        .expect("corrupt scenario result");
+
+        let matrix = build_regression_run_matrix(root.join("runs")).expect("matrix builds");
+        let smoke = matrix.projects[0].scenario_packs[0]
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "bootstrap-smoke")
+            .expect("smoke scenario present");
+        // A broken indexed result must surface as unknown (not a misleading
+        // "pending") and keep the result path so the corruption is observable.
+        assert_eq!(smoke.current_status, "unknown");
+        assert_eq!(smoke.runs.len(), 1);
+        assert_eq!(smoke.runs[0].status, "unknown");
+        assert_eq!(
+            smoke.runs[0].scenario_result_path.as_deref(),
+            Some("evidence/scenarios/bootstrap-smoke/scenario-result.json")
         );
 
         fs::remove_dir_all(root).expect("fixture removed");
