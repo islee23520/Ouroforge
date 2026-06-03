@@ -13590,6 +13590,12 @@ pub const SUPPORTED_SCENE_EDIT_PATHS: &[&str] = &[
     "components.size.width",
     "components.size.height",
     "components.controllable",
+    "components.status.hitPoints",
+    "components.status.maxHitPoints",
+    "components.input.moveSpeed",
+    "components.input.jumpImpulse",
+    "components.cameraTarget.weight",
+    "components.uiText.text",
 ];
 
 pub fn supported_scene_edit_paths() -> &'static [&'static str] {
@@ -14700,6 +14706,24 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         if let Some(collider) = &entity.components.collider {
             validate_scene_collider(&entity.id, collider)?;
         }
+        if let Some(trigger) = &entity.components.trigger {
+            validate_scene_trigger(&entity.id, trigger)?;
+        }
+        if let Some(status) = &entity.components.status {
+            validate_scene_status(&format!("scene entity {} status", entity.id), status)?;
+        }
+        if let Some(goal_flag) = &entity.components.goal_flag {
+            validate_scene_goal_flag(&entity.id, goal_flag)?;
+        }
+        if let Some(input) = &entity.components.input {
+            validate_scene_input_controller(&format!("scene entity {} input", entity.id), input)?;
+        }
+        if let Some(camera_target) = &entity.components.camera_target {
+            validate_scene_camera_target(&entity.id, camera_target)?;
+        }
+        if let Some(ui_text) = &entity.components.ui_text {
+            validate_scene_ui_text(&entity.id, ui_text)?;
+        }
         if let Some(animation) = &entity.components.animation {
             validate_scene_animation(&entity.id, animation, scene.asset_manifest.as_ref())?;
         }
@@ -14720,6 +14744,12 @@ fn validate_scene_component_defaults(defaults: &SceneComponentDefaults) -> Resul
         if size.width <= 0 || size.height <= 0 {
             return Err(anyhow!("scene componentDefaults size must be positive"));
         }
+    }
+    if let Some(status) = &defaults.status {
+        validate_scene_status("scene componentDefaults status", status)?;
+    }
+    if let Some(input) = &defaults.input {
+        validate_scene_input_controller("scene componentDefaults input", input)?;
     }
     Ok(())
 }
@@ -15067,6 +15097,165 @@ fn validate_scene_collider(entity_id: &str, collider: &SceneCollider) -> Result<
     Ok(())
 }
 
+fn validate_scene_trigger(entity_id: &str, trigger: &SceneTrigger) -> Result<()> {
+    validate_path_component(&format!("scene entity {entity_id} trigger id"), &trigger.id)?;
+    if !matches!(trigger.kind.as_str(), "overlap" | "interact" | "enter") {
+        return Err(anyhow!(
+            "scene entity {entity_id} trigger kind must be overlap, interact, or enter"
+        ));
+    }
+    if let Some(flag) = &trigger.target_flag {
+        validate_path_component(
+            &format!("scene entity {entity_id} trigger targetFlag"),
+            flag,
+        )?;
+    }
+    let mut required_flags = BTreeSet::new();
+    for flag in &trigger.required_flags {
+        validate_path_component(
+            &format!("scene entity {entity_id} trigger requiredFlags"),
+            flag,
+        )?;
+        if !required_flags.insert(flag) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} trigger requiredFlags: {flag}"
+            ));
+        }
+    }
+    for action in &trigger.on_enter {
+        if !matches!(action.kind.as_str(), "setFlag" | "clearFlag" | "hideEntity") {
+            return Err(anyhow!(
+                "scene entity {entity_id} trigger onEnter kind must be setFlag, clearFlag, or hideEntity"
+            ));
+        }
+        if let Some(flag) = &action.flag {
+            validate_path_component(
+                &format!("scene entity {entity_id} trigger action flag"),
+                flag,
+            )?;
+        }
+        if let Some(target_entity) = &action.entity_id {
+            validate_path_component(
+                &format!("scene entity {entity_id} trigger action entityId"),
+                target_entity,
+            )?;
+        }
+        if matches!(action.kind.as_str(), "setFlag" | "clearFlag") && action.flag.is_none() {
+            return Err(anyhow!(
+                "scene entity {entity_id} trigger action {} requires a flag",
+                action.kind
+            ));
+        }
+        if action.kind == "hideEntity" && action.entity_id.is_none() {
+            return Err(anyhow!(
+                "scene entity {entity_id} trigger action hideEntity requires entityId"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_status(field: &str, status: &SceneStatus) -> Result<()> {
+    if let Some(hit_points) = status.hit_points {
+        if hit_points < 0 {
+            return Err(anyhow!("{field} hitPoints must be non-negative"));
+        }
+    }
+    if let Some(max_hit_points) = status.max_hit_points {
+        if max_hit_points <= 0 {
+            return Err(anyhow!("{field} maxHitPoints must be positive"));
+        }
+        if let Some(hit_points) = status.hit_points {
+            if hit_points > max_hit_points {
+                return Err(anyhow!("{field} hitPoints must not exceed maxHitPoints"));
+            }
+        }
+    }
+    validate_unique_path_components(field, "flags", &status.flags)?;
+    validate_unique_path_components(field, "states", &status.states)?;
+    Ok(())
+}
+
+fn validate_scene_goal_flag(entity_id: &str, goal_flag: &SceneGoalFlag) -> Result<()> {
+    validate_path_component(
+        &format!("scene entity {entity_id} goalFlag flag"),
+        &goal_flag.flag,
+    )?;
+    if let Some(label) = &goal_flag.label {
+        require_bounded_display_text(&format!("scene entity {entity_id} goalFlag label"), label)?;
+    }
+    Ok(())
+}
+
+fn validate_scene_input_controller(field: &str, input: &SceneInputController) -> Result<()> {
+    if !matches!(input.scheme.as_str(), "keyboard" | "arrows" | "wasd") {
+        return Err(anyhow!("{field} scheme must be keyboard, arrows, or wasd"));
+    }
+    if let Some(move_speed) = input.move_speed {
+        if move_speed <= 0 {
+            return Err(anyhow!("{field} moveSpeed must be positive"));
+        }
+    }
+    if let Some(jump_impulse) = input.jump_impulse {
+        if jump_impulse <= 0 {
+            return Err(anyhow!("{field} jumpImpulse must be positive"));
+        }
+    }
+    validate_unique_path_components(field, "allowedActions", &input.allowed_actions)?;
+    Ok(())
+}
+
+fn validate_scene_camera_target(entity_id: &str, camera_target: &SceneCameraTarget) -> Result<()> {
+    if camera_target.weight <= 0 {
+        return Err(anyhow!(
+            "scene entity {entity_id} cameraTarget weight must be positive"
+        ));
+    }
+    if let Some(dead_zone) = &camera_target.dead_zone {
+        if dead_zone.width <= 0 || dead_zone.height <= 0 {
+            return Err(anyhow!(
+                "scene entity {entity_id} cameraTarget deadZone must be positive"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_ui_text(entity_id: &str, ui_text: &SceneUiText) -> Result<()> {
+    require_bounded_display_text(
+        &format!("scene entity {entity_id} uiText text"),
+        &ui_text.text,
+    )?;
+    if let Some(role) = &ui_text.role {
+        validate_path_component(&format!("scene entity {entity_id} uiText role"), role)?;
+    }
+    if let Some(flag) = &ui_text.bind_flag {
+        validate_path_component(&format!("scene entity {entity_id} uiText bindFlag"), flag)?;
+    }
+    Ok(())
+}
+
+fn validate_unique_path_components(field: &str, label: &str, values: &[String]) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    for value in values {
+        validate_path_component(&format!("{field} {label}"), value)?;
+        if !seen.insert(value) {
+            return Err(anyhow!("duplicate {field} {label}: {value}"));
+        }
+    }
+    Ok(())
+}
+
+fn require_bounded_display_text(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    if value.chars().count() > 120 {
+        return Err(anyhow!("{field} must be 120 characters or fewer"));
+    }
+    if value.chars().any(|ch| ch.is_control()) {
+        return Err(anyhow!("{field} must not contain control characters"));
+    }
+    Ok(())
+}
 fn validate_scene_animation(
     entity_id: &str,
     animation: &SceneAnimation,
@@ -15317,6 +15506,65 @@ fn apply_scene_edit(scene: &mut SceneDocument, edit: SceneEdit) -> Result<()> {
         "components.controllable" => {
             entity.components.controllable = scene_edit_bool(&edit.value, &edit.path)?
         }
+        "components.status.hitPoints" => {
+            entity
+                .components
+                .status
+                .as_mut()
+                .ok_or_else(|| {
+                    anyhow!("scene edit path `{}` requires status component", edit.path)
+                })?
+                .hit_points = Some(scene_edit_i64(&edit.value, &edit.path)?);
+        }
+        "components.status.maxHitPoints" => {
+            entity
+                .components
+                .status
+                .as_mut()
+                .ok_or_else(|| {
+                    anyhow!("scene edit path `{}` requires status component", edit.path)
+                })?
+                .max_hit_points = Some(scene_edit_i64(&edit.value, &edit.path)?);
+        }
+        "components.input.moveSpeed" => {
+            entity
+                .components
+                .input
+                .as_mut()
+                .ok_or_else(|| anyhow!("scene edit path `{}` requires input component", edit.path))?
+                .move_speed = Some(scene_edit_i64(&edit.value, &edit.path)?);
+        }
+        "components.input.jumpImpulse" => {
+            entity
+                .components
+                .input
+                .as_mut()
+                .ok_or_else(|| anyhow!("scene edit path `{}` requires input component", edit.path))?
+                .jump_impulse = Some(scene_edit_i64(&edit.value, &edit.path)?);
+        }
+        "components.cameraTarget.weight" => {
+            entity
+                .components
+                .camera_target
+                .as_mut()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "scene edit path `{}` requires cameraTarget component",
+                        edit.path
+                    )
+                })?
+                .weight = scene_edit_i64(&edit.value, &edit.path)?;
+        }
+        "components.uiText.text" => {
+            entity
+                .components
+                .ui_text
+                .as_mut()
+                .ok_or_else(|| {
+                    anyhow!("scene edit path `{}` requires uiText component", edit.path)
+                })?
+                .text = scene_edit_display_string(&edit.value, &edit.path)?;
+        }
         _ => {
             return Err(anyhow!(
                 "unsupported scene edit path `{}`; supported paths are {}",
@@ -15341,11 +15589,17 @@ fn scene_edit_bool(value: &serde_json::Value, path: &str) -> Result<bool> {
 }
 
 fn scene_edit_string(value: &serde_json::Value, path: &str) -> Result<String> {
+    let value = scene_edit_display_string(value, path)?;
+    validate_scene_color(&value)?;
+    Ok(value)
+}
+
+fn scene_edit_display_string(value: &serde_json::Value, path: &str) -> Result<String> {
     let value = value
         .as_str()
         .ok_or_else(|| anyhow!("scene edit path `{path}` requires a string value"))?
         .to_string();
-    validate_scene_color(&value)?;
+    require_bounded_display_text(&format!("scene edit path `{path}`"), &value)?;
     Ok(value)
 }
 
@@ -25735,7 +25989,13 @@ scenarios:
                 "components.velocity.y",
                 "components.size.width",
                 "components.size.height",
-                "components.controllable"
+                "components.controllable",
+                "components.status.hitPoints",
+                "components.status.maxHitPoints",
+                "components.input.moveSpeed",
+                "components.input.jumpImpulse",
+                "components.cameraTarget.weight",
+                "components.uiText.text",
             ]
         );
 
@@ -26007,6 +26267,176 @@ scenarios:
             serialized["entities"][2]["components"]["uiText"]["text"],
             "Coin: 0/1"
         );
+    }
+
+    #[test]
+    fn scene_component_model_v2_validates_hashes_and_bounded_edits() {
+        let temp = unique_temp_dir("scene-component-model-v2-validation-edit");
+        fs::create_dir_all(&temp).expect("temp dir exists");
+        let scene_path = temp.join("scene-components-v2.json");
+        fs::write(
+            &scene_path,
+            include_str!("../../../examples/game-runtime/scene-components-v2.json"),
+        )
+        .expect("fixture written");
+
+        let scene = read_scene(&scene_path).expect("v2 fixture validates");
+        let first_hash = hash_scene_document(&scene).expect("hash created");
+        let round_trip: SceneDocument =
+            serde_json::from_value(serde_json::to_value(&scene).unwrap())
+                .expect("round trip parses");
+        let second_hash = hash_scene_document(&round_trip).expect("hash repeats");
+        assert_eq!(first_hash, second_hash);
+        assert_eq!(first_hash.algorithm, "fnv1a64-canonical-json-v1");
+
+        for path in [
+            "components.status.hitPoints",
+            "components.status.maxHitPoints",
+            "components.input.moveSpeed",
+            "components.input.jumpImpulse",
+            "components.cameraTarget.weight",
+            "components.uiText.text",
+        ] {
+            assert!(supported_scene_edit_paths().contains(&path));
+        }
+
+        edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.status.hitPoints".to_string(),
+                value: json!(2),
+            },
+        )
+        .expect("status edit applies");
+        edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.input.moveSpeed".to_string(),
+                value: json!(4),
+            },
+        )
+        .expect("input edit applies");
+        edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "player".to_string(),
+                path: "components.cameraTarget.weight".to_string(),
+                value: json!(3),
+            },
+        )
+        .expect("camera target edit applies");
+        let edited = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "hud_coin".to_string(),
+                path: "components.uiText.text".to_string(),
+                value: json!("Coin: 1/1"),
+            },
+        )
+        .expect("ui text edit applies");
+
+        assert_eq!(
+            edited.entities[0]
+                .components
+                .status
+                .as_ref()
+                .expect("status")
+                .hit_points,
+            Some(2)
+        );
+        assert_eq!(
+            edited.entities[0]
+                .components
+                .input
+                .as_ref()
+                .expect("input")
+                .move_speed,
+            Some(4)
+        );
+        assert_eq!(
+            edited.entities[0]
+                .components
+                .camera_target
+                .as_ref()
+                .expect("camera target")
+                .weight,
+            3
+        );
+        assert_eq!(
+            edited.entities[2]
+                .components
+                .ui_text
+                .as_ref()
+                .expect("ui text")
+                .text,
+            "Coin: 1/1"
+        );
+        assert_ne!(
+            first_hash,
+            hash_scene_document(&edited).expect("edited hash created")
+        );
+
+        let missing_component = edit_scene(
+            &scene_path,
+            SceneEdit {
+                entity_id: "coin".to_string(),
+                path: "components.input.moveSpeed".to_string(),
+                value: json!(2),
+            },
+        )
+        .expect_err("missing optional component is not created by edit path");
+        assert!(missing_component
+            .to_string()
+            .contains("requires input component"));
+
+        fs::remove_dir_all(temp).ok();
+    }
+
+    #[test]
+    fn scene_component_model_v2_validation_rejects_malformed_values() {
+        let mut scene: SceneDocument = serde_json::from_str(include_str!(
+            "../../../examples/game-runtime/scene-components-v2.json"
+        ))
+        .expect("fixture parses");
+
+        scene.entities[0]
+            .components
+            .status
+            .as_mut()
+            .expect("status")
+            .hit_points = Some(9);
+        let status_error = validate_scene(&scene).expect_err("hp above max rejected");
+        assert!(status_error
+            .to_string()
+            .contains("hitPoints must not exceed"));
+
+        let mut scene: SceneDocument = serde_json::from_str(include_str!(
+            "../../../examples/game-runtime/scene-components-v2.json"
+        ))
+        .expect("fixture parses");
+        scene.entities[1]
+            .components
+            .trigger
+            .as_mut()
+            .expect("trigger")
+            .kind = "script".to_string();
+        let trigger_error = validate_scene(&scene).expect_err("bad trigger kind rejected");
+        assert!(trigger_error.to_string().contains("trigger kind must be"));
+
+        let mut scene: SceneDocument = serde_json::from_str(include_str!(
+            "../../../examples/game-runtime/scene-components-v2.json"
+        ))
+        .expect("fixture parses");
+        scene.entities[2]
+            .components
+            .ui_text
+            .as_mut()
+            .expect("ui text")
+            .text = "bad\u{7f}".to_string();
+        let text_error = validate_scene(&scene).expect_err("control text rejected");
+        assert!(text_error.to_string().contains("must not contain control"));
     }
 
     #[test]
