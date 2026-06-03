@@ -74,6 +74,15 @@ scenarios:
       - world_state:
           path: tilemaps.layerOrder.1.layerId
           equals: ground
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.collisionCells.0.tileId
+          equals: ground
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.collisionCells.0.x
+          equals: 0
+      - world_state:
+          path: tilemaps.tilemaps.0.authoring.collisionCells.0.y
+          equals: 1
       - frame_stats:
           path: fixedDeltaMs
           equals: 16

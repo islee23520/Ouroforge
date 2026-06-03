@@ -27380,12 +27380,21 @@ scenarios:
                         assertion.less_than = Some(json!(10));
                     }),
                 },
+                ScenarioAssertion::CollisionEvidence {
+                    collision_evidence: json_path_equals(
+                        "1.staticEntityId",
+                        json!("tilemap.collision.authoring-map.terrain.2.0.wall"),
+                    ),
+                },
             ],
         };
         let world_state = json!({
             "tick": 2,
             "object": { "id": "probe-square" },
-            "collisions": [{ "pairId": "goal:player" }],
+            "collisions": [
+                { "pairId": "goal:player" },
+                { "pairId": "player:tilemap.collision.authoring-map.terrain.2.0.wall", "staticEntityId": "tilemap.collision.authoring-map.terrain.2.0.wall" }
+            ],
             "physics": { "grounded": { "player": true } },
             "goalFlags": { "coin_collected": true }
         });
@@ -27410,7 +27419,7 @@ scenarios:
 
         let assertions = evaluate_scenario_assertions(&scenario, &sources);
 
-        assert_eq!(assertions.len(), 10);
+        assert_eq!(assertions.len(), 11);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
@@ -27425,6 +27434,8 @@ scenarios:
         assert_eq!(assertions[7]["target"], "physics_evidence");
         assert_eq!(assertions[8]["passed"], true);
         assert_eq!(assertions[9]["passed"], true);
+        assert_eq!(assertions[10]["passed"], true);
+        assert_eq!(assertions[10]["target"], "collision_evidence");
     }
 
     #[test]

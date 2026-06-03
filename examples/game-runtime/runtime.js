@@ -466,7 +466,9 @@
   }
 
   function entityById(entityId) {
-    return world.entities.find((entity) => entity.id === entityId) || null;
+    return world.entities.find((entity) => entity.id === entityId)
+      || (typeof tilemap.entityById === 'function' ? tilemap.entityById(world.tilemaps, entityId) : null)
+      || null;
   }
 
   function setGoalFlag(flag, value) {
@@ -567,8 +569,9 @@
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
     recordAnimationTransitions(beforeAnimationStates);
+    const physicsEntities = world.entities.concat(typeof tilemap.collisionEntities === 'function' ? tilemap.collisionEntities(world.tilemaps) : []);
     if (typeof collision.stepAabbPhysics === 'function') {
-      world.collisions = collision.stepAabbPhysics(world.entities, world.bounds, world.tick, world.collisionRules).events;
+      world.collisions = collision.stepAabbPhysics(physicsEntities, world.bounds, world.tick, world.collisionRules).events;
     } else {
       for (const entity of world.entities) {
         const transform = entity.components.transform;
@@ -577,7 +580,7 @@
         transform.x = Math.max(0, Math.min(world.bounds.width - size.width, transform.x + velocity.x));
         transform.y = Math.max(0, Math.min(world.bounds.height - size.height, transform.y + velocity.y));
       }
-      world.collisions = collision.detectAabbCollisions(world.entities, world.tick, world.collisionRules);
+      world.collisions = collision.detectAabbCollisions(physicsEntities, world.tick, world.collisionRules);
     }
     for (const event of world.collisions) {
       world.collisionEvents.push(event);
@@ -617,6 +620,11 @@
     world.goalFlags = {};
     for (const flag of world.gameplayRules.flags) {
       if (flag.initial === true) world.goalFlags[flag.id] = true;
+    }
+    if (typeof tilemap.extractAuthoringCells === 'function') {
+      for (const cell of tilemap.extractAuthoringCells(world.tilemaps).triggerCells) {
+        if (cell.trigger && world.goalFlags[cell.trigger] !== true) world.goalFlags[cell.trigger] = false;
+      }
     }
     world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };
     for (const entity of world.entities) {
