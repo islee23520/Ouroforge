@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "patch-preview.v1",
+  "patchPreviewId": "patch-preview-demo-001",
+  "proposalId": "proposal-demo-collectible-label-copy",
+  "createdAt": "2026-06-03T00:00:00Z",
+  "producer": {
+    "name": "source-mutation-design-gate-fixture",
+    "version": "v1",
+    "trustedBoundary": "design-fixture-only"
+  },
+  "sourceMutationApplyStatus": "blocked",
+  "baseRef": {
+    "branch": "main",
+    "commit": "example-stable-base-ref",
+    "targetFreshness": "fixture-not-live"
+  },
+  "staleTargetPolicy": "regenerate_preview_before_any_future_review_if_target_hash_or_latest_main_changes",
+  "targets": [
+    {
+      "path": "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
+      "beforeHash": "sha256:fixture-before-hash",
+      "afterHash": "sha256:fixture-after-hash-if-later-authorized",
+      "fileClass": "deterministic_scene_fixture",
+      "reviewLevel": "elevated_source_like_data_review",
+      "classificationStatus": "potentially_allowed_later",
+      "classificationRationale": "Tracked deterministic scene fixture; still requires preview, review, rollback, sandbox, and stale-target controls before any apply path.",
+      "blockedReasons": [
+        "source_mutation_apply_not_authorized_by_design_gate"
+      ]
+    }
+  ],
+  "diffSummary": {
+    "summary": "Fixture-only preview of a text label change in a deterministic scene file.",
+    "diffStats": {
+      "filesChanged": 1,
+      "additions": 1,
+      "deletions": 1,
+      "binaryOrOpaque": false,
+      "generatedOrigin": false,
+      "truncated": false
+    },
+    "hunks": [
+      {
+        "path": "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
+        "summary": "Would rename a HUD label if a later apply milestone authorized it. This fixture is not an executable patch."
+      }
+    ],
+    "largeDiffWarning": null,
+    "binaryOrOpaqueWarning": null
+  },
+  "riskLevel": "medium",
+  "riskIds": [
+    "STM-07",
+    "STM-09",
+    "STM-11",
+    "STM-13"
+  ],
+  "linkedEvidence": [
+    {
+      "kind": "design-doc",
+      "path": "docs/patch-preview-artifact-v1.md"
+    },
+    {
+      "kind": "file-class-policy",
+      "path": "docs/source-mutation-file-classes-v1.md"
+    }
+  ],
+  "expectedBehaviorChange": "If separately authorized in a future milestone, the scene label text would change while game behavior remains otherwise equivalent.",
+  "requiredTests": [
+    {
+      "command": "cargo test validates_engine_expressiveness_v2_regression_seed_and_pack -- --nocapture",
+      "executionAuthority": "copyable_only_not_executed_by_preview"
+    }
+  ],
+  "reviewerChecklist": [
+    "Confirm sourceMutationApplyStatus remains blocked.",
+    "Confirm target class is potentially_allowed_later, not currently apply-authorized.",
+    "Confirm target hash freshness before any future review.",
+    "Confirm no ignored generated state is included.",
+    "Confirm rollback/audit expectations are present before any later apply path."
+  ],
+  "rollbackExpectations": {
+    "requiredBeforeApply": true,
+    "minimumFields": [
+      "pre_change_ref",
+      "target_before_hash",
+      "review_decision_ref",
+      "cleanup_expectations"
+    ]
+  },
+  "readModelPrototype": {
+    "status": "blocked",
+    "displayLabel": "Blocked preview: apply not authorized",
+    "fileClassSummary": "1 potentially allowed later target; 0 restricted; 0 blocked-by-design",
+    "riskSummary": "medium risk; 4 threat-model risk ids",
+    "primaryBlockedReason": "source_mutation_apply_not_authorized_by_design_gate",
+    "allowedActions": [
+      "inspect",
+      "copy_test_commands"
+    ],
+    "forbiddenActions": [
+      "apply_patch",
+      "execute_command",
+      "merge",
+      "write_source_file"
+    ]
+  }
+}
