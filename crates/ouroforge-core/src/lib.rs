@@ -6458,9 +6458,11 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let run = read_json_value(run_dir.join("run.json"))?;
     let proposals = read_mutation_proposals(run_dir)?.proposals;
     let reviews = read_mutation_review_artifact(run_dir)?.decisions;
-    let applications = read_scene_only_mutation_applications(run_dir)
-        .unwrap_or_default()
-        .applications;
+    let (applications, application_read_error) =
+        match read_scene_only_mutation_applications(run_dir) {
+            Ok(index) => (index.applications, None),
+            Err(error) => (Vec::new(), Some(error.to_string())),
+        };
     let comparison = read_dashboard_comparison(run_dir);
     let regression_promotions = read_regression_promotion_records(run_dir);
     let mut journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
@@ -6468,6 +6470,7 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         &proposals,
         &reviews,
         &applications,
+        application_read_error.as_deref(),
         &comparison,
         &regression_promotions,
     ));
@@ -6728,6 +6731,7 @@ fn render_authoring_governance_journal_section(
     proposals: &[MutationProposal],
     reviews: &[MutationReviewDecision],
     applications: &[SceneOnlyMutationApplicationRecord],
+    application_read_error: Option<&str>,
     comparison: &RunDashboardComparison,
     promotions: &[RegressionPromotionPackResult],
 ) -> String {
@@ -6849,7 +6853,12 @@ fn render_authoring_governance_journal_section(
 
 ",
     );
-    if applications.is_empty() {
+    if let Some(error) = application_read_error {
+        out.push_str(&format!(
+            "- Scene application artifact is present but malformed: {}\n",
+            error
+        ));
+    } else if applications.is_empty() {
         out.push_str(
             "- No review-gated scene applications recorded.
 ",
@@ -18132,6 +18141,7 @@ scenarios:
             &[proposal],
             &[decision],
             &[application],
+            None,
             &comparison,
             &[promotion],
         );
@@ -18156,12 +18166,68 @@ scenarios:
             artifacts: Vec::new(),
         };
 
-        let journal = render_authoring_governance_journal_section(&[], &[], &[], &comparison, &[]);
+        let journal =
+            render_authoring_governance_journal_section(&[], &[], &[], None, &comparison, &[]);
 
         assert!(journal.contains("No mutation proposals recorded"));
         assert!(journal.contains("No review decisions recorded"));
         assert!(journal.contains("No review-gated scene applications recorded"));
         assert!(journal.contains("No run comparison artifacts were found"));
+        assert!(journal.contains("No regression promotions recorded"));
+    }
+
+    #[test]
+    fn journal_authoring_governance_lifecycle_exposes_partial_and_malformed_data() {
+        let partial_proposal = MutationProposal {
+            id: "proposal-without-rationale".to_string(),
+            reason: "partial lifecycle fixture".to_string(),
+            evidence_id: "evidence-partial".to_string(),
+            target: "seeds/platformer.yaml".to_string(),
+            path: "scenarios.smoke.assertions".to_string(),
+            from: "old".to_string(),
+            to: "new".to_string(),
+            confidence: "low".to_string(),
+            status: "proposed".to_string(),
+            verdict_status: "failed".to_string(),
+            created_at_unix_ms: 1,
+            rationale: None,
+        };
+        let comparison = RunDashboardComparison {
+            present: true,
+            empty_state: String::new(),
+            artifacts: vec![RunDashboardComparisonArtifact {
+                id: "run-comparison-malformed".to_string(),
+                path: "mutation/run-comparison-malformed.json".to_string(),
+                exists: true,
+                read_error: Some("expected value at line 1 column 1".to_string()),
+                before_run_id: None,
+                after_run_id: None,
+                classification: None,
+                deltas: serde_json::Value::Null,
+                semantic: serde_json::Value::Null,
+                evidence_refs: Vec::new(),
+                unsupported: vec!["malformed_json".to_string()],
+                value: None,
+            }],
+        };
+
+        let journal = render_authoring_governance_journal_section(
+            &[partial_proposal],
+            &[],
+            &[],
+            Some("failed to parse scene applications mutation/scene-applications.json"),
+            &comparison,
+            &[],
+        );
+
+        assert!(journal.contains("proposal-without-rationale"));
+        assert!(journal.contains("Rationale: missing"));
+        assert!(journal.contains("Scene application artifact is present but malformed"));
+        assert!(journal.contains("failed to parse scene applications"));
+        assert!(journal.contains("run-comparison-malformed"));
+        assert!(journal.contains("Read error: expected value"));
+        assert!(journal.contains("unsupported: malformed_json"));
+        assert!(journal.contains("No review decisions recorded"));
         assert!(journal.contains("No regression promotions recorded"));
     }
 
