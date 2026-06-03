@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-blocked-audio-editor",
+  "target": { "type": "asset-reference", "path": "asset-manifest.json", "id": "ambient-audio" },
+  "proposedOperations": [
+    {
+      "id": "op-edit-audio-waveform",
+      "kind": "update",
+      "path": "assets.ambient-audio.waveform",
+      "summary": "Blocked because waveform editing is outside safe visual edit drafting.",
+      "value": { "requestedEditor": "waveform" }
+    }
+  ],
+  "beforeHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "expectedAfterSummary": "No trusted transaction should be produced for this blocked draft.",
+  "linkedEvidence": [],
+  "author": { "type": "system", "id": "draft-preflight" },
+  "validationStatus": "blocked",
+  "blockedReasons": ["audio waveform editing is not a Visual Edit Draft v1 target"]
+}

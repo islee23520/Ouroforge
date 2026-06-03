@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-invalid-unknown-field",
+  "target": { "type": "scene", "path": "scenes/main.scene.json" },
+  "proposedOperations": [],
+  "beforeHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+  "expectedAfterSummary": "Invalid fixture: unknown trustedWrite field must not deserialize.",
+  "linkedEvidence": [],
+  "author": { "type": "studio", "id": "invalid-fixture" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": [],
+  "trustedWrite": true
+}

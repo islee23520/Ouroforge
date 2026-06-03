@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-invalid-source-edit",
+  "target": { "type": "source", "path": "crates/ouroforge-core/src/lib.rs" },
+  "proposedOperations": [],
+  "beforeHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+  "expectedAfterSummary": "Invalid fixture: source edits are not visual edit draft targets.",
+  "linkedEvidence": [],
+  "author": { "type": "agent", "id": "invalid-fixture" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

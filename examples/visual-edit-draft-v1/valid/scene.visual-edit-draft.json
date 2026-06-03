@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-scene-add-goal-hint",
+  "target": {
+    "type": "scene",
+    "path": "scenes/collect-and-exit.scene.json",
+    "id": "collect-and-exit"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-add-goal-hint",
+      "kind": "add",
+      "path": "entities.goal-hint",
+      "summary": "Add an inert draft entity that can later be validated as a goal hint.",
+      "value": {
+        "entityId": "goal-hint",
+        "componentKinds": ["transform", "text"]
+      }
+    }
+  ],
+  "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "expectedAfterSummary": "Scene would include a goal hint entity after Rust validation converts this draft into a transaction preview.",
+  "linkedEvidence": ["runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "author": {
+    "type": "human",
+    "id": "local-author",
+    "source": "studio-copy-only"
+  },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}
