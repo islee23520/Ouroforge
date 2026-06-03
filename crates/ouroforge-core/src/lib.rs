@@ -2908,42 +2908,79 @@ pub fn execute_authoring_loop_step(
         }),
     )?;
 
-    let generated_artifacts = match step.kind {
-        AuthoringLoopStepKind::RunScenarioPack => {
-            execute_authoring_loop_run_step(&running, &step, base_dir)?
-        }
-        AuthoringLoopStepKind::CompareRuns => execute_authoring_loop_compare_step(&step, base_dir)?,
-        AuthoringLoopStepKind::GenerateProposal => {
-            execute_authoring_loop_proposal_step(&step, base_dir)?
-        }
-        AuthoringLoopStepKind::ApplyAcceptedSceneMutation => {
-            execute_authoring_loop_apply_step(&step, base_dir)?
-        }
-        AuthoringLoopStepKind::Rerun => {
-            execute_authoring_loop_rerun_step(&running, &step, base_dir)?
-        }
-        AuthoringLoopStepKind::PromoteRegression => {
-            execute_authoring_loop_promotion_step(&step, base_dir)?
-        }
-        AuthoringLoopStepKind::RecordReviewDecision | AuthoringLoopStepKind::Summarize => {
-            unreachable!("unsupported kinds are blocked before execution")
+    // Everything from here on runs after the step has started (the started
+    // ledger event above is a side effect), so any failure must be persisted as
+    // a failed plan status rather than left on disk as "pending".
+    let finalize = (|| -> Result<(AuthoringLoopPlan, Vec<AuthoringLoopGeneratedArtifact>)> {
+        let generated_artifacts = match step.kind {
+            AuthoringLoopStepKind::RunScenarioPack => {
+                execute_authoring_loop_run_step(&running, &step, base_dir)?
+            }
+            AuthoringLoopStepKind::CompareRuns => {
+                execute_authoring_loop_compare_step(&step, base_dir)?
+            }
+            AuthoringLoopStepKind::GenerateProposal => {
+                execute_authoring_loop_proposal_step(&step, base_dir)?
+            }
+            AuthoringLoopStepKind::ApplyAcceptedSceneMutation => {
+                execute_authoring_loop_apply_step(&step, base_dir)?
+            }
+            AuthoringLoopStepKind::Rerun => {
+                execute_authoring_loop_rerun_step(&running, &step, base_dir)?
+            }
+            AuthoringLoopStepKind::PromoteRegression => {
+                execute_authoring_loop_promotion_step(&step, base_dir)?
+            }
+            AuthoringLoopStepKind::RecordReviewDecision | AuthoringLoopStepKind::Summarize => {
+                unreachable!("unsupported kinds are blocked before execution")
+            }
+        };
+        let remapped =
+            remap_authoring_loop_artifact_paths(running.clone(), &generated_artifacts)?;
+        let (completed, _) =
+            remapped.update_step_status(step_id, AuthoringLoopStepStatus::Completed)?;
+        append_ledger_event(
+            &ledger_dir,
+            "authoring_loop.step.completed",
+            "loop-step-runner",
+            json!({
+                "loop_id": completed.loop_id,
+                "step_id": step.id,
+                "kind": step.kind.as_str(),
+                "generated_artifacts": generated_artifacts,
+                "boundary": "bounded run/compare/proposal step completed without browser execution or source-code mutation"
+            }),
+        )?;
+        Ok((completed, generated_artifacts))
+    })();
+
+    let (completed, generated_artifacts) = match finalize {
+        Ok(value) => value,
+        Err(error) => {
+            // Persist the failed status so the next invocation sees the failure
+            // instead of rerunning or duplicating work. Best-effort: persistence
+            // failures never mask the original execution error.
+            if let Ok((failed, _)) =
+                running.update_step_status(step_id, AuthoringLoopStepStatus::Failed)
+            {
+                let _ = write_json_atomic(plan_path, &json!(failed));
+                let _ = append_ledger_event(
+                    &ledger_dir,
+                    "authoring_loop.step.failed",
+                    "loop-step-runner",
+                    json!({
+                        "loop_id": failed.loop_id,
+                        "step_id": step.id,
+                        "kind": step.kind.as_str(),
+                        "error": error.to_string(),
+                        "boundary": "step execution failed after start; persisted failed plan state"
+                    }),
+                );
+            }
+            return Err(error);
         }
     };
-    let remapped = remap_authoring_loop_artifact_paths(running, &generated_artifacts)?;
-    let (completed, _) =
-        remapped.update_step_status(step_id, AuthoringLoopStepStatus::Completed)?;
-    append_ledger_event(
-        &ledger_dir,
-        "authoring_loop.step.completed",
-        "loop-step-runner",
-        json!({
-            "loop_id": completed.loop_id,
-            "step_id": step.id,
-            "kind": step.kind.as_str(),
-            "generated_artifacts": generated_artifacts,
-            "boundary": "bounded run/compare/proposal step completed without browser execution or source-code mutation"
-        }),
-    )?;
+
     let summary = authoring_loop_step_execution_summary(
         &completed,
         &step,
@@ -17935,6 +17972,45 @@ scenarios:
         assert!(root
             .join("runs/authoring-loop-ledgers/temp-loop-execution/ledger.jsonl")
             .is_file());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn loop_step_runner_persists_failed_status_when_execution_errors() {
+        let root = unique_temp_dir("loop-step-runner-failure");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_execution_plan(&root);
+
+        // Complete the compare-runs dependencies so the step can actually start.
+        execute_authoring_loop_step_from_path(&plan_path, "run-baseline")
+            .expect("baseline run step executes");
+        let after = execute_authoring_loop_step_from_path(&plan_path, "run-after")
+            .expect("after run step executes");
+
+        // Remove the after run's verdict.json so the comparison executor errors
+        // *after* the step has started. The run.json inputs still exist, so the
+        // step is not preflight-blocked and genuinely begins executing.
+        let after_run_dir = root
+            .join(&after.generated_artifacts[0].path)
+            .parent()
+            .expect("after run dir")
+            .to_path_buf();
+        fs::remove_file(after_run_dir.join("verdict.json")).expect("remove verdict");
+
+        let error = execute_authoring_loop_step_from_path(&plan_path, "compare-runs")
+            .expect_err("compare step errors after starting");
+        assert!(!error.to_string().is_empty());
+
+        // The plan on disk must record the started step as failed, not pending,
+        // so a later invocation sees the failure instead of rerunning blindly.
+        let persisted = read_loop_plan_from_path(&plan_path);
+        let compare = persisted
+            .steps
+            .iter()
+            .find(|step| step.id == "compare-runs")
+            .expect("compare step present");
+        assert_eq!(compare.status, AuthoringLoopStepStatus::Failed);
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
