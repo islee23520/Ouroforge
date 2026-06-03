@@ -51,11 +51,17 @@ assertions:
       equals: succeeded
 ```
 
-Scenario execution writes a `transition_evidence` artifact with:
+In assertions, `transition_evidence` resolves to the bounded
+`transitionEvents` rows, so an index path such as `0.status` targets the
+first transition attempt's status. (The runtime smoke fixture mirrors this by
+exposing `transition_evidence` as the transition-event rows.)
+
+The persisted `transition_evidence` artifact additionally wraps those rows with
+surrounding context, so the on-disk file contains:
 
 - `currentSceneId`
 - `declaredTransitions`
-- `transitionEvents`
+- `transitionEvents` (the rows that assertion index paths resolve against)
 
 Dashboard/Studio read models expose these as read-only transition summaries:
 
