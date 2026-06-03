@@ -14802,6 +14802,12 @@ pub struct SceneTileDefinition {
     pub asset: Option<String>,
     #[serde(default)]
     pub solid: bool,
+    #[serde(default)]
+    pub hazard: bool,
+    #[serde(default)]
+    pub goal: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -30251,6 +30257,56 @@ scenarios:
                 .expect("tilemap layer order serializes"),
             r#"[{"tilemapId":"level","layerId":"background","order":-10},{"tilemapId":"level","layerId":"foreground","order":10}]"#
         );
+    }
+
+    #[test]
+    fn scene_tilemap_tile_accepts_trigger_goal_and_hazard_fields() {
+        // The browser runtime normalizes tile-level `trigger`, `goal`, and
+        // `hazard` fields (examples/game-runtime/tilemap.js). SceneTileDefinition
+        // is `deny_unknown_fields`, so a scene using them must still parse and
+        // validate or it cannot be used as a validated scenario/seed.
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "tilemap-tile-flags-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "tilemaps": [
+                {
+                    "id": "level",
+                    "tileSize": { "width": 16, "height": 16 },
+                    "grid": { "width": 2, "height": 1 },
+                    "tiles": [
+                        { "id": "spikes", "color": "#ef4444", "hazard": true },
+                        { "id": "exit", "color": "#facc15", "goal": true, "trigger": "exit_reached" }
+                    ],
+                    "layers": [
+                        { "id": "main", "order": 0, "data": ["spikes", "exit"] }
+                    ]
+                }
+            ],
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 16, "y": 16 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("tile flag scene parses");
+
+        validate_scene(&scene).expect("tile flag scene validates");
+        let tiles = &scene.tilemaps[0].tiles;
+        assert!(tiles.iter().any(|tile| tile.id == "spikes" && tile.hazard));
+        let exit = tiles
+            .iter()
+            .find(|tile| tile.id == "exit")
+            .expect("exit tile present");
+        assert!(exit.goal);
+        assert_eq!(exit.trigger.as_deref(), Some("exit_reached"));
     }
 
     #[test]
