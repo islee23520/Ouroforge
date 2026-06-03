@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1",
+  "id": "trigger-flags-v1-fixture",
+  "bounds": { "width": 320, "height": 180 },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      { "id": "coin_collected", "initial": false, "label": "Coin collected", "description": "Set when the player overlaps the coin trigger." },
+      { "id": "door_open", "initial": false, "label": "Door open" },
+      { "id": "player_alive", "initial": true, "label": "Player alive" }
+    ]
+  },
+  "componentDefaults": {
+    "transform": { "x": 0, "y": 0 },
+    "velocity": { "x": 0, "y": 0 },
+    "size": { "width": 16, "height": 16 },
+    "controllable": false,
+    "status": { "hitPoints": 1, "maxHitPoints": 1, "flags": ["player_alive"], "states": [] }
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 32, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["player_alive"], "states": [] }
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "coin",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 160, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "controllable": false,
+        "trigger": {
+          "id": "collect_coin",
+          "kind": "overlap",
+          "targetFlag": "coin_collected",
+          "onEnter": [
+            { "kind": "setFlag", "flag": "coin_collected", "value": true },
+            { "kind": "setFlag", "flag": "door_open", "value": true }
+          ]
+        },
+        "goalFlag": { "flag": "coin_collected", "label": "Collect coin" }
+      },
+      "tags": ["collectible"]
+    },
+    {
+      "id": "hud_coin",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 8 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 64, "height": 12 },
+        "controllable": false,
+        "uiText": { "text": "Coin: 0/1", "role": "hud", "bindFlag": "coin_collected" }
+      },
+      "tags": ["hud"]
+    }
+  ],
+  "metadata": { "fixture": "trigger-flags-v1" }
+}

@@ -13219,6 +13219,12 @@ pub struct SceneDocument {
     pub collision_rules: Option<SceneCollisionRules>,
     #[serde(
         default,
+        rename = "gameplayRules",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub gameplay_rules: Option<SceneGameplayRules>,
+    #[serde(
+        default,
         rename = "assetManifest",
         skip_serializing_if = "Option::is_none"
     )]
@@ -13293,6 +13299,27 @@ pub struct SceneCollisionLayer {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub collides_with: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGameplayRules {
+    #[serde(default = "gameplay_rules_v1")]
+    pub version: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<SceneGameplayFlag>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGameplayFlag {
+    pub id: String,
+    #[serde(default)]
+    pub initial: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -14696,6 +14723,10 @@ fn collision_rules_v2() -> String {
     "2".to_string()
 }
 
+fn gameplay_rules_v1() -> String {
+    "1".to_string()
+}
+
 fn default_collision_layer() -> String {
     "default".to_string()
 }
@@ -14805,13 +14836,14 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             .context("scene assetManifest is invalid")?;
     }
     let collision_layers = validate_scene_collision_rules(scene.collision_rules.as_ref())?;
+    let gameplay_flags = validate_scene_gameplay_rules(scene.gameplay_rules.as_ref())?;
     validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     if scene.entities.is_empty() {
         return Err(anyhow!("scene entities must not be empty"));
     }
     if let Some(defaults) = &scene.component_defaults {
-        validate_scene_component_defaults(defaults)?;
+        validate_scene_component_defaults(defaults, gameplay_flags.as_ref())?;
     }
     validate_scene_composition(scene)?;
     let mut ids = std::collections::BTreeSet::new();
@@ -14855,13 +14887,17 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             validate_scene_collider(&entity.id, collider, collision_layers.as_ref())?;
         }
         if let Some(trigger) = &entity.components.trigger {
-            validate_scene_trigger(&entity.id, trigger)?;
+            validate_scene_trigger(&entity.id, trigger, gameplay_flags.as_ref())?;
         }
         if let Some(status) = &entity.components.status {
-            validate_scene_status(&format!("scene entity {} status", entity.id), status)?;
+            validate_scene_status(
+                &format!("scene entity {} status", entity.id),
+                status,
+                gameplay_flags.as_ref(),
+            )?;
         }
         if let Some(goal_flag) = &entity.components.goal_flag {
-            validate_scene_goal_flag(&entity.id, goal_flag)?;
+            validate_scene_goal_flag(&entity.id, goal_flag, gameplay_flags.as_ref())?;
         }
         if let Some(input) = &entity.components.input {
             validate_scene_input_controller(&format!("scene entity {} input", entity.id), input)?;
@@ -14870,7 +14906,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             validate_scene_camera_target(&entity.id, camera_target)?;
         }
         if let Some(ui_text) = &entity.components.ui_text {
-            validate_scene_ui_text(&entity.id, ui_text)?;
+            validate_scene_ui_text(&entity.id, ui_text, gameplay_flags.as_ref())?;
         }
         if let Some(animation) = &entity.components.animation {
             validate_scene_animation(&entity.id, animation, scene.asset_manifest.as_ref())?;
@@ -14887,14 +14923,17 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     Ok(())
 }
 
-fn validate_scene_component_defaults(defaults: &SceneComponentDefaults) -> Result<()> {
+fn validate_scene_component_defaults(
+    defaults: &SceneComponentDefaults,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
     if let Some(size) = &defaults.size {
         if size.width <= 0 || size.height <= 0 {
             return Err(anyhow!("scene componentDefaults size must be positive"));
         }
     }
     if let Some(status) = &defaults.status {
-        validate_scene_status("scene componentDefaults status", status)?;
+        validate_scene_status("scene componentDefaults status", status, gameplay_flags)?;
     }
     if let Some(input) = &defaults.input {
         validate_scene_input_controller("scene componentDefaults input", input)?;
@@ -15269,6 +15308,43 @@ fn validate_scene_collision_rules(
     Ok(Some(layer_ids))
 }
 
+fn validate_scene_gameplay_rules(
+    rules: Option<&SceneGameplayRules>,
+) -> Result<Option<BTreeSet<String>>> {
+    let Some(rules) = rules else {
+        return Ok(None);
+    };
+    if rules.version != "1" {
+        return Err(anyhow!("scene gameplayRules version must be 1"));
+    }
+    if rules.flags.is_empty() {
+        return Err(anyhow!("scene gameplayRules flags must not be empty"));
+    }
+    let mut flag_ids = BTreeSet::new();
+    for flag in &rules.flags {
+        validate_path_component("scene gameplayRules flag id", &flag.id)?;
+        if !flag_ids.insert(flag.id.clone()) {
+            return Err(anyhow!(
+                "duplicate scene gameplayRules flag id: {}",
+                flag.id
+            ));
+        }
+        if let Some(label) = &flag.label {
+            require_bounded_display_text(
+                &format!("scene gameplayRules flag {} label", flag.id),
+                label,
+            )?;
+        }
+        if let Some(description) = &flag.description {
+            require_bounded_display_text(
+                &format!("scene gameplayRules flag {} description", flag.id),
+                description,
+            )?;
+        }
+    }
+    Ok(Some(flag_ids))
+}
+
 fn validate_scene_collider(
     entity_id: &str,
     collider: &SceneCollider,
@@ -15324,7 +15400,11 @@ fn validate_scene_collider(
     Ok(())
 }
 
-fn validate_scene_trigger(entity_id: &str, trigger: &SceneTrigger) -> Result<()> {
+fn validate_scene_trigger(
+    entity_id: &str,
+    trigger: &SceneTrigger,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
     validate_path_component(&format!("scene entity {entity_id} trigger id"), &trigger.id)?;
     if !matches!(trigger.kind.as_str(), "overlap" | "interact" | "enter") {
         return Err(anyhow!(
@@ -15332,16 +15412,18 @@ fn validate_scene_trigger(entity_id: &str, trigger: &SceneTrigger) -> Result<()>
         ));
     }
     if let Some(flag) = &trigger.target_flag {
-        validate_path_component(
+        validate_scene_flag_ref(
             &format!("scene entity {entity_id} trigger targetFlag"),
             flag,
+            gameplay_flags,
         )?;
     }
     let mut required_flags = BTreeSet::new();
     for flag in &trigger.required_flags {
-        validate_path_component(
+        validate_scene_flag_ref(
             &format!("scene entity {entity_id} trigger requiredFlags"),
             flag,
+            gameplay_flags,
         )?;
         if !required_flags.insert(flag) {
             return Err(anyhow!(
@@ -15356,9 +15438,10 @@ fn validate_scene_trigger(entity_id: &str, trigger: &SceneTrigger) -> Result<()>
             ));
         }
         if let Some(flag) = &action.flag {
-            validate_path_component(
+            validate_scene_flag_ref(
                 &format!("scene entity {entity_id} trigger action flag"),
                 flag,
+                gameplay_flags,
             )?;
         }
         if let Some(target_entity) = &action.entity_id {
@@ -15382,7 +15465,11 @@ fn validate_scene_trigger(entity_id: &str, trigger: &SceneTrigger) -> Result<()>
     Ok(())
 }
 
-fn validate_scene_status(field: &str, status: &SceneStatus) -> Result<()> {
+fn validate_scene_status(
+    field: &str,
+    status: &SceneStatus,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
     if let Some(hit_points) = status.hit_points {
         if hit_points < 0 {
             return Err(anyhow!("{field} hitPoints must be non-negative"));
@@ -15399,14 +15486,22 @@ fn validate_scene_status(field: &str, status: &SceneStatus) -> Result<()> {
         }
     }
     validate_unique_path_components(field, "flags", &status.flags)?;
+    for flag in &status.flags {
+        validate_scene_flag_ref(&format!("{field} flags"), flag, gameplay_flags)?;
+    }
     validate_unique_path_components(field, "states", &status.states)?;
     Ok(())
 }
 
-fn validate_scene_goal_flag(entity_id: &str, goal_flag: &SceneGoalFlag) -> Result<()> {
-    validate_path_component(
+fn validate_scene_goal_flag(
+    entity_id: &str,
+    goal_flag: &SceneGoalFlag,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
+    validate_scene_flag_ref(
         &format!("scene entity {entity_id} goalFlag flag"),
         &goal_flag.flag,
+        gameplay_flags,
     )?;
     if let Some(label) = &goal_flag.label {
         require_bounded_display_text(&format!("scene entity {entity_id} goalFlag label"), label)?;
@@ -15448,7 +15543,11 @@ fn validate_scene_camera_target(entity_id: &str, camera_target: &SceneCameraTarg
     Ok(())
 }
 
-fn validate_scene_ui_text(entity_id: &str, ui_text: &SceneUiText) -> Result<()> {
+fn validate_scene_ui_text(
+    entity_id: &str,
+    ui_text: &SceneUiText,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
     require_bounded_display_text(
         &format!("scene entity {entity_id} uiText text"),
         &ui_text.text,
@@ -15457,7 +15556,27 @@ fn validate_scene_ui_text(entity_id: &str, ui_text: &SceneUiText) -> Result<()> 
         validate_path_component(&format!("scene entity {entity_id} uiText role"), role)?;
     }
     if let Some(flag) = &ui_text.bind_flag {
-        validate_path_component(&format!("scene entity {entity_id} uiText bindFlag"), flag)?;
+        validate_scene_flag_ref(
+            &format!("scene entity {entity_id} uiText bindFlag"),
+            flag,
+            gameplay_flags,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_flag_ref(
+    field: &str,
+    value: &str,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
+    validate_path_component(field, value)?;
+    if let Some(flags) = gameplay_flags {
+        if !flags.contains(value) {
+            return Err(anyhow!(
+                "{field} references unknown gameplayRules flag: {value}"
+            ));
+        }
     }
     Ok(())
 }
@@ -26535,6 +26654,101 @@ scenarios:
             serialized["entities"][2]["components"]["uiText"]["text"],
             "Coin: 0/1"
         );
+    }
+
+    #[test]
+    fn scene_trigger_flag_rules_v1_fixture_validates_declared_flags() {
+        let fixture = include_str!("../../../examples/game-runtime/trigger-flags-v1.json");
+        let scene: SceneDocument =
+            serde_json::from_str(fixture).expect("trigger flag fixture parses");
+
+        validate_scene(&scene).expect("trigger flag fixture validates");
+        let gameplay = scene.gameplay_rules.as_ref().expect("gameplay rules");
+        assert_eq!(gameplay.version, "1");
+        assert_eq!(gameplay.flags.len(), 3);
+        assert_eq!(gameplay.flags[0].id, "coin_collected");
+        assert!(!gameplay.flags[0].initial);
+
+        let coin = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == "coin")
+            .expect("coin entity");
+        assert_eq!(
+            coin.components
+                .trigger
+                .as_ref()
+                .expect("coin trigger")
+                .target_flag
+                .as_deref(),
+            Some("coin_collected")
+        );
+        assert_eq!(
+            coin.components
+                .goal_flag
+                .as_ref()
+                .expect("coin goal flag")
+                .flag,
+            "coin_collected"
+        );
+    }
+
+    #[test]
+    fn scene_trigger_flag_rules_v1_rejects_duplicate_and_unknown_flags() {
+        let mut duplicate_flag: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "duplicate-trigger-flags",
+            "bounds": { "width": 64, "height": 64 },
+            "gameplayRules": {
+                "version": "1",
+                "flags": [
+                    { "id": "coin_collected" },
+                    { "id": "coin_collected" }
+                ]
+            },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }
+            ]
+        }))
+        .expect("duplicate flag scene parses");
+        let duplicate_error =
+            validate_scene(&duplicate_flag).expect_err("duplicate gameplay flag rejected");
+        assert!(duplicate_error
+            .to_string()
+            .contains("duplicate scene gameplayRules flag id: coin_collected"));
+
+        duplicate_flag
+            .gameplay_rules
+            .as_mut()
+            .expect("gameplay rules")
+            .flags
+            .pop();
+        duplicate_flag.entities[0].components.trigger = Some(SceneTrigger {
+            id: "collect_coin".to_string(),
+            kind: "overlap".to_string(),
+            target_flag: Some("missing_flag".to_string()),
+            required_flags: Vec::new(),
+            on_enter: vec![SceneTriggerAction {
+                kind: "setFlag".to_string(),
+                flag: Some("coin_collected".to_string()),
+                value: Some(true),
+                entity_id: None,
+            }],
+        });
+        let unknown_error =
+            validate_scene(&duplicate_flag).expect_err("unknown trigger flag rejected");
+        assert!(unknown_error
+            .to_string()
+            .contains("trigger targetFlag references unknown gameplayRules flag: missing_flag"));
     }
 
     #[test]
