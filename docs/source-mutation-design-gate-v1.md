@@ -94,6 +94,27 @@ Issue closure should require:
    gaps, and closure rationale; and
 6. #1 and #23 confirmed open.
 
+
+## Gate outcome and sequencing recommendation
+
+Source Mutation Design Gate v1 is complete when the roadmap/#1 governance
+refresh records the gate outcome. The outcome is conservative:
+
+- source mutation apply remains blocked;
+- arbitrary patch apply, auto-merge, auto-accept, browser command bridges,
+  browser trusted writes, credentialed commands, implicit network, install
+  scripts, and CI/workflow mutation remain blocked;
+- the completed gate is evidence for future planning only, not an implementation
+  authorization;
+- Asset Pipeline v1 and Visual Authoring v1 should proceed before Source
+  Mutation Preview v1 implementation work; and
+- any later Source Mutation Preview v1 implementation must remain inert
+  preview/evidence work until a separate explicit governance decision authorizes
+  anything broader.
+
+#1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
+context anchor. This gate does not close, replace, or narrow either issue.
+
 ## Source mutation remains blocked
 
 Source mutation apply remains blocked until a later explicit implementation

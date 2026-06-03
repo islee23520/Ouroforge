@@ -87,23 +87,32 @@ component, collision, trigger, HUD, animation/audio event, manifest-declared
 transition, regression, and Studio-inspection surfaces. These are bounded local
 evidence contracts, not broad editor/runtime compatibility claims.
 
-Source Mutation Preview v1 is scoped as a preview-only control contract in
-`docs/source-mutation-preview-v1.md`. Its implementation slices remain future
-work and do not authorize source patch application.
+Source Mutation Design Gate v1 is complete as a design/control milestone. Its
+outcome keeps source mutation apply blocked: the gate produced threat model,
+file-class, preview-artifact, review-gate, rollback/audit, sandbox/worktree, and
+read-only Studio review designs, but it did not implement source patch
+application, arbitrary patch apply, browser command bridges, or source-mutation
+readiness. Source Mutation Preview v1 remains scoped as a later preview-only
+implementation contract in `docs/source-mutation-preview-v1.md`; it may only
+produce inert preview/evidence surfaces unless a separate later governance issue
+authorizes more.
 
 ## Near-term governance and public-readiness work
 
-This roadmap/#1 governance refresh records the completed Engine Expressiveness
-v2 playable-authoring milestone while preserving conservative public wording and
-leaving #1/#23 open.
+This roadmap/#1 governance refresh records the completed Source Mutation Design
+Gate v1 control milestone while preserving conservative public wording and
+leaving #1/#23 open. The recommendation after the gate is to keep source
+mutation implementation blocked, complete Asset Pipeline v1 (#332-#342) and
+Visual Authoring v1 (#343-#354) first, then revisit Source Mutation Preview v1
+implementation slices (#356-#366) as inert preview/evidence work only.
 
-After #322, the next milestone candidates should stay inside the same
-local-first, Rust-trusted, browser-read-only boundary. Recommended candidates
-are Source Mutation Design Gate v1 (#323-#331), Asset Pipeline v1 (#332-#342),
-Visual Authoring v1 (#343-#354), Source Mutation Preview v1 implementation
-slices (#356-#366), Public Alpha Readiness (#367-#377), and Public Alpha Launch
-Governance (#378-#387), only when each is backed by fixed PR units, regression
-coverage, generated-state audits, and explicit non-goals.
+After #331, the next milestone candidates should stay inside the same
+local-first, Rust-trusted, browser-read-only boundary. Recommended sequence is
+Asset Pipeline v1 (#332-#342), Visual Authoring v1 (#343-#354), Source Mutation
+Preview v1 implementation slices (#356-#366), Public Alpha Readiness
+(#367-#377), and Public Alpha Launch Governance (#378-#387), only when each is
+backed by fixed PR units, regression coverage, generated-state audits, and
+explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -121,7 +130,9 @@ code path.
 - Use Rust-owned validation for trusted persistence, project resolution, run
   binding, comparison artifacts, and scene-only mutation application.
 - Keep browser surfaces static/read-only for trusted state: display exported
-  data, preview runtime state, and show copyable CLI commands only.
+  data, preview runtime state, and show copyable CLI commands only; Studio
+  source patch review surfaces remain inert evidence displays and never apply,
+  merge, write files, or execute commands.
 - Expand runtime/scenario coverage only when backed by concrete issues and
   tests; keep each expressive surface tied to its bounded evidence contract and
   do not infer broader production-engine/editor capabilities from completed
@@ -133,6 +144,9 @@ code path.
   run-facing surface should distinguish Rust-trusted artifacts from browser/CDP
   observations, and should expose missing or malformed evidence/review state as
   warnings instead of inferred passes.
+- Keep source mutation apply blocked until a separately scoped later milestone
+  has an explicit implementation decision, sandbox/evidence enforcement, and
+  review approval; the completed design gate is not that authorization.
 
 ## Active anchors
 
