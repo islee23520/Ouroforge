@@ -7,13 +7,16 @@ workspace loop in addition to the original run-centered demo, with hardened
 run evidence fidelity, a completed Agentic Review & Regression Promotion v1
 loop around proposal rationale, review decisions, review-gated scene
 application, rerun comparison, regression promotion, Journal v2, and Studio
-review cockpit state, and a completed Agentic Loop Orchestration v1 control
+review cockpit state, a completed Agentic Loop Orchestration v1 control
 layer for data-only plans, dry-run sequencing, CLI-only step execution,
 recovery preflight, evidence bundles, agent handoffs, and Studio loop cockpit
-inspection:
+inspection, and a completed Engine Expressiveness v2 playable-authoring
+surface for richer scene components, deterministic collision/triggers/HUD
+state, collect-and-exit demo evidence, regression coverage, and read-only
+Studio inspection:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -64,10 +67,24 @@ The current implementation has completed these documented milestone surfaces:
   `docs/authoring-loop-evidence-bundle-v1.md`,
   `docs/agent-handoff-contract-v1.md`,
   `examples/authoring-cockpit/README.md`)
+- Engine Expressiveness v2 / Playable Game Authoring v1 implemented subset
+  (`docs/engine-expressiveness-v2.md`,
+  `docs/scene-component-model-v2.md`,
+  `docs/collision-physics-v2.md`,
+  `docs/gameplay-trigger-flags-v1.md`,
+  `docs/playable-demo-v2-collect-and-exit.md`,
+  `docs/scenario-coverage-v3.md`,
+  `docs/studio-authoring-surface-v2-expressive-inspection.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
 scopes a tiny deterministic fixture as tracked source-like data.
+
+Engine Expressiveness v2 completion covers the implemented local playable demo,
+component, collision, trigger, HUD, regression, and Studio-inspection surfaces.
+Animation/audio gameplay events (#317) and multi-scene transitions (#318)
+remain separate design-blocked candidates and are not implied by this completed
+milestone evidence.
 
 Source Mutation Preview v1 is scoped as a preview-only control contract in
 `docs/source-mutation-preview-v1.md`. Its implementation slices remain future
@@ -75,18 +92,18 @@ work and do not authorize source patch application.
 
 ## Near-term governance and public-readiness work
 
-Agentic Loop Orchestration v1 issue #311 is the current roadmap/#1
-governance refresh. Its purpose is to keep top-level docs and #1 aligned with
-the completed loop orchestration milestone while preserving conservative public
-wording and leaving #1/#23 open.
+Issue #322 is the current roadmap/#1 governance refresh after the implemented
+Engine Expressiveness v2 surfaces. Its purpose is to keep top-level docs and #1
+aligned with the completed playable-authoring milestone while preserving
+conservative public wording and leaving #1/#23 open.
 
-After #311, the next milestone candidates should stay inside the same
-local-first, Rust-trusted, browser-read-only boundary. The next recommended
-candidate is Engine Expressiveness v2 / Playable Game Authoring v1, followed by
-source-mutation design gates, asset pipeline work, visual authoring, Source
-Mutation Preview v1 implementation slices, public alpha readiness, or launch
-governance only when each is backed by fixed PR units, regression coverage,
-generated-state audits, and explicit non-goals.
+After #322, the next milestone candidates should stay inside the same
+local-first, Rust-trusted, browser-read-only boundary. Recommended candidates
+are Source Mutation Design Gate v1 (#323-#331), Asset Pipeline v1 (#332-#342),
+Visual Authoring v1 (#343-#354), Source Mutation Preview v1 implementation
+slices (#356-#366), Public Alpha Readiness (#367-#377), and Public Alpha Launch
+Governance (#378-#387), only when each is backed by fixed PR units, regression
+coverage, generated-state audits, and explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -106,7 +123,9 @@ code path.
 - Keep browser surfaces static/read-only for trusted state: display exported
   data, preview runtime state, and show copyable CLI commands only.
 - Expand runtime/scenario coverage only when backed by concrete issues and
-  tests.
+  tests, and keep design-blocked expressive surfaces such as animation/audio
+  events (#317) and multi-scene transitions (#318) out of completion claims
+  until their design gates are resolved.
 - Keep authoring actions connected to QA evidence, semantic comparison,
   journals, rollback metadata, explicit mutation review, and regression
   promotion/matrix context.

@@ -1,15 +1,20 @@
 # Engine Expressiveness v2 / Playable Game Authoring v1
 
-Engine Expressiveness v2 is the next bounded milestone after Agentic Loop
+Engine Expressiveness v2 was the bounded milestone after Agentic Loop
 Orchestration v1. The authoring loop can now plan, dry-run, execute trusted
 steps, recover, bundle evidence, hand off to agents, and display loop state in a
-read-only Studio cockpit. The next bottleneck is the small 2D game expression
-surface: scenes, runtime rules, scenario coverage, and Studio inspection need
+read-only Studio cockpit. The next bottleneck was the small 2D game expression
+surface: scenes, runtime rules, scenario coverage, and Studio inspection needed
 enough structure to author and verify a tiny playable game without changing the
 project's local-first trust boundary.
 
-This document is a scope contract only. It does not implement runtime, scene,
-scenario, dashboard, or Studio behavior.
+Status: the implemented subset is complete through the expressive Studio
+inspection work and this #322 governance refresh. Completion covers additive
+scene components, deterministic collision/trigger/HUD evidence, the
+collect-and-exit playable demo fixture, regression scenario coverage, and
+read-only Studio inspection. Animation/audio gameplay events (#317) and
+multi-scene transitions (#318) remain separate design-blocked candidates and are
+not included in the completed milestone claim.
 
 ## Completed baseline
 
@@ -28,25 +33,51 @@ Engine Expressiveness v2 builds on these completed MVP contracts:
   CLI-only step execution, explicit recovery preflight, generated evidence
   bundles, advisory handoff contracts, and read-only Studio loop cockpit.
 
+## Completed implementation evidence
+
+The implemented Engine Expressiveness v2 evidence is recorded in these source
+contracts and fixtures:
+
+- `docs/scene-component-model-v2.md` for additive component summaries and
+  compatibility expectations.
+- `docs/collision-physics-v2.md` for deterministic movement/collision rules and
+  explicit missing/malformed reporting.
+- `docs/gameplay-trigger-flags-v1.md` for trigger/flag state used by goals,
+  pickups, exits, and scenario evidence.
+- `docs/playable-demo-v2-collect-and-exit.md` plus
+  `examples/playable-demo-v2/collect-and-exit/` for the local collect-and-exit
+  fixture.
+- `docs/scenario-coverage-v3.md` plus
+  `examples/engine-expressiveness-v2-regression/` for regression coverage over
+  expressive runtime behavior.
+- `docs/studio-authoring-surface-v2-expressive-inspection.md` and
+  `examples/authoring-cockpit/` for escaped, read-only inspection of expressive
+  component, collision, trigger, HUD, transition, and event state.
+
+The milestone remains an MVP contract, not a public compatibility promise or a
+production editor/runtime claim.
+
 ## Target outcome
 
-The milestone should enable a small 2D playable authoring loop:
+The milestone enables a small 2D playable authoring loop for the implemented
+surfaces while keeping design-blocked surfaces explicit:
 
 ```text
 richer scene components
   -> gameplay triggers and flags
   -> HUD/state feedback
   -> collision/physics rules
-  -> animation/audio gameplay events
-  -> manifest-declared scene transitions
+  -> animation/audio gameplay events (design-blocked #317)
+  -> manifest-declared scene transitions (design-blocked #318)
   -> playable collect-and-exit demo
   -> scenario regression coverage
   -> Studio read-only inspection
 ```
 
-The target is not a production engine. It is enough expressive structure to make
-small playable game states inspectable, testable, and reviewable through the
-existing evidence-native loop.
+The target is not a production engine. The completed subset provides enough
+expressive structure to make small playable game states inspectable, testable,
+and reviewable through the existing evidence-native loop while leaving #317 and
+#318 out of completion claims.
 
 ## Dependency order
 
@@ -63,10 +94,12 @@ blocker and replacement ordering:
    explicit evidence inputs for goals, pickups, exits, and state changes.
 4. **UI/HUD Entities v1** — expose small HUD/state feedback entities without
    turning Studio into a production UI editor.
-5. **Animation and Audio Gameplay Events v2** — add bounded event declarations
-   and evidence hooks for animation/audio state used by gameplay scenarios.
-6. **Multi-Scene and Level Transition v1** — allow manifest-declared scene
-   transitions with deterministic validation and scenario evidence.
+5. **Animation and Audio Gameplay Events v2** — design-blocked (#317); add
+   bounded event declarations and evidence hooks only after its design gate is
+   resolved.
+6. **Multi-Scene and Level Transition v1** — design-blocked (#318); allow
+   manifest-declared scene transitions only after deterministic validation and
+   scenario-evidence design are resolved.
 7. **Playable Demo v2** — create a one-screen collect-and-exit demo that exercises
    the new component/rule surface.
 8. **Scenario Coverage v3** — add regression scenarios for expressiveness
@@ -74,7 +107,7 @@ blocker and replacement ordering:
 9. **Studio Authoring Surface v2** — extend read-only Studio inspection for the
    new scene/runtime state and inert Rust command text only.
 10. **Roadmap and #1 Governance Refresh** — update #1/top-level docs after the
-    milestone is implemented and verified.
+    implemented milestone surfaces are verified, while leaving #1/#23 open.
 
 ## Compatibility policy
 
