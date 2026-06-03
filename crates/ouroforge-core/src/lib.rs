@@ -2076,6 +2076,167 @@ pub struct AuthoringLoopResumePreflight {
     pub boundary: String,
 }
 
+pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffContract {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    #[serde(
+        rename = "currentStep",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub current_step: Option<AgentHandoffStep>,
+    pub status: AgentHandoffStatus,
+    #[serde(rename = "nextSafeAction")]
+    pub next_safe_action: String,
+    #[serde(
+        rename = "requiredDecisions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub required_decisions: Vec<AuthoringLoopDecisionRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blockers: Vec<String>,
+    #[serde(
+        rename = "allowedCommands",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub allowed_commands: Vec<AuthoringLoopResumeCommandContext>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "driftGuardrails")]
+    pub drift_guardrails: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffStep {
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub kind: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentHandoffStatus {
+    Ready,
+    Blocked,
+    Failed,
+    Completed,
+}
+
+impl AgentHandoffContract {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let handoff: AgentHandoffContract =
+            serde_json::from_str(input).context("failed to parse Agent Handoff Contract JSON")?;
+        handoff.validate_schema()?;
+        Ok(handoff)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent handoff schemaVersion must be {AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent handoff loopId", &self.loop_id)?;
+        if let Some(step) = &self.current_step {
+            step.validate()?;
+        }
+        validate_safe_handoff_text("agent handoff nextSafeAction", &self.next_safe_action)?;
+        if matches!(
+            self.status,
+            AgentHandoffStatus::Blocked | AgentHandoffStatus::Failed
+        ) && self.blockers.is_empty()
+        {
+            return Err(anyhow!(
+                "blocked or failed agent handoff must list blockers"
+            ));
+        }
+        for (index, decision) in self.required_decisions.iter().enumerate() {
+            decision.validate(&format!("agent handoff requiredDecisions[{index}]"))?;
+        }
+        for (index, blocker) in self.blockers.iter().enumerate() {
+            require_text(&format!("agent handoff blockers[{index}]"), blocker)?;
+        }
+        for (index, command) in self.allowed_commands.iter().enumerate() {
+            command.validate(&format!("agent handoff allowedCommands[{index}]"))?;
+            let boundary = command.boundary.to_ascii_lowercase();
+            if !(boundary.contains("inert") || boundary.contains("does not execute")) {
+                return Err(anyhow!(
+                    "agent handoff allowedCommands[{index}].boundary must state commands are inert or do not execute"
+                ));
+            }
+        }
+        validate_nonempty_text_list("agent handoff forbiddenActions", &self.forbidden_actions)?;
+        validate_nonempty_text_list("agent handoff driftGuardrails", &self.drift_guardrails)?;
+        for (index, evidence_ref) in self.evidence_refs.iter().enumerate() {
+            evidence_ref.validate(&format!("agent handoff evidenceRefs[{index}]"))?;
+        }
+        self.generated_state.validate()?;
+        require_text("agent handoff boundary", &self.boundary)?;
+        let boundary = self.boundary.to_ascii_lowercase();
+        if !(boundary.contains("advisory") && boundary.contains("does not execute")) {
+            return Err(anyhow!(
+                "agent handoff boundary must state advisory evidence and does not execute"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl AgentHandoffStep {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("agent handoff currentStep.stepId", &self.step_id)?;
+        require_text("agent handoff currentStep.kind", &self.kind)?;
+        require_text("agent handoff currentStep.status", &self.status)
+    }
+}
+
+fn validate_safe_handoff_text(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let lowered = value.to_ascii_lowercase();
+    for forbidden in [
+        "auto-apply",
+        "auto-merge",
+        "execute automatically",
+        "grant authority",
+        "mutate source code",
+        "source-code mutation",
+    ] {
+        if lowered.contains(forbidden) {
+            return Err(anyhow!("{field} contains unsafe action: {forbidden}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_nonempty_text_list(field: &str, values: &[String]) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    for (index, value) in values.iter().enumerate() {
+        require_text(&format!("{field}[{index}]"), value)?;
+    }
+    Ok(())
+}
+
 pub const AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "authoring-loop-evidence-bundle-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -18017,6 +18178,95 @@ scenarios:
             fs::create_dir_all(path.parent().expect("bundle ref parent")).expect("bundle ref dir");
             fs::write(path, "{}\n").expect("bundle ref file");
         }
+    }
+
+    fn agent_handoff_value(status: &str) -> serde_json::Value {
+        json!({
+            "schemaVersion": "agent-handoff-contract-v1",
+            "loopId": "handoff-loop",
+            "currentStep": { "stepId": "compare-runs", "kind": "compare-runs", "status": status },
+            "status": status,
+            "nextSafeAction": "Inspect blockers and run the displayed CLI command manually after required decisions are satisfied.",
+            "requiredDecisions": [],
+            "blockers": if status == "blocked" || status == "failed" { json!(["missing comparison evidence"]) } else { json!([]) },
+            "allowedCommands": [{
+                "command": "cargo run -p ouroforge-cli -- loop status loop-plan.json",
+                "argv": ["cargo", "run", "-p", "ouroforge-cli", "--", "loop", "status", "loop-plan.json"],
+                "boundary": "inert display text only; browser does not execute"
+            }],
+            "forbiddenActions": ["Do not auto-apply mutations", "Do not auto-merge changes", "Do not execute commands from browser UI"],
+            "evidenceRefs": [{ "id": "bundle", "path": "runs/authoring-loop-bundles/handoff-loop/bundle.json" }],
+            "driftGuardrails": ["#1 remains open", "#23 remains open", "Generated artifacts stay untracked"],
+            "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true },
+            "boundary": "advisory evidence only; does not execute commands or grant authority beyond documented loop state"
+        })
+    }
+
+    #[test]
+    fn agent_handoff_schema_accepts_complete_blocked_and_failed_states() {
+        let complete = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&agent_handoff_value("completed")).expect("handoff json"),
+        )
+        .expect("completed handoff validates");
+        assert_eq!(
+            complete.schema_version,
+            AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION
+        );
+        assert_eq!(complete.status, AgentHandoffStatus::Completed);
+
+        let blocked = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&agent_handoff_value("blocked")).expect("handoff json"),
+        )
+        .expect("blocked handoff validates with blockers");
+        assert_eq!(blocked.status, AgentHandoffStatus::Blocked);
+        assert_eq!(blocked.blockers, vec!["missing comparison evidence"]);
+
+        let failed = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&agent_handoff_value("failed")).expect("handoff json"),
+        )
+        .expect("failed handoff validates with blockers");
+        assert_eq!(failed.status, AgentHandoffStatus::Failed);
+        assert!(failed.boundary.contains("does not execute"));
+    }
+
+    #[test]
+    fn agent_handoff_schema_reports_missing_decision_and_unsafe_next_action() {
+        let mut missing_decision = agent_handoff_value("blocked");
+        missing_decision["requiredDecisions"] =
+            json!([{ "id": "human-review", "kind": "human-review" }]);
+        missing_decision["blockers"] = json!(["missing decision:human-review"]);
+        let handoff = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&missing_decision).expect("handoff json"),
+        )
+        .expect("missing decision handoff remains valid and explicit");
+        assert_eq!(handoff.required_decisions[0].id, "human-review");
+        assert!(handoff.blockers[0].contains("missing decision"));
+
+        let mut no_blockers = agent_handoff_value("blocked");
+        no_blockers["blockers"] = json!([]);
+        let blocked_error = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&no_blockers).expect("handoff json"),
+        )
+        .expect_err("blocked handoff requires blockers");
+        assert!(blocked_error.to_string().contains("must list blockers"));
+
+        let mut unsafe_next = agent_handoff_value("ready");
+        unsafe_next["nextSafeAction"] = json!("execute automatically and auto-merge the result");
+        let unsafe_error = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&unsafe_next).expect("handoff json"),
+        )
+        .expect_err("unsafe next action rejected");
+        assert!(unsafe_error.to_string().contains("unsafe action"));
+
+        let mut executing_command = agent_handoff_value("ready");
+        executing_command["allowedCommands"][0]["boundary"] = json!("runs immediately");
+        let command_error = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&executing_command).expect("handoff json"),
+        )
+        .expect_err("allowed command must be inert");
+        assert!(command_error
+            .to_string()
+            .contains("must state commands are inert"));
     }
 
     #[test]
