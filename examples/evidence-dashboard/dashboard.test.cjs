@@ -33,7 +33,23 @@ const run = {
     ],
     probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
   },
-  evidence: [{ id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true }],
+  evidence: [
+    { id: 'artifact-1', kind: 'application/json', path: 'evidence/a.json', metadata: {}, exists: true },
+    { id: 'asset-reference-integrity', kind: 'application/json', path: 'evidence/assets/asset-reference-integrity.json', metadata: { artifact: 'asset_reference_integrity' }, exists: true },
+  ],
+  asset_integrity: {
+    present: true,
+    empty_state: '',
+    warning_count: 2,
+    stale_hash_count: 1,
+    missing_ref_count: 1,
+    invalid_type_count: 0,
+    evidence_refs: ['evidence/assets/asset-reference-integrity.json'],
+    warnings: [
+      { field: 'scene entity player sprite asset', assetId: 'player_sprite', kind: 'stale_asset_hash', message: 'contentHash mismatch', path: 'assets/sprites/player.png' },
+      { field: 'scene entity ghost audio event spawn asset', assetId: 'missing_audio', kind: 'missing_asset_ref', message: 'unknown project asset id' },
+    ],
+  },
   probe_contract_status: { status: 'present', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 2, missing_count: 0, malformed_count: 0, evidence_refs: ['evidence/world.json', 'evidence/frame.json'] },
   engine_summaries: {
     present: true,
@@ -548,6 +564,10 @@ assert.equal(dashboard.currentReplayView(run, replayState).frame, 0);
 replayState = dashboard.jumpReplayToCheckpoint(run, replayState, 1);
 assert.equal(dashboard.currentReplayView(run, replayState).frame, 4);
 assert.match(dashboard.renderReplayControls(run, replayState), /Current tick/);
+assert.match(dashboard.renderAssetIntegrity(run), /Asset reference|Warnings|stale_asset_hash/);
+assert.match(dashboard.renderRunDetail(run), /Asset reference integrity/);
+assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
+assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
 
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {
@@ -557,6 +577,7 @@ const xssRun = {
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
   regression_promotions: [{ id: '<script>', scenarioId: '<img>', target: { scenarioPackId: '<svg>', scenarioPackPath: '<b>' }, beforeHash: { value: '<before>' }, afterHash: { value: '<after>' }, recordPath: '<record>' }],
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
+  asset_integrity: { present: true, warning_count: 1, stale_hash_count: 1, missing_ref_count: 0, invalid_type_count: 0, evidence_refs: ['javascript:alert(1)'], warnings: [{ kind: '<script>alert(1)</script>', assetId: '<img src=x onerror=alert(1)>', message: '<script>alert(1)</script>', path: '<b>bad</b>' }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
   comparison: { present: true, empty_state: '', artifacts: [{ id: '<img>', path: 'mutation/<script>.json', exists: true, read_error: '<script>alert(1)</script>', before_run_id: '<script>', after_run_id: '<img>', classification: '<script>', deltas: { '<script>': '<img>' }, evidence_refs: ['javascript:alert(1)', '<script>'], unsupported: ['<script>alert(1)</script>'], value: { unsafe: '<script>alert(1)</script>' } }] },
   verdict: {}, journal: '<script>alert(1)</script>',

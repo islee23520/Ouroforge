@@ -220,6 +220,31 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>`;
   }
 
+  function renderAssetIntegrity(run = {}) {
+    const integrity = run.asset_integrity || run.assetIntegrity || {};
+    if (!integrity.present) {
+      return `<p class="empty-state">${escapeText(integrity.empty_state || 'No asset reference integrity evidence is available for this run.')}</p>`;
+    }
+    const warnings = Array.isArray(integrity.warnings) ? integrity.warnings : [];
+    const refs = Array.isArray(integrity.evidence_refs || integrity.evidenceRefs) ? (integrity.evidence_refs || integrity.evidenceRefs) : [];
+    const rows = [
+      ['Warnings', integrity.warning_count ?? integrity.warningCount ?? warnings.length],
+      ['Stale hashes', integrity.stale_hash_count ?? integrity.staleHashCount ?? 0],
+      ['Missing refs/files', integrity.missing_ref_count ?? integrity.missingRefCount ?? 0],
+      ['Invalid types', integrity.invalid_type_count ?? integrity.invalidTypeCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const warningRows = warnings.length
+      ? warnings.slice(0, 8).map((warning) => {
+          const path = warning.path ? ` · ${warning.path}` : '';
+          return `<li><strong>${escapeText(warning.kind || 'warning')}</strong>: ${escapeText(warning.assetId || warning.asset_id || 'unknown asset')} — ${escapeText(warning.message || '')}${escapeText(path)}</li>`;
+        }).join('')
+      : '<li>No missing, stale, invalid-type, or unresolved asset reference warnings recorded.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <ul class="run-meta-list">${warningRows}</ul>
+      ${renderRefLinks('Integrity evidence refs', refs, run)}
+      <p class="run-meta">Read-only Rust validation evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.</p>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -986,6 +1011,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Tilemap authoring evidence</h3>${renderTilemapSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1062,7 +1088,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

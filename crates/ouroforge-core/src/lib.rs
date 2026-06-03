@@ -5969,6 +5969,40 @@ pub struct ProjectAssetResolvedReference {
     pub path: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetReferenceIntegrityReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "manifestId")]
+    pub manifest_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    #[serde(rename = "resolvedRefs")]
+    pub resolved_refs: Vec<ProjectAssetResolvedReference>,
+    pub warnings: Vec<ProjectAssetReferenceIntegrityWarning>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetReferenceIntegrityWarning {
+    pub field: String,
+    #[serde(rename = "assetId")]
+    pub asset_id: String,
+    pub kind: String,
+    pub message: String,
+    #[serde(
+        rename = "expectedTypes",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub expected_types: Vec<ProjectAssetType>,
+    #[serde(rename = "observedType", skip_serializing_if = "Option::is_none")]
+    pub observed_type: Option<ProjectAssetType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
 impl ProjectAssetManifest {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let manifest: ProjectAssetManifest =
@@ -6247,6 +6281,195 @@ impl ProjectAssetManifest {
             scene_id: scene.id.clone(),
             resolved_refs,
         })
+    }
+
+    pub fn check_scene_reference_integrity(
+        &self,
+        scene: &SceneDocument,
+        base_dir: &Path,
+    ) -> Result<ProjectAssetReferenceIntegrityReport> {
+        self.validate_schema()?;
+        let base = base_dir.canonicalize().with_context(|| {
+            format!(
+                "failed to resolve project asset manifest base {}",
+                base_dir.display()
+            )
+        })?;
+        let assets_by_id = self
+            .assets
+            .iter()
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect::<BTreeMap<_, _>>();
+        let mut resolved_refs = Vec::new();
+        let mut warnings = Vec::new();
+
+        for reference in collect_project_scene_asset_refs(scene) {
+            if let Err(error) = validate_path_component(&reference.field, &reference.asset_id) {
+                warnings.push(ProjectAssetReferenceIntegrityWarning {
+                    field: reference.field,
+                    asset_id: reference.asset_id,
+                    kind: "invalid_asset_id".to_string(),
+                    message: error.to_string(),
+                    expected_types: reference.expected_types.to_vec(),
+                    observed_type: None,
+                    path: None,
+                });
+                continue;
+            }
+            let Some(asset) = assets_by_id.get(reference.asset_id.as_str()) else {
+                warnings.push(ProjectAssetReferenceIntegrityWarning {
+                    field: reference.field.clone(),
+                    asset_id: reference.asset_id.clone(),
+                    kind: "missing_asset_ref".to_string(),
+                    message: format!(
+                        "{} references unknown project asset id: {}",
+                        reference.field, reference.asset_id
+                    ),
+                    expected_types: reference.expected_types.to_vec(),
+                    observed_type: None,
+                    path: None,
+                });
+                continue;
+            };
+            if !reference.expected_types.contains(&asset.asset_type) {
+                warnings.push(ProjectAssetReferenceIntegrityWarning {
+                    field: reference.field.clone(),
+                    asset_id: reference.asset_id.clone(),
+                    kind: "invalid_asset_type".to_string(),
+                    message: format!(
+                        "{} references project asset {} of type {:?}, expected one of {:?}",
+                        reference.field,
+                        reference.asset_id,
+                        asset.asset_type,
+                        reference.expected_types
+                    ),
+                    expected_types: reference.expected_types.to_vec(),
+                    observed_type: Some(asset.asset_type),
+                    path: Some(asset.path.clone()),
+                });
+                continue;
+            }
+            match project_asset_entry_file_integrity_warning(
+                asset,
+                base_dir,
+                &base,
+                &reference.field,
+            ) {
+                Some(warning) => warnings.push(warning),
+                None => resolved_refs.push(ProjectAssetResolvedReference {
+                    field: reference.field,
+                    asset_id: asset.id.clone(),
+                    asset_type: asset.asset_type,
+                    path: asset.path.clone(),
+                }),
+            }
+        }
+
+        resolved_refs.sort_by(|left, right| {
+            (left.field.as_str(), left.asset_id.as_str())
+                .cmp(&(right.field.as_str(), right.asset_id.as_str()))
+        });
+        warnings.sort_by(|left, right| {
+            (
+                left.kind.as_str(),
+                left.field.as_str(),
+                left.asset_id.as_str(),
+            )
+                .cmp(&(
+                    right.kind.as_str(),
+                    right.field.as_str(),
+                    right.asset_id.as_str(),
+                ))
+        });
+        Ok(ProjectAssetReferenceIntegrityReport {
+            schema_version: "asset-reference-integrity-v1".to_string(),
+            manifest_id: self.id.clone(),
+            scene_id: scene.id.clone(),
+            resolved_refs,
+            warnings,
+        })
+    }
+}
+
+fn project_asset_entry_file_integrity_warning(
+    asset: &ProjectAssetManifestEntry,
+    base_dir: &Path,
+    base: &Path,
+    field: &str,
+) -> Option<ProjectAssetReferenceIntegrityWarning> {
+    let path = base_dir.join(&asset.path);
+    if !path.is_file() {
+        return Some(ProjectAssetReferenceIntegrityWarning {
+            field: field.to_string(),
+            asset_id: asset.id.clone(),
+            kind: "missing_asset_file".to_string(),
+            message: format!(
+                "project asset manifest asset {} missing file: {}",
+                asset.id, asset.path
+            ),
+            expected_types: Vec::new(),
+            observed_type: Some(asset.asset_type),
+            path: Some(asset.path.clone()),
+        });
+    }
+    match path.canonicalize() {
+        Ok(resolved) if !resolved.starts_with(base) => Some(ProjectAssetReferenceIntegrityWarning {
+            field: field.to_string(),
+            asset_id: asset.id.clone(),
+            kind: "asset_path_outside_project".to_string(),
+            message: format!(
+                "project asset manifest asset {} must stay inside the project root",
+                asset.id
+            ),
+            expected_types: Vec::new(),
+            observed_type: Some(asset.asset_type),
+            path: Some(asset.path.clone()),
+        }),
+        Err(error) => Some(ProjectAssetReferenceIntegrityWarning {
+            field: field.to_string(),
+            asset_id: asset.id.clone(),
+            kind: "asset_path_unresolved".to_string(),
+            message: format!(
+                "failed to resolve project asset manifest asset {} path {}: {}",
+                asset.id, asset.path, error
+            ),
+            expected_types: Vec::new(),
+            observed_type: Some(asset.asset_type),
+            path: Some(asset.path.clone()),
+        }),
+        Ok(_) => match hash_project_asset_file(&path) {
+            Ok(observed)
+                if asset.content_hash.algorithm == observed.algorithm
+                    && asset.content_hash.value == observed.value =>
+            {
+                None
+            }
+            Ok(observed) => Some(ProjectAssetReferenceIntegrityWarning {
+                field: field.to_string(),
+                asset_id: asset.id.clone(),
+                kind: "stale_asset_hash".to_string(),
+                message: format!(
+                    "project asset manifest asset {} contentHash mismatch: expected {}:{}, observed {}:{}",
+                    asset.id,
+                    asset.content_hash.algorithm,
+                    asset.content_hash.value,
+                    observed.algorithm,
+                    observed.value
+                ),
+                expected_types: Vec::new(),
+                observed_type: Some(asset.asset_type),
+                path: Some(asset.path.clone()),
+            }),
+            Err(error) => Some(ProjectAssetReferenceIntegrityWarning {
+                field: field.to_string(),
+                asset_id: asset.id.clone(),
+                kind: "asset_hash_unreadable".to_string(),
+                message: error.to_string(),
+                expected_types: Vec::new(),
+                observed_type: Some(asset.asset_type),
+                path: Some(asset.path.clone()),
+            }),
+        },
     }
 }
 
@@ -11229,6 +11452,10 @@ fn render_journal(
         legacy_replay_count, scenario_replay_count
     ));
 
+    out.push_str(&render_asset_reference_integrity_journal_section(
+        run_dir, evidence,
+    ));
+
     out.push_str("## Gameplay Trigger/Flag Evidence\n\n");
     match journal_gameplay_summary(run_dir, evidence) {
         Some((source, gameplay)) => {
@@ -11610,6 +11837,63 @@ fn join_or_none(values: &[String]) -> String {
     } else {
         values.join(", ")
     }
+}
+
+fn render_asset_reference_integrity_journal_section(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+) -> String {
+    let mut out = String::new();
+    out.push_str("## Asset Reference Integrity\n\n");
+    match read_dashboard_asset_integrity(run_dir, &evidence.artifacts) {
+        Ok(report) if report.present => {
+            out.push_str(&format!(
+                "- Warnings: `{}` total (`{}` stale hash, `{}` missing ref/file, `{}` invalid type)\n",
+                report.warning_count,
+                report.stale_hash_count,
+                report.missing_ref_count,
+                report.invalid_type_count
+            ));
+            out.push_str(&format!(
+                "- Evidence refs: {}\n",
+                join_or_none(&report.evidence_refs)
+            ));
+            if report.warnings.is_empty() {
+                out.push_str("- No missing, stale, invalid-type, or unresolved asset reference warnings recorded.\n");
+            } else {
+                for warning in report.warnings.iter().take(8) {
+                    out.push_str(&format!(
+                        "- `{}` `{}`: {}{}\n",
+                        warning.kind,
+                        warning.asset_id,
+                        warning.message,
+                        warning
+                            .path
+                            .as_ref()
+                            .map(|path| format!(" (`{path}`)"))
+                            .unwrap_or_default()
+                    ));
+                }
+                if report.warnings.len() > 8 {
+                    out.push_str(&format!(
+                        "- ... {} more warning(s) in asset reference integrity evidence.\n",
+                        report.warnings.len() - 8
+                    ));
+                }
+            }
+        }
+        Ok(report) => {
+            out.push_str(&format!("- {}\n", report.empty_state));
+        }
+        Err(error) => {
+            out.push_str(&format!(
+                "- Asset reference integrity evidence could not be read: {}\n",
+                error
+            ));
+        }
+    }
+    out.push('\n');
+    out
 }
 
 fn render_review_decision_journal_section(reviews: &[MutationReviewDecision]) -> String {
@@ -17628,6 +17912,7 @@ pub struct RunDashboardReadModel {
     pub comparison: RunDashboardComparison,
     pub transaction_provenance: Option<RunTransactionProvenance>,
     pub engine_summaries: RunDashboardEngineSummaries,
+    pub asset_integrity: RunDashboardAssetIntegrity,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -17788,6 +18073,19 @@ pub struct RunDashboardEngineSummaries {
     pub events: serde_json::Value,
     pub reload: serde_json::Value,
     pub composition: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardAssetIntegrity {
+    pub present: bool,
+    pub empty_state: String,
+    pub warning_count: usize,
+    pub stale_hash_count: usize,
+    pub missing_ref_count: usize,
+    pub invalid_type_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub warnings: Vec<ProjectAssetReferenceIntegrityWarning>,
+    pub artifacts: Vec<RunDashboardArtifact>,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -18124,6 +18422,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let project = read_dashboard_project_context(&run);
     let command_context = read_dashboard_command_context(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
+    let asset_integrity = read_dashboard_asset_integrity(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -18174,6 +18473,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         comparison,
         transaction_provenance,
         engine_summaries,
+        asset_integrity,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -18461,6 +18761,105 @@ fn dashboard_artifact_is_world_state(artifact: &EvidenceArtifact) -> bool {
             == Some("getWorldState")
         || artifact.id.contains("world-state")
         || artifact.path.contains("world-state")
+}
+
+fn dashboard_artifact_is_asset_reference_integrity(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("asset_reference_integrity")
+        || artifact.id.contains("asset-reference-integrity")
+        || artifact.path.contains("asset-reference-integrity")
+}
+
+fn read_dashboard_asset_integrity(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardAssetIntegrity> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_asset_reference_integrity,
+    )?;
+    if artifacts.is_empty() {
+        return Ok(RunDashboardAssetIntegrity {
+            present: false,
+            empty_state: "No asset reference integrity evidence is indexed for this run."
+                .to_string(),
+            warning_count: 0,
+            stale_hash_count: 0,
+            missing_ref_count: 0,
+            invalid_type_count: 0,
+            evidence_refs: Vec::new(),
+            warnings: Vec::new(),
+            artifacts,
+        });
+    }
+
+    let mut warnings = Vec::new();
+    let mut evidence_refs = Vec::new();
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if let Some(value) = &artifact.value {
+            if let Some(items) = value.get("warnings").and_then(|value| value.as_array()) {
+                for item in items {
+                    if let Ok(warning) = serde_json::from_value::<
+                        ProjectAssetReferenceIntegrityWarning,
+                    >(item.clone())
+                    {
+                        warnings.push(warning);
+                    }
+                }
+            }
+        }
+    }
+    warnings.sort_by(|left, right| {
+        (
+            left.kind.as_str(),
+            left.field.as_str(),
+            left.asset_id.as_str(),
+        )
+            .cmp(&(
+                right.kind.as_str(),
+                right.field.as_str(),
+                right.asset_id.as_str(),
+            ))
+    });
+    warnings.dedup_by(|left, right| {
+        left.kind == right.kind && left.field == right.field && left.asset_id == right.asset_id
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let warning_count = warnings.len();
+    let stale_hash_count = warnings
+        .iter()
+        .filter(|warning| warning.kind == "stale_asset_hash")
+        .count();
+    let missing_ref_count = warnings
+        .iter()
+        .filter(|warning| {
+            matches!(
+                warning.kind.as_str(),
+                "missing_asset_ref" | "missing_asset_file"
+            )
+        })
+        .count();
+    let invalid_type_count = warnings
+        .iter()
+        .filter(|warning| warning.kind == "invalid_asset_type")
+        .count();
+    Ok(RunDashboardAssetIntegrity {
+        present: true,
+        empty_state: String::new(),
+        warning_count,
+        stale_hash_count,
+        missing_ref_count,
+        invalid_type_count,
+        evidence_refs,
+        warnings,
+        artifacts,
+    })
 }
 
 fn dashboard_artifact_is_frame_metric(artifact: &EvidenceArtifact) -> bool {
@@ -23384,6 +23783,133 @@ scenarios:
             .validate_scene_references(&scene_with_sprite("https://example.com/player.png"))
             .expect_err("remote URL-like scene ref rejected");
         assert!(remote.to_string().contains("ASCII letters"));
+    }
+
+    #[test]
+    fn project_asset_reference_integrity_reports_warnings_without_remote_fetch() {
+        let root = unique_temp_dir("project-asset-reference-integrity-warnings");
+        fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio dir");
+        fs::write(root.join("assets/sprites/player.png"), b"sprite-v1").expect("sprite");
+        fs::write(root.join("assets/audio/spawn.ogg"), b"audio").expect("audio");
+        let sprite_hash =
+            hash_project_asset_file(root.join("assets/sprites/player.png")).expect("sprite hash");
+        let audio_hash =
+            hash_project_asset_file(root.join("assets/audio/spawn.ogg")).expect("audio hash");
+        fs::write(root.join("assets/sprites/player.png"), b"sprite-v2").expect("stale sprite");
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "warning_manifest",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": sprite_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "spawn_audio",
+                        "type": "audio",
+                        "path": "assets/audio/spawn.ogg",
+                        "contentHash": audio_hash,
+                        "classification": "source_like",
+                        "durationMs": 100
+                    },
+                    {
+                        "id": "missing_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/missing.png",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "warning-scene",
+            "bounds": { "width": 64, "height": 32 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "asset": "player_sprite" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "audio": { "events": [{ "name": "spawn", "trigger": "scene_loaded", "asset": "missing_audio" }] }
+                    }
+                },
+                {
+                    "id": "remote",
+                    "sprite": { "color": "#f97316", "asset": "https://example.com/remote.png" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    }
+                },
+                {
+                    "id": "wrong_type",
+                    "sprite": { "color": "#facc15", "asset": "spawn_audio" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    }
+                },
+                {
+                    "id": "missing_file",
+                    "sprite": { "color": "#94a3b8", "asset": "missing_sprite" },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false
+                    }
+                }
+            ]
+        }))
+        .expect("scene parses");
+
+        let report = manifest
+            .check_scene_reference_integrity(&scene, &root)
+            .expect("warning report builds without fetching remote assets");
+
+        assert_eq!(report.schema_version, "asset-reference-integrity-v1");
+        assert_eq!(report.resolved_refs.len(), 0);
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "stale_asset_hash"));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "missing_asset_ref"));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "missing_asset_file"));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "invalid_asset_type"));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "invalid_asset_id"));
+        assert!(!root.join("assets/remote.png").exists());
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
@@ -32847,6 +33373,62 @@ scenarios:
             &json!({ "run_command_context": { "schemaVersion": 7 } }),
         );
         assert!(malformed.contains("present but malformed"));
+    }
+
+    #[test]
+    fn dashboard_and_journal_surface_asset_reference_integrity_warnings() {
+        let (root, artifacts) = create_test_run("dashboard-asset-reference-integrity");
+        let warning = ProjectAssetReferenceIntegrityWarning {
+            field: "scene entity player sprite asset".to_string(),
+            asset_id: "player_sprite".to_string(),
+            kind: "stale_asset_hash".to_string(),
+            message: "project asset manifest asset player_sprite contentHash mismatch".to_string(),
+            expected_types: Vec::new(),
+            observed_type: Some(ProjectAssetType::Image),
+            path: Some("assets/sprites/player.png".to_string()),
+        };
+        let report = ProjectAssetReferenceIntegrityReport {
+            schema_version: "asset-reference-integrity-v1".to_string(),
+            manifest_id: "warning_manifest".to_string(),
+            scene_id: "main".to_string(),
+            resolved_refs: Vec::new(),
+            warnings: vec![warning],
+        };
+        fs::create_dir_all(artifacts.run_dir.join("evidence/assets")).expect("asset evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/assets/asset-reference-integrity.json"),
+            serde_json::to_string_pretty(&report).expect("report serializes"),
+        )
+        .expect("integrity report written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "asset-reference-integrity",
+            "application/json",
+            "evidence/assets/asset-reference-integrity.json",
+            json!({
+                "artifact": "asset_reference_integrity",
+                "boundary": "local Rust validation only; no remote asset fetches"
+            }),
+        )
+        .expect("asset integrity evidence indexed");
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+        assert!(journal.contains("## Asset Reference Integrity"));
+        assert!(journal.contains("stale_asset_hash"));
+        assert!(journal.contains("asset-reference-integrity.json"));
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(model.asset_integrity.present);
+        assert_eq!(model.asset_integrity.warning_count, 1);
+        assert_eq!(model.asset_integrity.stale_hash_count, 1);
+        assert_eq!(
+            model.asset_integrity.evidence_refs,
+            vec!["evidence/assets/asset-reference-integrity.json".to_string()]
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
