@@ -5947,6 +5947,28 @@ pub struct ProjectAssetManifestValidationReport {
     pub asset_types: BTreeMap<ProjectAssetType, usize>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetReferenceValidationReport {
+    #[serde(rename = "manifestId")]
+    pub manifest_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    #[serde(rename = "resolvedRefs")]
+    pub resolved_refs: Vec<ProjectAssetResolvedReference>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAssetResolvedReference {
+    pub field: String,
+    #[serde(rename = "assetId")]
+    pub asset_id: String,
+    #[serde(rename = "assetType")]
+    pub asset_type: ProjectAssetType,
+    pub path: String,
+}
+
 impl ProjectAssetManifest {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let manifest: ProjectAssetManifest =
@@ -6177,6 +6199,129 @@ impl ProjectAssetManifest {
         }
         Ok(ProjectTilemapAuthoringExtractionReport { tilemaps })
     }
+
+    pub fn validate_scene_references(
+        &self,
+        scene: &SceneDocument,
+    ) -> Result<ProjectAssetReferenceValidationReport> {
+        self.validate_schema()?;
+        let assets_by_id = self
+            .assets
+            .iter()
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect::<BTreeMap<_, _>>();
+        let mut resolved_refs = Vec::new();
+        for reference in collect_project_scene_asset_refs(scene) {
+            validate_path_component(&reference.field, &reference.asset_id)?;
+            let asset = assets_by_id
+                .get(reference.asset_id.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "{} references unknown project asset id: {}",
+                        reference.field,
+                        reference.asset_id
+                    )
+                })?;
+            if !reference.expected_types.contains(&asset.asset_type) {
+                return Err(anyhow!(
+                    "{} references project asset {} of type {:?}, expected one of {:?}",
+                    reference.field,
+                    reference.asset_id,
+                    asset.asset_type,
+                    reference.expected_types
+                ));
+            }
+            resolved_refs.push(ProjectAssetResolvedReference {
+                field: reference.field,
+                asset_id: asset.id.clone(),
+                asset_type: asset.asset_type,
+                path: asset.path.clone(),
+            });
+        }
+        resolved_refs.sort_by(|left, right| {
+            (left.field.as_str(), left.asset_id.as_str())
+                .cmp(&(right.field.as_str(), right.asset_id.as_str()))
+        });
+        Ok(ProjectAssetReferenceValidationReport {
+            manifest_id: self.id.clone(),
+            scene_id: scene.id.clone(),
+            resolved_refs,
+        })
+    }
+}
+
+struct ProjectSceneAssetRef {
+    field: String,
+    asset_id: String,
+    expected_types: &'static [ProjectAssetType],
+}
+
+const PROJECT_SCENE_IMAGE_REF_TYPES: &[ProjectAssetType] =
+    &[ProjectAssetType::Image, ProjectAssetType::SpriteAtlas];
+const PROJECT_SCENE_AUDIO_REF_TYPES: &[ProjectAssetType] = &[ProjectAssetType::Audio];
+
+fn collect_project_scene_asset_refs(scene: &SceneDocument) -> Vec<ProjectSceneAssetRef> {
+    let mut refs = Vec::new();
+    for entity in &scene.entities {
+        if let Some(asset) = &entity.sprite.asset {
+            refs.push(ProjectSceneAssetRef {
+                field: format!("scene entity {} sprite asset", entity.id),
+                asset_id: asset.clone(),
+                expected_types: PROJECT_SCENE_IMAGE_REF_TYPES,
+            });
+        }
+        if let Some(animation) = &entity.components.animation {
+            for (index, frame) in animation.frames.iter().enumerate() {
+                if let Some(asset) = &frame.asset {
+                    refs.push(ProjectSceneAssetRef {
+                        field: format!("scene entity {} animation frame {index} asset", entity.id),
+                        asset_id: asset.clone(),
+                        expected_types: PROJECT_SCENE_IMAGE_REF_TYPES,
+                    });
+                }
+            }
+            for clip in &animation.clips {
+                for (index, frame) in clip.frames.iter().enumerate() {
+                    if let Some(asset) = &frame.asset {
+                        refs.push(ProjectSceneAssetRef {
+                            field: format!(
+                                "scene entity {} animation clip {} frame {index} asset",
+                                entity.id, clip.id
+                            ),
+                            asset_id: asset.clone(),
+                            expected_types: PROJECT_SCENE_IMAGE_REF_TYPES,
+                        });
+                    }
+                }
+            }
+        }
+        if let Some(audio) = &entity.components.audio {
+            for event in &audio.events {
+                if let Some(asset) = &event.asset {
+                    refs.push(ProjectSceneAssetRef {
+                        field: format!(
+                            "scene entity {} audio event {} asset",
+                            entity.id, event.name
+                        ),
+                        asset_id: asset.clone(),
+                        expected_types: PROJECT_SCENE_AUDIO_REF_TYPES,
+                    });
+                }
+            }
+        }
+    }
+    for tilemap in &scene.tilemaps {
+        for tile in &tilemap.tiles {
+            if let Some(asset) = &tile.asset {
+                refs.push(ProjectSceneAssetRef {
+                    field: format!("scene tilemap {} tile {} asset", tilemap.id, tile.id),
+                    asset_id: asset.clone(),
+                    expected_types: PROJECT_SCENE_IMAGE_REF_TYPES,
+                });
+            }
+        }
+    }
+    refs
 }
 
 impl ProjectAssetManifestEntry {
@@ -23065,6 +23210,174 @@ scenarios:
         assert_eq!(report.asset_types.get(&ProjectAssetType::Audio), Some(&1));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn project_asset_manifest_resolves_scene_asset_references_by_id_and_type() {
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "asset_reference_integrity_fixture",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "player_atlas",
+                        "type": "sprite_atlas",
+                        "path": "assets/atlases/player.json",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "2222222222222222" },
+                        "classification": "source_like",
+                        "atlas": {
+                            "imageAssetId": "player_sprite",
+                            "frames": [{ "id": "idle", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } }]
+                        }
+                    },
+                    {
+                        "id": "spawn_audio",
+                        "type": "audio",
+                        "path": "assets/audio/spawn.ogg",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "3333333333333333" },
+                        "classification": "source_like",
+                        "durationMs": 100
+                    },
+                    {
+                        "id": "ground_tile",
+                        "type": "image",
+                        "path": "assets/tiles/ground.png",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "4444444444444444" },
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "asset-ref-scene",
+            "bounds": { "width": 64, "height": 32 },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "asset": "player_sprite" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "animation": {
+                        "mode": "sprite_frame",
+                        "frameDuration": 2,
+                        "frames": [{ "color": "#5eead4", "asset": "player_atlas" }],
+                        "clips": [{ "id": "idle", "frameDuration": 2, "frames": [{ "color": "#2dd4bf", "asset": "player_sprite" }] }]
+                    },
+                    "audio": { "events": [{ "name": "spawn", "trigger": "scene_loaded", "asset": "spawn_audio" }] }
+                }
+            }],
+            "tilemaps": [{
+                "id": "level",
+                "tileSize": { "width": 16, "height": 16 },
+                "grid": { "width": 1, "height": 1 },
+                "tiles": [{ "id": "ground", "color": "#334155", "asset": "ground_tile" }],
+                "layers": [{ "id": "terrain", "data": ["ground"] }]
+            }]
+        }))
+        .expect("scene parses");
+
+        let report = manifest
+            .validate_scene_references(&scene)
+            .expect("scene refs resolve through project manifest");
+
+        assert_eq!(report.manifest_id, "asset_reference_integrity_fixture");
+        assert_eq!(report.scene_id, "asset-ref-scene");
+        assert_eq!(report.resolved_refs.len(), 5);
+        assert!(report.resolved_refs.iter().any(|reference| {
+            reference.field == "scene entity player sprite asset"
+                && reference.asset_id == "player_sprite"
+                && reference.asset_type == ProjectAssetType::Image
+        }));
+        assert!(report.resolved_refs.iter().any(|reference| {
+            reference.field == "scene entity player audio event spawn asset"
+                && reference.asset_id == "spawn_audio"
+                && reference.asset_type == ProjectAssetType::Audio
+        }));
+        assert!(report.resolved_refs.iter().any(|reference| {
+            reference.field == "scene tilemap level tile ground asset"
+                && reference.asset_id == "ground_tile"
+                && reference.asset_type == ProjectAssetType::Image
+        }));
+        let serialized = serde_json::to_string(&report).expect("report serializes");
+        assert!(serialized.contains("\"resolvedRefs\""));
+        assert!(serialized.contains("\"assetType\":\"sprite_atlas\""));
+    }
+
+    #[test]
+    fn project_asset_manifest_rejects_unknown_type_mismatch_and_remote_scene_refs() {
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "asset_reference_rejection_fixture",
+                "assets": [
+                    {
+                        "id": "player_sprite",
+                        "type": "image",
+                        "path": "assets/sprites/player.png",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+                        "classification": "source_like",
+                        "dimensions": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "id": "spawn_audio",
+                        "type": "audio",
+                        "path": "assets/audio/spawn.ogg",
+                        "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "2222222222222222" },
+                        "classification": "source_like",
+                        "durationMs": 100
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let scene_with_sprite = |asset: &str| -> SceneDocument {
+            serde_json::from_value(json!({
+                "schemaVersion": "1",
+                "id": "asset-ref-rejected-scene",
+                "bounds": { "width": 64, "height": 32 },
+                "entities": [{
+                    "id": "player",
+                    "sprite": { "color": "#5eead4", "asset": asset },
+                    "components": {
+                        "transform": { "x": 0, "y": 0 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true
+                    }
+                }]
+            }))
+            .expect("scene parses")
+        };
+
+        let missing = manifest
+            .validate_scene_references(&scene_with_sprite("missing_sprite"))
+            .expect_err("unknown scene ref rejected");
+        assert!(missing.to_string().contains("unknown project asset id"));
+
+        let wrong_type = manifest
+            .validate_scene_references(&scene_with_sprite("spawn_audio"))
+            .expect_err("sprite ref to audio rejected");
+        assert!(wrong_type.to_string().contains("expected one of"));
+
+        let remote = manifest
+            .validate_scene_references(&scene_with_sprite("https://example.com/player.png"))
+            .expect_err("remote URL-like scene ref rejected");
+        assert!(remote.to_string().contains("ASCII letters"));
     }
 
     #[test]
