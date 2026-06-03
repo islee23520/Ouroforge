@@ -82,6 +82,18 @@ const run = {
     beforeSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' },
     afterSceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'afterhash' },
   },
+  review_cockpit: {
+    schemaVersion: 'ouroforge-studio-review-cockpit-v1',
+    terminalState: 'applied',
+    boundary: 'read-only exported evidence; commands are inert text only',
+    commandHints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --accept --reason "manual evidence review accepted"'],
+    proposals: { id: 'proposed', label: 'Proposals', state: 'proposed', artifactPath: 'mutation/proposals.json', recordCount: 1, recordIds: ['proposal-1'], evidenceRefs: ['evidence/indexed.json'] },
+    decisions: { id: 'reviewed', label: 'Review decisions', state: 'accepted', artifactPath: 'mutation/review-decisions.json', recordCount: 1, recordIds: ['review-decision-1'], evidenceRefs: ['mutation/rerun-orchestration.json'] },
+    applications: { id: 'scene_applied', label: 'Review-gated applications', state: 'applied', artifactPath: 'mutation/scene-applications.json', recordCount: 1, recordIds: ['scene-application-1'], evidenceRefs: ['mutation/scene-applications.json'] },
+    comparisons: { id: 'compared', label: 'Rerun comparisons', state: 'compared', artifactPath: 'mutation/rerun-orchestration.json', recordCount: 1, recordIds: ['comparison-1'], evidenceRefs: ['mutation/rerun-orchestration.json'] },
+    promotions: { id: 'promotions', label: 'Regression promotions', state: 'promoted', artifactPath: 'regression-promotions/*.json', recordCount: 1, recordIds: ['regression-promotion-1'], evidenceRefs: ['regression-promotions/regression-promotion-1.json'] },
+    matrix: { id: 'matrix', label: 'Regression matrix', state: 'export_level', artifactPath: 'regression_matrix', recordCount: 1, recordIds: ['scaffold-smoke'], evidenceRefs: [] },
+  },
   mutation_lifecycle: {
     terminal_state: 'pending_review',
     command_hints: ['cargo run -p ouroforge-cli -- mutation review runs/run-1 --reject --reason "manual"'],
@@ -205,6 +217,15 @@ assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped scene mutation lifecycle/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Studio review cockpit/);
+assert.match(cockpit.renderMutationReviewSurface(run), /ouroforge-studio-review-cockpit-v1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /proposal-1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /review-decision-1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /scene-application-1/);
+assert.match(cockpit.renderMutationReviewSurface(run), /Inert copyable review commands/);
+assert.doesNotMatch(cockpit.renderMutationReviewSurface(run), /<button/i);
+assert.match(cockpit.renderStudioReviewCockpitCards({ review_cockpit: { schemaVersion: '<script>', terminalState: '<bad>', boundary: '<img>', commandHints: ['<script>alert(1)</script>'], proposals: { label: '<proposal>', state: 'malformed', readError: '<b>bad</b>', recordIds: ['<id>'], evidenceRefs: ['<ref>'] }, decisions: '<script>', applications: { label: 'Applications', state: 'missing', recordIds: [], evidenceRefs: [] } } }), /&lt;script&gt;/);
+assert.match(cockpit.renderStudioReviewCockpitCards({ review_cockpit: { proposals: { label: 'Proposals', state: 'missing', recordIds: [], evidenceRefs: [] }, decisions: { label: 'Decisions', state: 'missing', recordIds: [], evidenceRefs: [] }, applications: { label: 'Applications', state: 'missing', recordIds: [], evidenceRefs: [] } } }), /No record ids exported/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /Regression promotions/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /promoted-smoke-regression/);
 assert.match(cockpit.renderRegressionPromotionSurface(run), /scenario promote &lt;draft-json&gt; --project examples\/project\/ouroforge\.project\.json --scenario-pack smoke --dry-run/);

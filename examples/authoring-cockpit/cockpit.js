@@ -708,6 +708,57 @@ const OuroforgeCockpit = (() => {
     return `<div class="proposal-rationale"><h3>Review decisions</h3><p class="hint">Read-only append-only review ledger. The cockpit does not write, accept, apply, promote, rerun, or merge mutations.</p>${rows}</div>`;
   }
 
+  function reviewCockpitStage(run, key, fallbackId) {
+    const cockpit = run?.review_cockpit || run?.reviewCockpit || null;
+    const stage = cockpit && typeof cockpit === 'object' ? cockpit[key] : null;
+    if (stage && typeof stage === 'object' && !Array.isArray(stage)) return stage;
+    const lifecycleStage = mutationStage(run?.mutation_lifecycle, fallbackId);
+    if (!lifecycleStage) {
+      return { id: fallbackId, label: key, state: 'missing', recordCount: 0, recordIds: [], evidenceRefs: [], readError: 'No review cockpit stage exported.' };
+    }
+    return {
+      id: lifecycleStage.id,
+      label: lifecycleStage.label,
+      state: lifecycleStage.state,
+      artifactPath: lifecycleStage.artifact_path || lifecycleStage.artifactPath,
+      recordCount: lifecycleStage.record_count || lifecycleStage.recordCount || 0,
+      recordIds: (lifecycleStage.records || []).map((record) => record?.id || record?.proposalId || record?.proposal_id || record?.decisionId || record?.applicationId).filter(Boolean),
+      evidenceRefs: lifecycleStage.evidence_refs || lifecycleStage.evidenceRefs || [],
+      readError: lifecycleStage.read_error || lifecycleStage.readError || null,
+    };
+  }
+
+  function renderReviewCockpitStageCard(stage, run) {
+    if (!stage || typeof stage !== 'object' || Array.isArray(stage)) {
+      return '<div class="surface-row warning"><strong>Malformed review cockpit stage</strong><p class="empty compact">Stage data is missing or malformed in exported dashboard data.</p></div>';
+    }
+    const state = stage.state || 'missing';
+    const count = stage.recordCount ?? stage.record_count ?? 0;
+    const artifact = stage.artifactPath || stage.artifact_path || 'No artifact path';
+    const ids = Array.isArray(stage.recordIds) ? stage.recordIds : Array.isArray(stage.record_ids) ? stage.record_ids : [];
+    const refs = Array.isArray(stage.evidenceRefs) ? stage.evidenceRefs : Array.isArray(stage.evidence_refs) ? stage.evidence_refs : [];
+    const readError = stage.readError || stage.read_error || '';
+    const idsText = ids.length ? ids.map((id) => `<code>${escapeText(id)}</code>`).join('') : '<span class="empty compact">No record ids exported.</span>';
+    const refsHtml = refs.length ? renderRefLinks(refs, run) : '<p class="empty compact">No evidence refs exported for this stage.</p>';
+    const warning = readError ? `<p class="warn">${escapeText(readError)}</p>` : '';
+    return `<div class="surface-row review-cockpit-card"><strong>${escapeText(stage.label || stage.id || 'review cockpit stage')}</strong> ${surfaceState(state !== 'missing' && state !== 'malformed', state)}<br><small>${escapeText(count)} record(s) · ${escapeText(artifact)}</small><div>${idsText}</div>${warning}${refsHtml}</div>`;
+  }
+
+  function renderStudioReviewCockpitCards(run) {
+    const cockpit = run?.review_cockpit || run?.reviewCockpit || null;
+    const schema = cockpit && typeof cockpit === 'object' ? (cockpit.schemaVersion || cockpit.schema_version || 'legacy lifecycle fallback') : 'legacy lifecycle fallback';
+    const terminal = cockpit && typeof cockpit === 'object' ? (cockpit.terminalState || cockpit.terminal_state || 'missing') : (run?.mutation_lifecycle?.terminal_state || 'missing');
+    const boundary = cockpit && typeof cockpit === 'object' ? (cockpit.boundary || 'read-only exported evidence') : 'read-only exported evidence';
+    const commandHints = cockpit && typeof cockpit === 'object' && Array.isArray(cockpit.commandHints) ? cockpit.commandHints : Array.isArray(cockpit?.command_hints) ? cockpit.command_hints : (run?.mutation_lifecycle?.command_hints || []);
+    const cards = [
+      renderReviewCockpitStageCard(reviewCockpitStage(run, 'proposals', 'proposed'), run),
+      renderReviewCockpitStageCard(reviewCockpitStage(run, 'decisions', 'reviewed'), run),
+      renderReviewCockpitStageCard(reviewCockpitStage(run, 'applications', 'scene_applied'), run),
+    ].join('');
+    const hints = commandHints.length ? commandHints.map((hint) => `<code>${escapeText(hint)}</code>`).join('') : '<p class="empty compact">No inert manual review command hints exported.</p>';
+    return `<div class="studio-review-cockpit"><h3>Studio review cockpit</h3><p class="hint">${escapeText(boundary)}. Schema ${escapeText(schema)}. Terminal state: ${escapeText(terminal)}.</p><div class="surface-list">${cards}</div><h4>Inert copyable review commands</h4><div class="command-list">${hints}</div></div>`;
+  }
+
   function renderMutationReviewSurface(run) {
     const lifecycle = run?.mutation_lifecycle;
     if (!lifecycle) {
@@ -718,6 +769,7 @@ const OuroforgeCockpit = (() => {
     return `<section id="mutation-review" class="panel"><h2>Mutation review state</h2>
       <p class="hint">Inspect-only. The cockpit does not accept/reject mutations or apply patches.</p>
       <div><strong>Terminal state:</strong> ${escapeText(lifecycle.terminal_state || 'missing')}</div>
+      ${renderStudioReviewCockpitCards(run)}
       <div class="surface-list">${stages}</div>
       ${renderProposalRationaleSurface(run)}
       ${renderReviewDecisionSurface(lifecycle, run)}
@@ -941,7 +993,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
