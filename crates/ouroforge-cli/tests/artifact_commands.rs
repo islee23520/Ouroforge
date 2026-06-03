@@ -266,7 +266,211 @@ fn edit_draft_preview_emits_deterministic_scene_transaction_preview_without_writ
 }
 
 #[test]
-fn edit_draft_preview_rejects_non_scene_targets_before_outputs() {
+fn edit_draft_preview_preflights_transaction_output_without_writing() {
+    let temp = unique_temp_dir("ouroforge-cli-edit-draft-preview-output-test");
+    write_visual_edit_preview_project(&temp);
+    let scene_path = temp.join("scenes/main.scene.json");
+    let before_scene = fs::read(&scene_path).expect("scene bytes read before preview");
+    let scene = read_scene(&scene_path).expect("scene reads");
+    let before_hash = hash_scene_document(&scene).expect("scene hashes");
+    let draft_path = temp.join("drafts/scene-draft.visual-edit-draft.json");
+    let transaction_output = temp.join("runs/draft-previews/scene-edit.json");
+    fs::create_dir_all(temp.join("drafts")).expect("draft dir exists");
+    fs::write(
+        &draft_path,
+        scene_draft_json(
+            "cli-scene-draft-output",
+            &before_hash.algorithm,
+            &before_hash.value,
+        ),
+    )
+    .expect("draft writes");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "edit",
+            "draft-preview",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--transaction-output",
+            transaction_output.to_str().unwrap(),
+        ],
+    );
+
+    let preview: serde_json::Value = serde_json::from_str(&output).expect("preview json parses");
+    assert_eq!(preview["projectPreflight"]["status"], "passed");
+    assert_eq!(preview["projectPreflight"]["hashValidation"], "passed");
+    assert_eq!(preview["transactionOutputPreflight"]["status"], "passed");
+    assert_eq!(
+        preview["transactionOutputPreflight"]["path"].as_str(),
+        Some(transaction_output.to_string_lossy().as_ref())
+    );
+    assert!(preview["transactionOutputPreflight"]["guardrail"]
+        .as_str()
+        .expect("transaction output guardrail")
+        .contains("not written"));
+    assert_eq!(
+        fs::read(&scene_path).expect("scene bytes read after preview"),
+        before_scene,
+        "draft preview must not write the scene"
+    );
+    assert!(
+        !transaction_output.exists(),
+        "draft-preview transaction output preflight must not write output files"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn edit_draft_preview_rejects_transaction_output_scene_alias_before_writes() {
+    let temp = unique_temp_dir("ouroforge-cli-edit-draft-preview-output-collision-test");
+    write_visual_edit_preview_project(&temp);
+    let scene_path = temp.join("scenes/main.scene.json");
+    let before_scene = fs::read(&scene_path).expect("scene bytes read before preview");
+    let scene = read_scene(&scene_path).expect("scene reads");
+    let before_hash = hash_scene_document(&scene).expect("scene hashes");
+    let draft_path = temp.join("drafts/scene-draft.visual-edit-draft.json");
+    fs::create_dir_all(temp.join("drafts")).expect("draft dir exists");
+    fs::write(
+        &draft_path,
+        scene_draft_json(
+            "cli-scene-draft-output-collision",
+            &before_hash.algorithm,
+            &before_hash.value,
+        ),
+    )
+    .expect("draft writes");
+
+    let output = run_cli_expect_failure(
+        &temp,
+        &[
+            "edit",
+            "draft-preview",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--transaction-output",
+            scene_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(
+        output.contains("transaction output must not equal target scene path"),
+        "{output}"
+    );
+    assert_eq!(
+        fs::read(&scene_path).expect("scene bytes read after rejected preview"),
+        before_scene,
+        "transaction output collision must be rejected before trusted scene writes"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn edit_draft_preview_preflights_asset_references_without_writes() {
+    let temp = unique_temp_dir("ouroforge-cli-edit-draft-preview-asset-ref-test");
+    write_visual_edit_preview_project(&temp);
+    fs::create_dir_all(temp.join("assets/sprites")).expect("asset dir exists");
+    fs::create_dir_all(temp.join("drafts")).expect("draft dir exists");
+    fs::write(temp.join("assets/sprites/player.png"), b"png fixture").expect("asset writes");
+    let sprite_hash = fnv1a64_hex(b"png fixture");
+    fs::write(
+        temp.join("asset-manifest.json"),
+        format!(
+            r#"{{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "cli_draft_preview_assets",
+  "assets": [{{
+    "id": "player_sprite",
+    "type": "image",
+    "path": "assets/sprites/player.png",
+    "contentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{sprite_hash}" }},
+    "classification": "source_like"
+  }}]
+}}"#
+        ),
+    )
+    .expect("asset manifest writes");
+    let draft_path = temp.join("drafts/asset-reference.visual-edit-draft.json");
+    fs::write(
+        &draft_path,
+        format!(
+            r#"{{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "cli-asset-ref-draft",
+  "target": {{
+    "type": "asset-reference",
+    "path": "asset-manifest.json",
+    "id": "cli_draft_preview_assets"
+  }},
+  "proposedOperations": [{{
+    "id": "op-link-player-sprite",
+    "kind": "link_asset",
+    "path": "scenes.main.entities.player.sprite.assetId",
+    "summary": "Draft a sprite image reference.",
+    "value": {{ "replacementAssetId": "player_sprite", "expectedAssetType": "image" }},
+    "assetReferenceOperation": {{
+      "kind": "sprite_asset_reference",
+      "targetReferencePath": "scenes.main.entities.player.sprite.assetId",
+      "replacementAssetId": "player_sprite",
+      "expectedAssetType": "image",
+      "expectedContentHash": {{ "algorithm": "fnv1a64-file-v1", "value": "{sprite_hash}" }},
+      "summary": "Preview linking a sprite asset reference."
+    }}
+  }}],
+  "beforeHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "expectedAfterSummary": "Asset reference draft validates against the manifest without writing files.",
+  "author": {{
+    "type": "agent",
+    "id": "visual-authoring-assistant",
+    "source": "cli-test"
+  }},
+  "validationStatus": "unvalidated"
+}}"#
+        ),
+    )
+    .expect("asset reference draft writes");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "edit",
+            "draft-preview",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+        ],
+    );
+
+    let preview: serde_json::Value = serde_json::from_str(&output).expect("preview json parses");
+    assert_eq!(preview["previewKind"], "asset_reference_drafts");
+    assert_eq!(
+        preview["projectPreflight"]["assetManifestId"],
+        "cli_draft_preview_assets"
+    );
+    assert_eq!(
+        preview["projectPreflight"]["assetReferencesValidated"],
+        true
+    );
+    assert_eq!(
+        preview["previews"][0]["replacementAssetId"],
+        "player_sprite"
+    );
+    assert_eq!(preview["previews"][0]["contentHash"]["value"], sprite_hash);
+    assert!(
+        !temp.join("runs").exists(),
+        "asset-reference preview must not write generated output"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn edit_draft_preview_rejects_tilemap_targets_before_outputs() {
     let temp = unique_temp_dir("ouroforge-cli-edit-draft-preview-reject-test");
     write_visual_edit_preview_project(&temp);
     let draft_path = temp.join("drafts/tilemap-draft.visual-edit-draft.json");
@@ -316,8 +520,7 @@ fn edit_draft_preview_rejects_non_scene_targets_before_outputs() {
         ],
     );
 
-    assert!(output.contains("supports scene drafts only"));
-    assert!(output.contains("reserved for later #348 PR units"));
+    assert!(output.contains("reserves Tilemap draft targets"));
     assert!(
         !temp.join("runs").exists(),
         "rejected preview must not create generated output roots"
@@ -2524,6 +2727,46 @@ fn write_visual_edit_preview_project(root: &Path) {
 }"#,
     )
     .expect("project manifest writes");
+}
+
+fn scene_draft_json(
+    draft_id: &str,
+    before_hash_algorithm: &str,
+    before_hash_value: &str,
+) -> String {
+    format!(
+        r##"{{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "{draft_id}",
+  "target": {{
+    "type": "scene",
+    "path": "scenes/main.scene.json",
+    "id": "foundation-scene"
+  }},
+  "proposedOperations": [{{
+    "id": "op-move-player-x",
+    "kind": "update",
+    "path": "entities.player.components.transform.x",
+    "summary": "Move player x without writing the scene file.",
+    "value": 48,
+    "sceneOperation": {{
+      "kind": "transform_move",
+      "entityId": "player",
+      "sceneEditPath": "components.transform.x",
+      "value": 48
+    }}
+  }}],
+  "beforeHash": "{before_hash_algorithm}:{before_hash_value}",
+  "expectedAfterSummary": "Scene draft preview returns transactions without applying them.",
+  "linkedEvidence": ["runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "author": {{
+    "type": "agent",
+    "id": "visual-authoring-assistant",
+    "source": "cli-test"
+  }},
+  "validationStatus": "unvalidated"
+}}"##
+    )
 }
 
 fn fnv1a64_hex(bytes: &[u8]) -> String {
