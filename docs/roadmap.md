@@ -10,13 +10,16 @@ application, rerun comparison, regression promotion, Journal v2, and Studio
 review cockpit state, a completed Agentic Loop Orchestration v1 control
 layer for data-only plans, dry-run sequencing, CLI-only step execution,
 recovery preflight, evidence bundles, agent handoffs, and Studio loop cockpit
-inspection, and a completed Engine Expressiveness v2 playable-authoring
+inspection, a completed Engine Expressiveness v2 playable-authoring
 surface for richer scene components, deterministic collision/triggers/HUD
 state, collect-and-exit demo evidence, regression coverage, and read-only
-Studio inspection:
+Studio inspection, and a completed Asset Pipeline v1 content-authoring foundation
+for local asset manifests, atlas/tilemap metadata, reference integrity, runtime
+loading evidence, preview/read-model evidence, Studio asset inspection, demo asset
+refresh, and asset regression coverage:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -77,6 +80,18 @@ The current implementation has completed these documented milestone surfaces:
   `docs/playable-demo-v2-collect-and-exit.md`,
   `docs/scenario-coverage-v3.md`,
   `docs/studio-authoring-surface-v2-expressive-inspection.md`)
+- Asset Pipeline v1 / Content Authoring Foundation
+  (`docs/asset-pipeline-v1.md`,
+  `docs/asset-manifest-v1.md`,
+  `docs/sprite-atlas-manifest-v1.md`,
+  `docs/tileset-tilemap-authoring-v2.md`,
+  `docs/asset-reference-integrity-v1.md`,
+  `docs/runtime-asset-loading-evidence-v1.md`,
+  `docs/asset-preview-evidence-v1.md`,
+  `docs/studio-asset-inspector-v1.md`,
+  `docs/playable-demo-v2-collect-and-exit.md`,
+  `docs/scenario-coverage-v4-asset-pipeline.md`,
+  `docs/asset-pipeline-v1-governance-handoff.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -86,6 +101,15 @@ Engine Expressiveness v2 completion covers the implemented local playable demo,
 component, collision, trigger, HUD, animation/audio event, manifest-declared
 transition, regression, and Studio-inspection surfaces. These are bounded local
 evidence contracts, not broad editor/runtime compatibility claims.
+
+Asset Pipeline v1 completion covers local source-like asset manifests, sprite
+atlas metadata, tileset/tilemap authoring metadata, scene/reference integrity,
+runtime loading evidence, preview/read-model evidence, Studio asset inspection,
+asset-backed playable-demo refresh, Scenario Coverage v4, and the post-milestone
+governance handoff. It remains local-first and Rust-trusted; it does not add
+remote asset hosting, browser uploads/writes, marketplace/plugin behavior,
+native export, production editor claims, source mutation apply, or public launch
+automation.
 
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
@@ -99,20 +123,21 @@ authorizes more.
 
 ## Near-term governance and public-readiness work
 
-This roadmap/#1 governance refresh records the completed Source Mutation Design
-Gate v1 control milestone while preserving conservative public wording and
-leaving #1/#23 open. The recommendation after the gate is to keep source
-mutation implementation blocked, complete Asset Pipeline v1 (#332-#342) and
-Visual Authoring v1 (#343-#354) first, then revisit Source Mutation Preview v1
-implementation slices (#356-#366) as inert preview/evidence work only.
+This roadmap/#1 governance refresh records the completed Asset Pipeline v1
+control and implementation milestone while preserving conservative public wording
+and leaving #1/#23 open. Asset Pipeline v1 (#332-#342) is now complete as a
+local-first content-authoring foundation; it is not a public-readiness or
+production-editor claim.
 
-After #331, the next milestone candidates should stay inside the same
+After #342, the next milestone candidates should stay inside the same
 local-first, Rust-trusted, browser-read-only boundary. Recommended sequence is
-Asset Pipeline v1 (#332-#342), Visual Authoring v1 (#343-#354), Source Mutation
-Preview v1 implementation slices (#356-#366), Public Alpha Readiness
-(#367-#377), and Public Alpha Launch Governance (#378-#387), only when each is
-backed by fixed PR units, regression coverage, generated-state audits, and
-explicit non-goals.
+Visual Authoring v1 (#343-#354), then Source Mutation Preview v1 implementation
+slices (#356-#366) as inert preview/evidence work only, then Public Alpha
+Readiness (#367-#377), and Public Alpha Launch Governance (#378-#387), only when
+each is backed by fixed PR units, regression coverage, generated-state audits,
+and explicit non-goals. Native Export Design Gate and Plugin Design Gate remain
+possible later governance topics, but neither is authorized as implementation
+scope by the Asset Pipeline completion handoff.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -146,7 +171,12 @@ code path.
   warnings instead of inferred passes.
 - Keep source mutation apply blocked until a separately scoped later milestone
   has an explicit implementation decision, sandbox/evidence enforcement, and
-  review approval; the completed design gate is not that authorization.
+  review approval; the completed design gate and completed Asset Pipeline v1 are
+  not that authorization.
+- Treat Visual Authoring v1 as the preferred next content-authoring milestone
+  because it can build on asset manifests and read-only evidence without adding
+  browser trusted writes, marketplace/plugin scope, native export, or source
+  mutation authority.
 
 ## Active anchors
 

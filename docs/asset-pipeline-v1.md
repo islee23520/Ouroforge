@@ -1,6 +1,10 @@
 # Asset Pipeline v1 Scope and Contract
 
-Asset Pipeline v1 / Content Authoring Foundation is the next local-first,
+Status: **completed as a local-first content-authoring foundation after #342**.
+The completion evidence is summarized in
+`docs/asset-pipeline-v1-governance-handoff.md`; #1 and #23 remain open.
+
+Asset Pipeline v1 / Content Authoring Foundation was the next local-first,
 Rust-trusted, evidence-native milestone after Engine Expressiveness v2 and Source
 Mutation Design Gate v1. It brings project game content assets into the same
 bounded review loop as scenes, scenarios, runs, comparisons, journals, and
@@ -176,10 +180,15 @@ Asset Pipeline v1 does not authorize:
 
 ## Closure policy for this milestone
 
-Asset Pipeline v1 is complete only when its ordered follow-up issues are merged,
-latest-main verification passes, generated/local artifacts remain untracked, and
-the roadmap/#1 governance refresh records the outcome. Until then, this document
-is a planning contract, not a claim that the asset pipeline is production-ready.
+Asset Pipeline v1 is complete after #342 because its ordered follow-up issues
+merged, latest-main verification passed, generated/local artifacts remained
+untracked, and the roadmap/#1 governance refresh recorded the outcome. This is a
+bounded local content-authoring completion claim, not a claim that Ouroforge has
+a production-ready asset pipeline.
+
+Completion does not authorize remote asset hosting, browser uploads/writes,
+marketplace/plugin behavior, native export, production editor behavior, source
+mutation apply, public launch automation, or a Godot replacement claim.
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. Both remain open unless a separate explicit governance decision

@@ -30,7 +30,7 @@ Ouroforge now has the documentation, governance, demo evidence, fresh-clone smok
 | Dependency posture | Refreshed by #217 AL2.8.1 | `docs/public-demo-evidence.md` records current `cargo audit` output against `Cargo.lock`: 1102 advisories loaded, 66 crate dependencies scanned, no vulnerabilities reported. | Re-run audit before any later public release decision. |
 | Demo quality | Refreshed by #217 AL2.8.1 | `docs/assets/demo/` contains runtime, evidence dashboard, and authoring cockpit screenshots; `docs/public-demo-evidence.md` now records Platformer and Engine Expansion v1 smoke run ids and limitations. | Review media drift in AL2.8.2 before changing screenshots. |
 | Issue templates | Remediated by #48 | `.github/ISSUE_TEMPLATE` defines bug, scoped feature, and public-readiness templates with evidence and guardrail fields. | Keep templates aligned with support policy and SECURITY.md. |
-| Roadmap clarity | Remediated by #47 | `docs/roadmap.md` documents current status, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
+| Roadmap clarity | Refreshed after Asset Pipeline v1 (#342) | `docs/roadmap.md` documents completed Asset Pipeline v1, next milestone candidates, public-readiness work, direction, and non-goals. | Keep roadmap conservative until public launch decision. |
 | Example reproducibility | Remediated by #49 | `docs/public-demo-evidence.md` records Chrome/`OUROFORGE_CHROME`, generated artifacts, and fresh-clone smoke commands. | Re-run fresh-clone smoke before public visibility changes. |
 | Secrets/private paths | Pass with caveat | No tracked `.openchrome/`, `.omc/`, or generated `runs/`; verification found only untracked local tool state. | Keep `.openchrome/`, `.omc/`, `runs/`, and generated dashboard data out of commits. |
 
@@ -92,6 +92,13 @@ Remediation blockers created by #18.1 and addressed by stacked follow-up PRs:
 - #47 — Harden README, architecture, contribution, and roadmap docs for public onboarding.
 - #48 — Add public issue templates and support/scope boundaries.
 - #49 — Add public demo media and reproduce fresh-clone smoke evidence.
+
+## Post-Asset Pipeline v1 note
+
+Asset Pipeline v1 completion adds local asset manifest, loading, preview, Studio
+inspection, demo refresh, and regression evidence. It does not change this audit
+into a launch approval: public visibility remains a separate manual maintainer
+decision after the launch checklist is re-run on the intended visibility date.
 
 ## Final recommendation
 
