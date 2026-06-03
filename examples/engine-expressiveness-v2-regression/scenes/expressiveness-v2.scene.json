@@ -41,7 +41,7 @@
           "clips": [{ "id": "idle", "frameDuration": 2, "loop": true, "frames": [{ "color": "#5eead4" }, { "color": "#2dd4bf" }] }],
           "currentClip": "idle"
         },
-        "audio": { "onSceneLoaded": [{ "name": "player_spawn", "action": "play", "muted": true }] }
+        "audio": { "events": [{ "name": "player_spawn", "trigger": "scene_loaded", "action": "play" }] }
       },
       "tags": ["player"]
     },

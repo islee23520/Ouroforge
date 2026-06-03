@@ -20,3 +20,18 @@ intent, and the playable collect-and-exit loop.
 
 Generated `runs/`, `dashboard-data/`, `target/`, screenshots, and temporary
 smoke output are local review evidence and must not be committed.
+
+
+## Evidence smoke
+
+Run the source/evidence compatibility smoke without committing generated state:
+
+```bash
+node examples/engine-expressiveness-v2-regression/evidence-smoke.test.cjs
+```
+
+The smoke drives the local runtime fixture to key collection and exit, evaluates
+each scenario-pack assertion against in-memory evidence, writes a temporary
+verdict file under the OS temp directory, then deletes it. Evidence references in
+that verdict are relative `evidence/...` paths so dashboard/read-model exporters
+can link them without browser-side trusted writes or command execution.
