@@ -44,9 +44,10 @@ This model inherits the existing Ouroforge trust boundary:
 ## Risk matrix
 
 Severity values: **Critical**, **High**, **Medium**, **Low**. Likelihood values:
-**Likely**, **Possible**, **Unlikely**. Residual acceptance is intentionally not
-assigned in SMG1.2.1; required mitigations and blocked-by-design categories are
-specified in SMG1.2.2.
+**Likely**, **Possible**, **Unlikely**. Residual acceptance is intentionally
+conservative: every listed risk requires a mitigation or remains
+blocked-by-design before any later source mutation apply milestone can be
+considered.
 
 | ID | Risk | Example failure mode | Severity | Likelihood |
 | --- | --- | --- | --- | --- |
@@ -71,10 +72,71 @@ specified in SMG1.2.2.
 | STM-19 | Unsafe rollback target | Rollback data points at stale hashes, wrong branches, generated paths, or untrusted backups. | High | Possible |
 | STM-20 | Governance anchor drift | #1 or #23 is closed, replaced, or narrowed by source-mutation work without explicit governance. | Medium | Possible |
 
+## Required mitigations
+
+The following mitigations are mandatory design requirements for later Source
+Mutation Design Gate work. They are not implemented by this document.
+
+| Risk IDs | Required mitigation | Closure evidence expected in later issues |
+| --- | --- | --- |
+| STM-01, STM-02, STM-16 | Explicit command allowlist, no hidden shell execution, reproducible command context, and human-visible command rationale before any future dry run. | Allowlist design, command provenance, and rejected-command examples. |
+| STM-03 | Dependency changes blocked unless a later issue explicitly scopes dependency review, lockfile policy, and supply-chain evidence. | File-class policy marking dependency manifests/lockfiles separately from ordinary docs/data. |
+| STM-04 | CI/workflow files blocked by default; any future change requires separate governance and secret-exposure review. | Blocked file-class list and reviewer checklist. |
+| STM-05, STM-13 | Source/generated boundary classifier plus generated-state audit before review and closure. | Preview artifact must label generated, source-like fixture, and ignored-local paths distinctly. |
+| STM-06 | Browser/Studio review surfaces remain read-only, cannot write trusted files, cannot execute commands, and can only show copyable CLI commands. | Studio design doc and UI wording scan proving no command bridge or trusted write path. |
+| STM-07, STM-18 | Bounded diff previews with file-class labels, risk labels, omitted-content warnings, binary/generated-file warnings, and reviewer-facing rationale. | Patch preview artifact contract with truncation and large-diff behavior. |
+| STM-08 | New file classes require a separate design issue and cannot be inferred from existing acceptance. | Allowed/forbidden file-class governance rules. |
+| STM-09 | Verification commands, evidence readers, tests, and fixtures touched by a patch require elevated review and stale-evidence detection. | Review gate rules for test/evidence-impacting diffs. |
+| STM-10, STM-19 | Rollback metadata must include pre-change refs, target hashes, cleanup expectations, audit links, and stale/unsafe rollback rejection behavior. | Rollback/audit contract with invalid rollback cases. |
+| STM-11, STM-12 | Target file hashes, canonical paths, symlink/hard-link/path traversal rejection, and main-branch freshness checks before apply is ever considered. | Preview/review gate stale-target and unsafe-path tests/design cases. |
+| STM-14 | Independent review gate; proposer/self-review cannot be sole acceptance authority. | Source patch review decision model with accept/reject/hold and reviewer separation. |
+| STM-15, STM-20 | Conservative public/governance wording and explicit #1/#23 open-state audit in every closure. | Final issue comments and roadmap/#1 handoff checks. |
+| STM-17 | Multi-file invariant checklist and affected-surface summary before reviewer decision. | Review artifact must list related files, expected invariants, and verification coverage. |
+
+## Blocked-by-design categories
+
+The following categories remain blocked unless a later explicit governance issue
+changes the boundary with evidence. They are not eligible for source mutation
+apply under this design gate:
+
+- CI/workflow files, secret-handling config, deployment config, or release
+  automation.
+- Build scripts, package scripts, tool installer scripts, or other files whose
+  normal verification path executes host commands.
+- Dependency manifest or lockfile changes without a dedicated dependency-review
+  issue.
+- Browser/Studio code that writes trusted source files or executes commands.
+- Plugin runtime, marketplace, dynamic loading, hosted/cloud/server/auth, native
+  export, distributed QA/Elixir, production editor, public launch automation, or
+  Godot replacement scope.
+- Binary files, opaque generated files, ignored local state, build outputs, run
+  caches, and evidence bundles not explicitly promoted as deterministic
+  source-like fixtures.
+- Any patch that changes its own review gate, rollback path, sandbox boundary,
+  evidence reader, or verification command without elevated explicit review.
+- Any patch preview whose target files are stale, outside the canonical repo
+  root, symlink/hard-link ambiguous, truncated without warning, or missing
+  reviewer-visible rationale.
+
+## Review requirements
+
+Later source-patch design or implementation issues must keep review mandatory:
+
+1. classify every touched file before review;
+2. label risk IDs from this threat model;
+3. show the exact diff or an explicit omitted-content warning;
+4. list expected verification commands and why they are safe to run;
+5. record reviewer decision as accept, reject, or hold;
+6. reject self-approval as sufficient authority;
+7. require rollback/audit references before any future apply path; and
+8. preserve #1 and #23 as open anchors unless a separate governance decision is
+   made outside this milestone.
+
 ## Design-only boundary for this artifact
 
-SMG1.2.1 records risks and threat assumptions only. It does not define the final
-mitigation policy, blocked source classes, preview schema, source patch review
-state machine, sandbox runner, rollback format, Studio implementation, or source
-mutation apply path. Those remain separate design/control issues in the Source
-Mutation Design Gate sequence.
+SMG1.2.1 records risks and threat assumptions. SMG1.2.2 records required
+mitigations and blocked-by-design categories. Together they still do not
+implement source mutation apply, a patch preview schema, a source patch review
+state machine, a sandbox runner, a rollback artifact format, a Studio write path,
+or command execution. Those remain separate design/control or later
+implementation issues in the Source Mutation Design Gate sequence.
