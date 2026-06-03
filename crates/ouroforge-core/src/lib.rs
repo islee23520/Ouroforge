@@ -16410,13 +16410,19 @@ pub struct RunDashboardEngineSummaries {
     pub empty_state: String,
     pub source_world_state: Option<String>,
     pub scene: serde_json::Value,
+    pub components: serde_json::Value,
     pub renderer: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
     pub audio: serde_json::Value,
     pub physics: serde_json::Value,
+    pub collision: serde_json::Value,
     pub gameplay: serde_json::Value,
+    pub triggers: serde_json::Value,
+    pub hud: serde_json::Value,
+    pub transition: serde_json::Value,
+    pub events: serde_json::Value,
     pub reload: serde_json::Value,
     pub composition: serde_json::Value,
 }
@@ -17393,6 +17399,181 @@ fn dashboard_entities_with_component(world_state: &serde_json::Value, component:
         .unwrap_or(0)
 }
 
+fn dashboard_component_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let mut counts = BTreeMap::<String, usize>::new();
+    let mut entities = Vec::new();
+    if let Some(items) = world_state.get("entities").and_then(|value| value.as_array()) {
+        for entity in items {
+            let entity_id = entity
+                .get("id")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown");
+            let components = entity
+                .get("components")
+                .and_then(|value| value.as_object())
+                .map(|components| {
+                    let mut names = components.keys().cloned().collect::<Vec<_>>();
+                    names.sort();
+                    for name in &names {
+                        *counts.entry(name.clone()).or_default() += 1;
+                    }
+                    names
+                })
+                .unwrap_or_default();
+            entities.push(json!({ "entityId": entity_id, "components": components }));
+        }
+    }
+    if let Some(model_counts) = world_state
+        .pointer("/componentModel/counts")
+        .and_then(|value| value.as_object())
+    {
+        for (name, count) in model_counts {
+            if let Some(count) = count.as_u64() {
+                counts.insert(name.clone(), count as usize);
+            }
+        }
+    }
+    json!({
+        "present": !counts.is_empty() || !entities.is_empty(),
+        "entityCount": entities.len(),
+        "componentCounts": counts,
+        "entities": entities
+    })
+}
+
+fn dashboard_trigger_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let triggers = world_state
+        .get("entities")
+        .and_then(|entities| entities.as_array())
+        .map(|entities| {
+            entities
+                .iter()
+                .filter_map(|entity| {
+                    let trigger = entity.pointer("/components/trigger")?;
+                    Some(json!({
+                        "entityId": entity.get("id").cloned().unwrap_or(json!(null)),
+                        "id": trigger.get("id").cloned().unwrap_or(json!(null)),
+                        "kind": trigger.get("kind").cloned().unwrap_or(json!(null)),
+                        "targetFlag": trigger.get("targetFlag").cloned().unwrap_or(json!(null)),
+                        "requiredFlags": trigger.get("requiredFlags").cloned().unwrap_or(json!([])),
+                        "onEnterCount": dashboard_array_len(trigger.get("onEnter")),
+                    }))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    json!({
+        "present": !triggers.is_empty(),
+        "triggerCount": triggers.len(),
+        "triggerCollisionEventCount": world_state
+            .get("collisionEvents")
+            .and_then(|events| events.as_array())
+            .map(|events| {
+                events
+                    .iter()
+                    .filter(|event| {
+                        event.get("type").and_then(|value| value.as_str())
+                            == Some("runtime.collision.trigger")
+                    })
+                    .count()
+            })
+            .unwrap_or(0),
+        "triggers": triggers
+    })
+}
+
+fn dashboard_hud_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let values = world_state
+        .pointer("/componentModel/hudValues")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    json!({
+        "present": !values.is_empty() || dashboard_entities_with_component(world_state, "hudValue") > 0,
+        "hudValueCount": values.len(),
+        "hudValueEntityCount": world_state.pointer("/componentModel/counts/hudValue")
+            .cloned()
+            .unwrap_or_else(|| json!(dashboard_entities_with_component(world_state, "hudValue"))),
+        "values": values
+    })
+}
+
+fn dashboard_collision_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let rules_present = world_state.get("collisionRules").is_some();
+    json!({
+        "present": rules_present
+            || world_state.get("collisions").is_some()
+            || world_state.get("collisionEvents").is_some()
+            || dashboard_entities_with_component(world_state, "collider") > 0,
+        "rules": world_state.get("collisionRules").cloned().unwrap_or(json!({})),
+        "colliderEntityCount": dashboard_entities_with_component(world_state, "collider"),
+        "collisionCount": dashboard_array_len(world_state.get("collisions")),
+        "collisionEventCount": dashboard_array_len(world_state.get("collisionEvents")),
+        "events": world_state.get("collisionEvents").cloned().unwrap_or(json!([]))
+    })
+}
+
+fn dashboard_transition_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let transition_events = world_state
+        .get("transitionEvents")
+        .or_else(|| world_state.get("sceneTransitions"))
+        .cloned()
+        .unwrap_or(json!([]));
+    json!({
+        "present": world_state.get("sceneId").is_some()
+            || world_state.get("reloads").is_some()
+            || transition_events.as_array().is_some_and(|events| !events.is_empty()),
+        "currentSceneId": world_state.get("sceneId").cloned().unwrap_or(json!(null)),
+        "transitionEventCount": transition_events.as_array().map_or(0, Vec::len),
+        "transitions": transition_events,
+        "reloadCount": dashboard_array_len(world_state.get("reloads")),
+        "lastReloadStatus": world_state.get("reloads")
+            .and_then(|reloads| reloads.as_array())
+            .and_then(|reloads| reloads.last())
+            .and_then(|reload| reload.get("status"))
+            .cloned()
+            .unwrap_or(json!(null))
+    })
+}
+
+fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let audio_events = world_state.get("audioEvents").cloned().unwrap_or(json!([]));
+    let collision_events = world_state.get("collisionEvents").cloned().unwrap_or(json!([]));
+    let animation_entities = world_state
+        .get("entities")
+        .and_then(|entities| entities.as_array())
+        .map(|entities| {
+            entities
+                .iter()
+                .filter_map(|entity| {
+                    let animation = entity.pointer("/components/animation")?;
+                    Some(json!({
+                        "entityId": entity.get("id").cloned().unwrap_or(json!(null)),
+                        "mode": animation.get("mode").cloned().unwrap_or(json!(null)),
+                        "currentClip": animation
+                            .get("currentClip")
+                            .cloned()
+                            .or_else(|| animation.pointer("/state/currentClip").cloned())
+                            .unwrap_or(json!(null)),
+                        "frameIndex": animation.pointer("/state/frameIndex").cloned().unwrap_or(json!(null)),
+                    }))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    json!({
+        "present": !animation_entities.is_empty()
+            || audio_events.as_array().is_some_and(|events| !events.is_empty())
+            || collision_events.as_array().is_some_and(|events| !events.is_empty()),
+        "animationEntityCount": animation_entities.len(),
+        "audioEventCount": audio_events.as_array().map_or(0, Vec::len),
+        "collisionEventCount": collision_events.as_array().map_or(0, Vec::len),
+        "animationEntities": animation_entities,
+        "audioEvents": audio_events,
+        "collisionEvents": collision_events
+    })
+}
+
 fn read_dashboard_transaction_provenance(
     run: &serde_json::Value,
 ) -> Option<RunTransactionProvenance> {
@@ -17427,13 +17608,19 @@ fn read_dashboard_engine_summaries(
                     .to_string(),
             source_world_state: None,
             scene: json!({}),
+            components: json!({}),
             renderer: json!({}),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
             audio: json!({}),
             physics: json!({}),
+            collision: json!({}),
             gameplay: json!({}),
+            triggers: json!({}),
+            hud: json!({}),
+            transition: json!({}),
+            events: json!({}),
             reload: json!({}),
             composition: json!({}),
         };
@@ -17450,6 +17637,7 @@ fn read_dashboard_engine_summaries(
             "entityCount": entities,
             "tick": world_state.get("tick").cloned().unwrap_or(json!(null))
         }),
+        components: dashboard_component_summary(world_state),
         renderer: json!({
             "present": world_state.get("renderer").is_some(),
             "version": world_state.pointer("/renderer/version").cloned().unwrap_or(json!(null)),
@@ -17478,7 +17666,12 @@ fn read_dashboard_engine_summaries(
             "collisionEventCount": dashboard_array_len(world_state.get("collisionEvents")),
             "colliderEntityCount": dashboard_entities_with_component(world_state, "collider")
         }),
+        collision: dashboard_collision_summary(world_state),
         gameplay: dashboard_gameplay_summary(world_state),
+        triggers: dashboard_trigger_summary(world_state),
+        hud: dashboard_hud_summary(world_state),
+        transition: dashboard_transition_summary(world_state),
+        events: dashboard_runtime_event_summary(world_state),
         reload: json!({
             "reloadCount": dashboard_array_len(world_state.get("reloads")),
             "lastStatus": world_state.get("reloads")
@@ -29985,6 +30178,14 @@ scenarios:
             model.engine_summaries.renderer["renderedEntities"],
             json!(1)
         );
+        assert_eq!(
+            model.engine_summaries.components["componentCounts"]["collider"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.components["entities"][0]["components"][0],
+            json!("animation")
+        );
         assert_eq!(model.engine_summaries.tilemaps["tilemapCount"], json!(1));
         assert_eq!(
             model.engine_summaries.assets["manifestId"],
@@ -29997,6 +30198,14 @@ scenarios:
         assert_eq!(model.engine_summaries.audio["audioEventCount"], json!(1));
         assert_eq!(
             model.engine_summaries.physics["collisionEventCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.collision["rules"]["defaultLayer"],
+            json!("default")
+        );
+        assert_eq!(
+            model.engine_summaries.collision["collisionEventCount"],
             json!(1)
         );
         assert_eq!(
@@ -30016,6 +30225,26 @@ scenarios:
         assert_eq!(
             model.engine_summaries.gameplay["hudValues"][0]["text"],
             json!("Goal: Collect coin")
+        );
+        assert_eq!(
+            model.engine_summaries.triggers["triggerCollisionEventCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.hud["hudValueCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.transition["currentSceneId"],
+            json!("foundation-scene")
+        );
+        assert_eq!(
+            model.engine_summaries.events["animationEntityCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.events["audioEventCount"],
+            json!(1)
         );
         assert_eq!(
             model.engine_summaries.reload["lastStatus"],
