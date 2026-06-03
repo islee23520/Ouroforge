@@ -258,6 +258,30 @@ const run = {
     audio: { audioEntityCount: 0, audioEventCount: 0 },
     physics: { colliderEntityCount: 2, collisionEventCount: 1 },
     gameplay: { worldFlagCount: 3, trueFlagCount: 2, triggerCollisionEventCount: 1, hudValueEntityCount: 2 },
+    components: {
+      present: true,
+      entityCount: 2,
+      componentCounts: { controllable: 1, hudValue: 2, trigger: 1 },
+      entities: [
+        { entityId: 'player', components: ['controllable', 'status'] },
+        { entityId: 'hud_goal', components: ['hudValue', 'uiText'] },
+      ],
+    },
+    triggers: {
+      present: true,
+      triggerCount: 1,
+      triggerCollisionEventCount: 1,
+      triggers: [{ entityId: 'key', id: 'collect_key', kind: 'overlap', targetFlag: 'coin_collected', requiredFlags: ['player_alive'], onEnterCount: 2 }],
+    },
+    hud: {
+      present: true,
+      hudValueCount: 2,
+      hudValueEntityCount: 2,
+      values: [
+        { entityId: 'hud_goal', kind: 'goal', label: 'Goal', value: 'Collect coin', bindFlag: 'coin_collected', flagValue: true, text: 'Goal: Collect coin' },
+        { entityId: 'hud_health', kind: 'health', label: 'HP', value: '3/3', text: 'HP: 3/3' },
+      ],
+    },
     reload: { reloadCount: 0, lastStatus: null },
     composition: { entityCount: 3, parentedEntityCount: 0 },
   },
@@ -277,7 +301,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 13);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 14);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -448,6 +472,15 @@ assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { reas
 assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);
 assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { project: '<bad>' } } }), /No project comparison fields/);
 assert.match(cockpit.renderSemanticComparisonSummary({ semantic: { reasons: [{ kind: '<script>', severity: '<img>', summary: '<bad>' }], warnings: ['<warn>'] } }), /&lt;bad&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /Expressive scene inspection/);
+assert.match(cockpit.renderExpressiveComponentHudSurface(run), /Component counts/);
+assert.match(cockpit.renderExpressiveComponentHudSurface(run), /collect_key/);
+assert.match(cockpit.renderExpressiveComponentHudSurface(run), /Goal: Collect coin/);
+assert.match(cockpit.renderExpressiveComponentHudSurface({ engine_summaries: { present: true, components: '<bad>', triggers: null, hud: [] } }), /component summary missing or malformed/);
+assert.match(cockpit.renderExpressiveComponentHudSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
+const xssExpressive = cockpit.renderExpressiveComponentHudSurface({ engine_summaries: { present: true, components: { present: true, entityCount: 1, componentCounts: { '<script>': 1 }, entities: [{ entityId: '<img>', components: ['<svg>'] }] }, triggers: { present: true, triggerCount: 1, triggerCollisionEventCount: 0, triggers: [{ id: '<script>', entityId: '<img>', kind: '<b>', targetFlag: '<svg>', requiredFlags: ['<i>'], onEnterCount: 1 }] }, hud: { present: true, hudValueEntityCount: 1, values: [{ label: '<script>', text: '<img>', bindFlag: '<svg>', flagValue: '<b>' }] } } });
+assert.doesNotMatch(xssExpressive, /<script>|<img>|<svg>|<b>/);
+assert.match(xssExpressive, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);
