@@ -2076,6 +2076,329 @@ pub struct AuthoringLoopResumePreflight {
     pub boundary: String,
 }
 
+pub const AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "authoring-loop-evidence-bundle-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopEvidenceBundle {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    pub status: AuthoringLoopEvidenceBundleStatus,
+    pub plan: AuthoringLoopEvidenceBundleArtifactRef,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<AuthoringLoopEvidenceBundleStep>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runs: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comparisons: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub proposals: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(
+        rename = "reviewDecisions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub review_decisions: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transactions: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(
+        rename = "regressionPromotions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub regression_promotions: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(
+        rename = "matrixSnapshots",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub matrix_snapshots: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(
+        rename = "journalSummaries",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub journal_summaries: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(rename = "missingRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_refs: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopEvidenceBundleStatus {
+    Partial,
+    Failed,
+    Completed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopEvidenceBundleStep {
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub kind: String,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outputs: Vec<AuthoringLoopEvidenceBundleArtifactRef>,
+    #[serde(rename = "missingRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopEvidenceBundleArtifactRef {
+    pub id: String,
+    pub kind: AuthoringLoopEvidenceBundleArtifactKind,
+    pub path: String,
+    #[serde(rename = "stepId", default, skip_serializing_if = "Option::is_none")]
+    pub step_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopEvidenceBundleArtifactKind {
+    LoopPlan,
+    StepOutput,
+    Run,
+    Comparison,
+    Proposal,
+    ReviewDecision,
+    Transaction,
+    RegressionPromotion,
+    MatrixSnapshot,
+    JournalSummary,
+}
+
+impl AuthoringLoopEvidenceBundle {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let bundle: AuthoringLoopEvidenceBundle = serde_json::from_str(input)
+            .context("failed to parse Authoring Loop Evidence Bundle JSON")?;
+        bundle.validate_schema()?;
+        Ok(bundle)
+    }
+
+    pub fn from_json_str_with_base(input: &str, base_dir: impl AsRef<Path>) -> Result<Self> {
+        let bundle = Self::from_json_str(input)?;
+        bundle.validate_references(base_dir)?;
+        Ok(bundle)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "authoring loop evidence bundle schemaVersion must be {AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("authoring loop evidence bundle loopId", &self.loop_id)?;
+        require_text("authoring loop evidence bundle boundary", &self.boundary)?;
+        self.generated_state.validate()?;
+        for (index, missing_ref) in self.missing_refs.iter().enumerate() {
+            require_text(
+                &format!("authoring loop evidence bundle missingRefs[{index}]"),
+                missing_ref,
+            )?;
+        }
+
+        let mut ids = BTreeSet::new();
+        self.plan.validate(
+            "authoring loop evidence bundle plan",
+            &self.generated_state.roots,
+            &mut ids,
+        )?;
+        self.validate_refs("authoring loop evidence bundle runs", &self.runs, &mut ids)?;
+        self.validate_refs(
+            "authoring loop evidence bundle comparisons",
+            &self.comparisons,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle proposals",
+            &self.proposals,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle reviewDecisions",
+            &self.review_decisions,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle transactions",
+            &self.transactions,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle regressionPromotions",
+            &self.regression_promotions,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle matrixSnapshots",
+            &self.matrix_snapshots,
+            &mut ids,
+        )?;
+        self.validate_refs(
+            "authoring loop evidence bundle journalSummaries",
+            &self.journal_summaries,
+            &mut ids,
+        )?;
+        for (index, step) in self.steps.iter().enumerate() {
+            step.validate(index, &self.generated_state.roots, &mut ids)?;
+        }
+        if self.status == AuthoringLoopEvidenceBundleStatus::Completed
+            && !self.missing_refs.is_empty()
+        {
+            return Err(anyhow!(
+                "completed authoring loop evidence bundle must not include missingRefs"
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn validate_references(&self, base_dir: impl AsRef<Path>) -> Result<()> {
+        self.validate_schema()?;
+        let base_dir = base_dir.as_ref();
+        let missing = self
+            .all_artifact_refs()
+            .into_iter()
+            .filter(|artifact| !base_dir.join(&artifact.path).exists())
+            .map(|artifact| format!("{}:{}", artifact.id, artifact.path))
+            .collect::<Vec<_>>();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "stale authoring loop evidence bundle references: {}",
+                missing.join(", ")
+            ))
+        }
+    }
+
+    fn validate_refs(
+        &self,
+        field: &str,
+        refs: &[AuthoringLoopEvidenceBundleArtifactRef],
+        ids: &mut BTreeSet<String>,
+    ) -> Result<()> {
+        for (index, artifact) in refs.iter().enumerate() {
+            artifact.validate(
+                &format!("{field}[{index}]"),
+                &self.generated_state.roots,
+                ids,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn all_artifact_refs(&self) -> Vec<&AuthoringLoopEvidenceBundleArtifactRef> {
+        let mut refs = vec![&self.plan];
+        refs.extend(self.runs.iter());
+        refs.extend(self.comparisons.iter());
+        refs.extend(self.proposals.iter());
+        refs.extend(self.review_decisions.iter());
+        refs.extend(self.transactions.iter());
+        refs.extend(self.regression_promotions.iter());
+        refs.extend(self.matrix_snapshots.iter());
+        refs.extend(self.journal_summaries.iter());
+        for step in &self.steps {
+            refs.extend(step.outputs.iter());
+        }
+        refs
+    }
+}
+
+impl AuthoringLoopEvidenceBundleStep {
+    fn validate(
+        &self,
+        index: usize,
+        generated_roots: &[String],
+        ids: &mut BTreeSet<String>,
+    ) -> Result<()> {
+        validate_path_component(
+            &format!("authoring loop evidence bundle steps[{index}].stepId"),
+            &self.step_id,
+        )?;
+        require_text(
+            &format!("authoring loop evidence bundle steps[{index}].kind"),
+            &self.kind,
+        )?;
+        require_text(
+            &format!("authoring loop evidence bundle steps[{index}].status"),
+            &self.status,
+        )?;
+        for (missing_index, missing_ref) in self.missing_refs.iter().enumerate() {
+            require_text(
+                &format!(
+                    "authoring loop evidence bundle steps[{index}].missingRefs[{missing_index}]"
+                ),
+                missing_ref,
+            )?;
+        }
+        for (output_index, output) in self.outputs.iter().enumerate() {
+            output.validate(
+                &format!("authoring loop evidence bundle steps[{index}].outputs[{output_index}]"),
+                generated_roots,
+                ids,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopEvidenceBundleArtifactRef {
+    fn validate(
+        &self,
+        field: &str,
+        generated_roots: &[String],
+        ids: &mut BTreeSet<String>,
+    ) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        validate_authoring_loop_bundle_ref_path(
+            &format!("{field}.path"),
+            &self.path,
+            generated_roots,
+        )?;
+        if let Some(step_id) = &self.step_id {
+            validate_path_component(&format!("{field}.stepId"), step_id)?;
+        }
+        if let Some(description) = &self.description {
+            require_text(&format!("{field}.description"), description)?;
+        }
+        if !ids.insert(self.id.clone()) {
+            return Err(anyhow!(
+                "duplicate authoring loop evidence bundle artifact id: {}",
+                self.id
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_authoring_loop_bundle_ref_path(
+    field: &str,
+    value: &str,
+    generated_roots: &[String],
+) -> Result<()> {
+    validate_authoring_loop_generated_root(field, value)?;
+    let path = Path::new(value);
+    let under_generated_root = generated_roots.iter().any(|root| {
+        let root = Path::new(root);
+        path == root || path.starts_with(root)
+    });
+    if !under_generated_root && !is_documented_generated_artifact_path(path) {
+        return Err(anyhow!(
+            "{field} must stay within configured generated roots"
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AuthoringLoopArtifactRef {
@@ -2935,8 +3258,7 @@ pub fn execute_authoring_loop_step(
                 unreachable!("unsupported kinds are blocked before execution")
             }
         };
-        let remapped =
-            remap_authoring_loop_artifact_paths(running.clone(), &generated_artifacts)?;
+        let remapped = remap_authoring_loop_artifact_paths(running.clone(), &generated_artifacts)?;
         let (completed, _) =
             remapped.update_step_status(step_id, AuthoringLoopStepStatus::Completed)?;
         append_ledger_event(
@@ -17314,6 +17636,131 @@ scenarios:
         ))
         .expect_err("unsupported field rejected");
         assert!(unsupported_field.to_string().contains("failed to parse"));
+    }
+
+    fn loop_evidence_bundle_value(status: &str, missing_refs: Vec<&str>) -> serde_json::Value {
+        json!({
+            "schemaVersion": "authoring-loop-evidence-bundle-v1",
+            "loopId": "loop-bundle-fixture",
+            "status": status,
+            "plan": { "id": "loop-plan", "kind": "loop-plan", "path": "runs/loops/loop-plan.json" },
+            "steps": [{
+                "stepId": "run-baseline",
+                "kind": "run-scenario-pack",
+                "status": status,
+                "outputs": [{ "id": "baseline-output", "kind": "step-output", "path": "runs/loops/baseline-output.json", "stepId": "run-baseline" }],
+                "missingRefs": missing_refs,
+            }],
+            "runs": [
+                { "id": "source-run", "kind": "run", "path": "runs/source/run.json" },
+                { "id": "after-run", "kind": "run", "path": "runs/after/run.json" }
+            ],
+            "comparisons": [{ "id": "comparison", "kind": "comparison", "path": "runs/after/comparison.json" }],
+            "proposals": [{ "id": "proposal", "kind": "proposal", "path": "runs/after/mutation-proposals.json" }],
+            "reviewDecisions": [{ "id": "decision", "kind": "review-decision", "path": "runs/after/review-decisions.json" }],
+            "transactions": [{ "id": "transaction", "kind": "transaction", "path": "runs/after/transactions/scene-edit.json" }],
+            "regressionPromotions": [{ "id": "promotion", "kind": "regression-promotion", "path": "runs/after/regression-promotion.json" }],
+            "matrixSnapshots": [{ "id": "matrix", "kind": "matrix-snapshot", "path": "runs/regression-matrix.json" }],
+            "journalSummaries": [{ "id": "journal", "kind": "journal-summary", "path": "runs/after/journal.md" }],
+            "missingRefs": missing_refs,
+            "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true },
+            "boundary": "Generated local index only; does not move artifacts, write source state, serve files, or add browser controls."
+        })
+    }
+
+    fn write_bundle_ref_files(
+        root: &Path,
+        bundle: &AuthoringLoopEvidenceBundle,
+        skip_id: Option<&str>,
+    ) {
+        for artifact in bundle.all_artifact_refs() {
+            if skip_id == Some(artifact.id.as_str()) {
+                continue;
+            }
+            let path = root.join(&artifact.path);
+            fs::create_dir_all(path.parent().expect("bundle ref parent")).expect("bundle ref dir");
+            fs::write(path, "{}\n").expect("bundle ref file");
+        }
+    }
+
+    #[test]
+    fn loop_evidence_bundle_schema_accepts_complete_partial_and_failed_states() {
+        let complete_json = loop_evidence_bundle_value("completed", Vec::new());
+        let complete = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&complete_json).expect("bundle json"),
+        )
+        .expect("complete bundle validates");
+        assert_eq!(
+            complete.schema_version,
+            AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION
+        );
+        assert_eq!(complete.runs.len(), 2);
+        assert_eq!(
+            complete.steps[0].outputs[0].kind,
+            AuthoringLoopEvidenceBundleArtifactKind::StepOutput
+        );
+
+        let partial_json = loop_evidence_bundle_value("partial", vec!["after-run pending"]);
+        let partial = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&partial_json).expect("bundle json"),
+        )
+        .expect("partial bundle allows explicit missing refs");
+        assert_eq!(partial.status, AuthoringLoopEvidenceBundleStatus::Partial);
+        assert_eq!(partial.missing_refs, vec!["after-run pending"]);
+
+        let failed_json = loop_evidence_bundle_value("failed", vec!["comparison missing"]);
+        let failed = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&failed_json).expect("bundle json"),
+        )
+        .expect("failed bundle allows explicit missing refs");
+        assert_eq!(failed.status, AuthoringLoopEvidenceBundleStatus::Failed);
+        assert_eq!(failed.steps[0].missing_refs, vec!["comparison missing"]);
+    }
+
+    #[test]
+    fn loop_evidence_bundle_validation_reports_stale_and_unsafe_refs() {
+        let root = unique_temp_dir("loop-evidence-bundle");
+        let bundle_json = loop_evidence_bundle_value("completed", Vec::new());
+        let bundle = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&bundle_json).expect("bundle json"),
+        )
+        .expect("bundle parses");
+        write_bundle_ref_files(&root, &bundle, Some("transaction"));
+        let stale = bundle
+            .validate_references(&root)
+            .expect_err("stale transaction ref is reported");
+        assert!(stale
+            .to_string()
+            .contains("stale authoring loop evidence bundle references"));
+        assert!(stale
+            .to_string()
+            .contains("transaction:runs/after/transactions/scene-edit.json"));
+
+        write_bundle_ref_files(&root, &bundle, None);
+        bundle
+            .validate_references(&root)
+            .expect("all generated refs exist");
+
+        let mut unsafe_json = loop_evidence_bundle_value("completed", Vec::new());
+        unsafe_json["plan"]["path"] = json!("docs/loop-plan.json");
+        let unsafe_ref = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&unsafe_json).expect("bundle json"),
+        )
+        .expect_err("source-like plan ref rejected");
+        assert!(unsafe_ref.to_string().contains("generated roots"));
+
+        let mut missing_complete =
+            loop_evidence_bundle_value("completed", vec!["missing after run"]);
+        missing_complete["steps"][0]["missingRefs"] = json!([]);
+        let rejected_complete = AuthoringLoopEvidenceBundle::from_json_str(
+            &serde_json::to_string_pretty(&missing_complete).expect("bundle json"),
+        )
+        .expect_err("completed bundle cannot declare missing refs");
+        assert!(rejected_complete
+            .to_string()
+            .contains("must not include missingRefs"));
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
