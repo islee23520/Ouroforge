@@ -224,6 +224,11 @@ assert.match(cockpit.renderMutationReviewSurface(run), /does not apply, accept, 
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /proposal-1/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /1 record\(s\)/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /review decision review-decision-1/);
+// The copyable apply-scene command must NOT embed a recorded application's
+// already-consumed decision id; the Rust preflight rejects reusing it, so such
+// a command would always fail for the exact records this surface displays.
+assert.match(cockpit.renderSceneMutationLifecycleSurface(run), /mutation apply-scene/);
+assert.doesNotMatch(cockpit.renderSceneMutationLifecycleSurface(run), /--decision review-decision-1/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'legacy-run' }, mutation_lifecycle: { stages: [{ id: 'scene_applied', state: 'applied', record_count: 1, records: [{ id: 'legacy-application', status: 'applied', proposalId: 'proposal-legacy', transactionId: 'scene-edit-legacy', beforeSceneHash: { value: 'before' }, afterSceneHash: { value: 'after' } }] }] } }), /legacy\/no project mutation context recorded/);
 assert.match(cockpit.renderSceneMutationLifecycleSurface({ summary: { id: 'run-empty' }, mutation_lifecycle: { stages: [] } }), /No scene-safe proposal records loaded/);
 assert.equal(

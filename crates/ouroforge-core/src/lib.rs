@@ -777,7 +777,7 @@ impl RegressionPromotionSourceEvidence {
             "regression promotion sourceEvidence scenarioId",
             &self.scenario_id,
         )?;
-        validate_mutation_review_ref(&self.scenario_result_path)?;
+        validate_scenario_result_ref(&self.scenario_result_path)?;
         if let Some(replay_artifact_path) = &self.replay_artifact_path {
             validate_mutation_review_ref(replay_artifact_path)?;
         }
@@ -822,12 +822,13 @@ impl RegressionPromotionTarget {
             "regression promotion target projectManifestPath",
             &self.project_manifest_path,
         )?;
-        if !self
-            .project_manifest_path
-            .ends_with(PROJECT_MANIFEST_FILE_NAME)
+        if Path::new(&self.project_manifest_path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            != Some(PROJECT_MANIFEST_FILE_NAME)
         {
             return Err(anyhow!(
-                "regression promotion target projectManifestPath must end with {PROJECT_MANIFEST_FILE_NAME}"
+                "regression promotion target projectManifestPath file name must be {PROJECT_MANIFEST_FILE_NAME}"
             ));
         }
         validate_path_component(
@@ -5233,6 +5234,27 @@ fn validate_mutation_review_ref(reference: &str) -> Result<()> {
     {
         return Err(anyhow!(
             "mutation review evidence ref must point to evidence/, mutation/, or sandbox/"
+        ));
+    }
+    Ok(())
+}
+
+/// Validate that a regression promotion `scenarioResultPath` actually anchors a
+/// scenario result artifact. Scenario results are always written under
+/// `evidence/scenarios/<scenario-id>/scenario-result-*.json`, so accepting any
+/// `evidence/`, `mutation/`, or `sandbox/` ref (as the generic mutation review
+/// ref validator does) would let a draft pass while pointing at an unrelated
+/// artifact that downstream promotion/preview code cannot rely on.
+fn validate_scenario_result_ref(reference: &str) -> Result<()> {
+    validate_mutation_review_ref(reference)?;
+    let anchors_scenario_result = reference.starts_with("evidence/scenarios/")
+        && Path::new(reference)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.contains("scenario-result"));
+    if !anchors_scenario_result {
+        return Err(anyhow!(
+            "regression promotion scenarioResultPath must reference a scenario result under evidence/scenarios/ (a scenario-result artifact)"
         ));
     }
     Ok(())
@@ -20106,6 +20128,39 @@ scenarios:
             .expect_err("mismatched scenario rejected")
             .to_string()
             .contains("must match sourceEvidence scenarioId"));
+
+        // scenarioResultPath must anchor an actual scenario result, not just any
+        // run-relative evidence/mutation/sandbox ref.
+        let mut non_scenario_result = valid_regression_promotion_draft();
+        non_scenario_result.source_evidence.scenario_result_path =
+            "mutation/proposals.json".to_string();
+        assert!(non_scenario_result
+            .validate()
+            .expect_err("non-scenario scenarioResultPath rejected")
+            .to_string()
+            .contains("scenarioResultPath must reference a scenario result"));
+
+        let mut non_result_filename = valid_regression_promotion_draft();
+        non_result_filename.source_evidence.scenario_result_path =
+            "evidence/scenarios/failed-smoke/after-run.json".to_string();
+        assert!(non_result_filename
+            .validate()
+            .expect_err("non-result scenario filename rejected")
+            .to_string()
+            .contains("scenarioResultPath must reference a scenario result"));
+
+        // projectManifestPath must be named ouroforge.project.json by file name,
+        // not merely end with that string (a raw suffix check wrongly accepts
+        // names like not-ouroforge.project.json that ProjectManifest::from_path
+        // rejects).
+        let mut suffix_manifest = valid_regression_promotion_draft();
+        suffix_manifest.target.project_manifest_path =
+            "configs/not-ouroforge.project.json".to_string();
+        assert!(suffix_manifest
+            .validate()
+            .expect_err("suffix-only manifest filename rejected")
+            .to_string()
+            .contains("file name must be"));
     }
 
     #[test]

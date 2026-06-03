@@ -608,8 +608,13 @@ const OuroforgeCockpit = (() => {
         : '<br><small>legacy/no review decision linkage recorded</small>';
       return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small>${decisionLine}<br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
     }).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
-    const decisionId = firstApplication.reviewDecisionId || null;
-    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath, decisionId);
+    // A recorded application's reviewDecisionId is, by definition, already
+    // consumed: the Rust preflight rejects reusing a decision ("review-gated
+    // scene apply decision ... was already used"). Embedding it here would make
+    // the copyable command fail for the exact review-gated records this surface
+    // displays, so the manual template intentionally omits a decision id. Each
+    // application row still shows its consumed decision id as provenance.
+    const applyCommand = sceneMutationApplyCommand(runDir, 'mutation/scene-operation.json', transactionPath, projectPath);
     const projectCommand = projectPath ? `<code>${escapeText(projectValidateCommand(projectPath))}</code>` : '';
     return `<div class="scene-mutation-lifecycle"><h3>Project-scoped scene mutation lifecycle</h3>
       <p class="hint">Scene-only project mutations remain manual and Rust-validated. The browser displays proposal/application state and safe CLI strings only; it does not apply, accept, reject, rollback, or merge anything.</p>
