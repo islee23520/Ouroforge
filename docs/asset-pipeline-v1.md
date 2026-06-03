@@ -64,7 +64,8 @@ Follow-up Asset Pipeline v1 issues should be implemented in this order:
    loading resolved declared local assets without remote fetches or browser
    authority (see `docs/runtime-asset-loading-evidence-v1.md`).
 6. **Asset Preview Evidence v1** — generate bounded preview evidence for sprites,
-   atlases, tilesets, tilemaps, audio metadata, and missing/malformed refs.
+   atlases, tilesets, tilemaps, audio metadata, and missing/malformed refs
+   (see `docs/asset-preview-evidence-v1.md`).
 7. **Studio Asset Inspector v1** — render exported asset/preview/reference state
    as escaped read-only Studio data with no uploads, writes, or commands.
 8. **Playable Demo Asset Refresh** — update the local collect-and-exit demo to
@@ -112,7 +113,8 @@ Generated evidence should record enough provenance for review:
 - command/run id that produced the evidence;
 - missing/malformed/unsupported state when applicable;
 - runtime/preview status and bounded diagnostics;
-- runtime load attempt/success/failure/rejection evidence with worker/scenario correlation; and
+- runtime load attempt/success/failure/rejection evidence with worker/scenario correlation;
+- asset preview metadata/read-model evidence with missing/stale warnings; and
 - cleanup/generated-state expectations.
 
 ## Rust-trusted / browser-read-only boundary

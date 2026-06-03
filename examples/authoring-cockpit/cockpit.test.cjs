@@ -178,6 +178,20 @@ const run = {
       { attemptId: 'load-missing-audio', assetId: 'missing_audio', path: 'assets/audio/missing.ogg', status: 'failed', failureReason: 'Image load failed' },
     ],
   },
+  asset_preview: {
+    present: true,
+    preview_count: 2,
+    warning_count: 1,
+    image_count: 1,
+    atlas_frame_count: 1,
+    tilemap_count: 0,
+    boundary: 'Read-only asset preview evidence; cockpit never fetches remote assets or writes trusted state.',
+    records: [
+      { assetId: 'player_sprite', assetType: 'image', sourcePath: 'assets/sprites/player.png', previewKind: 'thumbnail', image: { width: 16, height: 16 } },
+      { assetId: 'player_atlas', assetType: 'sprite_atlas', sourcePath: 'assets/atlases/player.atlas.json', previewKind: 'thumbnail', atlasFrames: [{ frameId: 'idle_0', rect: { x: 0, y: 0, width: 16, height: 16 } }] },
+    ],
+    warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -341,7 +355,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 16);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 17);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -616,6 +630,9 @@ assert.ok(!cockpit.renderEvidenceFidelitySurface(xssFidelity).includes('<script>
 const xssAssetLoading = { asset_loading: { present: true, boundary: '<script>boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', attemptId: '<script>attempt</script>', path: '<b>bad</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] } };
 assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<script>reason</script>'), 'asset loading rows must be escaped');
 assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<script>boundary</script>'), 'asset loading boundary must be escaped');
+const xssAssetPreview = { asset_preview: { present: true, boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>' }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>' }] } };
+assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview reason</script>'), 'asset preview rows must be escaped');
+assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview-boundary</script>'), 'asset preview boundary must be escaped');
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
@@ -686,7 +703,12 @@ assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /Runtime asset loadi
 assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /player_sprite/);
 assert.match(cockpit.renderRuntimeAssetLoadingSurface(run), /Image load failed/);
 assert.match(cockpit.renderRuntimeAssetLoadingSurface({}), /No runtime asset loading evidence/);
+assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /Asset preview evidence/);
+assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /player_atlas/);
+assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /missing_asset_file/);
+assert.match(cockpit.renderAssetPreviewEvidenceSurface({}), /No asset preview evidence/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
+assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
