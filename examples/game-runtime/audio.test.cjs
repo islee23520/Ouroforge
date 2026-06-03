@@ -23,10 +23,10 @@ assert.deepEqual(normalizeAudioEvents(entities[0]), [
 ]);
 
 assert.deepEqual(emitIntentEvents({ entities, trigger: 'scene_loaded', tick: 7 }), [
-  { tick: 7, name: 'player_spawn', trigger: 'scene_loaded', action: 'play', entityId: 'player', asset: 'player-spawn-audio', muted: true, playback: 'intent' },
-  { tick: 7, name: 'player_stop', trigger: 'scene_loaded', action: 'stop', entityId: 'player', asset: 'player-spawn-audio', muted: true, playback: 'intent' },
+  { kind: 'audio_request', requestId: 'audio-7-1', tick: 7, name: 'player_spawn', trigger: 'scene_loaded', action: 'play', entityId: 'player', asset: 'player-spawn-audio', muted: true, playback: 'intent' },
+  { kind: 'audio_request', requestId: 'audio-7-2', tick: 7, name: 'player_stop', trigger: 'scene_loaded', action: 'stop', entityId: 'player', asset: 'player-spawn-audio', muted: true, playback: 'intent' },
 ]);
 
 assert.deepEqual(emitIntentEvents({ entities, trigger: 'collision', tick: 8, muted: false }), [
-  { tick: 8, name: 'ignored', trigger: 'collision', action: 'play', entityId: 'player', asset: 'player-spawn-audio', muted: false, playback: 'intent' },
+  { kind: 'audio_request', requestId: 'audio-8-1', tick: 8, name: 'ignored', trigger: 'collision', action: 'play', entityId: 'player', asset: 'player-spawn-audio', muted: false, playback: 'intent' },
 ]);

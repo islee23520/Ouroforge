@@ -21,7 +21,10 @@
     for (const entity of entities) {
       for (const event of normalizeAudioEvents(entity)) {
         if (event.trigger !== trigger) continue;
+        const requestIndex = emitted.length + 1;
         emitted.push({
+          kind: 'audio_request',
+          requestId: `audio-${tick}-${requestIndex}`,
           tick,
           name: event.name,
           trigger,

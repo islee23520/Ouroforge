@@ -383,6 +383,7 @@
   function emitAudioEvents(trigger) {
     const emittedEvents = audio.emitIntentEvents({ entities: world.entities, trigger, tick: world.tick, muted: true });
     for (const emitted of emittedEvents) {
+      emitted.sceneId = world.sceneId;
       world.audioEvents.push(emitted);
       if (world.audioEvents.length > 64) world.audioEvents.shift();
       record('runtime.audio.emitted', emitted);

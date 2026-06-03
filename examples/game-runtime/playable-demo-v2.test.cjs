@@ -42,6 +42,9 @@ function createRuntime() {
   assert.equal(state.componentModel.goalFlags.key_collected, false);
   assert.equal(state.componentModel.goalFlags.door_open, undefined);
   assert.equal(state.componentModel.goalFlags.exit_reached, false);
+  assert.equal(state.audioEvents[0].kind, 'audio_request');
+  assert.equal(state.audioEvents[0].requestId, 'audio-0-1');
+  assert.equal(state.audioEvents[0].sceneId, state.sceneId);
   assert.equal(state.audioEvents[0].name, 'player_spawn');
   assert.equal(state.entities.find((entity) => entity.id === 'player').components.animation.mode, 'sprite_frame');
 
