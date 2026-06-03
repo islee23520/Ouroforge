@@ -2413,7 +2413,11 @@ fn validate_authoring_loop_bundle_ref_path(
     generated_roots: &[String],
 ) -> Result<()> {
     if kind == AuthoringLoopEvidenceBundleArtifactKind::LoopPlan {
-        return validate_project_manifest_path(field, value);
+        // The loop plan itself may live under an allowed generated local root
+        // (e.g. .omx/loop-plan.json), which execute_authoring_loop_step_from_path
+        // already accepts. Use the generated-root validator so bundle generation
+        // does not reject a plan location the runner just executed against.
+        return validate_authoring_loop_generated_root(field, value);
     }
     validate_authoring_loop_generated_root(field, value)?;
     let path = Path::new(value);
@@ -18145,6 +18149,23 @@ scenarios:
         assert!(rejected_step_missing_refs
             .to_string()
             .contains("must not include step missingRefs"));
+    }
+
+    #[test]
+    fn evidence_bundle_loop_plan_ref_allows_generated_root_locations() {
+        use AuthoringLoopEvidenceBundleArtifactKind::LoopPlan;
+        // A plan stored under an allowed generated local root validates, matching
+        // what the runner accepts for the plan path it executed against.
+        validate_authoring_loop_bundle_ref_path("loopPlan", LoopPlan, ".omx/loop-plan.json", &[])
+            .expect("generated-root loop plan path allowed");
+        // A plain project-relative plan path still validates.
+        validate_authoring_loop_bundle_ref_path("loopPlan", LoopPlan, "loop-plan.json", &[])
+            .expect("plain loop plan path allowed");
+        // Traversal stays rejected.
+        assert!(
+            validate_authoring_loop_bundle_ref_path("loopPlan", LoopPlan, "../escape.json", &[])
+                .is_err()
+        );
     }
 
     #[test]
