@@ -257,6 +257,14 @@ const run = {
     animation: { animatedEntityCount: 0 },
     audio: { audioEntityCount: 0, audioEventCount: 0 },
     physics: { colliderEntityCount: 2, collisionEventCount: 1 },
+    collision: {
+      present: true,
+      rules: { player_key: { a: 'player', b: 'key', event: 'collect_key' } },
+      colliderEntityCount: 2,
+      collisionCount: 1,
+      collisionEventCount: 1,
+      events: [{ type: 'runtime.collision.trigger', a: 'player', b: 'key', triggerId: 'collect_key' }],
+    },
     gameplay: { worldFlagCount: 3, trueFlagCount: 2, triggerCollisionEventCount: 1, hudValueEntityCount: 2 },
     components: {
       present: true,
@@ -282,6 +290,23 @@ const run = {
         { entityId: 'hud_health', kind: 'health', label: 'HP', value: '3/3', text: 'HP: 3/3' },
       ],
     },
+    transition: {
+      present: true,
+      currentSceneId: 'scene-main',
+      transitionEventCount: 1,
+      transitions: [{ type: 'runtime.scene.transition', from: 'scene-main', to: 'scene-boss' }],
+      reloadCount: 1,
+      lastReloadStatus: 'ok',
+    },
+    events: {
+      present: true,
+      animationEntityCount: 1,
+      audioEventCount: 1,
+      collisionEventCount: 1,
+      animationEntities: [{ entityId: 'player', mode: 'playing', currentClip: 'run', frameIndex: 3 }],
+      audioEvents: [{ type: 'runtime.audio.play', clipId: 'coin' }],
+      collisionEvents: [{ type: 'runtime.collision.trigger', triggerId: 'collect_key' }],
+    },
     reload: { reloadCount: 0, lastStatus: null },
     composition: { entityCount: 3, parentedEntityCount: 0 },
   },
@@ -301,7 +326,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 14);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 15);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -481,6 +506,15 @@ assert.match(cockpit.renderExpressiveComponentHudSurface({ engine_summaries: { p
 const xssExpressive = cockpit.renderExpressiveComponentHudSurface({ engine_summaries: { present: true, components: { present: true, entityCount: 1, componentCounts: { '<script>': 1 }, entities: [{ entityId: '<img>', components: ['<svg>'] }] }, triggers: { present: true, triggerCount: 1, triggerCollisionEventCount: 0, triggers: [{ id: '<script>', entityId: '<img>', kind: '<b>', targetFlag: '<svg>', requiredFlags: ['<i>'], onEnterCount: 1 }] }, hud: { present: true, hudValueEntityCount: 1, values: [{ label: '<script>', text: '<img>', bindFlag: '<svg>', flagValue: '<b>' }] } } });
 assert.doesNotMatch(xssExpressive, /<script>|<img>|<svg>|<b>/);
 assert.match(xssExpressive, /&lt;script&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /Collision\/transition\/event inspection/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Collision rules/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /runtime\.scene\.transition/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /runtime\.audio\.play/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: '<bad>', transition: null, events: [] } }), /collision summary missing or malformed/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: false, empty_state: '<script>events</script>' } }), /&lt;script&gt;events&lt;\/script&gt;/);
+const xssRuntimeEvents = cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: { present: true, rules: { '<script>': { bad: '<img>' } }, colliderEntityCount: 1, collisionEventCount: 1, events: [{ type: '<script>', payload: '<img>' }] }, transition: { present: true, currentSceneId: '<svg>', transitionEventCount: 1, transitions: [{ type: '<b>', to: '<img>' }], lastReloadStatus: '<i>' }, events: { present: true, animationEntityCount: 1, audioEventCount: 1, collisionEventCount: 1, animationEntities: [{ entityId: '<img>', mode: '<svg>', currentClip: '<script>', frameIndex: 1 }], audioEvents: [{ type: '<b>', clipId: '<i>' }] } } });
+assert.doesNotMatch(xssRuntimeEvents, /<script>|<img>|<svg>|<b>|<i>/);
+assert.match(xssRuntimeEvents, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);

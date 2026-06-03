@@ -312,6 +312,7 @@ const OuroforgeCockpit = (() => {
       { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
       { id: 'expressive-scene-inspection', label: 'Expressive scene inspection', present: Boolean(run?.engine_summaries?.components?.present || run?.engine_summaries?.triggers?.present || run?.engine_summaries?.hud?.present), detail: run?.engine_summaries?.source_world_state || 'component/trigger/HUD summary unavailable' },
+      { id: 'runtime-event-inspection', label: 'Collision/transition/event inspection', present: Boolean(run?.engine_summaries?.collision?.present || run?.engine_summaries?.transition?.present || run?.engine_summaries?.events?.present), detail: run?.engine_summaries?.source_world_state || 'collision/transition/event summary unavailable' },
       { id: 'loop-cockpit', label: 'Loop cockpit', present: Boolean(normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length), detail: `${normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length} loop(s)` },
       { id: 'run-comparison', label: 'Run comparison', present: Boolean(run?.comparison?.present), detail: `${(run?.comparison?.artifacts || []).length} comparison artifact(s)` },
     ];
@@ -363,6 +364,16 @@ const OuroforgeCockpit = (() => {
     return Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
   }
 
+  function compactJson(value) {
+    if (value === undefined || value === null || value === '') return 'none';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+      return JSON.stringify(value);
+    } catch (_) {
+      return 'unserializable';
+    }
+  }
+
   function renderExpressiveComponentHudSurface(run) {
     const summary = run?.engine_summaries;
     if (!summary?.present) {
@@ -406,6 +417,57 @@ const OuroforgeCockpit = (() => {
       <h3>Entity components</h3><ul>${entityRows}</ul>
       <h3>Triggers and flags</h3>${triggerRows}
       <h3>HUD values</h3>${hudRows}
+    </section>`;
+  }
+
+
+  function renderRuntimeEventInspectionSurface(run) {
+    const summary = run?.engine_summaries;
+    if (!summary?.present) {
+      return `<section id="runtime-event-inspection" class="panel"><h2>Collision/transition/event inspection</h2><p class="empty">${escapeText(summary?.empty_state || 'No runtime event read model is available for this run.')}</p></section>`;
+    }
+    const collision = summary.collision && typeof summary.collision === 'object' && !Array.isArray(summary.collision)
+      ? summary.collision
+      : null;
+    const transition = summary.transition && typeof summary.transition === 'object' && !Array.isArray(summary.transition)
+      ? summary.transition
+      : null;
+    const events = summary.events && typeof summary.events === 'object' && !Array.isArray(summary.events)
+      ? summary.events
+      : null;
+    const warnings = [];
+    if (!collision) warnings.push('collision summary missing or malformed');
+    if (!transition) warnings.push('transition summary missing or malformed');
+    if (!events) warnings.push('runtime event summary missing or malformed');
+
+    const collisionRules = objectEntries(collision?.rules)
+      .map(([rule, value]) => `<div><strong>${escapeText(rule)}</strong><br>${escapeText(compactJson(value))}</div>`)
+      .join('') || '<p class="empty compact">No collision rules exported.</p>';
+    const collisionRows = Array.isArray(collision?.events) && collision.events.length
+      ? collision.events.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'collision event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
+      : '<p class="empty compact">No collision event rows exported.</p>';
+    const transitionRows = Array.isArray(transition?.transitions) && transition.transitions.length
+      ? transition.transitions.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'scene transition')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
+      : '<p class="empty compact">No transition event rows exported.</p>';
+    const animationRows = Array.isArray(events?.animationEntities) && events.animationEntities.length
+      ? events.animationEntities.map((entity) => `<li><strong>${escapeText(entity?.entityId || 'entity')}</strong> · ${escapeText(entity?.mode || 'mode unknown')} · clip ${escapeText(entity?.currentClip || 'none')} · frame ${escapeText(entity?.frameIndex ?? 'unknown')}</li>`).join('')
+      : '<li>No animation event entity rows exported.</li>';
+    const audioRows = Array.isArray(events?.audioEvents) && events.audioEvents.length
+      ? events.audioEvents.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'audio event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
+      : '<p class="empty compact">No audio event rows exported.</p>';
+    return `<section id="runtime-event-inspection" class="panel"><h2>Collision/transition/event inspection</h2>
+      <p class="hint">Read-only runtime event summaries from Rust-exported evidence. This panel is inspection-only: it does not execute commands, mutate scenes, or persist browser state.</p>
+      ${warnings.length ? `<div class="error">${escapeText(warnings.join(' · '))}</div>` : '<div class="hint">Collision/transition/event summaries loaded.</div>'}
+      <div class="field-grid">
+        <div><strong>Collision</strong><br>${escapeText(collision?.colliderEntityCount ?? 0)} collider(s), ${escapeText(collision?.collisionEventCount ?? 0)} event(s)</div>
+        <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.transitionEventCount ?? 0)} transition event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
+        <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s)</div>
+      </div>
+      <h3>Collision rules</h3><div class="field-grid">${collisionRules}</div>
+      <h3>Collision events</h3>${collisionRows}
+      <h3>Scene transitions</h3>${transitionRows}
+      <h3>Animation entities</h3><ul>${animationRows}</ul>
+      <h3>Audio events</h3>${audioRows}
     </section>`;
   }
 
@@ -1180,7 +1242,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1265,7 +1327,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
