@@ -69,6 +69,10 @@ These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
 scopes a tiny deterministic fixture as tracked source-like data.
 
+Source Mutation Preview v1 is scoped as a preview-only control contract in
+`docs/source-mutation-preview-v1.md`. Its implementation slices remain future
+work and do not authorize source patch application.
+
 ## Near-term governance and public-readiness work
 
 Agentic Loop Orchestration v1 issue #311 is the current roadmap/#1
@@ -79,9 +83,10 @@ wording and leaving #1/#23 open.
 After #311, the next milestone candidates should stay inside the same
 local-first, Rust-trusted, browser-read-only boundary. The next recommended
 candidate is Engine Expressiveness v2 / Playable Game Authoring v1, followed by
-source-mutation design gates, asset pipeline work, visual authoring, public
-alpha readiness, or launch governance only when each is backed by fixed PR
-units, regression coverage, generated-state audits, and explicit non-goals.
+source-mutation design gates, asset pipeline work, visual authoring, Source
+Mutation Preview v1 implementation slices, public alpha readiness, or launch
+governance only when each is backed by fixed PR units, regression coverage,
+generated-state audits, and explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
