@@ -17,6 +17,68 @@ scenarios:
 "#;
 
 #[test]
+fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
+    let temp = unique_temp_dir("ouroforge-cli-loop-handoff-test");
+    fs::create_dir_all(temp.join("runs/baseline")).expect("temp dirs exist");
+    fs::write(temp.join("runs/baseline/run.json"), "{}\n").expect("baseline exists");
+    let plan_path = temp.join("loop-plan.json");
+    fs::write(
+        &plan_path,
+        r#"{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "cli-handoff-loop",
+  "project": { "projectId": "cli_project", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }] }
+  ],
+  "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }
+}"#,
+    )
+    .expect("plan writes");
+    let handoff_path = temp.join("runs/agent-handoffs/cli-handoff-loop/handoff.json");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "loop",
+            "handoff",
+            plan_path.to_str().unwrap(),
+            "--output",
+            handoff_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(output.contains("Agent handoff written:"));
+    let handoff: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&handoff_path).expect("handoff output reads"))
+            .expect("handoff parses");
+    assert_eq!(handoff["schemaVersion"], "agent-handoff-contract-v1");
+    assert_eq!(handoff["currentStep"]["stepId"], "compare-runs");
+    assert!(handoff["allowedCommands"]
+        .as_array()
+        .expect("commands array")
+        .iter()
+        .all(|command| command["boundary"]
+            .as_str()
+            .expect("boundary text")
+            .contains("inert")));
+    assert!(temp
+        .join("runs/authoring-loop-ledgers/cli-handoff-loop/ledger.jsonl")
+        .is_file());
+    assert!(
+        !temp
+            .join("runs/baseline/comparisons/run-comparison.json")
+            .exists(),
+        "allowed commands are not executed by handoff generation"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn project_validate_reports_manifest_summary_and_rejects_invalid_manifest() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let valid_root = repo_root.join("examples/project-workspace-fixtures/valid");

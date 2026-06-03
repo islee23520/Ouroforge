@@ -16,11 +16,12 @@ use ouroforge_core::{
     read_ledger_events, read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
     run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_regression_promotion_draft,
-    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
-    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, WorkerId,
+    update_journal, validate_scene_reload, write_agent_handoff_contract_from_path,
+    write_regression_promotion_draft, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
+    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -122,6 +123,11 @@ enum LoopCommand {
         plan_path: PathBuf,
         #[arg(long)]
         step: String,
+    },
+    Handoff {
+        plan_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
     },
 }
 
@@ -385,6 +391,14 @@ fn main() -> Result<()> {
         } => {
             let summary = execute_authoring_loop_step_from_path(&plan_path, &step)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::Loop {
+            command: LoopCommand::Handoff { plan_path, output },
+        } => {
+            reject_generated_artifact_source_collision(&output, "agent handoff")?;
+            let handoff = write_agent_handoff_contract_from_path(&plan_path, &output)?;
+            println!("Agent handoff written: {}", output.display());
+            println!("{}", serde_json::to_string_pretty(&handoff)?);
         }
         Commands::Seed {
             command: SeedCommand::Validate { seed_path },

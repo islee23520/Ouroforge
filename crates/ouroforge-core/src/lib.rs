@@ -3506,6 +3506,196 @@ pub fn build_authoring_loop_status(
     })
 }
 
+pub fn write_agent_handoff_contract_from_path(
+    plan_path: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+) -> Result<AgentHandoffContract> {
+    let plan_path = plan_path.as_ref();
+    let output_path = output_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    let base_dir = plan_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let handoff = build_agent_handoff_contract(&plan, base_dir, plan_path, output_path)?;
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create agent handoff output directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json_atomic(output_path, &json!(handoff))?;
+    let ledger_dir = ensure_authoring_loop_ledger_dir(base_dir, &plan.loop_id)?;
+    append_ledger_event(
+        &ledger_dir,
+        "authoring_loop.handoff.generated",
+        "loop-handoff",
+        json!({
+            "loop_id": handoff.loop_id,
+            "status": handoff.status,
+            "handoff_path": relative_path_string(base_dir, output_path)?,
+            "next_safe_action": handoff.next_safe_action,
+            "blockers": handoff.blockers,
+            "allowed_commands": handoff.allowed_commands,
+            "boundary": "Agent handoff generation writes advisory JSON and a ledger summary only; it does not execute displayed commands or grant authority."
+        }),
+    )?;
+    Ok(handoff)
+}
+
+pub fn build_agent_handoff_contract(
+    plan: &AuthoringLoopPlan,
+    base_dir: impl AsRef<Path>,
+    plan_path: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+) -> Result<AgentHandoffContract> {
+    plan.validate_schema()?;
+    let base_dir = base_dir.as_ref();
+    let plan_path = plan_path.as_ref();
+    let output_path = output_path.as_ref();
+    let status_summary = build_authoring_loop_status(plan, base_dir)?;
+    let bundle = build_authoring_loop_evidence_bundle(plan, base_dir, plan_path)?;
+    let current_status = status_summary.steps.iter().find(|step| {
+        matches!(
+            step.status.as_str(),
+            "failed" | "blocked" | "running" | "pending"
+        )
+    });
+    let current_plan_step = current_status.and_then(|status_step| {
+        plan.steps
+            .iter()
+            .find(|plan_step| plan_step.id == status_step.id)
+    });
+    let current_step = current_status.map(|step| AgentHandoffStep {
+        step_id: step.id.clone(),
+        kind: step.kind.clone(),
+        status: step.status.clone(),
+    });
+
+    let handoff_status = match current_status.map(|step| step.status.as_str()) {
+        None => AgentHandoffStatus::Completed,
+        Some("failed") => AgentHandoffStatus::Failed,
+        Some("blocked") => AgentHandoffStatus::Blocked,
+        Some(_) if status_summary.status == "needs-recovery" => AgentHandoffStatus::Blocked,
+        Some(_) => AgentHandoffStatus::Ready,
+    };
+
+    let mut blockers = current_status
+        .map(|step| step.missing_prerequisites.clone())
+        .unwrap_or_default();
+    if let Some(step) = current_plan_step {
+        if let Some(recovery) = &step.recovery {
+            blockers.push(format!("recovery:{}", recovery.failure.reason));
+            blockers.push(format!(
+                "manual-action:{}",
+                recovery.manual_action.description
+            ));
+        }
+        if matches!(
+            step.status,
+            AuthoringLoopStepStatus::Blocked | AuthoringLoopStepStatus::Failed
+        ) && blockers.is_empty()
+        {
+            blockers.push(format!("step {} is {}", step.id, step.status.as_str()));
+        }
+    }
+    blockers.extend(
+        bundle
+            .missing_refs
+            .iter()
+            .map(|missing| format!("missing bundle ref:{missing}")),
+    );
+    blockers.sort();
+    blockers.dedup();
+
+    let mut allowed_commands = vec![AuthoringLoopResumeCommandContext {
+        command: format!(
+            "cargo run -p ouroforge-cli -- loop status {}",
+            plan_path.display()
+        ),
+        argv: vec![
+            "cargo".to_string(),
+            "run".to_string(),
+            "-p".to_string(),
+            "ouroforge-cli".to_string(),
+            "--".to_string(),
+            "loop".to_string(),
+            "status".to_string(),
+            plan_path.display().to_string(),
+        ],
+        boundary: "inert display text only; handoff does not execute".to_string(),
+    }];
+    if let Some(step) = current_status {
+        let mut resume_command = default_resume_command(plan_path, &step.id);
+        resume_command.boundary =
+            "inert display text only; handoff does not execute resume commands".to_string();
+        allowed_commands.push(resume_command);
+    }
+
+    let mut required_decisions = current_plan_step
+        .map(|step| step.required_decisions.clone())
+        .unwrap_or_default();
+    required_decisions.sort_by(|left, right| left.id.cmp(&right.id));
+    required_decisions.dedup_by(|left, right| left.id == right.id && left.kind == right.kind);
+
+    let handoff = AgentHandoffContract {
+        schema_version: AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        current_step,
+        status: handoff_status,
+        next_safe_action: status_summary.next_safe_action,
+        required_decisions,
+        blockers,
+        allowed_commands,
+        forbidden_actions: vec![
+            "Do not apply mutations without an accepted decision".to_string(),
+            "Do not merge changes automatically".to_string(),
+            "Do not execute commands from browser or dashboard surfaces".to_string(),
+            "Do not treat generated handoff JSON as authority beyond documented loop state"
+                .to_string(),
+        ],
+        evidence_refs: vec![
+            AuthoringLoopArtifactRef {
+                id: "loop-plan".to_string(),
+                path: relative_path_string(base_dir, plan_path)?,
+                description: Some("source authoring loop plan used for handoff".to_string()),
+            },
+            AuthoringLoopArtifactRef {
+                id: "loop-evidence-bundle".to_string(),
+                path: format!(
+                    "runs/authoring-loop-bundles/{}/{}",
+                    plan.loop_id, AUTHORING_LOOP_EVIDENCE_BUNDLE_FILE_NAME
+                ),
+                description: Some("latest generated bundle location for the loop".to_string()),
+            },
+            AuthoringLoopArtifactRef {
+                id: "agent-handoff".to_string(),
+                path: relative_path_string(base_dir, output_path)?,
+                description: Some("generated advisory handoff contract".to_string()),
+            },
+        ],
+        drift_guardrails: vec![
+            "Issue #1 remains open until the roadmap is explicitly completed".to_string(),
+            "Issue #23 remains open as project memory".to_string(),
+            "Generated artifacts remain local and untracked".to_string(),
+            "Handoff allowed commands are inert text, not delegated authority".to_string(),
+        ],
+        generated_state: plan.generated_state.clone(),
+        boundary: "advisory evidence only; does not execute commands or grant authority beyond documented loop state".to_string(),
+    };
+    handoff.validate_schema()?;
+    Ok(handoff)
+}
+
 pub fn build_authoring_loop_resume_preflight_from_path(
     plan_path: impl AsRef<Path>,
     step_id: &str,
@@ -18270,6 +18460,53 @@ scenarios:
     }
 
     #[test]
+    fn agent_handoff_generation_writes_advisory_contract_and_ledger_summary() {
+        let root = unique_temp_dir("agent-handoff-generation");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        let baseline_path = root.join("runs/baseline/run.json");
+        fs::create_dir_all(baseline_path.parent().expect("baseline parent")).expect("baseline dir");
+        fs::write(&baseline_path, "{}\n").expect("baseline artifact");
+        let handoff_path = root.join("runs/agent-handoffs/temp-loop/handoff.json");
+
+        let handoff = write_agent_handoff_contract_from_path(&plan_path, &handoff_path)
+            .expect("handoff writes");
+
+        assert_eq!(
+            handoff.schema_version,
+            AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION
+        );
+        assert_eq!(handoff.status, AgentHandoffStatus::Ready);
+        assert_eq!(
+            handoff.current_step.as_ref().expect("current step").step_id,
+            "compare-runs"
+        );
+        assert!(handoff_path.is_file(), "handoff is generated local JSON");
+        assert!(handoff
+            .allowed_commands
+            .iter()
+            .all(|command| command.boundary.contains("inert")
+                || command.boundary.contains("does not execute")));
+        assert!(handoff
+            .evidence_refs
+            .iter()
+            .any(|reference| reference.id == "loop-evidence-bundle"));
+        assert!(
+            root.join("runs/authoring-loop-ledgers/temp-loop/ledger.jsonl")
+                .is_file(),
+            "handoff generation records a journal/ledger summary"
+        );
+        assert!(
+            !root
+                .join("runs/authoring-loop-bundles/temp-loop/bundle.json")
+                .exists(),
+            "handoff generation reads bundle state in memory but does not create bundle artifacts"
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn loop_evidence_bundle_schema_accepts_complete_partial_and_failed_states() {
         let complete_json = loop_evidence_bundle_value("completed", Vec::new());
         let complete = AuthoringLoopEvidenceBundle::from_json_str(
@@ -18412,10 +18649,13 @@ scenarios:
         validate_authoring_loop_bundle_ref_path("loopPlan", LoopPlan, "loop-plan.json", &[])
             .expect("plain loop plan path allowed");
         // Traversal stays rejected.
-        assert!(
-            validate_authoring_loop_bundle_ref_path("loopPlan", LoopPlan, "../escape.json", &[])
-                .is_err()
-        );
+        assert!(validate_authoring_loop_bundle_ref_path(
+            "loopPlan",
+            LoopPlan,
+            "../escape.json",
+            &[]
+        )
+        .is_err());
     }
 
     #[test]
