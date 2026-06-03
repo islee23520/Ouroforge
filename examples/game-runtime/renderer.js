@@ -130,6 +130,11 @@
         context.fillStyle = (activeFrame && activeFrame.color) || (entity.sprite && entity.sprite.color) || '#f2f6f8';
         context.fillRect(x, y, entitySize.width, entitySize.height);
       }
+      if (components.uiText && typeof components.uiText.text === 'string') {
+        context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
+        context.font = '10px ui-monospace, monospace';
+        context.fillText(components.uiText.text, x, y + Math.max(10, entitySize.height));
+      }
       if (activeRenderer.debug.showEntityIds) {
         context.fillStyle = '#f2f6f8';
         context.font = '10px ui-monospace, monospace';

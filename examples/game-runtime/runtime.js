@@ -87,6 +87,7 @@
     reloads: [],
     tilemaps: [],
     assetManifest: null,
+    goalFlags: {},
   };
   let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
 
@@ -123,6 +124,82 @@
     return value && typeof value === 'object' && !Array.isArray(value) ? clone(value) : {};
   }
 
+  function stringList(value = []) {
+    return Array.isArray(value) ? value.map(String) : [];
+  }
+
+  function statusComponent(value = {}, fallback = null) {
+    const source = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const maxHitPoints = Number.isFinite(source.maxHitPoints)
+      ? source.maxHitPoints
+      : (Number.isFinite(base.maxHitPoints) ? base.maxHitPoints : null);
+    const hitPoints = Number.isFinite(source.hitPoints)
+      ? source.hitPoints
+      : (Number.isFinite(base.hitPoints) ? base.hitPoints : maxHitPoints);
+    return {
+      hitPoints,
+      maxHitPoints,
+      flags: stringList(Object.prototype.hasOwnProperty.call(source, 'flags') ? source.flags : base.flags),
+      states: stringList(Object.prototype.hasOwnProperty.call(source, 'states') ? source.states : base.states),
+    };
+  }
+
+  function inputComponent(value = {}, fallback = null) {
+    const source = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    return {
+      scheme: typeof source.scheme === 'string' ? source.scheme : (typeof base.scheme === 'string' ? base.scheme : 'keyboard'),
+      moveSpeed: Number.isFinite(source.moveSpeed) ? source.moveSpeed : (Number.isFinite(base.moveSpeed) ? base.moveSpeed : 2),
+      jumpImpulse: Number.isFinite(source.jumpImpulse) ? source.jumpImpulse : (Number.isFinite(base.jumpImpulse) ? base.jumpImpulse : null),
+      allowedActions: stringList(Object.prototype.hasOwnProperty.call(source, 'allowedActions') ? source.allowedActions : base.allowedActions),
+    };
+  }
+
+  function triggerComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      id: String(source.id || 'trigger'),
+      kind: typeof source.kind === 'string' ? source.kind : 'overlap',
+      targetFlag: typeof source.targetFlag === 'string' ? source.targetFlag : null,
+      requiredFlags: stringList(source.requiredFlags),
+      onEnter: Array.isArray(source.onEnter)
+        ? source.onEnter
+          .filter((action) => action && typeof action === 'object')
+          .map((action) => ({
+            kind: typeof action.kind === 'string' ? action.kind : 'setFlag',
+            flag: typeof action.flag === 'string' ? action.flag : null,
+            value: action.value !== false,
+            entityId: typeof action.entityId === 'string' ? action.entityId : null,
+          }))
+        : [],
+    };
+  }
+
+  function goalFlagComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      flag: String(source.flag || ''),
+      label: typeof source.label === 'string' ? source.label : null,
+    };
+  }
+
+  function cameraTargetComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    const component = { weight: Number.isFinite(source.weight) ? source.weight : 1 };
+    if (source.deadZone && typeof source.deadZone === 'object') component.deadZone = size(source.deadZone);
+    return component;
+  }
+
+  function uiTextComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      text: typeof source.text === 'string' ? source.text : '',
+      role: typeof source.role === 'string' ? source.role : null,
+      bindFlag: typeof source.bindFlag === 'string' ? source.bindFlag : null,
+    };
+  }
+
   function normalizeEntity(entity = {}, index = 0, componentDefaults = {}) {
     const components = entity.components || {};
     const sprite = entity.sprite || {};
@@ -145,6 +222,16 @@
       metadata: objectValue(entity.metadata),
     };
     if (typeof sprite.asset === 'string') normalized.sprite.asset = sprite.asset;
+    if (components.status || componentDefaults.status) {
+      normalized.components.status = statusComponent(components.status, componentDefaults.status);
+    }
+    if (components.input || componentDefaults.input) {
+      normalized.components.input = inputComponent(components.input, componentDefaults.input);
+    }
+    if (components.trigger) normalized.components.trigger = triggerComponent(components.trigger);
+    if (components.goalFlag) normalized.components.goalFlag = goalFlagComponent(components.goalFlag);
+    if (components.cameraTarget) normalized.components.cameraTarget = cameraTargetComponent(components.cameraTarget);
+    if (components.uiText) normalized.components.uiText = uiTextComponent(components.uiText);
     if (components.audio && Array.isArray(components.audio.events)) {
       normalized.components.audio = {
         events: components.audio.events
@@ -177,6 +264,8 @@
       velocity: point(source.velocity),
       size: size(source.size),
       controllable: Boolean(source.controllable),
+      status: source.status ? statusComponent(source.status) : null,
+      input: source.input ? inputComponent(source.input) : null,
     };
   }
 
@@ -249,9 +338,59 @@
   function applyInput() {
     const entity = player();
     const velocity = entity.components.velocity;
-    const speed = 2;
+    const inputComponent = entity.components.input || {};
+    const allowedActions = Array.isArray(inputComponent.allowedActions) ? inputComponent.allowedActions : [];
+    const canMove = allowedActions.length === 0 || allowedActions.includes('move');
+    const speed = canMove ? (Number.isFinite(inputComponent.moveSpeed) ? inputComponent.moveSpeed : 2) : 0;
     velocity.x = ((input.right ? 1 : 0) - (input.left ? 1 : 0)) * speed;
     velocity.y = ((input.down ? 1 : 0) - (input.up ? 1 : 0)) * speed;
+  }
+
+  function entityById(entityId) {
+    return world.entities.find((entity) => entity.id === entityId) || null;
+  }
+
+  function setGoalFlag(flag, value) {
+    if (!flag) return;
+    world.goalFlags[flag] = Boolean(value);
+  }
+
+  function triggerReady(trigger) {
+    return !Array.isArray(trigger.requiredFlags)
+      || trigger.requiredFlags.every((flag) => world.goalFlags[flag] === true);
+  }
+
+  function applyTriggerAction(triggerEntity, action) {
+    if (action.kind === 'setFlag' && action.flag) {
+      setGoalFlag(action.flag, action.value !== false);
+      record('runtime.trigger.action', { triggerId: triggerEntity.id, action: action.kind, flag: action.flag, value: world.goalFlags[action.flag] });
+    } else if (action.kind === 'clearFlag' && action.flag) {
+      setGoalFlag(action.flag, false);
+      record('runtime.trigger.action', { triggerId: triggerEntity.id, action: action.kind, flag: action.flag, value: false });
+    } else if (action.kind === 'hideEntity' && action.entityId) {
+      const target = entityById(action.entityId);
+      if (target) target.sprite.visible = false;
+      record('runtime.trigger.action', { triggerId: triggerEntity.id, action: action.kind, entityId: action.entityId, hidden: Boolean(target) });
+    }
+  }
+
+  function processTriggerEvents(eventsToProcess) {
+    for (const event of eventsToProcess) {
+      if (event.type !== 'runtime.collision.trigger') continue;
+      const candidates = [entityById(event.otherEntityId), entityById(event.movingEntityId)].filter(Boolean);
+      for (const triggerEntity of candidates) {
+        const trigger = triggerEntity.components && triggerEntity.components.trigger;
+        if (!trigger || !triggerReady(trigger)) continue;
+        if (trigger.targetFlag) setGoalFlag(trigger.targetFlag, true);
+        for (const action of trigger.onEnter || []) applyTriggerAction(triggerEntity, action);
+        record('runtime.trigger.entered', {
+          triggerId: trigger.id,
+          entityId: triggerEntity.id,
+          pairId: event.pairId,
+          targetFlag: trigger.targetFlag,
+        });
+      }
+    }
   }
 
   function stepOne() {
@@ -275,6 +414,7 @@
       if (world.collisionEvents.length > 64) world.collisionEvents.shift();
       record(event.type, event);
     }
+    processTriggerEvents(world.collisions);
   }
 
   function renderCanvas() {
@@ -300,6 +440,15 @@
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
+    world.goalFlags = {};
+    for (const entity of world.entities) {
+      const goalFlag = entity.components && entity.components.goalFlag;
+      if (goalFlag && goalFlag.flag) world.goalFlags[goalFlag.flag] = false;
+      const status = entity.components && entity.components.status;
+      if (status && Array.isArray(status.flags)) {
+        for (const flag of status.flags) world.goalFlags[flag] = true;
+      }
+    }
     rendererState = clone(normalized.renderer);
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
@@ -415,6 +564,27 @@
     };
   }
 
+  function componentModelDebugState(entities) {
+    const names = ['status', 'input', 'trigger', 'goalFlag', 'cameraTarget', 'uiText'];
+    const counts = Object.fromEntries(names.map((name) => [name, 0]));
+    const entityComponents = entities.map((entity) => {
+      const components = {};
+      for (const name of names) {
+        if (entity.components && entity.components[name]) {
+          counts[name] += 1;
+          components[name] = clone(entity.components[name]);
+        }
+      }
+      return { entityId: entity.id, components };
+    });
+    return {
+      version: '2',
+      counts,
+      entities: entityComponents,
+      goalFlags: clone(world.goalFlags),
+    };
+  }
+
   const api = Object.freeze({
     getWorldState() {
       const state = clone(world);
@@ -422,6 +592,7 @@
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
+      state.componentModel = componentModelDebugState(world.entities);
       state.assetManifest = assets.manifestSummary ? assets.manifestSummary() : null;
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();

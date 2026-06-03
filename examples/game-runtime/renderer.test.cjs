@@ -96,3 +96,27 @@ assert.deepEqual(context.calls.filter((call) => call[0] === 'fillRect').slice(0,
 ]);
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'player'));
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'scene=renderer-test tick=3'));
+
+const uiContext = createContext();
+drawRuntime({
+  canvas: { width: 320, height: 180 },
+  context: uiContext,
+  renderer,
+  world: {
+    sceneId: 'renderer-ui-text-test',
+    tick: 4,
+    bounds: { width: 320, height: 180 },
+    entities: [{
+      id: 'hud_coin',
+      sprite: { color: '#ffffff', layer: 'actors', order: 6 },
+      components: {
+        transform: { x: 8, y: 8 },
+        size: { width: 64, height: 12 },
+        uiText: { text: 'Coin: 0/1', role: 'hud', bindFlag: 'coin_collected' },
+      },
+    }],
+  },
+  assets: { imageFor: () => null },
+  animation: { activeSpriteFrame: () => null },
+});
+assert.ok(uiContext.calls.some((call) => call[0] === 'fillText' && call[2] === 'Coin: 0/1'));
