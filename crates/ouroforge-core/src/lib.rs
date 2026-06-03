@@ -854,6 +854,433 @@ pub fn write_regression_promotion_draft(
     write_json_atomic(path.as_ref(), &json!(draft))
 }
 
+pub fn build_regression_promotion_draft_from_run(
+    run_dir: impl AsRef<Path>,
+    project_manifest_path: impl AsRef<Path>,
+    scenario_id: &str,
+) -> Result<RegressionPromotionDraft> {
+    validate_path_component("regression promotion scenario id", scenario_id)?;
+    let run_dir = run_dir.as_ref();
+    let manifest_path = project_manifest_path.as_ref();
+    let manifest = ProjectManifest::from_path(manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    manifest.validate_references(project_root)?;
+
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let verdict = read_json_value(run_dir.join("verdict.json"))?;
+    if verdict.get("status").and_then(|value| value.as_str()) != Some("failed") {
+        return Err(anyhow!(
+            "regression promotion requires a failed source run verdict"
+        ));
+    }
+    let run_id = json_string(&run, "id").unwrap_or_else(|| {
+        run_dir
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("unknown-run")
+            .to_string()
+    });
+    require_text("regression promotion source run id", &run_id)?;
+
+    let project = run
+        .get("project")
+        .ok_or_else(|| anyhow!("regression promotion source run must be project-bound"))?;
+    if project.get("id").and_then(|value| value.as_str()) != Some(manifest.project.id.as_str()) {
+        return Err(anyhow!(
+            "regression promotion project does not match source run project metadata"
+        ));
+    }
+    let source_pack = project
+        .get("scenarioPack")
+        .ok_or_else(|| anyhow!("regression promotion source run must record a scenario pack"))?;
+    let scenario_pack_id = source_pack
+        .get("id")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("regression promotion source run scenario pack id is missing"))?;
+    let scenario_pack_path = source_pack
+        .get("path")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("regression promotion source run scenario pack path is missing"))?;
+    let _pack_ref = manifest
+        .scenario_packs
+        .iter()
+        .find(|reference| reference.id == scenario_pack_id && reference.path == scenario_pack_path)
+        .ok_or_else(|| {
+            anyhow!(
+                "regression promotion scenario pack {scenario_pack_id} is not authorized by project manifest"
+            )
+        })?;
+
+    let evidence = read_evidence_index(run_dir)?;
+    let scenario_result_path =
+        select_failed_scenario_result_path(run_dir, &verdict, &evidence, scenario_id)?;
+    let scenario_result =
+        read_json_value(run_dir.join(&scenario_result_path)).with_context(|| {
+            format!(
+                "failed to read regression promotion scenario result {}",
+                scenario_result_path
+            )
+        })?;
+    if scenario_result
+        .get("scenario_id")
+        .and_then(|value| value.as_str())
+        != Some(scenario_id)
+    {
+        return Err(anyhow!(
+            "regression promotion scenario result scenario_id must match requested scenario"
+        ));
+    }
+    if scenario_result
+        .get("status")
+        .and_then(|value| value.as_str())
+        != Some("failed")
+    {
+        return Err(anyhow!(
+            "regression promotion scenario result must be failed"
+        ));
+    }
+
+    let replay_artifact_paths =
+        select_regression_replay_paths(run_dir, &scenario_result, &evidence, scenario_id)?;
+    let steps = replay_artifact_paths
+        .iter()
+        .map(|path| scenario_step_from_replay_artifact(run_dir, path))
+        .collect::<Result<Vec<_>>>()?;
+    let assertions = scenario_assertions_from_failed_result(&scenario_result)?;
+    let evidence_ids = evidence
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact.path == scenario_result_path
+                || replay_artifact_paths
+                    .iter()
+                    .any(|replay_path| replay_path == &artifact.path)
+        })
+        .map(|artifact| artifact.id.clone())
+        .collect::<Vec<_>>();
+    if evidence_ids.is_empty() {
+        return Err(anyhow!(
+            "regression promotion source evidence must be indexed"
+        ));
+    }
+    let mut evidence_refs = Vec::new();
+    evidence_refs.push(scenario_result_path.clone());
+    evidence_refs.extend(replay_artifact_paths.clone());
+    evidence_refs.sort();
+    evidence_refs.dedup();
+
+    let draft = RegressionPromotionDraft {
+        schema_version: REGRESSION_PROMOTION_DRAFT_SCHEMA_VERSION.to_string(),
+        id: format!("regression-draft-{scenario_id}-{run_id}"),
+        source_run: RegressionPromotionSourceRun {
+            run_id: run_id.clone(),
+            run_dir: regression_promotion_run_dir_ref(run_dir)?,
+            verdict_path: "verdict.json".to_string(),
+        },
+        source_evidence: RegressionPromotionSourceEvidence {
+            scenario_id: scenario_id.to_string(),
+            scenario_result_path: scenario_result_path.clone(),
+            replay_artifact_path: replay_artifact_paths.first().cloned(),
+            evidence_ids,
+            evidence_refs,
+        },
+        target: RegressionPromotionTarget {
+            project_manifest_path: project_relative_path(project_root, manifest_path)?,
+            scenario_pack_id: scenario_pack_id.to_string(),
+            scenario_pack_path: scenario_pack_path.to_string(),
+            scenario_group_id: "promoted-regressions".to_string(),
+        },
+        proposed_scenario: Scenario {
+            id: scenario_id.to_string(),
+            description: format!("Promoted regression from failed run {run_id}."),
+            steps,
+            assertions,
+        },
+        created_at_unix_ms: unix_millis()?,
+    };
+    draft.validate()?;
+    Ok(draft)
+}
+
+fn select_failed_scenario_result_path(
+    run_dir: &Path,
+    verdict: &serde_json::Value,
+    evidence: &EvidenceIndex,
+    scenario_id: &str,
+) -> Result<String> {
+    let mut candidates = Vec::new();
+    if let Some(failures) = verdict.get("failures").and_then(|value| value.as_array()) {
+        for failure in failures {
+            if failure.get("scenario_id").and_then(|value| value.as_str()) == Some(scenario_id) {
+                for field in ["path", "evidence_ref"] {
+                    if let Some(path) = failure.get(field).and_then(|value| value.as_str()) {
+                        candidates.push(path.to_string());
+                    }
+                }
+            }
+        }
+    }
+    for artifact in &evidence.artifacts {
+        if artifact
+            .metadata
+            .get("scenario_id")
+            .and_then(|value| value.as_str())
+            == Some(scenario_id)
+            && (artifact.id.contains("scenario-result")
+                || artifact.path.contains("scenario-result")
+                || artifact
+                    .metadata
+                    .get("artifact")
+                    .and_then(|value| value.as_str())
+                    == Some("scenario_result"))
+        {
+            candidates.push(artifact.path.clone());
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+    for candidate in candidates {
+        validate_evidence_artifact_path(&candidate)?;
+        let value = read_json_value(run_dir.join(&candidate))?;
+        if value.get("scenario_id").and_then(|value| value.as_str()) == Some(scenario_id)
+            && value.get("status").and_then(|value| value.as_str()) == Some("failed")
+        {
+            return Ok(candidate);
+        }
+    }
+    Err(anyhow!(
+        "regression promotion could not find failed scenario result evidence for {scenario_id}"
+    ))
+}
+
+fn select_regression_replay_paths(
+    run_dir: &Path,
+    scenario_result: &serde_json::Value,
+    evidence: &EvidenceIndex,
+    scenario_id: &str,
+) -> Result<Vec<String>> {
+    let mut paths = Vec::new();
+    for pointer in [
+        "/evidence/scenario_input_replays",
+        "/evidence/input_replays",
+        "/evidence/replays",
+    ] {
+        if let Some(values) = scenario_result
+            .pointer(pointer)
+            .and_then(|value| value.as_array())
+        {
+            for value in values {
+                if let Some(path) = value.as_str() {
+                    paths.push(path.to_string());
+                }
+            }
+        }
+    }
+    for artifact in &evidence.artifacts {
+        if artifact
+            .metadata
+            .get("scenario_id")
+            .and_then(|value| value.as_str())
+            == Some(scenario_id)
+            && (artifact.id.contains("input-replay")
+                || artifact.path.contains("input-replay")
+                || artifact
+                    .metadata
+                    .get("artifact")
+                    .and_then(|value| value.as_str())
+                    == Some("scenario_input_replay"))
+        {
+            paths.push(artifact.path.clone());
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    if paths.is_empty() {
+        return Err(anyhow!(
+            "regression promotion requires at least one replay evidence artifact"
+        ));
+    }
+    for path in &paths {
+        validate_evidence_artifact_path(path)?;
+        if !run_dir.join(path).is_file() {
+            return Err(anyhow!(
+                "regression promotion replay evidence missing file: {path}"
+            ));
+        }
+    }
+    Ok(paths)
+}
+
+fn scenario_step_from_replay_artifact(run_dir: &Path, path: &str) -> Result<ScenarioStep> {
+    let value = read_json_value(run_dir.join(path))?;
+    if value.get("schemaVersion").and_then(|value| value.as_str())
+        == Some(SCENARIO_INPUT_REPLAY_ARTIFACT_SCHEMA_VERSION)
+    {
+        let artifact: ScenarioInputReplayArtifact = serde_json::from_value(value)
+            .with_context(|| format!("failed to parse scenario input replay artifact {path}"))?;
+        artifact.validate()?;
+        return Ok(ScenarioStep::Input {
+            input: artifact.input,
+        });
+    }
+    let replay: InputReplay = serde_json::from_value(value)
+        .with_context(|| format!("failed to parse input replay artifact {path}"))?;
+    replay.validate()?;
+    Ok(ScenarioStep::Replay { replay })
+}
+
+fn scenario_assertions_from_failed_result(
+    scenario_result: &serde_json::Value,
+) -> Result<Vec<ScenarioAssertion>> {
+    let assertion_values = scenario_result
+        .get("assertions")
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| anyhow!("regression promotion scenario result assertions are missing"))?;
+    let mut assertions = Vec::new();
+    for assertion in assertion_values {
+        if assertion.get("passed").and_then(|value| value.as_bool()) == Some(false) {
+            assertions.push(regression_assertion_from_result(assertion)?);
+        }
+    }
+    if assertions.is_empty() {
+        return Err(anyhow!(
+            "regression promotion scenario result has no failed assertions to promote"
+        ));
+    }
+    Ok(assertions)
+}
+
+fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<ScenarioAssertion> {
+    let target = assertion
+        .get("target")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("regression promotion assertion target is missing"))?;
+    let path = assertion
+        .get("path")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("regression promotion assertion path is missing"))?;
+    let operator = assertion
+        .get("operator")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("regression promotion assertion operator is missing"))?;
+    let expected = assertion
+        .get("expected")
+        .cloned()
+        .ok_or_else(|| anyhow!("regression promotion assertion expected value is missing"))?;
+    let json_path_assertion = json_path_assertion_from_result(path, operator, expected)?;
+    match target {
+        "world_state" => Ok(ScenarioAssertion::WorldState {
+            world_state: json_path_assertion,
+        }),
+        "frame_stats" => Ok(ScenarioAssertion::FrameStats {
+            frame_stats: json_path_assertion,
+        }),
+        "runtime_events" => Ok(ScenarioAssertion::RuntimeEvents {
+            runtime_events: json_path_assertion,
+        }),
+        "performance_metrics" => Ok(ScenarioAssertion::PerformanceMetrics {
+            performance_metrics: json_path_assertion,
+        }),
+        "console_errors" => Ok(ScenarioAssertion::ConsoleErrors {
+            console_errors: json_path_assertion,
+        }),
+        "collision_evidence" => Ok(ScenarioAssertion::CollisionEvidence {
+            collision_evidence: json_path_assertion,
+        }),
+        "audio_evidence" => Ok(ScenarioAssertion::AudioEvidence {
+            audio_evidence: json_path_assertion,
+        }),
+        "animation_evidence" => Ok(ScenarioAssertion::AnimationEvidence {
+            animation_evidence: json_path_assertion,
+        }),
+        _ => Err(anyhow!(
+            "regression promotion assertion target is unsupported: {target}"
+        )),
+    }
+}
+
+fn json_path_assertion_from_result(
+    path: &str,
+    operator: &str,
+    expected: serde_json::Value,
+) -> Result<JsonPathAssertion> {
+    let mut assertion = JsonPathAssertion {
+        path: path.to_string(),
+        equals: None,
+        not_equals: None,
+        exists: None,
+        contains: None,
+        greater_than: None,
+        less_than: None,
+        count_equals: None,
+        count_greater_than: None,
+        count_less_than: None,
+    };
+    match operator {
+        "equals" => assertion.equals = Some(expected),
+        "notEquals" => assertion.not_equals = Some(expected),
+        "exists" => {
+            assertion.exists = Some(expected.as_bool().ok_or_else(|| {
+                anyhow!("regression promotion exists assertion expected value must be boolean")
+            })?)
+        }
+        "contains" => assertion.contains = Some(expected),
+        "greaterThan" => assertion.greater_than = Some(expected),
+        "lessThan" => assertion.less_than = Some(expected),
+        "countEquals" => {
+            assertion.count_equals = Some(expected.as_u64().ok_or_else(|| {
+                anyhow!("regression promotion countEquals expected value must be integer")
+            })?)
+        }
+        "countGreaterThan" => {
+            assertion.count_greater_than = Some(expected.as_u64().ok_or_else(|| {
+                anyhow!("regression promotion countGreaterThan expected value must be integer")
+            })?)
+        }
+        "countLessThan" => {
+            assertion.count_less_than = Some(expected.as_u64().ok_or_else(|| {
+                anyhow!("regression promotion countLessThan expected value must be integer")
+            })?)
+        }
+        _ => {
+            return Err(anyhow!(
+                "regression promotion assertion operator is unsupported: {operator}"
+            ))
+        }
+    }
+    Ok(assertion)
+}
+
+fn regression_promotion_run_dir_ref(run_dir: &Path) -> Result<String> {
+    let relative = if run_dir.is_absolute() {
+        match std::env::current_dir()
+            .ok()
+            .and_then(|cwd| run_dir.strip_prefix(cwd).ok().map(Path::to_path_buf))
+        {
+            Some(path) => path,
+            None => {
+                let name = run_dir.file_name().ok_or_else(|| {
+                    anyhow!("regression promotion run_dir has no final component")
+                })?;
+                Path::new("runs").join(name)
+            }
+        }
+    } else {
+        run_dir.to_path_buf()
+    };
+    let path = relative.to_string_lossy().to_string();
+    validate_relative_artifact_path("regression promotion sourceRun runDir", &path)?;
+    if !path.starts_with("runs/") {
+        return Err(anyhow!(
+            "regression promotion sourceRun runDir must point to runs/"
+        ));
+    }
+    Ok(path)
+}
+
 impl ScenarioPackGroup {
     fn validate(&self, group_index: usize, scenario_ids: &mut BTreeSet<String>) -> Result<()> {
         validate_path_component("scenario pack group id", &self.id)?;

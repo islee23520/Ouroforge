@@ -4,19 +4,19 @@ use ouroforge_core::{
     add_evidence_artifact, append_ledger_event,
     append_mutation_review_decision_for_proposal_from_path, apply_patch_sandbox_from_path,
     apply_scene_only_mutation_operation, bind_run_command_context, bind_run_project_metadata,
-    bind_run_transaction_provenance, create_minimal_2d_project_scaffold, create_mutation_proposal,
-    create_run, edit_scene, evaluate_run, evolve_run, hash_project_manifest_file,
-    hash_scene_document, list_dashboard_runs, list_evidence_artifacts, list_mutation_proposals,
-    orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
-    project_run_metadata_from_manifest, read_cdp_targets, read_dashboard_run, read_ledger_events,
-    read_scene, reject_generated_artifact_source_collision,
+    bind_run_transaction_provenance, build_regression_promotion_draft_from_run,
+    create_minimal_2d_project_scaffold, create_mutation_proposal, create_run, edit_scene,
+    evaluate_run, evolve_run, hash_project_manifest_file, hash_scene_document, list_dashboard_runs,
+    list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
+    preview_scene_edit_transaction, project_run_metadata_from_manifest, read_cdp_targets,
+    read_dashboard_run, read_ledger_events, read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
     run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_run_comparison_artifact,
-    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectManifest,
-    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    WorkerId,
+    update_journal, validate_scene_reload, write_regression_promotion_draft,
+    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
+    ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -288,6 +288,15 @@ enum ScenarioCommand {
         #[arg(long, default_value = "http://127.0.0.1:9222")]
         cdp: String,
     },
+    PromoteDraft {
+        run_dir: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project: PathBuf,
+        #[arg(long, value_name = "ID")]
+        scenario: String,
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -510,6 +519,40 @@ fn main() -> Result<()> {
                     summary.scenarios
                 ));
             }
+        }
+        Commands::Scenario {
+            command:
+                ScenarioCommand::PromoteDraft {
+                    run_dir,
+                    project,
+                    scenario,
+                    output,
+                },
+        } => {
+            reject_generated_artifact_source_collision(&output, "regression promotion draft")?;
+            let manifest_path = resolve_project_manifest_path(&project);
+            let draft =
+                build_regression_promotion_draft_from_run(&run_dir, &manifest_path, &scenario)?;
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!(
+                        "failed to create regression promotion draft output directory {}",
+                        parent.display()
+                    )
+                })?;
+            }
+            write_regression_promotion_draft(&output, &draft)?;
+            println!("Regression promotion draft: {}", output.display());
+            println!("Source run: {}", draft.source_run.run_id);
+            println!("Scenario: {}", draft.source_evidence.scenario_id);
+            println!(
+                "Scenario result: {}",
+                draft.source_evidence.scenario_result_path
+            );
+            if let Some(replay) = &draft.source_evidence.replay_artifact_path {
+                println!("Replay artifact: {replay}");
+            }
+            println!("Target scenario pack: {}", draft.target.scenario_pack_id);
         }
         Commands::Evaluate { run_dir } => {
             let verdict = evaluate_run(run_dir)?;

@@ -592,6 +592,133 @@ fn run_command_binds_validated_project_metadata_and_preflights_invalid_projects(
 }
 
 #[test]
+fn scenario_promote_draft_generates_evidence_linked_draft_without_pack_write() {
+    let temp = unique_temp_dir("ouroforge-cli-regression-promote-draft-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let (project_dir, run_dir) = create_project_bound_run(&temp);
+    write_failed_regression_evidence(&temp, &run_dir, "scaffold-smoke", true);
+    let pack_path = project_dir.join("scenarios/smoke.scenario-pack.json");
+    let pack_before = fs::read_to_string(&pack_path).expect("pack reads before");
+    let output_path = temp.join("runs/drafts/scaffold-smoke-draft.json");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "scenario",
+            "promote-draft",
+            run_dir.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario",
+            "scaffold-smoke",
+            "--output",
+            output_path.to_str().unwrap(),
+        ],
+    );
+
+    assert!(output.contains("Regression promotion draft:"));
+    assert!(output.contains("Scenario: scaffold-smoke"));
+    assert!(output.contains("Replay artifact: evidence/scenarios/scaffold-smoke/input-replay.json"));
+    let pack_after = fs::read_to_string(&pack_path).expect("pack reads after");
+    assert_eq!(
+        pack_after, pack_before,
+        "promote-draft must not write scenario pack files"
+    );
+    let draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&output_path).expect("draft reads"))
+            .expect("draft parses");
+    assert_eq!(draft["schemaVersion"], "regression-promotion-draft-v1");
+    assert_eq!(draft["sourceRun"]["verdictPath"], "verdict.json");
+    assert_eq!(
+        draft["sourceEvidence"]["scenarioResultPath"],
+        "evidence/scenarios/scaffold-smoke/scenario-result.json"
+    );
+    assert_eq!(
+        draft["sourceEvidence"]["replayArtifactPath"],
+        "evidence/scenarios/scaffold-smoke/input-replay.json"
+    );
+    assert_eq!(draft["target"]["scenarioPackId"], "smoke");
+    assert_eq!(
+        draft["target"]["scenarioPackPath"],
+        "scenarios/smoke.scenario-pack.json"
+    );
+    assert_eq!(draft["proposedScenario"]["id"], "scaffold-smoke");
+    assert_eq!(
+        draft["proposedScenario"]["steps"][0]["input"]["right"],
+        true
+    );
+    assert_eq!(
+        draft["proposedScenario"]["assertions"][0]["world_state"]["path"],
+        "entities.0.id"
+    );
+    assert_eq!(
+        draft["proposedScenario"]["assertions"][0]["world_state"]["equals"],
+        "player"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn scenario_promote_draft_rejects_missing_or_malformed_replay_evidence() {
+    let temp = unique_temp_dir("ouroforge-cli-regression-promote-draft-invalid-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let (project_dir, run_dir) = create_project_bound_run(&temp);
+    write_failed_regression_evidence(&temp, &run_dir, "scaffold-smoke", false);
+    let missing_replay_output = temp.join("runs/drafts/missing-replay.json");
+
+    let missing = run_cli_expect_failure(
+        &temp,
+        &[
+            "scenario",
+            "promote-draft",
+            run_dir.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario",
+            "scaffold-smoke",
+            "--output",
+            missing_replay_output.to_str().unwrap(),
+        ],
+    );
+    assert!(missing.contains("requires at least one replay evidence artifact"));
+    assert!(
+        !missing_replay_output.exists(),
+        "rejection must happen before writing draft output"
+    );
+
+    let malformed_run = create_project_bound_run(&temp).1;
+    write_failed_regression_evidence(&temp, &malformed_run, "scaffold-smoke", true);
+    fs::write(
+        malformed_run.join("evidence/scenarios/scaffold-smoke/input-replay.json"),
+        r#"{"schemaVersion":"ouroforge.scenario-input-replay.v1","scenarioId":"scaffold-smoke"}"#,
+    )
+    .expect("malformed replay written");
+    let malformed_output = temp.join("runs/drafts/malformed-replay.json");
+    let malformed = run_cli_expect_failure(
+        &temp,
+        &[
+            "scenario",
+            "promote-draft",
+            malformed_run.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario",
+            "scaffold-smoke",
+            "--output",
+            malformed_output.to_str().unwrap(),
+        ],
+    );
+    assert!(malformed.contains("failed to parse scenario input replay artifact"));
+    assert!(
+        !malformed_output.exists(),
+        "malformed evidence rejection must happen before writing draft output"
+    );
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn run_command_binds_scene_edit_transaction_to_metadata_ledger_and_journal() {
     let temp = unique_temp_dir("ouroforge-cli-run-transaction-binding-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
@@ -1556,6 +1683,148 @@ fn write_cli_scenario_result(run_dir: &Path, status: &str) {
         ],
     );
     assert!(output.contains("scenario-result-smoke"));
+}
+
+fn create_project_bound_run(root: &Path) -> (PathBuf, PathBuf) {
+    let project_dir = root.join(format!(
+        "project-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time works")
+            .as_nanos()
+    ));
+    run_cli(
+        root,
+        &[
+            "project",
+            "init",
+            project_dir.to_str().unwrap(),
+            "--template",
+            "minimal-2d",
+        ],
+    );
+    let seed_path = project_dir.join("seeds/platformer.yaml");
+    let output = run_cli(
+        root,
+        &[
+            "run",
+            seed_path.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--scenario-pack",
+            "smoke",
+        ],
+    );
+    (project_dir, run_dir_from_output(root, &output))
+}
+
+fn write_failed_regression_evidence(
+    current_dir: &Path,
+    run_dir: &Path,
+    scenario_id: &str,
+    include_replay: bool,
+) {
+    let scenario_result_rel = format!("evidence/scenarios/{scenario_id}/scenario-result.json");
+    let replay_rel = format!("evidence/scenarios/{scenario_id}/input-replay.json");
+    fs::create_dir_all(run_dir.join(format!("evidence/scenarios/{scenario_id}")))
+        .expect("scenario evidence dir exists");
+    fs::write(
+        run_dir.join("verdict.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "status": "failed",
+            "summary": "controlled regression promotion test failure",
+            "failures": [{
+                "kind": "scenario_assertion_failure",
+                "scenario_id": scenario_id,
+                "path": scenario_result_rel,
+                "evidence_ref": scenario_result_rel
+            }],
+            "evidence_refs": [scenario_result_rel]
+        }))
+        .unwrap(),
+    )
+    .expect("failed verdict written");
+    fs::write(
+        run_dir.join(&scenario_result_rel),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "scenario_id": scenario_id,
+            "status": "failed",
+            "evidence": {
+                "scenario_input_replays": if include_replay {
+                    vec![replay_rel.clone()]
+                } else {
+                    Vec::<String>::new()
+                }
+            },
+            "assertions": [{
+                "target": "world_state",
+                "path": "entities.0.id",
+                "operator": "equals",
+                "expected": "player",
+                "actual": "enemy",
+                "passed": false,
+                "evidence_ref": format!("evidence/scenarios/{scenario_id}/world-state.json")
+            }]
+        }))
+        .unwrap(),
+    )
+    .expect("scenario result written");
+    let scenario_result_output = run_cli(
+        current_dir,
+        &[
+            "evidence",
+            "add",
+            run_dir.to_str().unwrap(),
+            "--id",
+            &format!("scenario-result-{scenario_id}"),
+            "--kind",
+            "application/json",
+            "--path",
+            &scenario_result_rel,
+            "--json",
+            &format!(
+                r#"{{"artifact":"scenario_result","scenario_id":"{scenario_id}","status":"failed"}}"#
+            ),
+        ],
+    );
+    assert!(scenario_result_output.contains(&format!("scenario-result-{scenario_id}")));
+    if include_replay {
+        fs::write(
+            run_dir.join(&replay_rel),
+            serde_json::to_string_pretty(&serde_json::json!({
+                "schemaVersion": "ouroforge.scenario-input-replay.v1",
+                "scenarioId": scenario_id,
+                "stepIndex": 0,
+                "action": { "kind": "scenario_input_step" },
+                "frame": 0,
+                "tick": 0,
+                "input": { "right": true },
+                "result": {
+                    "scenarioResultPath": scenario_result_rel,
+                    "verdictPath": "verdict.json"
+                }
+            }))
+            .unwrap(),
+        )
+        .expect("replay evidence written");
+        let replay_output = run_cli(
+            current_dir,
+            &[
+                "evidence",
+                "add",
+                run_dir.to_str().unwrap(),
+                "--id",
+                &format!("scenario-input-replay-{scenario_id}"),
+                "--kind",
+                "application/json",
+                "--path",
+                &replay_rel,
+                "--json",
+                &format!(r#"{{"artifact":"scenario_input_replay","scenario_id":"{scenario_id}"}}"#),
+            ],
+        );
+        assert!(replay_output.contains(&format!("scenario-input-replay-{scenario_id}")));
+    }
 }
 
 fn run_dir_from_output(root: &Path, output: &str) -> PathBuf {
