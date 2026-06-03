@@ -641,6 +641,219 @@ impl ScenarioPack {
     }
 }
 
+const REGRESSION_PROMOTION_DRAFT_SCHEMA_VERSION: &str = "regression-promotion-draft-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegressionPromotionDraft {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub id: String,
+    #[serde(rename = "sourceRun")]
+    pub source_run: RegressionPromotionSourceRun,
+    #[serde(rename = "sourceEvidence")]
+    pub source_evidence: RegressionPromotionSourceEvidence,
+    pub target: RegressionPromotionTarget,
+    #[serde(rename = "proposedScenario")]
+    pub proposed_scenario: Scenario,
+    #[serde(rename = "createdAtUnixMs")]
+    pub created_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RegressionPromotionSourceRun {
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "runDir")]
+    pub run_dir: String,
+    #[serde(rename = "verdictPath")]
+    pub verdict_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RegressionPromotionSourceEvidence {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "scenarioResultPath")]
+    pub scenario_result_path: String,
+    #[serde(
+        rename = "replayArtifactPath",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub replay_artifact_path: Option<String>,
+    #[serde(rename = "evidenceIds")]
+    pub evidence_ids: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RegressionPromotionTarget {
+    #[serde(rename = "projectManifestPath")]
+    pub project_manifest_path: String,
+    #[serde(rename = "scenarioPackId")]
+    pub scenario_pack_id: String,
+    #[serde(rename = "scenarioPackPath")]
+    pub scenario_pack_path: String,
+    #[serde(rename = "scenarioGroupId")]
+    pub scenario_group_id: String,
+}
+
+impl RegressionPromotionDraft {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let draft: RegressionPromotionDraft = serde_json::from_str(input)
+            .context("failed to parse regression promotion draft JSON")?;
+        draft.validate()?;
+        Ok(draft)
+    }
+
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let input = fs::read_to_string(path).with_context(|| {
+            format!(
+                "failed to read regression promotion draft {}",
+                path.display()
+            )
+        })?;
+        Self::from_json_str(&input).with_context(|| {
+            format!(
+                "failed to parse regression promotion draft {}",
+                path.display()
+            )
+        })
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != REGRESSION_PROMOTION_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "regression promotion draft schemaVersion must be {REGRESSION_PROMOTION_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("regression promotion draft id", &self.id)?;
+        self.source_run.validate()?;
+        self.source_evidence.validate()?;
+        self.target.validate()?;
+        self.proposed_scenario
+            .validate(0)
+            .context("regression promotion proposedScenario is invalid")?;
+        if self.proposed_scenario.id != self.source_evidence.scenario_id {
+            return Err(anyhow!(
+                "regression promotion proposedScenario id must match sourceEvidence scenarioId"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl RegressionPromotionSourceRun {
+    fn validate(&self) -> Result<()> {
+        require_text("regression promotion sourceRun runId", &self.run_id)?;
+        validate_relative_artifact_path("regression promotion sourceRun runDir", &self.run_dir)?;
+        if !self.run_dir.starts_with("runs/") {
+            return Err(anyhow!(
+                "regression promotion sourceRun runDir must point to runs/"
+            ));
+        }
+        validate_relative_artifact_path(
+            "regression promotion sourceRun verdictPath",
+            &self.verdict_path,
+        )?;
+        if self.verdict_path != "verdict.json" {
+            return Err(anyhow!(
+                "regression promotion sourceRun verdictPath must be verdict.json"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl RegressionPromotionSourceEvidence {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "regression promotion sourceEvidence scenarioId",
+            &self.scenario_id,
+        )?;
+        validate_mutation_review_ref(&self.scenario_result_path)?;
+        if let Some(replay_artifact_path) = &self.replay_artifact_path {
+            validate_mutation_review_ref(replay_artifact_path)?;
+        }
+        if self.evidence_ids.is_empty() {
+            return Err(anyhow!(
+                "regression promotion sourceEvidence evidenceIds must not be empty"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        for evidence_id in &self.evidence_ids {
+            validate_path_component(
+                "regression promotion sourceEvidence evidenceId",
+                evidence_id,
+            )?;
+            if !ids.insert(evidence_id.clone()) {
+                return Err(anyhow!(
+                    "duplicate regression promotion evidence id: {evidence_id}"
+                ));
+            }
+        }
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "regression promotion sourceEvidence evidenceRefs must not be empty"
+            ));
+        }
+        let mut refs = BTreeSet::new();
+        for evidence_ref in &self.evidence_refs {
+            validate_mutation_review_ref(evidence_ref)?;
+            if !refs.insert(evidence_ref.clone()) {
+                return Err(anyhow!(
+                    "duplicate regression promotion evidence ref: {evidence_ref}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl RegressionPromotionTarget {
+    fn validate(&self) -> Result<()> {
+        validate_project_manifest_path(
+            "regression promotion target projectManifestPath",
+            &self.project_manifest_path,
+        )?;
+        if !self
+            .project_manifest_path
+            .ends_with(PROJECT_MANIFEST_FILE_NAME)
+        {
+            return Err(anyhow!(
+                "regression promotion target projectManifestPath must end with {PROJECT_MANIFEST_FILE_NAME}"
+            ));
+        }
+        validate_path_component(
+            "regression promotion target scenarioPackId",
+            &self.scenario_pack_id,
+        )?;
+        validate_project_manifest_path(
+            "regression promotion target scenarioPackPath",
+            &self.scenario_pack_path,
+        )?;
+        validate_path_component(
+            "regression promotion target scenarioGroupId",
+            &self.scenario_group_id,
+        )?;
+        Ok(())
+    }
+}
+
+pub fn write_regression_promotion_draft(
+    path: impl AsRef<Path>,
+    draft: &RegressionPromotionDraft,
+) -> Result<()> {
+    draft.validate()?;
+    write_json_atomic(path.as_ref(), &json!(draft))
+}
+
 impl ScenarioPackGroup {
     fn validate(&self, group_index: usize, scenario_ids: &mut BTreeSet<String>) -> Result<()> {
         validate_path_component("scenario pack group id", &self.id)?;
@@ -19194,6 +19407,117 @@ scenarios:
         let rejected = format!("{rejected:#}");
         assert!(rejected.contains("scenarioPacks ref unsupported failed validation"));
         assert!(rejected.contains("unknown field"));
+    }
+
+    fn valid_regression_promotion_draft() -> RegressionPromotionDraft {
+        RegressionPromotionDraft {
+            schema_version: REGRESSION_PROMOTION_DRAFT_SCHEMA_VERSION.to_string(),
+            id: "regression-draft-1".to_string(),
+            source_run: RegressionPromotionSourceRun {
+                run_id: "run-1".to_string(),
+                run_dir: "runs/run-1".to_string(),
+                verdict_path: "verdict.json".to_string(),
+            },
+            source_evidence: RegressionPromotionSourceEvidence {
+                scenario_id: "failed-smoke".to_string(),
+                scenario_result_path: "evidence/scenarios/failed-smoke/scenario-result.json"
+                    .to_string(),
+                replay_artifact_path: Some(
+                    "evidence/scenarios/failed-smoke/input-replay.json".to_string(),
+                ),
+                evidence_ids: vec!["scenario-result".to_string(), "input-replay".to_string()],
+                evidence_refs: vec![
+                    "evidence/scenarios/failed-smoke/scenario-result.json".to_string(),
+                    "evidence/scenarios/failed-smoke/input-replay.json".to_string(),
+                ],
+            },
+            target: RegressionPromotionTarget {
+                project_manifest_path: "ouroforge.project.json".to_string(),
+                scenario_pack_id: "regression".to_string(),
+                scenario_pack_path: "scenarios/regression.json".to_string(),
+                scenario_group_id: "promoted-regressions".to_string(),
+            },
+            proposed_scenario: Scenario {
+                id: "failed-smoke".to_string(),
+                description: "Promoted deterministic regression from failed-smoke evidence."
+                    .to_string(),
+                steps: Vec::new(),
+                assertions: vec![ScenarioAssertion::WorldState {
+                    world_state: JsonPathAssertion {
+                        path: "player.position.x".to_string(),
+                        equals: Some(json!(48)),
+                        not_equals: None,
+                        exists: None,
+                        contains: None,
+                        greater_than: None,
+                        less_than: None,
+                        count_equals: None,
+                        count_greater_than: None,
+                        count_less_than: None,
+                    },
+                }],
+            },
+            created_at_unix_ms: 123,
+        }
+    }
+
+    #[test]
+    fn regression_promotion_draft_schema_accepts_valid_evidence_linked_draft() {
+        let draft = valid_regression_promotion_draft();
+        draft.validate().expect("valid regression promotion draft");
+        let value = serde_json::to_value(&draft).expect("draft serializes");
+        assert_eq!(value["schemaVersion"], "regression-promotion-draft-v1");
+        assert_eq!(value["sourceEvidence"]["scenarioId"], "failed-smoke");
+        assert_eq!(value["target"]["scenarioPackId"], "regression");
+        let parsed = RegressionPromotionDraft::from_json_str(
+            &serde_json::to_string(&value).expect("draft to json"),
+        )
+        .expect("draft parses");
+        assert_eq!(parsed, draft);
+    }
+
+    #[test]
+    fn regression_promotion_draft_schema_rejects_unsafe_or_malformed_links() {
+        let mut bad_schema = valid_regression_promotion_draft();
+        bad_schema.schema_version = "bad".to_string();
+        assert!(bad_schema
+            .validate()
+            .expect_err("bad schema rejected")
+            .to_string()
+            .contains("schemaVersion"));
+
+        let mut escaping_evidence = valid_regression_promotion_draft();
+        escaping_evidence.source_evidence.evidence_refs[0] = "../secret.json".to_string();
+        assert!(escaping_evidence
+            .validate()
+            .expect_err("escaping evidence rejected")
+            .to_string()
+            .contains("must not escape"));
+
+        let mut duplicate_evidence = valid_regression_promotion_draft();
+        duplicate_evidence.source_evidence.evidence_ids =
+            vec!["same".to_string(), "same".to_string()];
+        assert!(duplicate_evidence
+            .validate()
+            .expect_err("duplicate evidence id rejected")
+            .to_string()
+            .contains("duplicate regression promotion evidence id"));
+
+        let mut hidden_target = valid_regression_promotion_draft();
+        hidden_target.target.scenario_pack_path = ".omx/regression.json".to_string();
+        assert!(hidden_target
+            .validate()
+            .expect_err("hidden target rejected")
+            .to_string()
+            .contains("hidden"));
+
+        let mut mismatched_scenario = valid_regression_promotion_draft();
+        mismatched_scenario.proposed_scenario.id = "other-scenario".to_string();
+        assert!(mismatched_scenario
+            .validate()
+            .expect_err("mismatched scenario rejected")
+            .to_string()
+            .contains("must match sourceEvidence scenarioId"));
     }
 
     #[test]
