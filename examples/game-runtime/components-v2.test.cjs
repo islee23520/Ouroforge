@@ -53,6 +53,41 @@ assert.deepEqual(JSON.parse(JSON.stringify(state.componentModel.counts)), {
 assert.equal(state.componentModel.goalFlags.alive, true);
 assert.equal(state.componentModel.goalFlags.coin_collected, false);
 
+const presetFlagScene = structuredClone(scene);
+presetFlagScene.entities.push({
+  id: 'gate_state',
+  sprite: { color: '#ffffff', visible: false },
+  components: {
+    transform: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    size: { width: 1, height: 1 },
+    goalFlag: { flag: 'gate_open', label: 'Gate open', value: true },
+  },
+});
+const presetCoin = presetFlagScene.entities.find((entity) => entity.id === 'coin');
+presetCoin.components.transform.x = 34;
+presetCoin.components.collider = {
+  shape: 'aabb',
+  body: 'static',
+  offset: { x: 0, y: 0 },
+  size: { width: 12, height: 12 },
+  sensor: false,
+  trigger: true,
+  collisionGroup: 'triggers',
+};
+presetCoin.components.trigger.requiredFlags = ['gate_open'];
+const presetPlayer = presetFlagScene.entities.find((entity) => entity.id === 'player');
+presetPlayer.components.collider.collisionMask = ['triggers'];
+state = api.loadScene(presetFlagScene);
+assert.equal(state.componentModel.goalFlags.gate_open, true);
+const presetEventCount = api.getEvents().length;
+state = api.step(1);
+assert.equal(state.componentModel.goalFlags.coin_collected, true);
+assert.equal(state.entities.find((entity) => entity.id === 'coin').sprite.visible, false);
+assert.ok(api.getEvents().slice(presetEventCount).some((event) => event.type === 'runtime.trigger.entered'));
+
+state = api.loadScene(scene);
+assert.equal(state.componentModel.goalFlags.coin_collected, false);
 api.setInput({ right: true });
 state = api.step(1);
 assert.equal(state.entities.find((entity) => entity.id === 'player').components.velocity.x, 3);
@@ -72,7 +107,8 @@ triggerCoin.components.collider = {
 const triggerPlayer = triggerScene.entities.find((entity) => entity.id === 'player');
 triggerPlayer.components.collider.collisionMask = ['triggers'];
 state = api.loadScene(triggerScene);
+const triggerEventCount = api.getEvents().length;
 state = api.step(1);
 assert.equal(state.componentModel.goalFlags.coin_collected, true);
 assert.equal(state.entities.find((entity) => entity.id === 'coin').sprite.visible, false);
-assert.ok(api.getEvents().some((event) => event.type === 'runtime.trigger.entered'));
+assert.ok(api.getEvents().slice(triggerEventCount).some((event) => event.type === 'runtime.trigger.entered'));

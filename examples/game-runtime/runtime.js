@@ -183,10 +183,12 @@
 
   function goalFlagComponent(value = {}) {
     const source = value && typeof value === 'object' ? value : {};
-    return {
+    const component = {
       flag: String(source.flag || ''),
       label: typeof source.label === 'string' ? source.label : null,
     };
+    if (Object.prototype.hasOwnProperty.call(source, 'value')) component.value = Boolean(source.value);
+    return component;
   }
 
   function cameraTargetComponent(value = {}) {
@@ -496,7 +498,7 @@
     }
     for (const entity of world.entities) {
       const goalFlag = entity.components && entity.components.goalFlag;
-      if (goalFlag && goalFlag.flag) world.goalFlags[goalFlag.flag] = false;
+      if (goalFlag && goalFlag.flag) world.goalFlags[goalFlag.flag] = Boolean(goalFlag.value);
       const status = entity.components && entity.components.status;
       if (status && Array.isArray(status.flags)) {
         for (const flag of status.flags) world.goalFlags[flag] = true;
