@@ -82,6 +82,9 @@ pub enum ScenarioStep {
     Input {
         input: InputStep,
     },
+    Transition {
+        transition: TransitionStep,
+    },
     Replay {
         replay: InputReplay,
     },
@@ -105,6 +108,12 @@ pub enum ScenarioStep {
 #[serde(deny_unknown_fields)]
 pub struct WaitStep {
     pub frames: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TransitionStep {
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
@@ -370,6 +379,9 @@ pub enum ScenarioAssertion {
     },
     AnimationEvidence {
         animation_evidence: JsonPathAssertion,
+    },
+    TransitionEvidence {
+        transition_evidence: JsonPathAssertion,
     },
 }
 
@@ -1236,6 +1248,9 @@ fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<Sce
         "animation_evidence" => Ok(ScenarioAssertion::AnimationEvidence {
             animation_evidence: json_path_assertion,
         }),
+        "transition_evidence" => Ok(ScenarioAssertion::TransitionEvidence {
+            transition_evidence: json_path_assertion,
+        }),
         _ => Err(anyhow!(
             "regression promotion assertion target is unsupported: {target}"
         )),
@@ -1611,6 +1626,15 @@ impl ScenarioStep {
                         "scenarios[{scenario_index}].steps[{step_index}].input must set at least one direction"
                     ));
                 }
+            }
+            ScenarioStep::Transition { transition } => {
+                validate_path_component("transition step id", &transition.id).with_context(
+                    || {
+                        format!(
+                        "scenarios[{scenario_index}].steps[{step_index}].transition.id is invalid"
+                    )
+                    },
+                )?;
             }
             ScenarioStep::Replay { replay } => replay.validate().with_context(|| {
                 format!("scenarios[{scenario_index}].steps[{step_index}].replay is invalid")
@@ -5878,6 +5902,9 @@ impl ScenarioAssertion {
             ScenarioAssertion::CollisionEvidence { collision_evidence } => collision_evidence,
             ScenarioAssertion::AudioEvidence { audio_evidence } => audio_evidence,
             ScenarioAssertion::AnimationEvidence { animation_evidence } => animation_evidence,
+            ScenarioAssertion::TransitionEvidence {
+                transition_evidence,
+            } => transition_evidence,
         };
         assertion.validate(scenario_index, assertion_index)
     }
@@ -6271,13 +6298,25 @@ impl<T: CdpTransport> CdpClient<T> {
     }
 
     pub fn evaluate_json(&mut self, expression: &str) -> Result<serde_json::Value> {
+        self.evaluate_json_with_await(expression, false)
+    }
+
+    pub fn evaluate_json_await(&mut self, expression: &str) -> Result<serde_json::Value> {
+        self.evaluate_json_with_await(expression, true)
+    }
+
+    fn evaluate_json_with_await(
+        &mut self,
+        expression: &str,
+        await_promise: bool,
+    ) -> Result<serde_json::Value> {
         require_text("CDP Runtime.evaluate expression", expression)?;
         let result = self.transport.send_command(
             "Runtime.evaluate",
             json!({
                 "expression": expression,
                 "returnByValue": true,
-                "awaitPromise": false
+                "awaitPromise": await_promise
             }),
         )?;
         if let Some(exception) = result.get("exceptionDetails") {
@@ -12273,6 +12312,19 @@ fn run_scenario<T: CdpTransport>(
                 });
                 execute_scenario_step(client, step)?;
             }
+            ScenarioStep::Transition { transition } => {
+                execute_scenario_step(client, step)?;
+                append_ledger_event(
+                    &config.run_dir,
+                    "scenario.transition",
+                    "scenario-runner",
+                    json!({
+                        "scenario_id": scenario.id,
+                        "transition_id": transition.id,
+                        "frame": scenario_frame
+                    }),
+                )?;
+            }
         }
     }
 
@@ -12468,6 +12520,24 @@ fn run_scenario<T: CdpTransport>(
         .get("entities")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let transition_source = world_state
+        .get("transitionEvents")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let transition_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "transition-evidence",
+        "transition_evidence",
+        unix_millis()?,
+        &json!({
+            "bounded": true,
+            "currentSceneId": world_state.get("sceneId").cloned().unwrap_or(serde_json::Value::Null),
+            "declaredTransitions": world_state.get("sceneTransitions").cloned().unwrap_or_else(|| json!([])),
+            "transitionEvents": transition_source.clone()
+        }),
+    )?;
     let assertion_sources = ScenarioAssertionSources {
         world_state: AssertionSource {
             value: &world_state,
@@ -12514,6 +12584,10 @@ fn run_scenario<T: CdpTransport>(
         animation_evidence: AssertionSource {
             value: &animation_source,
             evidence_ref: &world_state_path,
+        },
+        transition_evidence: AssertionSource {
+            value: &transition_source,
+            evidence_ref: &transition_path,
         },
     };
     let assertions = evaluate_scenario_assertions(scenario, &assertion_sources);
@@ -12563,6 +12637,7 @@ fn run_scenario<T: CdpTransport>(
                 "snapshots": snapshot_paths.clone(),
                 "visual_checkpoints": visual_checkpoint_paths.clone(),
                 "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
+                "transition_evidence": transition_path.clone(),
                 "console_logs": console_paths.clone(),
                 "performance_metrics": performance_paths.clone(),
                 "cdp_trace_summaries": trace_paths.clone()
@@ -12592,6 +12667,7 @@ fn run_scenario<T: CdpTransport>(
             "snapshot_paths": snapshot_paths.clone(),
             "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
             "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
+            "transition_evidence_path": transition_path.clone(),
             "console_log_paths": console_paths.clone(),
             "performance_metric_paths": performance_paths.clone(),
             "cdp_trace_summary_paths": trace_paths.clone(),
@@ -12603,6 +12679,7 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(visual_checkpoint_paths);
     evidence_paths.extend(visual_checkpoint_screenshot_paths);
     evidence_paths.push(world_state_path);
+    evidence_paths.push(transition_path);
     evidence_paths.push(frame_stats_path);
     evidence_paths.extend(console_paths);
     evidence_paths.extend(performance_paths);
@@ -12888,6 +12965,7 @@ struct ScenarioAssertionSources<'a> {
     collision_evidence: AssertionSource<'a>,
     audio_evidence: AssertionSource<'a>,
     animation_evidence: AssertionSource<'a>,
+    transition_evidence: AssertionSource<'a>,
 }
 
 struct VisualCheckpointCapture {
@@ -13062,6 +13140,13 @@ fn evaluate_scenario_assertions(
                     "animation_evidence",
                     animation_evidence,
                     sources.animation_evidence,
+                ),
+                ScenarioAssertion::TransitionEvidence {
+                    transition_evidence,
+                } => (
+                    "transition_evidence",
+                    transition_evidence,
+                    sources.transition_evidence,
                 ),
             };
             let actual = read_json_path(source.value, &assertion.path)
@@ -13243,19 +13328,46 @@ fn wait_for_runtime_step_api<T: CdpTransport>(client: &mut CdpClient<T>) -> Resu
     ))
 }
 
+fn wait_for_runtime_transition_api<T: CdpTransport>(client: &mut CdpClient<T>) -> Result<()> {
+    let expression =
+        "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.transition === 'function')";
+    let mut last_value = serde_json::Value::Null;
+    for _ in 0..30 {
+        last_value = client.evaluate_json(expression)?;
+        if last_value == json!(true) {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    Err(anyhow!(
+        "window.__OUROFORGE__ transition API not ready for scenario step; last readiness value: {}",
+        last_value
+    ))
+}
+
 fn execute_scenario_step<T: CdpTransport>(
     client: &mut CdpClient<T>,
     step: &ScenarioStep,
 ) -> Result<()> {
-    wait_for_runtime_step_api(client)?;
     match step {
         ScenarioStep::Wait { wait } => {
+            wait_for_runtime_step_api(client)?;
             client.evaluate_json(&format!("window.__OUROFORGE__.step({})", wait.frames))?;
         }
         ScenarioStep::Input { input } => {
+            wait_for_runtime_step_api(client)?;
             let input_json =
                 serde_json::to_string(input).context("failed to serialize input step")?;
             client.evaluate_json(&format!("window.__OUROFORGE__.setInput({input_json})"))?;
+        }
+        ScenarioStep::Transition { transition } => {
+            wait_for_runtime_transition_api(client)?;
+            validate_path_component("scenario transition id", &transition.id)?;
+            let transition_json = serde_json::to_string(&transition.id)
+                .context("failed to serialize transition id")?;
+            client.evaluate_json_await(&format!(
+                "window.__OUROFORGE__.transition({transition_json})"
+            ))?;
         }
         ScenarioStep::Replay { replay } => {
             execute_input_replay(client, replay)?;
@@ -21487,6 +21599,8 @@ scenarios:
           frames: 2
       - input:
           right: true
+      - transition:
+          id: to_level_2
     assertions:
       - world_state:
           path: tick
@@ -21494,12 +21608,19 @@ scenarios:
       - frame_stats:
           path: fixedDeltaMs
           equals: 16
+      - transition_evidence:
+          path: 0.status
+          equals: succeeded
 "#;
 
         let seed = Seed::from_yaml_str(valid).expect("scenario dsl parses");
 
-        assert_eq!(seed.scenarios[0].steps.len(), 2);
-        assert_eq!(seed.scenarios[0].assertions.len(), 2);
+        assert_eq!(seed.scenarios[0].steps.len(), 3);
+        assert_eq!(seed.scenarios[0].assertions.len(), 3);
+        assert!(matches!(
+            seed.scenarios[0].steps[2],
+            ScenarioStep::Transition { .. }
+        ));
     }
 
     #[test]
@@ -22840,7 +22961,9 @@ scenarios:
                 .expect("expression is present")
                 .to_string();
             self.calls.push(expression.clone());
-            let value = if expression.contains("typeof window.__OUROFORGE__.step") {
+            let value = if expression.contains("typeof window.__OUROFORGE__.step")
+                || expression.contains("typeof window.__OUROFORGE__.transition")
+            {
                 json!(true)
             } else {
                 json!({})
@@ -25464,6 +25587,15 @@ scenarios:
         .expect("input executes");
         execute_scenario_step(
             &mut client,
+            &ScenarioStep::Transition {
+                transition: TransitionStep {
+                    id: "to_level_2".to_string(),
+                },
+            },
+        )
+        .expect("transition executes");
+        execute_scenario_step(
+            &mut client,
             &ScenarioStep::Replay {
                 replay: InputReplay {
                     schema_version: "1".to_string(),
@@ -25494,17 +25626,23 @@ scenarios:
             transport.calls[3],
             "window.__OUROFORGE__.setInput({\"right\":true})"
         );
-        assert_eq!(transport.calls[4], readiness);
-        assert_eq!(transport.calls[5], readiness);
+        let transition_readiness =
+            "Boolean(window.__OUROFORGE__ && typeof window.__OUROFORGE__.transition === 'function')";
+        assert_eq!(transport.calls[4], transition_readiness);
         assert_eq!(
-            transport.calls[6],
+            transport.calls[5],
+            "window.__OUROFORGE__.transition(\"to_level_2\")"
+        );
+        assert_eq!(transport.calls[6], readiness);
+        assert_eq!(
+            transport.calls[7],
             "window.__OUROFORGE__.setInput({\"right\":true})"
         );
-        assert_eq!(transport.calls[7], readiness);
-        assert_eq!(transport.calls[8], "window.__OUROFORGE__.step(4)");
-        assert_eq!(transport.calls[9], readiness);
+        assert_eq!(transport.calls[8], readiness);
+        assert_eq!(transport.calls[9], "window.__OUROFORGE__.step(4)");
+        assert_eq!(transport.calls[10], readiness);
         assert_eq!(
-            transport.calls[10],
+            transport.calls[11],
             "window.__OUROFORGE__.setInput({\"right\":false})"
         );
     }
@@ -25761,6 +25899,135 @@ scenarios:
                 _ => Ok(json!({})),
             }
         }
+    }
+
+    struct TransitionScenarioTransport {
+        calls: Vec<(String, bool)>,
+    }
+
+    impl CdpTransport for TransitionScenarioTransport {
+        fn send_command(
+            &mut self,
+            method: &str,
+            params: serde_json::Value,
+        ) -> Result<serde_json::Value> {
+            match method {
+                "Runtime.evaluate" => {
+                    let expression = params["expression"]
+                        .as_str()
+                        .expect("expression present")
+                        .to_string();
+                    let await_promise = params["awaitPromise"].as_bool().unwrap_or(false);
+                    self.calls.push((expression.clone(), await_promise));
+                    let value = if expression.contains("typeof window.__OUROFORGE__.transition") {
+                        json!(true)
+                    } else if expression.contains("transition(\"to_level_2\")") {
+                        json!({
+                            "sceneId": "level-2",
+                            "transitionEvents": [{
+                                "status": "succeeded",
+                                "id": "to_level_2",
+                                "fromSceneId": "level-1",
+                                "toSceneId": "level-2",
+                                "toScene": "scenes/level-2.scene.json"
+                            }]
+                        })
+                    } else if expression.contains("getWorldState") {
+                        json!({
+                            "sceneId": "level-2",
+                            "sceneTransitions": [],
+                            "transitionEvents": [{
+                                "status": "succeeded",
+                                "id": "to_level_2",
+                                "fromSceneId": "level-1",
+                                "toSceneId": "level-2",
+                                "toScene": "scenes/level-2.scene.json"
+                            }]
+                        })
+                    } else if expression.contains("getFrameStats") {
+                        json!({ "fixedDeltaMs": 16, "tick": 0 })
+                    } else if expression.contains("getEvents") {
+                        json!({ "events": [{ "type": "runtime.scene.transition.succeeded" }] })
+                    } else if expression.contains("__OUROFORGE_CONSOLE__") {
+                        json!([])
+                    } else {
+                        json!({})
+                    };
+                    Ok(json!({ "result": { "value": value } }))
+                }
+                "Performance.enable" => Ok(json!({})),
+                "Performance.getMetrics" => Ok(json!({ "metrics": [] })),
+                _ => Ok(json!({})),
+            }
+        }
+    }
+
+    #[test]
+    fn scenario_transition_step_records_transition_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-scenario-transition-evidence");
+        let seed = Seed::from_yaml_str(
+            r#"
+id: transition-scenario.v1
+title: Transition Scenario Fixture
+goal: Verify transition evidence.
+constraints:
+  target: game-runtime
+acceptance:
+  - Transition evidence is assertion-addressable.
+scenarios:
+  - id: transition-smoke
+    description: Drive a declared scene transition.
+    steps:
+      - transition:
+          id: to_level_2
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: level-2
+      - transition_evidence:
+          path: 0.status
+          equals: succeeded
+      - transition_evidence:
+          path: 0.toSceneId
+          equals: level-2
+"#,
+        )
+        .expect("transition seed parses");
+        let config = ScenarioRunConfig::new(&artifacts.run_dir, "http://127.0.0.1:8080")
+            .expect("scenario config");
+        let mut client = CdpClient::new(TransitionScenarioTransport { calls: Vec::new() });
+
+        let summary =
+            run_scenarios_with_client(&config, &seed, &mut client).expect("scenario runs");
+
+        assert_eq!(summary.completed, 1);
+        assert_eq!(summary.passed, 1);
+        let transport = client.into_transport();
+        assert!(transport.calls.iter().any(|(expression, await_promise)| {
+            expression == "window.__OUROFORGE__.transition(\"to_level_2\")" && *await_promise
+        }));
+        let result = read_json_value(artifacts.run_dir.join(&summary.result_paths[0]))
+            .expect("scenario result reads");
+        assert_eq!(result["status"], "passed");
+        let transition_path = result["evidence"]["transition_evidence"]
+            .as_str()
+            .expect("transition evidence path");
+        let transition_evidence =
+            read_json_value(artifacts.run_dir.join(transition_path)).expect("transition evidence");
+        assert_eq!(transition_evidence["bounded"], true);
+        assert_eq!(transition_evidence["currentSceneId"], "level-2");
+        assert_eq!(
+            transition_evidence["transitionEvents"][0]["id"],
+            "to_level_2"
+        );
+        assert!(result["assertions"]
+            .as_array()
+            .expect("assertions")
+            .iter()
+            .any(|assertion| assertion["target"] == "transition_evidence"
+                && assertion["passed"] == true
+                && assertion["evidence_ref"] == transition_path));
+        fs::remove_dir_all(root).ok();
     }
 
     struct MalformedProbeScenarioTransport;
@@ -31616,6 +31883,10 @@ scenarios:
             animation_evidence: AssertionSource {
                 value: animation_evidence,
                 evidence_ref: "evidence/world-state.json",
+            },
+            transition_evidence: AssertionSource {
+                value: world_state.get("transitionEvents").unwrap_or(world_state),
+                evidence_ref: "evidence/transition-evidence.json",
             },
         }
     }
