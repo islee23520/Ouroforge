@@ -10011,9 +10011,10 @@ fn render_journal(
                 gameplay["falseFlagCount"].as_u64().unwrap_or(0)
             ));
             out.push_str(&format!(
-                "- Trigger components: `{}`; goalFlag components: `{}`; trigger collision events: `{}`\n",
+                "- Trigger components: `{}`; goalFlag components: `{}`; HUD value components: `{}`; trigger collision events: `{}`\n",
                 gameplay["triggerEntityCount"].as_u64().unwrap_or(0),
                 gameplay["goalFlagEntityCount"].as_u64().unwrap_or(0),
+                gameplay["hudValueEntityCount"].as_u64().unwrap_or(0),
                 gameplay["triggerCollisionEventCount"].as_u64().unwrap_or(0)
             ));
             let true_flags = gameplay["trueFlags"]
@@ -17536,6 +17537,30 @@ fn dashboard_gameplay_summary(world_state: &serde_json::Value) -> serde_json::Va
                 .count()
         })
         .unwrap_or(0);
+    let hud_values = world_state
+        .pointer("/componentModel/hudValues")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .map(|value| {
+                    json!({
+                        "entityId": value.get("entityId").cloned().unwrap_or(json!(null)),
+                        "kind": value.get("kind").cloned().unwrap_or(json!(null)),
+                        "label": value.get("label").cloned().unwrap_or(json!(null)),
+                        "value": value.get("value").cloned().unwrap_or(json!(null)),
+                        "bindFlag": value.get("bindFlag").cloned().unwrap_or(json!(null)),
+                        "flagValue": value.get("flagValue").cloned().unwrap_or(json!(null)),
+                        "text": value.get("text").cloned().unwrap_or(json!(null)),
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let hud_value_entity_count = world_state
+        .pointer("/componentModel/counts/hudValue")
+        .cloned()
+        .unwrap_or_else(|| json!(hud_values.len()));
     json!({
         "present": world_state.get("goalFlags").is_some()
             || world_state.get("gameplayRules").is_some()
@@ -17550,6 +17575,8 @@ fn dashboard_gameplay_summary(world_state: &serde_json::Value) -> serde_json::Va
         "goalFlagEntityCount": world_state.pointer("/componentModel/counts/goalFlag")
             .cloned()
             .unwrap_or_else(|| json!(dashboard_entities_with_component(world_state, "goalFlag"))),
+        "hudValueEntityCount": hud_value_entity_count,
+        "hudValues": hud_values,
         "triggerCollisionEventCount": trigger_collision_event_count,
         "trueFlags": true_flags,
         "flags": flag_entries
@@ -29877,7 +29904,13 @@ scenarios:
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
                 "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
                 "goalFlags": { "coin_collected": true, "door_open": true, "player_alive": true },
-                "componentModel": { "counts": { "trigger": 1, "goalFlag": 1 } },
+                "componentModel": {
+                    "counts": { "trigger": 1, "goalFlag": 1, "hudValue": 2 },
+                    "hudValues": [
+                        { "entityId": "hud_goal", "kind": "goal", "label": "Goal", "value": "Collect coin", "bindFlag": "coin_collected", "flagValue": true, "text": "Goal: Collect coin" },
+                        { "entityId": "hud_health", "kind": "health", "label": "HP", "value": "3/3", "text": "HP: 3/3" }
+                    ]
+                },
                 "reloads": [{ "status": "succeeded" }],
                 "composition": { "entities": [{ "entityId": "player", "parent": null }] }
             }))
@@ -29932,6 +29965,14 @@ scenarios:
             json!(1)
         );
         assert_eq!(
+            model.engine_summaries.gameplay["hudValueEntityCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.gameplay["hudValues"][0]["text"],
+            json!("Goal: Collect coin")
+        );
+        assert_eq!(
             model.engine_summaries.reload["lastStatus"],
             json!("succeeded")
         );
@@ -29941,7 +29982,7 @@ scenarios:
         assert!(journal.contains("## Gameplay Trigger/Flag Evidence"));
         assert!(journal.contains("Declared flags: `2`; observed world flags: `3`"));
         assert!(journal.contains(
-            "Trigger components: `1`; goalFlag components: `1`; trigger collision events: `1`"
+            "Trigger components: `1`; goalFlag components: `1`; HUD value components: `2`; trigger collision events: `1`"
         ));
 
         fs::remove_dir_all(root).expect("fixture removed");

@@ -21,7 +21,9 @@ The cockpit at `examples/authoring-cockpit/` now includes:
   project run/export commands.
 - **Run/evidence browser** — existing evidence link summary.
 - **Authoring provenance** — scene edit transaction metadata when bound.
-- **Engine Expansion state** — read-only world-state-derived engine summaries.
+- **Engine Expansion state** — read-only world-state-derived engine summaries,
+  including gameplay flags and minimal HUD value counts when runtime probes
+  expose `componentModel.hudValues`.
 - **Journal viewer** — generated run journal summary and refs.
 - **Project-scoped scene mutation lifecycle** — proposal/application records,
   project-scoped application count, accepted review decision linkage, rollback
@@ -72,6 +74,21 @@ Studio v3 does not implement:
 Generated `runs/`, dashboard exports, screenshots, transaction artifacts, and
 local runtime state remain untracked unless a future issue explicitly scopes a
 small deterministic fixture as tracked source-like data.
+
+## HUD read-model contract
+
+The dashboard and cockpit consume HUD state only through exported runtime
+evidence. `read_dashboard_run` may surface:
+
+- `engine_summaries.gameplay.hudValueEntityCount`
+- `engine_summaries.gameplay.hudValues[]` with display-safe fields such as
+  `entityId`, `kind`, `label`, `value`, `bindFlag`, `flagValue`, and `text`
+
+Studio displays those fields as read-only summaries. It does not edit HUD
+components, infer semantic gameplay quality, or execute scenario checks in the
+browser. Scenario packs can assert HUD-visible state with existing
+`world_state` assertions against `componentModel.hudValues`; no new evaluator
+target is required for HUD v1.
 
 ## PW1.8.4 integration evidence
 

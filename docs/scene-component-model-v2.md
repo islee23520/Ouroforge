@@ -80,6 +80,12 @@ Runtime behavior stays intentionally small and evidence-first:
 
 `hudValue` is intentionally a minimal HUD surface, not a UI framework. It carries static display text plus an optional `bindFlag` so scenarios and evidence can correlate visible HUD state with trusted Rust-validated gameplay flags.
 
+Dashboard and Studio read models consume the same probe surface via
+`engine_summaries.gameplay.hudValueEntityCount` and
+`engine_summaries.gameplay.hudValues[]`. Scenario packs should assert HUD-visible
+state through existing `world_state` JSON-path assertions such as
+`componentModel.hudValues`; HUD v1 does not add a separate evaluator target.
+
 ## Non-goals and guardrails
 
 Scene Component Model v2 is not visual scripting, a native export pipeline, a plugin/runtime marketplace, a hosted/cloud/server/auth feature, or a Godot replacement claim. It introduces no trusted browser command bridge and no browser-side source-write path. Generated run evidence remains local under `runs/` and untracked.

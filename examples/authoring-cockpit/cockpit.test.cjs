@@ -257,7 +257,7 @@ const run = {
     animation: { animatedEntityCount: 0 },
     audio: { audioEntityCount: 0, audioEventCount: 0 },
     physics: { colliderEntityCount: 2, collisionEventCount: 1 },
-    gameplay: { worldFlagCount: 3, trueFlagCount: 2, triggerCollisionEventCount: 1 },
+    gameplay: { worldFlagCount: 3, trueFlagCount: 2, triggerCollisionEventCount: 1, hudValueEntityCount: 2 },
     reload: { reloadCount: 0, lastStatus: null },
     composition: { entityCount: 3, parentedEntityCount: 0 },
   },
@@ -450,8 +450,8 @@ assert.match(cockpit.renderSemanticComparisonSummary({ value: { semantic: { proj
 assert.match(cockpit.renderSemanticComparisonSummary({ semantic: { reasons: [{ kind: '<script>', severity: '<img>', summary: '<bad>' }], warnings: ['<warn>'] } }), /&lt;bad&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
-assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay flags/);
-assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\)/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);

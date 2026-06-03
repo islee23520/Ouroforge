@@ -177,13 +177,18 @@ const OuroforgeDashboard = (() => {
     const trueFlags = Array.isArray(gameplay.trueFlags) && gameplay.trueFlags.length
       ? gameplay.trueFlags.join(', ')
       : 'none';
+    const hudValues = Array.isArray(gameplay.hudValues) && gameplay.hudValues.length
+      ? gameplay.hudValues.map((hud) => hud?.text || [hud?.label, hud?.value].filter(Boolean).join(': ') || hud?.entityId || 'HUD value').join(', ')
+      : 'none';
     const rows = [
       ['Declared flags', gameplay.declaredFlagCount ?? 0],
       ['World flags', `${gameplay.worldFlagCount ?? 0} (${gameplay.trueFlagCount ?? 0} true / ${gameplay.falseFlagCount ?? 0} false)`],
       ['Trigger components', gameplay.triggerEntityCount ?? 0],
       ['Goal flag components', gameplay.goalFlagEntityCount ?? 0],
+      ['HUD value components', gameplay.hudValueEntityCount ?? 0],
       ['Trigger collision events', gameplay.triggerCollisionEventCount ?? 0],
       ['True flags', trueFlags],
+      ['HUD values', hudValues],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     return `<div class="field-grid">${rows}</div><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>`;
   }

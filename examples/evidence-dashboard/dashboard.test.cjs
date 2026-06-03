@@ -46,6 +46,11 @@ const run = {
       falseFlagCount: 1,
       triggerEntityCount: 1,
       goalFlagEntityCount: 1,
+      hudValueEntityCount: 2,
+      hudValues: [
+        { entityId: 'hud_goal', kind: 'goal', label: 'Goal', value: 'Collect coin', bindFlag: 'coin_collected', flagValue: true, text: 'Goal: Collect coin' },
+        { entityId: 'hud_health', kind: 'health', label: 'HP', value: '3/3', text: 'HP: 3/3' },
+      ],
       triggerCollisionEventCount: 1,
       trueFlags: ['coin_collected', 'door_open'],
     },
@@ -481,6 +486,8 @@ assert.match(dashboard.renderProbeContractStatus(run.probe_contract_status), /pr
 assert.match(dashboard.renderProbeContractStatus({ status: 'malformed', contract_name: 'ouroforge-runtime-probe', version: 'v2', observed_count: 1, missing_count: 1, malformed_count: 1, evidence_refs: ['evidence/failure.json'] }), /1 malformed/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);
+assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /HUD value components/);
+assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Goal: Collect coin/);
 assert.match(dashboard.renderGameplaySummary({}), /No trigger\/flag world-state summary/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);

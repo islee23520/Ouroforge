@@ -346,7 +346,7 @@ const OuroforgeCockpit = (() => {
       ['Animation', `${summaryValue(summary, 'animation', 'animatedEntityCount', 0)} animated entit(ies)`],
       ['Audio', `${summaryValue(summary, 'audio', 'audioEntityCount', 0)} audio entit(ies), ${summaryValue(summary, 'audio', 'audioEventCount', 0)} event(s)`],
       ['Physics/contact', `${summaryValue(summary, 'physics', 'colliderEntityCount', 0)} collider entit(ies), ${summaryValue(summary, 'physics', 'collisionEventCount', 0)} event(s)`],
-      ['Gameplay flags', `${summaryValue(summary, 'gameplay', 'worldFlagCount', 0)} flag(s), ${summaryValue(summary, 'gameplay', 'trueFlagCount', 0)} true, ${summaryValue(summary, 'gameplay', 'triggerCollisionEventCount', 0)} trigger event(s)`],
+      ['Gameplay/HUD', `${summaryValue(summary, 'gameplay', 'worldFlagCount', 0)} flag(s), ${summaryValue(summary, 'gameplay', 'trueFlagCount', 0)} true, ${summaryValue(summary, 'gameplay', 'triggerCollisionEventCount', 0)} trigger event(s), ${summaryValue(summary, 'gameplay', 'hudValueEntityCount', 0)} HUD value(s)`],
       ['Reload', `${summaryValue(summary, 'reload', 'reloadCount', 0)} reload(s), last ${summaryValue(summary, 'reload', 'lastStatus')}`],
       ['Composition', `${summaryValue(summary, 'composition', 'entityCount', 0)} composed entit(ies), ${summaryValue(summary, 'composition', 'parentedEntityCount', 0)} parented`],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');

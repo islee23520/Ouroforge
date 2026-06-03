@@ -85,6 +85,10 @@ Scenario Pack v1 reuses the existing bounded Scenario DSL:
 - existing bounded assertion operators such as `equals`, `notEquals`, `exists`,
   `contains`, `greaterThan`, `lessThan`, and count comparisons.
 
+HUD v1 scenario checks use the existing `world_state` target. Runtime probes
+publish HUD display state under `componentModel.hudValues`, so scenario packs can
+assert HUD presence without adding browser-side semantics or an AI judge.
+
 Unsupported fields are rejected by Rust `deny_unknown_fields`. Scenario Pack v1
 intentionally does not add AI judging, natural-language verdicts, Playwright, or
 new evaluator semantics.
