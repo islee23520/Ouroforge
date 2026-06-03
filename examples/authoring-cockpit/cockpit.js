@@ -780,8 +780,9 @@ const OuroforgeCockpit = (() => {
 
   function renderRegressionMatrixSurface(run) {
     const matrix = run?.regression_matrix || run?.regressionMatrix || null;
+    const matrixSummary = renderReviewCockpitStageCard(reviewCockpitStage(run, 'matrix', 'matrix'), run);
     if (!matrix || typeof matrix !== 'object') {
-      return '<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No regression matrix export loaded. Run dashboard export with the latest Rust CLI.</p></section>';
+      return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2><p class="empty">No regression matrix export loaded. Run dashboard export with the latest Rust CLI.</p>${matrixSummary}</section>`;
     }
     const projects = Array.isArray(matrix.projects) ? matrix.projects : [];
     const skipped = Array.isArray(matrix.skippedRuns) ? matrix.skippedRuns : Array.isArray(matrix.skipped_runs) ? matrix.skipped_runs : [];
@@ -799,6 +800,7 @@ const OuroforgeCockpit = (() => {
     return `<section id="regression-matrix" class="panel"><h2>Regression run matrix</h2>
       <p class="hint">Read-only local run history. The cockpit does not schedule CI, rerun scenarios, promote scenarios, execute commands, or write scenario packs from this matrix.</p>
       <p class="hint">${escapeText(skippedText)}</p>
+      ${matrixSummary}
       <div class="surface-list">${rows}</div>
     </section>`;
   }
@@ -827,8 +829,9 @@ const OuroforgeCockpit = (() => {
     const context = run?.command_context || run?.summary?.command_context || {};
     const project = run?.project || run?.summary?.project || {};
     const projectPath = project.manifestPath || context.manifestPath || 'ouroforge.project.json';
+    const promotionSummary = renderReviewCockpitStageCard(reviewCockpitStage(run, 'promotions', 'promotions'), run);
     if (!records.length) {
-      return '<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="empty">No regression promotion records loaded. Use the Rust CLI outside the browser to generate drafts, dry-run promotion, and promote manually.</p></section>';
+      return `<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="empty">No regression promotion records loaded. Use the Rust CLI outside the browser to generate drafts, dry-run promotion, and promote manually.</p>${promotionSummary}</section>`;
     }
     const rows = records.map((record) => {
       const target = record.target || {};
@@ -839,7 +842,7 @@ const OuroforgeCockpit = (() => {
         <small>record ${escapeText(record.recordPath || record.record_path || 'dry-run/no record')}</small>
         <div class="command-list"><code>${escapeText(command)}</code></div></div>`;
     }).join('');
-    return `<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="hint">Display-only manual promotion records. The cockpit does not generate drafts, dry-run, promote, execute commands, or write scenario packs from browser JavaScript.</p>${rows}</section>`;
+    return `<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="hint">Display-only manual promotion records. The cockpit does not generate drafts, dry-run, promote, execute commands, or write scenario packs from browser JavaScript.</p>${promotionSummary}${rows}</section>`;
   }
 
   function renderReplaySurface(run) {
