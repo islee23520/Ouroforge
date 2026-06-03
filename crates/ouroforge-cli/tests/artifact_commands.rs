@@ -342,6 +342,36 @@ fn asset_validate_reports_sprite_atlas_read_only_summary() {
 }
 
 #[test]
+fn asset_validate_accepts_playable_demo_asset_fixture_manifest() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let demo_root = repo_root.join("examples/playable-demo-v2/collect-and-exit");
+    let manifest_path = demo_root.join("asset-manifest.json");
+
+    let asset_output = run_cli(
+        &repo_root,
+        &["asset", "validate", manifest_path.to_str().unwrap()],
+    );
+    assert!(asset_output.contains("Asset manifest valid: collect_and_exit_demo_assets"));
+    assert!(asset_output.contains("Assets: 5"));
+    assert!(asset_output.contains("Source-like assets: 5"));
+    assert!(asset_output.contains("Generated assets: 0"));
+    assert!(asset_output.contains("Sprite atlases: 1"));
+    assert!(asset_output.contains("Sprite atlas frames: 6"));
+    assert!(asset_output.contains("Sprite atlas animations: 1"));
+    assert!(
+        asset_output.contains("Asset types: image=1,sprite_atlas=1,tileset=1,tilemap=1,audio=1")
+    );
+
+    let project_output = run_cli(
+        &repo_root,
+        &["project", "validate", demo_root.to_str().unwrap()],
+    );
+    assert!(project_output.contains("Project manifest valid: collect_and_exit_demo"));
+    assert!(project_output.contains("Asset roots: 1"));
+    assert!(project_output.contains("Scenario packs: 1"));
+}
+
+#[test]
 fn project_init_creates_valid_minimal_workspace_and_rejects_unsafe_destinations() {
     let temp = unique_temp_dir("ouroforge-cli-project-init-test");
     fs::create_dir_all(&temp).expect("temp dir exists");

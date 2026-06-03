@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "demo-sprite-atlas-fixture-v1",
+  "image": "assets/sprites/collect-and-exit-sheet.png",
+  "frames": [
+    {
+      "id": "player_idle_0",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "player_idle_1",
+      "rect": {
+        "x": 16,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "key",
+      "rect": {
+        "x": 32,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "door_closed",
+      "rect": {
+        "x": 48,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "ground",
+      "rect": {
+        "x": 0,
+        "y": 16,
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "exit",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "width": 16,
+        "height": 16
+      }
+    }
+  ],
+  "animations": [
+    {
+      "id": "player_idle",
+      "frames": [
+        {
+          "frameId": "player_idle_0",
+          "durationMs": 120
+        },
+        {
+          "frameId": "player_idle_1",
+          "durationMs": 120
+        }
+      ]
+    }
+  ]
+}
