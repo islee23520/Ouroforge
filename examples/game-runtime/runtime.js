@@ -84,6 +84,7 @@
     collisions: [],
     collisionEvents: [],
     collisionRules: { defaultLayer: 'default' },
+    gameplayRules: { version: '1', flags: [] },
     audioEvents: [],
     reloads: [],
     tilemaps: [],
@@ -287,12 +288,18 @@
   function normalizeGameplayRules(gameplayRules = null) {
     if (!gameplayRules || typeof gameplayRules !== 'object' || Array.isArray(gameplayRules)) return null;
     const source = objectValue(gameplayRules);
+    const seen = new Set();
     return {
       ...source,
       version: typeof source.version === 'string' ? source.version : '1',
       flags: Array.isArray(source.flags)
         ? source.flags
           .filter((flag) => flag && typeof flag === 'object' && typeof flag.id === 'string' && flag.id)
+          .filter((flag) => {
+            if (seen.has(flag.id)) return false;
+            seen.add(flag.id);
+            return true;
+          })
           .map((flag) => ({
             ...objectValue(flag),
             id: flag.id,
@@ -463,8 +470,12 @@
         record('runtime.trigger.entered', {
           triggerId: trigger.id,
           entityId: triggerEntity.id,
+          movingEntityId: event.movingEntityId,
+          otherEntityId: event.otherEntityId,
           pairId: event.pairId,
           targetFlag: trigger.targetFlag,
+          targetValue: trigger.targetFlag ? world.goalFlags[trigger.targetFlag] === true : null,
+          flags: clone(world.goalFlags),
         });
       }
     }
@@ -519,17 +530,15 @@
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
     world.collisionRules = clone(normalized.collisionRules);
-    world.gameplayRules = normalized.gameplayRules ? clone(normalized.gameplayRules) : null;
+    world.gameplayRules = normalized.gameplayRules ? clone(normalized.gameplayRules) : { version: '1', flags: [] };
     world.assetManifest = normalized.assetManifest ? clone(normalized.assetManifest) : null;
     world.goalFlags = {};
+    for (const flag of world.gameplayRules.flags) {
+      if (flag.initial === true) world.goalFlags[flag.id] = true;
+    }
     world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };
     for (const entity of world.entities) {
       if (isDynamicPhysicsEntity(entity)) world.physics.grounded[entity.id] = false;
-    }
-    if (world.gameplayRules && Array.isArray(world.gameplayRules.flags)) {
-      for (const flag of world.gameplayRules.flags) {
-        if (flag.initial === true) world.goalFlags[flag.id] = true;
-      }
     }
     for (const entity of world.entities) {
       const goalFlag = entity.components && entity.components.goalFlag;
@@ -551,6 +560,7 @@
       sceneId: world.sceneId,
       entityCount: world.entities.length,
       assetCount: assetMetadata.length,
+      gameplayFlagCount: world.gameplayRules.flags.length,
       assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
     });
     emitAudioEvents('scene_loaded');

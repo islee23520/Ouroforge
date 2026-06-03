@@ -350,6 +350,9 @@ pub enum ScenarioAssertion {
     RuntimeEvents {
         runtime_events: JsonPathAssertion,
     },
+    WorldFlags {
+        world_flags: JsonPathAssertion,
+    },
     PhysicsEvidence {
         physics_evidence: JsonPathAssertion,
     },
@@ -1211,6 +1214,9 @@ fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<Sce
         }),
         "runtime_events" => Ok(ScenarioAssertion::RuntimeEvents {
             runtime_events: json_path_assertion,
+        }),
+        "world_flags" => Ok(ScenarioAssertion::WorldFlags {
+            world_flags: json_path_assertion,
         }),
         "physics_evidence" => Ok(ScenarioAssertion::PhysicsEvidence {
             physics_evidence: json_path_assertion,
@@ -5833,6 +5839,7 @@ impl ScenarioAssertion {
             ScenarioAssertion::WorldState { world_state } => world_state,
             ScenarioAssertion::FrameStats { frame_stats } => frame_stats,
             ScenarioAssertion::RuntimeEvents { runtime_events } => runtime_events,
+            ScenarioAssertion::WorldFlags { world_flags } => world_flags,
             ScenarioAssertion::PhysicsEvidence { physics_evidence } => physics_evidence,
             ScenarioAssertion::PerformanceMetrics {
                 performance_metrics,
@@ -12349,6 +12356,10 @@ fn run_scenario<T: CdpTransport>(
         .get("physics")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let world_flags_source = world_state
+        .get("goalFlags")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     // The runtime exposes audio under `audioEvents` and animation per-entity
     // under `entities[*].components.animation` (examples/game-runtime/runtime.js),
     // so point the audio/animation assertion sources at the data that actually
@@ -12376,6 +12387,10 @@ fn run_scenario<T: CdpTransport>(
             evidence_ref: runtime_event_paths
                 .first()
                 .map_or(trace_path.as_str(), String::as_str),
+        },
+        world_flags: AssertionSource {
+            value: &world_flags_source,
+            evidence_ref: &world_state_path,
         },
         physics_evidence: AssertionSource {
             value: &physics_source,
@@ -12771,6 +12786,7 @@ struct ScenarioAssertionSources<'a> {
     world_state: AssertionSource<'a>,
     frame_stats: AssertionSource<'a>,
     runtime_events: AssertionSource<'a>,
+    world_flags: AssertionSource<'a>,
     physics_evidence: AssertionSource<'a>,
     performance_metrics: AssertionSource<'a>,
     console_errors: AssertionSource<'a>,
@@ -12920,6 +12936,9 @@ fn evaluate_scenario_assertions(
                 }
                 ScenarioAssertion::RuntimeEvents { runtime_events } => {
                     ("runtime_events", runtime_events, sources.runtime_events)
+                }
+                ScenarioAssertion::WorldFlags { world_flags } => {
+                    ("world_flags", world_flags, sources.world_flags)
                 }
                 ScenarioAssertion::PhysicsEvidence { physics_evidence } => (
                     "physics_evidence",
@@ -21280,6 +21299,9 @@ scenarios:
       - runtime_events:
           path: events
           countGreaterThan: 0
+      - world_flags:
+          path: coin_collected
+          equals: true
       - physics_evidence:
           path: grounded.player
           equals: true
@@ -21305,7 +21327,7 @@ scenarios:
 
         let seed = Seed::from_yaml_str(valid).expect("richer assertion schema parses");
 
-        assert_eq!(seed.scenarios[0].assertions.len(), 9);
+        assert_eq!(seed.scenarios[0].assertions.len(), 10);
     }
 
     #[test]
@@ -24713,6 +24735,9 @@ scenarios:
                         assertion.count_greater_than = Some(0);
                     }),
                 },
+                ScenarioAssertion::WorldFlags {
+                    world_flags: json_path_equals("coin_collected", json!(true)),
+                },
                 ScenarioAssertion::PhysicsEvidence {
                     physics_evidence: json_path_equals("grounded.player", json!(true)),
                 },
@@ -24732,7 +24757,8 @@ scenarios:
             "tick": 2,
             "object": { "id": "probe-square" },
             "collisions": [{ "pairId": "goal:player" }],
-            "physics": { "grounded": { "player": true } }
+            "physics": { "grounded": { "player": true } },
+            "goalFlags": { "coin_collected": true }
         });
         let frame_stats = json!({ "fixedDeltaMs": 16 });
         let runtime_events =
@@ -24744,6 +24770,7 @@ scenarios:
             &world_state,
             &frame_stats,
             &runtime_events,
+            &world_state["goalFlags"],
             &world_state["physics"],
             &performance_metrics,
             &console_errors,
@@ -24754,7 +24781,7 @@ scenarios:
 
         let assertions = evaluate_scenario_assertions(&scenario, &sources);
 
-        assert_eq!(assertions.len(), 9);
+        assert_eq!(assertions.len(), 10);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
@@ -24764,9 +24791,11 @@ scenarios:
         assert_eq!(assertions[4]["evidence_ref"], "evidence/world-state.json");
         assert_eq!(assertions[5]["passed"], true);
         assert_eq!(assertions[6]["passed"], true);
-        assert_eq!(assertions[6]["target"], "physics_evidence");
+        assert_eq!(assertions[6]["target"], "world_flags");
         assert_eq!(assertions[7]["passed"], true);
+        assert_eq!(assertions[7]["target"], "physics_evidence");
         assert_eq!(assertions[8]["passed"], true);
+        assert_eq!(assertions[9]["passed"], true);
     }
 
     #[test]
@@ -30765,6 +30794,7 @@ scenarios:
         world_state: &'a serde_json::Value,
         frame_stats: &'a serde_json::Value,
         runtime_events: &'a serde_json::Value,
+        world_flags: &'a serde_json::Value,
         physics_evidence: &'a serde_json::Value,
         performance_metrics: &'a serde_json::Value,
         console_errors: &'a serde_json::Value,
@@ -30784,6 +30814,10 @@ scenarios:
             runtime_events: AssertionSource {
                 value: runtime_events,
                 evidence_ref: "evidence/cdp-trace-summary.json",
+            },
+            world_flags: AssertionSource {
+                value: world_flags,
+                evidence_ref: "evidence/world-state.json",
             },
             physics_evidence: AssertionSource {
                 value: physics_evidence,

@@ -27,6 +27,7 @@ function createRuntime() {
 }
 
 const scene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'scene-components-v2.json'), 'utf8'));
+const triggerFlagsScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'trigger-flags-v1.json'), 'utf8'));
 const api = createRuntime();
 let state = api.loadScene(scene);
 
@@ -146,3 +147,36 @@ state = api.step(1);
 assert.equal(state.componentModel.goalFlags.coin_collected, true);
 assert.equal(state.entities.find((entity) => entity.id === 'coin').sprite.visible, false);
 assert.ok(api.getEvents().slice(triggerEventCount).some((event) => event.type === 'runtime.trigger.entered'));
+
+const declaredFlagScene = structuredClone(triggerFlagsScene);
+const declaredCoin = declaredFlagScene.entities.find((entity) => entity.id === 'coin');
+declaredCoin.components.transform.x = 34;
+declaredCoin.components.collider = {
+  shape: 'aabb',
+  body: 'static',
+  offset: { x: 0, y: 0 },
+  size: { width: 12, height: 12 },
+  trigger: true,
+};
+const declaredPlayer = declaredFlagScene.entities.find((entity) => entity.id === 'player');
+declaredPlayer.components.collider = {
+  shape: 'aabb',
+  body: 'dynamic',
+  offset: { x: 0, y: 0 },
+  size: { width: 16, height: 16 },
+  collisionMask: ['default'],
+};
+state = api.loadScene(declaredFlagScene);
+assert.equal(state.gameplayRules.flags.length, 3);
+assert.equal(state.componentModel.goalFlags.player_alive, true);
+assert.equal(state.componentModel.goalFlags.coin_collected, false);
+assert.equal(state.componentModel.goalFlags.door_open, undefined);
+const declaredEventCount = api.getEvents().length;
+state = api.step(1);
+assert.equal(state.componentModel.goalFlags.coin_collected, true);
+assert.equal(state.componentModel.goalFlags.door_open, true);
+const declaredTriggerEvent = api.getEvents().slice(declaredEventCount).find((event) => event.type === 'runtime.trigger.entered');
+assert.ok(declaredTriggerEvent);
+assert.equal(declaredTriggerEvent.payload.targetFlag, 'coin_collected');
+assert.equal(declaredTriggerEvent.payload.targetValue, true);
+assert.equal(declaredTriggerEvent.payload.flags.door_open, true);
