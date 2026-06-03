@@ -2014,6 +2014,54 @@ impl AuthoringLoopPlan {
 }
 
 impl AuthoringLoopStepKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthoringLoopStepKind::RunScenarioPack => "run-scenario-pack",
+            AuthoringLoopStepKind::CompareRuns => "compare-runs",
+            AuthoringLoopStepKind::GenerateProposal => "generate-proposal",
+            AuthoringLoopStepKind::RecordReviewDecision => "record-review-decision",
+            AuthoringLoopStepKind::ApplyAcceptedSceneMutation => "apply-accepted-scene-mutation",
+            AuthoringLoopStepKind::Rerun => "rerun",
+            AuthoringLoopStepKind::PromoteRegression => "promote-regression",
+            AuthoringLoopStepKind::Summarize => "summarize",
+        }
+    }
+
+    fn inert_command_text(self) -> String {
+        match self {
+            AuthoringLoopStepKind::RunScenarioPack => "cargo run -p ouroforge-cli -- run <seed> --project <project> --scenario-pack <id>".to_string(),
+            AuthoringLoopStepKind::CompareRuns => "cargo run -p ouroforge-cli -- compare <before-run> <after-run>".to_string(),
+            AuthoringLoopStepKind::GenerateProposal => "cargo run -p ouroforge-cli -- evolve <run-dir>".to_string(),
+            AuthoringLoopStepKind::RecordReviewDecision => "cargo run -p ouroforge-cli -- mutation review <run-or-draft> --proposal <id> --decision <accepted|rejected|deferred> --reason <text> --evidence <ref>".to_string(),
+            AuthoringLoopStepKind::ApplyAcceptedSceneMutation => "cargo run -p ouroforge-cli -- mutation apply-scene <run-dir> --project <project> --operation <operation.json> --decision <id> --transaction-output <path>".to_string(),
+            AuthoringLoopStepKind::Rerun => "cargo run -p ouroforge-cli -- run <seed> --project <project> --scenario-pack <id>".to_string(),
+            AuthoringLoopStepKind::PromoteRegression => "cargo run -p ouroforge-cli -- scenario promote <draft> --project <project> --scenario-pack <id> --dry-run".to_string(),
+            AuthoringLoopStepKind::Summarize => "cargo run -p ouroforge-cli -- journal show <run-dir>".to_string(),
+        }
+    }
+
+    fn safety_gates(self) -> Vec<String> {
+        let mut gates = vec!["inert command text only".to_string()];
+        match self {
+            AuthoringLoopStepKind::ApplyAcceptedSceneMutation => {
+                gates.push(
+                    "requires accepted review decision before any later execution issue may apply"
+                        .to_string(),
+                );
+                gates.push("dry-run does not mutate scenes".to_string());
+            }
+            AuthoringLoopStepKind::PromoteRegression => {
+                gates
+                    .push("dry-run does not write scenario packs or promotion records".to_string());
+            }
+            AuthoringLoopStepKind::RecordReviewDecision => {
+                gates.push("dry-run does not record review decisions".to_string());
+            }
+            _ => {}
+        }
+        gates
+    }
+
     fn order_rank(self) -> u8 {
         match self {
             AuthoringLoopStepKind::RunScenarioPack => 0,
@@ -2051,6 +2099,16 @@ impl AuthoringLoopStepKind {
 }
 
 impl AuthoringLoopStepStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthoringLoopStepStatus::Pending => "pending",
+            AuthoringLoopStepStatus::Running => "running",
+            AuthoringLoopStepStatus::Blocked => "blocked",
+            AuthoringLoopStepStatus::Failed => "failed",
+            AuthoringLoopStepStatus::Completed => "completed",
+        }
+    }
+
     pub fn can_transition_to(self, next: Self) -> bool {
         match (self, next) {
             (current, next) if current == next => true,
@@ -2145,6 +2203,17 @@ impl AuthoringLoopArtifactRef {
     }
 }
 
+impl AuthoringLoopDecisionKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthoringLoopDecisionKind::HumanReview => "human-review",
+            AuthoringLoopDecisionKind::AgentReview => "agent-review",
+            AuthoringLoopDecisionKind::AcceptedMutation => "accepted-mutation",
+            AuthoringLoopDecisionKind::RegressionPromotion => "regression-promotion",
+        }
+    }
+}
+
 impl AuthoringLoopDecisionRef {
     fn validate(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field} id"), &self.id)?;
@@ -2164,6 +2233,115 @@ impl AuthoringLoopGeneratedStatePolicy {
         }
         validate_project_path_list("authoring loop plan generatedState.roots", &self.roots)
     }
+}
+
+pub const AUTHORING_LOOP_DRY_RUN_SCHEMA_VERSION: &str = "authoring-loop-dry-run-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopDryRunSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    pub project: AuthoringLoopProjectContext,
+    pub seed: AuthoringLoopPathRef,
+    #[serde(rename = "scenarioPack")]
+    pub scenario_pack: AuthoringLoopPathRef,
+    pub steps: Vec<AuthoringLoopDryRunStep>,
+    #[serde(rename = "safetyGates")]
+    pub safety_gates: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AuthoringLoopDryRunStep {
+    pub id: String,
+    pub kind: String,
+    pub status: String,
+    #[serde(rename = "commandText")]
+    pub command_text: String,
+    pub prerequisites: Vec<String>,
+    #[serde(rename = "expectedArtifacts")]
+    pub expected_artifacts: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "requiredDecisions")]
+    pub required_decisions: Vec<AuthoringLoopDecisionRef>,
+    #[serde(rename = "safetyGates")]
+    pub safety_gates: Vec<String>,
+}
+
+pub fn build_authoring_loop_dry_run_summary_from_path(
+    plan_path: impl AsRef<Path>,
+) -> Result<AuthoringLoopDryRunSummary> {
+    let plan_path = plan_path.as_ref();
+    let input = fs::read_to_string(plan_path)
+        .with_context(|| format!("failed to read authoring loop plan {}", plan_path.display()))?;
+    let plan = AuthoringLoopPlan::from_json_str(&input).with_context(|| {
+        format!(
+            "failed to parse authoring loop plan {}",
+            plan_path.display()
+        )
+    })?;
+    build_authoring_loop_dry_run_summary(&plan)
+}
+
+pub fn build_authoring_loop_dry_run_summary(
+    plan: &AuthoringLoopPlan,
+) -> Result<AuthoringLoopDryRunSummary> {
+    plan.validate_schema()?;
+    let steps = plan
+        .steps
+        .iter()
+        .map(AuthoringLoopDryRunStep::from_plan_step)
+        .collect();
+    Ok(AuthoringLoopDryRunSummary {
+        schema_version: AUTHORING_LOOP_DRY_RUN_SCHEMA_VERSION.to_string(),
+        loop_id: plan.loop_id.clone(),
+        project: plan.project.clone(),
+        seed: plan.seed.clone(),
+        scenario_pack: plan.scenario_pack.clone(),
+        steps,
+        safety_gates: vec![
+            "dry-run only: no commands executed".to_string(),
+            "dry-run only: no trusted files written".to_string(),
+            "browser surfaces must treat command text as inert display data".to_string(),
+        ],
+        boundary: "Dry-run summary is inert local data; it does not execute, mutate scenes, promote regressions, or bridge browser output to commands.".to_string(),
+    })
+}
+
+impl AuthoringLoopDryRunStep {
+    fn from_plan_step(step: &AuthoringLoopStep) -> Self {
+        Self {
+            id: step.id.clone(),
+            kind: step.kind.as_str().to_string(),
+            status: step.status.as_str().to_string(),
+            command_text: step.kind.inert_command_text(),
+            prerequisites: dry_run_prerequisites(step),
+            expected_artifacts: step.expected_artifacts.clone(),
+            required_decisions: step.required_decisions.clone(),
+            safety_gates: step.kind.safety_gates(),
+        }
+    }
+}
+
+fn dry_run_prerequisites(step: &AuthoringLoopStep) -> Vec<String> {
+    let mut prerequisites = Vec::new();
+    prerequisites.extend(
+        step.depends_on
+            .iter()
+            .map(|dependency| format!("step:{dependency}")),
+    );
+    prerequisites.extend(
+        step.inputs
+            .iter()
+            .map(|input| format!("artifact:{}:{}", input.id, input.path)),
+    );
+    prerequisites.extend(
+        step.required_decisions
+            .iter()
+            .map(|decision| format!("decision:{}:{}", decision.id, decision.kind.as_str())),
+    );
+    prerequisites
 }
 
 const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "project-manifest-v1";
@@ -15653,6 +15831,75 @@ scenarios:
         assert!(
             !AuthoringLoopStepStatus::Pending.can_transition_to(AuthoringLoopStepStatus::Completed)
         );
+    }
+
+    #[test]
+    fn loop_dry_run_summary_renders_inert_step_order_and_commands() {
+        let plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/completed.json"
+        ))
+        .expect("completed loop plan validates");
+
+        let summary = build_authoring_loop_dry_run_summary(&plan).expect("dry-run summary builds");
+
+        assert_eq!(
+            summary.schema_version,
+            AUTHORING_LOOP_DRY_RUN_SCHEMA_VERSION
+        );
+        assert_eq!(summary.loop_id, "fixture-loop-completed");
+        assert_eq!(summary.steps.len(), 8);
+        assert_eq!(summary.steps[0].kind, "run-scenario-pack");
+        assert_eq!(summary.steps[0].status, "completed");
+        assert!(summary.steps[0]
+            .command_text
+            .contains("cargo run -p ouroforge-cli -- run"));
+        assert!(summary.steps[4]
+            .safety_gates
+            .iter()
+            .any(|gate| gate.contains("does not mutate scenes")));
+        assert!(summary.boundary.contains("does not execute"));
+
+        let rendered = serde_json::to_string_pretty(&summary).expect("summary serializes");
+        assert!(rendered.contains("inert command text only"));
+        assert!(!rendered.contains("statusTransition"));
+    }
+
+    #[test]
+    fn loop_dry_run_summary_lists_prerequisites_and_expected_artifacts() {
+        let plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/partial.json"
+        ))
+        .expect("partial loop plan validates");
+
+        let summary = build_authoring_loop_dry_run_summary(&plan).expect("dry-run summary builds");
+        let compare = summary
+            .steps
+            .iter()
+            .find(|step| step.id == "compare-runs")
+            .expect("compare step present");
+        assert_eq!(compare.status, "running");
+        assert!(compare
+            .prerequisites
+            .iter()
+            .any(|prerequisite| prerequisite == "step:run-baseline"));
+        assert!(compare
+            .prerequisites
+            .iter()
+            .any(|prerequisite| prerequisite.contains("artifact:baseline-run")));
+        assert!(compare
+            .expected_artifacts
+            .iter()
+            .any(|artifact| artifact.id == "comparison"));
+
+        let review = summary
+            .steps
+            .iter()
+            .find(|step| step.id == "record-review")
+            .expect("review step present");
+        assert!(review
+            .prerequisites
+            .iter()
+            .any(|prerequisite| prerequisite.contains("decision:human-review")));
     }
 
     #[test]
