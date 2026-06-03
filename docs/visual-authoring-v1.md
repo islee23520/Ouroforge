@@ -93,8 +93,10 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    and preview-only transaction generation for bounded scene entity/component
    edits within the existing scene edit transaction model; unsupported scene
    categories remain rejected before preview.
-3. **Tilemap Visual Edit Draft v1** — support draft descriptions for tilemap,
-   layer, tileset, collision-tag, and placement edits without direct writes.
+3. **Tilemap Visual Edit Draft v1** — support draft descriptions, Rust
+   preflight, preview summaries, and collision/trigger read-model metadata for
+   tilemap, layer, tileset, collision-tag, and placement edits without direct
+   writes.
 4. **Asset Reference Edit Draft v1** — support draft descriptions for manifest,
    sprite, tilemap, audio, font, and scenario asset-reference edits with
    integrity expectations.
@@ -125,6 +127,8 @@ Studio may:
 
 - maintain temporary draft state in browser memory;
 - render escaped preview/read-model state from trusted exported artifacts;
+- render escaped tilemap draft preview summaries, affected-cell counts, hashes,
+  and collision/trigger metadata as display-only diagnostics;
 - show warnings for stale, invalid, unsupported, or unreviewed drafts;
 - copy draft JSON to the clipboard or display copyable commands; and
 - explain which trusted CLI command a human can run outside the browser.
@@ -132,6 +136,8 @@ Studio may:
 Studio must not:
 
 - write trusted project, scene, asset, tilemap, source, config, or evidence files;
+- treat tilemap draft preview metadata as an apply decision or persistence
+  permission;
 - execute shell commands, spawn local processes, install dependencies, or call a
   local write API;
 - upload, fetch, or persist assets through a browser-trusted path;
