@@ -10229,6 +10229,107 @@ pub struct PatchDraftArtifact {
     pub drafts: Vec<PatchDraft>,
 }
 
+pub const VISUAL_EDIT_DRAFT_SCHEMA_VERSION: &str = "visual-edit-draft-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum VisualEditDraftTargetType {
+    Scene,
+    Tilemap,
+    AssetReference,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualEditDraftOperationKind {
+    Add,
+    Update,
+    Remove,
+    Reorder,
+    LinkAsset,
+    UnlinkAsset,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualEditDraftValidationStatus {
+    Unvalidated,
+    Partial,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualEditDraftAuthorType {
+    Human,
+    Agent,
+    Studio,
+    System,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    pub target: VisualEditDraftTarget,
+    #[serde(rename = "proposedOperations")]
+    pub proposed_operations: Vec<VisualEditDraftOperation>,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "expectedAfterSummary")]
+    pub expected_after_summary: String,
+    #[serde(
+        rename = "linkedEvidence",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub linked_evidence: Vec<String>,
+    pub author: VisualEditDraftAuthor,
+    #[serde(rename = "validationStatus")]
+    pub validation_status: VisualEditDraftValidationStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftTarget {
+    #[serde(rename = "type")]
+    pub target_type: VisualEditDraftTargetType,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftOperation {
+    pub id: String,
+    pub kind: VisualEditDraftOperationKind,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftAuthor {
+    #[serde(rename = "type")]
+    pub author_type: VisualEditDraftAuthorType,
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MutationReviewState {
@@ -22641,11 +22742,91 @@ scenarios:
             .join(relative)
     }
 
+    fn read_visual_edit_draft_fixture(relative: &str) -> String {
+        fs::read_to_string(repo_fixture_path(relative))
+            .unwrap_or_else(|error| panic!("{relative} reads: {error:#}"))
+    }
+
     #[test]
     fn parses_valid_seed() {
         let seed = Seed::from_yaml_str(VALID_SEED).expect("valid seed parses");
         assert_eq!(seed.id, "platformer.v0");
         assert_eq!(seed.constraints.target, "file-harness");
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_round_trips_valid_target_fixtures() {
+        for (fixture, expected_target_type) in [
+            (
+                "examples/visual-edit-draft-v1/valid/scene.visual-edit-draft.json",
+                VisualEditDraftTargetType::Scene,
+            ),
+            (
+                "examples/visual-edit-draft-v1/valid/tilemap.visual-edit-draft.json",
+                VisualEditDraftTargetType::Tilemap,
+            ),
+            (
+                "examples/visual-edit-draft-v1/valid/asset-reference.visual-edit-draft.json",
+                VisualEditDraftTargetType::AssetReference,
+            ),
+        ] {
+            let input = read_visual_edit_draft_fixture(fixture);
+            let draft: VisualEditDraftArtifact = serde_json::from_str(&input)
+                .unwrap_or_else(|error| panic!("{fixture} parses: {error:#}"));
+
+            assert_eq!(draft.schema_version, VISUAL_EDIT_DRAFT_SCHEMA_VERSION);
+            assert_eq!(draft.target.target_type, expected_target_type);
+            assert_eq!(
+                draft.validation_status,
+                VisualEditDraftValidationStatus::Unvalidated
+            );
+            assert!(!draft.proposed_operations.is_empty());
+
+            let serialized = serde_json::to_string_pretty(&draft).expect("draft serializes");
+            let round_trip: VisualEditDraftArtifact =
+                serde_json::from_str(&serialized).expect("serialized draft parses");
+            assert_eq!(round_trip, draft);
+        }
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_accepts_partial_and_blocked_fixtures() {
+        for (fixture, expected_status) in [
+            (
+                "examples/visual-edit-draft-v1/partial/missing-evidence.visual-edit-draft.json",
+                VisualEditDraftValidationStatus::Partial,
+            ),
+            (
+                "examples/visual-edit-draft-v1/blocked/unsupported-target.visual-edit-draft.json",
+                VisualEditDraftValidationStatus::Blocked,
+            ),
+        ] {
+            let input = read_visual_edit_draft_fixture(fixture);
+            let draft: VisualEditDraftArtifact = serde_json::from_str(&input)
+                .unwrap_or_else(|error| panic!("{fixture} parses: {error:#}"));
+
+            assert_eq!(draft.schema_version, VISUAL_EDIT_DRAFT_SCHEMA_VERSION);
+            assert_eq!(draft.validation_status, expected_status);
+            assert!(!draft.blocked_reasons.is_empty());
+        }
+    }
+
+    #[test]
+    fn visual_edit_draft_v1_rejects_unsupported_target_and_unknown_fields() {
+        for fixture in [
+            "examples/visual-edit-draft-v1/invalid/unsupported-target-type.visual-edit-draft.json",
+            "examples/visual-edit-draft-v1/invalid/unknown-field.visual-edit-draft.json",
+        ] {
+            let input = read_visual_edit_draft_fixture(fixture);
+            let error = serde_json::from_str::<VisualEditDraftArtifact>(&input)
+                .expect_err("invalid draft fixture must not deserialize");
+
+            let error = error.to_string();
+            assert!(
+                error.contains("unknown variant") || error.contains("unknown field"),
+                "{fixture} error was {error}"
+            );
+        }
     }
 
     #[test]

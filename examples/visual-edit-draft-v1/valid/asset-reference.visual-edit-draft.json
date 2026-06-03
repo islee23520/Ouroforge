@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-asset-ref-player-sprite",
+  "target": {
+    "type": "asset-reference",
+    "path": "asset-manifest.json",
+    "id": "player-sprite"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-link-player-sprite",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.entities.player.sprite.assetId",
+      "summary": "Draft a manifest-backed player sprite reference.",
+      "value": { "assetId": "player-sprite", "expectedType": "sprite" }
+    }
+  ],
+  "beforeHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "expectedAfterSummary": "Scene would reference the manifest-backed player sprite if hash and type checks pass.",
+  "linkedEvidence": ["runs/demo/evidence/assets/player-sprite.preview.json"],
+  "author": { "type": "agent", "id": "visual-authoring-assistant", "source": "draft-json" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

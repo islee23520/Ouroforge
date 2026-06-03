@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-tilemap-place-hazard",
+  "target": {
+    "type": "tilemap",
+    "path": "assets/tilemaps/asset-regression.tilemap.json",
+    "id": "asset-regression-tilemap"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-place-hazard-tile",
+      "kind": "update",
+      "path": "layers.collision.tiles[3,4]",
+      "summary": "Draft a hazard tile placement for later bounds and tileset validation.",
+      "value": { "tileId": "hazard", "collisionTag": "hazard" }
+    }
+  ],
+  "beforeHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "expectedAfterSummary": "Tilemap would place one hazard tile if the trusted CLI validates bounds, tileset refs, and collision tags.",
+  "linkedEvidence": [],
+  "author": { "type": "studio", "id": "authoring-cockpit", "source": "in-memory-draft" },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

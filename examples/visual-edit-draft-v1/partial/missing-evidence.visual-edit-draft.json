@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-partial-scene-edit",
+  "target": { "type": "scene", "path": "scenes/main.scene.json", "id": "main" },
+  "proposedOperations": [
+    {
+      "id": "op-update-player-start",
+      "kind": "update",
+      "path": "entities.player.components.transform",
+      "summary": "Draft a player start adjustment that still needs evidence links.",
+      "value": { "x": 48, "y": 96 }
+    }
+  ],
+  "beforeHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "expectedAfterSummary": "Partial draft needs linked evidence before transaction preview.",
+  "linkedEvidence": [],
+  "author": { "type": "human", "id": "local-author" },
+  "validationStatus": "partial",
+  "blockedReasons": ["missing linked scenario or preview evidence"]
+}
