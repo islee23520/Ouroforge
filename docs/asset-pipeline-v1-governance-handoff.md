@@ -55,6 +55,20 @@ plugin/marketplace decision, or source mutation authorization.
   `docs/public-demo-evidence.md` remain public-readiness inputs only; visibility
   changes still require a separate manual maintainer decision.
 
+## AP1.11.2 issue handoff audit
+
+The governance handoff comment for the broad roadmap anchor was posted at
+<https://github.com/shaun0927/Ouroforge/issues/1#issuecomment-4614700861>.
+
+During AP1.11.2, the roadmap anchor was found closed immediately after the
+AP1.11.1 roadmap-refresh merge even though no replacement source-of-truth
+decision existed and #342 requires it to remain open. The anchor was restored to
+OPEN before the handoff comment was posted. The repo-memory/design context anchor
+was verified OPEN and was not closed.
+
+This audit does not alter the milestone sequence or expand implementation scope;
+it records the required governance state for #342 closure evidence.
+
 ## Non-goals preserved
 
 Asset Pipeline v1 completion does not authorize:
