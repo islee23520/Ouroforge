@@ -10234,6 +10234,8 @@ pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS: usize = 128;
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS: u32 = 4096;
 pub const VISUAL_EDIT_TILEMAP_DRAFT_PREVIEW_SCHEMA_VERSION: &str =
     "visual-edit-tilemap-draft-preview-v1";
+pub const VISUAL_EDIT_ASSET_REFERENCE_DRAFT_PREVIEW_SCHEMA_VERSION: &str =
+    "visual-edit-asset-reference-draft-preview-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -10523,6 +10525,33 @@ pub struct VisualEditTilemapDraftPreview {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct VisualEditAssetReferenceDraftPreview {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "manifestId")]
+    pub manifest_id: String,
+    pub kind: VisualEditAssetReferenceDraftOperationKind,
+    #[serde(rename = "targetReferencePath")]
+    pub target_reference_path: String,
+    #[serde(rename = "replacementAssetId")]
+    pub replacement_asset_id: String,
+    #[serde(rename = "assetType")]
+    pub asset_type: ProjectAssetType,
+    pub path: String,
+    #[serde(rename = "contentHash")]
+    pub content_hash: ProjectAssetContentHash,
+    #[serde(rename = "frameId", default, skip_serializing_if = "Option::is_none")]
+    pub frame_id: Option<String>,
+    #[serde(rename = "eventId", default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    pub summary: String,
+    pub guardrail: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct VisualEditDraftAuthor {
     #[serde(rename = "type")]
     pub author_type: VisualEditDraftAuthorType,
@@ -10795,6 +10824,48 @@ impl VisualEditDraftArtifact {
             );
         }
         Ok(preflights)
+    }
+
+    pub fn preview_asset_reference_drafts(
+        &self,
+        manifest: &ProjectAssetManifest,
+        manifest_base_dir: impl AsRef<Path>,
+    ) -> Result<Vec<VisualEditAssetReferenceDraftPreview>> {
+        let preflights = self.validate_asset_reference_preflight(manifest, manifest_base_dir)?;
+        let preflights_by_target: BTreeMap<&str, &VisualEditAssetReferenceDraftPreflight> =
+            preflights
+                .iter()
+                .map(|preflight| (preflight.target_reference_path.as_str(), preflight))
+                .collect();
+        let mut previews = Vec::new();
+        for operation in &self.proposed_operations {
+            let asset_reference_operation = operation
+                .asset_reference_operation
+                .as_ref()
+                .expect("asset reference operation was validated");
+            let preflight = preflights_by_target
+                .get(asset_reference_operation.target_reference_path.as_str())
+                .expect("preflight was validated");
+            previews.push(VisualEditAssetReferenceDraftPreview {
+                schema_version: VISUAL_EDIT_ASSET_REFERENCE_DRAFT_PREVIEW_SCHEMA_VERSION
+                    .to_string(),
+                operation_id: operation.id.clone(),
+                manifest_id: preflight.manifest_id.clone(),
+                kind: preflight.kind.clone(),
+                target_reference_path: preflight.target_reference_path.clone(),
+                replacement_asset_id: preflight.replacement_asset_id.clone(),
+                asset_type: preflight.asset_type,
+                path: preflight.path.clone(),
+                content_hash: preflight.content_hash.clone(),
+                frame_id: preflight.frame_id.clone(),
+                event_id: preflight.event_id.clone(),
+                summary: asset_reference_operation.preview_summary(),
+                guardrail:
+                    "preview only; no asset file writes, browser trusted writes, remote fetches, or apply behavior"
+                        .to_string(),
+            });
+        }
+        Ok(previews)
     }
 
     pub fn preview_tilemap_edit_transactions(
@@ -11306,6 +11377,35 @@ impl VisualEditAssetReferenceDraftOperation {
             event_id: self.event_id.clone(),
             status: "ready".to_string(),
         })
+    }
+
+    fn preview_summary(&self) -> String {
+        match self.kind {
+            VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference => format!(
+                "Preview sprite asset reference `{}` for `{}`.",
+                self.replacement_asset_id, self.target_reference_path
+            ),
+            VisualEditAssetReferenceDraftOperationKind::SpriteFrameReference => format!(
+                "Preview sprite frame `{}` from atlas `{}` for `{}`.",
+                self.frame_id.as_deref().unwrap_or("<missing-frame>"),
+                self.replacement_asset_id,
+                self.target_reference_path
+            ),
+            VisualEditAssetReferenceDraftOperationKind::AudioEventAssetReference => format!(
+                "Preview audio event `{}` asset `{}` for `{}`.",
+                self.event_id.as_deref().unwrap_or("<missing-event>"),
+                self.replacement_asset_id,
+                self.target_reference_path
+            ),
+            VisualEditAssetReferenceDraftOperationKind::FontAssetReference => format!(
+                "Preview font asset `{}` for `{}`.",
+                self.replacement_asset_id, self.target_reference_path
+            ),
+            VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference => format!(
+                "Preview tilemap tileset asset `{}` for `{}`.",
+                self.replacement_asset_id, self.target_reference_path
+            ),
+        }
     }
 }
 
@@ -24555,6 +24655,26 @@ scenarios:
                 VisualEditAssetReferenceDraftOperationKind::TilemapTilesetReference,
             ]
         );
+        let previews = draft
+            .preview_asset_reference_drafts(&manifest, &root)
+            .expect("asset reference draft previews");
+        assert_eq!(previews.len(), 5);
+        assert!(previews.iter().all(|preview| {
+            preview.schema_version == VISUAL_EDIT_ASSET_REFERENCE_DRAFT_PREVIEW_SCHEMA_VERSION
+                && preview.manifest_id == "asset_ref_preflight_manifest"
+                && preview.guardrail.contains("no asset file writes")
+                && preview.guardrail.contains("remote fetches")
+        }));
+        assert_eq!(previews[0].operation_id, "op-sprite-asset-ref");
+        assert!(previews[0]
+            .summary
+            .contains("Preview sprite asset reference"));
+        assert!(previews
+            .iter()
+            .any(|preview| preview.summary.contains("Preview audio event")));
+        assert!(previews
+            .iter()
+            .any(|preview| preview.summary.contains("Preview tilemap tileset")));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

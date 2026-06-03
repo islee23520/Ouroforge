@@ -129,6 +129,9 @@ Studio may:
 - render escaped preview/read-model state from trusted exported artifacts;
 - render escaped tilemap draft preview summaries, affected-cell counts, hashes,
   and collision/trigger metadata as display-only diagnostics;
+- render escaped asset-reference draft preview summaries, manifest ids,
+  replacement asset ids, asset types, content hashes, and frame/event context as
+  display-only diagnostics;
 - show warnings for stale, invalid, unsupported, or unreviewed drafts;
 - copy draft JSON to the clipboard or display copyable commands; and
 - explain which trusted CLI command a human can run outside the browser.
@@ -138,6 +141,8 @@ Studio must not:
 - write trusted project, scene, asset, tilemap, source, config, or evidence files;
 - treat tilemap draft preview metadata as an apply decision or persistence
   permission;
+- treat asset-reference preview metadata as an apply decision, asset import,
+  remote fetch, or persistence permission;
 - execute shell commands, spawn local processes, install dependencies, or call a
   local write API;
 - upload, fetch, or persist assets through a browser-trusted path;
