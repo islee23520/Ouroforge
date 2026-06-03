@@ -10428,7 +10428,11 @@ fn validate_visual_edit_draft_hash(field: &str, value: &str) -> Result<()> {
     let Some(hash) = value.strip_prefix("sha256:") else {
         return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
     };
-    if hash.len() != 64 || !hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+    if hash.len() != 64
+        || !hash
+            .chars()
+            .all(|ch| ch.is_ascii_digit() || matches!(ch, 'a'..='f'))
+    {
         return Err(anyhow!("{field} must use sha256:<64 lowercase hex>"));
     }
     Ok(())
@@ -22967,6 +22971,14 @@ scenarios:
         draft.before_hash.clear();
         let error = draft.validate().expect_err("missing hash fails");
         assert!(error.to_string().contains("beforeHash is required"));
+
+        let mut draft: VisualEditDraftArtifact =
+            serde_json::from_str(&input).expect("valid draft parses");
+        draft.before_hash = format!("sha256:{}", "A".repeat(64));
+        let error = draft.validate().expect_err("uppercase hex hash fails");
+        assert!(error
+            .to_string()
+            .contains("must use sha256:<64 lowercase hex>"));
 
         let mut draft: VisualEditDraftArtifact =
             serde_json::from_str(&input).expect("valid draft parses");
