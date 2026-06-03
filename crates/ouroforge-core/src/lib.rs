@@ -13583,6 +13583,8 @@ pub struct SceneComponents {
     pub camera_target: Option<SceneCameraTarget>,
     #[serde(default, rename = "uiText", skip_serializing_if = "Option::is_none")]
     pub ui_text: Option<SceneUiText>,
+    #[serde(default, rename = "hudValue", skip_serializing_if = "Option::is_none")]
+    pub hud_value: Option<SceneHudValue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animation: Option<SceneAnimation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -13684,6 +13686,16 @@ pub struct SceneUiText {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+    #[serde(default, rename = "bindFlag", skip_serializing_if = "Option::is_none")]
+    pub bind_flag: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneHudValue {
+    pub kind: String,
+    pub label: String,
+    pub value: String,
     #[serde(default, rename = "bindFlag", skip_serializing_if = "Option::is_none")]
     pub bind_flag: Option<String>,
 }
@@ -14991,6 +15003,9 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         if let Some(ui_text) = &entity.components.ui_text {
             validate_scene_ui_text(&entity.id, ui_text, gameplay_flags.as_ref())?;
         }
+        if let Some(hud_value) = &entity.components.hud_value {
+            validate_scene_hud_value(&entity.id, hud_value, gameplay_flags.as_ref())?;
+        }
         if let Some(animation) = &entity.components.animation {
             validate_scene_animation(&entity.id, animation, scene.asset_manifest.as_ref())?;
         }
@@ -15641,6 +15656,37 @@ fn validate_scene_ui_text(
     if let Some(flag) = &ui_text.bind_flag {
         validate_scene_flag_ref(
             &format!("scene entity {entity_id} uiText bindFlag"),
+            flag,
+            gameplay_flags,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_hud_value(
+    entity_id: &str,
+    hud_value: &SceneHudValue,
+    gameplay_flags: Option<&BTreeSet<String>>,
+) -> Result<()> {
+    if !matches!(
+        hud_value.kind.as_str(),
+        "score" | "health" | "inventory" | "key_count" | "goal" | "flag" | "text"
+    ) {
+        return Err(anyhow!(
+            "scene entity {entity_id} hudValue kind must be score, health, inventory, key_count, goal, flag, or text"
+        ));
+    }
+    require_bounded_display_text(
+        &format!("scene entity {entity_id} hudValue label"),
+        &hud_value.label,
+    )?;
+    require_bounded_display_text(
+        &format!("scene entity {entity_id} hudValue value"),
+        &hud_value.value,
+    )?;
+    if let Some(flag) = &hud_value.bind_flag {
+        validate_scene_flag_ref(
+            &format!("scene entity {entity_id} hudValue bindFlag"),
             flag,
             gameplay_flags,
         )?;
@@ -26847,6 +26893,69 @@ scenarios:
                 .flag,
             "coin_collected"
         );
+    }
+
+    #[test]
+    fn scene_hud_entities_v1_fixture_validates_text_and_values() {
+        let fixture = include_str!("../../../examples/game-runtime/hud-entities-v1.json");
+        let scene: SceneDocument = serde_json::from_str(fixture).expect("hud fixture parses");
+
+        validate_scene(&scene).expect("hud fixture validates");
+        let hud_goal = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == "hud_goal")
+            .expect("goal HUD entity");
+        let hud_value = hud_goal
+            .components
+            .hud_value
+            .as_ref()
+            .expect("goal HUD value");
+        assert_eq!(hud_value.kind, "goal");
+        assert_eq!(hud_value.label, "Goal");
+        assert_eq!(hud_value.value, "Collect coin");
+        assert_eq!(hud_value.bind_flag.as_deref(), Some("coin_collected"));
+
+        let serialized = serde_json::to_value(&scene).expect("scene serializes");
+        assert_eq!(
+            serialized["entities"][1]["components"]["hudValue"]["kind"],
+            "goal"
+        );
+    }
+
+    #[test]
+    fn scene_hud_value_rejects_unknown_kind_and_unknown_flag() {
+        let mut scene: SceneDocument = serde_json::from_str(include_str!(
+            "../../../examples/game-runtime/hud-entities-v1.json"
+        ))
+        .expect("hud fixture parses");
+        scene.entities[1]
+            .components
+            .hud_value
+            .as_mut()
+            .expect("hud value")
+            .kind = "panel".to_string();
+        let kind_error = validate_scene(&scene).expect_err("unknown HUD kind rejected");
+        assert!(kind_error.to_string().contains(
+            "hudValue kind must be score, health, inventory, key_count, goal, flag, or text"
+        ));
+
+        scene.entities[1]
+            .components
+            .hud_value
+            .as_mut()
+            .expect("hud value")
+            .kind = "goal".to_string();
+        scene.entities[1]
+            .components
+            .hud_value
+            .as_mut()
+            .expect("hud value")
+            .bind_flag = Some("missing_flag".to_string());
+        let flag_error = validate_scene(&scene).expect_err("unknown HUD bindFlag rejected");
+        assert!(flag_error
+            .to_string()
+            .contains("hudValue bindFlag references unknown gameplayRules flag: missing_flag"));
     }
 
     #[test]

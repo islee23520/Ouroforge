@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1",
+  "id": "hud-entities-v1-fixture",
+  "bounds": { "width": 320, "height": 180 },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      { "id": "coin_collected", "initial": false, "label": "Coin collected" },
+      { "id": "player_alive", "initial": true, "label": "Player alive" }
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 32, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["player_alive"], "states": [] }
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "hud_goal",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 8 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 96, "height": 12 },
+        "controllable": false,
+        "uiText": { "text": "Goal: collect coin", "role": "hud", "bindFlag": "coin_collected" },
+        "hudValue": { "kind": "goal", "label": "Goal", "value": "Collect coin", "bindFlag": "coin_collected" }
+      },
+      "tags": ["hud"]
+    },
+    {
+      "id": "hud_health",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 24 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 64, "height": 12 },
+        "controllable": false,
+        "hudValue": { "kind": "health", "label": "HP", "value": "3/3", "bindFlag": "player_alive" }
+      },
+      "tags": ["hud"]
+    }
+  ],
+  "metadata": { "fixture": "hud-entities-v1", "scope": "minimal-hud" }
+}
