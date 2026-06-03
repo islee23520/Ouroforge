@@ -1002,6 +1002,66 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     );
     let proposal: serde_json::Value = serde_json::from_str(&proposal_json).unwrap();
     let proposal_id = proposal["id"].as_str().unwrap();
+    let run: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(run_dir.join("run.json")).unwrap()).unwrap();
+    fs::create_dir_all(run_dir.join("mutation")).expect("mutation dir exists");
+    fs::write(
+        run_dir.join("mutation/patch-drafts.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema_version": "1",
+            "run_id": run["id"].as_str().unwrap_or("run-cli-review-gated"),
+            "drafts": [{
+                "id": "patch-draft-cli-scene-apply-1",
+                "proposal_id": proposal_id,
+                "classification_id": "classification-cli-scene-apply-1",
+                "lifecycle_state": "drafted",
+                "target_path": "scenes/review-gated-apply.scene.json",
+                "rationale": "manual scene-only apply review draft",
+                "evidence_refs": ["evidence/scene-mutation.json"],
+                "draft_text": "scene-only CLI review-gated apply draft; no source patch apply"
+            }]
+        }))
+        .unwrap(),
+    )
+    .expect("patch drafts written");
+    let rejected_decision = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            "rejected",
+            "--reason",
+            "manual test rejects before apply",
+            "--evidence",
+            "evidence/scene-mutation.json",
+        ],
+    );
+    let rejected_decision: serde_json::Value =
+        serde_json::from_str(&rejected_decision).expect("rejected decision json");
+    let rejected_decision_id = rejected_decision["id"].as_str().unwrap().to_string();
+    let accepted_decision = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            "accepted",
+            "--reason",
+            "manual test accepts scene-only apply",
+            "--evidence",
+            "evidence/scene-mutation.json",
+        ],
+    );
+    let accepted_decision: serde_json::Value =
+        serde_json::from_str(&accepted_decision).expect("accepted decision json");
+    let accepted_decision_id = accepted_decision["id"].as_str().unwrap().to_string();
     let hash_probe_path = temp.join("transactions/hash-probe.json");
     run_cli(
         &temp,
@@ -1035,6 +1095,30 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
             "validationRequired": true
         }),
     );
+    let rejected_transaction = temp.join("transactions/rejected-review-gated.json");
+    let rejected_apply = run_cli_expect_failure(
+        &temp,
+        &[
+            "mutation",
+            "apply-scene",
+            run_dir.to_str().unwrap(),
+            "--operation",
+            success_operation_path.to_str().unwrap(),
+            "--decision",
+            &rejected_decision_id,
+            "--transaction-output",
+            rejected_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(rejected_apply.contains("requires an accepted decision"));
+    assert!(!rejected_transaction.exists());
+    let scene_before_accepted_apply: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    assert_eq!(
+        scene_before_accepted_apply.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(32))
+    );
+
     let success_transaction = temp.join("transactions/apply-success.json");
     let apply_output = run_cli(
         &temp,
@@ -1044,11 +1128,14 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
             run_dir.to_str().unwrap(),
             "--operation",
             success_operation_path.to_str().unwrap(),
+            "--decision",
+            &accepted_decision_id,
             "--transaction-output",
             success_transaction.to_str().unwrap(),
         ],
     );
     assert!(apply_output.contains("Scene-only mutation applied: scene-edit-"));
+    assert!(apply_output.contains(&format!("Review decision: {accepted_decision_id}")));
     assert!(apply_output.contains("Next QA command:"));
     assert!(success_transaction.is_file());
     let edited_scene: serde_json::Value =
@@ -1064,6 +1151,10 @@ fn mutation_apply_scene_applies_valid_operation_and_rejects_invalid_inputs() {
     )
     .unwrap();
     assert_eq!(applications["applications"][0]["proposalId"], proposal_id);
+    assert_eq!(
+        applications["applications"][0]["reviewDecisionId"],
+        accepted_decision_id
+    );
     assert_eq!(applications["applications"][0]["status"], "applied");
 
     let updated_hash_probe = temp.join("transactions/hash-after.json");

@@ -245,6 +245,8 @@ enum MutationCommand {
         project: Option<PathBuf>,
         #[arg(long, value_name = "PATH")]
         operation: PathBuf,
+        #[arg(long, value_name = "ID")]
+        decision: Option<String>,
         #[arg(long, value_name = "PATH")]
         transaction_output: PathBuf,
     },
@@ -579,6 +581,7 @@ fn main() -> Result<()> {
                     run_dir,
                     project,
                     operation,
+                    decision,
                     transaction_output,
                 },
         } => {
@@ -592,6 +595,9 @@ fn main() -> Result<()> {
                     &project_path,
                 )?;
             }
+            if let Some(decision_id) = decision {
+                operation_model.review_decision_id = Some(decision_id);
+            }
             let transaction = apply_scene_only_mutation_operation(
                 &run_dir,
                 &operation_model,
@@ -599,6 +605,9 @@ fn main() -> Result<()> {
             )?;
             println!("Scene-only mutation applied: {}", transaction.id);
             println!("Transaction artifact: {}", transaction_output.display());
+            if let Some(decision_id) = &operation_model.review_decision_id {
+                println!("Review decision: {decision_id}");
+            }
             println!("Before scene hash: {}", transaction.before_scene_hash.value);
             if let Some(after_hash) = &transaction.after_scene_hash {
                 println!("After scene hash: {}", after_hash.value);
