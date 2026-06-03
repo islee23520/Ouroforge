@@ -57,7 +57,8 @@
       "sprite": {
         "color": "#5eead4",
         "layer": "actors",
-        "order": 0
+        "order": 0,
+        "asset": "collect_and_exit_sheet"
       },
       "components": {
         "transform": {
@@ -123,10 +124,12 @@
               "loop": true,
               "frames": [
                 {
-                  "color": "#5eead4"
+                  "color": "#5eead4",
+                  "asset": "collect_and_exit_sheet"
                 },
                 {
-                  "color": "#2dd4bf"
+                  "color": "#2dd4bf",
+                  "asset": "collect_and_exit_sheet"
                 }
               ]
             }
@@ -142,7 +145,8 @@
             {
               "name": "player_spawn",
               "trigger": "scene_loaded",
-              "action": "play"
+              "action": "play",
+              "asset": "collect_sound"
             }
           ]
         }
@@ -157,7 +161,8 @@
       "sprite": {
         "color": "#facc15",
         "layer": "actors",
-        "order": 5
+        "order": 5,
+        "asset": "collect_and_exit_sheet"
       },
       "components": {
         "transform": {
@@ -209,7 +214,8 @@
         "goalFlag": {
           "flag": "key_collected",
           "label": "Collect key"
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "collectible",
@@ -221,7 +227,8 @@
       "sprite": {
         "color": "#a78bfa",
         "layer": "actors",
-        "order": 6
+        "order": 6,
+        "asset": "collect_and_exit_sheet"
       },
       "components": {
         "transform": {
@@ -267,7 +274,8 @@
         "goalFlag": {
           "flag": "exit_reached",
           "label": "Exit through door"
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "exit",
@@ -279,7 +287,8 @@
       "sprite": {
         "color": "#64748b",
         "layer": "actors",
-        "order": 20
+        "order": 20,
+        "asset": "collect_and_exit_sheet"
       },
       "components": {
         "transform": {
@@ -306,7 +315,8 @@
             "height": 32
           },
           "sensor": false
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "wall",
@@ -344,7 +354,8 @@
           "label": "Goal",
           "value": "Collect key and exit",
           "bindFlag": "exit_reached"
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "hud"
@@ -376,7 +387,8 @@
           "label": "Key",
           "value": "0/1",
           "bindFlag": "key_collected"
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "hud"
@@ -408,7 +420,8 @@
           "label": "HP",
           "value": "3/3",
           "bindFlag": "player_alive"
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "hud"
@@ -419,7 +432,8 @@
       "sprite": {
         "color": "#334155",
         "layer": "actors",
-        "order": 19
+        "order": 19,
+        "asset": "collect_and_exit_sheet"
       },
       "components": {
         "transform": {
@@ -446,7 +460,8 @@
             "height": 16
           },
           "sensor": false
-        }
+        },
+        "controllable": false
       },
       "tags": [
         "floor",
@@ -479,5 +494,135 @@
         "order": 10
       }
     ]
-  }
+  },
+  "assetManifest": {
+    "schemaVersion": "1",
+    "id": "collect-and-exit-runtime-assets",
+    "assets": [
+      {
+        "id": "collect_and_exit_sheet",
+        "kind": "sprite",
+        "path": "assets/sprites/collect-and-exit-sheet.png",
+        "metadata": {
+          "projectAssetId": "collect_and_exit_sheet",
+          "source": "asset-manifest.json"
+        }
+      },
+      {
+        "id": "collect_sound",
+        "kind": "audio",
+        "path": "assets/audio/collect.ogg",
+        "metadata": {
+          "projectAssetId": "collect_sound",
+          "source": "asset-manifest.json"
+        }
+      }
+    ],
+    "metadata": {
+      "purpose": "#340 AP1.9.2 read-only runtime asset refs; project asset manifest remains Rust-trusted"
+    }
+  },
+  "tilemaps": [
+    {
+      "id": "collect_and_exit_level",
+      "tileSize": {
+        "width": 16,
+        "height": 16
+      },
+      "grid": {
+        "width": 10,
+        "height": 6
+      },
+      "tiles": [
+        {
+          "id": "empty",
+          "color": "#0f172a"
+        },
+        {
+          "id": "ground",
+          "color": "#334155",
+          "asset": "collect_and_exit_sheet"
+        },
+        {
+          "id": "key_marker",
+          "color": "#facc15",
+          "trigger": "key_collected",
+          "asset": "collect_and_exit_sheet"
+        },
+        {
+          "id": "exit_marker",
+          "color": "#a78bfa",
+          "goal": true,
+          "asset": "collect_and_exit_sheet"
+        }
+      ],
+      "layers": [
+        {
+          "id": "terrain",
+          "data": [
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "empty",
+            "key_marker",
+            "empty",
+            "empty",
+            "empty",
+            "exit_marker",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground"
+          ]
+        }
+      ]
+    }
+  ]
 }
