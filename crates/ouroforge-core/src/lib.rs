@@ -18343,6 +18343,7 @@ pub struct RunDashboardReadModel {
     pub transaction_provenance: Option<RunTransactionProvenance>,
     pub engine_summaries: RunDashboardEngineSummaries,
     pub asset_integrity: RunDashboardAssetIntegrity,
+    pub asset_loading: RunDashboardAssetLoading,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -18516,6 +18517,21 @@ pub struct RunDashboardAssetIntegrity {
     pub evidence_refs: Vec<String>,
     pub warnings: Vec<ProjectAssetReferenceIntegrityWarning>,
     pub artifacts: Vec<RunDashboardArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardAssetLoading {
+    pub present: bool,
+    pub empty_state: String,
+    pub attempt_count: usize,
+    pub loaded_count: usize,
+    pub failed_count: usize,
+    pub rejected_count: usize,
+    pub fallback_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub records: Vec<RuntimeAssetLoadRecord>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
 }
 
 pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboardSummary>> {
@@ -18853,6 +18869,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let command_context = read_dashboard_command_context(&run);
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let asset_integrity = read_dashboard_asset_integrity(run_dir, &evidence)?;
+    let asset_loading = read_dashboard_asset_loading(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -18904,6 +18921,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         transaction_provenance,
         engine_summaries,
         asset_integrity,
+        asset_loading,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -19201,6 +19219,98 @@ fn dashboard_artifact_is_asset_reference_integrity(artifact: &EvidenceArtifact) 
         == Some("asset_reference_integrity")
         || artifact.id.contains("asset-reference-integrity")
         || artifact.path.contains("asset-reference-integrity")
+}
+
+fn dashboard_artifact_is_runtime_asset_load_evidence(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("runtime_asset_load_evidence")
+        || artifact.id.contains("asset-load-evidence")
+        || artifact.path.contains("asset-load-evidence")
+}
+
+fn read_dashboard_asset_loading(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardAssetLoading> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_runtime_asset_load_evidence,
+    )?;
+    let boundary = "Read-only runtime loading evidence from Rust-exported artifacts; browser surfaces display escaped local evidence only and never fetch remote assets, upload files, write trusted state, or execute commands.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardAssetLoading {
+            present: false,
+            empty_state: "No runtime asset loading evidence is indexed for this run.".to_string(),
+            attempt_count: 0,
+            loaded_count: 0,
+            failed_count: 0,
+            rejected_count: 0,
+            fallback_count: 0,
+            evidence_refs: Vec::new(),
+            records: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut records = Vec::new();
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if let Some(value) = &artifact.value {
+            if let Ok(evidence) = serde_json::from_value::<RuntimeAssetLoadEvidence>(value.clone())
+            {
+                records.extend(evidence.loads);
+            }
+        }
+    }
+    records.sort_by(|left, right| {
+        (
+            left.asset_id.as_str(),
+            left.attempt_id.as_str(),
+            left.started_at_unix_ms,
+        )
+            .cmp(&(
+                right.asset_id.as_str(),
+                right.attempt_id.as_str(),
+                right.started_at_unix_ms,
+            ))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let loaded_count = records
+        .iter()
+        .filter(|record| record.status == RuntimeAssetLoadStatus::Loaded)
+        .count();
+    let failed_count = records
+        .iter()
+        .filter(|record| record.status == RuntimeAssetLoadStatus::Failed)
+        .count();
+    let rejected_count = records
+        .iter()
+        .filter(|record| record.status == RuntimeAssetLoadStatus::Rejected)
+        .count();
+    let fallback_count = records
+        .iter()
+        .filter(|record| record.status == RuntimeAssetLoadStatus::Fallback)
+        .count();
+    Ok(RunDashboardAssetLoading {
+        present: true,
+        empty_state: String::new(),
+        attempt_count: records.len(),
+        loaded_count,
+        failed_count,
+        rejected_count,
+        fallback_count,
+        evidence_refs,
+        records,
+        artifacts,
+        boundary,
+    })
 }
 
 fn read_dashboard_asset_integrity(
