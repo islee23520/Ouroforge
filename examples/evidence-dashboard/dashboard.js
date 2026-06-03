@@ -275,6 +275,44 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(loading.boundary || 'Read-only runtime loading evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.')}</p>`;
   }
 
+  function renderAssetPreview(run = {}) {
+    const preview = run.asset_preview || run.assetPreview || {};
+    if (!preview.present) {
+      return `<p class="empty-state">${escapeText(preview.empty_state || 'No asset preview evidence is available for this run.')}</p>`;
+    }
+    const records = Array.isArray(preview.records) ? preview.records : [];
+    const warnings = Array.isArray(preview.warnings) ? preview.warnings : [];
+    const refs = Array.isArray(preview.evidence_refs || preview.evidenceRefs) ? (preview.evidence_refs || preview.evidenceRefs) : [];
+    const rows = [
+      ['Previews', preview.preview_count ?? preview.previewCount ?? records.length],
+      ['Warnings', preview.warning_count ?? preview.warningCount ?? warnings.length],
+      ['Images', preview.image_count ?? preview.imageCount ?? 0],
+      ['Atlas frames', preview.atlas_frame_count ?? preview.atlasFrameCount ?? 0],
+      ['Tilemaps', preview.tilemap_count ?? preview.tilemapCount ?? 0],
+      ['Audio/font', `${preview.audio_count ?? preview.audioCount ?? 0}/${preview.font_count ?? preview.fontCount ?? 0}`],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const recordRows = records.length
+      ? records.slice(0, 10).map((record) => {
+          const assetId = record.assetId || record.asset_id || 'unknown asset';
+          const assetType = record.assetType || record.asset_type || 'unknown';
+          const image = record.image ? ` · ${record.image.width ?? '?'}×${record.image.height ?? '?'}` : '';
+          const atlasFrames = Array.isArray(record.atlasFrames || record.atlas_frames) ? (record.atlasFrames || record.atlas_frames).length : 0;
+          const tilemap = record.tilemap ? ` · tilemap ${record.tilemap.width ?? '?'}×${record.tilemap.height ?? '?'}` : '';
+          const media = record.audio?.durationMs || record.audio?.duration_ms ? ` · ${record.audio.durationMs ?? record.audio.duration_ms}ms` : '';
+          const font = record.font?.family ? ` · ${record.font.family}` : '';
+          return `<li><strong>${escapeText(assetId)}</strong>: ${escapeText(assetType)}${escapeText(image)}${atlasFrames ? ` · ${escapeText(atlasFrames)} frame(s)` : ''}${escapeText(tilemap)}${escapeText(media)}${escapeText(font)}<br><small>${escapeText(record.sourcePath || record.source_path || 'no source path')} · ${escapeText(record.previewKind || record.preview_kind || 'preview')}</small></li>`;
+        }).join('')
+      : '<li>No parsed asset preview records are available.</li>';
+    const warningRows = warnings.length
+      ? warnings.slice(0, 8).map((warning) => `<li><strong>${escapeText(warning.kind || 'warning')}</strong>: ${escapeText(warning.assetId || warning.asset_id || 'manifest')} — ${escapeText(warning.message || '')}${warning.path ? ` · ${escapeText(warning.path)}` : ''}</li>`).join('')
+      : '<li>No asset preview warnings recorded.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Preview records</h4><ul class="run-meta-list">${recordRows}</ul>
+      <h4>Warnings</h4><ul class="run-meta-list">${warningRows}</ul>
+      ${renderRefLinks('Asset preview evidence refs', refs, run)}
+      <p class="run-meta">${escapeText(preview.boundary || 'Read-only asset preview evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.')}</p>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -1043,6 +1081,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
+      <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1119,7 +1158,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

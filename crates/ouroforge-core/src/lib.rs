@@ -18783,6 +18783,7 @@ pub struct RunDashboardReadModel {
     pub engine_summaries: RunDashboardEngineSummaries,
     pub asset_integrity: RunDashboardAssetIntegrity,
     pub asset_loading: RunDashboardAssetLoading,
+    pub asset_preview: RunDashboardAssetPreview,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -18969,6 +18970,24 @@ pub struct RunDashboardAssetLoading {
     pub fallback_count: usize,
     pub evidence_refs: Vec<String>,
     pub records: Vec<RuntimeAssetLoadRecord>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardAssetPreview {
+    pub present: bool,
+    pub empty_state: String,
+    pub preview_count: usize,
+    pub warning_count: usize,
+    pub image_count: usize,
+    pub atlas_frame_count: usize,
+    pub tilemap_count: usize,
+    pub audio_count: usize,
+    pub font_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub records: Vec<AssetPreviewRecord>,
+    pub warnings: Vec<AssetPreviewWarning>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -19309,6 +19328,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let engine_summaries = read_dashboard_engine_summaries(&world_states);
     let asset_integrity = read_dashboard_asset_integrity(run_dir, &evidence)?;
     let asset_loading = read_dashboard_asset_loading(run_dir, &evidence)?;
+    let asset_preview = read_dashboard_asset_preview(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -19361,6 +19381,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         engine_summaries,
         asset_integrity,
         asset_loading,
+        asset_preview,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -19668,6 +19689,107 @@ fn dashboard_artifact_is_runtime_asset_load_evidence(artifact: &EvidenceArtifact
         == Some("runtime_asset_load_evidence")
         || artifact.id.contains("asset-load-evidence")
         || artifact.path.contains("asset-load-evidence")
+}
+
+fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("asset_preview_evidence")
+        || artifact.id.contains("asset-preview-evidence")
+        || artifact.path.contains("asset-preview-evidence")
+}
+
+fn read_dashboard_asset_preview(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardAssetPreview> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_asset_preview_evidence,
+    )?;
+    let boundary = "Read-only asset preview evidence from Rust-exported artifacts; browser surfaces display escaped local metadata only and never fetch remote assets, upload files, write trusted state, or execute commands.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardAssetPreview {
+            present: false,
+            empty_state: "No asset preview evidence is indexed for this run.".to_string(),
+            preview_count: 0,
+            warning_count: 0,
+            image_count: 0,
+            atlas_frame_count: 0,
+            tilemap_count: 0,
+            audio_count: 0,
+            font_count: 0,
+            evidence_refs: Vec::new(),
+            records: Vec::new(),
+            warnings: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut records = Vec::new();
+    let mut warnings = Vec::new();
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if let Some(value) = &artifact.value {
+            if let Ok(evidence) = serde_json::from_value::<AssetPreviewEvidence>(value.clone()) {
+                records.extend(evidence.previews);
+                warnings.extend(evidence.warnings);
+            }
+        }
+    }
+    records.sort_by(|left, right| left.asset_id.cmp(&right.asset_id));
+    warnings.sort_by(|left, right| {
+        (
+            left.asset_id.as_deref(),
+            left.kind.as_str(),
+            left.message.as_str(),
+        )
+            .cmp(&(
+                right.asset_id.as_deref(),
+                right.kind.as_str(),
+                right.message.as_str(),
+            ))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let image_count = records
+        .iter()
+        .filter(|record| record.image.is_some())
+        .count();
+    let atlas_frame_count = records.iter().map(|record| record.atlas_frames.len()).sum();
+    let tilemap_count = records
+        .iter()
+        .filter(|record| record.tilemap.is_some())
+        .count();
+    let audio_count = records
+        .iter()
+        .filter(|record| record.audio.is_some())
+        .count();
+    let font_count = records
+        .iter()
+        .filter(|record| record.font.is_some())
+        .count();
+    Ok(RunDashboardAssetPreview {
+        present: true,
+        empty_state: String::new(),
+        preview_count: records.len(),
+        warning_count: warnings.len(),
+        image_count,
+        atlas_frame_count,
+        tilemap_count,
+        audio_count,
+        font_count,
+        evidence_refs,
+        records,
+        warnings,
+        artifacts,
+        boundary,
+    })
 }
 
 fn read_dashboard_asset_loading(
