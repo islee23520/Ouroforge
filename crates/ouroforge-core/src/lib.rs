@@ -11734,6 +11734,84 @@ pub struct RunDashboardArtifact {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrix {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub projects: Vec<RegressionRunMatrixProject>,
+    #[serde(rename = "skippedRuns")]
+    pub skipped_runs: Vec<RegressionRunMatrixSkippedRun>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrixSkippedRun {
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "runDir")]
+    pub run_dir: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrixProject {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "projectName")]
+    pub project_name: String,
+    #[serde(rename = "scenarioPacks")]
+    pub scenario_packs: Vec<RegressionRunMatrixScenarioPack>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrixScenarioPack {
+    #[serde(rename = "scenarioPackId")]
+    pub scenario_pack_id: String,
+    #[serde(rename = "scenarioPackPath")]
+    pub scenario_pack_path: String,
+    pub scenarios: Vec<RegressionRunMatrixScenario>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrixScenario {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "currentStatus")]
+    pub current_status: String,
+    #[serde(rename = "lastPass", skip_serializing_if = "Option::is_none")]
+    pub last_pass: Option<RegressionRunMatrixObservation>,
+    #[serde(rename = "lastFail", skip_serializing_if = "Option::is_none")]
+    pub last_fail: Option<RegressionRunMatrixObservation>,
+    pub runs: Vec<RegressionRunMatrixObservation>,
+    pub context: RegressionRunMatrixContext,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RegressionRunMatrixObservation {
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "runDir")]
+    pub run_dir: String,
+    #[serde(rename = "createdAtUnixMs")]
+    pub created_at_unix_ms: u128,
+    pub status: String,
+    #[serde(rename = "scenarioResultPath", skip_serializing_if = "Option::is_none")]
+    pub scenario_result_path: Option<String>,
+    #[serde(rename = "verdictStatus")]
+    pub verdict_status: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
+pub struct RegressionRunMatrixContext {
+    #[serde(rename = "mutationIds")]
+    pub mutation_ids: Vec<String>,
+    #[serde(rename = "reviewDecisionIds")]
+    pub review_decision_ids: Vec<String>,
+    #[serde(rename = "promotionIds")]
+    pub promotion_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunDashboardReadModel {
     pub summary: RunDashboardSummary,
     pub run: serde_json::Value,
@@ -11901,6 +11979,259 @@ pub fn list_dashboard_runs(runs_root: impl AsRef<Path>) -> Result<Vec<RunDashboa
             .then_with(|| left.id.cmp(&right.id))
     });
     Ok(runs)
+}
+
+pub fn build_regression_run_matrix(runs_root: impl AsRef<Path>) -> Result<RegressionRunMatrix> {
+    let mut summaries = list_dashboard_runs(runs_root)?;
+    summaries.sort_by(|left, right| {
+        left.created_at_unix_ms
+            .cmp(&right.created_at_unix_ms)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    let mut skipped_runs = Vec::new();
+    let mut scenarios: BTreeMap<(String, String, String), RegressionMatrixScenarioBuilder> =
+        BTreeMap::new();
+    let mut projects: BTreeMap<String, String> = BTreeMap::new();
+    let mut packs: BTreeMap<(String, String), String> = BTreeMap::new();
+
+    for summary in summaries {
+        let Some(project) = summary.project.clone() else {
+            skipped_runs.push(RegressionRunMatrixSkippedRun {
+                run_id: summary.id.clone(),
+                run_dir: summary.run_dir.to_string_lossy().to_string(),
+                reason: "missing_or_malformed_project_context".to_string(),
+            });
+            continue;
+        };
+        let Some(pack) = project.scenario_pack.clone() else {
+            skipped_runs.push(RegressionRunMatrixSkippedRun {
+                run_id: summary.id.clone(),
+                run_dir: summary.run_dir.to_string_lossy().to_string(),
+                reason: "missing_scenario_pack_context".to_string(),
+            });
+            continue;
+        };
+
+        projects.insert(project.id.clone(), project.name.clone());
+        packs.insert((project.id.clone(), pack.id.clone()), pack.path.clone());
+
+        let run = read_dashboard_run(&summary.run_dir)?;
+        let result_observations = dashboard_scenario_result_observations(&run);
+        let expected_ids = pack
+            .scenario_ids
+            .iter()
+            .cloned()
+            .chain(result_observations.keys().cloned())
+            .collect::<BTreeSet<_>>();
+
+        for scenario_id in expected_ids {
+            let key = (project.id.clone(), pack.id.clone(), scenario_id.clone());
+            let builder = scenarios.entry(key).or_insert_with(|| {
+                RegressionMatrixScenarioBuilder::new(
+                    project.id.clone(),
+                    pack.id.clone(),
+                    scenario_id.clone(),
+                )
+            });
+            builder.context.mutation_ids.extend(
+                run.mutations
+                    .iter()
+                    .map(|mutation| mutation.id.clone())
+                    .collect::<Vec<_>>(),
+            );
+            builder.context.review_decision_ids.extend(
+                read_mutation_review_artifact(&summary.run_dir)
+                    .map(|artifact| {
+                        artifact
+                            .decisions
+                            .into_iter()
+                            .map(|decision| decision.id)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default(),
+            );
+            builder.context.promotion_ids.extend(
+                run.regression_promotions
+                    .iter()
+                    .filter(|promotion| promotion.scenario_id == scenario_id)
+                    .map(|promotion| promotion.id.clone())
+                    .collect::<Vec<_>>(),
+            );
+
+            let observation = result_observations
+                .get(&scenario_id)
+                .cloned()
+                .unwrap_or_else(|| RegressionRunMatrixObservation {
+                    run_id: summary.id.clone(),
+                    run_dir: summary.run_dir.to_string_lossy().to_string(),
+                    created_at_unix_ms: summary.created_at_unix_ms,
+                    status: "pending".to_string(),
+                    scenario_result_path: None,
+                    verdict_status: summary.verdict_status.clone(),
+                    evidence_refs: Vec::new(),
+                });
+            builder.runs.push(observation);
+        }
+    }
+
+    let mut project_builders: BTreeMap<String, BTreeMap<String, Vec<RegressionRunMatrixScenario>>> =
+        BTreeMap::new();
+    for ((project_id, pack_id, _scenario_id), builder) in scenarios {
+        project_builders
+            .entry(project_id)
+            .or_default()
+            .entry(pack_id)
+            .or_default()
+            .push(builder.finish());
+    }
+
+    let projects = project_builders
+        .into_iter()
+        .map(|(project_id, pack_builders)| {
+            let scenario_packs = pack_builders
+                .into_iter()
+                .map(|(pack_id, mut scenarios)| {
+                    scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+                    RegressionRunMatrixScenarioPack {
+                        scenario_pack_path: packs
+                            .get(&(project_id.clone(), pack_id.clone()))
+                            .cloned()
+                            .unwrap_or_default(),
+                        scenario_pack_id: pack_id,
+                        scenarios,
+                    }
+                })
+                .collect();
+            RegressionRunMatrixProject {
+                project_name: projects.get(&project_id).cloned().unwrap_or_default(),
+                project_id,
+                scenario_packs,
+            }
+        })
+        .collect();
+
+    Ok(RegressionRunMatrix {
+        schema_version: "ouroforge-regression-run-matrix-v1".to_string(),
+        projects,
+        skipped_runs,
+    })
+}
+
+#[derive(Debug, Clone)]
+struct RegressionMatrixScenarioBuilder {
+    scenario_id: String,
+    runs: Vec<RegressionRunMatrixObservation>,
+    context: RegressionRunMatrixContext,
+}
+
+impl RegressionMatrixScenarioBuilder {
+    fn new(_project_id: String, _pack_id: String, scenario_id: String) -> Self {
+        Self {
+            scenario_id,
+            runs: Vec::new(),
+            context: RegressionRunMatrixContext::default(),
+        }
+    }
+
+    fn finish(mut self) -> RegressionRunMatrixScenario {
+        self.runs.sort_by(|left, right| {
+            left.created_at_unix_ms
+                .cmp(&right.created_at_unix_ms)
+                .then_with(|| left.run_id.cmp(&right.run_id))
+        });
+        dedupe_sorted(&mut self.context.mutation_ids);
+        dedupe_sorted(&mut self.context.review_decision_ids);
+        dedupe_sorted(&mut self.context.promotion_ids);
+        let current_status = self
+            .runs
+            .last()
+            .map(|observation| observation.status.clone())
+            .unwrap_or_else(|| "pending".to_string());
+        let last_pass = self
+            .runs
+            .iter()
+            .rev()
+            .find(|observation| observation.status == "passed")
+            .cloned();
+        let last_fail = self
+            .runs
+            .iter()
+            .rev()
+            .find(|observation| observation.status == "failed")
+            .cloned();
+        RegressionRunMatrixScenario {
+            scenario_id: self.scenario_id,
+            current_status,
+            last_pass,
+            last_fail,
+            runs: self.runs,
+            context: self.context,
+        }
+    }
+}
+
+fn dedupe_sorted(values: &mut Vec<String>) {
+    values.sort();
+    values.dedup();
+}
+
+fn dashboard_scenario_result_observations(
+    run: &RunDashboardReadModel,
+) -> BTreeMap<String, RegressionRunMatrixObservation> {
+    let mut observations = BTreeMap::new();
+    for artifact in &run.scenario_results {
+        let Some(value) = &artifact.value else {
+            continue;
+        };
+        let Some(scenario_id) = value
+            .get("scenario_id")
+            .or_else(|| value.get("scenarioId"))
+            .and_then(|value| value.as_str())
+        else {
+            continue;
+        };
+        let status = value
+            .get("status")
+            .and_then(|value| value.as_str())
+            .filter(|status| matches!(*status, "passed" | "failed" | "pending"))
+            .unwrap_or("failed")
+            .to_string();
+        let mut evidence_refs = vec![artifact.path.clone()];
+        collect_dashboard_evidence_refs(value.get("evidence"), &mut evidence_refs);
+        evidence_refs.sort();
+        evidence_refs.dedup();
+        observations.insert(
+            scenario_id.to_string(),
+            RegressionRunMatrixObservation {
+                run_id: run.summary.id.clone(),
+                run_dir: run.summary.run_dir.to_string_lossy().to_string(),
+                created_at_unix_ms: run.summary.created_at_unix_ms,
+                status,
+                scenario_result_path: Some(artifact.path.clone()),
+                verdict_status: run.summary.verdict_status.clone(),
+                evidence_refs,
+            },
+        );
+    }
+    observations
+}
+
+fn collect_dashboard_evidence_refs(value: Option<&serde_json::Value>, output: &mut Vec<String>) {
+    match value {
+        Some(serde_json::Value::String(path)) => output.push(path.clone()),
+        Some(serde_json::Value::Array(values)) => {
+            for value in values {
+                collect_dashboard_evidence_refs(Some(value), output);
+            }
+        }
+        Some(serde_json::Value::Object(map)) => {
+            for value in map.values() {
+                collect_dashboard_evidence_refs(Some(value), output);
+            }
+        }
+        _ => {}
+    }
 }
 
 pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadModel> {
@@ -21815,6 +22146,90 @@ scenarios:
     }
 
     #[test]
+    fn regression_matrix_groups_project_pack_scenarios_with_last_pass_fail_and_pending() {
+        let root = unique_temp_dir("regression-matrix-history");
+        fs::create_dir_all(&root).expect("temp root exists");
+        let first = create_project_test_run(&root, &["bootstrap-smoke", "not-yet-run"]);
+        write_fixture_scenario_result(&first.run_dir, "bootstrap-smoke", "passed");
+        let second = create_project_test_run(&root, &["bootstrap-smoke", "not-yet-run"]);
+        write_fixture_scenario_result(&second.run_dir, "bootstrap-smoke", "failed");
+
+        let matrix = build_regression_run_matrix(root.join("runs")).expect("matrix builds");
+
+        assert_eq!(matrix.schema_version, "ouroforge-regression-run-matrix-v1");
+        assert!(matrix.skipped_runs.is_empty());
+        assert_eq!(matrix.projects.len(), 1);
+        let pack = &matrix.projects[0].scenario_packs[0];
+        assert_eq!(pack.scenario_pack_id, "smoke");
+        let smoke = pack
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "bootstrap-smoke")
+            .expect("smoke scenario present");
+        assert_eq!(smoke.current_status, "failed");
+        assert_eq!(smoke.last_pass.as_ref().unwrap().status, "passed");
+        assert_eq!(smoke.last_fail.as_ref().unwrap().status, "failed");
+        assert_eq!(smoke.runs.len(), 2);
+        assert!(smoke.runs[0]
+            .evidence_refs
+            .iter()
+            .any(|path| { path == "evidence/scenarios/bootstrap-smoke/scenario-result.json" }));
+        assert!(smoke.runs[0]
+            .evidence_refs
+            .iter()
+            .any(|path| { path == "evidence/scenarios/bootstrap-smoke/world-state.json" }));
+        let pending = pack
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "not-yet-run")
+            .expect("expected pack scenario present");
+        assert_eq!(pending.current_status, "pending");
+        assert!(pending.last_pass.is_none());
+        assert!(pending.last_fail.is_none());
+        assert_eq!(pending.runs.len(), 2);
+        assert!(pending.runs.iter().all(|run| run.status == "pending"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_matrix_skips_legacy_and_malformed_project_runs_without_breaking() {
+        let root = unique_temp_dir("regression-matrix-legacy");
+        fs::create_dir_all(&root).expect("temp root exists");
+        let project_run = create_project_test_run(&root, &["bootstrap-smoke"]);
+        write_fixture_scenario_result(&project_run.run_dir, "bootstrap-smoke", "passed");
+        let legacy = create_run(root.join("seed.yaml"), root.join("runs"))
+            .expect("legacy run artifacts created");
+        let mut malformed = read_json_value(legacy.run_dir.join("run.json")).expect("run reads");
+        malformed["project"] = json!({ "id": 7, "name": false });
+        fs::write(
+            legacy.run_dir.join("run.json"),
+            serde_json::to_string_pretty(&malformed).expect("run serializes"),
+        )
+        .expect("run updated");
+
+        let matrix = build_regression_run_matrix(root.join("runs")).expect("matrix builds");
+
+        assert_eq!(matrix.projects.len(), 1);
+        assert_eq!(matrix.projects[0].project_id, "minimal_2d");
+        assert_eq!(matrix.skipped_runs.len(), 1);
+        assert_eq!(
+            matrix.skipped_runs[0].reason,
+            "missing_or_malformed_project_context"
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn regression_matrix_handles_missing_runs_root() {
+        let root = unique_temp_dir("regression-matrix-missing-root");
+        let matrix = build_regression_run_matrix(root.join("runs")).expect("matrix builds");
+        assert!(matrix.projects.is_empty());
+        assert!(matrix.skipped_runs.is_empty());
+    }
+
+    #[test]
     fn dashboard_read_model_handles_command_context_missing_and_malformed() {
         let (root, artifacts) = create_test_run("dashboard-command-context");
         let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
@@ -23111,6 +23526,75 @@ scenarios:
         let runs_root = root.join("runs");
         let artifacts = create_run(&seed_path, &runs_root).expect("run artifacts created");
         (root, artifacts)
+    }
+
+    fn create_project_test_run(root: &Path, scenario_ids: &[&str]) -> RunArtifacts {
+        let seed_path = root.join("seed.yaml");
+        if !seed_path.exists() {
+            fs::write(&seed_path, VALID_SEED).expect("seed written");
+        }
+        let artifacts = create_run(&seed_path, root.join("runs")).expect("run artifacts created");
+        write_fixture_project_context(&artifacts.run_dir, scenario_ids);
+        artifacts
+    }
+
+    fn write_fixture_project_context(run_dir: &Path, scenario_ids: &[&str]) {
+        let mut run_json = read_json_value(run_dir.join("run.json")).expect("run json reads");
+        run_json["project"] = json!({
+            "id": "minimal_2d",
+            "name": "Minimal 2D Ouroforge Project",
+            "projectRoot": ".",
+            "manifestPath": "ouroforge.project.json",
+            "manifestHash": { "algorithm": "fnv1a64-file-v1", "value": "manifesthash" },
+            "seedPath": "seeds/platformer.yaml",
+            "scenes": [{
+                "id": "main",
+                "path": "scenes/main.scene.json",
+                "hash": { "algorithm": "fnv1a64-canonical-json-v1", "value": "scenehash" }
+            }],
+            "scenarioPack": {
+                "id": "smoke",
+                "path": "scenarios/smoke.scenario-pack.json",
+                "scenarioIds": scenario_ids
+            }
+        });
+        fs::write(
+            run_dir.join("run.json"),
+            serde_json::to_string_pretty(&run_json).expect("run json serializes"),
+        )
+        .expect("run json updated");
+    }
+
+    fn write_fixture_scenario_result(run_dir: &Path, scenario_id: &str, status: &str) {
+        let path = format!("evidence/scenarios/{scenario_id}/scenario-result.json");
+        fs::create_dir_all(run_dir.join(format!("evidence/scenarios/{scenario_id}")))
+            .expect("scenario dir exists");
+        fs::write(
+            run_dir.join(&path),
+            serde_json::to_string_pretty(&json!({
+                "scenario_id": scenario_id,
+                "status": status,
+                "evidence": {
+                    "world_state": format!("evidence/scenarios/{scenario_id}/world-state.json"),
+                    "input_replays": [format!("evidence/scenarios/{scenario_id}/input-replay.json")]
+                }
+            }))
+            .expect("scenario result serializes"),
+        )
+        .expect("scenario result written");
+        add_evidence_artifact(
+            run_dir,
+            &format!("fixture-scenario-result-{scenario_id}-{status}"),
+            "application/json",
+            &path,
+            json!({ "artifact": "scenario_result" }),
+        )
+        .expect("scenario result indexed");
+        fs::write(
+            run_dir.join("verdict.json"),
+            serde_json::to_string_pretty(&json!({ "status": status })).expect("verdict serializes"),
+        )
+        .expect("verdict written");
     }
 
     fn create_scene_only_mutation_fixture(
