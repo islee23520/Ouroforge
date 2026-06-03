@@ -5177,6 +5177,7 @@ impl ProjectManifest {
                 ));
             }
         }
+        self.validate_scene_transitions(base_dir)?;
         let scenario_packs = self.resolve_scenario_packs(base_dir)?;
         Ok(ProjectManifestValidationReport {
             project_id: self.project.id.clone(),
@@ -5209,6 +5210,35 @@ impl ProjectManifest {
                     .map(|root| ("assetRoots", root.as_str())),
             )
             .collect()
+    }
+
+    fn validate_scene_transitions(&self, base_dir: &Path) -> Result<()> {
+        self.validate()?;
+        let scene_paths = self
+            .scenes
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect::<BTreeSet<_>>();
+        for reference in &self.scenes {
+            let transitions =
+                read_scene_transitions(base_dir.join(&reference.path)).with_context(|| {
+                    format!(
+                        "project manifest scenes ref {} failed transition validation: {}",
+                        reference.id, reference.path
+                    )
+                })?;
+            for transition in &transitions {
+                if !scene_paths.contains(transition.to_scene.as_str()) {
+                    return Err(anyhow!(
+                        "scene {} transition {} toScene {} is not declared in project manifest scenes",
+                        reference.path,
+                        transition.id,
+                        transition.to_scene
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn resolve_scenario_packs(&self, base_dir: &Path) -> Result<Vec<ScenarioPack>> {
@@ -13309,6 +13339,12 @@ pub struct SceneDocument {
     pub gameplay_rules: Option<SceneGameplayRules>,
     #[serde(
         default,
+        rename = "sceneTransitions",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub scene_transitions: Vec<SceneTransition>,
+    #[serde(
+        default,
         rename = "assetManifest",
         skip_serializing_if = "Option::is_none"
     )]
@@ -13404,6 +13440,16 @@ pub struct SceneGameplayFlag {
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneTransition {
+    pub id: String,
+    #[serde(rename = "toScene")]
+    pub to_scene: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -14849,6 +14895,22 @@ pub fn read_scene(scene_path: impl AsRef<Path>) -> Result<SceneDocument> {
     Ok(scene)
 }
 
+#[derive(Debug, Deserialize)]
+struct SceneTransitionDocument {
+    #[serde(default, rename = "sceneTransitions")]
+    scene_transitions: Vec<SceneTransition>,
+}
+
+fn read_scene_transitions(scene_path: impl AsRef<Path>) -> Result<Vec<SceneTransition>> {
+    let scene_path = scene_path.as_ref();
+    let input = fs::read_to_string(scene_path)
+        .with_context(|| format!("failed to read scene {}", scene_path.display()))?;
+    let scene: SceneTransitionDocument = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse scene {}", scene_path.display()))?;
+    validate_scene_transitions(&scene.scene_transitions)?;
+    Ok(scene.scene_transitions)
+}
+
 pub fn validate_scene_reload(scene_path: impl AsRef<Path>) -> Result<SceneReloadValidationReport> {
     let scene_path = scene_path.as_ref();
     let scene = read_scene(scene_path)?;
@@ -14933,6 +14995,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     }
     let collision_layers = validate_scene_collision_rules(scene.collision_rules.as_ref())?;
     let gameplay_flags = validate_scene_gameplay_rules(scene.gameplay_rules.as_ref())?;
+    validate_scene_transitions(&scene.scene_transitions)?;
     validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
     if scene.entities.is_empty() {
@@ -15442,6 +15505,27 @@ fn validate_scene_gameplay_rules(
         }
     }
     Ok(Some(flag_ids))
+}
+
+fn validate_scene_transitions(transitions: &[SceneTransition]) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    for transition in transitions {
+        validate_path_component("scene transition id", &transition.id)?;
+        if !ids.insert(transition.id.as_str()) {
+            return Err(anyhow!("duplicate scene transition id: {}", transition.id));
+        }
+        validate_project_manifest_path(
+            &format!("scene transition {} toScene", transition.id),
+            &transition.to_scene,
+        )?;
+        if let Some(label) = &transition.label {
+            require_bounded_display_text(
+                &format!("scene transition {} label", transition.id),
+                label,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn validate_scene_collider(
@@ -21185,6 +21269,122 @@ scenarios:
         let rejected = format!("{rejected:#}");
         assert!(rejected.contains("missing file"));
         assert!(rejected.to_string().contains("scenes/missing.scene.json"));
+    }
+
+    fn transition_test_scene(scene_id: &str, transitions: serde_json::Value) -> serde_json::Value {
+        let mut scene = json!({
+            "schemaVersion": "1",
+            "id": scene_id,
+            "bounds": { "width": 64, "height": 64 },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true
+                }
+            }]
+        });
+        scene["sceneTransitions"] = transitions;
+        scene
+    }
+
+    fn write_transition_manifest_fixture(root: &Path, main_scene: serde_json::Value) {
+        fs::create_dir_all(root.join("scenes")).expect("scenes dir");
+        fs::create_dir_all(root.join("seeds")).expect("seeds dir");
+        fs::create_dir_all(root.join("assets")).expect("assets dir");
+        fs::create_dir_all(root.join("runs")).expect("runs dir");
+        fs::write(
+            root.join("scenes/main.scene.json"),
+            serde_json::to_string_pretty(&main_scene).expect("main scene serializes"),
+        )
+        .expect("main scene written");
+        fs::write(
+            root.join("scenes/level-2.scene.json"),
+            serde_json::to_string_pretty(&transition_test_scene("level-2", json!([])))
+                .expect("level scene serializes"),
+        )
+        .expect("level scene written");
+        fs::write(root.join("seeds/smoke.yaml"), "id: smoke\n").expect("seed written");
+        fs::write(
+            root.join(PROJECT_MANIFEST_FILE_NAME),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "project-manifest-v1",
+                "project": { "id": "transition_fixture", "name": "Transition Fixture" },
+                "scenes": [
+                    { "id": "main", "path": "scenes/main.scene.json" },
+                    { "id": "level_2", "path": "scenes/level-2.scene.json" }
+                ],
+                "seeds": [{ "id": "smoke", "path": "seeds/smoke.yaml" }],
+                "scenarioPacks": [],
+                "assetRoots": ["assets"],
+                "runsRoot": "runs",
+                "generated": { "roots": ["runs"] }
+            }))
+            .expect("manifest serializes"),
+        )
+        .expect("manifest written");
+    }
+
+    #[test]
+    fn scene_transition_v1_validates_manifest_declared_targets() {
+        let root = unique_temp_dir("scene-transition-manifest-valid");
+        write_transition_manifest_fixture(
+            &root,
+            transition_test_scene(
+                "main",
+                json!([{ "id": "to_level_2", "toScene": "scenes/level-2.scene.json", "label": "Level 2" }]),
+            ),
+        );
+
+        let manifest = ProjectManifest::from_path(root.join(PROJECT_MANIFEST_FILE_NAME))
+            .expect("manifest with declared transition validates");
+        assert_eq!(manifest.scenes.len(), 2);
+        let main_scene = read_scene(root.join("scenes/main.scene.json")).expect("scene validates");
+        assert_eq!(main_scene.scene_transitions[0].id, "to_level_2");
+        assert_eq!(
+            main_scene.scene_transitions[0].to_scene,
+            "scenes/level-2.scene.json"
+        );
+    }
+
+    #[test]
+    fn scene_transition_v1_rejects_undeclared_manifest_targets() {
+        let root = unique_temp_dir("scene-transition-manifest-undeclared");
+        write_transition_manifest_fixture(
+            &root,
+            transition_test_scene(
+                "main",
+                json!([{ "id": "to_secret", "toScene": "scenes/secret.scene.json" }]),
+            ),
+        );
+        fs::write(
+            root.join("scenes/secret.scene.json"),
+            serde_json::to_string_pretty(&transition_test_scene("secret", json!([])))
+                .expect("secret scene serializes"),
+        )
+        .expect("secret scene written");
+
+        let rejected = ProjectManifest::from_path(root.join(PROJECT_MANIFEST_FILE_NAME))
+            .expect_err("undeclared transition target rejected");
+        let rejected = format!("{rejected:#}");
+        assert!(rejected.contains("transition to_secret toScene scenes/secret.scene.json"));
+        assert!(rejected.contains("not declared in project manifest scenes"));
+    }
+
+    #[test]
+    fn scene_transition_v1_rejects_unsafe_target_paths() {
+        let scene: SceneDocument = serde_json::from_value(transition_test_scene(
+            "main",
+            json!([{ "id": "escape", "toScene": "../secret.scene.json" }]),
+        ))
+        .expect("unsafe transition scene parses");
+        let rejected = validate_scene(&scene).expect_err("unsafe transition path rejected");
+        assert!(rejected
+            .to_string()
+            .contains("scene transition escape toScene must stay inside the project root"));
     }
 
     #[test]
