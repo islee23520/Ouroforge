@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "missing_atlas_fixture",
+  "assets": [
+    {
+      "id": "player_sheet_atlas",
+      "type": "sprite_atlas",
+      "path": "assets/atlases/player-sheet.atlas.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "1111111111111111"
+      },
+      "classification": "source_like"
+    }
+  ]
+}

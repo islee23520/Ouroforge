@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "sprite_atlas_manifest_v1_fixture",
+  "notes": "Tiny deterministic schema fixture for Sprite Atlas Manifest v1.",
+  "assets": [
+    {
+      "id": "player_sheet_image",
+      "type": "image",
+      "path": "assets/sprites/player-sheet.png",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "0000000000000000"
+      },
+      "classification": "source_like",
+      "dimensions": {
+        "width": 64,
+        "height": 32
+      },
+      "license": "CC0 test fixture",
+      "source": "Ouroforge deterministic fixture"
+    },
+    {
+      "id": "player_sheet_atlas",
+      "type": "sprite_atlas",
+      "path": "assets/atlases/player-sheet.atlas.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "1111111111111111"
+      },
+      "classification": "source_like",
+      "atlas": {
+        "imageAssetId": "player_sheet_image",
+        "frames": [
+          {
+            "id": "idle_0",
+            "rect": { "x": 0, "y": 0, "width": 16, "height": 16 }
+          },
+          {
+            "id": "idle_1",
+            "rect": { "x": 16, "y": 0, "width": 16, "height": 16 }
+          }
+        ],
+        "animations": [
+          {
+            "id": "idle",
+            "frames": [
+              { "frameId": "idle_0", "durationMs": 120 },
+              { "frameId": "idle_1", "durationMs": 120 }
+            ]
+          }
+        ]
+      },
+      "metadata": {
+        "purpose": "sprite-atlas-schema-test"
+      }
+    }
+  ]
+}

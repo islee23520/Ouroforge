@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "atlas_on_image_fixture",
+  "assets": [
+    {
+      "id": "player_sheet_image",
+      "type": "image",
+      "path": "assets/sprites/player-sheet.png",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "0000000000000000"
+      },
+      "classification": "source_like",
+      "atlas": {
+        "imageAssetId": "player_sheet_image",
+        "frames": [
+          {
+            "id": "idle_0",
+            "rect": { "x": 0, "y": 0, "width": 16, "height": 16 }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -5746,6 +5746,8 @@ pub struct ProjectAssetManifestEntry {
     pub classification: ProjectAssetClassification,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dimensions: Option<ProjectAssetDimensions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas: Option<ProjectSpriteAtlasManifest>,
     #[serde(
         rename = "durationMs",
         default,
@@ -5790,6 +5792,48 @@ pub struct ProjectAssetContentHash {
 pub struct ProjectAssetDimensions {
     pub width: u32,
     pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSpriteAtlasManifest {
+    #[serde(rename = "imageAssetId")]
+    pub image_asset_id: String,
+    pub frames: Vec<ProjectSpriteAtlasFrame>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub animations: Vec<ProjectSpriteAtlasAnimation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSpriteAtlasFrame {
+    pub id: String,
+    pub rect: ProjectSpriteAtlasFrameRect,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSpriteAtlasFrameRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSpriteAtlasAnimation {
+    pub id: String,
+    pub frames: Vec<ProjectSpriteAtlasAnimationFrame>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectSpriteAtlasAnimationFrame {
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -5912,6 +5956,21 @@ impl ProjectAssetManifestEntry {
                 "project asset manifest assets[{index}].dimensions"
             ))?;
         }
+        let field = format!("project asset manifest assets[{index}]");
+        match (&self.asset_type, &self.atlas) {
+            (ProjectAssetType::SpriteAtlas, Some(atlas)) => {
+                atlas.validate_schema(&format!("{field}.atlas"))?;
+            }
+            (ProjectAssetType::SpriteAtlas, None) => {
+                return Err(anyhow!("{field}.atlas is required for sprite_atlas assets"));
+            }
+            (_, Some(_)) => {
+                return Err(anyhow!(
+                    "{field}.atlas is only allowed for sprite_atlas assets"
+                ));
+            }
+            (_, None) => {}
+        }
         if self.duration_ms == Some(0) {
             return Err(anyhow!(
                 "project asset manifest assets[{index}].durationMs must be positive when present"
@@ -6012,6 +6071,63 @@ impl ProjectAssetDimensions {
     fn validate_schema(&self, field: &str) -> Result<()> {
         if self.width == 0 || self.height == 0 {
             return Err(anyhow!("{field} width and height must be positive"));
+        }
+        Ok(())
+    }
+}
+
+impl ProjectSpriteAtlasManifest {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.imageAssetId"), &self.image_asset_id)?;
+        if self.frames.is_empty() {
+            return Err(anyhow!("{field}.frames must not be empty"));
+        }
+        for (index, frame) in self.frames.iter().enumerate() {
+            frame.validate_schema(&format!("{field}.frames[{index}]"))?;
+        }
+        for (index, animation) in self.animations.iter().enumerate() {
+            animation.validate_schema(&format!("{field}.animations[{index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectSpriteAtlasFrame {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        self.rect.validate_schema(&format!("{field}.rect"))
+    }
+}
+
+impl ProjectSpriteAtlasFrameRect {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!(
+                "{field}.width and height must be greater than zero"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ProjectSpriteAtlasAnimation {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        if self.frames.is_empty() {
+            return Err(anyhow!("{field}.frames must not be empty"));
+        }
+        for (index, frame) in self.frames.iter().enumerate() {
+            frame.validate_schema(&format!("{field}.frames[{index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectSpriteAtlasAnimationFrame {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.frameId"), &self.frame_id)?;
+        if self.duration_ms == 0 {
+            return Err(anyhow!("{field}.durationMs must be greater than zero"));
         }
         Ok(())
     }
@@ -21804,6 +21920,102 @@ scenarios:
         assert!(serialized.contains("\"type\":\"image\""));
         assert!(serialized.contains("\"classification\":\"source_like\""));
         assert!(serialized.contains("\"durationMs\":240"));
+    }
+
+    #[test]
+    fn sprite_atlas_manifest_v1_accepts_schema_fixture() {
+        let fixture =
+            include_str!("../../../examples/sprite-atlas-manifest-v1/asset-manifest.valid.json");
+        let manifest =
+            ProjectAssetManifest::from_json_str(fixture).expect("sprite atlas fixture parses");
+
+        assert_eq!(manifest.id, "sprite_atlas_manifest_v1_fixture");
+        assert_eq!(manifest.assets.len(), 2);
+        assert_eq!(manifest.assets[0].id, "player_sheet_image");
+        assert_eq!(manifest.assets[1].asset_type, ProjectAssetType::SpriteAtlas);
+        let atlas = manifest.assets[1]
+            .atlas
+            .as_ref()
+            .expect("sprite atlas payload present");
+        assert_eq!(atlas.image_asset_id, "player_sheet_image");
+        assert_eq!(atlas.frames.len(), 2);
+        assert_eq!(atlas.frames[0].id, "idle_0");
+        assert_eq!(atlas.frames[0].rect.x, 0);
+        assert_eq!(atlas.frames[0].rect.width, 16);
+        assert_eq!(atlas.animations.len(), 1);
+        assert_eq!(atlas.animations[0].id, "idle");
+        assert_eq!(atlas.animations[0].frames[0].frame_id, "idle_0");
+        assert_eq!(atlas.animations[0].frames[0].duration_ms, 120);
+
+        let serialized = serde_json::to_string(&manifest).expect("manifest serializes");
+        assert!(serialized.contains("\"type\":\"sprite_atlas\""));
+        assert!(serialized.contains("\"imageAssetId\":\"player_sheet_image\""));
+        assert!(serialized.contains("\"frameId\":\"idle_0\""));
+    }
+
+    #[test]
+    fn sprite_atlas_manifest_v1_rejects_schema_level_invalid_fixtures() {
+        let missing_atlas = include_str!(
+            "../../../examples/sprite-atlas-manifest-v1/invalid/missing-atlas.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(missing_atlas)
+            .expect_err("sprite atlas payload is required");
+        assert!(rejected.to_string().contains("atlas is required"));
+
+        let empty_frames = include_str!(
+            "../../../examples/sprite-atlas-manifest-v1/invalid/empty-frames.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(empty_frames)
+            .expect_err("empty atlas frames rejected");
+        assert!(rejected.to_string().contains("frames must not be empty"));
+
+        let atlas_on_image = include_str!(
+            "../../../examples/sprite-atlas-manifest-v1/invalid/atlas-on-image.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(atlas_on_image)
+            .expect_err("atlas payload is only allowed on sprite_atlas");
+        assert!(rejected
+            .to_string()
+            .contains("only allowed for sprite_atlas"));
+
+        let zero_rect = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "zero_rect_fixture",
+            "assets": [{
+                "id": "sheet_atlas",
+                "type": "sprite_atlas",
+                "path": "assets/atlases/sheet.json",
+                "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+                "classification": "source_like",
+                "atlas": {
+                    "imageAssetId": "sheet_image",
+                    "frames": [{ "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 0, "height": 16 } }]
+                }
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&zero_rect.to_string())
+            .expect_err("zero-sized frame rect rejected");
+        assert!(rejected.to_string().contains("width and height"));
+
+        let zero_duration = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "zero_duration_fixture",
+            "assets": [{
+                "id": "sheet_atlas",
+                "type": "sprite_atlas",
+                "path": "assets/atlases/sheet.json",
+                "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "1111111111111111" },
+                "classification": "source_like",
+                "atlas": {
+                    "imageAssetId": "sheet_image",
+                    "frames": [{ "id": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } }],
+                    "animations": [{ "id": "idle", "frames": [{ "frameId": "idle_0", "durationMs": 0 }] }]
+                }
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&zero_duration.to_string())
+            .expect_err("zero duration rejected");
+        assert!(rejected.to_string().contains("durationMs"));
     }
 
     #[test]
