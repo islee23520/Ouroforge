@@ -66,3 +66,81 @@ This review gate is a design/control artifact only. It does not authorize:
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. This document does not close, replace, or narrow either issue.
+
+## Dependency-change restrictions
+
+Dependency manifests and lockfiles are restricted by default and must not be
+changed by a generic source patch preview or future source mutation flow. A
+preview that touches dependency configuration must be `hold` or `reject` unless a
+separate explicit design/governance issue authorizes dependency review scope.
+
+A dependency-related review must, at minimum, identify:
+
+- the manifest or lockfile path;
+- direct and transitive dependency impact;
+- supply-chain and build-script risk;
+- affected verification commands;
+- rollback plan for manifest and lockfile state; and
+- why the change belongs in the current milestone instead of a dedicated
+  dependency issue.
+
+Without that separate authorization, dependency mutation remains blocked.
+
+## Test plan requirements
+
+A source patch preview's test plan must be reviewer-visible and copyable. It must
+not be executed by the preview artifact, browser, or Studio. The test plan should
+include:
+
+1. targeted checks for the changed behavior or data;
+2. stale-target and base-ref freshness checks;
+3. generated-state audit commands;
+4. file-class and risk-specific verification;
+5. broad gates when trusted code, tests, evidence readers, or public wording are
+   affected;
+6. explicit commands that are safe to run locally; and
+7. known gaps when a command is intentionally not run.
+
+If a preview changes tests, evidence readers, review gates, rollback contracts,
+or command allowlists, the review level must be elevated because the patch could
+hide failures or spoof confidence.
+
+## Rollback requirements
+
+A source patch preview is not eligible for later apply consideration unless it
+states rollback expectations. A future implementation issue may define exact
+formats, but the review gate requires the design to cover:
+
+- pre-change branch/ref and target hashes;
+- affected file list and file classes;
+- review decision reference;
+- evidence bundle or audit reference;
+- cleanup expectations for generated/local state;
+- stale rollback rejection behavior;
+- symlink, hard-link, traversal, and ignored-root rejection behavior; and
+- human-readable recovery instructions.
+
+Rollback metadata is review evidence only in this design gate. It does not apply,
+restore, or write files.
+
+## Generated-state audit requirements
+
+Every future source patch review should record whether local/generated roots are
+untracked or ignored. At minimum, closure evidence should confirm that generated
+state such as `.omx/`, `.omc/`, `.claude/`, `.openchrome/`, `runs/`, and
+`target/` was not committed unless a later issue explicitly scopes a deterministic
+source-like fixture.
+
+## Closure constraints for future source patch review issues
+
+A future source patch review issue cannot close until:
+
+- every preview has explicit file-class approval or a hold/reject reason;
+- linked evidence is present or missing-evidence is called out;
+- dependency changes are absent or separately authorized;
+- test plan and rollback expectations are recorded;
+- generated-state audit is recorded;
+- no browser apply/write/command bridge exists;
+- source mutation apply remains blocked unless the issue is an explicit later
+  apply implementation milestone; and
+- #1 and #23 remain open unless a separate governance decision says otherwise.
