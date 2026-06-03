@@ -85,6 +85,23 @@ const run = {
       nextSafeAction: 'Restore <comparison> artifact',
     }],
   },
+  loop_evidence_bundles: [{
+    schemaVersion: 'authoring-loop-evidence-bundle-v1',
+    loopId: '<loop-bundle>',
+    status: 'partial',
+    plan: { id: 'loop-plan', kind: 'loop-plan', path: '<loop-plan.json>' },
+    steps: [{ stepId: '<step-3>', kind: 'compare-runs', status: 'blocked' }],
+    runs: [{ id: 'baseline', kind: 'run', path: 'runs/<baseline>/run.json' }],
+    comparisons: [{ id: 'comparison', kind: 'comparison', path: 'runs/comparison.json' }],
+    proposals: [],
+    reviewDecisions: [],
+    transactions: [],
+    regressionPromotions: [],
+    matrixSnapshots: [],
+    journalSummaries: [],
+    missingRefs: ['comparison:runs/<comparison>.json'],
+    boundary: 'Generated local index only; <browser> read-only.',
+  }],
   command_context: {
     schemaVersion: 'run-command-context-v1',
     command: 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project --workers 4 --scenario-pack smoke',
@@ -521,3 +538,11 @@ assert.match(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /&lt;missing
 assert.doesNotMatch(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /<missing comparison>/);
 assert.match(dashboard.renderRunDetail(run), /Authoring loop recovery/);
 assert.match(dashboard.renderLoopRecoveryStatus(null), /No recovery status/);
+
+assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /Authoring loop evidence bundle/);
+assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /partial/);
+assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /&lt;loop-bundle&gt;/);
+assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /runs\//);
+assert.doesNotMatch(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /<loop-bundle>/);
+assert.match(dashboard.renderRunDetail(run), /Authoring loop evidence bundle/);
+assert.match(dashboard.renderLoopEvidenceBundles(null), /No loop evidence bundle/);

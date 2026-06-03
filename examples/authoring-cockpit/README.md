@@ -143,3 +143,7 @@ When exported dashboard data includes `loop_execution`, the cockpit displays the
 ## Authoring Loop Recovery v1
 
 When exported dashboard data includes `loop_recovery` or `loop_status`, the cockpit displays recovery state as escaped read-only evidence. The browser never resumes, retries, repairs artifacts, applies mutations, promotes regressions, or writes trusted plan state. See `../../docs/authoring-loop-recovery-v1.md`.
+
+## Authoring Loop Evidence Bundle v1
+
+When exported dashboard data includes `loop_evidence_bundles`, the cockpit displays bundle status, artifact counts, step states, and missing refs as escaped read-only evidence. The browser never writes bundle data, packages artifacts, executes commands, repairs references, applies mutations, or promotes regressions. See `../../docs/authoring-loop-evidence-bundle-v1.md`.

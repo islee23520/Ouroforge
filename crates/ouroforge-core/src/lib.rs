@@ -25710,14 +25710,15 @@ scenarios:
             }],
             rollback_refs: Vec::new(),
             status_transition: None,
+            recovery: None,
         };
 
         let artifacts =
             execute_authoring_loop_promotion_step(&plan, &step, &root).expect("promotion writes");
 
-        assert!(artifacts
-            .iter()
-            .any(|artifact| artifact.path.starts_with("runs/run-1/regression-promotions/")));
+        assert!(artifacts.iter().any(|artifact| artifact
+            .path
+            .starts_with("runs/run-1/regression-promotions/")));
         assert!(project_root
             .join("runs/run-1/regression-promotions")
             .is_dir());

@@ -102,6 +102,23 @@ const run = {
       nextSafeAction: 'Restore <comparison> artifact',
     }],
   },
+  loop_evidence_bundles: [{
+    schemaVersion: 'authoring-loop-evidence-bundle-v1',
+    loopId: '<loop-bundle>',
+    status: 'partial',
+    plan: { id: 'loop-plan', kind: 'loop-plan', path: '<loop-plan.json>' },
+    steps: [{ stepId: '<step-3>', kind: 'compare-runs', status: 'blocked' }],
+    runs: [{ id: 'baseline', kind: 'run', path: 'runs/<baseline>/run.json' }],
+    comparisons: [{ id: 'comparison', kind: 'comparison', path: 'runs/comparison.json' }],
+    proposals: [],
+    reviewDecisions: [],
+    transactions: [],
+    regressionPromotions: [],
+    matrixSnapshots: [],
+    journalSummaries: [],
+    missingRefs: ['comparison:runs/<comparison>.json'],
+    boundary: 'Generated local index only; <browser> read-only.',
+  }],
   evidence_fidelity: {
     transaction: { id: 'transaction', label: 'Transaction provenance', status: 'present', summary: 'Transaction scene-edit-abc123 records scene edit provenance.', observed_count: 1, missing_count: 0, warnings: [], evidence_refs: ['transactions/scene-edit.json'] },
     runtime_probe: { id: 'runtime_probe', label: 'Runtime probe contract', status: 'present', summary: 'Runtime probe contract present.', observed_count: 2, missing_count: 0, warnings: [], evidence_refs: ['evidence/world.json'] },
@@ -517,3 +534,11 @@ assert.match(cockpit.renderLoopRecoverySurface(run), /&lt;missing comparison&gt;
 assert.doesNotMatch(cockpit.renderLoopRecoverySurface(run), /<missing comparison>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop recovery/);
 assert.match(cockpit.renderLoopRecoverySurface({ summary: { id: 'run-no-loop' } }), /No recovery status/);
+
+assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /Authoring loop evidence bundle/);
+assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /partial/);
+assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /&lt;loop-bundle&gt;/);
+assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /runs:/);
+assert.doesNotMatch(cockpit.renderLoopEvidenceBundleSurface(run), /<loop-bundle>/);
+assert.match(cockpit.renderEvidencePane(run), /Authoring loop evidence bundle/);
+assert.match(cockpit.renderLoopEvidenceBundleSurface({ summary: { id: 'run-no-bundle' } }), /No loop evidence bundle/);

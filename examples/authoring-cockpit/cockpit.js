@@ -962,6 +962,45 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function normalizeLoopEvidenceBundles(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderLoopEvidenceBundleSurface(run) {
+    const bundles = normalizeLoopEvidenceBundles(run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null);
+    if (!bundles.length) {
+      return '<section id="loop-evidence-bundle" class="panel"><h2>Authoring loop evidence bundle</h2><p class="empty">No loop evidence bundle is attached to dashboard-data.json. Generated bundles stay local under runs/authoring-loop-bundles.</p></section>';
+    }
+    const rows = bundles.map((bundle) => {
+      const missing = Array.isArray(bundle.missingRefs) ? bundle.missingRefs : [];
+      const steps = Array.isArray(bundle.steps) ? bundle.steps : [];
+      const counts = [
+        ['runs', bundle.runs],
+        ['comparisons', bundle.comparisons],
+        ['proposals', bundle.proposals],
+        ['decisions', bundle.reviewDecisions],
+        ['transactions', bundle.transactions],
+        ['promotions', bundle.regressionPromotions],
+        ['matrices', bundle.matrixSnapshots],
+        ['journals', bundle.journalSummaries],
+      ].map(([label, artifacts]) => `${label}:${Array.isArray(artifacts) ? artifacts.length : 0}`).join(' · ');
+      const stepText = steps.map((step) => `${step.stepId || 'step'}:${step.status || 'unknown'}`).join(' · ');
+      return `<div class="surface-row"><strong>${escapeText(bundle.loopId || 'unknown-loop')}</strong> <span class="status-idle">${escapeText(bundle.status || 'unknown')}</span><br>
+        <small>${escapeText(counts)}</small>
+        <div class="hint">Plan: ${escapeText(bundle.plan?.path || 'unrecorded')}</div>
+        ${stepText ? `<div class="hint">Steps: ${escapeText(stepText)}</div>` : '<div class="hint">No step outputs recorded.</div>'}
+        ${missing.length ? `<div class="hint">Missing/stale refs: ${escapeText(missing.join(' · '))}</div>` : '<div class="hint">No missing refs reported.</div>'}
+        <small>${escapeText(bundle.boundary || 'Generated local index only; browser is read-only.')}</small>
+      </div>`;
+    }).join('');
+    return `<section id="loop-evidence-bundle" class="panel"><h2>Authoring loop evidence bundle</h2>
+      <p class="hint">Read-only generated index. The browser does not package artifacts, write bundle data, or execute commands.</p>
+      ${rows}
+    </section>`;
+  }
+
   function renderLoopRecoverySurface(run) {
     const summary = run?.loop_recovery || run?.loopRecovery || run?.loop_status || run?.loopStatus || null;
     if (!summary || typeof summary !== 'object') {
@@ -997,7 +1036,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1022,8 +1061,12 @@ const OuroforgeCockpit = (() => {
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
-      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix)) {
-        latest = { ...latest, regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix };
+      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix || dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles)) {
+        latest = {
+          ...latest,
+          regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix,
+          loop_evidence_bundles: dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || [],
+        };
       }
     } catch (_) {
       latest = null;
@@ -1076,7 +1119,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

@@ -177,6 +177,8 @@ Loop state should make interruption visible, not hidden:
 
 ## Evidence bundle and handoff policy
 
+#308 adds the generated local loop evidence bundle index. Bundles live under `runs/authoring-loop-bundles/<loop-id>/bundle.json`, validate referenced generated artifacts, report explicit missing/stale refs, and are exported to dashboard/cockpit as read-only evidence. They are not storage backends, package exports, browser write surfaces, servers, or retention policies.
+
 Evidence bundles and handoff records should be generated summaries of existing
 trusted artifacts. They should link to evidence, verdicts, proposals, decisions,
 applications, comparisons, promotions, journals, and matrix state where present.
