@@ -725,6 +725,26 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function renderRegressionPromotionSurface(run) {
+    const records = Array.isArray(run?.regression_promotions) ? run.regression_promotions : [];
+    const context = run?.command_context || run?.summary?.command_context || {};
+    const project = run?.project || run?.summary?.project || {};
+    const projectPath = project.manifestPath || context.manifestPath || 'ouroforge.project.json';
+    if (!records.length) {
+      return '<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="empty">No regression promotion records loaded. Use the Rust CLI outside the browser to generate drafts, dry-run promotion, and promote manually.</p></section>';
+    }
+    const rows = records.map((record) => {
+      const target = record.target || {};
+      const packId = target.scenarioPackId || target.scenario_pack_id || '<pack-id>';
+      const command = `cargo run -p ouroforge-cli -- scenario promote <draft-json> --project ${projectPath} --scenario-pack ${packId} --dry-run`;
+      return `<div class="surface-row"><strong>${escapeText(record.scenarioId || record.scenario_id || 'unknown scenario')}</strong> ${surfaceState(true, record.dryRun ? 'dry-run' : 'promoted')}<br>
+        <small>pack ${escapeText(packId)} · before ${escapeText(record.beforeHash?.value || record.before_hash?.value || 'missing')} · after ${escapeText(record.afterHash?.value || record.after_hash?.value || 'missing')}</small><br>
+        <small>record ${escapeText(record.recordPath || record.record_path || 'dry-run/no record')}</small>
+        <div class="command-list"><code>${escapeText(command)}</code></div></div>`;
+    }).join('');
+    return `<section id="regression-promotions" class="panel"><h2>Regression promotions</h2><p class="hint">Display-only manual promotion records. The cockpit does not generate drafts, dry-run, promote, execute commands, or write scenario packs from browser JavaScript.</p>${rows}</section>`;
+  }
+
   function renderReplaySurface(run) {
     const replay = run?.replay;
     if (!replay?.present) {
@@ -797,7 +817,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -873,7 +893,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

@@ -37,6 +37,7 @@ The cockpit composes completed local surfaces only:
 - journal viewer when journal data exists;
 - mutation review lifecycle state and manual command hints when artifacts exist;
 - project-scoped scene-only mutation proposal/application lifecycle state when artifacts exist;
+- regression promotion records and display-only dry-run commands when artifacts exist;
 - replay evidence surface when replay artifacts exist;
 - live preview controls through the existing runtime probe;
 - scene edit command generation for Rust-validated fields;
@@ -59,7 +60,7 @@ cargo run -p ouroforge-cli -- dashboard export --runs-root runs \
   --output examples/evidence-dashboard/dashboard-data.json
 ```
 
-After exporting dashboard data, refresh the cockpit to view project workspace context, latest project-bound run evidence, authoring provenance, semantic project comparison, project-scoped scene-only mutation lifecycle, and journal panes. The browser still does not execute commands or mutate files directly.
+After exporting dashboard data, refresh the cockpit to view project workspace context, latest project-bound run evidence, authoring provenance, semantic project comparison, project-scoped scene-only mutation lifecycle, regression promotion records, and journal panes. The browser still does not execute commands or mutate files directly.
 
 ## Live preview controls
 

@@ -536,6 +536,33 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderRegressionPromotions(run) {
+    const promotions = Array.isArray(run?.regression_promotions) ? run.regression_promotions : [];
+    const context = commandContext(run) || {};
+    const project = run?.project || run?.summary?.project || {};
+    const projectPath = project.manifestPath || context.manifestPath || 'ouroforge.project.json';
+    if (!promotions.length) {
+      return `<section class="panel"><h3>Regression Promotions</h3><p class="empty-state">No regression promotion records are available for this run.</p><p class="run-meta">Read-only. The dashboard may display promotion records and copyable CLI commands, but it does not promote, write scenario packs, or execute commands.</p></section>`;
+    }
+    const cards = promotions.map((record) => {
+      const target = record.target || {};
+      const packId = target.scenarioPackId || target.scenario_pack_id || '<pack-id>';
+      const command = `cargo run -p ouroforge-cli -- scenario promote <draft-json> --project ${projectPath} --scenario-pack ${packId} --dry-run`;
+      return `<article class="review-decision-card">
+        <div class="journal-entry-header"><strong>${escapeText(record.id || 'regression-promotion')}</strong><span class="${statusClass(record.dryRun ? 'dry-run' : 'promoted')}">${escapeText(record.dryRun ? 'dry-run' : 'promoted')}</span></div>
+        <dl class="project-mutation-context">
+          <dt>Scenario</dt><dd>${escapeText(record.scenarioId || record.scenario_id || 'unknown')}</dd>
+          <dt>Target pack</dt><dd>${escapeText(packId)} (${escapeText(target.scenarioPackPath || target.scenario_pack_path || 'unknown path')})</dd>
+          <dt>Before hash</dt><dd>${escapeText(record.beforeHash?.value || record.before_hash?.value || 'missing')}</dd>
+          <dt>After hash</dt><dd>${escapeText(record.afterHash?.value || record.after_hash?.value || 'missing')}</dd>
+          <dt>Record path</dt><dd>${escapeText(record.recordPath || record.record_path || 'dry-run/no record')}</dd>
+        </dl>
+        <div class="command-list"><code>${escapeText(command)}</code></div>
+      </article>`;
+    }).join('');
+    return `<section class="panel"><h3>Regression Promotions</h3><p class="run-meta">Inspect-only manual promotion records. Browser UI does not dry-run, promote, mutate scenario packs, or execute commands.</p><div class="lifecycle-grid">${cards}</div></section>`;
+  }
+
   function renderProjectMutationRecord(record) {
     if (!record || typeof record !== 'object') return '';
     const project = record.project && typeof record.project === 'object' ? record.project : null;
@@ -683,6 +710,7 @@ const OuroforgeDashboard = (() => {
       ${renderCommandContext(run)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
+      ${renderRegressionPromotions(run)}
       ${renderProjectContext(run)}
       ${renderTransactionProvenance(run)}
       ${renderReplayControls(run, replayState)}
@@ -748,7 +776,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

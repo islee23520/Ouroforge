@@ -149,6 +149,29 @@ A safe regression promotion path should:
 - require a Rust CLI action for any tracked scenario-pack update;
 - record promotion evidence and generated-state policy.
 
+Current v1 CLI flow:
+
+```bash
+cargo run -p ouroforge-cli -- scenario promote-draft <run-dir> \
+  --project <project>/ouroforge.project.json \
+  --scenario <scenario-id> \
+  --output runs/drafts/<scenario-id>.json
+cargo run -p ouroforge-cli -- scenario promote runs/drafts/<scenario-id>.json \
+  --project <project>/ouroforge.project.json \
+  --scenario-pack <pack-id> \
+  --dry-run
+cargo run -p ouroforge-cli -- scenario promote runs/drafts/<scenario-id>.json \
+  --project <project>/ouroforge.project.json \
+  --scenario-pack <pack-id>
+```
+
+The draft command writes generated draft state only. Dry-run reports before/after
+pack hashes without writing. Promotion writes only the project-manifest
+authorized scenario pack and a run-local `regression-promotions/*.json` record.
+Dashboard and cockpit surfaces display those records read-only with copyable
+dry-run commands; browser JavaScript must not generate drafts, promote, write
+scenario packs, or execute CLI commands.
+
 The milestone should prefer small deterministic fixtures and focused tests over
 large generated run artifacts.
 

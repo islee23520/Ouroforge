@@ -85,6 +85,11 @@ command hints as escaped, copyable text. It does not apply patches, write
 accepted/rejected decisions, run Git operations, or call GitHub from the
 browser.
 
+Regression Promotions v1 renders run-local `regression-promotions/*.json`
+records and copyable `scenario promote --dry-run` commands as escaped text.
+It does not generate drafts, promote scenarios, mutate scenario packs, execute
+commands, or bridge to a shell from browser JavaScript.
+
 Replay Controls v1 renders deterministic replay evidence with local,
 in-memory step/reset/jump controls. It displays the current frame/tick,
 evidence links, and linked world-state snapshots from the generated export.

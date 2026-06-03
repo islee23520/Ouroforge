@@ -6422,8 +6422,12 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let run = read_json_value(run_dir.join("run.json"))?;
     let proposals = read_mutation_proposals(run_dir)?.proposals;
     let reviews = read_mutation_review_artifact(run_dir)?.decisions;
+    let regression_promotions = read_regression_promotion_records(run_dir);
     let mut journal = render_journal(&seed, &evidence, &ledger, &verdict, &proposals, &run);
     journal.push_str(&render_review_decision_journal_section(&reviews));
+    journal.push_str(&render_regression_promotion_journal_section(
+        &regression_promotions,
+    ));
     fs::write(run_dir.join("journal.md"), &journal).context("failed to write journal")?;
     Ok(journal)
 }
@@ -6726,6 +6730,40 @@ fn render_review_decision_journal_section(reviews: &[MutationReviewDecision]) ->
                 checklist.browser_read_only,
                 checklist.evidence_refs_checked
             ));
+        }
+    }
+    out
+}
+
+fn render_regression_promotion_journal_section(
+    promotions: &[RegressionPromotionPackResult],
+) -> String {
+    let mut out = String::new();
+    out.push_str(
+        "
+## Regression Promotions
+
+",
+    );
+    if promotions.is_empty() {
+        out.push_str(
+            "- No regression promotions recorded.
+",
+        );
+        return out;
+    }
+    for promotion in promotions {
+        out.push_str(&format!(
+            "- `{}`: scenario `{}` -> pack `{}` (dry-run: `{}`, before `{}`, after `{}`)\n",
+            promotion.id,
+            promotion.scenario_id,
+            promotion.target.scenario_pack_id,
+            promotion.dry_run,
+            promotion.before_hash.value,
+            promotion.after_hash.value
+        ));
+        if let Some(record_path) = &promotion.record_path {
+            out.push_str(&format!("  - Record: `{record_path}`\n"));
         }
     }
     out
@@ -11714,6 +11752,7 @@ pub struct RunDashboardReadModel {
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
+    pub regression_promotions: Vec<RegressionPromotionPackResult>,
     pub replay: RunDashboardReplay,
     pub comparison: RunDashboardComparison,
     pub transaction_provenance: Option<RunTransactionProvenance>,
@@ -11893,6 +11932,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
+    let regression_promotions = read_regression_promotion_records(run_dir);
     let replay = read_dashboard_replay(run_dir, &evidence)?;
     let comparison = read_dashboard_comparison(run_dir);
     let transaction_provenance = read_dashboard_transaction_provenance(&run);
@@ -11943,6 +11983,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results,
         mutation_artifacts,
         mutation_lifecycle,
+        regression_promotions,
         replay,
         comparison,
         transaction_provenance,
@@ -13464,6 +13505,27 @@ fn read_dashboard_mutation_lifecycle(
         stages,
         command_hints,
     }
+}
+
+fn read_regression_promotion_records(run_dir: &Path) -> Vec<RegressionPromotionPackResult> {
+    let dir = run_dir.join("regression-promotions");
+    let mut records = Vec::new();
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return records;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        if let Ok(value) = read_json_value(&path) {
+            if let Ok(record) = serde_json::from_value::<RegressionPromotionPackResult>(value) {
+                records.push(record);
+            }
+        }
+    }
+    records.sort_by(|left, right| left.id.cmp(&right.id));
+    records
 }
 
 fn dashboard_lifecycle_stage_from_json_file(

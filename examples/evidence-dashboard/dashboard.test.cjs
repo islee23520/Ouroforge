@@ -86,6 +86,20 @@ const run = {
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'agent', reviewer: 'agent-reviewer', reason: '<script>accepted</script>', evidence_refs: ['mutation/rerun-orchestration.json'], guardrail_checklist: { proposal_is_record_only: true, accepted_does_not_apply: true, browser_read_only: true, evidence_refs_checked: true } }] },
     ],
   },
+  regression_promotions: [{
+    schemaVersion: 'regression-promotion-result-v1',
+    id: 'regression-promotion-1',
+    draftId: 'regression-draft-1',
+    scenarioId: 'promoted-smoke-regression',
+    sourceRun: { runId: 'run-1', runDir: 'runs/run-1', verdictPath: 'verdict.json' },
+    target: { projectManifestPath: 'ouroforge.project.json', scenarioPackId: 'smoke', scenarioPackPath: 'scenarios/smoke.scenario-pack.json', scenarioGroupId: 'promoted-regressions' },
+    dryRun: false,
+    createdGroup: true,
+    beforeHash: { algorithm: 'fnv1a64-file-v1', value: 'beforepack' },
+    afterHash: { algorithm: 'fnv1a64-file-v1', value: 'afterpack' },
+    changes: ['created_group:promoted-regressions', 'added_scenario:promoted-smoke-regression'],
+    recordPath: 'regression-promotions/regression-promotion-1.json',
+  }],
   transaction_provenance: {
     transactionId: 'scene-edit-abc123',
     transactionArtifactPath: 'transactions/scene-edit.json',
@@ -246,6 +260,9 @@ assert.match(detail, /Scenario results/);
 assert.match(detail, /Mutation artifacts/);
 assert.match(detail, /Journal Viewer/);
 assert.match(detail, /Mutation Review/);
+assert.match(detail, /Regression Promotions/);
+assert.match(detail, /promoted-smoke-regression/);
+assert.match(detail, /scenario promote &lt;draft-json&gt; --project ouroforge\.project\.json --scenario-pack smoke --dry-run/);
 assert.match(detail, /Replay Controls/);
 assert.match(detail, /Project Context/);
 assert.match(detail, /Minimal 2D Ouroforge Project/);
@@ -331,6 +348,8 @@ assert.match(dashboard.renderProbeContractStatus({ status: 'malformed', contract
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);
+assert.match(dashboard.renderRegressionPromotions({ regression_promotions: [] }), /No regression promotion records/);
+assert.match(dashboard.renderRegressionPromotions({ regression_promotions: [{ id: '<script>', scenarioId: '<img>', target: { scenarioPackId: '<svg>', scenarioPackPath: '<b>' }, beforeHash: { value: '<before>' }, afterHash: { value: '<after>' }, recordPath: '<record>' }] }), /&lt;script&gt;/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
@@ -367,6 +386,7 @@ const xssRun = {
   command_context: { command: '<script>alert(1)</script>', argv: ['<img src=x onerror=alert(1)>'], seedPath: '<script>seed</script>', workers: '<script>workers</script>', runsRoot: 'runs', scenarioPackId: '<script>pack</script>', runtimeTarget: '<script>runtime</script>', browserBoundary: '<script>boundary</script>', cdpTransport: '<script>transport</script>', environmentHints: ['<script>hint</script>'] },
   evidence: [], screenshots: [], world_states: [], frame_metrics: [], performance_metrics: [{ id: '<script>perf</script>', kind: 'application/json', path: 'evidence/<script>perf</script>.json', value: null, read_error: '<script>bad perf</script>', metadata: { worker_id: '<script>worker</script>', execution_boundary: '<script>boundary</script>' } }], console_logs: [{ id: '<script>console</script>', kind: 'application/json', path: 'evidence/<script>console</script>.json', value: [{ text: '<script>log</script>' }], metadata: { worker_session_id: '<img src=x onerror=alert(1)>', cdp_transport: '<script>transport</script>' } }], cdp_trace_summaries: [], scenario_results: [], mutation_artifacts: [], mutations: [],
   mutation_lifecycle: { terminal_state: '<img>', stages: [{ id: 'x', label: '<img>', state: '<script>', artifact_path: '<b>', record_count: 0, evidence_refs: [], records: [] }], command_hints: ['<script>alert(1)</script>'] },
+  regression_promotions: [{ id: '<script>', scenarioId: '<img>', target: { scenarioPackId: '<svg>', scenarioPackPath: '<b>' }, beforeHash: { value: '<before>' }, afterHash: { value: '<after>' }, recordPath: '<record>' }],
   replay: { present: true, empty_state: '', sequences: [{ id: '<script>', source: '<img>', event_count: 1, frames: [0], evidence_refs: ['<script>'], checkpoints: [{ label: '<img>', frame: 0, tick: 0, world_state_path: '<b>', world_state: { unsafe: '<script>alert(1)</script>' } }] }] },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
   comparison: { present: true, empty_state: '', artifacts: [{ id: '<img>', path: 'mutation/<script>.json', exists: true, read_error: '<script>alert(1)</script>', before_run_id: '<script>', after_run_id: '<img>', classification: '<script>', deltas: { '<script>': '<img>' }, evidence_refs: ['javascript:alert(1)', '<script>'], unsupported: ['<script>alert(1)</script>'], value: { unsafe: '<script>alert(1)</script>' } }] },

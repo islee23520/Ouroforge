@@ -91,6 +91,20 @@ const run = {
       { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: 'scene-application-1', proposalId: 'proposal-1', transactionId: 'scene-edit-abc123', reviewDecisionId: 'review-decision-1', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'examples/project/ouroforge.project.json', scenePath: 'scenes/main.scene.json' }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' } }, status: 'applied' }] },
     ],
   },
+  regression_promotions: [{
+    schemaVersion: 'regression-promotion-result-v1',
+    id: 'regression-promotion-1',
+    draftId: 'regression-draft-1',
+    scenarioId: 'promoted-smoke-regression',
+    sourceRun: { runId: 'run-1', runDir: 'runs/run-1', verdictPath: 'verdict.json' },
+    target: { projectManifestPath: 'ouroforge.project.json', scenarioPackId: 'smoke', scenarioPackPath: 'scenarios/smoke.scenario-pack.json', scenarioGroupId: 'promoted-regressions' },
+    dryRun: false,
+    createdGroup: true,
+    beforeHash: { algorithm: 'fnv1a64-file-v1', value: 'beforepack' },
+    afterHash: { algorithm: 'fnv1a64-file-v1', value: 'afterpack' },
+    changes: ['added_scenario:promoted-smoke-regression'],
+    recordPath: 'regression-promotions/regression-promotion-1.json',
+  }],
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
   comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, project: { relation: 'same_project', changed: true, changes: [{ kind: 'scene_hash', summary: 'scene hash changed for scenes/main.scene.json', before: 'before-scene', after: 'after-scene' }], warnings: ['project fixture warning'] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
   engine_summaries: {
@@ -168,6 +182,10 @@ assert.match(cockpit.renderAuthoringProvenanceSurface({ summary: { id: '<script>
 assert.match(cockpit.renderJournalSurface(run), /journal summary/);
 assert.match(cockpit.renderMutationReviewSurface(run), /mutation review runs\/run-1 --reject/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Project-scoped scene mutation lifecycle/);
+assert.match(cockpit.renderRegressionPromotionSurface(run), /Regression promotions/);
+assert.match(cockpit.renderRegressionPromotionSurface(run), /promoted-smoke-regression/);
+assert.match(cockpit.renderRegressionPromotionSurface(run), /scenario promote &lt;draft-json&gt; --project examples\/project\/ouroforge\.project\.json --scenario-pack smoke --dry-run/);
+assert.match(cockpit.renderRegressionPromotionSurface({ regression_promotions: [] }), /No regression promotion records/);
 assert.match(cockpit.renderMutationReviewSurface(run), /Proposal rationale/);
 assert.match(cockpit.renderMutationReviewSurface(run), /scenario_assertion_failure/);
 assert.match(cockpit.renderMutationReviewSurface(run), /player reaches the goal/);
@@ -277,6 +295,7 @@ assert.match(cockpit.renderIntegration(run), /Run\/evidence browser/);
 assert.match(cockpit.renderIntegration(run), /Authoring provenance/);
 assert.match(cockpit.renderIntegration(run), /Journal viewer/);
 assert.match(cockpit.renderIntegration(run), /Mutation review state/);
+assert.match(cockpit.renderIntegration(run), /Regression promotions/);
 assert.match(cockpit.renderIntegration(run), /Replay controls/);
 assert.match(cockpit.renderIntegration(run), /Run comparison/);
 assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
