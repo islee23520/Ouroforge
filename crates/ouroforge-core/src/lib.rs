@@ -27363,7 +27363,7 @@ scenarios:
             .expect("scenario packs resolve");
         assert_eq!(packs.len(), 1);
         assert_eq!(packs[0].id, "regression");
-        assert_eq!(packs[0].ordered_scenario_ids().len(), 4);
+        assert_eq!(packs[0].ordered_scenario_ids().len(), 5);
         let report = manifest
             .validate_references(root)
             .expect("report validates");
@@ -28007,6 +28007,7 @@ scenarios:
             vec![
                 "project-smoke".to_string(),
                 "feature-sanity".to_string(),
+                "hud-visible-state".to_string(),
                 "movement-contact".to_string(),
                 "performance-reload".to_string(),
             ]
