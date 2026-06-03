@@ -86,3 +86,61 @@ This sandbox boundary does not authorize:
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. This document does not close, replace, or narrow either issue.
+
+## Allowed command policy
+
+A future sandbox evaluator may only run commands that are declared before
+execution, require no credentials, require no network, avoid dependency
+installation, and operate inside the isolated worktree or generated evidence
+roots. The policy is allowlist-first: an omitted command is disallowed until a
+reviewer records why it is necessary, bounded, and safe for the specific patch
+preview.
+
+### Allowlisted command classes
+
+| Command class | Boundary |
+| --- | --- |
+| Repository inspection | Read-only commands such as `git status --short`, `git diff --check`, `git rev-parse`, and file hash checks against the isolated worktree. |
+| Formatting checks | Check-only format commands such as `cargo fmt --check` that do not rewrite source files. |
+| Deterministic tests | Project test commands already required by the governing issue, such as `cargo test`, when they do not require network, secrets, or install scripts. |
+| Static analysis | Check-only linters such as `cargo clippy --all-targets --all-features -- -D warnings` when they use already-present dependencies and local caches. |
+| Evidence packaging | Commands that copy or serialize bounded logs, status, hashes, and generated reports into approved generated evidence roots. |
+
+Allowed commands must be recorded with command text, working directory, expected
+outputs, timeout/failure expectations, and whether they may write generated
+artifacts. Any command that can mutate source files must be converted to a
+check-only mode or rejected.
+
+### Disallowed command classes
+
+The sandbox policy must reject:
+
+- arbitrary shell snippets, command injection, unreviewed scripts, schedulers,
+  daemons, or command runners;
+- dependency installation, dependency upgrades, package-manager mutation,
+  postinstall scripts, build-script mutation, or toolchain bootstrap;
+- network access, remote service calls, hosted/cloud/server/auth flows,
+  credential prompts, secret reads, SSH agents, token material, or browser
+  session reuse that carries credentials;
+- CI/workflow mutation, release/publish/export commands, native export, plugin
+  runtime activation, public-launch automation, or Godot replacement claims;
+- source mutation apply, arbitrary patch apply, auto-merge, auto-accept,
+  auto-apply, or writes to the primary maintainer worktree; and
+- browser-side trusted file writes, browser command bridges, or CDP flows that
+  execute repository commands.
+
+### No-credential, no-network, no-install-script acknowledgement
+
+Every future evaluation record should include an explicit acknowledgement that
+its allowed commands:
+
+1. do not need credentials, tokens, SSH agents, browser login state, or local
+   secret files;
+2. do not require network access or remote services;
+3. do not run dependency installation, postinstall hooks, or toolchain bootstrap;
+4. do not mutate source files except inside a separately authorized dry-run
+   sandbox artifact; and
+5. do not create browser, Studio, CI, or plugin write paths.
+
+If any acknowledgement cannot be made, the evaluation is held for separate
+review instead of broadening the allowlist implicitly.
