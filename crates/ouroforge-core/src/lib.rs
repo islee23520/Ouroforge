@@ -17402,7 +17402,10 @@ fn dashboard_entities_with_component(world_state: &serde_json::Value, component:
 fn dashboard_component_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let mut counts = BTreeMap::<String, usize>::new();
     let mut entities = Vec::new();
-    if let Some(items) = world_state.get("entities").and_then(|value| value.as_array()) {
+    if let Some(items) = world_state
+        .get("entities")
+        .and_then(|value| value.as_array())
+    {
         for entity in items {
             let entity_id = entity
                 .get("id")
@@ -17538,7 +17541,10 @@ fn dashboard_transition_summary(world_state: &serde_json::Value) -> serde_json::
 
 fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let audio_events = world_state.get("audioEvents").cloned().unwrap_or(json!([]));
-    let collision_events = world_state.get("collisionEvents").cloned().unwrap_or(json!([]));
+    let collision_events = world_state
+        .get("collisionEvents")
+        .cloned()
+        .unwrap_or(json!([]));
     let animation_entities = world_state
         .get("entities")
         .and_then(|entities| entities.as_array())
@@ -30230,10 +30236,7 @@ scenarios:
             model.engine_summaries.triggers["triggerCollisionEventCount"],
             json!(1)
         );
-        assert_eq!(
-            model.engine_summaries.hud["hudValueCount"],
-            json!(2)
-        );
+        assert_eq!(model.engine_summaries.hud["hudValueCount"], json!(2));
         assert_eq!(
             model.engine_summaries.transition["currentSceneId"],
             json!("foundation-scene")
@@ -30242,10 +30245,7 @@ scenarios:
             model.engine_summaries.events["animationEntityCount"],
             json!(1)
         );
-        assert_eq!(
-            model.engine_summaries.events["audioEventCount"],
-            json!(1)
-        );
+        assert_eq!(model.engine_summaries.events["audioEventCount"], json!(1));
         assert_eq!(
             model.engine_summaries.reload["lastStatus"],
             json!("succeeded")
