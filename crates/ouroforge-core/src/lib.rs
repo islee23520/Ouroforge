@@ -6003,6 +6003,312 @@ pub struct ProjectAssetReferenceIntegrityWarning {
     pub path: Option<String>,
 }
 
+const ASSET_PREVIEW_EVIDENCE_SCHEMA_VERSION: &str = "asset-preview-evidence-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewEvidence {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "runId", skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    #[serde(rename = "manifestId")]
+    pub manifest_id: String,
+    #[serde(rename = "generatedAtUnixMs")]
+    pub generated_at_unix_ms: u128,
+    pub previews: Vec<AssetPreviewRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<AssetPreviewWarning>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewRecord {
+    #[serde(rename = "assetId")]
+    pub asset_id: String,
+    #[serde(rename = "assetType")]
+    pub asset_type: ProjectAssetType,
+    #[serde(rename = "sourcePath")]
+    pub source_path: String,
+    #[serde(rename = "previewKind")]
+    pub preview_kind: AssetPreviewKind,
+    #[serde(rename = "previewPath", skip_serializing_if = "Option::is_none")]
+    pub preview_path: Option<String>,
+    #[serde(
+        rename = "previewClassification",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub preview_classification: Option<ProjectAssetClassification>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<AssetPreviewImageMetadata>,
+    #[serde(rename = "atlasFrames", default, skip_serializing_if = "Vec::is_empty")]
+    pub atlas_frames: Vec<AssetPreviewAtlasFrame>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tilemap: Option<AssetPreviewTilemapMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio: Option<AssetPreviewAudioMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<AssetPreviewFontMetadata>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<AssetPreviewWarning>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AssetPreviewKind {
+    Thumbnail,
+    Metadata,
+    Reference,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewImageMetadata {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewAtlasFrame {
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    pub rect: ProjectSpriteAtlasFrameRect,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewTilemapMetadata {
+    #[serde(rename = "tilesetAssetId")]
+    pub tileset_asset_id: String,
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "layerCount")]
+    pub layer_count: usize,
+    #[serde(rename = "tileCount")]
+    pub tile_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewAudioMetadata {
+    #[serde(rename = "durationMs", skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channels: Option<u8>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewFontMetadata {
+    #[serde(rename = "family", skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    #[serde(rename = "style", skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AssetPreviewWarning {
+    #[serde(rename = "assetId", skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
+    pub kind: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+impl AssetPreviewEvidence {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: AssetPreviewEvidence =
+            serde_json::from_str(input).context("failed to parse Asset Preview Evidence JSON")?;
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != ASSET_PREVIEW_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "asset preview evidence schemaVersion must be {ASSET_PREVIEW_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        if let Some(run_id) = &self.run_id {
+            validate_path_component("asset preview evidence runId", run_id)?;
+        }
+        validate_path_component("asset preview evidence manifestId", &self.manifest_id)?;
+        require_text("asset preview evidence boundary", &self.boundary)?;
+        if self.previews.is_empty() && self.warnings.is_empty() {
+            return Err(anyhow!(
+                "asset preview evidence requires at least one preview record or warning"
+            ));
+        }
+        let mut asset_ids = BTreeSet::new();
+        for (index, preview) in self.previews.iter().enumerate() {
+            preview.validate(index)?;
+            if !asset_ids.insert(preview.asset_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate asset preview evidence assetId: {}",
+                    preview.asset_id
+                ));
+            }
+        }
+        for (index, warning) in self.warnings.iter().enumerate() {
+            warning.validate(&format!("asset preview evidence warnings[{index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewRecord {
+    fn validate(&self, index: usize) -> Result<()> {
+        let field = format!("asset preview evidence previews[{index}]");
+        validate_path_component(&format!("{field}.assetId"), &self.asset_id)?;
+        validate_project_asset_path(
+            &format!("{field}.sourcePath"),
+            &self.source_path,
+            self.asset_type,
+            ProjectAssetClassification::SourceLike,
+        )?;
+        if let Some(preview_path) = &self.preview_path {
+            let classification = self
+                .preview_classification
+                .unwrap_or(ProjectAssetClassification::Generated);
+            validate_asset_preview_path(
+                &format!("{field}.previewPath"),
+                preview_path,
+                classification,
+            )?;
+        }
+        if self.preview_path.is_none() && self.preview_classification.is_some() {
+            return Err(anyhow!(
+                "{field}.previewClassification requires previewPath"
+            ));
+        }
+        if let Some(image) = &self.image {
+            image.validate(&format!("{field}.image"))?;
+        }
+        for (frame_index, frame) in self.atlas_frames.iter().enumerate() {
+            frame.validate(&format!("{field}.atlasFrames[{frame_index}]"))?;
+        }
+        if let Some(tilemap) = &self.tilemap {
+            tilemap.validate(&format!("{field}.tilemap"))?;
+        }
+        if let Some(audio) = &self.audio {
+            audio.validate(&format!("{field}.audio"))?;
+        }
+        if let Some(font) = &self.font {
+            font.validate(&format!("{field}.font"))?;
+        }
+        for (warning_index, warning) in self.warnings.iter().enumerate() {
+            warning.validate(&format!("{field}.warnings[{warning_index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewImageMetadata {
+    fn validate(&self, field: &str) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!("{field} dimensions must be positive"));
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewAtlasFrame {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.frameId"), &self.frame_id)?;
+        if self.rect.width == 0 || self.rect.height == 0 {
+            return Err(anyhow!("{field}.rect dimensions must be positive"));
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewTilemapMetadata {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.tilesetAssetId"), &self.tileset_asset_id)?;
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!("{field} dimensions must be positive"));
+        }
+        if self.layer_count == 0 {
+            return Err(anyhow!("{field}.layerCount must be positive"));
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewAudioMetadata {
+    fn validate(&self, field: &str) -> Result<()> {
+        if self.duration_ms == Some(0) {
+            return Err(anyhow!("{field}.durationMs must be positive when present"));
+        }
+        if self.channels == Some(0) {
+            return Err(anyhow!("{field}.channels must be positive when present"));
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewFontMetadata {
+    fn validate(&self, field: &str) -> Result<()> {
+        if let Some(family) = &self.family {
+            require_bounded_display_text(&format!("{field}.family"), family)?;
+        }
+        if let Some(style) = &self.style {
+            require_bounded_display_text(&format!("{field}.style"), style)?;
+        }
+        Ok(())
+    }
+}
+
+impl AssetPreviewWarning {
+    fn validate(&self, field: &str) -> Result<()> {
+        if let Some(asset_id) = &self.asset_id {
+            validate_path_component(&format!("{field}.assetId"), asset_id)?;
+        }
+        validate_path_component(&format!("{field}.kind"), &self.kind)?;
+        require_bounded_display_text(&format!("{field}.message"), &self.message)?;
+        if let Some(path) = &self.path {
+            validate_project_manifest_path(&format!("{field}.path"), path)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_asset_preview_path(
+    field: &str,
+    value: &str,
+    classification: ProjectAssetClassification,
+) -> Result<()> {
+    validate_project_manifest_path(field, value)?;
+    if classification == ProjectAssetClassification::SourceLike {
+        for generated_root in PROJECT_ASSET_SOURCE_GENERATED_ROOTS {
+            if project_manifest_paths_overlap(value, generated_root) {
+                return Err(anyhow!(
+                    "{field} for source-like previews must not overlap generated root {generated_root}"
+                ));
+            }
+        }
+    }
+    let extension = Path::new(value)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "svg" | "webp" | "json"
+    ) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "{field} has unsupported extension for asset preview evidence"
+        ))
+    }
+}
+
 const RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION: &str = "runtime-asset-load-evidence-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -23553,6 +23859,154 @@ scenarios:
         let rejected = format!("{rejected:#}");
         assert!(rejected.contains("missing file"));
         assert!(rejected.to_string().contains("scenes/missing.scene.json"));
+    }
+
+    #[test]
+    fn asset_preview_evidence_model_accepts_preview_metadata_and_warnings() {
+        let evidence = AssetPreviewEvidence::from_json_str(
+            &json!({
+                "schemaVersion": "asset-preview-evidence-v1",
+                "runId": "run_1",
+                "manifestId": "asset_manifest",
+                "generatedAtUnixMs": 1000,
+                "boundary": "Read-only local preview evidence; no browser writes or remote hosting.",
+                "previews": [
+                    {
+                        "assetId": "player_sprite",
+                        "assetType": "image",
+                        "sourcePath": "assets/sprites/player.png",
+                        "previewKind": "thumbnail",
+                        "previewPath": "runs/run_1/previews/player.png",
+                        "previewClassification": "generated",
+                        "image": { "width": 16, "height": 16 }
+                    },
+                    {
+                        "assetId": "player_atlas",
+                        "assetType": "sprite_atlas",
+                        "sourcePath": "assets/atlases/player.atlas.json",
+                        "previewKind": "metadata",
+                        "atlasFrames": [
+                            { "frameId": "idle_0", "rect": { "x": 0, "y": 0, "width": 16, "height": 16 } }
+                        ]
+                    },
+                    {
+                        "assetId": "level_tilemap",
+                        "assetType": "tilemap",
+                        "sourcePath": "assets/tilemaps/level.json",
+                        "previewKind": "metadata",
+                        "tilemap": { "tilesetAssetId": "terrain_tiles", "width": 20, "height": 12, "layerCount": 2, "tileCount": 240 }
+                    },
+                    {
+                        "assetId": "jump_sound",
+                        "assetType": "audio",
+                        "sourcePath": "assets/audio/jump.ogg",
+                        "previewKind": "metadata",
+                        "audio": { "durationMs": 350, "channels": 2 }
+                    },
+                    {
+                        "assetId": "ui_font",
+                        "assetType": "font",
+                        "sourcePath": "assets/fonts/ui.woff2",
+                        "previewKind": "reference",
+                        "font": { "family": "UI Sans", "style": "Regular" },
+                        "warnings": [{ "assetId": "ui_font", "kind": "metadata_missing", "message": "Font metrics are not available yet." }]
+                    }
+                ],
+                "warnings": [{ "kind": "missing_preview", "message": "One optional preview was skipped.", "path": "assets/fonts/ui.woff2" }]
+            })
+            .to_string(),
+        )
+        .expect("asset preview evidence parses");
+
+        assert_eq!(evidence.manifest_id, "asset_manifest");
+        assert_eq!(evidence.previews.len(), 5);
+        assert_eq!(evidence.previews[1].atlas_frames[0].frame_id, "idle_0");
+        assert_eq!(
+            evidence.previews[2].tilemap.as_ref().unwrap().tile_count,
+            240
+        );
+        assert_eq!(
+            evidence.previews[3].audio.as_ref().unwrap().channels,
+            Some(2)
+        );
+        assert_eq!(
+            evidence.previews[4]
+                .font
+                .as_ref()
+                .unwrap()
+                .family
+                .as_deref(),
+            Some("UI Sans")
+        );
+        assert_eq!(evidence.warnings[0].kind, "missing_preview");
+    }
+
+    #[test]
+    fn asset_preview_evidence_model_rejects_unsafe_or_silent_records() {
+        let base = |preview: serde_json::Value| {
+            json!({
+                "schemaVersion": "asset-preview-evidence-v1",
+                "manifestId": "asset_manifest",
+                "generatedAtUnixMs": 1000,
+                "boundary": "Read-only local preview evidence.",
+                "previews": [preview]
+            })
+            .to_string()
+        };
+
+        let unsafe_source = AssetPreviewEvidence::from_json_str(&base(json!({
+            "assetId": "remote_sprite",
+            "assetType": "image",
+            "sourcePath": "https://example.com/player.png",
+            "previewKind": "thumbnail"
+        })));
+        assert!(unsafe_source.is_err());
+
+        let source_like_generated_preview = AssetPreviewEvidence::from_json_str(&base(json!({
+            "assetId": "player_sprite",
+            "assetType": "image",
+            "sourcePath": "assets/sprites/player.png",
+            "previewKind": "thumbnail",
+            "previewPath": "runs/run_1/previews/player.png",
+            "previewClassification": "source_like"
+        })));
+        assert!(source_like_generated_preview.is_err());
+
+        let zero_dimension = AssetPreviewEvidence::from_json_str(&base(json!({
+            "assetId": "player_sprite",
+            "assetType": "image",
+            "sourcePath": "assets/sprites/player.png",
+            "previewKind": "thumbnail",
+            "image": { "width": 0, "height": 16 }
+        })));
+        assert!(zero_dimension.is_err());
+
+        let duplicate_assets = AssetPreviewEvidence::from_json_str(
+            &json!({
+                "schemaVersion": "asset-preview-evidence-v1",
+                "manifestId": "asset_manifest",
+                "generatedAtUnixMs": 1000,
+                "boundary": "Read-only local preview evidence.",
+                "previews": [
+                    { "assetId": "player_sprite", "assetType": "image", "sourcePath": "assets/sprites/player.png", "previewKind": "thumbnail" },
+                    { "assetId": "player_sprite", "assetType": "image", "sourcePath": "assets/sprites/player.png", "previewKind": "reference" }
+                ]
+            })
+            .to_string(),
+        );
+        assert!(duplicate_assets.is_err());
+
+        let empty = AssetPreviewEvidence::from_json_str(
+            &json!({
+                "schemaVersion": "asset-preview-evidence-v1",
+                "manifestId": "asset_manifest",
+                "generatedAtUnixMs": 1000,
+                "boundary": "Read-only local preview evidence.",
+                "previews": []
+            })
+            .to_string(),
+        );
+        assert!(empty.is_err());
     }
 
     #[test]
