@@ -85,6 +85,21 @@ const run = {
       nextSafeAction: 'Restore <comparison> artifact',
     }],
   },
+  agent_handoffs: [{
+    schemaVersion: 'agent-handoff-contract-v1',
+    loopId: '<handoff-loop>',
+    currentStep: { stepId: '<step-4>', kind: 'compare-runs', status: 'blocked' },
+    status: 'blocked',
+    nextSafeAction: 'Resolve <manual> blocker',
+    requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+    blockers: ['missing <comparison>'],
+    allowedCommands: [{ command: 'cargo run -p ouroforge-cli -- loop status <plan>', argv: [], boundary: 'inert display text only; browser does not execute' }],
+    forbiddenActions: ['Do not execute <browser> commands'],
+    evidenceRefs: [{ id: 'handoff', path: 'runs/<handoff>/handoff.json' }],
+    driftGuardrails: ['#1 remains open', '#23 remains open'],
+    generatedState: { roots: ['runs'], trackedFixtureOnly: true },
+    boundary: 'advisory evidence only; does not execute commands',
+  }],
   loop_evidence_bundles: [{
     schemaVersion: 'authoring-loop-evidence-bundle-v1',
     loopId: '<loop-bundle>',
@@ -539,6 +554,14 @@ assert.doesNotMatch(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /<mis
 assert.match(dashboard.renderRunDetail(run), /Authoring loop recovery/);
 assert.match(dashboard.renderLoopRecoveryStatus(null), /No recovery status/);
 
+assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /Agent handoff/);
+assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /blocked/);
+assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /&lt;handoff-loop&gt;/);
+assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /Allowed command text/);
+assert.doesNotMatch(dashboard.renderAgentHandoffs(run.agent_handoffs), /<handoff-loop>/);
+assert.doesNotMatch(dashboard.renderAgentHandoffs(run.agent_handoffs), /<button/i);
+assert.match(dashboard.renderRunDetail(run), /Agent handoff/);
+assert.match(dashboard.renderAgentHandoffs(null), /No agent handoff/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /Authoring loop evidence bundle/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /partial/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /&lt;loop-bundle&gt;/);

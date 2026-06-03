@@ -102,6 +102,21 @@ const run = {
       nextSafeAction: 'Restore <comparison> artifact',
     }],
   },
+  agent_handoffs: [{
+    schemaVersion: 'agent-handoff-contract-v1',
+    loopId: '<handoff-loop>',
+    currentStep: { stepId: '<step-4>', kind: 'compare-runs', status: 'blocked' },
+    status: 'blocked',
+    nextSafeAction: 'Resolve <manual> blocker',
+    requiredDecisions: [{ id: '<human-review>', kind: 'human-review' }],
+    blockers: ['missing <comparison>'],
+    allowedCommands: [{ command: 'cargo run -p ouroforge-cli -- loop status <plan>', argv: [], boundary: 'inert display text only; cockpit does not execute' }],
+    forbiddenActions: ['Do not execute <browser> commands'],
+    evidenceRefs: [{ id: 'handoff', path: 'runs/<handoff>/handoff.json' }],
+    driftGuardrails: ['#1 remains open', '#23 remains open'],
+    generatedState: { roots: ['runs'], trackedFixtureOnly: true },
+    boundary: 'advisory evidence only; does not execute commands',
+  }],
   loop_evidence_bundles: [{
     schemaVersion: 'authoring-loop-evidence-bundle-v1',
     loopId: '<loop-bundle>',
@@ -535,6 +550,14 @@ assert.doesNotMatch(cockpit.renderLoopRecoverySurface(run), /<missing comparison
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop recovery/);
 assert.match(cockpit.renderLoopRecoverySurface({ summary: { id: 'run-no-loop' } }), /No recovery status/);
 
+assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
+assert.match(cockpit.renderAgentHandoffSurface(run), /blocked/);
+assert.match(cockpit.renderAgentHandoffSurface(run), /&lt;handoff-loop&gt;/);
+assert.match(cockpit.renderAgentHandoffSurface(run), /Allowed command text/);
+assert.doesNotMatch(cockpit.renderAgentHandoffSurface(run), /<handoff-loop>/);
+assert.doesNotMatch(cockpit.renderAgentHandoffSurface(run), /<button/i);
+assert.match(cockpit.renderEvidencePane(run), /Agent handoff/);
+assert.match(cockpit.renderAgentHandoffSurface({}), /No agent handoff/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /Authoring loop evidence bundle/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /partial/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /&lt;loop-bundle&gt;/);

@@ -2762,6 +2762,36 @@ pub fn build_authoring_loop_evidence_bundle(
     Ok(bundle)
 }
 
+pub fn list_agent_handoff_contracts(
+    runs_root: impl AsRef<Path>,
+) -> Result<Vec<AgentHandoffContract>> {
+    let runs_root = runs_root.as_ref();
+    let handoff_root = runs_root.join("agent-handoffs");
+    if !handoff_root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut handoffs = Vec::new();
+    for entry in fs::read_dir(&handoff_root).with_context(|| {
+        format!(
+            "failed to read agent handoff root {}",
+            handoff_root.display()
+        )
+    })? {
+        let entry = entry.context("failed to read agent handoff root entry")?;
+        let path = entry.path().join("handoff.json");
+        if !path.is_file() {
+            continue;
+        }
+        let body = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read agent handoff {}", path.display()))?;
+        let handoff = AgentHandoffContract::from_json_str(&body)
+            .with_context(|| format!("failed to validate agent handoff {}", path.display()))?;
+        handoffs.push(handoff);
+    }
+    handoffs.sort_by(|left, right| left.loop_id.cmp(&right.loop_id));
+    Ok(handoffs)
+}
+
 pub fn list_authoring_loop_evidence_bundles(
     runs_root: impl AsRef<Path>,
 ) -> Result<Vec<AuthoringLoopEvidenceBundle>> {
@@ -18496,6 +18526,9 @@ scenarios:
                 .is_file(),
             "handoff generation records a journal/ledger summary"
         );
+        let listed = list_agent_handoff_contracts(root.join("runs")).expect("handoffs list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].loop_id, "temp-loop");
         assert!(
             !root
                 .join("runs/authoring-loop-bundles/temp-loop/bundle.json")

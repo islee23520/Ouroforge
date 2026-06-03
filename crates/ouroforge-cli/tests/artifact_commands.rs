@@ -19,8 +19,7 @@ scenarios:
 #[test]
 fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
     let temp = unique_temp_dir("ouroforge-cli-loop-handoff-test");
-    fs::create_dir_all(temp.join("runs/baseline")).expect("temp dirs exist");
-    fs::write(temp.join("runs/baseline/run.json"), "{}\n").expect("baseline exists");
+    fs::create_dir_all(&temp).expect("temp dir exists");
     let plan_path = temp.join("loop-plan.json");
     fs::write(
         &plan_path,
@@ -31,8 +30,8 @@ fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
   "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
   "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
   "steps": [
-    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }] },
-    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{ "id": "baseline-run", "path": "runs/baseline/run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }] }
+    { "id": "run-baseline", "kind": "run-scenario-pack", "status": "completed", "expectedArtifacts": [{ "id": "baseline-run", "path": "dashboard-data/baseline-run.json" }] },
+    { "id": "compare-runs", "kind": "compare-runs", "status": "pending", "dependsOn": ["run-baseline"], "inputs": [{ "id": "baseline-run", "path": "dashboard-data/baseline-run.json" }], "expectedArtifacts": [{ "id": "comparison", "path": "runs/comparisons/run-comparison.json" }] }
   ],
   "generatedState": { "roots": ["runs", "target", "dashboard-data"], "trackedFixtureOnly": true }
 }"#,
@@ -68,10 +67,25 @@ fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
     assert!(temp
         .join("runs/authoring-loop-ledgers/cli-handoff-loop/ledger.jsonl")
         .is_file());
+    let dashboard_output = temp.join("dashboard-data/dashboard-data.json");
+    run_cli(
+        &temp,
+        &[
+            "dashboard",
+            "export",
+            "--runs-root",
+            temp.join("runs").to_str().unwrap(),
+            "--output",
+            dashboard_output.to_str().unwrap(),
+        ],
+    );
+    let dashboard: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(&dashboard_output).expect("dashboard output reads"),
+    )
+    .expect("dashboard parses");
+    assert_eq!(dashboard["agent_handoffs"][0]["loopId"], "cli-handoff-loop");
     assert!(
-        !temp
-            .join("runs/baseline/comparisons/run-comparison.json")
-            .exists(),
+        !temp.join("runs/comparisons/run-comparison.json").exists(),
         "allowed commands are not executed by handoff generation"
     );
 

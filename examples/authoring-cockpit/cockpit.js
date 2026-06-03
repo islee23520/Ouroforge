@@ -968,6 +968,43 @@ const OuroforgeCockpit = (() => {
     return [];
   }
 
+  function normalizeAgentHandoffs(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderAgentHandoffSurface(run) {
+    const handoffs = normalizeAgentHandoffs(run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
+    if (!handoffs.length) {
+      return '<section id="agent-handoff" class="panel"><h2>Agent handoff</h2><p class="empty">No agent handoff is attached to dashboard-data.json. Generate one with the Rust CLI and keep it under local generated state.</p></section>';
+    }
+    const rows = handoffs.map((handoff) => {
+      const blockers = Array.isArray(handoff.blockers) ? handoff.blockers : [];
+      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : [];
+      const allowed = Array.isArray(handoff.allowedCommands) ? handoff.allowedCommands : [];
+      const forbidden = Array.isArray(handoff.forbiddenActions) ? handoff.forbiddenActions : [];
+      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : [];
+      const guardrails = Array.isArray(handoff.driftGuardrails) ? handoff.driftGuardrails : [];
+      const commandText = allowed.map((command) => command.command || '').filter(Boolean).join(' · ');
+      return `<div class="surface-row"><strong>${escapeText(handoff.loopId || 'unknown-loop')}</strong> ${surfaceState(Boolean(handoff.status), handoff.status || 'unknown')}<br>
+        <small>Step: ${escapeText(handoff.currentStep?.stepId || 'none')} · ${escapeText(handoff.currentStep?.kind || 'unknown')}</small>
+        <div class="hint">Next safe action: ${escapeText(handoff.nextSafeAction || 'unrecorded')}</div>
+        ${blockers.length ? `<div class="hint">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="hint">No blockers reported.</div>'}
+        ${decisions.length ? `<div class="hint">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="hint">No required decisions reported.</div>'}
+        <div class="hint">Allowed command text: ${escapeText(commandText || 'none')}</div>
+        <div class="hint">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
+        <div class="hint">Evidence refs: ${escapeText(evidence.map((ref) => `${ref.id || 'ref'}:${ref.path || 'missing'}`).join(' · ') || 'none')}</div>
+        <div class="hint">Guardrails: ${escapeText(guardrails.join(' · ') || 'none')}</div>
+        <small>${escapeText(handoff.boundary || 'Advisory evidence only; cockpit is read-only.')}</small>
+      </div>`;
+    }).join('');
+    return `<section id="agent-handoff" class="panel"><h2>Agent handoff</h2>
+      <p class="hint">Read-only Handoff Studio surface. It displays allowed command text but does not create buttons, execute commands, grant authority, apply mutations, or merge changes.</p>
+      ${rows}
+    </section>`;
+  }
+
   function renderLoopEvidenceBundleSurface(run) {
     const bundles = normalizeLoopEvidenceBundles(run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null);
     if (!bundles.length) {
@@ -1036,7 +1073,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1061,11 +1098,12 @@ const OuroforgeCockpit = (() => {
     try {
       const dashboardData = await loadDashboardData();
       latest = latestRun(dashboardData.runs || []);
-      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix || dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles)) {
+      if (latest && (dashboardData.regression_matrix || dashboardData.regressionMatrix || dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || dashboardData.agent_handoffs || dashboardData.agentHandoffs)) {
         latest = {
           ...latest,
           regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix,
           loop_evidence_bundles: dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || [],
+          agent_handoffs: dashboardData.agent_handoffs || dashboardData.agentHandoffs || [],
         };
       }
     } catch (_) {
@@ -1119,7 +1157,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

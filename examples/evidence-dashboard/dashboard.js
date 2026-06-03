@@ -812,6 +812,43 @@ const OuroforgeDashboard = (() => {
     return [];
   }
 
+  function normalizeAgentHandoffs(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderAgentHandoffs(value = null) {
+    const handoffs = normalizeAgentHandoffs(value);
+    if (!handoffs.length) {
+      return '<section class="panel agent-handoffs"><h3>Agent handoff</h3><p class="empty-state">No agent handoff is attached to this dashboard data.</p></section>';
+    }
+    const cards = handoffs.map((handoff) => {
+      const blockers = Array.isArray(handoff.blockers) ? handoff.blockers : [];
+      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : [];
+      const allowed = Array.isArray(handoff.allowedCommands) ? handoff.allowedCommands : [];
+      const forbidden = Array.isArray(handoff.forbiddenActions) ? handoff.forbiddenActions : [];
+      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : [];
+      const guardrails = Array.isArray(handoff.driftGuardrails) ? handoff.driftGuardrails : [];
+      return `<article class="artifact agent-handoff">
+        <h4>${escapeText(handoff.loopId || 'unknown-loop')}</h4>
+        <div class="run-meta"><span class="${statusClass(handoff.status || 'unknown')}">${escapeText(handoff.status || 'unknown')}</span> · step ${escapeText(handoff.currentStep?.stepId || 'none')}</div>
+        <div class="run-meta">Next safe action: ${escapeText(handoff.nextSafeAction || 'unrecorded')}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${decisions.length ? `<div class="run-meta">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="run-meta">No required decisions reported.</div>'}
+        <div class="run-meta">Allowed command text: ${escapeText(allowed.map((command) => command.command || '').filter(Boolean).join(' · ') || 'none')}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
+        <div class="run-meta">Evidence refs: ${escapeText(evidence.map((ref) => `${ref.id || 'ref'}:${ref.path || 'missing'}`).join(' · ') || 'none')}</div>
+        <div class="run-meta">Guardrails: ${escapeText(guardrails.join(' · ') || 'none')}</div>
+        <p class="run-meta">${escapeText(handoff.boundary || 'Advisory evidence only; browser is read-only.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel agent-handoffs"><h3>Agent handoff</h3>
+      <p class="run-meta">Read-only handoff evidence. The dashboard displays command text but does not execute commands, grant authority, apply mutations, or merge changes.</p>
+      <div class="artifact-grid">${cards}</div>
+    </section>`;
+  }
+
   function renderLoopEvidenceBundles(value = null) {
     const bundles = normalizeLoopEvidenceBundles(value);
     if (!bundles.length) {
@@ -874,10 +911,10 @@ const OuroforgeDashboard = (() => {
   }
 
   function renderRunDetail(run) {
-    return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null);
+    return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null, run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
   }
 
-  function renderRunDetailWithState(run, replayState, regressionMatrix = null, loopEvidenceBundles = null) {
+  function renderRunDetailWithState(run, replayState, regressionMatrix = null, loopEvidenceBundles = null, agentHandoffs = null) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
     const summary = summarizeRun(run);
@@ -901,6 +938,7 @@ const OuroforgeDashboard = (() => {
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
+      ${renderAgentHandoffs(agentHandoffs || run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
@@ -938,7 +976,7 @@ const OuroforgeDashboard = (() => {
       };
       const paint = () => {
         listEl.innerHTML = renderRunList(runs, selected && selected.summary.id);
-        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null);
+        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null, data.agent_handoffs || data.agentHandoffs || null);
         listEl.querySelectorAll('[data-run-id]').forEach((button) => {
           button.addEventListener('click', () => {
             selected = runs.find((run) => run.summary.id === button.dataset.runId) || null;
@@ -971,7 +1009,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderCategorySummary, renderCommandContext, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -147,3 +147,7 @@ When exported dashboard data includes `loop_recovery` or `loop_status`, the cock
 ## Authoring Loop Evidence Bundle v1
 
 When exported dashboard data includes `loop_evidence_bundles`, the cockpit displays bundle status, artifact counts, step states, and missing refs as escaped read-only evidence. The browser never writes bundle data, packages artifacts, executes commands, repairs references, applies mutations, or promotes regressions. See `../../docs/authoring-loop-evidence-bundle-v1.md`.
+
+## Agent Handoff Contract v1
+
+When exported dashboard data includes `agent_handoffs`, the cockpit displays a read-only Handoff Studio surface with the next safe action, blockers, required decisions, inert allowed command text, forbidden actions, evidence refs, guardrails, and boundary. The browser never creates command buttons, executes handoff commands, grants authority, applies mutations, repairs references, or merges changes. See `../../docs/agent-handoff-contract-v1.md`.
