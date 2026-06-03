@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-invalid-kind",
+  "project": { "projectId": "project_workspace_fixture", "manifestPath": "ouroforge.project.json" },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    { "id": "do-anything", "kind": "execute-command", "status": "pending" }
+  ],
+  "generatedState": { "roots": ["runs"], "trackedFixtureOnly": true }
+}

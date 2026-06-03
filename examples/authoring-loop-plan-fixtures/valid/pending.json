@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-pending",
+  "project": {
+    "projectId": "project_workspace_fixture",
+    "manifestPath": "ouroforge.project.json"
+  },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    {
+      "id": "run-baseline",
+      "kind": "run-scenario-pack",
+      "status": "pending",
+      "expectedArtifacts": [
+        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+      ]
+    },
+    {
+      "id": "summarize",
+      "kind": "summarize",
+      "status": "pending",
+      "dependsOn": ["run-baseline"],
+      "inputs": [
+        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+      ],
+      "expectedArtifacts": [
+        { "id": "summary", "path": "runs/baseline/loop-summary.json" }
+      ]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs", "target", "dashboard-data"],
+    "trackedFixtureOnly": true
+  }
+}

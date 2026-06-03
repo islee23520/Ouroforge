@@ -1748,6 +1748,240 @@ fn validate_visual_artifact_path(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+pub const AUTHORING_LOOP_PLAN_SCHEMA_VERSION: &str = "authoring-loop-plan-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopPlan {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "loopId")]
+    pub loop_id: String,
+    pub project: AuthoringLoopProjectContext,
+    pub seed: AuthoringLoopPathRef,
+    #[serde(rename = "scenarioPack")]
+    pub scenario_pack: AuthoringLoopPathRef,
+    pub steps: Vec<AuthoringLoopStep>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopProjectContext {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "manifestPath")]
+    pub manifest_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopPathRef {
+    pub id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopStep {
+    pub id: String,
+    pub kind: AuthoringLoopStepKind,
+    pub status: AuthoringLoopStepStatus,
+    #[serde(rename = "dependsOn", default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "expectedArtifacts",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub expected_artifacts: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "requiredDecisions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub required_decisions: Vec<AuthoringLoopDecisionRef>,
+    #[serde(
+        rename = "rollbackRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub rollback_refs: Vec<AuthoringLoopArtifactRef>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopStepKind {
+    RunScenarioPack,
+    CompareRuns,
+    GenerateProposal,
+    RecordReviewDecision,
+    ApplyAcceptedSceneMutation,
+    Rerun,
+    PromoteRegression,
+    Summarize,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopStepStatus {
+    Pending,
+    Running,
+    Blocked,
+    Failed,
+    Completed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopArtifactRef {
+    pub id: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopDecisionRef {
+    pub id: String,
+    pub kind: AuthoringLoopDecisionKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthoringLoopDecisionKind {
+    HumanReview,
+    AgentReview,
+    AcceptedMutation,
+    RegressionPromotion,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoringLoopGeneratedStatePolicy {
+    pub roots: Vec<String>,
+    #[serde(rename = "trackedFixtureOnly")]
+    pub tracked_fixture_only: bool,
+}
+
+impl AuthoringLoopPlan {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let plan: AuthoringLoopPlan =
+            serde_json::from_str(input).context("failed to parse Authoring Loop Plan JSON")?;
+        plan.validate_schema()?;
+        Ok(plan)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AUTHORING_LOOP_PLAN_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "authoring loop plan schemaVersion must be {AUTHORING_LOOP_PLAN_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("authoring loop plan loopId", &self.loop_id)?;
+        self.project.validate()?;
+        self.seed.validate("authoring loop plan seed")?;
+        self.scenario_pack
+            .validate("authoring loop plan scenarioPack")?;
+        if self.steps.is_empty() {
+            return Err(anyhow!("authoring loop plan steps must not be empty"));
+        }
+        for (index, step) in self.steps.iter().enumerate() {
+            step.validate_schema(index)?;
+        }
+        self.generated_state.validate()?;
+        Ok(())
+    }
+}
+
+impl AuthoringLoopProjectContext {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("authoring loop plan project.projectId", &self.project_id)?;
+        validate_project_manifest_path(
+            "authoring loop plan project.manifestPath",
+            &self.manifest_path,
+        )
+    }
+}
+
+impl AuthoringLoopPathRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field} id"), &self.id)?;
+        validate_project_manifest_path(&format!("{field} path"), &self.path)
+    }
+}
+
+impl AuthoringLoopStep {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(&format!("authoring loop plan steps[{index}].id"), &self.id)?;
+        for (dep_index, dependency) in self.depends_on.iter().enumerate() {
+            validate_path_component(
+                &format!("authoring loop plan steps[{index}].dependsOn[{dep_index}]"),
+                dependency,
+            )?;
+        }
+        for (input_index, input) in self.inputs.iter().enumerate() {
+            input.validate(&format!(
+                "authoring loop plan steps[{index}].inputs[{input_index}]"
+            ))?;
+        }
+        for (artifact_index, artifact) in self.expected_artifacts.iter().enumerate() {
+            artifact.validate(&format!(
+                "authoring loop plan steps[{index}].expectedArtifacts[{artifact_index}]"
+            ))?;
+        }
+        for (decision_index, decision) in self.required_decisions.iter().enumerate() {
+            decision.validate(&format!(
+                "authoring loop plan steps[{index}].requiredDecisions[{decision_index}]"
+            ))?;
+        }
+        for (rollback_index, rollback_ref) in self.rollback_refs.iter().enumerate() {
+            rollback_ref.validate(&format!(
+                "authoring loop plan steps[{index}].rollbackRefs[{rollback_index}]"
+            ))?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopArtifactRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field} id"), &self.id)?;
+        validate_project_manifest_path(&format!("{field} path"), &self.path)?;
+        if let Some(description) = &self.description {
+            require_text(&format!("{field} description"), description)?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopDecisionRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field} id"), &self.id)?;
+        if let Some(description) = &self.description {
+            require_text(&format!("{field} description"), description)?;
+        }
+        Ok(())
+    }
+}
+
+impl AuthoringLoopGeneratedStatePolicy {
+    fn validate(&self) -> Result<()> {
+        if self.roots.is_empty() {
+            return Err(anyhow!(
+                "authoring loop plan generatedState.roots must not be empty"
+            ));
+        }
+        validate_project_path_list("authoring loop plan generatedState.roots", &self.roots)
+    }
+}
+
 const PROJECT_MANIFEST_SCHEMA_VERSION: &str = "project-manifest-v1";
 const PROJECT_MANIFEST_FILE_NAME: &str = "ouroforge.project.json";
 const LOCAL_TOOL_ROOTS: &[&str] = &[".claude", ".git", ".omc", ".omx", ".openchrome"];
@@ -15123,6 +15357,80 @@ scenarios:
         let seed = Seed::from_yaml_str(VALID_SEED).expect("valid seed parses");
         assert_eq!(seed.id, "platformer.v0");
         assert_eq!(seed.constraints.target, "file-harness");
+    }
+
+    #[test]
+    fn authoring_loop_plan_schema_round_trips_valid_fixtures() {
+        for (fixture, expected_statuses) in [
+            (
+                "examples/authoring-loop-plan-fixtures/valid/pending.json",
+                vec![
+                    AuthoringLoopStepStatus::Pending,
+                    AuthoringLoopStepStatus::Pending,
+                ],
+            ),
+            (
+                "examples/authoring-loop-plan-fixtures/valid/partial.json",
+                vec![
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Running,
+                    AuthoringLoopStepStatus::Blocked,
+                ],
+            ),
+            (
+                "examples/authoring-loop-plan-fixtures/valid/completed.json",
+                vec![
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                    AuthoringLoopStepStatus::Completed,
+                ],
+            ),
+        ] {
+            let input = fs::read_to_string(repo_fixture_path(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} reads: {error:#}"));
+            let plan = AuthoringLoopPlan::from_json_str(&input)
+                .unwrap_or_else(|error| panic!("{fixture} parses: {error:#}"));
+            assert_eq!(plan.schema_version, AUTHORING_LOOP_PLAN_SCHEMA_VERSION);
+            assert_eq!(plan.project.project_id, "project_workspace_fixture");
+            assert_eq!(
+                plan.steps
+                    .iter()
+                    .map(|step| step.status)
+                    .collect::<Vec<_>>(),
+                expected_statuses
+            );
+
+            let value = serde_json::to_value(&plan).expect("plan serializes");
+            let reparsed: AuthoringLoopPlan =
+                serde_json::from_value(value).expect("serialized plan parses");
+            assert_eq!(reparsed, plan);
+        }
+    }
+
+    #[test]
+    fn authoring_loop_plan_schema_rejects_unsafe_and_unbounded_fixtures() {
+        let unknown_step = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/unknown-step-kind.json"
+        ))
+        .expect_err("unknown step kind rejected");
+        assert!(unknown_step.to_string().contains("failed to parse"));
+
+        let unsafe_path = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/unsafe-path.json"
+        ))
+        .expect_err("unsafe path rejected");
+        assert!(unsafe_path.to_string().contains("project root"));
+
+        let unsupported_field = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/unsupported-field.json"
+        ))
+        .expect_err("unsupported field rejected");
+        assert!(unsupported_field.to_string().contains("failed to parse"));
     }
 
     #[test]

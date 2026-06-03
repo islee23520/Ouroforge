@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "fixture-loop-partial",
+  "project": {
+    "projectId": "project_workspace_fixture",
+    "manifestPath": "ouroforge.project.json"
+  },
+  "seed": { "id": "smoke", "path": "seeds/smoke.yaml" },
+  "scenarioPack": { "id": "regression", "path": "scenarios/regression.json" },
+  "steps": [
+    {
+      "id": "run-baseline",
+      "kind": "run-scenario-pack",
+      "status": "completed",
+      "expectedArtifacts": [
+        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+      ]
+    },
+    {
+      "id": "compare-runs",
+      "kind": "compare-runs",
+      "status": "running",
+      "dependsOn": ["run-baseline"],
+      "inputs": [
+        { "id": "baseline-run", "path": "runs/baseline/run.json" }
+      ],
+      "expectedArtifacts": [
+        { "id": "comparison", "path": "runs/baseline/comparisons/run-comparison.json" }
+      ]
+    },
+    {
+      "id": "record-review",
+      "kind": "record-review-decision",
+      "status": "blocked",
+      "dependsOn": ["compare-runs"],
+      "requiredDecisions": [
+        { "id": "human-review", "kind": "human-review", "description": "Manual acceptance remains outside the plan model." }
+      ]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs", "target", "dashboard-data"],
+    "trackedFixtureOnly": true
+  }
+}
