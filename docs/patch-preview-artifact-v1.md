@@ -105,3 +105,78 @@ Patch Preview Artifact v1 does not authorize:
 
 #1 remains the broad roadmap/vision anchor and #23 remains the repo-memory/design
 context anchor. This document does not close, replace, or narrow either issue.
+
+## Dashboard and Studio read-only display contract
+
+A future dashboard or Studio surface may display patch preview artifacts as an
+inspection aid only. The display contract is intentionally read-only and must not
+be interpreted as product implementation scope for #326.
+
+### Required display sections
+
+A read-only display should show:
+
+- preview identity: `patchPreviewId`, `proposalId`, `schemaVersion`, producer,
+  created time, and base ref;
+- source mutation status: a prominent blocked banner when
+  `sourceMutationApplyStatus` is `blocked`;
+- target files: canonical paths, before hashes, file classes, review levels,
+  classification statuses, and classification rationale;
+- blocked reasons: per-file and preview-level reasons, including stale target,
+  restricted/blocked file class, missing evidence, generated-state ambiguity, or
+  source mutation apply not authorized;
+- risk summary: risk level and threat-model risk IDs;
+- evidence links: run/comparison/review/regression/design references used to
+  justify the preview;
+- expected behavior change: reviewer-facing statement of the proposed effect;
+- required tests: copyable commands only, with clear wording that the browser
+  does not execute them;
+- reviewer checklist: stale-target, generated-state, rollback, file-class,
+  risk, and non-goal drift checks; and
+- rollback expectations: whether rollback/audit references are missing or ready
+  for a future separately authorized apply milestone.
+
+### Allowed interactions
+
+Read-only surfaces may support:
+
+- expand/collapse preview details;
+- filter by status, file class, risk level, or blocked reason;
+- copy paths, evidence references, risk IDs, and test commands;
+- link to local/static evidence files already exported by Rust-owned tooling; and
+- show malformed, stale, blocked, or missing-evidence warnings.
+
+### Forbidden interactions
+
+Read-only surfaces must not include controls or APIs for:
+
+- applying patches;
+- editing source files;
+- writing trusted preview/review decisions;
+- executing test commands or shell commands;
+- merging branches or opening/closing PRs;
+- accepting, auto-accepting, auto-merging, or self-approving previews;
+- mutating dependency manifests, CI workflows, secrets, build scripts, or plugin
+  loaders; or
+- treating browser/CDP observations as trusted write authority.
+
+### Display states
+
+| State | Meaning | Display requirement |
+| --- | --- | --- |
+| `blocked` | Preview is reviewable but source mutation apply is not authorized. | Show blocked banner and disable/hide any apply-like affordance. |
+| `stale` | Base ref or target hashes no longer match review context. | Show regeneration-required warning. |
+| `malformed` | Required schema fields, classifications, risk IDs, evidence, or warnings are missing. | Show invalid preview warning and no review-ready indication. |
+| `restricted` | One or more files require separate governance approval. | Show hold/reject guidance and required approval rationale. |
+| `read_only_ready` | Preview is well-formed enough for inspection. | Still show no-apply boundary; only inspection/copy interactions are allowed. |
+
+### Wording guardrails
+
+The UI copy should say "preview", "blocked", "read-only", "copy command", and
+"requires separate review/apply milestone". It should not say "apply now",
+"approved", "safe to merge", "production ready", "source mutation ready", or
+"trusted browser write".
+
+If a future issue prototypes this display in dashboard or Studio code, that issue
+must run the relevant Node gates and repeat the no-apply/no-command-bridge audit.
+This issue adds only the display contract.
