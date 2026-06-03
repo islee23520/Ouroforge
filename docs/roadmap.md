@@ -69,6 +69,7 @@ The current implementation has completed these documented milestone surfaces:
   `examples/authoring-cockpit/README.md`)
 - Engine Expressiveness v2 / Playable Game Authoring v1 implemented subset
   (`docs/engine-expressiveness-v2.md`,
+  `docs/engine-expressiveness-v2-governance-handoff.md`,
   `docs/scene-component-model-v2.md`,
   `docs/collision-physics-v2.md`,
   `docs/gameplay-trigger-flags-v1.md`,
