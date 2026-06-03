@@ -4,13 +4,16 @@
 
 Ouroforge is a local, evidence-native MVP. It now supports a small project
 workspace loop in addition to the original run-centered demo, with hardened
-run evidence fidelity and a completed Agentic Review & Regression Promotion v1
+run evidence fidelity, a completed Agentic Review & Regression Promotion v1
 loop around proposal rationale, review decisions, review-gated scene
 application, rerun comparison, regression promotion, Journal v2, and Studio
-review cockpit state:
+review cockpit state, and a completed Agentic Loop Orchestration v1 control
+layer for data-only plans, dry-run sequencing, CLI-only step execution,
+recovery preflight, evidence bundles, agent handoffs, and Studio loop cockpit
+inspection:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -52,6 +55,15 @@ The current implementation has completed these documented milestone surfaces:
   `docs/regression-run-matrix-v1.md`,
   `docs/evidence-backed-journal-v2.md`,
   `docs/studio-review-cockpit-v1.md`)
+- Agentic Loop Orchestration v1
+  (`docs/agentic-loop-orchestration-v1.md`,
+  `docs/authoring-loop-plan-v1.md`,
+  `docs/authoring-loop-dry-run-v1.md`,
+  `docs/authoring-loop-execution-v1.md`,
+  `docs/authoring-loop-recovery-v1.md`,
+  `docs/authoring-loop-evidence-bundle-v1.md`,
+  `docs/agent-handoff-contract-v1.md`,
+  `examples/authoring-cockpit/README.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -59,17 +71,17 @@ scopes a tiny deterministic fixture as tracked source-like data.
 
 ## Near-term governance and public-readiness work
 
-Agentic Review & Regression Promotion v1 issue #302 is the current roadmap/#1
+Agentic Loop Orchestration v1 issue #311 is the current roadmap/#1
 governance refresh. Its purpose is to keep top-level docs and #1 aligned with
-the completed review/regression milestone while preserving conservative public
+the completed loop orchestration milestone while preserving conservative public
 wording and leaving #1/#23 open.
 
-After #302, the next milestone candidates should stay inside the same
-local-first, Rust-trusted, browser-read-only boundary. Suitable candidates are
-agentic loop orchestration hardening, playable authoring expressiveness,
-source-mutation design gates, asset pipeline work, visual authoring, or public
-alpha readiness only when each is backed by fixed PR units, regression coverage,
-generated-state audits, and explicit non-goals.
+After #311, the next milestone candidates should stay inside the same
+local-first, Rust-trusted, browser-read-only boundary. The next recommended
+candidate is Engine Expressiveness v2 / Playable Game Authoring v1, followed by
+source-mutation design gates, asset pipeline work, visual authoring, public
+alpha readiness, or launch governance only when each is backed by fixed PR
+units, regression coverage, generated-state audits, and explicit non-goals.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
