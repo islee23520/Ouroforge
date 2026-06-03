@@ -192,6 +192,20 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  asset_inspector: {
+    present: true,
+    status: 'warning',
+    asset_count: 3,
+    warning_count: 1,
+    preview_count: 2,
+    boundary: 'Read-only Studio asset inspector; browser cannot upload assets, write manifests, fetch remote assets, or execute commands.',
+    evidence_refs: ['asset-integrity.json', 'asset-loading.json', 'asset-preview.json'],
+    assets: [
+      { assetId: 'player_sprite', assetType: 'image', sourcePath: 'assets/sprites/player.png', contentHash: 'hash-player', warnings: [] },
+      { assetId: 'player_atlas', assetType: 'sprite_atlas', sourcePath: 'assets/atlases/player.atlas.json', contentHash: 'hash-atlas', warnings: [] },
+      { assetId: 'missing_audio', assetType: 'audio', sourcePath: 'assets/audio/missing.ogg', contentHash: 'hash-missing', warnings: ['missing_asset_file'] },
+    ],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -355,7 +369,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 17);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 18);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -633,6 +647,12 @@ assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<
 const xssAssetPreview = { asset_preview: { present: true, boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>' }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>' }] } };
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview reason</script>'), 'asset preview rows must be escaped');
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview-boundary</script>'), 'asset preview boundary must be escaped');
+const xssAssetInspector = { asset_inspector: { present: true, status: '<script>status</script>', boundary: '<script>inspector-boundary</script>', evidence_refs: ['<script>ref</script>'], assets: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', contentHash: '<script>hash</script>', warnings: ['<script>warning</script>'] }] } };
+const xssAssetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(xssAssetInspector);
+assert.ok(!xssAssetInspectorMarkup.includes('<script>inspector-boundary</script>'), 'asset inspector boundary must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<script>warning</script>'), 'asset inspector warnings must be escaped');
+assert.ok(!xssAssetInspectorMarkup.includes('<img src=x onerror=alert(1)>'), 'asset inspector asset id must be escaped');
+assert.match(xssAssetInspectorMarkup, /&lt;script&gt;status&lt;\/script&gt;/);
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');
@@ -707,8 +727,21 @@ assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /Asset preview evid
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /player_atlas/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /missing_asset_file/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface({}), /No asset preview evidence/);
+const assetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(run);
+assert.match(assetInspectorMarkup, /Asset inspector/);
+assert.match(assetInspectorMarkup, /player_sprite/);
+assert.match(assetInspectorMarkup, /player_atlas/);
+assert.match(assetInspectorMarkup, /missing_audio/);
+assert.match(assetInspectorMarkup, /warning/);
+assert.match(assetInspectorMarkup, /missing_asset_file/);
+assert.match(assetInspectorMarkup, /3/);
+assert.match(assetInspectorMarkup, /asset-integrity\.json/);
+assert.match(assetInspectorMarkup, /no upload, write, fetch, or execute controls/);
+assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifests, fetch remote assets, or execute commands/);
+assert.match(cockpit.renderStudioAssetInspectorSurface({}), /No asset inspector data/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
+assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
