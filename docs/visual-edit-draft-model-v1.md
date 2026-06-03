@@ -48,6 +48,10 @@ writes, visual diff rendering, review-gated apply, or Studio authoring UI.
 VA1.4 adds tilemap-specific operation metadata, Rust-owned preflight, and
 preview-only summaries/collision/trigger metadata for bounded tilemap draft
 operations. It still does not authorize tilemap file writes or browser apply.
+VA1.5 adds asset-reference operation metadata, Rust-owned manifest/integrity
+preflight, and preview-only summaries for bounded sprite, sprite-frame, audio,
+font, and tilemap tileset references. It still does not authorize asset writes,
+remote fetches, Studio authoring UI, or apply behavior.
 
 ## Read-model compatibility
 
@@ -134,6 +138,40 @@ summaries, affected cell counts, hashes, and collision/trigger metadata as
 escaped diagnostics. They must not claim that a tilemap draft has been applied or
 reviewed, and they must not execute preview/apply commands from browser
 JavaScript. Review-gated apply remains a separate trusted CLI flow.
+
+## Asset Reference Edit Draft v1 compatibility
+
+Asset-reference drafts may include an `assetReferenceOperation` object on each
+operation:
+
+| Field | Purpose |
+| --- | --- |
+| `assetReferenceOperation.kind` | Bounded asset reference category: `sprite_asset_reference`, `sprite_frame_reference`, `audio_event_asset_reference`, `font_asset_reference`, or `tilemap_tileset_reference`. |
+| `assetReferenceOperation.targetReferencePath` | Draft address of the reference being changed. It must match the operation envelope `path` during preflight. |
+| `assetReferenceOperation.replacementAssetId` | Manifest asset id proposed as the replacement reference. Missing ids fail preflight. |
+| `assetReferenceOperation.expectedAssetType` | Optional expected manifest type. If present, it must match both the operation kind and the manifest entry type. |
+| `assetReferenceOperation.expectedContentHash` | Optional manifest content hash expectation. If present, it must match the manifest entry before preview summaries are produced. |
+| `assetReferenceOperation.frameId` | Required for `sprite_frame_reference`; the frame id must exist in the sprite atlas payload. |
+| `assetReferenceOperation.eventId` | Required for `audio_event_asset_reference`; used only as preview/read-model context in this issue. |
+| `assetReferenceOperation.metadata` / `summary` | Draft-only display metadata. It must remain inert and must not authorize writes. |
+
+Asset-reference preflight is Rust-owned and side-effect-free except for explicit
+local file integrity reads supplied by the caller. It checks the draft shape,
+target type/id, operation payload consistency, replacement asset id, operation
+kind/type compatibility, optional expected type/hash, local file integrity, and
+kind-specific frame/event requirements before returning preview records.
+
+Asset-reference preview records are inert read-model data with operation ids,
+manifest id, target reference paths, replacement asset ids, observed asset type,
+content hash, optional frame/event ids, summaries, and an explicit guardrail
+string. Preview generation does not write asset files, fetch remote assets,
+execute browser commands, create transaction artifacts, or apply reviews.
+
+Read-only dashboards, journals, and Studio surfaces may display asset-reference
+preview summaries and manifest/hash diagnostics as escaped diagnostics. They must
+not claim that an asset reference draft has been applied or reviewed, and they
+must not execute preview/apply commands from browser JavaScript. Review-gated
+apply remains a separate trusted CLI flow.
 
 ## Generated-state policy
 
