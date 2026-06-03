@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "missing_tileset_payload_fixture",
+  "assets": [{
+    "id": "ground_tileset",
+    "type": "tileset",
+    "path": "assets/tilesets/ground.tileset.json",
+    "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "3333333333333333" },
+    "classification": "source_like"
+  }]
+}

@@ -5748,6 +5748,10 @@ pub struct ProjectAssetManifestEntry {
     pub dimensions: Option<ProjectAssetDimensions>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atlas: Option<ProjectSpriteAtlasManifest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tileset: Option<ProjectTilesetManifest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tilemap: Option<ProjectTilemapManifest>,
     #[serde(
         rename = "durationMs",
         default,
@@ -5834,6 +5838,61 @@ pub struct ProjectSpriteAtlasAnimationFrame {
     pub frame_id: String,
     #[serde(rename = "durationMs")]
     pub duration_ms: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilesetManifest {
+    #[serde(rename = "tileWidth")]
+    pub tile_width: u32,
+    #[serde(rename = "tileHeight")]
+    pub tile_height: u32,
+    pub tiles: Vec<ProjectTilesetTile>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilesetTile {
+    pub id: String,
+    pub index: u32,
+    #[serde(default)]
+    pub solid: bool,
+    #[serde(default)]
+    pub hazard: bool,
+    #[serde(default)]
+    pub goal: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilemapManifest {
+    #[serde(rename = "tilesetAssetId")]
+    pub tileset_asset_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub layers: Vec<ProjectTilemapLayer>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectTilemapLayer {
+    pub id: String,
+    pub kind: ProjectTilemapLayerKind,
+    pub data: Vec<Option<String>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectTilemapLayerKind {
+    Visual,
+    Collision,
+    Trigger,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -6028,6 +6087,34 @@ impl ProjectAssetManifestEntry {
             (_, Some(_)) => {
                 return Err(anyhow!(
                     "{field}.atlas is only allowed for sprite_atlas assets"
+                ));
+            }
+            (_, None) => {}
+        }
+        match (&self.asset_type, &self.tileset) {
+            (ProjectAssetType::Tileset, Some(tileset)) => {
+                tileset.validate_schema(&format!("{field}.tileset"))?;
+            }
+            (ProjectAssetType::Tileset, None) => {
+                return Err(anyhow!("{field}.tileset is required for tileset assets"));
+            }
+            (_, Some(_)) => {
+                return Err(anyhow!(
+                    "{field}.tileset is only allowed for tileset assets"
+                ));
+            }
+            (_, None) => {}
+        }
+        match (&self.asset_type, &self.tilemap) {
+            (ProjectAssetType::Tilemap, Some(tilemap)) => {
+                tilemap.validate_schema(&format!("{field}.tilemap"))?;
+            }
+            (ProjectAssetType::Tilemap, None) => {
+                return Err(anyhow!("{field}.tilemap is required for tilemap assets"));
+            }
+            (_, Some(_)) => {
+                return Err(anyhow!(
+                    "{field}.tilemap is only allowed for tilemap assets"
                 ));
             }
             (_, None) => {}
@@ -6249,6 +6336,74 @@ impl ProjectSpriteAtlasAnimationFrame {
         validate_path_component(&format!("{field}.frameId"), &self.frame_id)?;
         if self.duration_ms == 0 {
             return Err(anyhow!("{field}.durationMs must be greater than zero"));
+        }
+        Ok(())
+    }
+}
+
+impl ProjectTilesetManifest {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        if self.tile_width == 0 || self.tile_height == 0 {
+            return Err(anyhow!(
+                "{field}.tileWidth and tileHeight must be greater than zero"
+            ));
+        }
+        if self.tiles.is_empty() {
+            return Err(anyhow!("{field}.tiles must not be empty"));
+        }
+        for (index, tile) in self.tiles.iter().enumerate() {
+            tile.validate_schema(&format!("{field}.tiles[{index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectTilesetTile {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        if let Some(trigger) = &self.trigger {
+            validate_path_component(&format!("{field}.trigger"), trigger)?;
+        }
+        for (key, value) in &self.metadata {
+            require_text(&format!("{field}.metadata key"), key)?;
+            require_text(&format!("{field}.metadata.{key}"), value)?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectTilemapManifest {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.tilesetAssetId"), &self.tileset_asset_id)?;
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!(
+                "{field}.width and height must be greater than zero"
+            ));
+        }
+        if self.layers.is_empty() {
+            return Err(anyhow!("{field}.layers must not be empty"));
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            layer.validate_schema(&format!("{field}.layers[{index}]"))?;
+        }
+        Ok(())
+    }
+}
+
+impl ProjectTilemapLayer {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        if self.data.is_empty() {
+            return Err(anyhow!("{field}.data must not be empty"));
+        }
+        for (index, tile_id) in self.data.iter().enumerate() {
+            if let Some(tile_id) = tile_id {
+                validate_path_component(&format!("{field}.data[{index}]"), tile_id)?;
+            }
+        }
+        for (key, value) in &self.metadata {
+            require_text(&format!("{field}.metadata key"), key)?;
+            require_text(&format!("{field}.metadata.{key}"), value)?;
         }
         Ok(())
     }
@@ -22291,6 +22446,87 @@ scenarios:
         assert!(rejected.to_string().contains("unknown frame"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn tilemap_authoring_v2_accepts_schema_fixture() {
+        let fixture =
+            include_str!("../../../examples/tilemap-authoring-v2/asset-manifest.valid.json");
+        let manifest =
+            ProjectAssetManifest::from_json_str(fixture).expect("tilemap authoring fixture parses");
+
+        assert_eq!(manifest.id, "tilemap_authoring_v2_fixture");
+        assert_eq!(manifest.assets.len(), 2);
+        assert_eq!(manifest.assets[0].asset_type, ProjectAssetType::Tileset);
+        let tileset = manifest.assets[0]
+            .tileset
+            .as_ref()
+            .expect("tileset payload present");
+        assert_eq!(tileset.tile_width, 16);
+        assert!(tileset.tiles.iter().any(|tile| tile.solid));
+        assert!(tileset
+            .tiles
+            .iter()
+            .any(|tile| tile.trigger.as_deref() == Some("coin_collected")));
+        assert!(tileset.tiles.iter().any(|tile| tile.hazard));
+        assert!(tileset.tiles.iter().any(|tile| tile.goal));
+
+        assert_eq!(manifest.assets[1].asset_type, ProjectAssetType::Tilemap);
+        let tilemap = manifest.assets[1]
+            .tilemap
+            .as_ref()
+            .expect("tilemap payload present");
+        assert_eq!(tilemap.tileset_asset_id, "ground_tileset");
+        assert_eq!(tilemap.width, 3);
+        assert_eq!(tilemap.height, 2);
+        assert_eq!(tilemap.layers.len(), 2);
+        assert_eq!(tilemap.layers[0].kind, ProjectTilemapLayerKind::Visual);
+        assert_eq!(tilemap.layers[1].kind, ProjectTilemapLayerKind::Collision);
+
+        let serialized = serde_json::to_string(&manifest).expect("manifest serializes");
+        assert!(serialized.contains("\"type\":\"tileset\""));
+        assert!(serialized.contains("\"type\":\"tilemap\""));
+        assert!(serialized.contains("\"tilesetAssetId\":\"ground_tileset\""));
+    }
+
+    #[test]
+    fn tilemap_authoring_v2_rejects_schema_level_invalid_fixtures() {
+        let missing_tileset = include_str!(
+            "../../../examples/tilemap-authoring-v2/invalid/missing-tileset-payload.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(missing_tileset)
+            .expect_err("tileset payload required");
+        assert!(rejected.to_string().contains("tileset is required"));
+
+        let empty_layers = include_str!(
+            "../../../examples/tilemap-authoring-v2/invalid/empty-tilemap-layers.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(empty_layers)
+            .expect_err("empty tilemap layers rejected");
+        assert!(rejected.to_string().contains("layers must not be empty"));
+
+        let tileset_on_image = include_str!(
+            "../../../examples/tilemap-authoring-v2/invalid/tileset-on-image.asset-manifest.json"
+        );
+        let rejected = ProjectAssetManifest::from_json_str(tileset_on_image)
+            .expect_err("tileset payload only allowed on tileset");
+        assert!(rejected.to_string().contains("only allowed for tileset"));
+
+        let zero_tile_size = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "zero_tile_size_fixture",
+            "assets": [{
+                "id": "bad_tileset",
+                "type": "tileset",
+                "path": "assets/tilesets/bad.json",
+                "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "3333333333333333" },
+                "classification": "source_like",
+                "tileset": { "tileWidth": 0, "tileHeight": 16, "tiles": [{ "id": "solid", "index": 1 }] }
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&zero_tile_size.to_string())
+            .expect_err("zero tile size rejected");
+        assert!(rejected.to_string().contains("tileWidth"));
     }
 
     #[test]

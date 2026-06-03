@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "tileset_on_image_fixture",
+  "assets": [{
+    "id": "ground_image",
+    "type": "image",
+    "path": "assets/tilesets/ground.png",
+    "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "5555555555555555" },
+    "classification": "source_like",
+    "tileset": {
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "tiles": [{ "id": "solid_ground", "index": 1, "solid": true }]
+    }
+  }]
+}

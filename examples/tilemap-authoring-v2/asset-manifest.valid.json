@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "tilemap_authoring_v2_fixture",
+  "notes": "Tiny deterministic schema fixture for tileset and tilemap authoring v2.",
+  "assets": [
+    {
+      "id": "ground_tileset",
+      "type": "tileset",
+      "path": "assets/tilesets/ground.tileset.json",
+      "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "3333333333333333" },
+      "classification": "source_like",
+      "tileset": {
+        "tileWidth": 16,
+        "tileHeight": 16,
+        "tiles": [
+          { "id": "empty", "index": 0 },
+          { "id": "solid_ground", "index": 1, "solid": true },
+          { "id": "coin_trigger", "index": 2, "trigger": "coin_collected" },
+          { "id": "spike_hazard", "index": 3, "hazard": true },
+          { "id": "exit_goal", "index": 4, "goal": true }
+        ]
+      }
+    },
+    {
+      "id": "demo_tilemap",
+      "type": "tilemap",
+      "path": "assets/tilemaps/demo.tilemap.json",
+      "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "4444444444444444" },
+      "classification": "source_like",
+      "tilemap": {
+        "tilesetAssetId": "ground_tileset",
+        "width": 3,
+        "height": 2,
+        "layers": [
+          {
+            "id": "terrain",
+            "kind": "visual",
+            "data": ["solid_ground", "empty", "exit_goal", "solid_ground", "coin_trigger", "spike_hazard"]
+          },
+          {
+            "id": "collision",
+            "kind": "collision",
+            "data": ["solid_ground", null, null, "solid_ground", null, null]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "empty_tilemap_layers_fixture",
+  "assets": [{
+    "id": "demo_tilemap",
+    "type": "tilemap",
+    "path": "assets/tilemaps/demo.tilemap.json",
+    "contentHash": { "algorithm": "fnv1a64-file-v1", "value": "4444444444444444" },
+    "classification": "source_like",
+    "tilemap": {
+      "tilesetAssetId": "ground_tileset",
+      "width": 3,
+      "height": 2,
+      "layers": []
+    }
+  }]
+}
