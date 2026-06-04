@@ -93,7 +93,7 @@
     "description": "reviewer handoff artifact"
   },
   "blockedReasons": [
-    "state snapshot predates latest task board update"
+    "state snapshot is stale and must be refreshed before reviewer acceptance"
   ],
   "stateSnapshotRef": {
     "id": "state-snapshot",

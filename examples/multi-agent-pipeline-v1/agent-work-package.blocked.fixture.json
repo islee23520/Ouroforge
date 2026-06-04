@@ -95,11 +95,6 @@
   "blockedReasons": [
     "ownership evidence must be reviewed before writing fixture output"
   ],
-  "stateSnapshotRef": {
-    "id": "state-snapshot",
-    "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
-    "description": "fixture-scoped state snapshot"
-  },
   "generatedState": {
     "roots": [
       "runs/multi-agent-pipeline",

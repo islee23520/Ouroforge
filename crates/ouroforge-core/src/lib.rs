@@ -3489,7 +3489,9 @@ impl AgentWorkPackage {
             ));
         }
         require_text("agent work package objective", &self.objective)?;
+        self.reject_overbroad_scope()?;
         self.scope.validate("agent work package scope")?;
+        self.validate_forbidden_action_guardrails()?;
         if self.allowed_artifacts.is_empty() {
             return Err(anyhow!(
                 "agent work package allowedArtifacts must not be empty"
@@ -3497,6 +3499,12 @@ impl AgentWorkPackage {
         }
         for (index, artifact) in self.allowed_artifacts.iter().enumerate() {
             artifact.validate(&format!("agent work package allowedArtifacts[{index}]"))?;
+            validate_agent_work_package_artifact_path(
+                &format!("agent work package allowedArtifacts[{index}].path"),
+                &artifact.path,
+                &self.generated_state.roots,
+                true,
+            )?;
         }
         validate_nonempty_text_list(
             "agent work package forbiddenActions",
@@ -3524,6 +3532,7 @@ impl AgentWorkPackage {
                     "agent work package verificationCommands[{index}].boundary must state commands are inert or do not execute"
                 ));
             }
+            validate_agent_work_package_verification_command(index, command)?;
         }
         if self.expected_evidence.is_empty() {
             return Err(anyhow!(
@@ -3532,6 +3541,12 @@ impl AgentWorkPackage {
         }
         for (index, evidence) in self.expected_evidence.iter().enumerate() {
             evidence.validate(&format!("agent work package expectedEvidence[{index}]"))?;
+            validate_agent_work_package_artifact_path(
+                &format!("agent work package expectedEvidence[{index}].path"),
+                &evidence.path,
+                &self.generated_state.roots,
+                false,
+            )?;
         }
         if self.ownership_refs.is_empty() {
             return Err(anyhow!(
@@ -3540,9 +3555,27 @@ impl AgentWorkPackage {
         }
         for (index, ownership_ref) in self.ownership_refs.iter().enumerate() {
             ownership_ref.validate(&format!("agent work package ownershipRefs[{index}]"))?;
+            validate_agent_work_package_artifact_path(
+                &format!("agent work package ownershipRefs[{index}].path"),
+                &ownership_ref.path,
+                &self.generated_state.roots,
+                true,
+            )?;
+            if ownership_ref.path.contains("ownership-policy.conflict") {
+                return Err(anyhow!(
+                    "agent work package ownershipRefs[{index}] must not reference unresolved ownership conflict policy"
+                ));
+            }
         }
         self.handoff_target
             .validate("agent work package handoffTarget")?;
+        validate_agent_work_package_artifact_path(
+            "agent work package handoffTarget.path",
+            &self.handoff_target.path,
+            &self.generated_state.roots,
+            true,
+        )?;
+        self.validate_stale_snapshot_contract()?;
         if matches!(
             self.status,
             AgentWorkPackageStatus::Blocked | AgentWorkPackageStatus::Stale
@@ -3560,6 +3593,12 @@ impl AgentWorkPackage {
         }
         if let Some(snapshot) = &self.state_snapshot_ref {
             snapshot.validate("agent work package stateSnapshotRef")?;
+            validate_agent_work_package_artifact_path(
+                "agent work package stateSnapshotRef.path",
+                &snapshot.path,
+                &self.generated_state.roots,
+                true,
+            )?;
         }
         self.generated_state.validate()?;
         require_text("agent work package boundary", &self.boundary)?;
@@ -3572,6 +3611,127 @@ impl AgentWorkPackage {
         }
         Ok(())
     }
+
+    fn reject_overbroad_scope(&self) -> Result<()> {
+        let combined = std::iter::once(self.objective.as_str())
+            .chain(std::iter::once(self.scope.summary.as_str()))
+            .chain(self.scope.in_scope.iter().map(String::as_str))
+            .chain(self.scope.out_of_scope.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase();
+        for forbidden in [
+            "arbitrary game completion",
+            "complete arbitrary game",
+            "production ready",
+            "godot replacement",
+            "unrestricted project mutation",
+        ] {
+            if combined.contains(forbidden) {
+                return Err(anyhow!(
+                    "agent work package scope is overbroad or overclaims forbidden capability: {forbidden}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_forbidden_action_guardrails(&self) -> Result<()> {
+        let combined = self
+            .forbidden_actions
+            .iter()
+            .map(|action| action.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+        for required in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "browser command bridge",
+            "trusted browser writes",
+        ] {
+            if !combined.contains(required) {
+                return Err(anyhow!(
+                    "agent work package forbiddenActions must include {required} boundary"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_stale_snapshot_contract(&self) -> Result<()> {
+        if self.status == AgentWorkPackageStatus::Stale {
+            let Some(snapshot) = &self.state_snapshot_ref else {
+                return Err(anyhow!(
+                    "stale agent work package must include stateSnapshotRef"
+                ));
+            };
+            if !snapshot.path.contains("state-snapshot") {
+                return Err(anyhow!(
+                    "stale agent work package stateSnapshotRef must reference a state snapshot artifact"
+                ));
+            }
+            if !self.blocked_reasons.iter().any(|reason| {
+                let reason = reason.to_ascii_lowercase();
+                reason.contains("stale") || reason.contains("refresh")
+            }) {
+                return Err(anyhow!(
+                    "stale agent work package blockedReasons must describe stale state or refresh action"
+                ));
+            }
+        } else if self
+            .state_snapshot_ref
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.path.contains("demo-state-snapshot.fixture.json"))
+        {
+            return Err(anyhow!(
+                "non-stale agent work package must not reference known stale state snapshot fixture"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_agent_work_package_verification_command(
+    index: usize,
+    command: &AuthoringLoopResumeCommandContext,
+) -> Result<()> {
+    let test_command = SourcePatchTestCommand {
+        command: command.command.clone(),
+        argv: command.argv.clone(),
+    };
+    if default_source_patch_test_command_allowlist()
+        .match_command(&test_command)
+        .is_none()
+    {
+        return Err(anyhow!(
+            "agent work package verificationCommands[{index}].argv is not in the safe local check allowlist"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_agent_work_package_artifact_path(
+    field: &str,
+    value: &str,
+    generated_roots: &[String],
+    allow_fixture_source: bool,
+) -> Result<()> {
+    validate_authoring_loop_generated_root(field, value)?;
+    let path = Path::new(value);
+    let under_generated_root = generated_roots.iter().any(|root| {
+        let root = Path::new(root);
+        path == root || path.starts_with(root)
+    });
+    let fixture_scoped =
+        allow_fixture_source && path.starts_with("examples/multi-agent-pipeline-v1");
+    if !(under_generated_root || fixture_scoped || is_documented_generated_artifact_path(path)) {
+        return Err(anyhow!(
+            "{field} must be fixture-scoped or within documented generated roots"
+        ));
+    }
+    Ok(())
 }
 
 impl AgentWorkPackageScope {
@@ -41585,6 +41745,72 @@ scenarios:
                         .is_some_and(|text| text.contains("browser command bridge"))
                 })
             }));
+    }
+
+    #[test]
+    fn agent_work_package_v1_rejects_invalid_overbroad_and_unsafe_fixtures() {
+        for (path, expected) in [
+            (
+                "examples/multi-agent-pipeline-v1/agent-work-package.invalid.fixture.json",
+                "acceptanceCriteria",
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-work-package.overbroad.fixture.json",
+                "overbroad",
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-work-package.unsafe.fixture.json",
+                "path",
+            ),
+        ] {
+            let body = read_json_fixture(path);
+            let error = AgentWorkPackage::from_json_str(&body).unwrap_err();
+            assert!(
+                error.to_string().contains(expected),
+                "{path} error {error:#} should contain {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn agent_work_package_v1_rejects_unsupported_commands_conflicts_and_stale_drift() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+        );
+        let base: serde_json::Value = serde_json::from_str(&body).expect("work package json");
+
+        let mut unsupported_command = base.clone();
+        unsupported_command["verificationCommands"][0]["command"] =
+            json!("curl https://example.test");
+        unsupported_command["verificationCommands"][0]["argv"] =
+            json!(["curl", "https://example.test"]);
+        let command_error = AgentWorkPackage::from_json_str(&unsupported_command.to_string())
+            .expect_err("unsupported verification command rejects package");
+        assert!(command_error.to_string().contains("allowlist"));
+
+        let mut missing_guardrail = base.clone();
+        missing_guardrail["forbiddenActions"] = json!(["Do not execute commands from package"]);
+        let guardrail_error = AgentWorkPackage::from_json_str(&missing_guardrail.to_string())
+            .expect_err("missing forbidden guardrails reject package");
+        assert!(guardrail_error.to_string().contains("forbiddenActions"));
+
+        let mut ownership_conflict = base.clone();
+        ownership_conflict["ownershipRefs"][0]["path"] =
+            json!("examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json");
+        let ownership_error = AgentWorkPackage::from_json_str(&ownership_conflict.to_string())
+            .expect_err("ownership conflict refs reject package");
+        assert!(ownership_error.to_string().contains("ownership conflict"));
+
+        let mut stale_without_snapshot = base.clone();
+        stale_without_snapshot["status"] = json!("stale");
+        stale_without_snapshot["blockedReasons"] = json!(["refresh stale package evidence"]);
+        stale_without_snapshot
+            .as_object_mut()
+            .unwrap()
+            .remove("stateSnapshotRef");
+        let stale_error = AgentWorkPackage::from_json_str(&stale_without_snapshot.to_string())
+            .expect_err("stale package without snapshot rejects package");
+        assert!(stale_error.to_string().contains("stateSnapshotRef"));
     }
 
     #[test]

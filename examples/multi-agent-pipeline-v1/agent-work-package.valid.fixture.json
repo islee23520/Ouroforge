@@ -93,11 +93,6 @@
     "description": "reviewer handoff artifact"
   },
   "blockedReasons": [],
-  "stateSnapshotRef": {
-    "id": "state-snapshot",
-    "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
-    "description": "fixture-scoped state snapshot"
-  },
   "generatedState": {
     "roots": [
       "runs/multi-agent-pipeline",
