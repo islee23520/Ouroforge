@@ -1,0 +1,6 @@
+diff --git a/runs/run-1/run.json b/runs/run-1/run.json
+--- a/runs/run-1/run.json
++++ b/runs/run-1/run.json
+@@ -1 +1 @@
+-{"status":"old"}
++{"status":"new"}

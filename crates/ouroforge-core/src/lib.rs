@@ -10695,6 +10695,187 @@ fn parse_unified_hunk_range(range: &str, prefix: char) -> Option<(u32, u32)> {
     Some((start, count))
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffIntegrityLimits {
+    #[serde(rename = "maxFiles")]
+    pub max_files: usize,
+    #[serde(rename = "maxChangedLines")]
+    pub max_changed_lines: usize,
+}
+
+impl Default for PatchDiffIntegrityLimits {
+    fn default() -> Self {
+        Self {
+            max_files: 32,
+            max_changed_lines: 5_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffIntegrityValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    pub report: PatchDiffIntegrityReport,
+    #[serde(rename = "fileClassValidation")]
+    pub file_class_validation: SourcePatchTargetClassValidation,
+    pub limits: PatchDiffIntegrityLimits,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl PatchDiffIntegrityValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_unified_patch_diff_for_preview(
+    diff_text: &str,
+    limits: PatchDiffIntegrityLimits,
+) -> Result<PatchDiffIntegrityValidation> {
+    let report = parse_unified_patch_diff_integrity(diff_text)?;
+    Ok(validate_patch_diff_integrity_report_for_preview(
+        report, limits,
+    ))
+}
+
+pub fn validate_unified_patch_diff_for_preview(
+    diff_text: &str,
+    limits: PatchDiffIntegrityLimits,
+) -> Result<PatchDiffIntegrityValidation> {
+    let validation = inspect_unified_patch_diff_for_preview(diff_text, limits)?;
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "patch diff integrity validation blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+pub fn validate_patch_diff_integrity_report_for_preview(
+    report: PatchDiffIntegrityReport,
+    limits: PatchDiffIntegrityLimits,
+) -> PatchDiffIntegrityValidation {
+    let target_paths = patch_diff_target_paths(&report);
+    let file_class_validation = classify_source_patch_preview_targets(target_paths.iter());
+    let mut blocked_reasons = Vec::<String>::new();
+    blocked_reasons.extend(
+        file_class_validation
+            .blocked_reasons
+            .iter()
+            .map(|reason| format!("file class blocked: {reason}")),
+    );
+
+    if report.file_count > limits.max_files {
+        blocked_reasons.push(format!(
+            "diff touches {} files, exceeding limit {}",
+            report.file_count, limits.max_files
+        ));
+    }
+    let changed_lines = report.counts.added + report.counts.removed;
+    if changed_lines > limits.max_changed_lines {
+        blocked_reasons.push(format!(
+            "diff changes {changed_lines} lines, exceeding limit {}",
+            limits.max_changed_lines
+        ));
+    }
+
+    for warning in &report.warnings {
+        match warning.kind {
+            PatchDiffIntegrityWarningKind::BinaryPatch => blocked_reasons.push(format!(
+                "binary patch marker at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::ModeChange => blocked_reasons.push(format!(
+                "file mode metadata at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::RenameMetadata => blocked_reasons.push(format!(
+                "rename metadata at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::CopyMetadata => blocked_reasons.push(format!(
+                "copy metadata at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            _ => {}
+        }
+    }
+
+    for file in &report.files {
+        if file.is_binary {
+            blocked_reasons.push(format!(
+                "binary diff target {}",
+                first_non_empty_path(file).unwrap_or_else(|| "<unknown>".to_string())
+            ));
+        }
+        if file.old_mode.is_some() || file.new_mode.is_some() {
+            blocked_reasons.push(format!(
+                "mode change target {}",
+                first_non_empty_path(file).unwrap_or_else(|| "<unknown>".to_string())
+            ));
+        }
+        if file.status == PatchDiffFileStatus::Deleted
+            && is_critical_patch_diff_path(&file.old_path)
+        {
+            blocked_reasons.push(format!("critical file deletion target {}", file.old_path));
+        }
+    }
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    PatchDiffIntegrityValidation {
+        schema_version: "patch-diff-integrity-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        report,
+        file_class_validation,
+        limits,
+        blocked_reasons,
+        guardrails: vec![
+            "diff integrity validation only; no source patch apply".to_string(),
+            "blocked diffs stop before sandbox dry-run or trusted source writes".to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+            "generated preview/sandbox/report artifacts remain untracked unless fixture-scoped"
+                .to_string(),
+        ],
+    }
+}
+
+fn patch_diff_target_paths(report: &PatchDiffIntegrityReport) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    for file in &report.files {
+        if !file.old_path.is_empty() && file.old_path != "/dev/null" {
+            paths.push(PathBuf::from(&file.old_path));
+        }
+        if !file.new_path.is_empty() && file.new_path != "/dev/null" {
+            paths.push(PathBuf::from(&file.new_path));
+        }
+    }
+    paths
+}
+
+fn is_critical_patch_diff_path(path: &str) -> bool {
+    let normalized = normalize_diff_path(path);
+    matches!(
+        normalized.as_str(),
+        "Cargo.toml" | "Cargo.lock" | "README.md" | "AGENTS.md"
+    ) || normalized.starts_with(".github/workflows/")
+}
+
 pub const VISUAL_EDIT_DRAFT_SCHEMA_VERSION: &str = "visual-edit-draft-v1";
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS: usize = 128;
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS: u32 = 4096;

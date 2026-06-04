@@ -1,0 +1,6 @@
+diff --git a/../Cargo.toml b/../Cargo.toml
+--- a/../Cargo.toml
++++ b/../Cargo.toml
+@@ -1 +1 @@
+-old
++new
