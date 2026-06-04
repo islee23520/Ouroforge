@@ -67,3 +67,12 @@ classifier blocks:
 - source patch apply, merge, rebase, push, or auto-apply commands.
 
 A rejected command records a reason and the boundary that no command was run.
+
+
+## Patch preview requiredTests integration
+
+SMP1.5.3 wires patch preview `requiredTests` metadata to this policy. When a
+preview required test declares `allowlistPolicyId`, validation requires `argv`,
+checks that `command` matches normalized `argv`, rejects forbidden command
+classes first, and then matches the inert default allowlist. This is still a
+pre-execution validation hook; it does not create a sandbox or run the command.

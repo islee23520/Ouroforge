@@ -68,7 +68,7 @@ must not be treated as permission to write files.
 | `riskIds` | yes | References to `docs/source-mutation-threat-model-v1.md`, for example `STM-07`. |
 | `linkedEvidence` | yes | Existing run, comparison, review, regression, or handoff artifacts used to justify the proposal. |
 | `expectedBehaviorChange` | yes | What should change if a later authorized workflow applies the patch. |
-| `requiredTests` | yes | Commands or checks expected before any later review decision; commands are copyable context, not executed by the artifact. |
+| `requiredTests` | yes | Commands or checks expected before any later review decision; commands are copyable context, not executed by the artifact. When `allowlistPolicyId` is present, `argv` is validated against Source Patch Test Command Allowlist v1 before any future sandbox evaluation. |
 | `reviewerChecklist` | yes | Human/reviewer checks for class, risk, evidence, stale targets, generated-state, rollback, and non-goal drift. |
 | `rollbackExpectations` | yes | Required rollback/audit references a later implementation must provide before apply is considered. |
 
@@ -207,3 +207,19 @@ ouroforge patch-preview show examples/patch-preview-artifact-v1/patch-preview.sa
 Required tests are still copyable metadata only. A passed validation means the
 preview artifact is internally consistent enough for later review/read-model
 surfaces; it is not apply, merge, sandbox, or command authority.
+
+
+## Required test allowlist metadata
+
+Issue #359 connects preview `requiredTests` to the inert Source Patch Test
+Command Allowlist v1 policy. A required test may include:
+
+- `argv`: shell-free argument vector used for normalization and matching;
+- `allowlistPolicyId`: currently `source-patch-preview-safe-local-checks-v1`;
+- `executionAuthority`: still copyable-only and not executed by preview validation.
+
+Validation rejects policy-linked tests whose command text does not match normalized
+`argv`, whose `argv` is forbidden by the command policy, or whose `argv` is not
+in the inert allowlist. This remains metadata validation only; it does not run
+commands, create sandboxes, apply patches, merge branches, or write trusted
+source files.

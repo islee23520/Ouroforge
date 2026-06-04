@@ -70,8 +70,18 @@
   "expectedBehaviorChange": "If separately authorized in a future milestone, the scene label text would change while game behavior remains otherwise equivalent.",
   "requiredTests": [
     {
-      "command": "cargo test validates_engine_expressiveness_v2_regression_seed_and_pack -- --nocapture",
-      "executionAuthority": "copyable_only_not_executed_by_preview"
+      "command": "cargo test -p ouroforge-core validates_engine_expressiveness_v2_regression_seed_and_pack -- --nocapture",
+      "executionAuthority": "copyable_only_not_executed_by_preview",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-core",
+        "validates_engine_expressiveness_v2_regression_seed_and_pack",
+        "--",
+        "--nocapture"
+      ],
+      "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
     }
   ],
   "reviewerChecklist": [
