@@ -39016,7 +39016,9 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 &format!("scene3d node {} colliderRef", node.id),
                 collider_ref,
             )?;
-            if !collider_ids.is_empty() && !collider_ids.contains(collider_ref.as_str()) {
+            // A non-empty colliderRef must match a declared collider, including
+            // when the collider catalog is empty (no scene3d.colliders[]).
+            if !collider_ids.contains(collider_ref.as_str()) {
                 return Err(anyhow!(
                     "scene3d node {} colliderRef references missing collider: {}",
                     node.id,
@@ -39482,9 +39484,7 @@ fn validate_scene_3d_component(
                     "scene3d node {node_id} component material reference missing material: {reference}"
                 ));
             }
-            "collider"
-                if !collider_ids.is_empty() && !collider_ids.contains(reference.as_str()) =>
-            {
+            "collider" if !collider_ids.contains(reference.as_str()) => {
                 return Err(anyhow!(
                     "scene3d node {node_id} component collider reference missing collider: {reference}"
                 ));
@@ -68727,6 +68727,20 @@ scenarios:
                 "{fixture} error {error:#} contains {expected}"
             );
         }
+
+        // A colliderRef must be rejected even when the collider catalog is empty.
+        let mut empty_catalog: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-collider-invalid-missing-ref.scene.json",
+        ))
+        .expect("collider fixture json");
+        empty_catalog["scene3d"]["colliders"] = json!([]);
+        let empty_scene: SceneDocument =
+            serde_json::from_str(&empty_catalog.to_string()).expect("empty-catalog scene parses");
+        let empty_error = validate_scene(&empty_scene)
+            .expect_err("colliderRef with an empty collider catalog is rejected");
+        assert!(empty_error
+            .to_string()
+            .contains("colliderRef references missing collider"));
     }
 
     #[test]
