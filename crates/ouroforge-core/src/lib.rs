@@ -37132,6 +37132,77 @@ fn multiply_scene_3d_vectors(
     })
 }
 
+pub fn scene_3d_camera_state_summary(scene: &SceneDocument) -> Result<serde_json::Value> {
+    validate_scene(scene)?;
+    let Some(graph) = &scene.scene_3d else {
+        return Ok(json!({
+            "present": false,
+            "emptyState": "No scene3d camera state is available."
+        }));
+    };
+    if graph.cameras.is_empty() {
+        return Ok(json!({
+            "present": false,
+            "sceneId": scene.id,
+            "emptyState": "No scene3d cameras are configured."
+        }));
+    }
+    let active_camera_id = graph
+        .active_camera_id
+        .as_deref()
+        .ok_or_else(|| anyhow!("scene3d cameras require activeCameraId"))?;
+    let cameras = graph
+        .cameras
+        .iter()
+        .map(scene_3d_camera_summary_entry)
+        .collect::<Result<Vec<_>>>()?;
+    let active_camera = cameras
+        .iter()
+        .find(|camera| camera.get("id").and_then(|value| value.as_str()) == Some(active_camera_id))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    Ok(json!({
+        "present": true,
+        "schemaVersion": "ouroforge.scene3d-camera-state.v1",
+        "sceneId": scene.id,
+        "activeCameraId": active_camera_id,
+        "activeCamera": active_camera,
+        "cameraCount": cameras.len(),
+        "cameras": cameras,
+        "readOnlyInspection": {
+            "trustedEmitter": "rust-scene-validation",
+            "browserStudioMode": "read-only 3D camera evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "viewport persistence", "camera editor tooling"]
+        }
+    }))
+}
+
+fn scene_3d_camera_summary_entry(camera: &Scene3dCamera) -> Result<serde_json::Value> {
+    let aspect_ratio_x1000 = camera
+        .viewport
+        .width
+        .checked_mul(1000)
+        .and_then(|value| value.checked_div(camera.viewport.height))
+        .ok_or_else(|| anyhow!("scene3d camera {} aspect ratio overflow", camera.id))?;
+    Ok(json!({
+        "id": camera.id,
+        "nodeId": camera.node_id,
+        "active": camera.active,
+        "transform": camera.transform,
+        "projection": {
+            "kind": camera.projection.kind,
+            "fovDegrees": camera.projection.fov_degrees,
+            "near": camera.projection.near,
+            "far": camera.projection.far,
+            "orthographicHeight": camera.projection.orthographic_height,
+            "aspectMode": camera.projection.aspect_mode,
+        },
+        "viewport": camera.viewport,
+        "aspectRatioX1000": aspect_ratio_x1000,
+        "metadata": camera.metadata,
+    }))
+}
+
 fn validate_scene_component_defaults(
     defaults: &SceneComponentDefaults,
     gameplay_flags: Option<&BTreeSet<String>>,
@@ -42778,9 +42849,21 @@ fn dashboard_camera_summary(world_state: &serde_json::Value) -> serde_json::Valu
         .and_then(|value| value.as_object())
         .cloned()
         .unwrap_or_default();
+    let scene_3d_camera = camera
+        .and_then(|value| value.get("camera3d").or_else(|| value.get("scene3dCamera")))
+        .or_else(|| world_state.get("camera3d"))
+        .or_else(|| world_state.get("scene3dCamera"))
+        .cloned()
+        .unwrap_or_else(|| {
+            json!({
+                "present": false,
+                "emptyState": "No 3D camera evidence is available."
+            })
+        });
     let active_camera_id = camera
         .and_then(|value| value.get("activeCameraId"))
         .or_else(|| world_state.get("activeCameraId"))
+        .or_else(|| scene_3d_camera.get("activeCameraId"))
         .cloned()
         .unwrap_or(json!(null));
     let active_camera = cameras
@@ -42816,12 +42899,18 @@ fn dashboard_camera_summary(world_state: &serde_json::Value) -> serde_json::Valu
                 == Some(false)
         })
         .count();
-    let present = camera.is_some() || !cameras.is_empty() || !layers.is_empty();
+    let scene_3d_camera_present = scene_3d_camera
+        .get("present")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    let present =
+        camera.is_some() || !cameras.is_empty() || !layers.is_empty() || scene_3d_camera_present;
     json!({
         "present": present,
         "emptyState": if present { "" } else { "No camera/layer read model is available." },
         "activeCameraId": active_camera_id,
         "activeCamera": active_camera,
+        "scene3dCamera": scene_3d_camera,
         "rendererCamera": renderer_camera,
         "viewport": viewport,
         "cameraCount": cameras.len(),
@@ -64149,6 +64238,64 @@ scenarios:
                 "{fixture} error {error:#} contains {expected}"
             );
         }
+    }
+
+    #[test]
+    fn scene_3d_camera_state_summary_v1_exports_deterministic_read_model() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-camera-valid.scene.json",
+        ))
+        .expect("3D camera fixture parses");
+
+        let summary = scene_3d_camera_state_summary(&scene).expect("camera summary resolves");
+        assert_eq!(
+            summary["schemaVersion"],
+            "ouroforge.scene3d-camera-state.v1"
+        );
+        assert_eq!(summary["activeCameraId"], "main-camera");
+        assert_eq!(summary["cameraCount"], 1);
+        assert_eq!(summary["activeCamera"]["projection"]["kind"], "perspective");
+        assert_eq!(summary["activeCamera"]["projection"]["fovDegrees"], 60);
+        assert_eq!(summary["activeCamera"]["aspectRatioX1000"], 1777);
+        assert_eq!(
+            summary["readOnlyInspection"]["browserStudioMode"],
+            "read-only 3D camera evidence inspection"
+        );
+    }
+
+    #[test]
+    fn dashboard_camera_summary_includes_3d_camera_evidence_without_losing_2d_fields() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-camera-valid.scene.json",
+        ))
+        .expect("3D camera fixture parses");
+        let camera_3d = scene_3d_camera_state_summary(&scene).expect("camera summary resolves");
+        let world_state = json!({
+            "sceneId": "dashboard-3d-camera",
+            "camera": {
+                "activeCameraId": "legacy-camera",
+                "cameras": [
+                    { "id": "legacy-camera", "active": true, "position": { "x": 1, "y": 2 } }
+                ],
+                "camera3d": camera_3d,
+                "worldToScreen": {
+                    "player": { "x": 10, "y": 12, "layer": "actors" }
+                }
+            },
+            "renderer": {
+                "layers": [
+                    { "id": "actors", "order": 1, "visible": true, "parallaxFactor": 100 }
+                ]
+            }
+        });
+
+        let summary = dashboard_camera_summary(&world_state);
+        assert_eq!(summary["present"], true);
+        assert_eq!(summary["activeCameraId"], "legacy-camera");
+        assert_eq!(summary["cameraCount"], 1);
+        assert_eq!(summary["scene3dCamera"]["activeCameraId"], "main-camera");
+        assert_eq!(summary["scene3dCamera"]["cameraCount"], 1);
+        assert_eq!(summary["worldToScreenSampleCount"], 1);
     }
 
     #[test]

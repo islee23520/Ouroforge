@@ -470,7 +470,7 @@ const OuroforgeCockpit = (() => {
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
       { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
-      { id: 'camera-layer-inspection', label: 'Camera/layer inspection', present: Boolean(run?.engine_summaries?.camera || run?.engine_summaries?.camera_state || run?.engine_summaries?.cameraState), detail: run?.engine_summaries?.camera?.activeCameraId || run?.engine_summaries?.camera_state?.activeCameraId || run?.engine_summaries?.cameraState?.activeCameraId || 'camera read model unavailable' },
+      { id: 'camera-layer-inspection', label: 'Camera/layer inspection', present: Boolean(run?.engine_summaries?.camera || run?.engine_summaries?.camera_state || run?.engine_summaries?.cameraState), detail: run?.engine_summaries?.camera?.scene3dCamera?.activeCameraId || run?.engine_summaries?.camera?.activeCameraId || run?.engine_summaries?.camera_state?.activeCameraId || run?.engine_summaries?.cameraState?.activeCameraId || 'camera read model unavailable' },
       { id: 'render-breakdown-inspection', label: 'Render breakdown inspection', present: Boolean(run?.engine_summaries?.render_breakdown?.present || run?.engine_summaries?.renderBreakdown?.present), detail: `${(run?.engine_summaries?.render_breakdown?.elements || run?.engine_summaries?.renderBreakdown?.elements || []).length} renderable row(s)` },
       { id: 'runtime-profiler-inspection', label: 'Runtime profiler inspection', present: Boolean(run?.engine_summaries?.runtime_frame_budget || run?.engine_summaries?.runtimeFrameBudget), detail: run?.engine_summaries?.runtime_frame_budget?.status || run?.engine_summaries?.runtimeFrameBudget?.status || 'frame-budget read model unavailable' },
       { id: 'runtime-state-inspection', label: 'Runtime save/state inspection', present: Boolean(run?.engine_summaries?.runtime_state?.present || run?.engine_summaries?.runtimeState?.present), detail: `${run?.engine_summaries?.runtime_state?.saveEventCount ?? run?.engine_summaries?.runtimeState?.saveEventCount ?? 0} save event(s), ${run?.engine_summaries?.runtime_state?.replayDigestComparedCount ?? run?.engine_summaries?.runtimeState?.replayDigestComparedCount ?? 0} replay digest check(s)` },
@@ -514,7 +514,7 @@ const OuroforgeCockpit = (() => {
     const cards = [
       ['Scene', `${summaryValue(summary, 'scene', 'sceneId')} · ${summaryValue(summary, 'scene', 'entityCount', 0)} entit(ies) · tick ${summaryValue(summary, 'scene', 'tick')}`],
       ['Renderer / camera', `v${summaryValue(summary, 'renderer', 'version')} · ${summaryValue(summary, 'renderer', 'renderedEntities', 0)} rendered · camera ${summaryValue(summary, 'renderer', 'camera')}`],
-      ['Camera/layers', `${summaryValue(summary, 'camera', 'cameraCount', 0)} camera(s), ${summaryValue(summary, 'camera', 'layerCount', 0)} layer(s), active ${summaryValue(summary, 'camera', 'activeCameraId')}`],
+      ['Camera/layers', `${summaryValue(summary, 'camera', 'cameraCount', 0)} 2D camera(s), ${summary?.camera?.scene3dCamera?.cameraCount ?? summary?.camera?.scene3d_camera?.camera_count ?? 0} 3D camera(s), ${summaryValue(summary, 'camera', 'layerCount', 0)} layer(s), active ${summary?.camera?.scene3dCamera?.activeCameraId || summaryValue(summary, 'camera', 'activeCameraId')}`],
       ['Render breakdown', `${(summary?.render_breakdown?.elements || summary?.renderBreakdown?.elements || []).length} element(s), ${(summary?.render_breakdown?.absenceDiagnostics || summary?.render_breakdown?.absence_diagnostics || summary?.renderBreakdown?.absenceDiagnostics || []).length} absence diagnostic(s)`],
       ['Runtime profiler', `${summary?.runtime_frame_budget?.status || summary?.runtimeFrameBudget?.status || 'unreported'} · ${(summary?.runtime_frame_budget?.violations || summary?.runtimeFrameBudget?.violations || []).length} violation(s)`],
       ['Tilemaps', `${summaryValue(summary, 'tilemaps', 'tilemapCount', 0)} tilemap(s), ${summaryValue(summary, 'tilemaps', 'layerCount', 0)} layer(s)`],
@@ -672,6 +672,8 @@ const OuroforgeCockpit = (() => {
       return `<section id="camera-layer-inspection" class="panel"><h2>Camera/layer inspection</h2><p class="empty">${escapeText(camera?.emptyState || camera?.empty_state || 'No camera/layer read model is available; camera/layer evidence is missing or malformed for this run.')}</p><p class="hint">Read-only inspection only: this panel does not write files, execute commands, mutate scenes, or control the browser runtime.</p></section>`;
     }
     const cameras = Array.isArray(camera.cameras) ? camera.cameras : [];
+    const scene3dCamera = camera.scene3dCamera || camera.scene3d_camera || camera.camera3d || {};
+    const scene3dCameras = Array.isArray(scene3dCamera.cameras) ? scene3dCamera.cameras : [];
     const layers = Array.isArray(camera.layers) ? camera.layers : (Array.isArray(renderer.layers) ? renderer.layers : []);
     const worldToScreen = camera.worldToScreen && typeof camera.worldToScreen === 'object' && !Array.isArray(camera.worldToScreen) ? camera.worldToScreen : {};
     const readOnlyInspection = camera.readOnlyInspection || camera.read_only_inspection || {};
@@ -681,18 +683,21 @@ const OuroforgeCockpit = (() => {
       ['Renderer camera', JSON.stringify(camera.rendererCamera || camera.renderer_camera || renderer.camera || {})],
       ['Viewport', JSON.stringify(camera.viewport || renderer.viewport || {})],
       ['Camera records', camera.cameraCount ?? camera.camera_count ?? cameras.length],
+      ['3D camera records', scene3dCamera.cameraCount ?? scene3dCamera.camera_count ?? scene3dCameras.length],
       ['Layer records', camera.layerCount ?? camera.layer_count ?? layers.length],
       ['Parallax layers', camera.parallaxLayerCount ?? camera.parallax_layer_count ?? 0],
       ['Camera-excluded layers', camera.cameraExcludedLayerCount ?? camera.camera_excluded_layer_count ?? 0],
       ['World-to-screen samples', camera.worldToScreenSampleCount ?? camera.world_to_screen_sample_count ?? Object.keys(worldToScreen).length],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const cameraRows = cameras.slice(0, 12).map((entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || 'camera')}</strong> ${surfaceState(Boolean(entry?.active), entry?.active ? 'active' : 'inactive')}<br><small>follow ${escapeText(entry?.followTarget || entry?.follow_target || 'none')} · position ${escapeText(JSON.stringify(entry?.position || {}))} · clamp ${escapeText(JSON.stringify(entry?.clampBounds || entry?.clamp_bounds || {}))}</small></div>`).join('') || '<div class="surface-row">No camera records exported.</div>';
+    const camera3dRows = scene3dCameras.slice(0, 12).map((entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || 'camera3d')}</strong> ${surfaceState(Boolean(entry?.active), entry?.active ? 'active' : 'inactive')}<br><small>projection ${escapeText(entry?.projection?.kind || 'unknown')} · fov ${escapeText(entry?.projection?.fovDegrees ?? 'n/a')} · near/far ${escapeText(entry?.projection?.near ?? '?')}/${escapeText(entry?.projection?.far ?? '?')} · aspect×1000 ${escapeText(entry?.aspectRatioX1000 ?? 'n/a')} · viewport ${escapeText(JSON.stringify(entry?.viewport || {}))}</small></div>`).join('') || `<div class="surface-row">${escapeText(scene3dCamera.emptyState || scene3dCamera.empty_state || 'No 3D camera evidence exported.')}</div>`;
     const layerRows = layers.slice(0, 12).map((layer) => `<div class="surface-row"><strong>${escapeText(layer?.id || 'layer')}</strong> ${surfaceState(layer?.cameraParticipation !== false && layer?.camera_participation !== false, layer?.cameraParticipation === false || layer?.camera_participation === false ? 'screen-space' : 'camera-space')}<br><small>order ${escapeText(layer?.order ?? '?')} · parallax ${escapeText(layer?.parallaxFactor ?? layer?.parallax_factor ?? 'n/a')} · ${escapeText(layer?.visible === false ? 'hidden' : 'visible')}</small></div>`).join('') || '<div class="surface-row">No layer records exported.</div>';
     const sampleRows = Object.entries(worldToScreen).slice(0, 12).map(([entityId, sample]) => `<div class="surface-row"><strong>${escapeText(entityId)}</strong> ${surfaceState(true, sample?.layer || 'default')}<br><small>screen ${escapeText(JSON.stringify({ x: sample?.x, y: sample?.y }))} · offset ${escapeText(JSON.stringify(sample?.cameraOffset || sample?.camera_offset || {}))}</small></div>`).join('') || '<div class="surface-row">No world-to-screen samples exported.</div>';
     return `<section id="camera-layer-inspection" class="panel"><h2>Camera/layer inspection</h2>
       <p class="hint">Escaped read-only camera/layer evidence from runtime world-state. This surface cannot write scene state, execute commands, mutate sources, or control the browser runtime.</p>
       <div class="field-grid">${cards}</div>
       <h3>Cameras</h3>${cameraRows}
+      <h3>3D cameras</h3><p class="hint">Read-only 3D camera evidence only; no viewport persistence, cinematic timeline, or camera editor tooling.</p>${camera3dRows}
       <h3>Layers</h3>${layerRows}
       <h3>World-to-screen samples</h3>${sampleRows}
       <p class="hint">Disallowed actions: ${escapeText(disallowedActions.join(' · '))}</p>

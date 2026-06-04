@@ -229,6 +229,9 @@ const OuroforgeDashboard = (() => {
       ? camera.worldToScreen
       : {};
     const active = camera.activeCamera || cameras.find((entry) => entry && entry.id === camera.activeCameraId) || cameras.find((entry) => entry && entry.active) || {};
+    const scene3dCamera = camera.scene3dCamera || camera.scene3d_camera || camera.camera3d || {};
+    const scene3dCameras = Array.isArray(scene3dCamera.cameras) ? scene3dCamera.cameras : [];
+    const active3d = scene3dCamera.activeCamera || scene3dCamera.active_camera || scene3dCameras.find((entry) => entry && entry.id === scene3dCamera.activeCameraId) || {};
     const rendererCamera = camera.rendererCamera || renderer.camera || {};
     const viewport = camera.viewport || renderer.viewport || active.viewport || {};
     const rows = [
@@ -236,13 +239,18 @@ const OuroforgeDashboard = (() => {
       ['Renderer camera', JSON.stringify(rendererCamera)],
       ['Viewport', JSON.stringify(viewport)],
       ['Camera records', cameras.length],
+      ['3D camera records', scene3dCameras.length],
       ['Layer records', layers.length],
       ['World-to-screen samples', Object.keys(worldToScreen).length],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const cameraRows = cameras.slice(0, 6).map((entry) => `<li><strong>${escapeText(entry?.id || 'camera')}</strong>: ${escapeText(entry?.active ? 'active' : 'inactive')} · follow ${escapeText(entry?.followTarget || 'none')} · position ${escapeText(JSON.stringify(entry?.position || {}))} · clamp ${escapeText(JSON.stringify(entry?.clampBounds || {}))}</li>`).join('') || '<li>No camera records exported.</li>';
+    const camera3dRows = scene3dCameras.slice(0, 6).map((entry) => `<li><strong>${escapeText(entry?.id || 'camera3d')}</strong>: ${escapeText(entry?.active ? 'active' : 'inactive')} · projection ${escapeText(entry?.projection?.kind || 'unknown')} · fov ${escapeText(entry?.projection?.fovDegrees ?? 'n/a')} · near/far ${escapeText(entry?.projection?.near ?? '?')}/${escapeText(entry?.projection?.far ?? '?')} · aspect×1000 ${escapeText(entry?.aspectRatioX1000 ?? 'n/a')} · viewport ${escapeText(JSON.stringify(entry?.viewport || {}))}</li>`).join('') || '<li>No 3D camera records exported.</li>';
     const layerRows = layers.slice(0, 8).map((layer) => `<li><strong>${escapeText(layer?.id || 'layer')}</strong>: order ${escapeText(layer?.order ?? '?')} · ${escapeText(layer?.visible === false ? 'hidden' : 'visible')} · parallax ${escapeText(layer?.parallaxFactor ?? 'n/a')} · camera ${escapeText(layer?.cameraParticipation === false ? 'disabled' : 'participates')}</li>`).join('') || '<li>No layer records exported.</li>';
     const sampleRows = Object.entries(worldToScreen).slice(0, 6).map(([entityId, sample]) => `<li><strong>${escapeText(entityId)}</strong>: screen ${escapeText(JSON.stringify({ x: sample?.x, y: sample?.y }))} · layer ${escapeText(sample?.layer || 'default')} · offset ${escapeText(JSON.stringify(sample?.cameraOffset || {}))}</li>`).join('') || '<li>No world-to-screen samples exported.</li>';
-    return `<div class="field-grid">${rows}</div><h4>Cameras</h4><ul class="run-meta-list">${cameraRows}</ul><h4>Layers</h4><ul class="run-meta-list">${layerRows}</ul><h4>World-to-screen samples</h4><ul class="run-meta-list">${sampleRows}</ul><p class="run-meta">Read-only camera/layer evidence only; the dashboard cannot write scene state, execute commands, or control the browser runtime.</p>`;
+    const camera3dSection = scene3dCamera.present
+      ? `<h4>3D cameras</h4><p class="run-meta">Active 3D camera: ${escapeText(scene3dCamera.activeCameraId || active3d.id || 'none')}. Read-only 3D camera evidence; no viewport persistence or camera editor tooling.</p><ul class="run-meta-list">${camera3dRows}</ul>`
+      : `<h4>3D cameras</h4><p class="empty-state compact">${escapeText(scene3dCamera.emptyState || 'No 3D camera evidence is available.')}</p>`;
+    return `<div class="field-grid">${rows}</div><h4>Cameras</h4><ul class="run-meta-list">${cameraRows}</ul>${camera3dSection}<h4>Layers</h4><ul class="run-meta-list">${layerRows}</ul><h4>World-to-screen samples</h4><ul class="run-meta-list">${sampleRows}</ul><p class="run-meta">Read-only camera/layer evidence only; the dashboard cannot write scene state, execute commands, or control the browser runtime.</p>`;
   }
 
   function renderGameplaySummary(summary = {}) {

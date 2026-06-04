@@ -962,6 +962,58 @@ assert.match(cockpit.renderCameraLayerInspectionSurface(run), /screen-space/);
 assert.match(cockpit.renderCameraLayerInspectionSurface(run), /World-to-screen samples/);
 assert.match(cockpit.renderCameraLayerInspectionSurface(run), /scene mutation/);
 assert.doesNotMatch(cockpit.renderCameraLayerInspectionSurface(run), /<follow-player>/);
+assert.match(cockpit.renderCameraLayerInspectionSurface({
+  engine_summaries: {
+    present: true,
+    camera: {
+      present: true,
+      scene3dCamera: {
+        present: true,
+        activeCameraId: '<main-camera>',
+        cameraCount: 1,
+        cameras: [{
+          id: '<main-camera>',
+          active: true,
+          projection: { kind: 'perspective', fovDegrees: 60, near: 1, far: 1000 },
+          viewport: { width: 640, height: 360 },
+          aspectRatioX1000: 1777
+        }]
+      }
+    }
+  }
+}), /3D cameras/);
+assert.match(cockpit.renderCameraLayerInspectionSurface({
+  engine_summaries: {
+    present: true,
+    camera: {
+      present: true,
+      scene3dCamera: {
+        present: true,
+        activeCameraId: '<main-camera>',
+        cameras: [{
+          id: '<main-camera>',
+          active: true,
+          projection: { kind: 'perspective', fovDegrees: 60, near: 1, far: 1000 },
+          viewport: { width: 640, height: 360 },
+          aspectRatioX1000: 1777
+        }]
+      }
+    }
+  }
+}), /&lt;main-camera&gt;/);
+assert.doesNotMatch(cockpit.renderCameraLayerInspectionSurface({
+  engine_summaries: {
+    present: true,
+    camera: {
+      present: true,
+      scene3dCamera: {
+        present: true,
+        activeCameraId: '<main-camera>',
+        cameras: [{ id: '<main-camera>', projection: { kind: '<script>' }, viewport: {} }]
+      }
+    }
+  }
+}), /<script>/);
 assert.match(cockpit.renderCameraLayerInspectionSurface({ engine_summaries: { present: true, camera: '<bad>' } }), /missing or malformed/);
 assert.match(cockpit.renderStudioNavigation(run), /Runtime profiler inspection/);
 assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /Runtime profiler inspection/);

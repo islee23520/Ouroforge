@@ -30,4 +30,16 @@ Generated screenshots, previews, run output, dashboard exports, and temp project
 
 ## Boundary
 
-This model only lets Rust/local validation identify an active 3D camera and reject invalid camera/projection/viewport shape. Camera evidence/read-model summaries and scenario checks are separate #598 PR units. Existing 2D camera config remains unchanged.
+## Evidence/read-model summary
+
+Rust can derive a deterministic `ouroforge.scene3d-camera-state.v1` summary from
+a validated scene. The summary includes the active camera id, active camera
+record, camera count, normalized projection fields, viewport fields, and an
+integer `aspectRatioX1000` derived from viewport width/height. Dashboard and
+Studio/cockpit surfaces may display this summary when exported as `camera3d` or
+`scene3dCamera` in world-state evidence. Those browser surfaces remain
+read-only displays and do not persist viewport edits, operate camera tooling, or
+control the runtime.
+
+Scenario/evaluator camera checks are a separate #598 PR unit. Existing 2D
+camera config remains unchanged.

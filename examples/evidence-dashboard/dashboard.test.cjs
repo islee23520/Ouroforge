@@ -849,6 +849,52 @@ assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /camera d
 assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /World-to-screen samples/);
 assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /Read-only camera\/layer evidence/);
 assert.doesNotMatch(dashboard.renderCameraLayerSummary(run.engine_summaries), /<follow-player>/);
+assert.match(dashboard.renderCameraLayerSummary({
+  present: true,
+  camera: {
+    activeCameraId: 'legacy-camera',
+    cameras: [],
+    scene3dCamera: {
+      present: true,
+      activeCameraId: '<main-camera>',
+      cameraCount: 1,
+      cameras: [{
+        id: '<main-camera>',
+        active: true,
+        projection: { kind: 'perspective', fovDegrees: 60, near: 1, far: 1000 },
+        viewport: { width: 640, height: 360 },
+        aspectRatioX1000: 1777
+      }]
+    }
+  }
+}), /3D camera records/);
+assert.match(dashboard.renderCameraLayerSummary({
+  present: true,
+  camera: {
+    scene3dCamera: {
+      present: true,
+      activeCameraId: '<main-camera>',
+      cameraCount: 1,
+      cameras: [{
+        id: '<main-camera>',
+        active: true,
+        projection: { kind: 'perspective', fovDegrees: 60, near: 1, far: 1000 },
+        viewport: { width: 640, height: 360 },
+        aspectRatioX1000: 1777
+      }]
+    }
+  }
+}), /&lt;main-camera&gt;/);
+assert.doesNotMatch(dashboard.renderCameraLayerSummary({
+  present: true,
+  camera: {
+    scene3dCamera: {
+      present: true,
+      activeCameraId: '<main-camera>',
+      cameras: [{ id: '<main-camera>', projection: { kind: '<script>' }, viewport: {} }]
+    }
+  }
+}), /<script>/);
 assert.match(dashboard.renderCameraLayerSummary({}), /No camera\/layer read model/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Renderable elements/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Render queue/);
