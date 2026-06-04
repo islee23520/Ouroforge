@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "tilemap-terrain-generation-draft-v1",
+  "draftId": "draft_unsafe_tilemap",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "targetSceneRef": "../outside.scene.json",
+  "targetTilemapRef": "examples/tilemap-authoring-v2/asset-manifest.valid.json",
+  "grid": { "width": 32, "height": 18, "tileSize": 16 },
+  "layers": [{ "layerId": "terrain", "kind": "terrain" }],
+  "tilePlacements": [
+    {
+      "placementId": "tile_a",
+      "layerId": "terrain",
+      "tileId": "ground",
+      "tilesetAssetRef": "assets/tilesets/ground.json",
+      "x": 1,
+      "y": 1
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Invalid unsafe scene target.",
+  "linkedConstraints": [{ "constraintId": "bounds_all", "status": "satisfied" }],
+  "expectedEvidence": [
+    {
+      "evidenceId": "report",
+      "kind": "draft_validation",
+      "pathHint": "evidence/tilemap-terrain-drafts/draft_unsafe_tilemap/report.json"
+    }
+  ],
+  "status": "drafted"
+}

@@ -73,7 +73,8 @@ proves a safer dependency order:
    ([Scene Generation Plan v1](scene-generation-plan-v1.md)).
 3. #630 - Spatial Layout and Placement Constraint Solver v1
    ([Spatial Layout Constraint Solver v1](spatial-layout-constraint-solver-v1.md)).
-4. #631 - Tilemap and Terrain Generation Draft v1.
+4. #631 - Tilemap and Terrain Generation Draft v1
+   ([Tilemap Terrain Generation Draft v1](tilemap-terrain-generation-draft-v1.md)).
 5. #632 - Entity, Objective, and Encounter Placement Draft v1.
 6. #633 - Reachability and Pathing Evidence v1.
 7. #634 - Objective Completion and Win Loss Proof v1.

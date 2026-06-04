@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "tilemap-terrain-generation-draft-v1",
+  "draftId": "draft_collect_and_exit_unsupported_tilemap",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "targetTilemapRef": "examples/tilemap-authoring-v2/asset-manifest.valid.json",
+  "grid": { "width": 32, "height": 18, "tileSize": 16 },
+  "layers": [{ "layerId": "terrain", "kind": "terrain" }],
+  "tilePlacements": [
+    {
+      "placementId": "tile_unsupported_bridge",
+      "layerId": "terrain",
+      "tileId": "bridge",
+      "tilesetAssetRef": "assets/tilesets/ground.json",
+      "x": 4,
+      "y": 12
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Unsupported bridge terrain remains a draft-only note.",
+  "linkedConstraints": [{ "constraintId": "platform_spacing", "status": "unsupported" }],
+  "expectedEvidence": [
+    {
+      "evidenceId": "unsupported_report",
+      "kind": "constraint_linkage",
+      "pathHint": "evidence/tilemap-terrain-drafts/draft_collect_and_exit_unsupported_tilemap/unsupported-report.json"
+    }
+  ],
+  "status": "unsupported"
+}

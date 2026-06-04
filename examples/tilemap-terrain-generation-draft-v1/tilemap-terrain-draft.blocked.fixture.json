@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "tilemap-terrain-generation-draft-v1",
+  "draftId": "draft_collect_and_exit_blocked_tilemap",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "targetTilemapRef": "examples/tilemap-authoring-v2/asset-manifest.valid.json",
+  "grid": { "width": 32, "height": 18, "tileSize": 16 },
+  "layers": [{ "layerId": "terrain", "kind": "terrain" }],
+  "tilePlacements": [
+    {
+      "placementId": "tile_blocked_floor",
+      "layerId": "terrain",
+      "tileId": "ground",
+      "tilesetAssetRef": "assets/tilesets/ground.json",
+      "x": 3,
+      "y": 14
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Blocked draft waits for missing terrain art decision.",
+  "linkedConstraints": [{ "constraintId": "bounds_all", "status": "satisfied" }],
+  "expectedEvidence": [
+    {
+      "evidenceId": "blocked_report",
+      "kind": "draft_validation",
+      "pathHint": "evidence/tilemap-terrain-drafts/draft_collect_and_exit_blocked_tilemap/blocked-report.json"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": ["terrain tile choice is not approved for the target pack"]
+}

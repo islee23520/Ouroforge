@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "tilemap-terrain-generation-draft-v1",
+  "draftId": "draft_collect_and_exit_tilemap_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "targetTilemapRef": "examples/tilemap-authoring-v2/asset-manifest.valid.json",
+  "grid": { "width": 32, "height": 18, "tileSize": 16 },
+  "layers": [
+    { "layerId": "terrain", "kind": "terrain" },
+    { "layerId": "collision", "kind": "collision" },
+    { "layerId": "triggers", "kind": "trigger" }
+  ],
+  "tilePlacements": [
+    {
+      "placementId": "tile_spawn_floor",
+      "layerId": "terrain",
+      "tileId": "ground",
+      "tilesetAssetRef": "assets/tilesets/ground.json",
+      "x": 1,
+      "y": 14
+    },
+    {
+      "placementId": "tile_goal_floor",
+      "layerId": "terrain",
+      "tileId": "goal_marker",
+      "tilesetAssetRef": "assets/tilesets/ground.json",
+      "x": 26,
+      "y": 14
+    }
+  ],
+  "terrainRegions": [
+    {
+      "regionId": "main_floor",
+      "layerId": "terrain",
+      "rect": { "x": 0, "y": 15, "width": 32, "height": 1 },
+      "summary": "One-screen floor under the collect-and-exit route."
+    }
+  ],
+  "collisionRegions": [
+    {
+      "regionId": "solid_floor_collision",
+      "layerId": "collision",
+      "rect": { "x": 0, "y": 15, "width": 32, "height": 1 },
+      "summary": "Collision preview for the main floor."
+    }
+  ],
+  "triggerRegions": [
+    {
+      "regionId": "goal_trigger_region",
+      "layerId": "triggers",
+      "triggerId": "goal_reached",
+      "rect": { "x": 26, "y": 13, "width": 2, "height": 2 },
+      "summary": "Goal trigger preview only."
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Preview places terrain, collision, and goal trigger cells without applying tilemap writes.",
+  "linkedConstraints": [
+    { "constraintId": "bounds_all", "status": "satisfied" },
+    { "constraintId": "goal_reachable", "status": "satisfied" }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "preview_summary",
+      "kind": "preview_summary",
+      "pathHint": "evidence/tilemap-terrain-drafts/draft_collect_and_exit_tilemap_intro/preview-summary.json"
+    },
+    {
+      "evidenceId": "read_model",
+      "kind": "read_model",
+      "pathHint": "evidence/tilemap-terrain-drafts/draft_collect_and_exit_tilemap_intro/read-model.json"
+    }
+  ],
+  "status": "drafted",
+  "guardrails": [
+    "preview only",
+    "no tilemap file writes",
+    "review-gated apply remains out of scope"
+  ]
+}

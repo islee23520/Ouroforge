@@ -15610,6 +15610,661 @@ fn spatial_layout_solver_status_label(status: SpatialLayoutSolverStatus) -> &'st
     }
 }
 
+const TILEMAP_TERRAIN_GENERATION_DRAFT_SCHEMA_VERSION: &str = "tilemap-terrain-generation-draft-v1";
+const TILEMAP_TERRAIN_GENERATION_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
+    "tilemap-terrain-generation-draft-read-model-v1";
+const MAX_TILEMAP_TERRAIN_DRAFT_GRID_TILES: u32 = 256;
+const MAX_TILEMAP_TERRAIN_DRAFT_TILE_PLACEMENTS: usize = 256;
+const MAX_TILEMAP_TERRAIN_DRAFT_REGIONS: usize = 64;
+const MAX_TILEMAP_TERRAIN_DRAFT_LAYERS: usize = 16;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainGenerationDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "solverId")]
+    pub solver_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "targetTilemapRef")]
+    pub target_tilemap_ref: String,
+    pub grid: TilemapTerrainDraftGrid,
+    pub layers: Vec<TilemapTerrainDraftLayer>,
+    #[serde(rename = "tilePlacements")]
+    pub tile_placements: Vec<TilemapTerrainDraftTilePlacement>,
+    #[serde(
+        rename = "terrainRegions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub terrain_regions: Vec<TilemapTerrainDraftRegion>,
+    #[serde(
+        rename = "collisionRegions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub collision_regions: Vec<TilemapTerrainDraftRegion>,
+    #[serde(
+        rename = "triggerRegions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub trigger_regions: Vec<TilemapTerrainDraftTriggerRegion>,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "expectedAfterSummary")]
+    pub expected_after_summary: String,
+    #[serde(rename = "linkedConstraints")]
+    pub linked_constraints: Vec<TilemapTerrainDraftConstraintLink>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<TilemapTerrainDraftExpectedEvidence>,
+    pub status: TilemapTerrainDraftStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftGrid {
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "tileSize")]
+    pub tile_size: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftLayer {
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    pub kind: TilemapTerrainDraftLayerKind,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TilemapTerrainDraftLayerKind {
+    Terrain,
+    Collision,
+    Trigger,
+    Decoration,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftTilePlacement {
+    #[serde(rename = "placementId")]
+    pub placement_id: String,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    #[serde(rename = "tileId")]
+    pub tile_id: String,
+    #[serde(rename = "tilesetAssetRef")]
+    pub tileset_asset_ref: String,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftRegion {
+    #[serde(rename = "regionId")]
+    pub region_id: String,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    pub rect: TilemapTerrainDraftRect,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftTriggerRegion {
+    #[serde(rename = "regionId")]
+    pub region_id: String,
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    #[serde(rename = "triggerId")]
+    pub trigger_id: String,
+    pub rect: TilemapTerrainDraftRect,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftConstraintLink {
+    #[serde(rename = "constraintId")]
+    pub constraint_id: String,
+    pub status: TilemapTerrainDraftConstraintStatus,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TilemapTerrainDraftConstraintStatus {
+    Satisfied,
+    Violated,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainDraftExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: TilemapTerrainDraftEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TilemapTerrainDraftEvidenceKind {
+    PreviewSummary,
+    DraftValidation,
+    ConstraintLinkage,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TilemapTerrainDraftStatus {
+    Drafted,
+    Stale,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapTerrainGenerationDraftReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "solverId")]
+    pub solver_id: String,
+    pub status: String,
+    #[serde(rename = "targetTilemapRef")]
+    pub target_tilemap_ref: String,
+    #[serde(rename = "gridWidth")]
+    pub grid_width: u32,
+    #[serde(rename = "gridHeight")]
+    pub grid_height: u32,
+    #[serde(rename = "layerCount")]
+    pub layer_count: usize,
+    #[serde(rename = "tilePlacementCount")]
+    pub tile_placement_count: usize,
+    #[serde(rename = "terrainRegionCount")]
+    pub terrain_region_count: usize,
+    #[serde(rename = "collisionRegionCount")]
+    pub collision_region_count: usize,
+    #[serde(rename = "triggerRegionCount")]
+    pub trigger_region_count: usize,
+    #[serde(rename = "constraintStatusSummary")]
+    pub constraint_status_summary: BTreeMap<String, usize>,
+    #[serde(rename = "expectedEvidenceRefs")]
+    pub expected_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl TilemapTerrainGenerationDraftArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: TilemapTerrainGenerationDraftArtifact = serde_json::from_str(input)
+            .context("failed to parse Tilemap Terrain Generation Draft JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != TILEMAP_TERRAIN_GENERATION_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "tilemap terrain generation draft schemaVersion must be {TILEMAP_TERRAIN_GENERATION_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("tilemap terrain draft draftId", &self.draft_id)?;
+        validate_path_component("tilemap terrain draft intentId", &self.intent_id)?;
+        validate_path_component("tilemap terrain draft planId", &self.plan_id)?;
+        validate_path_component("tilemap terrain draft solverId", &self.solver_id)?;
+        validate_repo_relative_source_ref(
+            "tilemap terrain draft targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        validate_repo_relative_source_ref(
+            "tilemap terrain draft targetTilemapRef",
+            &self.target_tilemap_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "tilemap terrain draft targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        if !self.target_tilemap_ref.ends_with(".json") {
+            return Err(anyhow!(
+                "tilemap terrain draft targetTilemapRef must point to a JSON tilemap fixture"
+            ));
+        }
+        self.grid.validate()?;
+        validate_tilemap_terrain_layers(&self.layers)?;
+        let layer_ids = self
+            .layers
+            .iter()
+            .map(|layer| layer.layer_id.as_str())
+            .collect::<BTreeSet<_>>();
+        validate_tilemap_terrain_tile_placements(&self.grid, &layer_ids, &self.tile_placements)?;
+        validate_tilemap_terrain_regions(
+            "terrainRegions",
+            &self.grid,
+            &layer_ids,
+            &self.terrain_regions,
+        )?;
+        validate_tilemap_terrain_regions(
+            "collisionRegions",
+            &self.grid,
+            &layer_ids,
+            &self.collision_regions,
+        )?;
+        validate_tilemap_terrain_trigger_regions(&self.grid, &layer_ids, &self.trigger_regions)?;
+        parse_visual_edit_draft_hash("tilemap terrain draft beforeHash", &self.before_hash)?;
+        require_bounded_display_text(
+            "tilemap terrain draft expectedAfterSummary",
+            &self.expected_after_summary,
+        )?;
+        validate_tilemap_terrain_constraint_links(&self.linked_constraints)?;
+        validate_tilemap_terrain_expected_evidence(&self.draft_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("tilemap terrain draft blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("tilemap terrain draft guardrails", guardrail)?;
+        }
+        validate_tilemap_terrain_draft_status(
+            self.status,
+            &self.linked_constraints,
+            &self.blocked_reasons,
+        )
+    }
+}
+
+impl TilemapTerrainDraftGrid {
+    fn validate(&self) -> Result<()> {
+        if self.width == 0
+            || self.height == 0
+            || self.width > MAX_TILEMAP_TERRAIN_DRAFT_GRID_TILES
+            || self.height > MAX_TILEMAP_TERRAIN_DRAFT_GRID_TILES
+        {
+            return Err(anyhow!(
+                "tilemap terrain draft grid width and height must be between 1 and {MAX_TILEMAP_TERRAIN_DRAFT_GRID_TILES}"
+            ));
+        }
+        if self.tile_size == 0 || self.tile_size > 256 {
+            return Err(anyhow!(
+                "tilemap terrain draft grid tileSize must be between 1 and 256"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl TilemapTerrainDraftRect {
+    fn validate(&self, field: &str, grid: &TilemapTerrainDraftGrid) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!("{field} width and height must be positive"));
+        }
+        let end_x = self
+            .x
+            .checked_add(self.width)
+            .ok_or_else(|| anyhow!("{field} x + width overflows"))?;
+        let end_y = self
+            .y
+            .checked_add(self.height)
+            .ok_or_else(|| anyhow!("{field} y + height overflows"))?;
+        if end_x > grid.width || end_y > grid.height {
+            return Err(anyhow!("{field} exceeds tilemap terrain draft bounds"));
+        }
+        Ok(())
+    }
+}
+
+pub fn tilemap_terrain_generation_draft_read_model_from_json_str(
+    input: &str,
+) -> Result<TilemapTerrainGenerationDraftReadModel> {
+    let artifact = TilemapTerrainGenerationDraftArtifact::from_json_str(input)?;
+    Ok(tilemap_terrain_generation_draft_read_model(&artifact))
+}
+
+pub fn tilemap_terrain_generation_draft_read_model(
+    artifact: &TilemapTerrainGenerationDraftArtifact,
+) -> TilemapTerrainGenerationDraftReadModel {
+    let mut constraint_status_summary = BTreeMap::new();
+    for constraint in &artifact.linked_constraints {
+        let label = tilemap_terrain_constraint_status_label(constraint.status).to_string();
+        *constraint_status_summary.entry(label).or_insert(0) += 1;
+    }
+    TilemapTerrainGenerationDraftReadModel {
+        schema_version: TILEMAP_TERRAIN_GENERATION_DRAFT_READ_MODEL_SCHEMA_VERSION.to_string(),
+        draft_id: artifact.draft_id.clone(),
+        intent_id: artifact.intent_id.clone(),
+        plan_id: artifact.plan_id.clone(),
+        solver_id: artifact.solver_id.clone(),
+        status: tilemap_terrain_draft_status_label(artifact.status).to_string(),
+        target_tilemap_ref: artifact.target_tilemap_ref.clone(),
+        grid_width: artifact.grid.width,
+        grid_height: artifact.grid.height,
+        layer_count: artifact.layers.len(),
+        tile_placement_count: artifact.tile_placements.len(),
+        terrain_region_count: artifact.terrain_regions.len(),
+        collision_region_count: artifact.collision_regions.len(),
+        trigger_region_count: artifact.trigger_regions.len(),
+        constraint_status_summary,
+        expected_evidence_refs: artifact
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.path_hint.clone())
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only tilemap terrain generation draft preview; no tilemap file writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_tilemap_terrain_layers(layers: &[TilemapTerrainDraftLayer]) -> Result<()> {
+    if layers.is_empty() || layers.len() > MAX_TILEMAP_TERRAIN_DRAFT_LAYERS {
+        return Err(anyhow!(
+            "tilemap terrain draft layers must contain between 1 and {MAX_TILEMAP_TERRAIN_DRAFT_LAYERS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for layer in layers {
+        validate_path_component("tilemap terrain draft layers.layerId", &layer.layer_id)?;
+        if !ids.insert(layer.layer_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft layers.layerId: {}",
+                layer.layer_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_tile_placements(
+    grid: &TilemapTerrainDraftGrid,
+    layer_ids: &BTreeSet<&str>,
+    placements: &[TilemapTerrainDraftTilePlacement],
+) -> Result<()> {
+    if placements.is_empty() || placements.len() > MAX_TILEMAP_TERRAIN_DRAFT_TILE_PLACEMENTS {
+        return Err(anyhow!(
+            "tilemap terrain draft tilePlacements must contain between 1 and {MAX_TILEMAP_TERRAIN_DRAFT_TILE_PLACEMENTS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for placement in placements {
+        validate_path_component(
+            "tilemap terrain draft tilePlacements.placementId",
+            &placement.placement_id,
+        )?;
+        validate_tilemap_terrain_layer_ref(layer_ids, &placement.layer_id)?;
+        validate_path_component(
+            "tilemap terrain draft tilePlacements.tileId",
+            &placement.tile_id,
+        )?;
+        validate_repo_relative_source_ref(
+            "tilemap terrain draft tilePlacements.tilesetAssetRef",
+            &placement.tileset_asset_ref,
+        )?;
+        if placement.x >= grid.width || placement.y >= grid.height {
+            return Err(anyhow!(
+                "tilemap terrain draft tilePlacement exceeds grid bounds: {}",
+                placement.placement_id
+            ));
+        }
+        if !ids.insert(placement.placement_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft tilePlacements.placementId: {}",
+                placement.placement_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_regions(
+    field: &str,
+    grid: &TilemapTerrainDraftGrid,
+    layer_ids: &BTreeSet<&str>,
+    regions: &[TilemapTerrainDraftRegion],
+) -> Result<()> {
+    if regions.len() > MAX_TILEMAP_TERRAIN_DRAFT_REGIONS {
+        return Err(anyhow!(
+            "tilemap terrain draft {field} exceeds limit of {MAX_TILEMAP_TERRAIN_DRAFT_REGIONS}"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for region in regions {
+        validate_path_component(
+            &format!("tilemap terrain draft {field}.regionId"),
+            &region.region_id,
+        )?;
+        validate_tilemap_terrain_layer_ref(layer_ids, &region.layer_id)?;
+        region
+            .rect
+            .validate(&format!("tilemap terrain draft {field}.rect"), grid)?;
+        if let Some(summary) = &region.summary {
+            require_bounded_display_text(
+                &format!("tilemap terrain draft {field}.summary"),
+                summary,
+            )?;
+        }
+        if !ids.insert(region.region_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft {field}.regionId: {}",
+                region.region_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_trigger_regions(
+    grid: &TilemapTerrainDraftGrid,
+    layer_ids: &BTreeSet<&str>,
+    regions: &[TilemapTerrainDraftTriggerRegion],
+) -> Result<()> {
+    if regions.len() > MAX_TILEMAP_TERRAIN_DRAFT_REGIONS {
+        return Err(anyhow!(
+            "tilemap terrain draft triggerRegions exceeds limit of {MAX_TILEMAP_TERRAIN_DRAFT_REGIONS}"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for region in regions {
+        validate_path_component(
+            "tilemap terrain draft triggerRegions.regionId",
+            &region.region_id,
+        )?;
+        validate_tilemap_terrain_layer_ref(layer_ids, &region.layer_id)?;
+        validate_path_component(
+            "tilemap terrain draft triggerRegions.triggerId",
+            &region.trigger_id,
+        )?;
+        region
+            .rect
+            .validate("tilemap terrain draft triggerRegions.rect", grid)?;
+        if let Some(summary) = &region.summary {
+            require_bounded_display_text("tilemap terrain draft triggerRegions.summary", summary)?;
+        }
+        if !ids.insert(region.region_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft triggerRegions.regionId: {}",
+                region.region_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_layer_ref(layer_ids: &BTreeSet<&str>, layer_id: &str) -> Result<()> {
+    validate_path_component("tilemap terrain draft layerId", layer_id)?;
+    if !layer_ids.contains(layer_id) {
+        return Err(anyhow!(
+            "tilemap terrain draft layerId references unknown layer: {layer_id}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_constraint_links(
+    links: &[TilemapTerrainDraftConstraintLink],
+) -> Result<()> {
+    if links.is_empty() {
+        return Err(anyhow!(
+            "tilemap terrain draft linkedConstraints must not be empty"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for link in links {
+        validate_path_component(
+            "tilemap terrain draft linkedConstraints.constraintId",
+            &link.constraint_id,
+        )?;
+        if !ids.insert(link.constraint_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft linkedConstraints.constraintId: {}",
+                link.constraint_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_expected_evidence(
+    draft_id: &str,
+    values: &[TilemapTerrainDraftExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "tilemap terrain draft expectedEvidence must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/tilemap-terrain-drafts/{draft_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "tilemap terrain draft expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "tilemap terrain draft expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap terrain draft expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tilemap_terrain_draft_status(
+    status: TilemapTerrainDraftStatus,
+    constraints: &[TilemapTerrainDraftConstraintLink],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_violated = constraints
+        .iter()
+        .any(|constraint| constraint.status == TilemapTerrainDraftConstraintStatus::Violated);
+    let has_unsupported = constraints
+        .iter()
+        .any(|constraint| constraint.status == TilemapTerrainDraftConstraintStatus::Unsupported);
+    match status {
+        TilemapTerrainDraftStatus::Drafted
+            if blocked_reasons.is_empty() && !has_violated && !has_unsupported =>
+        {
+            Ok(())
+        }
+        TilemapTerrainDraftStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        TilemapTerrainDraftStatus::Unsupported
+            if blocked_reasons.is_empty() && has_unsupported =>
+        {
+            Ok(())
+        }
+        TilemapTerrainDraftStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        TilemapTerrainDraftStatus::Drafted => Err(anyhow!(
+            "tilemap terrain drafted status cannot include blocked, violated, or unsupported constraint links"
+        )),
+        TilemapTerrainDraftStatus::Stale => Err(anyhow!(
+            "tilemap terrain stale status requires blockedReasons describing the stale beforeHash"
+        )),
+        TilemapTerrainDraftStatus::Unsupported => Err(anyhow!(
+            "tilemap terrain unsupported status requires at least one unsupported linked constraint and no blockedReasons"
+        )),
+        TilemapTerrainDraftStatus::Blocked => Err(anyhow!(
+            "tilemap terrain blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn tilemap_terrain_constraint_status_label(
+    status: TilemapTerrainDraftConstraintStatus,
+) -> &'static str {
+    match status {
+        TilemapTerrainDraftConstraintStatus::Satisfied => "satisfied",
+        TilemapTerrainDraftConstraintStatus::Violated => "violated",
+        TilemapTerrainDraftConstraintStatus::Unsupported => "unsupported",
+    }
+}
+
+fn tilemap_terrain_draft_status_label(status: TilemapTerrainDraftStatus) -> &'static str {
+    match status {
+        TilemapTerrainDraftStatus::Drafted => "drafted",
+        TilemapTerrainDraftStatus::Stale => "stale",
+        TilemapTerrainDraftStatus::Unsupported => "unsupported",
+        TilemapTerrainDraftStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -59373,6 +60028,131 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("spatial-layout-constraint-solver-v1.md"));
+    }
+
+    #[test]
+    fn tilemap_terrain_generation_draft_v1_accepts_valid_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.valid.fixture.json"
+        );
+        let artifact = TilemapTerrainGenerationDraftArtifact::from_json_str(fixture)
+            .expect("valid tilemap terrain draft fixture parses");
+        assert_eq!(
+            artifact.schema_version,
+            "tilemap-terrain-generation-draft-v1"
+        );
+        assert_eq!(artifact.draft_id, "draft_collect_and_exit_tilemap_intro");
+        assert_eq!(artifact.status, TilemapTerrainDraftStatus::Drafted);
+        assert_eq!(artifact.layers.len(), 3);
+        assert_eq!(artifact.tile_placements.len(), 2);
+        assert_eq!(artifact.trigger_regions.len(), 1);
+
+        let read_model = tilemap_terrain_generation_draft_read_model_from_json_str(fixture)
+            .expect("tilemap terrain draft read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "tilemap-terrain-generation-draft-read-model-v1"
+        );
+        assert_eq!(read_model.status, "drafted");
+        assert_eq!(read_model.grid_width, 32);
+        assert_eq!(read_model.grid_height, 18);
+        assert_eq!(
+            read_model.constraint_status_summary.get("satisfied"),
+            Some(&2)
+        );
+        assert!(read_model.boundary.contains("no tilemap file writes"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+        assert!(read_model.boundary.contains("no browser command bridge"));
+    }
+
+    #[test]
+    fn tilemap_terrain_generation_draft_v1_accepts_stale_unsupported_and_blocked() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.stale.fixture.json"
+                ),
+                TilemapTerrainDraftStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.unsupported.fixture.json"
+                ),
+                TilemapTerrainDraftStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.blocked.fixture.json"
+                ),
+                TilemapTerrainDraftStatus::Blocked,
+            ),
+        ] {
+            let artifact = TilemapTerrainGenerationDraftArtifact::from_json_str(fixture)
+                .expect("non-drafted tilemap terrain draft fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            if matches!(
+                expected_status,
+                TilemapTerrainDraftStatus::Stale | TilemapTerrainDraftStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn tilemap_terrain_generation_draft_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/invalid/oversized-grid.fixture.json"
+                ),
+                "grid",
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/invalid/unsafe-target.fixture.json"
+                ),
+                "targetSceneRef",
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/invalid/duplicate-placement.fixture.json"
+                ),
+                "duplicate",
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/tilemap-terrain-generation-draft-v1/invalid/status-drift.fixture.json"
+                ),
+                "drafted status",
+            ),
+        ] {
+            let error = TilemapTerrainGenerationDraftArtifact::from_json_str(fixture)
+                .expect_err("invalid tilemap terrain draft fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn tilemap_terrain_generation_draft_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/tilemap-terrain-generation-draft-v1.md");
+        assert!(doc.contains("reviewable draft evidence"));
+        assert!(doc.contains("does not write tilemap files"));
+        assert!(doc.contains("no tilemap file write"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("tilemap-terrain-generation-draft-v1.md"));
     }
 
     #[test]
