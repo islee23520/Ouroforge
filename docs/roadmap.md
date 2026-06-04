@@ -143,6 +143,8 @@ authorizes more.
 
 ### Public Alpha Readiness handoff
 
+The scope contract for this preparation milestone is [`docs/public-alpha-readiness-v1.md`](public-alpha-readiness-v1.md).
+
 Public Alpha Readiness v1 is recorded as **prepared for manual public-visibility review, not launched**. The handoff lives in [`docs/public-alpha-readiness-governance-handoff-v1.md`](public-alpha-readiness-governance-handoff-v1.md). It summarizes readiness evidence, remaining manual launch boundaries, and conservative next milestone candidates without changing repository visibility, publishing packages, or approving public-launch messaging.
 
 Actual visibility changes remain separate manual maintainer action after the launch checklist and decision-record process are rerun on the intended visibility date.

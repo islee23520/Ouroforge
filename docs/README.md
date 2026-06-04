@@ -30,6 +30,7 @@ and sandbox boundary section below.
 Use these when reviewing public-readiness changes. They are governance/evidence
 references, not launch approval:
 
+- [`public-alpha-readiness-v1.md`](public-alpha-readiness-v1.md) — Public Alpha Readiness v1 scope, dependency order, boundaries, and closure gates.
 - [`public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md) — public-alpha gate checklist and failure modes.
 - [`public-readiness-audit.md`](public-readiness-audit.md) — readiness audit evidence.
 - [`public-launch-checklist.md`](public-launch-checklist.md) — manual launch/visibility checklist; it does not change repository visibility.
