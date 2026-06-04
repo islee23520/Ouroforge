@@ -66,7 +66,12 @@ preview command text. The browser does not persist trusted draft state, write
 project/scene/tilemap/asset files, upload or fetch assets, execute local
 commands, bridge to a local server, apply edits, or treat preview metadata as a
 review decision. Trusted validation, transaction creation, review-gated apply,
-and persistence stay in the Rust CLI/manual terminal flow.
+and persistence stay in the Rust CLI/manual terminal flow. Visual Authoring Demo
+v1 documentation must describe this as a local static demo over Rust-exported
+evidence, not a production editor, public launch, hosted Studio, plugin runtime,
+visual scripting system, native export path, command bridge, or Godot
+replacement. Generated preview/transaction/run/compare/dashboard artifacts stay
+untracked unless a later issue explicitly scopes a tiny source-like fixture.
 
 Review-gated visual edit application evidence may appear in exported lifecycle data such as `mutation/visual-edit-applications.json`, review cockpit cards, journal sections, loop status/read-model summaries, or handoff evidence refs. The cockpit may render draft/proposal/patch-draft/decision ids, transaction links, before/after hashes, rollback metadata, rerun/compare refs, and reproducible command context as escaped read-only diagnostics. It must not turn those fields into apply, rerun, promote, resume, repair, or command-execution controls.
 
@@ -233,3 +238,27 @@ When exported dashboard data includes `loop_cockpit`, the cockpit displays a sta
 ## Agent Handoff Contract v1
 
 When exported dashboard data includes `agent_handoffs`, the cockpit displays a read-only Handoff Studio surface with the next safe action, blockers, required decisions, inert allowed command text, forbidden actions, evidence refs, guardrails, and boundary. The browser never creates command buttons, executes handoff commands, grants authority, applies mutations, repairs references, or merges changes. See `../../docs/agent-handoff-contract-v1.md`.
+
+
+## Visual Authoring Demo v1 Studio boundary audit
+
+For #352 VA1.10.3, Studio/cockpit presentation of the collect-and-exit visual
+authoring demo remains an inert local authoring aid:
+
+- scene, tilemap, and asset-reference draft rows are temporary/read-only display
+  state; the browser may show copyable JSON or CLI text but must not persist
+  trusted draft state;
+- visual diff, review, apply, rerun, compare, and generated smoke ids are
+  displayed only after Rust/local evidence export; the browser does not create
+  review decisions, run commands, apply edits, rerun QA, compare runs, or write
+  dashboard data;
+- tilemap and asset-reference controls remain preview/display surfaces only, not
+  upload/fetch/import/apply workflows;
+- public copy must keep the demo framed as local-first Safe Local Edit Cockpit
+  evidence, with no production editor, public launch, native export, plugin
+  runtime, hosted service, visual scripting, command bridge, or Godot replacement
+  claim.
+
+VA1.10.3 changes documentation only. Any future trusted write must stay routed
+through Rust validation, explicit review gates, rollback/evidence records, and
+source/generated-state audits.
