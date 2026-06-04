@@ -27,6 +27,39 @@ Review rules:
   `SECURITY.md`, current README/docs wording, generated-state policy, and the
   live state of #1 and #23.
 
+## Maintainer review process
+
+Use this process when a dated decision record is scheduled. The process is
+review-only and does not automate repository visibility, release, package, or
+announcement actions.
+
+1. **Prepare evidence on latest `main`.** Pull latest `main`, verify #1 and #23
+   are open, and run the current public-readiness commands from
+   `docs/public-launch-checklist.md`.
+2. **Draft a dated record.** Copy the template into
+   `docs/public-visibility-decisions/public-visibility-YYYY-MM-DD.md` only when
+   maintainers are evaluating a real visibility window. Use `pending` instead of
+   guessing missing evidence. Use pending instead of guessing.
+3. **Run wording and generated-state audits.** Confirm no generated local state
+   is tracked and no production-ready, compatibility-stable, secure sandbox,
+   Godot replacement, native export, plugin runtime, source apply, support SLA,
+   launch automation, or release automation claim was added.
+4. **Review blockers.** Any `fail`, `partial`, or `pending` critical field must
+   map to a blocker, owner, and required evidence command before a `go` decision
+   can be recorded.
+5. **Record maintainer approval.** A named maintainer records `approved`,
+   `not approved`, or `pending` in the decision record. Approval is evidence for
+   a human settings review, not an executable permission.
+6. **Keep the manual boundary explicit.** If the decision is `go`, maintainers
+   may separately decide whether to perform the GitHub settings visibility
+   change manually. The record itself does not perform or schedule that change.
+7. **Post-review follow-up.** If visibility is changed manually later, record
+   the external action in a separate governance note or issue comment; do not
+   retrofit the decision record into launch automation.
+
+See [`docs/public-visibility-decision-examples-v1.md`](public-visibility-decision-examples-v1.md)
+for non-executable example records.
+
 ## Required fields
 
 Every decision record must include all fields below.
