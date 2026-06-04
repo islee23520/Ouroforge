@@ -23715,6 +23715,326 @@ fn source_patch_target_class_validation(
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyWorktreeContextTargetInput {
+    pub path: String,
+    #[serde(rename = "gitStatus")]
+    pub git_status: String,
+    #[serde(rename = "expectedFileClassDecision")]
+    pub expected_file_class_decision: SourceFileClassDecision,
+    #[serde(rename = "authorizedCreation")]
+    pub authorized_creation: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyWorktreeLockStatus {
+    pub active: bool,
+    #[serde(rename = "attemptId")]
+    pub attempt_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyWorktreeContextInput {
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    #[serde(rename = "repositoryRoot")]
+    pub repository_root: String,
+    #[serde(rename = "worktreeRoot")]
+    pub worktree_root: String,
+    pub branch: String,
+    #[serde(rename = "expectedHeadCommit")]
+    pub expected_head_commit: String,
+    #[serde(rename = "currentHeadCommit")]
+    pub current_head_commit: String,
+    #[serde(rename = "lockStatus")]
+    pub lock_status: SourceApplyWorktreeLockStatus,
+    pub targets: Vec<SourceApplyWorktreeContextTargetInput>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyWorktreeContextTargetReport {
+    pub path: String,
+    #[serde(rename = "gitStatus")]
+    pub git_status: String,
+    #[serde(rename = "fileClass")]
+    pub file_class: SourceFileClassLabel,
+    #[serde(rename = "fileClassDecision")]
+    pub file_class_decision: SourceFileClassDecision,
+    #[serde(rename = "rootZone")]
+    pub root_zone: String,
+    pub exists: bool,
+    #[serde(rename = "isSymlink")]
+    pub is_symlink: bool,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyGeneratedRootSummary {
+    pub root: String,
+    pub policy: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplyWorktreeContextReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "repositoryRoot")]
+    pub repository_root: String,
+    #[serde(rename = "worktreeRoot")]
+    pub worktree_root: String,
+    pub branch: String,
+    #[serde(rename = "headCommit")]
+    pub head_commit: String,
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    pub targets: Vec<SourceApplyWorktreeContextTargetReport>,
+    #[serde(rename = "generatedRootSummary")]
+    pub generated_root_summary: Vec<SourceApplyGeneratedRootSummary>,
+    #[serde(rename = "lockStatus")]
+    pub lock_status: SourceApplyWorktreeLockStatus,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourceApplyWorktreeContextReport {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_source_apply_worktree_context(
+    input: &SourceApplyWorktreeContextInput,
+) -> SourceApplyWorktreeContextReport {
+    let mut blocked_reasons = Vec::<String>::new();
+    let mut target_reports = Vec::<SourceApplyWorktreeContextTargetReport>::new();
+
+    if input.policy_id != "source-apply-worktree-boundary-v1" {
+        blocked_reasons.push("policyId must be source-apply-worktree-boundary-v1".to_string());
+    }
+    push_if_blank(
+        &mut blocked_reasons,
+        "repositoryRoot",
+        &input.repository_root,
+    );
+    push_if_blank(&mut blocked_reasons, "worktreeRoot", &input.worktree_root);
+    push_if_blank(&mut blocked_reasons, "branch", &input.branch);
+    push_if_blank(
+        &mut blocked_reasons,
+        "currentHeadCommit",
+        &input.current_head_commit,
+    );
+    if input.expected_head_commit.trim().is_empty() {
+        blocked_reasons.push("expectedHeadCommit must not be empty".to_string());
+    } else if input.current_head_commit != input.expected_head_commit {
+        blocked_reasons.push(
+            "branch-head-mismatch: currentHeadCommit differs from expectedHeadCommit".to_string(),
+        );
+    }
+    if input.lock_status.active {
+        blocked_reasons.push(format!(
+            "active-apply-lock: attempt {} is already active",
+            input.lock_status.attempt_id
+        ));
+    }
+    if input.lock_status.attempt_id.trim().is_empty() {
+        blocked_reasons.push("lockStatus.attemptId must not be empty".to_string());
+    }
+    if input.targets.is_empty() {
+        blocked_reasons.push("targets must not be empty".to_string());
+    }
+
+    let repository_root = Path::new(&input.repository_root);
+    let worktree_root = Path::new(&input.worktree_root);
+    if !repository_root.exists() || !worktree_root.exists() {
+        blocked_reasons
+            .push("missing-git-context: repositoryRoot/worktreeRoot must exist".to_string());
+    } else if let Err(error) = ensure_path_inside(repository_root, worktree_root) {
+        blocked_reasons.push(format!(
+            "missing-git-context: worktreeRoot must be inside repositoryRoot: {error}"
+        ));
+    }
+
+    for target in &input.targets {
+        target_reports.push(inspect_source_apply_worktree_target(
+            target,
+            worktree_root,
+            repository_root.exists() && worktree_root.exists(),
+        ));
+    }
+    for target in &target_reports {
+        blocked_reasons.extend(
+            target
+                .blocked_reasons
+                .iter()
+                .map(|reason| format!("{}: {reason}", target.path)),
+        );
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourceApplyWorktreeContextReport {
+        schema_version: "source-apply-worktree-context-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        repository_root: input.repository_root.clone(),
+        worktree_root: input.worktree_root.clone(),
+        branch: input.branch.clone(),
+        head_commit: input.current_head_commit.clone(),
+        policy_id: input.policy_id.clone(),
+        targets: target_reports,
+        generated_root_summary: source_apply_generated_root_summary(),
+        lock_status: input.lock_status.clone(),
+        blocked_reasons,
+        guardrails: vec![
+            "worktree context inspection only; no trusted source apply is performed".to_string(),
+            "dirty targets, untracked collisions, generated roots, hidden roots, symlinks, and missing git context fail closed before trusted writes".to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+            "no auto-apply, auto-merge, dependency mutation, CI mutation, build-script mutation, or production-ready claim".to_string(),
+            "#1 and #23 remain open".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_apply_worktree_context(
+    input: &SourceApplyWorktreeContextInput,
+) -> Result<SourceApplyWorktreeContextReport> {
+    let report = inspect_source_apply_worktree_context(input);
+    if report.is_blocked() {
+        return Err(anyhow!(
+            "source apply worktree context blocked: {}",
+            report.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(report)
+}
+
+fn inspect_source_apply_worktree_target(
+    target: &SourceApplyWorktreeContextTargetInput,
+    worktree_root: &Path,
+    roots_exist: bool,
+) -> SourceApplyWorktreeContextTargetReport {
+    let class_report = classify_source_file_path_str(&target.path);
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if target.path.trim().is_empty() {
+        blocked_reasons.push("empty target path".to_string());
+    }
+    if class_report.is_blocked() {
+        blocked_reasons.extend(
+            class_report
+                .blocked_reasons
+                .iter()
+                .map(|reason| format!("file-class blocked: {reason}")),
+        );
+    }
+    if class_report.decision != target.expected_file_class_decision {
+        blocked_reasons.push(format!(
+            "file-class decision mismatch: expected {:?}, found {:?}",
+            target.expected_file_class_decision, class_report.decision
+        ));
+    }
+
+    let normalized = target.path.replace('\\', "/");
+    let root_zone = source_apply_root_zone(&normalized);
+    if matches!(
+        root_zone.as_str(),
+        "generated-local" | "hidden" | "blocked-ci"
+    ) {
+        blocked_reasons.push(format!(
+            "{root_zone}-target: target root is not trusted-source eligible"
+        ));
+    }
+
+    let git_status = target.git_status.trim();
+    match git_status {
+        "clean" => {}
+        "modified" | "deleted" | "renamed" | "typechanged" => {
+            blocked_reasons.push(format!("dirty-target: git status {git_status}"));
+        }
+        "staged" => blocked_reasons.push("staged-target: target has staged changes".to_string()),
+        "unmerged" | "conflicted" => {
+            blocked_reasons.push("unmerged-target: target has unresolved conflicts".to_string());
+        }
+        "untracked-collision" => blocked_reasons
+            .push("untracked-target-collision: untracked file collides with target".to_string()),
+        "missing" if target.authorized_creation => {}
+        "missing" => blocked_reasons
+            .push("missing-target: creation is not authorized for this target".to_string()),
+        "" => blocked_reasons.push("gitStatus must not be empty".to_string()),
+        other => blocked_reasons.push(format!("ambiguous-context: unsupported gitStatus {other}")),
+    }
+
+    let candidate = worktree_root.join(&target.path);
+    let exists = roots_exist && candidate.exists();
+    let is_symlink = roots_exist
+        && candidate
+            .symlink_metadata()
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false);
+    if roots_exist {
+        if let Err(error) = ensure_path_inside(worktree_root, &candidate) {
+            blocked_reasons.push(format!(
+                "path-traversal: target must stay inside worktreeRoot: {error}"
+            ));
+        }
+        if is_symlink {
+            blocked_reasons
+                .push("symlink-target: target path resolves through a symlink".to_string());
+        }
+    }
+
+    SourceApplyWorktreeContextTargetReport {
+        path: target.path.clone(),
+        git_status: target.git_status.clone(),
+        file_class: class_report.class,
+        file_class_decision: class_report.decision,
+        root_zone,
+        exists,
+        is_symlink,
+        blocked_reasons,
+    }
+}
+
+fn source_apply_root_zone(path: &str) -> String {
+    let first = path.split('/').next().unwrap_or("");
+    if first == ".github" {
+        return "blocked-ci".to_string();
+    }
+    if first.starts_with('.') {
+        return "hidden".to_string();
+    }
+    if source_file_generated_roots().contains(&first.to_ascii_lowercase().as_str()) {
+        return "generated-local".to_string();
+    }
+    if matches!(first, "seeds" | "examples" | "docs" | "crates") || path == "README.md" {
+        return "trusted-source".to_string();
+    }
+    "unknown".to_string()
+}
+
+fn source_apply_generated_root_summary() -> Vec<SourceApplyGeneratedRootSummary> {
+    source_file_generated_roots()
+        .iter()
+        .map(|root| SourceApplyGeneratedRootSummary {
+            root: (*root).to_string(),
+            policy: "blocked by default for trusted source apply".to_string(),
+        })
+        .collect()
+}
+
 pub fn reject_generated_artifact_source_collision(
     output_path: &Path,
     artifact_label: &str,
@@ -35385,6 +35705,160 @@ scenarios:
         assert_eq!(studio.class, SourceFileClassLabel::BrowserStudioDisplay);
         assert!(studio.needs_approval());
         assert!(studio.rationale.contains("read-only"));
+    }
+
+    fn clean_source_apply_worktree_context_input(
+        root: &Path,
+        targets: Vec<SourceApplyWorktreeContextTargetInput>,
+    ) -> SourceApplyWorktreeContextInput {
+        SourceApplyWorktreeContextInput {
+            policy_id: "source-apply-worktree-boundary-v1".to_string(),
+            repository_root: root.to_string_lossy().to_string(),
+            worktree_root: root.to_string_lossy().to_string(),
+            branch: "issue-701-fixture".to_string(),
+            expected_head_commit: "head123".to_string(),
+            current_head_commit: "head123".to_string(),
+            lock_status: SourceApplyWorktreeLockStatus {
+                active: false,
+                attempt_id: "attempt-1".to_string(),
+            },
+            targets,
+        }
+    }
+
+    #[test]
+    fn source_apply_worktree_context_accepts_clean_allowed_target_without_writes() {
+        let root = unique_temp_dir("source-apply-context-clean");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        let input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![SourceApplyWorktreeContextTargetInput {
+                path: "seeds/platformer.yaml".to_string(),
+                git_status: "clean".to_string(),
+                expected_file_class_decision: SourceFileClassDecision::Allowed,
+                authorized_creation: false,
+            }],
+        );
+        let report = validate_source_apply_worktree_context(&input).expect("clean context passes");
+        assert_eq!(report.schema_version, "source-apply-worktree-context-v1");
+        assert_eq!(report.status, "passed");
+        assert_eq!(report.targets[0].root_zone, "trusted-source");
+        assert!(report.targets[0].exists);
+        assert!(report
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("no trusted source apply")));
+        assert_eq!(
+            fs::read_to_string(root.join("seeds/platformer.yaml")).expect("seed unchanged"),
+            "id: platformer\n"
+        );
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_blocks_dirty_generated_and_collision_targets() {
+        let root = unique_temp_dir("source-apply-context-blocked");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::create_dir_all(root.join("runs/run-1")).expect("runs dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        fs::write(root.join("runs/run-1/output.json"), "{}\n").expect("run output");
+        let input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![
+                SourceApplyWorktreeContextTargetInput {
+                    path: "seeds/platformer.yaml".to_string(),
+                    git_status: "modified".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Allowed,
+                    authorized_creation: false,
+                },
+                SourceApplyWorktreeContextTargetInput {
+                    path: "runs/run-1/output.json".to_string(),
+                    git_status: "clean".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Blocked,
+                    authorized_creation: false,
+                },
+                SourceApplyWorktreeContextTargetInput {
+                    path: "examples/demo/new.scene.json".to_string(),
+                    git_status: "untracked-collision".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Allowed,
+                    authorized_creation: true,
+                },
+            ],
+        );
+        let report = inspect_source_apply_worktree_context(&input);
+        assert!(report.is_blocked());
+        let reasons = report.blocked_reasons.join(" | ");
+        assert!(reasons.contains("dirty-target"), "{reasons}");
+        assert!(reasons.contains("generated-local"), "{reasons}");
+        assert!(reasons.contains("untracked-target-collision"), "{reasons}");
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_blocks_symlink_and_traversal_targets() {
+        let root = unique_temp_dir("source-apply-context-symlink");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        let symlink_path = root.join("seeds/link.yaml");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(root.join("seeds/platformer.yaml"), &symlink_path)
+            .expect("symlink created");
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(root.join("seeds/platformer.yaml"), &symlink_path)
+            .expect("symlink created");
+        let input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![
+                SourceApplyWorktreeContextTargetInput {
+                    path: "seeds/link.yaml".to_string(),
+                    git_status: "clean".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Allowed,
+                    authorized_creation: false,
+                },
+                SourceApplyWorktreeContextTargetInput {
+                    path: "../outside.yaml".to_string(),
+                    git_status: "clean".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Blocked,
+                    authorized_creation: false,
+                },
+            ],
+        );
+        let report = inspect_source_apply_worktree_context(&input);
+        assert!(report.is_blocked());
+        let reasons = report.blocked_reasons.join(" | ");
+        assert!(reasons.contains("symlink-target"), "{reasons}");
+        assert!(
+            reasons.contains("path-traversal") || reasons.contains("file-class blocked"),
+            "{reasons}"
+        );
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_blocks_missing_git_head_and_active_lock() {
+        let root = unique_temp_dir("source-apply-context-missing-git");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        let mut input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![SourceApplyWorktreeContextTargetInput {
+                path: "seeds/platformer.yaml".to_string(),
+                git_status: "clean".to_string(),
+                expected_file_class_decision: SourceFileClassDecision::Allowed,
+                authorized_creation: false,
+            }],
+        );
+        input.branch.clear();
+        input.current_head_commit = "different".to_string();
+        input.lock_status.active = true;
+        let report = inspect_source_apply_worktree_context(&input);
+        assert!(report.is_blocked());
+        let reasons = report.blocked_reasons.join(" | ");
+        assert!(reasons.contains("branch must not be empty"), "{reasons}");
+        assert!(reasons.contains("branch-head-mismatch"), "{reasons}");
+        assert!(reasons.contains("active-apply-lock"), "{reasons}");
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
