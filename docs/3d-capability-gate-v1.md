@@ -109,6 +109,14 @@ through the active 3D camera into existing canvas markers and exports
 inspection. The behavior is documented in
 [`3d-render-smoke-v1.md`](./3d-render-smoke-v1.md).
 
+Issue #601 adds bounded 3D collision/physics evidence for scoped box colliders
+and trigger volumes. Rust validates the `scene3d.colliders[]` catalog, browser
+runtime emits `scene3dCollision`, existing `collision_evidence` scenario
+assertions can observe 3D contact/trigger events through world-state
+`collisions`, and dashboard/cockpit surfaces render escaped read-only
+`scene3d_collision` summaries. The behavior is documented in
+[`3d-collision-physics-v1.md`](./3d-collision-physics-v1.md).
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard

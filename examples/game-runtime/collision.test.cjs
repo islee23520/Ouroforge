@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { detectAabbCollisions, stepAabbPhysics } = require('./collision.js');
+const { detectAabbCollisions, scene3dCollisionSummary, stepAabbPhysics } = require('./collision.js');
 
 const baseEntity = (id, x, body = 'static', collider = {}) => ({
   id,
@@ -149,6 +149,40 @@ const disabledWallScene = [
 disabledWallScene[1].components.velocity.x = 24;
 const disabledStep = stepAabbPhysics(disabledWallScene, { width: 64, height: 32 }, 15);
 assert.equal(disabledWallScene[1].components.transform.x, 24, 'disabled colliders are ignored by resolution');
+
+const scene3dWorld = {
+  sceneId: 'scene3d-collision-smoke',
+  tick: 7,
+  sceneKind: '3d',
+  scene3d: {
+    colliders: [
+      { id: 'player-box', shape: 'box', body: 'dynamic', size: { x: 2, y: 2, z: 2 }, collisionGroup: 'actors', collisionMask: ['triggers', 'world'] },
+      { id: 'goal-trigger', shape: 'box', body: 'trigger', trigger: true, size: { x: 2, y: 2, z: 2 }, collisionGroup: 'triggers' },
+      { id: 'disabled-box', shape: 'box', disabled: true, size: { x: 1, y: 1, z: 1 } },
+    ],
+    nodes: [
+      { id: 'player', colliderRef: 'player-box', localTransform: { translation: { x: 0, y: 0, z: 0 } } },
+      { id: 'goal', colliderRef: 'goal-trigger', localTransform: { translation: { x: 1, y: 0, z: 0 } } },
+      { id: 'ignored', colliderRef: 'disabled-box', localTransform: { translation: { x: 0, y: 0, z: 0 } } },
+      { id: 'broken', colliderRef: 'missing-box', localTransform: { translation: { x: 0, y: 0, z: 0 } } },
+    ],
+  },
+};
+const scene3dCollision = scene3dCollisionSummary({ world: scene3dWorld, frameId: 'frame-3d-collision' });
+assert.equal(scene3dCollision.schemaVersion, 'ouroforge.scene3d-collision-evidence.v1');
+assert.equal(scene3dCollision.present, true);
+assert.equal(scene3dCollision.frameId, 'frame-3d-collision');
+assert.equal(scene3dCollision.colliderCount, 3);
+assert.equal(scene3dCollision.activeColliderCount, 2);
+assert.equal(scene3dCollision.disabledColliderCount, 1);
+assert.equal(scene3dCollision.contactCount, 0);
+assert.equal(scene3dCollision.triggerCount, 1);
+assert.equal(scene3dCollision.invalidColliderCount, 1);
+assert.equal(scene3dCollision.events[0].type, 'runtime.scene3d.collision.trigger');
+assert.equal(scene3dCollision.events[0].pairId, 'goal:player');
+assert.equal(scene3dCollision.events[0].axis, 'none');
+assert.ok(scene3dCollision.invalidColliders.some((entry) => entry.reason.includes('missing collider missing-box')));
+assert.match(scene3dCollision.boundary, /no full 3D physics engine/i);
 assert.deepEqual(disabledStep.events, []);
 
 function deterministicBlockedStep() {

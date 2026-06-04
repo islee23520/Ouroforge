@@ -5,7 +5,7 @@
   const actionInput = {};
   const events = [];
   const saveSlots = new Map();
-  const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
+  const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [], scene3dCollisionSummary: () => ({ present: false, events: [] }) };
   const snapshotFactory = (window.OuroforgeSnapshots || {
     createSnapshotRegistry: () => ({
       capture: () => 'snapshot-unavailable',
@@ -130,6 +130,8 @@
     metadata: clone(defaultScene.metadata),
     collisions: [],
     collisionEvents: [],
+    scene3dCollision: null,
+    scene3dCollisions: [],
     collisionRules: { defaultLayer: 'default' },
     gameplayRules: { version: '1', flags: [] },
     sceneTransitions: [],
@@ -961,6 +963,27 @@
     }
   }
 
+  function mergeCollisionEvents(primary = [], extra = []) {
+    const merged = [];
+    const seen = new Set();
+    for (const event of primary.concat(extra)) {
+      if (!event || typeof event !== 'object') continue;
+      const key = `${event.type || 'collision'}:${event.pairId || event.nodeId || JSON.stringify(event)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(event);
+    }
+    return merged;
+  }
+
+  function isScene3dCollisionEvent(event) {
+    return Boolean(event && typeof event.type === 'string' && event.type.startsWith('runtime.scene3d.collision.'));
+  }
+
+  function collisionEventsFor2dPhysics(eventsToProcess = []) {
+    return eventsToProcess.filter((event) => !isScene3dCollisionEvent(event));
+  }
+
   function stepOne() {
     applyInput();
     applyGravity();
@@ -981,13 +1004,20 @@
       }
       world.collisions = collision.detectAabbCollisions(physicsEntities, world.tick, world.collisionRules);
     }
-    for (const event of world.collisions) {
+    const scene3dCollision = typeof collision.scene3dCollisionSummary === 'function'
+      ? collision.scene3dCollisionSummary({ world, frameId: `tick-${world.tick}` })
+      : { present: false, events: [] };
+    world.scene3dCollision = clone(scene3dCollision);
+    world.scene3dCollisions = clone(Array.isArray(scene3dCollision.events) ? scene3dCollision.events : []);
+    const currentCollisionEvents = mergeCollisionEvents(world.collisions, world.scene3dCollisions);
+    for (const event of currentCollisionEvents) {
       world.collisionEvents.push(event);
       if (world.collisionEvents.length > 64) world.collisionEvents.shift();
       record(event.type, event);
     }
-    refreshGroundedState(world.collisions);
-    processTriggerEvents(world.collisions);
+    const physics2dCollisions = collisionEventsFor2dPhysics(currentCollisionEvents);
+    refreshGroundedState(physics2dCollisions);
+    processTriggerEvents(physics2dCollisions);
     emitVfxEvents('tick');
     updateCameraState();
   }
@@ -1055,6 +1085,8 @@
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
     world.collisionEvents = [];
+    world.scene3dCollision = null;
+    world.scene3dCollisions = [];
     world.audioEvents = [];
     world.audioWarnings = [];
     world.vfxEvents = [];
@@ -1537,6 +1569,11 @@
       state.scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
         ? renderer.scene3dRenderSummary({ world: state, frameId })
         : null;
+      state.scene3dCollision = typeof collision.scene3dCollisionSummary === 'function'
+        ? collision.scene3dCollisionSummary({ world: state, frameId })
+        : { present: false, events: [] };
+      state.scene3dCollisions = Array.isArray(state.scene3dCollision.events) ? clone(state.scene3dCollision.events) : [];
+      state.collisions = mergeCollisionEvents(Array.isArray(state.collisions) ? state.collisions : [], state.scene3dCollisions);
       state.runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, state.renderQueue);
       const runtimeStateEvidence = runtimeState(frameId);
       state.runtimeState = {

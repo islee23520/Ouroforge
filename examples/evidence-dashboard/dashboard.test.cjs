@@ -300,6 +300,20 @@ const run = {
       fallbackReasons: ['<missing-node>: <missing mesh>'],
       boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
     },
+    scene3d_collision: {
+      present: true,
+      frameId: '<frame-0003>',
+      sceneId: '<scene-render-test>',
+      colliderCount: 3,
+      activeColliderCount: 2,
+      disabledColliderCount: 1,
+      contactCount: 1,
+      triggerCount: 1,
+      invalidColliderCount: 1,
+      events: [{ type: 'runtime.scene3d.collision.trigger', pairId: '<goal:player>' }],
+      invalidColliders: [{ nodeId: '<broken>', colliderRef: '<missing-box>', reason: '<missing collider>' }],
+      boundary: 'Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.',
+    },
     renderer: {
       version: '1',
       camera: { x: 80, y: 30 },
@@ -964,9 +978,12 @@ assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /Audio 
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /Runtime|Frame|Status|Budget violations/);
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /&lt;frame-0003&gt;/);
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /&lt;renderMs&gt;/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /1 contact \/ 1 trigger \/ 1 invalid/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /&lt;missing collider&gt;/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /no full 3D physics engine/);
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /browser observations are evidence inputs, not trusted authority/i);
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /remote telemetry/);
-assert.doesNotMatch(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /<frame-0003>|<renderMs>/);
+assert.doesNotMatch(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /<frame-0003>|<renderMs>|<missing/);
 assert.match(dashboard.renderRuntimeProfilerSummary({}), /No runtime profiler\/frame-budget read model/);
 // present engine summaries without any profiler read model must still render the
 // absence state, not a default within-budget grid.

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-collider-invalid-missing-ref",
+  "bounds": {
+    "width": 640,
+    "height": 360
+  },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "colliders": [
+      {
+        "id": "player-box",
+        "shape": "box",
+        "body": "dynamic",
+        "size": { "x": 2, "y": 2, "z": 2 }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "player",
+        "colliderRef": "missing-box",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "components": [{ "kind": "collider", "reference": "missing-box" }]
+      }
+    ]
+  }
+}
