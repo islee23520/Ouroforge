@@ -4,6 +4,8 @@ Status: **conditional go for a manual public-visibility decision after #217 refr
 
 This checklist is the handoff artifact for public-readiness review. It does not publish the repository, change visibility, announce a release, or promise compatibility.
 
+Public Alpha Launch Governance v1 is scoped in [`docs/public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md); that scope contract keeps future public-alpha work governance-only unless a separate issue authorizes more.
+
 ## Merge prerequisites
 
 Historical readiness remediation has already landed:
