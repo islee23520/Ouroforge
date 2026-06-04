@@ -91,4 +91,28 @@ assert.equal(scene3dFrameStats.scene3dRenderAttemptedObjectCount, 1);
 assert.equal(scene3dFrameStats.scene3dRenderVisibleObjectCount, 1);
 assert.equal(scene3dFrameStats.scene3dRenderSkippedObjectCount, 0);
 
+// A 3D scene with OMITTED entities must not inherit the default 2D demo entities.
+const scene3dNoEntities = api.loadScene({
+  schemaVersion: '1',
+  id: 'runtime-scene3d-no-entities',
+  sceneKind: '3d',
+  bounds: { width: 320, height: 180 },
+  scene3d: {
+    version: '1',
+    activeCameraId: 'main-camera',
+    cameras: [{
+      id: 'main-camera',
+      active: true,
+      transform: { translation: { x: 0, y: 0, z: -8 } },
+      projection: { kind: 'perspective', fovDegrees: 60 },
+      viewport: { width: 320, height: 180 },
+    }],
+    meshes: [{ id: 'cube-mesh', kind: 'primitive', primitive: 'cube', materialRef: 'cube-mat' }],
+    materials: [{ id: 'cube-mat', kind: 'unlit', baseColor: '#44ccff' }],
+    nodes: [{ id: 'cube-node', meshRef: 'cube-mesh', localTransform: { translation: { x: 0, y: 0, z: 0 } } }],
+  },
+});
+assert.equal(scene3dNoEntities.sceneKind, '3d');
+assert.equal(scene3dNoEntities.entities.length, 0, '3D scene with omitted entities must not inject default 2D entities');
+
 console.log('runtime frame budget smoke test passed');

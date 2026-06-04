@@ -519,9 +519,13 @@
 
   function normalizeScene(scene = {}) {
     const sceneKind = scene.sceneKind === '3d' ? '3d' : '2d';
+    // A 3D scene carries its content through the scene3d graph, so an omitted (or
+    // empty) entities array must stay empty rather than inheriting the default 2D
+    // demo entities.
+    const defaultEntities = sceneKind === '3d' ? [] : defaultScene.entities;
     const sourceEntities = Array.isArray(scene.entities) && (scene.entities.length > 0 || sceneKind === '3d')
       ? scene.entities
-      : defaultScene.entities;
+      : defaultEntities;
     const bounds = size(scene.bounds, defaultScene.bounds);
     const componentDefaults = normalizeComponentDefaults(scene.componentDefaults);
     const normalizedRenderer = renderer.normalizeRenderer(scene.renderer, bounds);
