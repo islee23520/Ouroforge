@@ -91,8 +91,10 @@ surfaces. They do not create browser trusted writes or source apply authority:
 - [`studio-v1.md`](studio-v1.md), [`studio-v2-cockpit.md`](studio-v2-cockpit.md), [`studio-v3-project-workspace-cockpit.md`](studio-v3-project-workspace-cockpit.md), [`studio-review-cockpit-v1.md`](studio-review-cockpit-v1.md), [`studio-evidence-fidelity-surfaces.md`](studio-evidence-fidelity-surfaces.md), [`studio-asset-inspector-v1.md`](studio-asset-inspector-v1.md)
 - [`visual-authoring-v1.md`](visual-authoring-v1.md), [`visual-edit-draft-model-v1.md`](visual-edit-draft-model-v1.md)
 - [`studio-3d-inspection-surface-v1.md`](studio-3d-inspection-surface-v1.md) — read-only escaped Studio 3D evidence inspection; no 3D editor, trusted write, command bridge, viewport persistence, production 3D, or Godot replacement claim.
+- [`agentic-scene-level-designer-v1.md`](agentic-scene-level-designer-v1.md) — Agentic Scene and Level Designer v1 scope contract for evidence-gated level/scene authoring; no autonomous full game generation, production editor, visual scripting, browser trusted write, command bridge, native export, plugin runtime, hosted/cloud behavior, or Godot replacement claim.
 - [`agentic-level-design-demo-v1.md`](agentic-level-design-demo-v1.md) — deterministic Agentic Scene and Level Designer v1 demo chain; no autonomous full game generation, browser trusted write, command bridge, production editor, or Godot replacement claim.
 - [`scenario-coverage-v10-agentic-level-design.md`](scenario-coverage-v10-agentic-level-design.md) — Agentic Scene and Level Designer v1 regression coverage matrix for valid, malformed, missing, stale, unsupported, blocked, Studio, and generated-state cases.
+- [`agentic-scene-level-designer-governance-handoff.md`](agentic-scene-level-designer-governance-handoff.md) — #642 roadmap/#1 governance handoff after Agentic Scene and Level Designer v1; keeps #1/#23 open and records conservative next-candidate guidance.
 
 ## Source preview, sandbox, and apply-boundary references
 

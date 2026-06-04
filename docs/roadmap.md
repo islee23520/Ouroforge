@@ -34,10 +34,17 @@ v1 milestone for bounded local 3D evidence: scene graph/transform validation,
 camera/projection contracts, mesh/material local refs, renderer smoke evidence,
 collision/trigger evidence, animation/probe/evaluator compatibility, deterministic
 3D demo/regression fixtures, normalized dashboard read models, read-only Studio
-3D inspection, and a conservative governance refresh:
+3D inspection, and a conservative governance refresh, and a completed Agentic
+Scene and Level Designer v1 milestone for evidence-gated level/scene authoring:
+intent and constraint models, generation plans, layout constraints, tilemap and
+terrain drafts, entity/objective/encounter placement drafts, reachability and
+objective proof evidence, difficulty/pacing heuristic evidence, visual/semantic
+diffs, review-gated level apply records, read-only Studio inspection, a
+deterministic demo, Scenario Coverage v10, and a conservative governance
+refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -150,6 +157,23 @@ The current implementation has completed these documented milestone surfaces:
   `examples/3d-demo-scene-v1/README.md`,
   `examples/3d-capability-regression-v8/README.md`,
   `docs/studio-3d-inspection-surface-v1.md`)
+- Agentic Scene and Level Designer v1 / evidence-gated level authoring
+  (`docs/agentic-scene-level-designer-v1.md`,
+  `docs/level-intent-v1.md`,
+  `docs/scene-generation-plan-v1.md`,
+  `docs/spatial-layout-constraint-solver-v1.md`,
+  `docs/tilemap-terrain-generation-draft-v1.md`,
+  `docs/entity-objective-encounter-placement-draft-v1.md`,
+  `docs/reachability-pathing-evidence-v1.md`,
+  `docs/objective-completion-proof-v1.md`,
+  `docs/difficulty-pacing-heuristic-evidence-v1.md`,
+  `docs/level-visual-semantic-diff-v1.md`,
+  `docs/agent-generated-level-draft-v1.md`,
+  `docs/review-gated-level-apply-v1.md`,
+  `docs/studio-level-design-inspection-surface-v1.md`,
+  `docs/agentic-level-design-demo-v1.md`,
+  `docs/scenario-coverage-v10-agentic-level-design.md`,
+  `docs/agentic-scene-level-designer-governance-handoff.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -222,16 +246,35 @@ screenshots, previews, dashboard exports, temp projects, and local tool outputs
 remain ignored generated state unless a later issue explicitly scopes a tiny
 deterministic source-like fixture.
 
-After #608, the recommended next milestone candidate is Gameplay Scripting /
-Logic System v1 (#611-#625) because the completed 3D gate provides enough bounded
-scene/runtime/evaluator evidence to define local behavior models, event/signal
-contracts, state machines, safe script-module boundaries, review-gated behavior
-apply, evidence/journal integration, Studio behavior inspection, and Scenario
-Coverage v9 without jumping to production 3D, native export, plugins, hosted
-services, or source-apply authority. Agentic Scene and Level Designer,
-GDD-to-Playable Prototype, Autonomous QA/Playtest Swarm, Safe Source Apply,
-Build/Export/Packaging, Full Studio Editor, Plugin/Extension System, and demo game
-work remain later candidates requiring separate scope contracts and guardrails.
+Agentic Scene and Level Designer v1 completion covers the #627-#642 evidence
+chain: scope/contract, level intent, scene generation plan, spatial layout
+constraints, tilemap/terrain draft, entity/objective/encounter placement draft,
+reachability/pathing evidence, objective completion proof, difficulty/pacing
+heuristic evidence, level visual/semantic diff, agent-generated level draft,
+review-gated level apply record, read-only Studio inspection, deterministic demo,
+Scenario Coverage v10, and this roadmap/#1 governance refresh. It remains a
+bounded local level-authoring milestone: it does not add autonomous unrestricted
+game creation, a production editor, a full visual level editor, visual scripting,
+browser trusted writes, command bridges, auto-apply, auto-merge, self-approval,
+unrestricted source mutation apply, native export, plugin runtime, hosted/cloud
+behavior, production-ready status, secure-sandbox guarantees, shipped-game
+maturity, or current Godot replacement positioning. Generated level drafts,
+previews, screenshots, runs, dashboard exports, temp projects, and local tool
+outputs remain ignored generated state unless a later issue explicitly scopes a
+deterministic source-like fixture.
+
+After #642, the recommended next milestone candidate is the remaining Gameplay
+Scripting / Logic System v1 sequence (#614-#625). The #611 scope contract, #612
+behavior model, and #613 event/signal system are already closed, but state
+machine/ability actions, script-module design gates, safe script sandboxing,
+runtime integration, behavior scenario assertions, agent-generated behavior
+drafts, review-gated behavior apply, evidence/journal integration, Studio
+behavior inspection, demo evidence, Scenario Coverage v9, and the #625
+roadmap/#1 governance refresh remain open. This recommendation stays bounded to
+local behavior/evidence contracts and must not become arbitrary third-party code
+loading, plugin runtime, browser command bridge, hosted execution, production
+scripting, source-apply authority, public-launch approval, or Godot replacement
+scope.
 
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
@@ -291,13 +334,14 @@ record on a chosen date, or continue technical roadmap work while keeping launch
 actions manual. Production 2D Engine Core v1 (#581-#593) is now recorded as
 complete, with this #594 roadmap/#1 refresh preserving the evidence chain and
 conservative wording.
-The 3D Capability Gate v1 sequence (#596-#608) is now recorded as complete after
-implementation, demo, regression, Studio inspection, and governance evidence. The
-conservative next technical milestone candidate is Gameplay Scripting / Logic
-System v1 (#611-#625), framed as bounded local behavior/evidence contracts rather
-than arbitrary scripting, plugin loading, hosted execution, browser command
-bridges, source apply, public launch, production readiness, or Godot replacement
-scope.
+The 3D Capability Gate v1 sequence (#596-#608) and Agentic Scene and Level
+Designer v1 sequence (#627-#642) are now recorded as complete after
+implementation, demo, regression, Studio inspection, and governance evidence.
+The conservative next technical milestone candidate is the remaining Gameplay
+Scripting / Logic System v1 sequence (#614-#625), framed as bounded local
+behavior/evidence contracts rather than arbitrary scripting, plugin loading,
+hosted execution, browser command bridges, source apply, public launch,
+production readiness, or Godot replacement scope.
 
 Other possible later governance topics remain Native Export Design Gate, Plugin
 Design Gate, Source Mutation Apply Design Gate, and Visual Authoring v2. None is
@@ -329,29 +373,34 @@ publication, and support boundaries described above.
 
 Recommended next milestone candidates after this governance refresh are:
 
-1. **Gameplay Scripting / Logic System v1 (#611-#625)** — the next
-   dependency-ordered technical branch. It should start with the #611
-   scope/contract and remain bounded to local behavior models, event/signal
-   evidence, state-machine/ability action contracts, safe script-module design
-   gates, review-gated behavior apply, evidence/journal integration, Studio
-   behavior inspection, demo evidence, Scenario Coverage v9, generated-state
-   audits, and conservative wording. It must not become arbitrary third-party
-   code loading, plugin runtime, browser command bridge, hosted execution,
-   production scripting, source-apply authority, or Godot replacement scope.
-2. **Agentic Scene and Level Designer v1 (#627-#642)** or **GDD-to-Playable
-   Prototype v1 (#644-#661)** — later agentic authoring candidates that require
-   their own scoped contracts, review gates, generated-state audits, and
-   conservative wording. The Agentic Scene and Level Designer contract starts in
-   [`docs/agentic-scene-level-designer-v1.md`](agentic-scene-level-designer-v1.md).
-3. **Bounded Production 3D expansion** — defer unless maintainers open a new
+1. **Gameplay Scripting / Logic System v1 remaining sequence (#614-#625)** —
+   the next dependency-ordered technical branch because its scope contract and
+   first data-only behavior/event artifacts are already in place. Continue with
+   #614 and keep the branch bounded to local behavior models, state-machine and
+   ability-action contracts, safe script-module design gates, sandbox evidence,
+   behavior runtime integration, behavior assertions, review-gated behavior
+   apply, evidence/journal integration, Studio behavior inspection, demo
+   evidence, Scenario Coverage v9, generated-state audits, and conservative
+   wording. It must not become arbitrary third-party code loading, plugin
+   runtime, browser command bridge, hosted execution, production scripting,
+   source-apply authority, public-launch approval, or Godot replacement scope.
+2. **GDD-to-Playable Prototype v1 (#644-#661)** — a later agentic authoring
+   candidate that requires its own scoped contract, review gates, generated-state
+   audits, and conservative wording after the behavior/evidence backlog is
+   reconciled.
+3. **Autonomous QA / Playtest Swarm, Safe Source Mutation Apply, Build/Export/
+   Packaging, Plugin/Extension System, Full Studio Editor, and demo game tracks**
+   — later candidates only when opened by their own fixed issue sequences with
+   explicit trust boundaries and non-goals.
+4. **Bounded Production 3D expansion** — defer unless maintainers open a new
    evidence-backed scope contract after the 3D gate. The completed gate is not
    proof of broad 3D engine parity, advanced rendering, import pipelines, native
    export, production readiness, or Godot replacement status.
-4. **Manual public visibility review** — only if maintainers separately choose
+5. **Manual public visibility review** — only if maintainers separately choose
    it, using the launch checklist, visibility decision records, communication
    pack, hold/rollback criteria, issue/PR intake policy, security-response
    routing, and fresh verification on the intended decision date.
-5. **Deferral/hold** — if any launch-governance blocker or generated-state,
+6. **Deferral/hold** — if any launch-governance blocker or generated-state,
    wording, demo-stability, security-reporting, or #1/#23 anchor concern is
    found during a future manual review.
 
@@ -397,6 +446,12 @@ remain separate maintainer actions.
   claim production readiness, shipped-game maturity, secure sandboxing, broad
   compatibility stability, native export, plugin runtime, hosted/cloud behavior,
   source apply, public launch, or Godot replacement status.
+- Treat Agentic Scene and Level Designer v1 as complete but bounded. Its
+  artifacts are local evidence contracts for reviewable level/scene authoring,
+  not authority to claim autonomous full game generation, production editor/full
+  visual editor maturity, visual scripting, browser trusted writes, command
+  bridges, unrestricted source apply, native export, plugin runtime, hosted/cloud
+  behavior, public launch, production readiness, or Godot replacement status.
 
 ## Active anchors
 

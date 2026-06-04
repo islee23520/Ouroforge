@@ -220,10 +220,17 @@ v1 is recorded as complete in `docs/roadmap.md`,
 `docs/studio-3d-inspection-surface-v1.md` as a bounded local 3D evidence
 milestone; it is not production 3D readiness, broad 3D compatibility,
 advanced-import/rendering parity, native-export, plugin-runtime, hosted/cloud,
-source-apply, public-launch, or Godot replacement scope. The next recommended
-technical branch is the scoped Gameplay Scripting / Logic System v1 sequence
-(#611-#625), not arbitrary third-party scripting or unrestricted autonomous
-project mutation.
+source-apply, public-launch, or Godot replacement scope. Agentic Scene and Level
+Designer v1 is recorded as complete in `docs/roadmap.md`,
+`docs/agentic-scene-level-designer-v1.md`, and
+`docs/agentic-scene-level-designer-governance-handoff.md` as a bounded local
+level/scene-authoring evidence milestone; it is not autonomous full game
+generation, a production editor, visual scripting, browser trusted writes,
+native export, plugin runtime, hosted/cloud behavior, source-apply authority,
+public-launch approval, or Godot replacement scope. The next recommended
+technical branch is the remaining scoped Gameplay Scripting / Logic System v1
+sequence (#614-#625), not arbitrary third-party scripting or unrestricted
+autonomous project mutation.
 
 ## Contributor guide
 
