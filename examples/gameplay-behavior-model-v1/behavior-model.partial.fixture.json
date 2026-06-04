@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "gameplay-behavior-model.v1",
+  "behaviorPackId": "partial-demo-behaviors",
+  "scope": "local-fixture",
+  "status": "partial",
+  "behaviors": [
+    {
+      "id": "partial-ability-window",
+      "label": "Partial ability window",
+      "status": "partial",
+      "target": { "entityId": "player", "componentId": "ability_window" },
+      "triggers": [{ "kind": "on_signal", "signal": "combo_window_opened" }],
+      "conditions": [{ "kind": "state_is", "state": "combo_ready" }],
+      "actions": [{ "kind": "set_state", "state": "combo_pending" }],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#follow-up-validation-expectations"],
+      "blockedReasons": ["follow-up #614 will define state-machine transition semantics"]
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#compatibility-and-read-model-notes"],
+  "blockedReasons": []
+}

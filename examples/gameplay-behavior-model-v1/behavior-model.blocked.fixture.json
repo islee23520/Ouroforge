@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "gameplay-behavior-model.v1",
+  "behaviorPackId": "blocked-demo-behaviors",
+  "scope": "local-fixture",
+  "status": "blocked",
+  "behaviors": [
+    {
+      "id": "blocked-scripted-boss",
+      "label": "Blocked scripted boss behavior",
+      "status": "blocked",
+      "target": { "entityId": "boss_alpha" },
+      "triggers": [],
+      "conditions": [],
+      "actions": [],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-scripting-logic-system-v1.md#script-expansion-boundaries"],
+      "blockedReasons": ["requires later explicit script-runtime governance; #612 only models structured behavior data"]
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#non-goals"],
+  "blockedReasons": ["script execution remains unauthorized"]
+}

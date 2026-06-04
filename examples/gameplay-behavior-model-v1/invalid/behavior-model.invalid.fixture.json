@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "gameplay-behavior-model.v1",
+  "behaviorPackId": "invalid-demo-behaviors",
+  "scope": "local-fixture",
+  "status": "invalid",
+  "behaviors": [
+    {
+      "id": "duplicate-behavior",
+      "label": "Unsafe command behavior",
+      "status": "ready",
+      "target": { "entityId": "../escape" },
+      "triggers": [{ "kind": "on_input", "action": "debug" }],
+      "conditions": [{ "kind": "javascript_expression", "expression": "player.hp > 0" }],
+      "actions": [{ "kind": "execute_script", "script": "eval('open door')" }],
+      "variables": {},
+      "cooldowns": [{ "id": "bad_cd", "durationMs": -1 }],
+      "timers": [{ "id": "bad_timer", "durationMs": 0, "repeat": true }],
+      "evidenceRefs": [],
+      "blockedReasons": []
+    },
+    {
+      "id": "duplicate-behavior",
+      "label": "Duplicate behavior id",
+      "status": "unsupported",
+      "target": { "entityId": "door" },
+      "triggers": [],
+      "conditions": [],
+      "actions": [{ "kind": "plugin_loader", "plugin": "remote-plugin" }],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": [],
+      "blockedReasons": []
+    }
+  ],
+  "evidenceRefs": [],
+  "blockedReasons": ["negative fixture for GL10.2.2 validation"]
+}
