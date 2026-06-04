@@ -35340,7 +35340,7 @@ fn validate_scene_audio(
                 &format!("scene entity {entity_id} audio event {} bus", event.name),
                 bus,
             )?;
-            if !bus_ids.is_empty() && !bus_ids.contains(bus) {
+            if !bus_ids.contains(bus) {
                 return Err(anyhow!(
                     "scene entity {entity_id} audio event {} references unknown audio bus: {bus}",
                     event.name
@@ -59329,6 +59329,24 @@ scenarios:
             .events[0]
             .bus = Some("missing-bus".to_string());
         let rejected = validate_scene(&unknown_bus).expect_err("unknown audio bus rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown audio bus"));
+
+        // An event bus reference must be rejected even when no buses are declared
+        // (the empty-bus-table case previously skipped reference validation).
+        let mut bus_without_table = scene.clone();
+        {
+            let audio = bus_without_table.entities[0]
+                .components
+                .audio
+                .as_mut()
+                .expect("audio");
+            audio.buses.clear();
+            audio.events[0].bus = Some("sfx".to_string());
+        }
+        let rejected = validate_scene(&bus_without_table)
+            .expect_err("event bus reference rejected when no audio buses are declared");
         assert!(rejected
             .to_string()
             .contains("references unknown audio bus"));
