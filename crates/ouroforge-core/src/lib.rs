@@ -28112,6 +28112,14 @@ pub struct SceneDocument {
     pub bounds: SceneBounds,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renderer: Option<SceneRenderer>,
+    #[serde(
+        default,
+        rename = "activeCameraId",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub active_camera_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cameras: Vec<SceneCameraConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tilemaps: Vec<SceneTilemap>,
     #[serde(
@@ -28264,6 +28272,69 @@ pub struct SceneRenderLayer {
     pub order: i64,
     #[serde(default = "default_layer_visible")]
     pub visible: bool,
+    #[serde(
+        default = "default_parallax_factor",
+        rename = "parallaxFactor",
+        skip_serializing_if = "is_default_parallax_factor"
+    )]
+    pub parallax_factor: i64,
+    #[serde(
+        default = "default_camera_participation",
+        rename = "cameraParticipation",
+        skip_serializing_if = "is_default_camera_participation"
+    )]
+    pub camera_participation: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCameraConfig {
+    pub id: String,
+    #[serde(default)]
+    pub position: ScenePoint,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewport: Option<SceneSize>,
+    #[serde(
+        default,
+        rename = "followTarget",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub follow_target: Option<String>,
+    #[serde(
+        default,
+        rename = "clampBounds",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub clamp_bounds: Option<SceneCameraClampBounds>,
+    #[serde(default, rename = "deadZone", skip_serializing_if = "Option::is_none")]
+    pub dead_zone: Option<SceneSize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zoom: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneCameraClampBounds {
+    pub x: i64,
+    pub y: i64,
+    pub width: i64,
+    pub height: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneNormalizedCamera {
+    pub id: String,
+    pub active: bool,
+    pub position: ScenePoint,
+    pub viewport: SceneSize,
+    #[serde(rename = "followTarget", skip_serializing_if = "Option::is_none")]
+    pub follow_target: Option<String>,
+    #[serde(rename = "clampBounds", skip_serializing_if = "Option::is_none")]
+    pub clamp_bounds: Option<SceneCameraClampBounds>,
+    #[serde(rename = "deadZone", skip_serializing_if = "Option::is_none")]
+    pub dead_zone: Option<SceneSize>,
+    pub zoom: i64,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -31066,6 +31137,22 @@ fn default_layer_visible() -> bool {
     true
 }
 
+fn default_parallax_factor() -> i64 {
+    100
+}
+
+fn is_default_parallax_factor(value: &i64) -> bool {
+    *value == default_parallax_factor()
+}
+
+fn default_camera_participation() -> bool {
+    true
+}
+
+fn is_default_camera_participation(value: &bool) -> bool {
+    *value == default_camera_participation()
+}
+
 fn aabb_collider_shape() -> String {
     "aabb".to_string()
 }
@@ -31295,6 +31382,7 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
             &entity.metadata,
         )?;
     }
+    validate_scene_cameras(scene)?;
     Ok(())
 }
 
@@ -31532,8 +31620,196 @@ fn validate_scene_renderer(scene: &SceneDocument, renderer: &SceneRenderer) -> R
         if !layer_ids.insert(layer.id.clone()) {
             return Err(anyhow!("duplicate scene renderer layer id: {}", layer.id));
         }
+        if layer.parallax_factor <= 0 || layer.parallax_factor > 1000 {
+            return Err(anyhow!(
+                "scene renderer layer {} parallaxFactor must be between 1 and 1000",
+                layer.id
+            ));
+        }
     }
     Ok(())
+}
+
+fn validate_scene_cameras(scene: &SceneDocument) -> Result<()> {
+    if let Some(active_camera_id) = &scene.active_camera_id {
+        validate_path_component("scene activeCameraId", active_camera_id)?;
+    }
+    let entity_ids = scene
+        .entities
+        .iter()
+        .map(|entity| entity.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut camera_ids = BTreeSet::new();
+    for camera in &scene.cameras {
+        validate_path_component("scene camera id", &camera.id)?;
+        if !camera_ids.insert(camera.id.clone()) {
+            return Err(anyhow!("duplicate scene camera id: {}", camera.id));
+        }
+        let viewport = camera
+            .viewport
+            .as_ref()
+            .cloned()
+            .or_else(|| {
+                scene
+                    .renderer
+                    .as_ref()
+                    .map(|renderer| renderer.viewport.clone())
+            })
+            .unwrap_or(SceneSize {
+                width: scene.bounds.width,
+                height: scene.bounds.height,
+            });
+        validate_scene_camera_viewport(scene, &camera.id, &viewport)?;
+        if let Some(follow_target) = &camera.follow_target {
+            validate_path_component(
+                &format!("scene camera {} followTarget", camera.id),
+                follow_target,
+            )?;
+            if !entity_ids.contains(follow_target.as_str()) {
+                return Err(anyhow!(
+                    "scene camera {} followTarget references unknown entity: {}",
+                    camera.id,
+                    follow_target
+                ));
+            }
+        }
+        if let Some(clamp_bounds) = &camera.clamp_bounds {
+            validate_scene_camera_clamp_bounds(&camera.id, clamp_bounds, &viewport, scene)?;
+        }
+        if let Some(dead_zone) = &camera.dead_zone {
+            if dead_zone.width <= 0 || dead_zone.height <= 0 {
+                return Err(anyhow!(
+                    "scene camera {} deadZone must be positive",
+                    camera.id
+                ));
+            }
+            if dead_zone.width > viewport.width || dead_zone.height > viewport.height {
+                return Err(anyhow!(
+                    "scene camera {} deadZone must fit inside viewport",
+                    camera.id
+                ));
+            }
+        }
+        if let Some(zoom) = camera.zoom {
+            if !(1..=400).contains(&zoom) {
+                return Err(anyhow!(
+                    "scene camera {} zoom must be between 1 and 400",
+                    camera.id
+                ));
+            }
+        }
+    }
+    if let Some(active_camera_id) = &scene.active_camera_id {
+        if !camera_ids.contains(active_camera_id) {
+            return Err(anyhow!(
+                "scene activeCameraId references unknown camera: {active_camera_id}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_camera_viewport(
+    scene: &SceneDocument,
+    camera_id: &str,
+    viewport: &SceneSize,
+) -> Result<()> {
+    if viewport.width <= 0 || viewport.height <= 0 {
+        return Err(anyhow!(
+            "scene camera {camera_id} viewport must be positive"
+        ));
+    }
+    if viewport.width > scene.bounds.width || viewport.height > scene.bounds.height {
+        return Err(anyhow!(
+            "scene camera {camera_id} viewport must fit inside scene bounds"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_scene_camera_clamp_bounds(
+    camera_id: &str,
+    clamp_bounds: &SceneCameraClampBounds,
+    viewport: &SceneSize,
+    scene: &SceneDocument,
+) -> Result<()> {
+    if clamp_bounds.width <= 0 || clamp_bounds.height <= 0 {
+        return Err(anyhow!(
+            "scene camera {camera_id} clampBounds must be positive"
+        ));
+    }
+    if clamp_bounds.width < viewport.width || clamp_bounds.height < viewport.height {
+        return Err(anyhow!(
+            "scene camera {camera_id} clampBounds must contain the viewport"
+        ));
+    }
+    if clamp_bounds.x < 0 || clamp_bounds.y < 0 {
+        return Err(anyhow!(
+            "scene camera {camera_id} clampBounds must stay inside scene bounds"
+        ));
+    }
+    let max_x = clamp_bounds
+        .x
+        .checked_add(clamp_bounds.width)
+        .ok_or_else(|| anyhow!("scene camera {camera_id} clampBounds x + width overflows"))?;
+    let max_y = clamp_bounds
+        .y
+        .checked_add(clamp_bounds.height)
+        .ok_or_else(|| anyhow!("scene camera {camera_id} clampBounds y + height overflows"))?;
+    if max_x > scene.bounds.width || max_y > scene.bounds.height {
+        return Err(anyhow!(
+            "scene camera {camera_id} clampBounds must stay inside scene bounds"
+        ));
+    }
+    Ok(())
+}
+
+pub fn scene_normalized_cameras(scene: &SceneDocument) -> Vec<SceneNormalizedCamera> {
+    let fallback_viewport = scene
+        .renderer
+        .as_ref()
+        .map(|renderer| renderer.viewport.clone())
+        .unwrap_or(SceneSize {
+            width: scene.bounds.width,
+            height: scene.bounds.height,
+        });
+    if scene.cameras.is_empty() {
+        return vec![SceneNormalizedCamera {
+            id: "default".to_string(),
+            active: true,
+            position: scene
+                .renderer
+                .as_ref()
+                .map(|renderer| renderer.camera.clone())
+                .unwrap_or_default(),
+            viewport: fallback_viewport.clone(),
+            follow_target: None,
+            clamp_bounds: None,
+            dead_zone: None,
+            zoom: 100,
+        }];
+    }
+    let active_id = scene
+        .active_camera_id
+        .as_deref()
+        .unwrap_or(scene.cameras[0].id.as_str());
+    scene
+        .cameras
+        .iter()
+        .map(|camera| SceneNormalizedCamera {
+            id: camera.id.clone(),
+            active: camera.id == active_id,
+            position: camera.position.clone(),
+            viewport: camera
+                .viewport
+                .clone()
+                .unwrap_or_else(|| fallback_viewport.clone()),
+            follow_target: camera.follow_target.clone(),
+            clamp_bounds: camera.clamp_bounds.clone(),
+            dead_zone: camera.dead_zone.clone(),
+            zoom: camera.zoom.unwrap_or(100),
+        })
+        .collect()
 }
 
 fn scene_layer_order_and_visibility(
@@ -54912,6 +55188,217 @@ scenarios:
             serde_json::to_string(&order).expect("render order serializes"),
             r#"[{"entityId":"sky","layer":"background","layerOrder":-10,"spriteOrder":0},{"entityId":"player","layer":"actors","layerOrder":0,"spriteOrder":5},{"entityId":"zebra","layer":"actors","layerOrder":0,"spriteOrder":5}]"#
         );
+    }
+
+    #[test]
+    fn scene_camera_model_v1_normalizes_defaults_and_configured_camera() {
+        let legacy_scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "legacy-camera-defaults",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 8, "y": 12 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [{ "id": "actors", "order": 0 }]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "layer": "actors" },
+                "components": {
+                    "transform": { "x": 32, "y": 72 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true
+                }
+            }]
+        }))
+        .expect("legacy scene parses");
+        validate_scene(&legacy_scene).expect("legacy scene validates");
+        assert!(legacy_scene.cameras.is_empty());
+        let normalized = scene_normalized_cameras(&legacy_scene);
+        assert_eq!(normalized.len(), 1);
+        assert_eq!(normalized[0].id, "default");
+        assert!(normalized[0].active);
+        assert_eq!(normalized[0].position, ScenePoint { x: 8, y: 12 });
+        assert_eq!(
+            normalized[0].viewport,
+            SceneSize {
+                width: 160,
+                height: 90
+            }
+        );
+        assert_eq!(normalized[0].zoom, 100);
+
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "camera-model-v1-scene",
+            "bounds": { "width": 640, "height": 360 },
+            "activeCameraId": "follow-player",
+            "cameras": [
+                {
+                    "id": "wide",
+                    "position": { "x": 0, "y": 0 },
+                    "viewport": { "width": 320, "height": 180 }
+                },
+                {
+                    "id": "follow-player",
+                    "position": { "x": 10, "y": 20 },
+                    "viewport": { "width": 160, "height": 90 },
+                    "followTarget": "player",
+                    "clampBounds": { "x": 0, "y": 0, "width": 640, "height": 360 },
+                    "deadZone": { "width": 32, "height": 24 },
+                    "zoom": 125
+                }
+            ],
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 0, "y": 0 },
+                "viewport": { "width": 320, "height": 180 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "sky", "order": -10, "parallaxFactor": 50 },
+                    { "id": "actors", "order": 0, "cameraParticipation": true },
+                    { "id": "hud", "order": 10, "cameraParticipation": false }
+                ]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "layer": "actors" },
+                "components": {
+                    "transform": { "x": 32, "y": 72 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "cameraTarget": { "weight": 2, "deadZone": { "width": 16, "height": 12 } }
+                }
+            }]
+        }))
+        .expect("camera scene parses");
+        validate_scene(&scene).expect("camera model validates");
+        assert_eq!(
+            scene.renderer.as_ref().unwrap().layers[0].parallax_factor,
+            50
+        );
+        assert!(!scene.renderer.as_ref().unwrap().layers[2].camera_participation);
+        let normalized = scene_normalized_cameras(&scene);
+        assert_eq!(
+            normalized
+                .iter()
+                .map(|camera| (camera.id.as_str(), camera.active, camera.zoom))
+                .collect::<Vec<_>>(),
+            vec![("wide", false, 100), ("follow-player", true, 125)]
+        );
+        let active = normalized
+            .iter()
+            .find(|camera| camera.active)
+            .expect("active camera exists");
+        assert_eq!(active.follow_target.as_deref(), Some("player"));
+        assert_eq!(active.dead_zone.as_ref().unwrap().width, 32);
+        assert_eq!(active.clamp_bounds.as_ref().unwrap().width, 640);
+    }
+
+    #[test]
+    fn scene_camera_model_v1_rejects_malformed_camera_and_layer_metadata() {
+        let base_scene = json!({
+            "schemaVersion": "1",
+            "id": "camera-model-invalid",
+            "bounds": { "width": 320, "height": 180 },
+            "activeCameraId": "main",
+            "cameras": [{
+                "id": "main",
+                "position": { "x": 0, "y": 0 },
+                "viewport": { "width": 160, "height": 90 },
+                "followTarget": "player",
+                "clampBounds": { "x": 0, "y": 0, "width": 320, "height": 180 },
+                "deadZone": { "width": 16, "height": 16 },
+                "zoom": 100
+            }],
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 0, "y": 0 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [{ "id": "actors", "order": 0, "parallaxFactor": 100 }]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "layer": "actors" },
+                "components": {
+                    "transform": { "x": 32, "y": 72 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true
+                }
+            }]
+        });
+        let scene: SceneDocument =
+            serde_json::from_value(base_scene.clone()).expect("base camera scene parses");
+        validate_scene(&scene).expect("base camera scene validates");
+
+        let mut active_missing = base_scene.clone();
+        active_missing["activeCameraId"] = json!("missing");
+        let scene: SceneDocument =
+            serde_json::from_value(active_missing).expect("active-missing scene parses");
+        let rejected = validate_scene(&scene).expect_err("unknown active camera rejected");
+        assert!(rejected
+            .to_string()
+            .contains("activeCameraId references unknown camera"));
+
+        let mut follow_missing = base_scene.clone();
+        follow_missing["cameras"][0]["followTarget"] = json!("ghost");
+        let scene: SceneDocument =
+            serde_json::from_value(follow_missing).expect("follow-missing scene parses");
+        let rejected = validate_scene(&scene).expect_err("unknown follow target rejected");
+        assert!(rejected
+            .to_string()
+            .contains("followTarget references unknown entity"));
+
+        let mut oversized_viewport = base_scene.clone();
+        oversized_viewport["cameras"][0]["viewport"] = json!({ "width": 640, "height": 90 });
+        let scene: SceneDocument =
+            serde_json::from_value(oversized_viewport).expect("oversized viewport scene parses");
+        let rejected = validate_scene(&scene).expect_err("oversized camera viewport rejected");
+        assert!(rejected
+            .to_string()
+            .contains("camera main viewport must fit inside scene bounds"));
+
+        let mut small_clamp = base_scene.clone();
+        small_clamp["cameras"][0]["clampBounds"] =
+            json!({ "x": 0, "y": 0, "width": 80, "height": 90 });
+        let scene: SceneDocument =
+            serde_json::from_value(small_clamp).expect("small clamp scene parses");
+        let rejected = validate_scene(&scene).expect_err("small clamp rejected");
+        assert!(rejected
+            .to_string()
+            .contains("clampBounds must contain the viewport"));
+
+        let mut bad_dead_zone = base_scene.clone();
+        bad_dead_zone["cameras"][0]["deadZone"] = json!({ "width": 200, "height": 16 });
+        let scene: SceneDocument =
+            serde_json::from_value(bad_dead_zone).expect("bad dead zone scene parses");
+        let rejected = validate_scene(&scene).expect_err("dead zone rejected");
+        assert!(rejected
+            .to_string()
+            .contains("deadZone must fit inside viewport"));
+
+        let mut bad_zoom = base_scene.clone();
+        bad_zoom["cameras"][0]["zoom"] = json!(0);
+        let scene: SceneDocument = serde_json::from_value(bad_zoom).expect("bad zoom scene parses");
+        let rejected = validate_scene(&scene).expect_err("zoom rejected");
+        assert!(rejected
+            .to_string()
+            .contains("zoom must be between 1 and 400"));
+
+        let mut bad_parallax = base_scene;
+        bad_parallax["renderer"]["layers"][0]["parallaxFactor"] = json!(0);
+        let scene: SceneDocument =
+            serde_json::from_value(bad_parallax).expect("bad parallax scene parses");
+        let rejected = validate_scene(&scene).expect_err("parallax rejected");
+        assert!(rejected
+            .to_string()
+            .contains("parallaxFactor must be between 1 and 1000"));
     }
 
     #[test]
