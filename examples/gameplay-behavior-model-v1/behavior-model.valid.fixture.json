@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "gameplay-behavior-model.v1",
+  "behaviorPackId": "demo-gameplay-behaviors",
+  "scope": "local-fixture",
+  "status": "ready",
+  "behaviors": [
+    {
+      "id": "patrol-guard-route-a",
+      "label": "Patrol guard route A",
+      "status": "ready",
+      "target": { "entityId": "guard_a", "componentId": "patrol_controller" },
+      "triggers": [{ "kind": "on_start" }],
+      "conditions": [{ "kind": "entity_alive", "entityId": "guard_a" }],
+      "actions": [{ "kind": "move_along_path", "pathId": "route_a", "mode": "loop" }],
+      "variables": { "speed": { "type": "number", "value": 42 } },
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#supported-vocabulary-for-v1-fixtures"],
+      "blockedReasons": []
+    },
+    {
+      "id": "collect-keycard",
+      "label": "Collect keycard",
+      "status": "ready",
+      "target": { "entityId": "keycard_blue" },
+      "triggers": [{ "kind": "on_collect", "collectorEntityId": "player", "itemEntityId": "keycard_blue" }],
+      "conditions": [{ "kind": "objective_incomplete", "objectiveId": "collect_keycard" }],
+      "actions": [
+        { "kind": "set_flag", "flag": "has_blue_keycard", "value": true },
+        { "kind": "complete_objective", "objectiveId": "collect_keycard" }
+      ],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#artifact-shape"],
+      "blockedReasons": []
+    },
+    {
+      "id": "spike-damage-contact",
+      "label": "Damage on spike contact",
+      "status": "ready",
+      "target": { "entityId": "spike_trap" },
+      "triggers": [{ "kind": "on_contact", "sourceEntityId": "player", "targetEntityId": "spike_trap" }],
+      "conditions": [{ "kind": "cooldown_ready", "cooldownId": "spike_damage_cd" }],
+      "actions": [
+        { "kind": "damage", "entityId": "player", "amount": 1 },
+        { "kind": "start_cooldown", "cooldownId": "spike_damage_cd" }
+      ],
+      "variables": {},
+      "cooldowns": [{ "id": "spike_damage_cd", "durationMs": 750 }],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#bounded-behavior-target"],
+      "blockedReasons": []
+    },
+    {
+      "id": "open-blue-door",
+      "label": "Door opens on flag",
+      "status": "ready",
+      "target": { "entityId": "blue_door" },
+      "triggers": [{ "kind": "on_flag_changed", "flag": "has_blue_keycard" }],
+      "conditions": [{ "kind": "flag_equals", "flag": "has_blue_keycard", "value": true }],
+      "actions": [{ "kind": "open_door", "entityId": "blue_door" }],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#supported-vocabulary-for-v1-fixtures"],
+      "blockedReasons": []
+    },
+    {
+      "id": "win-after-exit",
+      "label": "Win condition at exit",
+      "status": "ready",
+      "target": { "entityId": "exit_zone" },
+      "triggers": [{ "kind": "on_contact", "sourceEntityId": "player", "targetEntityId": "exit_zone" }],
+      "conditions": [{ "kind": "flag_equals", "flag": "has_blue_keycard", "value": true }],
+      "actions": [{ "kind": "complete_objective", "objectiveId": "escape" }],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#compatibility-and-read-model-notes"],
+      "blockedReasons": []
+    },
+    {
+      "id": "timed-hazard-pulse",
+      "label": "Timed hazard pulse",
+      "status": "ready",
+      "target": { "entityId": "hazard_emitter" },
+      "triggers": [{ "kind": "on_timer", "timerId": "hazard_pulse_timer" }],
+      "conditions": [{ "kind": "timer_elapsed", "timerId": "hazard_pulse_timer" }],
+      "actions": [{ "kind": "spawn_local_effect", "effectId": "hazard_pulse_vfx", "atEntityId": "hazard_emitter" }],
+      "variables": {},
+      "cooldowns": [],
+      "timers": [{ "id": "hazard_pulse_timer", "durationMs": 2000, "repeat": true }],
+      "evidenceRefs": ["docs/gameplay-behavior-model-v1.md#supported-vocabulary-for-v1-fixtures"],
+      "blockedReasons": []
+    },
+    {
+      "id": "dash-ability-trigger",
+      "label": "Simple ability trigger",
+      "status": "ready",
+      "target": { "entityId": "player", "componentId": "ability_dash" },
+      "triggers": [{ "kind": "on_input", "action": "dash" }],
+      "conditions": [{ "kind": "cooldown_ready", "cooldownId": "dash_cd" }],
+      "actions": [
+        { "kind": "emit_signal", "signal": "ability_dash_requested", "payload": { "entityId": "player" } },
+        { "kind": "start_cooldown", "cooldownId": "dash_cd" }
+      ],
+      "variables": { "dashDistance": { "type": "number", "value": 96 } },
+      "cooldowns": [{ "id": "dash_cd", "durationMs": 1250 }],
+      "timers": [],
+      "evidenceRefs": ["docs/gameplay-scripting-logic-system-v1.md#bounded-behavior-target"],
+      "blockedReasons": []
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-behavior-model-v1.md"],
+  "blockedReasons": []
+}

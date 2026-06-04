@@ -1472,6 +1472,30 @@ assert.match(gameplayLogicScopeDoc, /#23 remains the memory\/governance anchor/)
 assert.doesNotMatch(gameplayLogicScopeDoc, /arbitrary script execution is authorized|eval is allowed|dynamic import is allowed|plugin loader is implemented|command bridge enabled|trusted browser write enabled|production-stable scripting API is implemented/);
 assert.match(docsReadme, /gameplay-scripting-logic-system-v1\.md/);
 assert.match(docsReadme, /no arbitrary script execution, plugin loader, command bridge, or production-stable scripting API claim/);
+const gameplayBehaviorModelDoc = fs.readFileSync(require.resolve('../../docs/gameplay-behavior-model-v1.md'), 'utf8');
+assert.match(gameplayBehaviorModelDoc, /Issue: #612/);
+assert.match(gameplayBehaviorModelDoc, /data-first contract/);
+assert.match(gameplayBehaviorModelDoc, /behavior ids, target entities\/components, triggers,\s+conditions, actions, variables, cooldowns\/timers, evidence links, and blocked\s+reasons/);
+assert.match(gameplayBehaviorModelDoc, /patrol, collect item, damage on contact, door opens\s+on flag, win condition, timed hazard, and simple ability trigger/);
+assert.match(gameplayBehaviorModelDoc, /must not contain executable script bodies, `eval`, dynamic\s+imports, plugin loader instructions, command strings/);
+assert.match(gameplayBehaviorModelDoc, /GL10\.2\.2 should validate duplicate ids, unsafe targets, unsupported actions/);
+assert.match(gameplayBehaviorModelDoc, /#1 remains the roadmap\/final-goal anchor/);
+assert.match(gameplayBehaviorModelDoc, /#23 remains the\s+memory\/governance anchor/);
+assert.doesNotMatch(gameplayBehaviorModelDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
+const gameplayBehaviorFixture = JSON.parse(fs.readFileSync(require.resolve('../../examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json'), 'utf8'));
+assert.equal(gameplayBehaviorFixture.schemaVersion, 'gameplay-behavior-model.v1');
+assert.deepEqual(gameplayBehaviorFixture.behaviors.map((behavior) => behavior.id), [
+  'patrol-guard-route-a',
+  'collect-keycard',
+  'spike-damage-contact',
+  'open-blue-door',
+  'win-after-exit',
+  'timed-hazard-pulse',
+  'dash-ability-trigger'
+]);
+assert.doesNotMatch(JSON.stringify(gameplayBehaviorFixture), /execute_script|plugin_loader|dynamic_import|eval\(|commandBridge|trustedWrite/);
+assert.match(docsReadme, /gameplay-behavior-model-v1\.md/);
+assert.match(docsReadme, /no executable scripts, plugin loaders, or command bridges/);
 const studio3dInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-3d-inspection-surface-v1.md'), 'utf8');
 assert.match(studio3dInspectionDoc, /Issue: #607/);
 assert.match(studio3dInspectionDoc, /no-write, no-command, no-3D-editor boundary/);
