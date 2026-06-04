@@ -52,3 +52,28 @@ assert.deepEqual(JSON.parse(JSON.stringify(frameTransition.payload.to)), {
   frameIndex: 1,
   elapsedFrames: 2,
 });
+
+
+const stateScene = JSON.parse(JSON.stringify(scene));
+const playerAnimation = stateScene.entities.find((entity) => entity.id === 'player').components.animation;
+playerAnimation.stateClips = { idle: 'idle', run: 'run' };
+playerAnimation.clips.push({
+  id: 'run',
+  frameDuration: 1,
+  loop: true,
+  frames: [
+    { color: '#38bdf8', asset: 'player-sprite' },
+    { color: '#0284c7', asset: 'player-sprite' },
+  ],
+});
+const statefulApi = createRuntime();
+statefulApi.loadScene(stateScene);
+statefulApi.setInput({ right: true });
+const statefulWorld = statefulApi.step(1);
+const statefulPlayer = statefulWorld.entities.find((entity) => entity.id === 'player');
+assert.equal(statefulPlayer.components.animation.state.activeState, 'run');
+assert.equal(statefulPlayer.components.animation.state.currentClip, 'run');
+const stateTransition = statefulApi.getEvents().find((event) => event.type === 'runtime.animation.state' && event.payload.activeState === 'run');
+assert.ok(stateTransition, 'runtime emits active animation state transition evidence');
+assert.equal(stateTransition.payload.from.activeState, 'idle');
+assert.equal(stateTransition.payload.to.activeState, 'run');

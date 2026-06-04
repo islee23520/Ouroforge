@@ -23,6 +23,17 @@
     };
   }
 
+  function normalizeStateClips(animation = {}) {
+    const source = animation.stateClips && typeof animation.stateClips === 'object' && !Array.isArray(animation.stateClips)
+      ? animation.stateClips
+      : {};
+    const normalized = {};
+    for (const [stateName, clipId] of Object.entries(source)) {
+      if (typeof stateName === 'string' && stateName && typeof clipId === 'string' && clipId) normalized[stateName] = clipId;
+    }
+    return normalized;
+  }
+
   function normalizeAnimation(animation) {
     if (!animation || animation.mode !== 'sprite_frame') return null;
     const defaultFrameDuration = Number.isFinite(animation.frameDuration) && animation.frameDuration > 0
@@ -47,26 +58,38 @@
     if (clips.length === 0) return null;
     const requestedClip = typeof animation.currentClip === 'string' ? animation.currentClip : null;
     const stateClip = animation.state && typeof animation.state.currentClip === 'string' ? animation.state.currentClip : null;
-    const currentClip = clips.some((clip) => clip.id === (stateClip || requestedClip))
-      ? (stateClip || requestedClip)
+    const stateClips = normalizeStateClips(animation);
+    const activeState = animation.state && typeof animation.state.activeState === 'string' && stateClips[animation.state.activeState]
+      ? animation.state.activeState
+      : Object.keys(stateClips).find((stateName) => stateClips[stateName] === (stateClip || requestedClip)) || null;
+    const stateMappedClip = activeState ? stateClips[activeState] : null;
+    const selectedClip = stateMappedClip || stateClip || requestedClip;
+    const currentClip = clips.some((clip) => clip.id === selectedClip)
+      ? selectedClip
       : clips[0].id;
     const activeClip = clips.find((clip) => clip.id === currentClip) || clips[0];
     const requestedFrameIndex = animation.state && Number.isInteger(animation.state.frameIndex) ? animation.state.frameIndex : 0;
-    return {
+    const state = {
+      currentClip,
+      elapsedFrames: animation.state && Number.isInteger(animation.state.elapsedFrames) && animation.state.elapsedFrames > 0
+        ? animation.state.elapsedFrames
+        : 0,
+      frameIndex: Math.max(0, Math.min(requestedFrameIndex, activeClip.frames.length - 1)),
+    };
+    const result = {
       mode: 'sprite_frame',
       frameDuration: defaultFrameDuration,
       loop: animation.loop !== false,
       frames: activeClip.frames.map(clone),
       clips,
       currentClip,
-      state: {
-        currentClip,
-        elapsedFrames: animation.state && Number.isInteger(animation.state.elapsedFrames) && animation.state.elapsedFrames > 0
-          ? animation.state.elapsedFrames
-          : 0,
-        frameIndex: Math.max(0, Math.min(requestedFrameIndex, activeClip.frames.length - 1)),
-      },
+      state,
     };
+    if (Object.keys(stateClips).length > 0) {
+      result.stateClips = stateClips;
+      result.state.activeState = activeState;
+    }
+    return result;
   }
 
   function activeClip(animation) {
@@ -78,7 +101,40 @@
       || null;
   }
 
-  function advanceAnimation(animation, frames = 1) {
+  function inferAnimationState(entity) {
+    const component = entity && entity.components ? entity.components : {};
+    const animation = component.animation;
+    const stateClips = animation && animation.stateClips && typeof animation.stateClips === 'object' ? animation.stateClips : {};
+    if (Object.keys(stateClips).length === 0) return null;
+    const statusStates = component.status && Array.isArray(component.status.states) ? component.status.states : [];
+    if (statusStates.includes('hit') || statusStates.includes('damaged')) return stateClips.hit ? 'hit' : null;
+    if (statusStates.includes('collect') || statusStates.includes('collected')) return stateClips.collect ? 'collect' : null;
+    const velocity = component.velocity || {};
+    if (Number.isFinite(velocity.y) && velocity.y < 0 && stateClips.jump) return 'jump';
+    if (Number.isFinite(velocity.x) && velocity.x !== 0 && stateClips.run) return 'run';
+    return stateClips.idle ? 'idle' : null;
+  }
+
+  function setAnimationState(animation, stateName) {
+    if (!animation || !stateName || !animation.stateClips || !animation.stateClips[stateName]) return false;
+    const clipId = animation.stateClips[stateName];
+    const clip = Array.isArray(animation.clips) ? animation.clips.find((candidate) => candidate.id === clipId) : null;
+    if (!clip || clip.frames.length === 0) return false;
+    const priorClip = animation.state && animation.state.currentClip;
+    if (!animation.state) animation.state = { currentClip: clipId, elapsedFrames: 0, frameIndex: 0, activeState: stateName };
+    if (priorClip !== clipId) {
+      animation.state.elapsedFrames = 0;
+      animation.state.frameIndex = 0;
+    }
+    animation.state.activeState = stateName;
+    animation.state.currentClip = clipId;
+    animation.currentClip = clipId;
+    animation.frames = clip.frames.map(clone);
+    return priorClip !== clipId;
+  }
+
+  function advanceAnimation(animation, frames = 1, context = {}) {
+    if (context && context.stateName) setAnimationState(animation, context.stateName);
     const clip = activeClip(animation);
     if (!animation || !clip || clip.frames.length === 0) return null;
     const stepCount = Number.isFinite(frames) ? Math.max(0, Math.floor(frames)) : 0;
@@ -105,11 +161,12 @@
 
   function advanceAnimations(entities, frames = 1) {
     for (const entity of entities) {
-      advanceAnimation(entity.components && entity.components.animation, frames);
+      const stateName = inferAnimationState(entity);
+      advanceAnimation(entity.components && entity.components.animation, frames, { stateName });
     }
   }
 
-  const api = Object.freeze({ normalizeAnimation, advanceAnimation, advanceAnimations, activeSpriteFrame });
+  const api = Object.freeze({ normalizeAnimation, inferAnimationState, setAnimationState, advanceAnimation, advanceAnimations, activeSpriteFrame });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeAnimation = api;
 })(typeof window !== 'undefined' ? window : globalThis);

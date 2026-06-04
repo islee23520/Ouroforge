@@ -30403,6 +30403,12 @@ pub struct SceneAnimation {
         skip_serializing_if = "Option::is_none"
     )]
     pub current_clip: Option<String>,
+    #[serde(
+        default,
+        rename = "stateClips",
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub state_clips: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<SceneAnimationState>,
 }
@@ -34558,6 +34564,21 @@ fn validate_scene_animation(
         if !clip_ids.contains(current_clip) {
             return Err(anyhow!(
                 "scene entity {entity_id} animation currentClip references unknown clip: {current_clip}"
+            ));
+        }
+    }
+    for (state_name, clip_id) in &animation.state_clips {
+        validate_path_component(
+            &format!("scene entity {entity_id} animation stateClips state"),
+            state_name,
+        )?;
+        validate_path_component(
+            &format!("scene entity {entity_id} animation stateClips.{state_name}"),
+            clip_id,
+        )?;
+        if !clip_ids.contains(clip_id) {
+            return Err(anyhow!(
+                "scene entity {entity_id} animation stateClips {state_name} references unknown clip: {clip_id}"
             ));
         }
     }
@@ -58386,6 +58407,7 @@ scenarios:
                         "mode": "sprite_frame",
                         "frameDuration": 2,
                         "currentClip": "idle",
+                        "stateClips": { "idle": "idle" },
                         "clips": [{
                             "id": "idle",
                             "frameDuration": 2,
@@ -58412,6 +58434,24 @@ scenarios:
             animation.clips[0].frames[1].asset.as_deref(),
             Some("player-idle-2")
         );
+        assert_eq!(
+            animation.state_clips.get("idle").map(String::as_str),
+            Some("idle")
+        );
+
+        let mut unknown_state_clip = scene.clone();
+        unknown_state_clip.entities[0]
+            .components
+            .animation
+            .as_mut()
+            .expect("animation")
+            .state_clips
+            .insert("run".to_string(), "missing-run".to_string());
+        let rejected =
+            validate_scene(&unknown_state_clip).expect_err("unknown state clip rejected");
+        assert!(rejected
+            .to_string()
+            .contains("stateClips run references unknown clip"));
 
         let mut unknown_clip = scene.clone();
         unknown_clip.entities[0]

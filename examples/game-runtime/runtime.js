@@ -818,12 +818,14 @@
     const animationComponent = entity && entity.components && entity.components.animation;
     const state = animationComponent && animationComponent.state;
     if (!animationComponent || !state) return null;
-    return {
+    const result = {
       mode: animationComponent.mode,
       currentClip: state.currentClip || animationComponent.currentClip || null,
       frameIndex: Number.isInteger(state.frameIndex) ? state.frameIndex : 0,
       elapsedFrames: Number.isInteger(state.elapsedFrames) ? state.elapsedFrames : 0,
     };
+    if (state.activeState) result.activeState = state.activeState;
+    return result;
   }
 
   function animationStatesByEntity(entities) {
@@ -852,6 +854,7 @@
         from: before,
         to: after,
         currentClip: after.currentClip,
+        ...(after.activeState ? { activeState: after.activeState } : {}),
         frameIndex: after.frameIndex,
         elapsedFrames: after.elapsedFrames,
       });
