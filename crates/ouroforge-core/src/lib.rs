@@ -3707,7 +3707,12 @@ impl AgentHandoffV2 {
                     evidence_ref.id
                 ));
             }
-            evidence_paths.insert(evidence_ref.path.as_str());
+            if !evidence_paths.insert(evidence_ref.path.as_str()) {
+                return Err(anyhow!(
+                    "agent handoff v2 duplicate evidenceLinks path: {}",
+                    evidence_ref.path
+                ));
+            }
         }
         if self.evidence_links.is_empty() {
             return Err(anyhow!("agent handoff v2 evidenceLinks must not be empty"));
@@ -41099,6 +41104,22 @@ scenarios:
         assert!(duplicate_error
             .to_string()
             .contains("duplicate artifactRefs"));
+
+        // Duplicate evidenceLinks path with a distinct id must still be rejected
+        // (ids and paths are both deduplicated, matching artifactRefs).
+        let mut duplicate_evidence_path = base.clone();
+        let mut duplicated_evidence = duplicate_evidence_path["evidenceLinks"][0].clone();
+        duplicated_evidence["id"] = json!("evidence-distinct-id");
+        duplicate_evidence_path["evidenceLinks"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicated_evidence);
+        let evidence_path_error =
+            AgentHandoffV2::from_json_str(&duplicate_evidence_path.to_string())
+                .expect_err("duplicate evidence paths reject handoff v2");
+        assert!(evidence_path_error
+            .to_string()
+            .contains("duplicate evidenceLinks path"));
 
         let mut malformed_assumption = base.clone();
         malformed_assumption["assumptions"][0] = json!("");
