@@ -482,6 +482,33 @@ const run = {
   journal: '# Journal',
 };
 
+run.mutation_artifacts.push({
+  id: 'source-patch-stale-target-guard',
+  kind: 'application/json',
+  path: 'mutation/source-patch-stale-target-guard.json',
+  metadata: { read_only: true },
+  value: {
+    guardId: 'stale-guard-1',
+    status: 'fresh',
+    evidenceFreshness: {
+      patchPreviewRef: 'mutation/preview.json',
+      sandboxReportRef: 'sandbox/preview-1/evidence/report.json',
+      reviewDecisionRef: 'mutation/review-decision.json',
+      fileClassReportRef: 'evidence/file-class.json',
+      diffIntegrityReportRef: 'evidence/diff.json',
+      applyTransactionRef: 'mutation/source-patch-apply-transaction.json',
+    },
+    worktreeContextRef: 'evidence/source-apply-worktree-context.json',
+    targets: [{ path: 'examples/source-patch-apply-transaction-v1/scenario-regression.json', fileClass: 'scenario_regression_fixture', fileStatus: 'exists_and_matches_expected_before_hash' }],
+    readModel: {
+      status: 'fresh_current_targets_and_linked_evidence_no_apply_authority',
+      readinessLabel: 'fresh_guard_metadata_only_no_apply_authority',
+      blockedReasons: [],
+      forbiddenActions: ['apply_patch', 'merge_branch', 'execute_command', 'write_trusted_file', 'browser_command_bridge'],
+    },
+  },
+});
+
 assert.equal(dashboard.statusClass('passed'), 'status status-passed');
 assert.equal(dashboard.artifactHref(run.evidence[0], run), '../../runs/run-1/evidence/a.json');
 const runList = dashboard.renderRunList([run], 'run-1');
@@ -781,4 +808,9 @@ assert.match(dashboard.renderSourcePatchApplyTransactions(run), /apply-tx-1/);
 assert.match(dashboard.renderSourcePatchApplyTransactions(run), /ready_metadata_only_no_apply_authority/);
 assert.match(dashboard.renderSourcePatchApplyTransactions(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchApplyTransactions(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /Source patch stale target guard/);
+assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /stale-guard-1/);
+assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /fresh_guard_metadata_only_no_apply_authority/);
+assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /apply_patch/);
+assert.doesNotMatch(dashboard.renderSourcePatchStaleTargetGuards(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(dashboard.renderRunDetail(run), /Source patch evidence bundle/);
