@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "gameplay-event-signal-system.v1",
+  "eventLogId": "demo-event-log-partial",
+  "scope": "local-fixture",
+  "status": "partial",
+  "events": [
+    {
+      "id": "hazard-pulse-timer-unconsumed",
+      "eventType": "timer_elapsed",
+      "signalName": "timer_elapsed",
+      "source": {
+        "timerId": "hazard-pulse"
+      },
+      "target": {
+        "entityId": "spike-trap-a",
+        "behaviorId": "timed-hazard-pulse"
+      },
+      "payload": {
+        "durationMs": 1500,
+        "repeat": true
+      },
+      "tick": 45,
+      "timestampUnixMs": 1700000000045,
+      "orderingIndex": 0,
+      "consumed": false,
+      "blockedReason": "Timer event is captured before GL10.3.2 queue consumption rules.",
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ],
+      "consumedBy": []
+    }
+  ],
+  "evidenceRefs": [
+    "docs/gameplay-event-signal-system-v1.md"
+  ],
+  "blockedReasons": []
+}

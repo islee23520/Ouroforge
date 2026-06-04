@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "gameplay-event-signal-system.v1",
+  "eventLogId": "invalid-event-log",
+  "scope": "local-fixture",
+  "status": "ready",
+  "events": [
+    {
+      "id": "bad-event",
+      "eventType": "execute_script",
+      "signalName": "run_script",
+      "source": {},
+      "target": {},
+      "payload": {
+        "evalScript": "eval(alert(1))",
+        "plugin_loader": "dynamic_import"
+      },
+      "tick": 0,
+      "orderingIndex": 0,
+      "consumed": false,
+      "consumedBy": [
+        "ghost"
+      ],
+      "evidenceRefs": [
+        "../unsafe"
+      ]
+    }
+  ],
+  "evidenceRefs": [],
+  "blockedReasons": [
+    "negative fixture only; not valid model data"
+  ]
+}

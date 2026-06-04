@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "gameplay-event-signal-system.v1",
+  "eventLogId": "demo-event-log-blocked",
+  "scope": "local-fixture",
+  "status": "blocked",
+  "events": [
+    {
+      "id": "missing-target-event",
+      "eventType": "collision_contact",
+      "signalName": "player_contacted_hazard",
+      "source": {
+        "entityId": "spike-trap-a",
+        "componentId": "collision"
+      },
+      "target": {
+        "entityId": "missing-target"
+      },
+      "payload": {
+        "normal": {
+          "x": 0,
+          "y": -1
+        },
+        "damage": 1
+      },
+      "tick": 42,
+      "timestampUnixMs": 1700000000042,
+      "orderingIndex": 0,
+      "consumed": false,
+      "consumedBy": [],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ],
+      "blockedReason": "Target entity is unresolved until GL10.3.2 runtime compatibility work."
+    }
+  ],
+  "evidenceRefs": [
+    "docs/gameplay-event-signal-system-v1.md"
+  ],
+  "blockedReasons": [
+    "Event routing is blocked until target resolution evidence exists."
+  ]
+}

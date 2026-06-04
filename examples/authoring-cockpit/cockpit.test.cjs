@@ -1590,6 +1590,26 @@ assert.match(docsReadme, /no executable scripts, plugin loaders, or command brid
 assert.match(gameplayBehaviorModelDoc, /read-model\/export compatibility notes/);
 assert.match(gameplayBehaviorModelDoc, /gameplay-behavior-model-read-model\.v1/);
 assert.match(gameplayBehaviorModelDoc, /no runtime execution, no\s+script execution, no command bridge, no browser trusted writes, no source\s+apply/);
+const gameplayEventSignalDoc = fs.readFileSync(require.resolve('../../docs/gameplay-event-signal-system-v1.md'), 'utf8');
+const gameplayEventSignalFixture = JSON.parse(fs.readFileSync(require.resolve('../../examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json'), 'utf8'));
+assert.equal(gameplayEventSignalFixture.schemaVersion, 'gameplay-event-signal-system.v1');
+assert.deepEqual(gameplayEventSignalFixture.events.map((event) => event.eventType), [
+  'collision_contact',
+  'item_collected',
+  'flag_changed',
+  'timer_elapsed',
+  'input_action',
+  'state_changed'
+]);
+assert.doesNotMatch(JSON.stringify(gameplayEventSignalFixture), /execute_script|plugin_loader|dynamic_import|eval\(|commandBridge|trustedWrite/);
+assert.match(docsReadme, /gameplay-event-signal-system-v1\.md/);
+assert.match(docsReadme, /deterministic event\/signal artifact schema/);
+assert.match(gameplayEventSignalDoc, /Issue: #613/);
+assert.match(gameplayEventSignalDoc, /no executable expressions, script bodies, command\s+text/);
+assert.match(gameplayEventSignalDoc, /GL10\.3\.1 defines the model and validation fixtures only/);
+assert.match(gameplayEventSignalDoc, /#1 remains the roadmap\/final-goal anchor/);
+assert.match(gameplayEventSignalDoc, /#23 remains the\s+memory\/governance anchor/);
+assert.doesNotMatch(gameplayEventSignalDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
 const studio3dInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-3d-inspection-surface-v1.md'), 'utf8');
 assert.match(studio3dInspectionDoc, /Issue: #607/);
 assert.match(studio3dInspectionDoc, /no-write, no-command, no-3D-editor boundary/);
