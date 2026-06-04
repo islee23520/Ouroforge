@@ -302,6 +302,170 @@
     };
   }
 
+  function vector3(value = {}, fallback = { x: 0, y: 0, z: 0 }) {
+    return {
+      x: Number.isFinite(value.x) ? value.x : fallback.x,
+      y: Number.isFinite(value.y) ? value.y : fallback.y,
+      z: Number.isFinite(value.z) ? value.z : fallback.z,
+    };
+  }
+
+  function scene3dActiveCamera(scene3d = {}) {
+    const cameras = Array.isArray(scene3d.cameras) ? scene3d.cameras : [];
+    if (cameras.length === 0) return null;
+    return cameras.find((camera) => camera && camera.id === scene3d.activeCameraId)
+      || cameras.find((camera) => camera && camera.active)
+      || cameras[0];
+  }
+
+  function scene3dProjectPoint(point3d, camera = {}, viewport = { x: 0, y: 0, width: 320, height: 180 }) {
+    const cameraTransform = camera.transform || {};
+    const cameraPosition = vector3(cameraTransform.translation, { x: 0, y: 0, z: 0 });
+    const relative = {
+      x: point3d.x - cameraPosition.x,
+      y: point3d.y - cameraPosition.y,
+      z: point3d.z - cameraPosition.z,
+    };
+    const depth = Math.max(1, Math.abs(relative.z));
+    const projection = camera.projection || {};
+    const scale = projection.kind === 'orthographic'
+      ? Math.max(1, Number(projection.orthographicHeight) || viewport.height || 1)
+      : Math.max(1, Number(projection.fovDegrees) || 60);
+    return {
+      x: Math.round((viewport.x || 0) + (viewport.width / 2) + ((relative.x * viewport.width) / (scale * 2))),
+      y: Math.round((viewport.y || 0) + (viewport.height / 2) - ((relative.y * viewport.height) / (scale * 2))),
+      depth,
+    };
+  }
+
+  function scene3dRenderSummary({ world = {}, frameId = `tick-${world.tick ?? 0}` } = {}) {
+    const scene3d = world && world.scene3d && typeof world.scene3d === 'object' && !Array.isArray(world.scene3d)
+      ? world.scene3d
+      : null;
+    if (!scene3d) {
+      return {
+        schemaVersion: 'ouroforge.scene3d-render-smoke.v1',
+        present: false,
+        frameId: String(frameId),
+        sceneId: String(world.sceneId || 'unknown-scene'),
+        cameraId: null,
+        meshCount: 0,
+        materialCount: 0,
+        attemptedObjectCount: 0,
+        visibleObjectCount: 0,
+        skippedObjectCount: 0,
+        failedObjectCount: 0,
+        screenshotArtifact: null,
+        renderables: [],
+        fallbackReasons: ['scene3d graph unavailable'],
+        boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
+      };
+    }
+    const meshes = Array.isArray(scene3d.meshes) ? scene3d.meshes : [];
+    const materials = Array.isArray(scene3d.materials) ? scene3d.materials : [];
+    const nodes = Array.isArray(scene3d.nodes) ? scene3d.nodes : [];
+    const meshById = new Map(meshes.filter((mesh) => mesh && typeof mesh.id === 'string').map((mesh) => [mesh.id, mesh]));
+    const materialById = new Map(materials.filter((material) => material && typeof material.id === 'string').map((material) => [material.id, material]));
+    const activeCamera = scene3dActiveCamera(scene3d);
+    const viewport = activeCamera && activeCamera.viewport && Number.isFinite(activeCamera.viewport.width) && Number.isFinite(activeCamera.viewport.height)
+      ? {
+        x: Number.isFinite(activeCamera.viewport.x) ? activeCamera.viewport.x : 0,
+        y: Number.isFinite(activeCamera.viewport.y) ? activeCamera.viewport.y : 0,
+        width: activeCamera.viewport.width,
+        height: activeCamera.viewport.height,
+      }
+      : { x: 0, y: 0, width: world.bounds && world.bounds.width ? world.bounds.width : 320, height: world.bounds && world.bounds.height ? world.bounds.height : 180 };
+    const renderables = [];
+    const fallbackReasons = [];
+    for (const node of nodes) {
+      const nodeId = String(node && node.id || `node-${renderables.length}`);
+      const meshRef = node && typeof node.meshRef === 'string' ? node.meshRef : null;
+      if (!meshRef) continue;
+      const mesh = meshById.get(meshRef);
+      const nodeMaterialRef = node && typeof node.materialRef === 'string' ? node.materialRef : null;
+      const meshMaterialRef = mesh && typeof mesh.materialRef === 'string' ? mesh.materialRef : null;
+      const materialRef = nodeMaterialRef || meshMaterialRef;
+      const material = materialRef ? materialById.get(materialRef) : null;
+      const transform = node && node.worldTransform ? node.worldTransform : (node && node.localTransform ? node.localTransform : {});
+      const translation = vector3(transform.translation);
+      const screen = activeCamera ? scene3dProjectPoint(translation, activeCamera, viewport) : null;
+      let visible = true;
+      let fallbackReason = null;
+      if (!activeCamera) {
+        visible = false;
+        fallbackReason = 'missing active 3d camera';
+      } else if (!mesh) {
+        visible = false;
+        fallbackReason = `missing mesh ${meshRef}`;
+      } else if (mesh.kind !== 'primitive') {
+        visible = false;
+        fallbackReason = `unsupported smoke mesh kind ${mesh.kind || 'unknown'}`;
+      } else if (!['cube', 'plane', 'triangle'].includes(mesh.primitive)) {
+        visible = false;
+        fallbackReason = `unsupported primitive ${mesh.primitive || 'unknown'}`;
+      } else if (materialRef && !material) {
+        visible = false;
+        fallbackReason = `missing material ${materialRef}`;
+      }
+      if (fallbackReason) fallbackReasons.push(`${nodeId}: ${fallbackReason}`);
+      renderables.push({
+        id: `scene3d-${nodeId}`,
+        nodeId,
+        meshRef,
+        meshKind: mesh ? mesh.kind : null,
+        primitive: mesh ? (mesh.primitive || null) : null,
+        materialRef,
+        materialKind: material ? material.kind : null,
+        baseColor: material && typeof material.baseColor === 'string' ? material.baseColor : '#44ccff',
+        cameraId: activeCamera ? activeCamera.id : null,
+        screen,
+        depth: screen ? screen.depth : null,
+        visible,
+        fallbackReason,
+      });
+    }
+    renderables.sort((left, right) => (
+      (left.visible === right.visible ? 0 : (left.visible ? -1 : 1))
+      || ((left.depth || 0) - (right.depth || 0))
+      || compareCodeUnits(left.id, right.id)
+    ));
+    const visibleCount = renderables.filter((renderable) => renderable.visible).length;
+    const skippedCount = renderables.filter((renderable) => renderable.visible === false).length;
+    return {
+      schemaVersion: 'ouroforge.scene3d-render-smoke.v1',
+      present: true,
+      frameId: String(frameId),
+      sceneId: String(world.sceneId || 'unknown-scene'),
+      cameraId: activeCamera ? activeCamera.id : null,
+      meshCount: meshes.length,
+      materialCount: materials.length,
+      attemptedObjectCount: renderables.length,
+      visibleObjectCount: visibleCount,
+      skippedObjectCount: skippedCount,
+      failedObjectCount: 0,
+      screenshotArtifact: null,
+      renderables,
+      fallbackReasons,
+      boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
+    };
+  }
+
+  function drawScene3dSmoke({ context, summary }) {
+    if (!context || !summary || !Array.isArray(summary.renderables)) return;
+    for (const renderable of summary.renderables) {
+      if (renderable.visible === false || !renderable.screen) continue;
+      const markerSize = renderable.primitive === 'plane' ? 10 : (renderable.primitive === 'triangle' ? 8 : 12);
+      const x = renderable.screen.x - Math.floor(markerSize / 2);
+      const y = renderable.screen.y - Math.floor(markerSize / 2);
+      context.fillStyle = renderable.baseColor || '#44ccff';
+      context.fillRect(x, y, markerSize, markerSize);
+      if (typeof context.strokeRect === 'function') {
+        context.strokeStyle = '#0f172a';
+        context.strokeRect(x, y, markerSize, markerSize);
+      }
+    }
+  }
+
   function compareBreakdowns(before = {}, after = {}) {
     const key = (element) => `${element.sceneId || ''}/${element.renderableId || element.entityId || ''}`;
     const beforeElements = new Map((before.elements || []).map((element) => [key(element), element]));
@@ -464,6 +628,10 @@
         drawDebugRenderable({ context, renderer: activeRenderer, entity: debugEntity, primitiveKind: renderable.primitiveKind, world });
       }
     }
+    drawScene3dSmoke({
+      context,
+      summary: scene3dRenderSummary({ world, frameId: `tick-${world.tick ?? 0}` }),
+    });
     context.fillStyle = '#f2f6f8';
     context.font = '10px ui-monospace, monospace';
     context.fillText(`scene=${world.sceneId} tick=${world.tick}`, 8, 14);
@@ -472,7 +640,7 @@
       .map((renderable) => ({ entityId: renderable.sourceId, layer: renderable.layer, layerOrder: renderable.layerOrder, spriteOrder: renderable.localOrder }));
   }
 
-  const api = Object.freeze({ normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer, clone });
+  const api = Object.freeze({ normalizeRenderer, renderOrder, renderQueue, renderBreakdown, scene3dRenderSummary, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer, clone });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeRenderer = api;
 })(typeof window !== 'undefined' ? window : globalThis);

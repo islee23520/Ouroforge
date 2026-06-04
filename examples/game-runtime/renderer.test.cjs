@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer } = require('./renderer.js');
+const { normalizeRenderer, renderOrder, renderQueue, renderBreakdown, scene3dRenderSummary, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer } = require('./renderer.js');
 const tilemap = require('./tilemap.js');
 
 function createContext() {
@@ -103,6 +103,80 @@ assert.deepEqual(worldToScreen({ x: 24, y: 20 }, renderer, 'actors'), { x: 16, y
 assert.deepEqual(worldToScreen({ x: 0, y: 0 }, renderer, 'background'), { x: -4, y: -2, layer: 'background', cameraOffset: { x: 4, y: 2 } });
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'player'));
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'scene=renderer-test tick=3'));
+
+const scene3dWorld = {
+  sceneId: 'scene3d-render-smoke-valid',
+  tick: 9,
+  bounds: { width: 320, height: 180 },
+  entities: [],
+  sceneKind: '3d',
+  scene3d: {
+    version: '1',
+    activeCameraId: 'main-camera',
+    cameras: [{
+      id: 'main-camera',
+      active: true,
+      transform: { translation: { x: 0, y: 0, z: -8 } },
+      projection: { kind: 'perspective', fovDegrees: 60 },
+      viewport: { x: 0, y: 0, width: 320, height: 180 },
+    }],
+    meshes: [{ id: 'cube-mesh', kind: 'primitive', primitive: 'cube', materialRef: 'cube-mat' }],
+    materials: [{ id: 'cube-mat', kind: 'unlit', baseColor: '#44ccff' }],
+    nodes: [{
+      id: 'cube-node',
+      meshRef: 'cube-mesh',
+      localTransform: { translation: { x: 0, y: 0, z: 0 } },
+    }],
+  },
+};
+const scene3dSummary = scene3dRenderSummary({ world: scene3dWorld, frameId: 'frame-3d-valid' });
+assert.equal(scene3dSummary.schemaVersion, 'ouroforge.scene3d-render-smoke.v1');
+assert.equal(scene3dSummary.present, true);
+assert.equal(scene3dSummary.frameId, 'frame-3d-valid');
+assert.equal(scene3dSummary.sceneId, 'scene3d-render-smoke-valid');
+assert.equal(scene3dSummary.cameraId, 'main-camera');
+assert.equal(scene3dSummary.meshCount, 1);
+assert.equal(scene3dSummary.materialCount, 1);
+assert.equal(scene3dSummary.attemptedObjectCount, 1);
+assert.equal(scene3dSummary.visibleObjectCount, 1);
+assert.equal(scene3dSummary.skippedObjectCount, 0);
+assert.deepEqual(scene3dSummary.fallbackReasons, []);
+assert.equal(scene3dSummary.renderables[0].primitive, 'cube');
+assert.deepEqual(scene3dSummary.renderables[0].screen, { x: 160, y: 90, depth: 8 });
+assert.match(scene3dSummary.boundary, /no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim/);
+
+const malformedScene3dSummary = scene3dRenderSummary({
+  world: {
+    sceneId: 'scene3d-render-smoke-malformed',
+    tick: 10,
+    sceneKind: '3d',
+    bounds: { width: 320, height: 180 },
+    scene3d: {
+      activeCameraId: 'main-camera',
+      cameras: [{ id: 'main-camera', projection: { kind: 'perspective', fovDegrees: 60 } }],
+      meshes: [{ id: 'cube-mesh', kind: 'primitive', primitive: 'cube', materialRef: 'missing-mat' }],
+      materials: [],
+      nodes: [{ id: 'broken-cube', meshRef: 'cube-mesh' }, { id: 'missing-mesh-node', meshRef: 'missing-mesh' }],
+    },
+  },
+  frameId: 'frame-3d-malformed',
+});
+assert.equal(malformedScene3dSummary.attemptedObjectCount, 2);
+assert.equal(malformedScene3dSummary.visibleObjectCount, 0);
+assert.equal(malformedScene3dSummary.skippedObjectCount, 2);
+assert.ok(malformedScene3dSummary.fallbackReasons.some((reason) => reason.includes('missing material missing-mat')));
+assert.ok(malformedScene3dSummary.fallbackReasons.some((reason) => reason.includes('missing mesh missing-mesh')));
+
+const scene3dContext = createContext();
+drawRuntime({
+  canvas: { width: 320, height: 180 },
+  context: scene3dContext,
+  renderer,
+  world: scene3dWorld,
+  assets: { imageFor: () => null },
+  animation: { activeSpriteFrame: () => null },
+});
+assert.ok(scene3dContext.calls.some((call) => call[0] === 'fillRect' && call[1] === '#44ccff' && call[4] === 12 && call[5] === 12));
 
 const queueRenderer = normalizeRenderer({
   version: '1',

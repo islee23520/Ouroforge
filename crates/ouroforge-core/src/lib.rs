@@ -41291,6 +41291,7 @@ pub struct RunDashboardEngineSummaries {
     pub camera: serde_json::Value,
     pub render_breakdown: serde_json::Value,
     pub render_queue: serde_json::Value,
+    pub scene3d_render: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
@@ -44314,6 +44315,7 @@ fn read_dashboard_engine_summaries(
             camera: json!({ "present": false, "emptyState": "No camera/layer read model is available." }),
             render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
             render_queue: json!({ "present": false, "emptyState": "No scene render queue evidence is available." }),
+            scene3d_render: json!({ "present": false, "emptyState": "No 3D render smoke evidence is available." }),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
@@ -44356,6 +44358,7 @@ fn read_dashboard_engine_summaries(
         camera: dashboard_camera_summary(world_state),
         render_breakdown: dashboard_render_breakdown_summary(world_state),
         render_queue: dashboard_render_queue_summary(world_state),
+        scene3d_render: dashboard_scene3d_render_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
@@ -44546,6 +44549,60 @@ fn dashboard_render_queue_summary(world_state: &serde_json::Value) -> serde_json
         "renderables": renderables,
         "tilemapStats": queue.get("tilemapStats").or_else(|| queue.get("tilemap_stats")).cloned().unwrap_or(json!({})),
         "readOnlyInspection": read_only
+    })
+}
+
+fn dashboard_scene3d_render_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dRender")
+        .or_else(|| world_state.get("scene3d_render"))
+        .or_else(|| world_state.get("scene3dRenderSummary"))
+        .or_else(|| world_state.get("scene3d_render_summary"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D render smoke evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D render smoke evidence is malformed."
+        });
+    }
+    let renderables = summary
+        .get("renderables")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let fallback_reasons = summary
+        .get("fallbackReasons")
+        .or_else(|| summary.get("fallback_reasons"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "frameId": summary.get("frameId").or_else(|| summary.get("frame_id")).cloned().unwrap_or(json!(null)),
+        "sceneId": summary.get("sceneId").or_else(|| summary.get("scene_id")).cloned().unwrap_or(json!(null)),
+        "cameraId": summary.get("cameraId").or_else(|| summary.get("camera_id")).cloned().unwrap_or(json!(null)),
+        "meshCount": summary.get("meshCount").or_else(|| summary.get("mesh_count")).cloned().unwrap_or(json!(0)),
+        "materialCount": summary.get("materialCount").or_else(|| summary.get("material_count")).cloned().unwrap_or(json!(0)),
+        "attemptedObjectCount": summary.get("attemptedObjectCount").or_else(|| summary.get("attempted_object_count")).cloned().unwrap_or(json!(renderables.len())),
+        "visibleObjectCount": summary.get("visibleObjectCount").or_else(|| summary.get("visible_object_count")).cloned().unwrap_or_else(|| json!(renderables.iter().filter(|renderable| renderable.get("visible").and_then(|value| value.as_bool()) != Some(false)).count())),
+        "skippedObjectCount": summary.get("skippedObjectCount").or_else(|| summary.get("skipped_object_count")).cloned().unwrap_or_else(|| json!(renderables.iter().filter(|renderable| renderable.get("visible").and_then(|value| value.as_bool()) == Some(false)).count())),
+        "failedObjectCount": summary.get("failedObjectCount").or_else(|| summary.get("failed_object_count")).cloned().unwrap_or(json!(0)),
+        "screenshotArtifact": summary.get("screenshotArtifact").or_else(|| summary.get("screenshot_artifact")).cloned().unwrap_or(json!(null)),
+        "renderables": renderables,
+        "fallbackReasons": fallback_reasons,
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-renderer",
+            "browserStudioMode": "read-only 3D render smoke evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+        }))
     })
 }
 
@@ -70230,7 +70287,8 @@ scenarios:
                 "tick": 1,
                 "entities": [],
                 "renderBreakdown": "not-an-object",
-                "renderQueue": "not-an-object"
+                "renderQueue": "not-an-object",
+                "scene3dRender": "not-an-object"
             }))
             .expect("world-state serializes"),
         )
@@ -70265,6 +70323,107 @@ scenarios:
         assert_eq!(
             model.engine_summaries.render_queue["emptyState"],
             json!("Scene render queue evidence is malformed.")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["present"],
+            json!(false)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["emptyState"],
+            json!("3D render smoke evidence is malformed.")
+        );
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_extract_scene3d_render_smoke_evidence() {
+        let (root, artifacts) = create_test_run("dashboard-scene3d-render-smoke");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"passed\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "sceneId": "scene3d-smoke",
+                "tick": 4,
+                "entities": [],
+                "scene3dRender": {
+                    "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+                    "present": true,
+                    "frameId": "tick-4",
+                    "sceneId": "scene3d-smoke",
+                    "cameraId": "main-camera",
+                    "meshCount": 1,
+                    "materialCount": 1,
+                    "attemptedObjectCount": 2,
+                    "visibleObjectCount": 1,
+                    "skippedObjectCount": 1,
+                    "failedObjectCount": 0,
+                    "screenshotArtifact": null,
+                    "renderables": [
+                        { "id": "scene3d-cube", "nodeId": "cube", "meshRef": "cube-mesh", "materialRef": "cube-mat", "primitive": "cube", "cameraId": "main-camera", "visible": true },
+                        { "id": "scene3d-missing", "nodeId": "missing", "meshRef": "missing-mesh", "primitive": "cube", "cameraId": "main-camera", "visible": false, "fallbackReason": "missing mesh missing-mesh" }
+                    ],
+                    "fallbackReasons": ["missing: missing mesh missing-mesh"],
+                    "boundary": "Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim."
+                }
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(
+            model.engine_summaries.scene3d_render["present"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["schemaVersion"],
+            json!("ouroforge.scene3d-render-smoke.v1")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["cameraId"],
+            json!("main-camera")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["attemptedObjectCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["visibleObjectCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["skippedObjectCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["renderables"][0]["id"],
+            json!("scene3d-cube")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_render["fallbackReasons"][0],
+            json!("missing: missing mesh missing-mesh")
         );
 
         fs::remove_dir_all(root).expect("fixture removed");

@@ -57,4 +57,38 @@ assert.equal(frameStats.runtimeFrameBudgetStatus, 'violated');
 assert.equal(frameStats.runtimeFrameBudgetViolationCount, 2);
 assert.equal(frameStats.runtimeFrameBudgetCounts.entityCount, state.entities.length);
 
+const scene3dState = api.loadScene({
+  schemaVersion: '1',
+  id: 'runtime-scene3d-render-smoke',
+  sceneKind: '3d',
+  bounds: { width: 320, height: 180 },
+  entities: [],
+  scene3d: {
+    version: '1',
+    activeCameraId: 'main-camera',
+    cameras: [{
+      id: 'main-camera',
+      active: true,
+      transform: { translation: { x: 0, y: 0, z: -8 } },
+      projection: { kind: 'perspective', fovDegrees: 60 },
+      viewport: { width: 320, height: 180 },
+    }],
+    meshes: [{ id: 'cube-mesh', kind: 'primitive', primitive: 'cube', materialRef: 'cube-mat' }],
+    materials: [{ id: 'cube-mat', kind: 'unlit', baseColor: '#44ccff' }],
+    nodes: [{ id: 'cube-node', meshRef: 'cube-mesh', localTransform: { translation: { x: 0, y: 0, z: 0 } } }],
+  },
+});
+assert.equal(scene3dState.sceneKind, '3d');
+assert.equal(scene3dState.entities.length, 0);
+assert.equal(scene3dState.scene3dRender.present, true);
+assert.equal(scene3dState.scene3dRender.cameraId, 'main-camera');
+assert.equal(scene3dState.scene3dRender.attemptedObjectCount, 1);
+assert.equal(scene3dState.scene3dRender.visibleObjectCount, 1);
+assert.equal(scene3dState.scene3dRender.skippedObjectCount, 0);
+const scene3dFrameStats = api.getFrameStats();
+assert.equal(scene3dFrameStats.scene3dRenderFrameId, 'tick-0');
+assert.equal(scene3dFrameStats.scene3dRenderAttemptedObjectCount, 1);
+assert.equal(scene3dFrameStats.scene3dRenderVisibleObjectCount, 1);
+assert.equal(scene3dFrameStats.scene3dRenderSkippedObjectCount, 0);
+
 console.log('runtime frame budget smoke test passed');

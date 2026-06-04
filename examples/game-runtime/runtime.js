@@ -79,6 +79,23 @@
       absenceDiagnostics: [],
       readOnlyInspection: { trustedEmitter: 'browser-runtime-evidence-helper', browserStudioMode: 'read-only evidence inspection', disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
     }),
+    scene3dRenderSummary: ({ world = {}, frameId = `tick-${world.tick ?? 0}` } = {}) => ({
+      schemaVersion: 'ouroforge.scene3d-render-smoke.v1',
+      present: false,
+      frameId: String(frameId),
+      sceneId: String(world.sceneId || 'unknown'),
+      cameraId: null,
+      meshCount: 0,
+      materialCount: 0,
+      attemptedObjectCount: 0,
+      visibleObjectCount: 0,
+      skippedObjectCount: 0,
+      failedObjectCount: 0,
+      screenshotArtifact: null,
+      renderables: [],
+      fallbackReasons: ['scene3d renderer unavailable'],
+      boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
+    }),
   };
   const defaultScene = {
     schemaVersion: '1',
@@ -106,8 +123,10 @@
     tick: 0,
     fixedDeltaMs,
     paused: false,
+    sceneKind: '2d',
     bounds: clone(defaultScene.bounds),
     entities: clone(defaultScene.entities),
+    scene3d: null,
     metadata: clone(defaultScene.metadata),
     collisions: [],
     collisionEvents: [],
@@ -499,7 +518,8 @@
   }
 
   function normalizeScene(scene = {}) {
-    const sourceEntities = Array.isArray(scene.entities) && scene.entities.length > 0
+    const sceneKind = scene.sceneKind === '3d' ? '3d' : '2d';
+    const sourceEntities = Array.isArray(scene.entities) && (scene.entities.length > 0 || sceneKind === '3d')
       ? scene.entities
       : defaultScene.entities;
     const bounds = size(scene.bounds, defaultScene.bounds);
@@ -508,6 +528,7 @@
     return {
       schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
       id: String(scene.id || 'unnamed-scene'),
+      sceneKind,
       bounds,
       renderer: normalizedRenderer,
       activeCameraId: typeof scene.activeCameraId === 'string' ? scene.activeCameraId : null,
@@ -517,6 +538,9 @@
       gameplayRules: normalizeGameplayRules(scene.gameplayRules),
       sceneTransitions: normalizeSceneTransitions(scene.sceneTransitions),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
+      scene3d: sceneKind === '3d' && scene.scene3d && typeof scene.scene3d === 'object' && !Array.isArray(scene.scene3d)
+        ? objectValue(scene.scene3d)
+        : null,
       metadata: objectValue(scene.metadata),
       componentDefaults,
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
@@ -613,13 +637,13 @@
 
   function resolvedActionState(inputComponent = null) {
     const entity = player();
-    const component = inputComponent || (entity.components.input || {});
+    const component = inputComponent || (entity && entity.components && entity.components.input) || {};
     return { ...actionMapState(component), ...clone(actionInput) };
   }
 
   function inputActionDiagnostics(inputComponent = null) {
     const entity = player();
-    const component = inputComponent || (entity.components.input || {});
+    const component = inputComponent || (entity && entity.components && entity.components.input) || {};
     const allowedActions = Array.isArray(component.allowedActions) ? component.allowedActions : [];
     const mapActions = component.actionMap && Array.isArray(component.actionMap.actions)
       ? component.actionMap.actions
@@ -669,6 +693,7 @@
 
   function applyInput() {
     const entity = player();
+    if (!entity || !entity.components) return;
     const velocity = entity.components.velocity;
     const inputComponent = entity.components.input || {};
     const allowedActions = Array.isArray(inputComponent.allowedActions) ? inputComponent.allowedActions : [];
@@ -988,8 +1013,10 @@
     for (const actionId of Object.keys(actionInput)) delete actionInput[actionId];
     world.schemaVersion = normalized.schemaVersion;
     world.sceneId = normalized.id;
+    world.sceneKind = normalized.sceneKind;
     world.bounds = clone(normalized.bounds);
     world.entities = clone(normalized.entities);
+    world.scene3d = normalized.scene3d ? clone(normalized.scene3d) : null;
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
     world.cameras = clone(normalized.cameras);
@@ -1507,6 +1534,9 @@
       state.renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })
         : null;
+      state.scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
+        ? renderer.scene3dRenderSummary({ world: state, frameId })
+        : null;
       state.runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, state.renderQueue);
       const runtimeStateEvidence = runtimeState(frameId);
       state.runtimeState = {
@@ -1530,11 +1560,13 @@
       state.assets = assets.metadata();
       state.snapshots = snapshots.list();
       const currentPlayer = player();
-      state.object = {
-        id: currentPlayer.id,
-        ...clone(currentPlayer.components.transform),
-        ...clone(currentPlayer.components.size),
-      };
+      state.object = currentPlayer && currentPlayer.components
+        ? {
+          id: currentPlayer.id,
+          ...clone(currentPlayer.components.transform),
+          ...clone(currentPlayer.components.size),
+        }
+        : null;
       return state;
     },
     getFrameStats() {
@@ -1542,6 +1574,9 @@
       const renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world, renderer: rendererState, tilemap, frameId })
         : { layers: [], renderables: [], validation: { status: 'unreported', blockedReasons: [], warnings: [] } };
+      const scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
+        ? renderer.scene3dRenderSummary({ world, frameId })
+        : { attemptedObjectCount: 0, visibleObjectCount: 0, skippedObjectCount: 0, failedObjectCount: 0 };
       const runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, renderQueue);
       return clone({
         tick: world.tick,
@@ -1556,6 +1591,11 @@
         renderQueueSkippedCount: renderQueue.renderables.filter((renderable) => renderable.visible === false).length,
         renderQueueBlockedReasonCount: Array.isArray(renderQueue.validation.blockedReasons) ? renderQueue.validation.blockedReasons.length : 0,
         renderQueueWarningCount: Array.isArray(renderQueue.validation.warnings) ? renderQueue.validation.warnings.length : 0,
+        scene3dRenderFrameId: frameId,
+        scene3dRenderAttemptedObjectCount: scene3dRender.attemptedObjectCount || 0,
+        scene3dRenderVisibleObjectCount: scene3dRender.visibleObjectCount || 0,
+        scene3dRenderSkippedObjectCount: scene3dRender.skippedObjectCount || 0,
+        scene3dRenderFailedObjectCount: scene3dRender.failedObjectCount || 0,
         tilemapRenderLayerCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.layerCount : 0,
         tilemapRenderCellCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.cellCount : 0,
         tilemapRenderDrawnTileCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.drawnTileCount : 0,

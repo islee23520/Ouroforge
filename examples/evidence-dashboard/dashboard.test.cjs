@@ -281,6 +281,25 @@ const run = {
       ],
       readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
     },
+    scene3d_render: {
+      present: true,
+      frameId: 'frame-0003',
+      sceneId: '<scene-render-test>',
+      cameraId: '<main-camera>',
+      meshCount: 1,
+      materialCount: 1,
+      attemptedObjectCount: 2,
+      visibleObjectCount: 1,
+      skippedObjectCount: 1,
+      failedObjectCount: 0,
+      screenshotArtifact: null,
+      renderables: [
+        { id: '<scene3d:cube>', nodeId: '<cube-node>', meshRef: '<cube-mesh>', materialRef: '<cube-mat>', primitive: 'cube', cameraId: '<main-camera>', visible: true },
+        { id: '<scene3d:missing>', nodeId: '<missing-node>', meshRef: '<missing-mesh>', primitive: 'cube', cameraId: '<main-camera>', visible: false, fallbackReason: '<missing mesh>' },
+      ],
+      fallbackReasons: ['<missing-node>: <missing mesh>'],
+      boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
+    },
     renderer: {
       version: '1',
       camera: { x: 80, y: 30 },
@@ -902,12 +921,33 @@ assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Queu
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Tilemap draw tiles/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Asset-backed tiles/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Missing tile refs/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /3D render smoke/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /3D smoke visible\/skipped/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /1\/1/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;scene3d:cube&gt;/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /no WebGPU, GLTF import, PBR/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /tiles 2/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;queue:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;entity:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /trusted writes, command bridge, live mutation/);
 assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<entity:player>/);
 assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<queue:player>/);
+assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<scene3d:cube>/);
+const xssScene3dRenderDashboard = dashboard.renderRenderBreakdownSummary({
+  present: true,
+  render_breakdown: { present: true, frameId: 'frame', elements: [] },
+  scene3d_render: {
+    present: true,
+    frameId: '<script>frame</script>',
+    sceneId: '<img>',
+    cameraId: '<svg>',
+    renderables: [{ id: '<script>cube</script>', nodeId: '<img>', meshRef: '<svg>', materialRef: '<b>', primitive: '<i>', cameraId: '<p>', visible: false, fallbackReason: '<script>skip</script>' }],
+    fallbackReasons: ['<script>fallback</script>'],
+    boundary: '<script>boundary</script>',
+  },
+});
+assert.doesNotMatch(xssScene3dRenderDashboard, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssScene3dRenderDashboard, /&lt;script&gt;cube&lt;\/script&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary({}), /No scene render breakdown evidence/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);

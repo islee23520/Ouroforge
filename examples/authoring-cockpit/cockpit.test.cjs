@@ -535,6 +535,25 @@ const run = {
         disallowedActions: ['writes', 'commands', 'scene mutation', 'browser runtime control'],
       },
     },
+    scene3d_render: {
+      present: true,
+      frameId: 12,
+      sceneId: 'trigger-flags-v1-fixture',
+      cameraId: '<main-camera>',
+      meshCount: 1,
+      materialCount: 1,
+      attemptedObjectCount: 2,
+      visibleObjectCount: 1,
+      skippedObjectCount: 1,
+      failedObjectCount: 0,
+      screenshotArtifact: null,
+      renderables: [
+        { id: '<scene3d-cube>', nodeId: '<cube-node>', meshRef: '<cube-mesh>', materialRef: '<cube-mat>', primitive: 'cube', cameraId: '<main-camera>', visible: true },
+        { id: '<scene3d-missing>', nodeId: '<missing-node>', meshRef: '<missing-mesh>', primitive: 'cube', cameraId: '<main-camera>', visible: false, fallbackReason: '<missing mesh>' },
+      ],
+      fallbackReasons: ['<missing-node>: <missing mesh>'],
+      boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
+    },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 1, activeStateCount: 1 },
@@ -1046,6 +1065,11 @@ assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Tilemap draw 
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Asset-backed tiles/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Missing tile refs/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /tiles 2/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /3D render smoke/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /3D smoke visible\/skipped/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /1\/1/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /&lt;scene3d-cube&gt;/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /no WebGPU, GLTF import, PBR/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity:player/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity-hidden/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite\.visible=false/);
@@ -1067,6 +1091,9 @@ assert.match(xssRenderBreakdown, /&lt;script&gt;renderable&lt;\/script&gt;/);
 const xssRenderQueue = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: 'frame', elements: [] }, render_queue: { present: true, validation: { status: '<script>ready</script>' }, renderables: [{ id: '<script>queue</script>', sourceKind: '<img>', sourceId: '<svg>', drawOrder: '<b>', layer: '<i>', primitiveKind: '<p>', visible: false, fallbackReason: '<script>skip</script>' }] } } });
 assert.doesNotMatch(xssRenderQueue, /<script>|<img|<svg>|<b>|<i>|<p>/);
 assert.match(xssRenderQueue, /&lt;script&gt;queue&lt;\/script&gt;/);
+const xssScene3dRenderCockpit = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: 'frame', elements: [] }, scene3d_render: { present: true, frameId: '<script>frame</script>', sceneId: '<img>', cameraId: '<svg>', renderables: [{ id: '<script>cube</script>', nodeId: '<img>', meshRef: '<svg>', materialRef: '<b>', primitive: '<i>', cameraId: '<p>', visible: false, fallbackReason: '<script>skip</script>' }], fallbackReasons: ['<script>fallback</script>'], boundary: '<script>boundary</script>' } } });
+assert.doesNotMatch(xssScene3dRenderCockpit, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssScene3dRenderCockpit, /&lt;script&gt;cube&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);

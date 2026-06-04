@@ -708,6 +708,7 @@ const OuroforgeCockpit = (() => {
     const summary = run?.engine_summaries;
     const breakdown = summary?.render_breakdown || summary?.renderBreakdown || null;
     const queue = summary?.render_queue || summary?.renderQueue || {};
+    const scene3dRender = summary?.scene3d_render || summary?.scene3dRender || {};
     if (!summary?.present || !breakdown || typeof breakdown !== 'object' || Array.isArray(breakdown)) {
       return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2><p class="empty">Render breakdown evidence is missing or malformed for this run.</p><p class="hint">Read-only inspection only: this panel does not write files, execute commands, mutate scenes, or control the browser runtime.</p></section>`;
     }
@@ -720,6 +721,10 @@ const OuroforgeCockpit = (() => {
       ? (readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
       : ['writes', 'commands', 'scene mutation', 'browser runtime control'];
     const queueRenderables = Array.isArray(queue.renderables) ? queue.renderables : [];
+    const scene3dRenderables = Array.isArray(scene3dRender.renderables) ? scene3dRender.renderables : [];
+    const scene3dFallbacks = Array.isArray(scene3dRender.fallbackReasons || scene3dRender.fallback_reasons)
+      ? (scene3dRender.fallbackReasons || scene3dRender.fallback_reasons)
+      : [];
     const queueValidation = queue.validation || {};
     const tilemapStats = queue.tilemapStats || queue.tilemap_stats || {};
     const cards = [
@@ -730,6 +735,7 @@ const OuroforgeCockpit = (() => {
       ['Queue renderables', queue.renderable_count ?? queue.renderableCount ?? queueRenderables.length],
       ['Draw calls', queue.draw_call_count ?? queue.drawCallCount ?? 0],
       ['Queue status', queueValidation.status || 'unreported'],
+      ['3D smoke visible/skipped', scene3dRender.present ? `${scene3dRender.visibleObjectCount ?? scene3dRender.visible_object_count ?? 0}/${scene3dRender.skippedObjectCount ?? scene3dRender.skipped_object_count ?? 0}` : 'not exported'],
       ['Tilemap draw tiles', tilemapStats.drawnTileCount ?? tilemapStats.drawn_tile_count ?? 0],
       ['Asset-backed tiles', tilemapStats.assetTileCount ?? tilemapStats.asset_tile_count ?? 0],
       ['Missing tile refs', tilemapStats.missingTileRefCount ?? tilemapStats.missing_tile_ref_count ?? 0],
@@ -750,14 +756,20 @@ const OuroforgeCockpit = (() => {
       return `<div class="surface-row"><strong>${escapeText(target)}</strong> ${surfaceState(true, reason)}<br><small>layer ${escapeText(renderBreakdownValue(diagnostic, 'layer', 'layer', 'default'))} · detail ${escapeText(detail)}</small></div>`;
     }).join('') || '<div class="surface-row">No absence diagnostics exported.</div>';
     const queueRows = queueRenderables.slice(0, 24).map((renderable) => `<div class="surface-row"><strong>${escapeText(renderable?.id || 'queue-renderable')}</strong> ${surfaceState(renderable?.visible !== false, renderable?.primitiveKind || 'unknown')}<br><small>draw order ${escapeText(renderable?.drawOrder ?? '?')} · layer ${escapeText(renderable?.layer || 'default')} · source ${escapeText(renderable?.sourceKind || 'unknown')}:${escapeText(renderable?.sourceId || 'unknown')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')} · tiles ${escapeText(renderable?.tileCount ?? 0)} · missing ${escapeText(renderable?.missingTileRefCount ?? 0)}</small></div>`).join('') || '<div class="surface-row">No render queue rows exported.</div>';
+    const scene3dRows = scene3dRender.present
+      ? scene3dRenderables.slice(0, 24).map((renderable) => `<div class="surface-row"><strong>${escapeText(renderable?.id || renderable?.nodeId || 'scene3d-renderable')}</strong> ${surfaceState(renderable?.visible !== false, renderable?.primitive || renderable?.meshKind || 'unknown')}<br><small>node ${escapeText(renderable?.nodeId || 'unknown')} · mesh ${escapeText(renderable?.meshRef || 'none')} · material ${escapeText(renderable?.materialRef || 'none')} · camera ${escapeText(renderable?.cameraId || scene3dRender.cameraId || 'none')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')} · screenshot ${escapeText(scene3dRender.screenshotArtifact || scene3dRender.screenshot_artifact || 'not produced')}</small></div>`).join('') || '<div class="surface-row">No 3D render smoke rows exported.</div>'
+      : `<div class="surface-row">${escapeText(scene3dRender.emptyState || 'No 3D render smoke evidence is available.')}</div>`;
+    const scene3dFallbackRows = scene3dFallbacks.slice(0, 24).map((reason) => `<div class="surface-row">${escapeText(reason)}</div>`).join('') || '<div class="surface-row">No 3D render fallback reasons exported.</div>';
     return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2>
       <p class="hint">Read-only render breakdown from runtime world-state evidence. This surface performs no writes, no commands, no scene mutation, and no browser runtime control.</p>
       <div class="field-grid">${cards}</div>
       <h3>Renderable draw order</h3>${elementRows}
       <h3>Render queue</h3>${queueRows}
+      <h3>3D render smoke</h3>${scene3dRows}
+      <h3>3D render fallbacks</h3>${scene3dFallbackRows}
       <h3>Absence diagnostics</h3>${absenceRows}
       <p class="hint">Disallowed actions: ${escapeText(disallowedActions.join(' · '))}</p>
-      <p class="hint">${escapeText(breakdown.boundary || readOnlyInspection.boundary || 'Display-only render breakdown inspection.')}</p>
+      <p class="hint">${escapeText(scene3dRender.boundary || breakdown.boundary || readOnlyInspection.boundary || 'Display-only render breakdown inspection.')}</p>
     </section>`;
   }
 
