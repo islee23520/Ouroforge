@@ -100,3 +100,65 @@ fn source_patch_evidence_bundle_rejects_escaping_paths_and_unknown_fields() {
         .iter()
         .any(|reason| reason.contains("previewRef.path")));
 }
+
+fn unique_run_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "ouroforge-{name}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(dir.join("evidence")).expect("create evidence dir");
+    dir
+}
+
+fn write_minimal_dashboard_run(run_dir: &std::path::Path) {
+    std::fs::write(
+        run_dir.join("run.json"),
+        serde_json::json!({"id":"run-source-patch-bundle","created_at_unix_ms":1}).to_string(),
+    )
+    .expect("write run");
+    std::fs::write(
+        run_dir.join("verdict.json"),
+        serde_json::json!({"status":"passed"}).to_string(),
+    )
+    .expect("write verdict");
+    std::fs::write(
+        run_dir.join("evidence/index.json"),
+        serde_json::json!({"artifacts":[]}).to_string(),
+    )
+    .expect("write evidence index");
+}
+
+#[test]
+fn source_patch_evidence_bundle_writes_generated_artifact_and_exports_to_dashboard() {
+    use ouroforge_core::{read_dashboard_run, write_source_patch_evidence_bundle};
+
+    let run_dir = unique_run_dir("source-patch-bundle-dashboard");
+    write_minimal_dashboard_run(&run_dir);
+    let bundle = fixture_bundle();
+    let path = write_source_patch_evidence_bundle(&run_dir, &bundle)
+        .expect("bundle writes under mutation generated state");
+    assert!(path.ends_with("mutation/source-patch-evidence-bundle.json"));
+
+    let dashboard = read_dashboard_run(&run_dir).expect("dashboard reads generated bundle");
+    let artifact = dashboard
+        .mutation_artifacts
+        .iter()
+        .find(|artifact| artifact.id == "source-patch-evidence-bundle")
+        .expect("bundle exported as mutation artifact");
+    assert_eq!(artifact.path, "mutation/source-patch-evidence-bundle.json");
+    assert_eq!(artifact.metadata["read_only"], true);
+    assert_eq!(
+        artifact.value.as_ref().unwrap()["bundleId"],
+        bundle.bundle_id
+    );
+    assert!(artifact
+        .value
+        .as_ref()
+        .unwrap()
+        .get("applyCommand")
+        .is_none());
+}

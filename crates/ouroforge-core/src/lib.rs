@@ -11419,6 +11419,35 @@ pub fn inspect_source_patch_evidence_bundle(
     }
 }
 
+pub fn source_patch_evidence_bundle_from_refs(
+    mut bundle: SourcePatchEvidenceBundleArtifact,
+) -> Result<SourcePatchEvidenceBundleArtifact> {
+    validate_source_patch_evidence_bundle(&bundle)?;
+    bundle.guardrails.sort();
+    bundle.guardrails.dedup();
+    Ok(bundle)
+}
+
+pub fn write_source_patch_evidence_bundle(
+    run_dir: impl AsRef<Path>,
+    bundle: &SourcePatchEvidenceBundleArtifact,
+) -> Result<PathBuf> {
+    validate_source_patch_evidence_bundle(bundle)?;
+    let path = run_dir
+        .as_ref()
+        .join("mutation/source-patch-evidence-bundle.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create source patch evidence bundle directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json_atomic(&path, &json!(bundle))?;
+    Ok(path)
+}
+
 pub fn validate_source_patch_evidence_bundle(
     bundle: &SourcePatchEvidenceBundleArtifact,
 ) -> Result<SourcePatchEvidenceBundleValidation> {
@@ -29574,6 +29603,10 @@ fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboar
         (
             "mutation-review-decisions",
             "mutation/review-decisions.json",
+        ),
+        (
+            "source-patch-evidence-bundle",
+            "mutation/source-patch-evidence-bundle.json",
         ),
         (
             "mutation-evolve-v1-demo-summary",
