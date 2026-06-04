@@ -273,8 +273,10 @@ const run = {
       drawCallCount: 1,
       skippedRenderableCount: 1,
       validation: { status: 'ready', blockedReasons: [], warnings: [] },
+      tilemapStats: { layerCount: 1, cellCount: 2, drawnTileCount: 2, missingTileRefCount: 1, assetTileCount: 1 },
       renderables: [
         { id: '<queue:player>', sourceKind: 'entity', sourceId: 'player', drawOrder: 0, layer: 'actors', primitiveKind: 'sprite', visible: true },
+        { id: '<tilemap:ground>', sourceKind: 'tilemap-layer', sourceId: 'level:ground', drawOrder: 1, layer: 'ground', primitiveKind: 'tilemap', visible: true, tileCount: 2, missingTileRefCount: 1, assetTileCount: 1 },
         { id: '<queue:hidden>', sourceKind: 'entity', sourceId: 'hidden', drawOrder: 1, layer: 'actors', primitiveKind: 'rect', visible: false, fallbackReason: 'sprite hidden' },
       ],
       readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
@@ -800,6 +802,10 @@ assert.match(dashboard.renderCameraLayerSummary({}), /No camera\/layer read mode
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Renderable elements/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Render queue/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Queue status/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Tilemap draw tiles/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Asset-backed tiles/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Missing tile refs/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /tiles 2/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;queue:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;entity:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /trusted writes, command bridge, live mutation/);

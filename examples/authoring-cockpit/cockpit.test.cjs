@@ -523,8 +523,10 @@ const run = {
       drawCallCount: 1,
       skippedRenderableCount: 1,
       validation: { status: 'ready', blockedReasons: [], warnings: [] },
+      tilemapStats: { layerCount: 1, cellCount: 2, drawnTileCount: 2, missingTileRefCount: 1, assetTileCount: 1 },
       renderables: [
         { id: 'entity-player', sourceKind: 'entity', sourceId: 'player', drawOrder: 4, layer: 'actors', primitiveKind: 'sprite', visible: true },
+        { id: 'tilemap-ground', sourceKind: 'tilemap-layer', sourceId: 'level:ground', drawOrder: 5, layer: 'ground', primitiveKind: 'tilemap', visible: true, tileCount: 2, missingTileRefCount: 1, assetTileCount: 1 },
         { id: 'entity-hidden', sourceKind: 'entity', sourceId: 'hidden', drawOrder: 5, layer: 'actors', primitiveKind: 'rect', visible: false, fallbackReason: 'sprite hidden' },
       ],
       readOnlyInspection: {
@@ -889,6 +891,10 @@ assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/)
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Queue status/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Tilemap draw tiles/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Asset-backed tiles/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Missing tile refs/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /tiles 2/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity:player/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity-hidden/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite\.visible=false/);

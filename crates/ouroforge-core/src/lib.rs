@@ -36484,6 +36484,7 @@ fn dashboard_render_queue_summary(world_state: &serde_json::Value) -> serde_json
         "validation": validation,
         "layers": layers,
         "renderables": renderables,
+        "tilemapStats": queue.get("tilemapStats").or_else(|| queue.get("tilemap_stats")).cloned().unwrap_or(json!({})),
         "readOnlyInspection": read_only
     })
 }
@@ -57108,6 +57109,7 @@ scenarios:
                         { "id": "entity-hidden", "sourceKind": "entity", "sourceId": "hidden", "layer": "actors", "layerOrder": 0, "localOrder": 1, "stableKey": "hidden", "drawOrder": 1, "primitiveKind": "rect", "visible": false, "fallbackReason": "sprite hidden" }
                     ],
                     "validation": { "status": "ready", "blockedReasons": [], "warnings": [] },
+                    "tilemapStats": { "layerCount": 1, "cellCount": 2, "drawnTileCount": 2, "missingTileRefCount": 0, "assetTileCount": 1 },
                     "readOnlyInspection": { "trustedEmitter": "browser-runtime-renderer", "browserStudioMode": "read-only evidence inspection", "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
                 },
                 "tilemaps": {
