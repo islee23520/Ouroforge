@@ -3485,6 +3485,8 @@ pub struct AgentHandoffV2 {
     pub to_role: String,
     #[serde(rename = "taskId")]
     pub task_id: String,
+    #[serde(rename = "knownTaskIds")]
+    pub known_task_ids: Vec<String>,
     pub status: AgentHandoffStatus,
     #[serde(rename = "artifactRefs")]
     pub artifact_refs: Vec<AuthoringLoopArtifactRef>,
@@ -3655,7 +3657,37 @@ impl AgentHandoffV2 {
             ));
         }
         validate_path_component("agent handoff v2 taskId", &self.task_id)?;
+        validate_nonempty_path_component_list(
+            "agent handoff v2 knownTaskIds",
+            &self.known_task_ids,
+        )?;
+        if !self
+            .known_task_ids
+            .iter()
+            .any(|task_id| task_id == &self.task_id)
+        {
+            return Err(anyhow!(
+                "agent handoff v2 taskId {} is not listed in knownTaskIds",
+                self.task_id
+            ));
+        }
+        validate_agent_handoff_v2_role_transition(&self.from_role, &self.to_role)?;
+
+        let mut artifact_ids = BTreeSet::new();
+        let mut artifact_paths = BTreeSet::new();
         for (index, artifact_ref) in self.artifact_refs.iter().enumerate() {
+            if !artifact_ids.insert(artifact_ref.id.as_str()) {
+                return Err(anyhow!(
+                    "agent handoff v2 duplicate artifactRefs id: {}",
+                    artifact_ref.id
+                ));
+            }
+            if !artifact_paths.insert(artifact_ref.path.as_str()) {
+                return Err(anyhow!(
+                    "agent handoff v2 duplicate artifactRefs path: {}",
+                    artifact_ref.path
+                ));
+            }
             artifact_ref.validate(&format!("agent handoff v2 artifactRefs[{index}]"))?;
         }
         if self.artifact_refs.is_empty() {
@@ -3665,8 +3697,17 @@ impl AgentHandoffV2 {
         for (index, decision) in self.decisions.iter().enumerate() {
             decision.validate(&format!("agent handoff v2 decisions[{index}]"))?;
         }
+        let mut evidence_ids = BTreeSet::new();
+        let mut evidence_paths = BTreeSet::new();
         for (index, evidence_ref) in self.evidence_links.iter().enumerate() {
             evidence_ref.validate(&format!("agent handoff v2 evidenceLinks[{index}]"))?;
+            if !evidence_ids.insert(evidence_ref.id.as_str()) {
+                return Err(anyhow!(
+                    "agent handoff v2 duplicate evidenceLinks id: {}",
+                    evidence_ref.id
+                ));
+            }
+            evidence_paths.insert(evidence_ref.path.as_str());
         }
         if self.evidence_links.is_empty() {
             return Err(anyhow!("agent handoff v2 evidenceLinks must not be empty"));
@@ -3682,8 +3723,23 @@ impl AgentHandoffV2 {
                 "agent handoff v2 acceptanceChecklist must not be empty"
             ));
         }
+        let mut stale_ids = BTreeSet::new();
         for (index, indicator) in self.stale_state_indicators.iter().enumerate() {
             indicator.validate(index)?;
+            if !stale_ids.insert(indicator.id.as_str()) {
+                return Err(anyhow!(
+                    "agent handoff v2 duplicate staleStateIndicators id: {}",
+                    indicator.id
+                ));
+            }
+            if !(artifact_paths.contains(indicator.artifact_ref.path.as_str())
+                || evidence_paths.contains(indicator.artifact_ref.path.as_str()))
+            {
+                return Err(anyhow!(
+                    "agent handoff v2 stale artifact ref {} must be listed in artifactRefs or evidenceLinks",
+                    indicator.artifact_ref.path
+                ));
+            }
         }
         if self.status == AgentHandoffStatus::Stale && self.stale_state_indicators.is_empty() {
             return Err(anyhow!(
@@ -3711,6 +3767,45 @@ impl AgentHandoffV2 {
         }
         Ok(())
     }
+}
+
+fn validate_nonempty_path_component_list(field: &str, values: &[String]) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    let mut seen = BTreeSet::new();
+    for value in values {
+        validate_path_component(field, value)?;
+        if !seen.insert(value) {
+            return Err(anyhow!("duplicate {field}: {value}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_agent_handoff_v2_role_transition(from_role: &str, to_role: &str) -> Result<()> {
+    let allowed = matches!(
+        (from_role, to_role),
+        ("designer", "reviewer")
+            | ("level-designer", "reviewer")
+            | ("gameplay-engineer", "reviewer")
+            | ("asset-import-planner", "reviewer")
+            | ("reviewer", "critic")
+            | ("critic", "reviewer")
+            | ("reviewer", "qa-agent")
+            | ("qa-agent", "performance-regression-agent")
+            | (
+                "performance-regression-agent",
+                "build-release-candidate-agent"
+            )
+            | ("build-release-candidate-agent", "reviewer")
+    );
+    if !allowed {
+        return Err(anyhow!(
+            "agent handoff v2 unsupported role transition from {from_role} to {to_role}"
+        ));
+    }
+    Ok(())
 }
 
 impl AgentHandoffRisk {
@@ -40951,6 +41046,71 @@ scenarios:
             .v1_compatibility
             .as_ref()
             .is_some_and(|compatibility| compatibility.compatible));
+    }
+
+    #[test]
+    fn agent_handoff_v2_rejects_unknown_task_transition_and_unlinked_stale_refs() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+        );
+        let base: serde_json::Value = serde_json::from_str(&body).expect("handoff fixture json");
+
+        let mut unknown_task = base.clone();
+        unknown_task["taskId"] = json!("unknown-task");
+        let task_error = AgentHandoffV2::from_json_str(&unknown_task.to_string())
+            .expect_err("unknown task id rejects handoff v2");
+        assert!(task_error.to_string().contains("knownTaskIds"));
+
+        let mut unsupported_transition = base.clone();
+        unsupported_transition["toRole"] = json!("build-release-candidate-agent");
+        let transition_error = AgentHandoffV2::from_json_str(&unsupported_transition.to_string())
+            .expect_err("unsupported role transition rejects handoff v2");
+        assert!(transition_error
+            .to_string()
+            .contains("unsupported role transition"));
+
+        let stale_body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.stale.fixture.json",
+        );
+        let mut unlinked_stale: serde_json::Value =
+            serde_json::from_str(&stale_body).expect("stale handoff fixture json");
+        unlinked_stale["staleStateIndicators"][0]["artifactRef"]["path"] =
+            json!("examples/multi-agent-pipeline-v1/missing-stale-artifact.json");
+        let stale_error = AgentHandoffV2::from_json_str(&unlinked_stale.to_string())
+            .expect_err("unlinked stale artifact ref rejects handoff v2");
+        assert!(stale_error.to_string().contains("stale artifact ref"));
+    }
+
+    #[test]
+    fn agent_handoff_v2_rejects_duplicate_refs_and_malformed_risk_text() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+        );
+        let base: serde_json::Value = serde_json::from_str(&body).expect("handoff fixture json");
+
+        let mut duplicate_artifact = base.clone();
+        let duplicated = duplicate_artifact["artifactRefs"][0].clone();
+        duplicate_artifact["artifactRefs"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicated);
+        let duplicate_error = AgentHandoffV2::from_json_str(&duplicate_artifact.to_string())
+            .expect_err("duplicate artifact refs reject handoff v2");
+        assert!(duplicate_error
+            .to_string()
+            .contains("duplicate artifactRefs"));
+
+        let mut malformed_assumption = base.clone();
+        malformed_assumption["assumptions"][0] = json!("");
+        let assumption_error = AgentHandoffV2::from_json_str(&malformed_assumption.to_string())
+            .expect_err("empty assumption rejects handoff v2");
+        assert!(assumption_error.to_string().contains("assumptions"));
+
+        let mut malformed_risk = base.clone();
+        malformed_risk["openRisks"][0]["mitigation"] = json!("");
+        let risk_error = AgentHandoffV2::from_json_str(&malformed_risk.to_string())
+            .expect_err("empty risk mitigation rejects handoff v2");
+        assert!(risk_error.to_string().contains("mitigation"));
     }
 
     #[test]

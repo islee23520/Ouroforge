@@ -79,5 +79,10 @@
     ],
     "trackedFixtureOnly": true
   },
-  "boundary": "advisory handoff evidence only; it does not execute commands, lock files, write trusted state, apply changes, merge branches, spawn agents, or grant production authority"
+  "boundary": "advisory handoff evidence only; it does not execute commands, lock files, write trusted state, apply changes, merge branches, spawn agents, or grant production authority",
+  "knownTaskIds": [
+    "task-board-schema",
+    "reviewer-decision-gate",
+    "ownership-policy"
+  ]
 }

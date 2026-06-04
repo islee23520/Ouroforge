@@ -10,6 +10,11 @@
       "id": "task-board",
       "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
       "description": "fixture-scoped task board context"
+    },
+    {
+      "id": "stale-task-board",
+      "path": "examples/multi-agent-pipeline-v1/production-task-board.stale.fixture.json",
+      "description": "stale task board fixture"
     }
   ],
   "assumptions": [
@@ -62,7 +67,7 @@
     {
       "id": "stale-task-board",
       "artifactRef": {
-        "id": "task-board",
+        "id": "stale-task-board",
         "path": "examples/multi-agent-pipeline-v1/production-task-board.stale.fixture.json",
         "description": "stale task board fixture"
       },
@@ -90,5 +95,10 @@
     ],
     "trackedFixtureOnly": true
   },
-  "boundary": "advisory handoff evidence only; it does not execute commands, lock files, write trusted state, apply changes, merge branches, spawn agents, or grant production authority"
+  "boundary": "advisory handoff evidence only; it does not execute commands, lock files, write trusted state, apply changes, merge branches, spawn agents, or grant production authority",
+  "knownTaskIds": [
+    "task-board-schema",
+    "reviewer-decision-gate",
+    "ownership-policy"
+  ]
 }

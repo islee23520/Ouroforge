@@ -7,6 +7,7 @@ The schema version is `agent-handoff-v2`. A handoff contains:
 - `handoffId`;
 - `fromRole` and `toRole`;
 - `taskId`;
+- `knownTaskIds` — task ids available to this handoff so unknown task references fail locally;
 - `status` (`ready`, `blocked`, `stale`, `failed`, or `completed`);
 - `artifactRefs`;
 - `assumptions`;
@@ -20,6 +21,23 @@ The schema version is `agent-handoff-v2`. A handoff contains:
 - `generatedState`;
 - optional `v1Compatibility` metadata;
 - `boundary`.
+
+## Validation
+
+Rust/local validation rejects:
+
+- unsupported `fromRole` / `toRole` values;
+- unsupported role transitions;
+- `taskId` values missing from `knownTaskIds`;
+- duplicate artifact or evidence refs;
+- missing `evidenceLinks`;
+- missing or malformed assumptions, open risks, checklist items, or stale-state indicators;
+- stale handoffs without linked `staleStateIndicators`;
+- stale indicators whose artifact ref is not listed in `artifactRefs` or `evidenceLinks`;
+- blocked handoffs without open risks;
+- unsafe `nextRecommendedAction` wording that implies automatic apply, merge, command execution, or source mutation.
+
+These checks make missing/stale context visible before the next role acts; they do not grant trusted persistence or apply authority.
 
 ## Fixture set
 

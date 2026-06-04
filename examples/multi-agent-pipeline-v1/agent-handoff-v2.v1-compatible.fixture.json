@@ -87,5 +87,10 @@
       "v2 artifact preserves v1 advisory boundary",
       "v1 loopId maps to v2 taskId and evidence links"
     ]
-  }
+  },
+  "knownTaskIds": [
+    "task-board-schema",
+    "reviewer-decision-gate",
+    "ownership-policy"
+  ]
 }
