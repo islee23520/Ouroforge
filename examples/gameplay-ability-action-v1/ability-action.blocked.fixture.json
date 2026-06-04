@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "gameplay-ability-action.v1",
+  "abilityPackId": "blocked-ability-actions",
+  "scope": "local-fixture",
+  "status": "blocked",
+  "abilities": [
+    {
+      "id": "unsupported-networked-summon",
+      "actionId": "action-networked-summon",
+      "label": "Unsupported networked summon",
+      "status": "blocked",
+      "runtimeStatus": "blocked",
+      "target": { "entityId": "summoner", "componentId": "ability-slot" },
+      "trigger": { "kind": "on_signal", "signalName": "summon_requested" },
+      "cooldown": { "id": "summon-cooldown", "durationMs": 5000 },
+      "costs": [{ "kind": "mana", "resourceId": "summoner-mana", "amount": 50 }],
+      "durationMs": 1000,
+      "effect": { "kind": "spawn_local_effect", "effectId": "summon-preview" },
+      "evidenceRefs": ["docs/gameplay-ability-action-v1.md"],
+      "blockedReasons": ["GL10.4.2 keeps this local and blocked; hosted/server/networked behavior is outside #614."]
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-ability-action-v1.md"],
+  "blockedReasons": ["GL10.4.3 must add evidence/read-model compatibility before blocked runtime status can be surfaced broadly."]
+}

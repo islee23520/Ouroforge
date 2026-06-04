@@ -1631,6 +1631,25 @@ assert.match(gameplayStateMachineDoc, /does not authorize arbitrary JS\/Rust\/Py
 assert.match(gameplayStateMachineDoc, /#1 remains the roadmap\/final-goal anchor/);
 assert.match(gameplayStateMachineDoc, /#23 remains the\s+memory\/governance anchor/);
 assert.doesNotMatch(gameplayStateMachineDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
+const gameplayAbilityActionDoc = fs.readFileSync(require.resolve('../../docs/gameplay-ability-action-v1.md'), 'utf8');
+const gameplayAbilityActionFixture = JSON.parse(fs.readFileSync(require.resolve('../../examples/gameplay-ability-action-v1/ability-action.valid.fixture.json'), 'utf8'));
+assert.equal(gameplayAbilityActionFixture.schemaVersion, 'gameplay-ability-action.v1');
+assert.deepEqual(gameplayAbilityActionFixture.abilities.map((ability) => ability.actionId), [
+  'action-dash',
+  'action-alert-strike',
+  'action-open-blue-door',
+  'action-hazard-pulse',
+  'action-complete-win-state'
+]);
+assert.doesNotMatch(JSON.stringify(gameplayAbilityActionFixture), /execute_script|plugin_loader|dynamic_import|eval\(|commandBridge|trustedWrite/);
+assert.match(docsReadme, /gameplay-ability-action-v1\.md/);
+assert.match(docsReadme, /structured ability\/action artifact schema/);
+assert.match(gameplayAbilityActionDoc, /Issue: #614/);
+assert.match(gameplayAbilityActionDoc, /GL10\.4\.2 defines\s+the ability\/action model and validation fixtures only/);
+assert.match(gameplayAbilityActionDoc, /does not authorize arbitrary JS\/Rust\/Python\/Lua\/WASM\s+execution/);
+assert.match(gameplayAbilityActionDoc, /#1 remains the roadmap\/final-goal anchor/);
+assert.match(gameplayAbilityActionDoc, /#23 remains the\s+memory\/governance anchor/);
+assert.doesNotMatch(gameplayAbilityActionDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
 const studio3dInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-3d-inspection-surface-v1.md'), 'utf8');
 assert.match(studio3dInspectionDoc, /Issue: #607/);
 assert.match(studio3dInspectionDoc, /no-write, no-command, no-3D-editor boundary/);
