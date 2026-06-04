@@ -3,8 +3,8 @@
 Issue #602 adds bounded 3D animation playback evidence with a source-like
 scene model for transform clip references and playback state. The current
 runtime slice advances transform-only clips deterministically in the browser
-runtime and exposes read-only `scene3dAnimation` world-state evidence. Dedicated
-scenario assertion integration remains staged in a later #602 PR unit.
+runtime and exposes read-only `scene3dAnimation` world-state evidence plus
+scenario assertion compatibility through the `scene3d_animation` target.
 
 ## Scene Contract
 
@@ -52,6 +52,29 @@ clip value to the target node's `localTransform` channel (`translation`,
 
 Playback is intentionally local and deterministic. It does not fetch assets,
 execute commands, persist trusted files, or infer animation quality.
+
+## Scenario Assertions
+
+Scenario runs write a read-only `scene3d-animation-evidence` artifact from the
+captured world state. Assertions can target `scene3d_animation` to check reached,
+playing, or stopped playback states, for example:
+
+```yaml
+assertions:
+  - scene3d_animation:
+      path: states.0.clipId
+      equals: cube-slide
+  - scene3d_animation:
+      path: states.0.currentFrame
+      equals: 2
+  - scene3d_animation:
+      path: states.0.playing
+      equals: true
+```
+
+The evaluator treats referenced `scene3d_animation` artifacts as linked
+scenario evidence and fails runs that report animation assertions without a
+readable evidence file.
 
 ## Boundary
 

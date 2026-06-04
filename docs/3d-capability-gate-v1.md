@@ -120,9 +120,9 @@ assertions can observe 3D contact/trigger events through world-state
 Issue #602 adds bounded 3D animation playback evidence with additive
 `scene3d.animationClips[]` and `scene3d.animationStates[]` source-like fields for
 transform clip/state validation plus browser-local deterministic transform
-playback and read-only `scene3dAnimation` evidence. Dedicated scenario assertion
-compatibility remains staged in a later #602 PR unit. The behavior is documented
-in [`3d-animation-playback-v1.md`](./3d-animation-playback-v1.md).
+playback, read-only `scene3dAnimation` evidence, and `scene3d_animation`
+scenario assertions for reached/playing/stopped playback checks. The behavior is
+documented in [`3d-animation-playback-v1.md`](./3d-animation-playback-v1.md).
 
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
