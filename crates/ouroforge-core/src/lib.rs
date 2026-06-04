@@ -10342,6 +10342,236 @@ pub struct SourcePatchPreviewRequiredTest {
     pub execution_authority: String,
 }
 
+pub const SOURCE_PATCH_TEST_COMMAND_ALLOWLIST_SCHEMA_VERSION: &str =
+    "source-patch-test-command-allowlist-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourcePatchTestCommandMatchPolicy {
+    Exact,
+    Prefix,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourcePatchTestCommandCategory {
+    RustFormatCheck,
+    RustFocusedTest,
+    RustFullTest,
+    RustClippy,
+    NodeSyntaxCheck,
+    NodeFixtureTest,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchAllowedTestCommand {
+    pub id: String,
+    pub command: String,
+    pub argv: Vec<String>,
+    pub category: SourcePatchTestCommandCategory,
+    #[serde(rename = "matchPolicy")]
+    pub match_policy: SourcePatchTestCommandMatchPolicy,
+    #[serde(rename = "workingDirectory")]
+    pub working_directory: String,
+    #[serde(rename = "mayWriteGeneratedArtifacts")]
+    pub may_write_generated_artifacts: bool,
+    #[serde(rename = "generatedOutputRoots")]
+    pub generated_output_roots: Vec<String>,
+    #[serde(rename = "timeoutSeconds")]
+    pub timeout_seconds: u64,
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommandAllowlistArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    pub commands: Vec<SourcePatchAllowedTestCommand>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommandAllowlistValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    #[serde(rename = "allowedCommandCount")]
+    pub allowed_command_count: usize,
+    #[serde(rename = "normalizedCommands")]
+    pub normalized_commands: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchTestCommandAllowlistValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommand {
+    pub command: String,
+    pub argv: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourcePatchTestCommandMatchKind {
+    Exact,
+    Prefix,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommandPolicy {
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    #[serde(rename = "matchKind")]
+    pub match_kind: SourcePatchTestCommandMatchKind,
+    pub argv: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommandMatch {
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    pub kind: SourcePatchTestCommandMatchKind,
+    #[serde(rename = "normalizedArgv")]
+    pub normalized_argv: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTestCommandAllowlist {
+    pub policies: Vec<SourcePatchTestCommandPolicy>,
+    pub boundary: String,
+}
+
+impl SourcePatchTestCommandAllowlist {
+    pub fn match_command(
+        &self,
+        command: &SourcePatchTestCommand,
+    ) -> Option<SourcePatchTestCommandMatch> {
+        let normalized_argv = command
+            .argv
+            .iter()
+            .map(|arg| arg.trim().to_string())
+            .collect::<Vec<_>>();
+        self.policies.iter().find_map(|policy| {
+            let matched = match policy.match_kind {
+                SourcePatchTestCommandMatchKind::Exact => normalized_argv == policy.argv,
+                SourcePatchTestCommandMatchKind::Prefix => {
+                    argv_matches_policy_prefix(normalized_argv.as_slice(), policy.argv.as_slice())
+                }
+            };
+            matched.then(|| SourcePatchTestCommandMatch {
+                policy_id: policy.policy_id.clone(),
+                kind: policy.match_kind.clone(),
+                normalized_argv: normalized_argv.clone(),
+                boundary: policy.boundary.clone(),
+            })
+        })
+    }
+}
+
+fn argv_matches_policy_prefix(argv: &[String], policy_prefix: &[String]) -> bool {
+    if argv.len() < policy_prefix.len() {
+        return false;
+    }
+    policy_prefix.iter().enumerate().all(|(index, expected)| {
+        let actual = &argv[index];
+        if expected.ends_with('/') {
+            actual.starts_with(expected)
+        } else {
+            actual == expected
+        }
+    })
+}
+
+pub fn default_source_patch_test_command_allowlist() -> SourcePatchTestCommandAllowlist {
+    let boundary = "inert source patch test command allowlist; does not execute commands";
+    SourcePatchTestCommandAllowlist {
+        boundary: boundary.to_string(),
+        policies: vec![
+            SourcePatchTestCommandPolicy {
+                policy_id: "cargo-fmt-check".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Exact,
+                argv: vec!["cargo", "fmt", "--check"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                boundary: boundary.to_string(),
+            },
+            SourcePatchTestCommandPolicy {
+                policy_id: "cargo-clippy-all-targets-all-features-deny-warnings".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Exact,
+                argv: vec![
+                    "cargo",
+                    "clippy",
+                    "--all-targets",
+                    "--all-features",
+                    "--",
+                    "-D",
+                    "warnings",
+                ]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+                boundary: boundary.to_string(),
+            },
+            SourcePatchTestCommandPolicy {
+                policy_id: "cargo-test-ouroforge-core-focused".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Prefix,
+                argv: vec!["cargo", "test", "-p", "ouroforge-core"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                boundary: boundary.to_string(),
+            },
+            SourcePatchTestCommandPolicy {
+                policy_id: "cargo-test-ouroforge-cli-focused".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Prefix,
+                argv: vec!["cargo", "test", "-p", "ouroforge-cli"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                boundary: boundary.to_string(),
+            },
+            SourcePatchTestCommandPolicy {
+                policy_id: "node-check-known-examples".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Prefix,
+                argv: vec!["node", "--check", "examples/"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                boundary: boundary.to_string(),
+            },
+            SourcePatchTestCommandPolicy {
+                policy_id: "node-test-known-examples".to_string(),
+                match_kind: SourcePatchTestCommandMatchKind::Prefix,
+                argv: vec!["node", "examples/"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                boundary: boundary.to_string(),
+            },
+        ],
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourcePatchPreviewRollbackExpectations {
@@ -10459,6 +10689,173 @@ impl SourcePatchPreviewValidation {
     pub fn is_blocked(&self) -> bool {
         self.status == "blocked"
     }
+}
+
+pub fn inspect_source_patch_test_command_allowlist(
+    artifact: &SourcePatchTestCommandAllowlistArtifact,
+) -> SourcePatchTestCommandAllowlistValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+    let mut normalized_commands = Vec::<String>::new();
+    let mut ids_seen = BTreeSet::<String>::new();
+
+    if artifact.schema_version != SOURCE_PATCH_TEST_COMMAND_ALLOWLIST_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_TEST_COMMAND_ALLOWLIST_SCHEMA_VERSION}"
+        ));
+    }
+    push_if_blank(&mut blocked_reasons, "policyId", &artifact.policy_id);
+    if artifact.commands.is_empty() {
+        blocked_reasons.push("commands must not be empty".to_string());
+    }
+    if !artifact
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("does not execute"))
+    {
+        blocked_reasons
+            .push("guardrails must state the policy does not execute commands".to_string());
+    }
+
+    for (index, command) in artifact.commands.iter().enumerate() {
+        let field = format!("commands[{index}]");
+        if !ids_seen.insert(command.id.clone()) {
+            blocked_reasons.push(format!("duplicate command id {}", command.id));
+        }
+        push_if_blank(&mut blocked_reasons, &format!("{field}.id"), &command.id);
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.command"),
+            &command.command,
+        );
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.workingDirectory"),
+            &command.working_directory,
+        );
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.rationale"),
+            &command.rationale,
+        );
+        if command.argv.is_empty() {
+            blocked_reasons.push(format!("{field}.argv must not be empty"));
+            continue;
+        }
+        if command.argv.iter().any(|arg| arg.trim().is_empty()) {
+            blocked_reasons.push(format!("{field}.argv entries must not be empty"));
+        }
+        if command.working_directory != "." {
+            blocked_reasons.push(format!(
+                "{field}.workingDirectory must be repository root '.' for this policy"
+            ));
+        }
+        if command.timeout_seconds == 0 || command.timeout_seconds > 1800 {
+            blocked_reasons.push(format!("{field}.timeoutSeconds must be between 1 and 1800"));
+        }
+        if command.may_write_generated_artifacts && command.generated_output_roots.is_empty() {
+            blocked_reasons.push(format!(
+                "{field}.generatedOutputRoots required when generated writes are declared"
+            ));
+        }
+        let normalized = normalize_source_patch_test_command(&command.argv);
+        if command.command != normalized {
+            blocked_reasons.push(format!(
+                "{field}.command must match normalized argv `{normalized}`"
+            ));
+        }
+        if !source_patch_test_command_matches_allowlist(command) {
+            blocked_reasons.push(format!(
+                "{field}.argv is not in the source patch test command allowlist"
+            ));
+        }
+        normalized_commands.push(normalized);
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchTestCommandAllowlistValidation {
+        schema_version: "source-patch-test-command-allowlist-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        policy_id: artifact.policy_id.clone(),
+        allowed_command_count: artifact.commands.len(),
+        normalized_commands,
+        blocked_reasons,
+        guardrails: vec![
+            "test command allowlist is inert policy data; it does not execute commands".to_string(),
+            "source patch apply to the trusted worktree remains unimplemented and forbidden"
+                .to_string(),
+            "browser/dashboard/Studio surfaces may display command text read-only only".to_string(),
+            "sandbox dry-run execution is future-scoped and must stay allowlist-only".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_test_command_allowlist(
+    artifact: &SourcePatchTestCommandAllowlistArtifact,
+) -> Result<SourcePatchTestCommandAllowlistValidation> {
+    let validation = inspect_source_patch_test_command_allowlist(artifact);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch test command allowlist blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+pub fn normalize_source_patch_test_command(argv: &[String]) -> String {
+    argv.iter()
+        .map(|arg| arg.trim())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn source_patch_test_command_matches_allowlist(command: &SourcePatchAllowedTestCommand) -> bool {
+    let argv = command.argv.iter().map(String::as_str).collect::<Vec<_>>();
+    match command.match_policy {
+        SourcePatchTestCommandMatchPolicy::Exact => source_patch_exact_test_commands()
+            .iter()
+            .any(|allowed| allowed.as_slice() == argv.as_slice()),
+        SourcePatchTestCommandMatchPolicy::Prefix => source_patch_prefix_test_commands()
+            .iter()
+            .any(|allowed| argv.starts_with(allowed.as_slice())),
+    }
+}
+
+fn source_patch_exact_test_commands() -> Vec<Vec<&'static str>> {
+    vec![
+        vec!["cargo", "fmt", "--check"],
+        vec!["cargo", "test"],
+        vec![
+            "cargo",
+            "clippy",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+        ],
+        vec![
+            "node",
+            "--check",
+            "examples/evidence-dashboard/dashboard.js",
+        ],
+        vec!["node", "examples/evidence-dashboard/dashboard.test.cjs"],
+        vec!["node", "--check", "examples/authoring-cockpit/cockpit.js"],
+        vec!["node", "examples/authoring-cockpit/cockpit.test.cjs"],
+    ]
+}
+
+fn source_patch_prefix_test_commands() -> Vec<Vec<&'static str>> {
+    vec![
+        vec!["cargo", "test", "-p", "ouroforge-core"],
+        vec!["cargo", "test", "-p", "ouroforge-cli"],
+    ]
 }
 
 pub fn source_patch_preview_read_model(
