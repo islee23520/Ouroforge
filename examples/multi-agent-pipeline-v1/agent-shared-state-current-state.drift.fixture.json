@@ -1,0 +1,62 @@
+{
+  "projectManifestHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "sceneHashes": [
+    {
+      "id": "scene-main",
+      "path": "examples/project-fixtures/minimal/scene.json",
+      "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "scene-new",
+      "path": "examples/project-fixtures/minimal/scene-extra.json",
+      "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "tilemapHashes": [],
+  "assetManifestHash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "behaviorVersionHashes": [
+    {
+      "id": "behavior-rules",
+      "path": "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+      "hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "scenarioPackHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "openTasks": [
+    "task-review-qa-handoff",
+    "task-new-current"
+  ],
+  "ownershipMap": [
+    {
+      "owner": "qa-agent",
+      "artifactRefs": [
+        {
+          "id": "task-board",
+          "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+          "description": "fixture task board"
+        }
+      ]
+    },
+    {
+      "owner": "reviewer",
+      "artifactRefs": [
+        {
+          "id": "handoff",
+          "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+          "description": "fixture handoff"
+        }
+      ]
+    },
+    {
+      "owner": "performance-regression-agent",
+      "artifactRefs": [
+        {
+          "id": "regression-lane",
+          "path": "examples/multi-agent-pipeline-v1/qa-worker-assignment.valid.fixture.json",
+          "description": "current regression ownership"
+        }
+      ]
+    }
+  ],
+  "pendingReviews": []
+}
