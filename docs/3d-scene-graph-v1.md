@@ -28,9 +28,14 @@ The `entities` array is still the legacy 2D entity list. It may be present in an
 - `localTransform`: required integer translation, rotation, and scale vectors with `x`, `y`, and `z` axes.
 - `worldTransform`: optional resolved transform slot for later deterministic world-transform evidence.
 - `meshRef` / `colliderRef`: optional local identifiers, not a broad asset import pipeline.
+- `components`: optional bounded component declarations. Version 1 accepts only
+  `mesh`, `collider`, and `marker` component kinds; script/runtime/editor
+  components are intentionally rejected until a later issue scopes them.
 - `metadata`: bounded JSON metadata for fixture notes.
 
-Scale axes must be non-zero. Numeric components are deliberately bounded for small deterministic local scenes.
+Hierarchy validation rejects duplicate ids, missing parents, self-parenting, and
+cycles. Scale axes must be non-zero. Numeric components are deliberately bounded
+for small deterministic local scenes.
 
 ## Source-like fixture policy
 
@@ -41,6 +46,11 @@ The initial fixtures cover:
 - valid explicit 3D schema: `scene-3d-valid.scene.json`;
 - invalid explicit 3D schema with missing graph: `scene-3d-invalid-missing-graph.scene.json`;
 - malformed 3D transform shape: `scene-3d-malformed-transform.scene.json`;
+- hierarchy and component validation failures: `scene-3d-invalid-missing-parent.scene.json`,
+  `scene-3d-invalid-duplicate-id.scene.json`,
+  `scene-3d-invalid-cycle.scene.json`,
+  `scene-3d-invalid-zero-scale.scene.json`, and
+  `scene-3d-invalid-unsupported-component.scene.json`;
 - mixed explicit 3D scene with legacy 2D compatibility data: `scene-3d-mixed-2d-compatibility.scene.json`.
 
 ## Boundaries

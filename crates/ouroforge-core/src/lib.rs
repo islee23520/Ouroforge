@@ -32647,6 +32647,18 @@ pub struct Scene3dNode {
         skip_serializing_if = "Option::is_none"
     )]
     pub collider_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub components: Vec<Scene3dComponent>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dComponent {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference: Option<String>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -36001,10 +36013,29 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
         return Err(anyhow!("scene3d nodes must not be empty"));
     }
     validate_scene_metadata("scene3d metadata", &graph.metadata)?;
+    let mut node_ids = BTreeSet::new();
     for node in &graph.nodes {
         validate_path_component("scene3d node id", &node.id)?;
+        if !node_ids.insert(node.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d node id: {}", node.id));
+        }
+    }
+    for node in &graph.nodes {
         if let Some(parent) = &node.parent {
             validate_path_component(&format!("scene3d node {} parent", node.id), parent)?;
+            if parent == &node.id {
+                return Err(anyhow!(
+                    "scene3d node {} parent must not reference itself",
+                    node.id
+                ));
+            }
+            if !node_ids.contains(parent.as_str()) {
+                return Err(anyhow!(
+                    "scene3d node {} references missing parent: {}",
+                    node.id,
+                    parent
+                ));
+            }
         }
         validate_scene_3d_transform(
             &format!("scene3d node {} localTransform", node.id),
@@ -36025,11 +36056,63 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 collider_ref,
             )?;
         }
+        for component in &node.components {
+            validate_scene_3d_component(&node.id, component)?;
+        }
         validate_scene_metadata(
             &format!("scene3d node {} metadata", node.id),
             &node.metadata,
         )?;
     }
+    for node in &graph.nodes {
+        let mut seen = BTreeSet::new();
+        let mut current = node.parent.as_deref();
+        while let Some(parent_id) = current {
+            if !seen.insert(parent_id) {
+                return Err(anyhow!(
+                    "scene3d hierarchy cycle detected at node {}",
+                    node.id
+                ));
+            }
+            current = graph
+                .nodes
+                .iter()
+                .find(|candidate| candidate.id == parent_id)
+                .and_then(|parent| parent.parent.as_deref());
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_component(node_id: &str, component: &Scene3dComponent) -> Result<()> {
+    validate_path_component(
+        &format!("scene3d node {node_id} component kind"),
+        &component.kind,
+    )?;
+    match component.kind.as_str() {
+        "mesh" | "collider" | "marker" => {}
+        other => {
+            return Err(anyhow!(
+                "scene3d node {node_id} has unsupported component kind: {other}"
+            ));
+        }
+    }
+    if let Some(reference) = &component.reference {
+        validate_path_component(
+            &format!(
+                "scene3d node {node_id} component {} reference",
+                component.kind
+            ),
+            reference,
+        )?;
+    }
+    validate_scene_metadata(
+        &format!(
+            "scene3d node {node_id} component {} metadata",
+            component.kind
+        ),
+        &component.metadata,
+    )?;
     Ok(())
 }
 
@@ -62535,6 +62618,8 @@ scenarios:
             graph.nodes[0].collider_ref.as_deref(),
             Some("cube-collider")
         );
+        assert_eq!(graph.nodes[0].components.len(), 2);
+        assert_eq!(graph.nodes[0].components[0].kind, "mesh");
     }
 
     #[test]
@@ -62598,6 +62683,43 @@ scenarios:
         ))
         .expect_err("malformed 3D transform is rejected by schema parsing");
         assert!(malformed.to_string().contains("missing field `z`"));
+    }
+
+    #[test]
+    fn scene_3d_hierarchy_v1_rejects_invalid_parent_graphs_and_components() {
+        for (fixture, expected) in [
+            (
+                "examples/3d-capability-gate-v1/scene-3d-invalid-missing-parent.scene.json",
+                "references missing parent",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-invalid-duplicate-id.scene.json",
+                "duplicate scene3d node id",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-invalid-cycle.scene.json",
+                "scene3d hierarchy cycle detected",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-invalid-zero-scale.scene.json",
+                "scale axes must be non-zero",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-invalid-unsupported-component.scene.json",
+                "unsupported component kind",
+            ),
+        ] {
+            let scene: SceneDocument = serde_json::from_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
+            let error = match validate_scene(&scene) {
+                Ok(()) => panic!("{fixture} rejected by 3D validation"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains(expected),
+                "{fixture} error {error:#} contains {expected}"
+            );
+        }
     }
 
     #[test]
