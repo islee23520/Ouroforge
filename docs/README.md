@@ -110,3 +110,7 @@ git status --short --ignored
 Matches are acceptable only when they are conservative boundary statements,
 explicit negations, non-goals, or wording-audit examples. Generated local state
 should remain ignored/untracked.
+
+## Documents
+
+- [Canonical Demo Script v1](canonical-demo-script-v1.md) — non-destructive local demo command sequence and command audit.
