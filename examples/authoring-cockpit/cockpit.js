@@ -789,6 +789,21 @@ const OuroforgeCockpit = (() => {
         })),
       };
     }
+    if (targetType === 'asset-reference') {
+      return {
+        ...common,
+        kind: 'asset-reference-draft-controls',
+        label: 'Asset-reference draft controls',
+        boundary: 'Display-only asset-reference controls; Studio does not upload assets, fetch remote assets, write manifests, execute commands, or apply edits.',
+        controls: operations.slice(0, 4).map((operation, index) => ({
+          id: operation.id || `asset-reference-operation-${index + 1}`,
+          label: operation.summary || operation.kind || 'Asset-reference operation preview',
+          field: operation.path || operation.assetPath || operation.asset_path || 'asset manifest reference',
+          value: operation.assetId || operation.asset_id || operation.value || operation.afterValue || operation.after_value || draft?.target?.id || 'pending trusted preview',
+          hint: 'Asset-reference edits remain inert until copied to the Rust CLI asset preflight/review flow.',
+        })),
+      };
+    }
     return {
       ...common,
       kind: 'unsupported-draft-controls',
@@ -799,7 +814,7 @@ const OuroforgeCockpit = (() => {
 
   function renderStudioDraftControls(draft) {
     const model = studioDraftControlModel(draft);
-    if (!['scene-draft-controls', 'tilemap-draft-controls'].includes(model.kind)) {
+    if (!['scene-draft-controls', 'tilemap-draft-controls', 'asset-reference-draft-controls'].includes(model.kind)) {
       return `<p class="hint">${escapeText(model.label)}: ${escapeText(model.blockedReasons.join('; '))}</p>`;
     }
     const controlRows = model.controls.map((control) => `<label>${escapeText(control.label)}<br><input type="text" value="${escapeText(control.value)}" disabled readonly data-draft-field="${escapeText(control.field)}"><small>${escapeText(control.field)} · ${escapeText(control.hint)}</small></label>`).join('') || '<p class="empty">No bounded controls are available for this draft.</p>';
