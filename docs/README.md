@@ -1,0 +1,112 @@
+# Ouroforge documentation index
+
+This index is the public-alpha navigation layer for the `docs/` directory. It is
+not a replacement for the milestone contracts; it points readers to the smallest
+useful starting set, then preserves deeper milestone documents as references.
+
+Ouroforge is a local-first, pre-release MVP. These docs do not authorize a public
+launch, release publication, repository visibility change, source apply,
+browser trusted writes, command bridges, secure sandboxing, or production support
+commitment.
+
+## Start here
+
+| Reader goal | Start with | Why |
+| --- | --- | --- |
+| Understand the project quickly | [`../README.md`](../README.md) | Public-alpha overview, quickstart, safety model, non-goals, and repository map. |
+| Understand the loop architecture | [`architecture.md`](architecture.md) | Explains Seed → Run → Evidence → Evaluation → Journal → Mutation. |
+| See what is complete and what is next | [`roadmap.md`](roadmap.md) | Canonical roadmap and completed milestone references. |
+| Run or verify the public-alpha demo | [`public-demo-evidence.md`](public-demo-evidence.md), [`public-demo-smoke-evidence-policy-v1.md`](public-demo-smoke-evidence-policy-v1.md) | Reproducible local demo evidence and generated-state expectations. |
+| Check safety/trust boundaries | [`evidence-fidelity-trust-boundary-v1.md`](evidence-fidelity-trust-boundary-v1.md), [`public-alpha-security-trust-boundary-v1.md`](public-alpha-security-trust-boundary-v1.md), [`public-alpha-disclosure-and-sandbox-limitations-v1.md`](public-alpha-disclosure-and-sandbox-limitations-v1.md) | Browser read-only, generated-state, disclosure, sandbox/dry-run, and no-source-apply boundaries. |
+| Prepare or review a contribution | [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`artifact-write-policy-v1.md`](artifact-write-policy-v1.md), [`public-wording-guardrail-v1.md`](public-wording-guardrail-v1.md) | Review workflow, trusted-write categories, generated-state rules, and conservative wording checks. |
+
+## Safety/trust boundaries
+
+See the safety/trust rows in [Start here](#start-here), plus the source-preview
+and sandbox boundary section below.
+
+## Public-alpha readiness and governance
+
+Use these when reviewing public-readiness changes. They are governance/evidence
+references, not launch approval:
+
+- [`public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md) — public-alpha gate checklist and failure modes.
+- [`public-readiness-audit.md`](public-readiness-audit.md) — readiness audit evidence.
+- [`public-launch-checklist.md`](public-launch-checklist.md) — manual launch/visibility checklist; it does not change repository visibility.
+- [`public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md) — launch governance and decision boundaries.
+- [`public-alpha-readiness-governance-handoff-v1.md`](public-alpha-readiness-governance-handoff-v1.md) — handoff evidence for later governance.
+- [`public-alpha-readiness-final-audit-v1.md`](public-alpha-readiness-final-audit-v1.md) and [`public-alpha-readiness-final-report-v1.md`](public-alpha-readiness-final-report-v1.md) — final public-alpha readiness evidence.
+- [`release-versioning-policy-v1.md`](release-versioning-policy-v1.md) and [`release-artifact-policy-v1.md`](release-artifact-policy-v1.md) — versioning and release artifact policy without publication automation.
+
+## Core loop and evidence contracts
+
+Read these for the foundational local loop and generated artifact contracts:
+
+- [`architecture.md`](architecture.md)
+- [`runtime-v1.md`](runtime-v1.md) and [`runtime-v1-demo.md`](runtime-v1-demo.md)
+- [`runtime-probe-contract-v2.md`](runtime-probe-contract-v2.md)
+- [`scenario-evaluator-v1.md`](scenario-evaluator-v1.md) and [`scenario-evaluator-v1-demo.md`](scenario-evaluator-v1-demo.md)
+- [`evidence-backed-journal-v2.md`](evidence-backed-journal-v2.md)
+- [`mutation-proposal-quality-v2.md`](mutation-proposal-quality-v2.md)
+- [`run-comparison-v2.md`](run-comparison-v2.md)
+- [`regression-run-matrix-v1.md`](regression-run-matrix-v1.md)
+- [`reproducible-run-command-context-v1.md`](reproducible-run-command-context-v1.md)
+
+## Project, scene, asset, and gameplay contracts
+
+Use these for source-like models and fixture-backed engine capability references:
+
+- [`project-manifest-v1.md`](project-manifest-v1.md), [`project-scaffold-v1.md`](project-scaffold-v1.md), [`project-run-v1.md`](project-run-v1.md), [`project-workspace-loop-v1.md`](project-workspace-loop-v1.md), [`project-mutation-loop-v1.md`](project-mutation-loop-v1.md)
+- [`scene-component-model-v2.md`](scene-component-model-v2.md), [`scene-edit-transactions.md`](scene-edit-transactions.md), [`scene-only-mutation-v2.md`](scene-only-mutation-v2.md), [`scene-transitions-v1.md`](scene-transitions-v1.md)
+- [`asset-manifest-v1.md`](asset-manifest-v1.md), [`asset-pipeline-v1.md`](asset-pipeline-v1.md), [`asset-preview-evidence-v1.md`](asset-preview-evidence-v1.md), [`asset-reference-integrity-v1.md`](asset-reference-integrity-v1.md), [`sprite-atlas-manifest-v1.md`](sprite-atlas-manifest-v1.md), [`tileset-tilemap-authoring-v2.md`](tileset-tilemap-authoring-v2.md)
+- [`collision-physics-v2.md`](collision-physics-v2.md), [`gameplay-trigger-flags-v1.md`](gameplay-trigger-flags-v1.md), [`engine-expansion-v1.md`](engine-expansion-v1.md), [`engine-expressiveness-v2.md`](engine-expressiveness-v2.md)
+
+## Authoring, Studio, and review surfaces
+
+These docs describe local authoring flows and read-only/review-gated inspection
+surfaces. They do not create browser trusted writes or source apply authority:
+
+- [`agentic-loop-orchestration-v1.md`](agentic-loop-orchestration-v1.md), [`authoring-loop-plan-v1.md`](authoring-loop-plan-v1.md), [`authoring-loop-dry-run-v1.md`](authoring-loop-dry-run-v1.md), [`authoring-loop-execution-v1.md`](authoring-loop-execution-v1.md), [`authoring-loop-recovery-v1.md`](authoring-loop-recovery-v1.md), [`authoring-loop-evidence-bundle-v1.md`](authoring-loop-evidence-bundle-v1.md)
+- [`agent-handoff-contract-v1.md`](agent-handoff-contract-v1.md), [`agent-role-model-v1.md`](agent-role-model-v1.md), [`review-decision-ledger-v1.md`](review-decision-ledger-v1.md)
+- [`studio-v1.md`](studio-v1.md), [`studio-v2-cockpit.md`](studio-v2-cockpit.md), [`studio-v3-project-workspace-cockpit.md`](studio-v3-project-workspace-cockpit.md), [`studio-review-cockpit-v1.md`](studio-review-cockpit-v1.md), [`studio-evidence-fidelity-surfaces.md`](studio-evidence-fidelity-surfaces.md), [`studio-asset-inspector-v1.md`](studio-asset-inspector-v1.md)
+- [`visual-authoring-v1.md`](visual-authoring-v1.md), [`visual-edit-draft-model-v1.md`](visual-edit-draft-model-v1.md)
+
+## Source preview, sandbox, and apply-boundary references
+
+These documents are easy to misread as source-write authorization. Treat them as
+preview, review, sandbox, threat-model, or later-governance references unless a
+specific document says a trusted operation is implemented and bounded. Public
+alpha still forbids browser command bridges, hidden command execution, and source
+apply from browser surfaces.
+
+- [`source-mutation-threat-model-v1.md`](source-mutation-threat-model-v1.md), [`source-apply-threat-model-refresh-v1.md`](source-apply-threat-model-refresh-v1.md)
+- [`source-mutation-design-gate-v1.md`](source-mutation-design-gate-v1.md), [`source-mutation-design-gate-governance-handoff.md`](source-mutation-design-gate-governance-handoff.md)
+- [`source-mutation-preview-v1.md`](source-mutation-preview-v1.md), [`patch-preview-artifact-v1.md`](patch-preview-artifact-v1.md), [`patch-diff-integrity-v1.md`](patch-diff-integrity-v1.md)
+- [`source-mutation-file-classes-v1.md`](source-mutation-file-classes-v1.md), [`source-file-class-validator-v1.md`](source-file-class-validator-v1.md)
+- [`source-mutation-sandbox-boundary-v1.md`](source-mutation-sandbox-boundary-v1.md), [`source-patch-sandbox-dry-run-evaluator-v1.md`](source-patch-sandbox-dry-run-evaluator-v1.md), [`source-patch-test-command-allowlist-v1.md`](source-patch-test-command-allowlist-v1.md)
+- [`source-patch-review-gate-v1.md`](source-patch-review-gate-v1.md), [`source-patch-stale-target-guard-v1.md`](source-patch-stale-target-guard-v1.md), [`source-patch-apply-transaction-v1.md`](source-patch-apply-transaction-v1.md), [`safe-source-mutation-apply-v1.md`](safe-source-mutation-apply-v1.md)
+
+## Optional/future capability references
+
+These are design or roadmap references, not current public-alpha capability
+claims:
+
+- [`production-2d-engine-core-v1.md`](production-2d-engine-core-v1.md)
+- [`native-export-design.md`](native-export-design.md)
+- [`plugin-system-design.md`](plugin-system-design.md)
+- [`distributed-elixir-design.md`](distributed-elixir-design.md)
+- [`godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md)
+- [`post-launch-roadmap-triage-v1.md`](post-launch-roadmap-triage-v1.md) and [`post-launch-roadmap-response-snippets-v1.md`](post-launch-roadmap-response-snippets-v1.md)
+
+## Generated-state and wording audits
+
+Before publishing public-facing doc changes, check:
+
+```bash
+grep -RInE "Godot replacement|Godot parity|production-ready|production ready|commercial-release ready|ship-ready|compatibility-stable|stable public engine API|secure sandbox|sandbox guarantee|source apply ready|auto-apply|auto-merge|autonomous repair|browser trusted write|command bridge|local server bridge|native export ready|desktop/mobile export|installer|app-store ready|plugin runtime ready|extension marketplace|third-party code loading|hosted service|cloud runtime|multi-user auth|autonomous launch|public release automation|go-live automation|support SLA|guaranteed support|security guarantee" README.md CONTRIBUTING.md SECURITY.md docs examples .github || true
+git status --short --ignored
+```
+
+Matches are acceptable only when they are conservative boundary statements,
+explicit negations, non-goals, or wording-audit examples. Generated local state
+should remain ignored/untracked.

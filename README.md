@@ -198,18 +198,17 @@ generated/local runtime state untracked.
 
 ## Documentation map
 
+Use [`docs/README.md`](docs/README.md) as the expanded documentation index. The
+README keeps only the most common starting points so public-alpha readers do not
+have to scan every milestone contract first.
+
 | Reader question | Start here |
 | --- | --- |
 | How does the loop work in detail? | [`docs/architecture.md`](docs/architecture.md) |
 | What is complete and what is next? | [`docs/roadmap.md`](docs/roadmap.md) |
-| What is the trust boundary? | [`docs/evidence-fidelity-trust-boundary-v1.md`](docs/evidence-fidelity-trust-boundary-v1.md), [`docs/public-alpha-security-trust-boundary-v1.md`](docs/public-alpha-security-trust-boundary-v1.md) |
-| How are generated files separated from source? | [`docs/artifact-write-policy-v1.md`](docs/artifact-write-policy-v1.md) |
-| What must happen before public visibility? | [`docs/public-readiness-audit.md`](docs/public-readiness-audit.md), [`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), [`docs/public-alpha-readiness-governance-handoff-v1.md`](docs/public-alpha-readiness-governance-handoff-v1.md) |
-| What are the release/versioning boundaries? | [`docs/release-versioning-policy-v1.md`](docs/release-versioning-policy-v1.md), [`docs/release-artifact-policy-v1.md`](docs/release-artifact-policy-v1.md) |
+| What is the trust boundary? | [`docs/README.md#safetytrust-boundaries`](docs/README.md#safetytrust-boundaries) |
+| Where are milestone references grouped? | [`docs/README.md`](docs/README.md) |
 | What wording is forbidden or risky? | [`docs/public-wording-guardrail-v1.md`](docs/public-wording-guardrail-v1.md), [`docs/public-wording-audit-process-v1.md`](docs/public-wording-audit-process-v1.md) |
-
-The full set of milestone contracts and demo-evidence notes lives under
-[`docs/`](docs/).
 
 ## Repository map
 
