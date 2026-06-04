@@ -83,7 +83,8 @@ proves a safer dependency order:
    ([Objective Completion Proof v1](objective-completion-proof-v1.md)).
 8. #635 - Difficulty, Pacing, and Balance Heuristic Evidence v1
    ([Difficulty Pacing Heuristic Evidence v1](difficulty-pacing-heuristic-evidence-v1.md)).
-9. #636 - Level Visual Diff and Semantic Comparison v1.
+9. #636 - Level Visual Diff and Semantic Comparison v1
+   ([Level Visual Semantic Diff v1](level-visual-semantic-diff-v1.md)).
 10. #637 - Agent-Generated Level Draft v1.
 11. #638 - Review-Gated Level Apply v1.
 12. #639 - Studio Level Design Inspection Surface v1.

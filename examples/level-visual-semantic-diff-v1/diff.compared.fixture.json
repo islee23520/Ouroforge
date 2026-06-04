@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "level-visual-semantic-diff-v1",
+  "diffId": "level_diff_collect_intro_compared",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "beforeDraftRef": "evidence/level-drafts/collect-intro-before/draft.json",
+  "afterDraftRef": "evidence/level-drafts/collect-intro-after/draft.json",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-completion/objective_collect_and_exit_complete/read-model.json",
+  "heuristicEvidenceRef": "evidence/difficulty-pacing/heuristics_collect_intro_within_target/read-model.json",
+  "transactionRef": "evidence/transactions/collect-intro-preview.json",
+  "changes": [
+    {
+      "changeId": "moved_key",
+      "category": "moved_entity",
+      "summary": "Moved key closer to the first checkpoint.",
+      "beforeRef": "evidence/level-diff/level_diff_collect_intro_compared/before-key.json",
+      "afterRef": "evidence/level-diff/level_diff_collect_intro_compared/after-key.json"
+    },
+    {
+      "changeId": "changed_hazard_region",
+      "category": "changed_region",
+      "summary": "Reduced hazard region near the exit."
+    },
+    {
+      "changeId": "changed_heuristic_warning",
+      "category": "changed_heuristic_warning",
+      "summary": "Hazard density warning cleared."
+    }
+  ],
+  "expectedScenarioImpacts": [
+    {
+      "scenarioId": "collect-and-exit",
+      "summary": "Expected to preserve completion while reducing early hazard pressure.",
+      "severity": "low"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "semantic-summary",
+      "kind": "semantic_summary",
+      "pathHint": "evidence/level-diff/level_diff_collect_intro_compared/semantic-summary.json"
+    }
+  ],
+  "status": "compared",
+  "guardrails": [
+    "Read-only diff evidence; no browser trusted diff computation."
+  ]
+}

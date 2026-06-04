@@ -18681,6 +18681,406 @@ fn difficulty_status_label(status: DifficultyHeuristicEvidenceStatus) -> &'stati
     }
 }
 
+const LEVEL_VISUAL_SEMANTIC_DIFF_SCHEMA_VERSION: &str = "level-visual-semantic-diff-v1";
+const LEVEL_VISUAL_SEMANTIC_DIFF_READ_MODEL_SCHEMA_VERSION: &str =
+    "level-visual-semantic-diff-read-model-v1";
+const MAX_LEVEL_DIFF_CHANGES: usize = 128;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelVisualSemanticDiffArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "diffId")]
+    pub diff_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "beforeDraftRef")]
+    pub before_draft_ref: String,
+    #[serde(rename = "afterDraftRef")]
+    pub after_draft_ref: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "reachabilityEvidenceRef")]
+    pub reachability_evidence_ref: String,
+    #[serde(rename = "objectiveProofRef")]
+    pub objective_proof_ref: String,
+    #[serde(rename = "heuristicEvidenceRef")]
+    pub heuristic_evidence_ref: String,
+    #[serde(
+        rename = "transactionRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub transaction_ref: Option<String>,
+    pub changes: Vec<LevelSemanticChange>,
+    #[serde(rename = "expectedScenarioImpacts")]
+    pub expected_scenario_impacts: Vec<LevelScenarioImpact>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<LevelDiffExpectedEvidence>,
+    pub status: LevelDiffStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelSemanticChange {
+    #[serde(rename = "changeId")]
+    pub change_id: String,
+    pub category: LevelSemanticChangeCategory,
+    pub summary: String,
+    #[serde(rename = "beforeRef", default, skip_serializing_if = "Option::is_none")]
+    pub before_ref: Option<String>,
+    #[serde(rename = "afterRef", default, skip_serializing_if = "Option::is_none")]
+    pub after_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelSemanticChangeCategory {
+    AddedEntity,
+    RemovedEntity,
+    MovedEntity,
+    ChangedEntity,
+    ChangedTile,
+    ChangedRegion,
+    ChangedObjectiveProof,
+    ChangedReachability,
+    ChangedHeuristicWarning,
+    ChangedBlocker,
+    Unchanged,
+    MissingEvidence,
+    Partial,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelScenarioImpact {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub summary: String,
+    pub severity: LevelScenarioImpactSeverity,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelScenarioImpactSeverity {
+    None,
+    Low,
+    Medium,
+    High,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelDiffExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: LevelDiffExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelDiffExpectedEvidenceKind {
+    VisualSummary,
+    SemanticSummary,
+    ScenarioImpact,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelDiffStatus {
+    Compared,
+    Unchanged,
+    Partial,
+    MissingEvidence,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelVisualSemanticDiffReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "diffId")]
+    pub diff_id: String,
+    pub status: String,
+    #[serde(rename = "changeCount")]
+    pub change_count: usize,
+    #[serde(rename = "semanticChangeCount")]
+    pub semantic_change_count: usize,
+    #[serde(rename = "missingEvidenceCount")]
+    pub missing_evidence_count: usize,
+    #[serde(rename = "partialCount")]
+    pub partial_count: usize,
+    #[serde(rename = "scenarioImpactCount")]
+    pub scenario_impact_count: usize,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl LevelVisualSemanticDiffArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: LevelVisualSemanticDiffArtifact = serde_json::from_str(input)
+            .context("failed to parse Level Visual Semantic Diff JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != LEVEL_VISUAL_SEMANTIC_DIFF_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "level visual semantic diff schemaVersion must be {LEVEL_VISUAL_SEMANTIC_DIFF_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("level diff diffId", &self.diff_id)?;
+        validate_path_component("level diff intentId", &self.intent_id)?;
+        validate_path_component("level diff planId", &self.plan_id)?;
+        validate_evidence_artifact_path(&self.before_draft_ref)?;
+        validate_evidence_artifact_path(&self.after_draft_ref)?;
+        validate_repo_relative_source_ref("level diff targetSceneRef", &self.target_scene_ref)?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "level diff targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        validate_evidence_artifact_path(&self.reachability_evidence_ref)?;
+        validate_evidence_artifact_path(&self.objective_proof_ref)?;
+        validate_evidence_artifact_path(&self.heuristic_evidence_ref)?;
+        if let Some(transaction_ref) = &self.transaction_ref {
+            validate_evidence_artifact_path(transaction_ref)?;
+        }
+        validate_level_diff_changes(&self.changes)?;
+        validate_level_scenario_impacts(&self.expected_scenario_impacts)?;
+        validate_level_diff_expected_evidence(&self.diff_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("level diff blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("level diff guardrails", guardrail)?;
+        }
+        validate_level_diff_status(self.status, &self.changes, &self.blocked_reasons)
+    }
+}
+
+pub fn level_visual_semantic_diff_read_model_from_json_str(
+    input: &str,
+) -> Result<LevelVisualSemanticDiffReadModel> {
+    let artifact = LevelVisualSemanticDiffArtifact::from_json_str(input)?;
+    Ok(level_visual_semantic_diff_read_model(&artifact))
+}
+
+pub fn level_visual_semantic_diff_read_model(
+    artifact: &LevelVisualSemanticDiffArtifact,
+) -> LevelVisualSemanticDiffReadModel {
+    let count_category = |category| {
+        artifact
+            .changes
+            .iter()
+            .filter(|change| change.category == category)
+            .count()
+    };
+    LevelVisualSemanticDiffReadModel {
+        schema_version: LEVEL_VISUAL_SEMANTIC_DIFF_READ_MODEL_SCHEMA_VERSION.to_string(),
+        diff_id: artifact.diff_id.clone(),
+        status: level_diff_status_label(artifact.status).to_string(),
+        change_count: artifact.changes.len(),
+        semantic_change_count: artifact
+            .changes
+            .iter()
+            .filter(|change| change.category != LevelSemanticChangeCategory::Unchanged)
+            .count(),
+        missing_evidence_count: count_category(LevelSemanticChangeCategory::MissingEvidence),
+        partial_count: count_category(LevelSemanticChangeCategory::Partial),
+        scenario_impact_count: artifact.expected_scenario_impacts.len(),
+        linked_evidence_refs: level_diff_linked_refs(artifact),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only level visual and semantic diff evidence; trusted diffs are local Rust-validated artifacts, browser and Studio display only, no scene writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn level_diff_linked_refs(artifact: &LevelVisualSemanticDiffArtifact) -> Vec<String> {
+    std::iter::once(artifact.before_draft_ref.clone())
+        .chain(std::iter::once(artifact.after_draft_ref.clone()))
+        .chain(std::iter::once(artifact.reachability_evidence_ref.clone()))
+        .chain(std::iter::once(artifact.objective_proof_ref.clone()))
+        .chain(std::iter::once(artifact.heuristic_evidence_ref.clone()))
+        .chain(artifact.transaction_ref.iter().cloned())
+        .chain(
+            artifact
+                .expected_evidence
+                .iter()
+                .map(|evidence| evidence.path_hint.clone()),
+        )
+        .collect()
+}
+
+fn validate_level_diff_changes(changes: &[LevelSemanticChange]) -> Result<()> {
+    if changes.is_empty() || changes.len() > MAX_LEVEL_DIFF_CHANGES {
+        return Err(anyhow!(
+            "level diff changes must contain between 1 and {MAX_LEVEL_DIFF_CHANGES} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for change in changes {
+        validate_path_component("level diff changes.changeId", &change.change_id)?;
+        require_bounded_display_text("level diff changes.summary", &change.summary)?;
+        if let Some(before_ref) = &change.before_ref {
+            validate_evidence_artifact_path(before_ref)?;
+        }
+        if let Some(after_ref) = &change.after_ref {
+            validate_evidence_artifact_path(after_ref)?;
+        }
+        if !ids.insert(change.change_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate level diff changes.changeId: {}",
+                change.change_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_level_scenario_impacts(impacts: &[LevelScenarioImpact]) -> Result<()> {
+    if impacts.is_empty() || impacts.len() > MAX_LEVEL_DIFF_CHANGES {
+        return Err(anyhow!(
+            "level diff expectedScenarioImpacts must contain between 1 and {MAX_LEVEL_DIFF_CHANGES} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for impact in impacts {
+        validate_path_component(
+            "level diff expectedScenarioImpacts.scenarioId",
+            &impact.scenario_id,
+        )?;
+        require_bounded_display_text(
+            "level diff expectedScenarioImpacts.summary",
+            &impact.summary,
+        )?;
+        if !ids.insert(impact.scenario_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate level diff expectedScenarioImpacts.scenarioId: {}",
+                impact.scenario_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_level_diff_expected_evidence(
+    diff_id: &str,
+    values: &[LevelDiffExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("level diff expectedEvidence must not be empty"));
+    }
+    let expected_prefix = format!("evidence/level-diff/{diff_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "level diff expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "level diff expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate level diff expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate level diff expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_level_diff_status(
+    status: LevelDiffStatus,
+    changes: &[LevelSemanticChange],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_missing = changes
+        .iter()
+        .any(|change| change.category == LevelSemanticChangeCategory::MissingEvidence);
+    let has_partial = changes
+        .iter()
+        .any(|change| change.category == LevelSemanticChangeCategory::Partial);
+    let changed_count = changes
+        .iter()
+        .filter(|change| change.category != LevelSemanticChangeCategory::Unchanged)
+        .count();
+    match status {
+        LevelDiffStatus::Compared
+            if changed_count > 0 && !has_missing && !has_partial && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        LevelDiffStatus::Unchanged if changed_count == 0 && blocked_reasons.is_empty() => Ok(()),
+        LevelDiffStatus::Partial if has_partial && blocked_reasons.is_empty() => Ok(()),
+        LevelDiffStatus::MissingEvidence if has_missing && blocked_reasons.is_empty() => Ok(()),
+        LevelDiffStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        LevelDiffStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        LevelDiffStatus::Compared => Err(anyhow!(
+            "level diff compared status requires complete changed evidence and no blockedReasons"
+        )),
+        LevelDiffStatus::Unchanged => Err(anyhow!(
+            "level diff unchanged status requires only unchanged entries and no blockedReasons"
+        )),
+        LevelDiffStatus::Partial => Err(anyhow!(
+            "level diff partial status requires partial change evidence and no blockedReasons"
+        )),
+        LevelDiffStatus::MissingEvidence => Err(anyhow!(
+            "level diff missing_evidence status requires missing evidence change and no blockedReasons"
+        )),
+        LevelDiffStatus::Stale => Err(anyhow!("level diff stale status requires blockedReasons")),
+        LevelDiffStatus::Blocked => Err(anyhow!("level diff blocked status requires blockedReasons")),
+    }
+}
+
+fn level_diff_status_label(status: LevelDiffStatus) -> &'static str {
+    match status {
+        LevelDiffStatus::Compared => "compared",
+        LevelDiffStatus::Unchanged => "unchanged",
+        LevelDiffStatus::Partial => "partial",
+        LevelDiffStatus::MissingEvidence => "missing_evidence",
+        LevelDiffStatus::Stale => "stale",
+        LevelDiffStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -63577,6 +63977,125 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("difficulty-pacing-heuristic-evidence-v1.md"));
+    }
+
+    #[test]
+    fn level_visual_semantic_diff_v1_accepts_compared_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/level-visual-semantic-diff-v1/diff.compared.fixture.json"
+        );
+        let artifact = LevelVisualSemanticDiffArtifact::from_json_str(fixture)
+            .expect("compared level diff fixture parses");
+        assert_eq!(artifact.schema_version, "level-visual-semantic-diff-v1");
+        assert_eq!(artifact.status, LevelDiffStatus::Compared);
+        assert_eq!(artifact.changes.len(), 3);
+
+        let read_model = level_visual_semantic_diff_read_model_from_json_str(fixture)
+            .expect("level diff read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "level-visual-semantic-diff-read-model-v1"
+        );
+        assert_eq!(read_model.status, "compared");
+        assert_eq!(read_model.change_count, 3);
+        assert_eq!(read_model.semantic_change_count, 3);
+        assert_eq!(read_model.scenario_impact_count, 1);
+        assert!(read_model
+            .boundary
+            .contains("browser and Studio display only"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+    }
+
+    #[test]
+    fn level_visual_semantic_diff_v1_accepts_non_compared_states() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/diff.unchanged.fixture.json"
+                ),
+                LevelDiffStatus::Unchanged,
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/diff.partial.fixture.json"
+                ),
+                LevelDiffStatus::Partial,
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/diff.missing.fixture.json"
+                ),
+                LevelDiffStatus::MissingEvidence,
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/diff.stale.fixture.json"
+                ),
+                LevelDiffStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/diff.blocked.fixture.json"
+                ),
+                LevelDiffStatus::Blocked,
+            ),
+        ] {
+            let artifact = LevelVisualSemanticDiffArtifact::from_json_str(fixture)
+                .expect("level diff fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            if matches!(
+                expected_status,
+                LevelDiffStatus::Stale | LevelDiffStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn level_visual_semantic_diff_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/invalid/status-drift.fixture.json"
+                ),
+                "unchanged status",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-visual-semantic-diff-v1/invalid/unsafe-ref.fixture.json"
+                ),
+                "must not escape",
+            ),
+        ] {
+            let error = LevelVisualSemanticDiffArtifact::from_json_str(fixture)
+                .expect_err("invalid level diff fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn level_visual_semantic_diff_v1_keeps_read_only_boundary_documented() {
+        let doc = include_str!("../../../docs/level-visual-semantic-diff-v1.md");
+        assert!(doc.contains("read-only"));
+        assert!(doc.contains("do not compute trusted diffs"));
+        assert!(doc.contains("no scene write"));
+        assert!(doc.contains("no trusted apply"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+        assert!(doc.contains("No production editor"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("level-visual-semantic-diff-v1.md"));
     }
 
     #[test]

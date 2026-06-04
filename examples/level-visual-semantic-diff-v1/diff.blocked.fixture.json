@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "level-visual-semantic-diff-v1",
+  "diffId": "level_diff_collect_intro_blocked",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "beforeDraftRef": "evidence/level-drafts/collect-intro-before/draft.json",
+  "afterDraftRef": "evidence/level-drafts/collect-intro-after/draft.json",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-completion/objective_collect_and_exit_complete/read-model.json",
+  "heuristicEvidenceRef": "evidence/difficulty-pacing/heuristics_collect_intro_within_target/read-model.json",
+  "changes": [
+    {
+      "changeId": "blocked_diff",
+      "category": "partial",
+      "summary": "Diff blocked before full visual summary was generated."
+    }
+  ],
+  "expectedScenarioImpacts": [
+    {
+      "scenarioId": "collect-and-exit",
+      "summary": "No trusted impact until blocker is cleared.",
+      "severity": "unknown"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "blocked-summary",
+      "kind": "read_model",
+      "pathHint": "evidence/level-diff/level_diff_collect_intro_blocked/read-model.json"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": ["Visual summary evidence is unavailable."]
+}
