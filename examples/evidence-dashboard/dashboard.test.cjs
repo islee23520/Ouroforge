@@ -943,6 +943,14 @@ const invariantXss = dashboard.renderRuntimeInvariants({ runtime_invariants: { p
 assert.ok(!invariantXss.includes('<script>check</script>'), 'runtime invariant check ids must be escaped');
 assert.ok(!invariantXss.includes('<script>boundary</script>'), 'runtime invariant boundary must be escaped');
 const routeAttemptXss = dashboard.renderRouteAttempts({ route_attempts: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], attempts: [{ attemptId: '<script>attempt</script>', outcome: '<script>outcome</script>', strategyKind: '<script>strategy</script>', objectiveId: '<script>objective</script>', scenarioId: '<script>scenario</script>', startState: { stateId: '<script>state</script>' }, budgetUsed: { actionsUsed: '<script>actions</script>' }, blockers: [{ reason: '<script>blocked</script>' }] }] } });
+assert.ok(!routeAttemptXss.includes('<script>attempt</script>'), 'route attempt ids must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>outcome</script>'), 'route attempt outcome must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>strategy</script>'), 'route attempt strategy must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>state</script>'), 'route attempt start state must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>actions</script>'), 'route attempt budget usage must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>blocked</script>'), 'route attempt blocker reason must be escaped');
+assert.ok(!routeAttemptXss.includes('<script>boundary</script>'), 'route attempt boundary must be escaped');
+assert.match(routeAttemptXss, /&lt;script&gt;attempt&lt;\/script&gt;/);
 const candidateXss = dashboard.renderQaScenarioCandidates({ qa_scenario_candidates: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], candidates: [{ candidateId: '<script>candidate</script>', priority: '<script>priority</script>', status: '<script>status</script>', sourceRisk: { riskId: '<script>risk</script>' }, targetObjective: { objectiveId: '<script>objective</script>', description: '<script>description</script>' }, inputStrategy: { kind: '<script>input</script>' }, budget: { maxRuns: '<script>runs</script>' }, blockedReasons: ['<script>blocked</script>'], expectedEvidence: [{ evidenceId: '<script>evidence</script>' }] }] } });
 assert.ok(!candidateXss.includes('<script>candidate</script>'), 'scenario candidate ids must be escaped');
 assert.ok(!candidateXss.includes('<script>boundary</script>'), 'scenario candidate boundary must be escaped');
