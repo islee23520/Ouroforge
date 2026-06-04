@@ -19081,6 +19081,451 @@ fn level_diff_status_label(status: LevelDiffStatus) -> &'static str {
     }
 }
 
+const GAMEPLAY_BEHAVIOR_MODEL_SCHEMA_VERSION: &str = "gameplay-behavior-model.v1";
+const MAX_GAMEPLAY_BEHAVIORS: usize = 128;
+const MAX_GAMEPLAY_BEHAVIOR_STEPS: usize = 32;
+const MAX_GAMEPLAY_BEHAVIOR_TIMER_MS: u64 = 600_000;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayBehaviorModelArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "behaviorPackId")]
+    pub behavior_pack_id: String,
+    pub scope: String,
+    pub status: GameplayBehaviorStatus,
+    pub behaviors: Vec<GameplayBehaviorDefinition>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayBehaviorDefinition {
+    pub id: String,
+    pub label: String,
+    pub status: GameplayBehaviorStatus,
+    pub target: BTreeMap<String, String>,
+    pub triggers: Vec<BTreeMap<String, serde_json::Value>>,
+    pub conditions: Vec<BTreeMap<String, serde_json::Value>>,
+    pub actions: Vec<BTreeMap<String, serde_json::Value>>,
+    pub variables: BTreeMap<String, serde_json::Value>,
+    pub cooldowns: Vec<GameplayBehaviorCooldown>,
+    pub timers: Vec<GameplayBehaviorTimer>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayBehaviorCooldown {
+    pub id: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayBehaviorTimer {
+    pub id: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+    pub repeat: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayBehaviorStatus {
+    Ready,
+    Partial,
+    Blocked,
+    Unsupported,
+}
+
+impl GameplayBehaviorModelArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: GameplayBehaviorModelArtifact =
+            serde_json::from_str(input).context("failed to parse Gameplay Behavior Model JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GAMEPLAY_BEHAVIOR_MODEL_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "gameplay behavior model schemaVersion must be {GAMEPLAY_BEHAVIOR_MODEL_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("gameplay behavior behaviorPackId", &self.behavior_pack_id)?;
+        validate_path_component("gameplay behavior scope", &self.scope)?;
+        validate_gameplay_behavior_reason_state(
+            "gameplay behavior model",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_behavior_refs(
+            "gameplay behavior model evidenceRefs",
+            &self.evidence_refs,
+        )?;
+        validate_gameplay_behavior_reasons(
+            "gameplay behavior model blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        if self.behaviors.is_empty() {
+            return Err(anyhow!(
+                "gameplay behavior model behaviors must not be empty"
+            ));
+        }
+        if self.behaviors.len() > MAX_GAMEPLAY_BEHAVIORS {
+            return Err(anyhow!(
+                "gameplay behavior model must contain at most {MAX_GAMEPLAY_BEHAVIORS} behaviors"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        for behavior in &self.behaviors {
+            if !ids.insert(behavior.id.as_str()) {
+                return Err(anyhow!("duplicate gameplay behavior id `{}`", behavior.id));
+            }
+            behavior.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl GameplayBehaviorDefinition {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("gameplay behavior id", &self.id)?;
+        require_bounded_display_text("gameplay behavior label", &self.label)?;
+        validate_gameplay_behavior_reason_state(
+            "gameplay behavior",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_behavior_target(&self.id, &self.target)?;
+        validate_gameplay_behavior_steps(
+            &self.id,
+            "triggers",
+            &self.triggers,
+            gameplay_trigger_kinds(),
+        )?;
+        validate_gameplay_behavior_steps(
+            &self.id,
+            "conditions",
+            &self.conditions,
+            gameplay_condition_kinds(),
+        )?;
+        validate_gameplay_behavior_steps(
+            &self.id,
+            "actions",
+            &self.actions,
+            gameplay_action_kinds(),
+        )?;
+        if matches!(self.status, GameplayBehaviorStatus::Ready) {
+            if self.triggers.is_empty() {
+                return Err(anyhow!(
+                    "ready gameplay behavior `{}` must define at least one trigger",
+                    self.id
+                ));
+            }
+            if self.actions.is_empty() {
+                return Err(anyhow!(
+                    "ready gameplay behavior `{}` must define at least one action",
+                    self.id
+                ));
+            }
+        }
+        validate_gameplay_behavior_variables(&self.id, &self.variables)?;
+        validate_gameplay_behavior_cooldowns(&self.id, &self.cooldowns)?;
+        validate_gameplay_behavior_timers(&self.id, &self.timers)?;
+        validate_gameplay_behavior_refs("gameplay behavior evidenceRefs", &self.evidence_refs)?;
+        validate_gameplay_behavior_reasons(
+            "gameplay behavior blockedReasons",
+            &self.blocked_reasons,
+        )
+    }
+}
+
+fn gameplay_trigger_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "on_start",
+        "on_contact",
+        "on_collect",
+        "on_flag_changed",
+        "on_timer",
+        "on_input",
+        "on_state_entered",
+        "on_signal",
+    ])
+}
+
+fn gameplay_condition_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "flag_equals",
+        "counter_at_least",
+        "has_item",
+        "objective_incomplete",
+        "timer_elapsed",
+        "state_is",
+        "cooldown_ready",
+        "entity_alive",
+    ])
+}
+
+fn gameplay_action_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "set_flag",
+        "increment_counter",
+        "damage",
+        "heal",
+        "open_door",
+        "complete_objective",
+        "move_along_path",
+        "start_cooldown",
+        "emit_signal",
+        "set_state",
+        "play_animation",
+        "spawn_local_effect",
+    ])
+}
+
+fn validate_gameplay_behavior_reason_state(
+    field: &str,
+    status: GameplayBehaviorStatus,
+    reasons: &[String],
+) -> Result<()> {
+    if matches!(
+        status,
+        GameplayBehaviorStatus::Blocked | GameplayBehaviorStatus::Unsupported
+    ) && reasons.is_empty()
+    {
+        return Err(anyhow!(
+            "{field} with blocked or unsupported status must include blockedReasons"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_target(
+    behavior_id: &str,
+    target: &BTreeMap<String, String>,
+) -> Result<()> {
+    if target.is_empty() {
+        return Err(anyhow!(
+            "gameplay behavior `{behavior_id}` target must not be empty"
+        ));
+    }
+    for (key, value) in target {
+        require_supported_gameplay_behavior_key("target", key)?;
+        if key.ends_with("Ref") {
+            validate_repo_relative_source_ref("gameplay behavior target ref", value)?;
+        } else {
+            validate_path_component("gameplay behavior target", value)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_steps(
+    behavior_id: &str,
+    field: &str,
+    steps: &[BTreeMap<String, serde_json::Value>],
+    supported_kinds: BTreeSet<&str>,
+) -> Result<()> {
+    if steps.len() > MAX_GAMEPLAY_BEHAVIOR_STEPS {
+        return Err(anyhow!(
+            "gameplay behavior `{behavior_id}` {field} must contain at most {MAX_GAMEPLAY_BEHAVIOR_STEPS} entries"
+        ));
+    }
+    for step in steps {
+        let Some(kind) = step.get("kind").and_then(|value| value.as_str()) else {
+            return Err(anyhow!(
+                "gameplay behavior `{behavior_id}` {field} entries require string kind"
+            ));
+        };
+        if !supported_kinds.contains(kind) {
+            return Err(anyhow!(
+                "gameplay behavior `{behavior_id}` {field} contains unsupported kind `{kind}`"
+            ));
+        }
+        validate_path_component("gameplay behavior step kind", kind)?;
+        for (key, value) in step {
+            require_supported_gameplay_behavior_key(field, key)?;
+            validate_gameplay_behavior_value(
+                &format!("gameplay behavior `{behavior_id}` {field}.{key}"),
+                value,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_variables(
+    behavior_id: &str,
+    variables: &BTreeMap<String, serde_json::Value>,
+) -> Result<()> {
+    for (key, value) in variables {
+        validate_path_component("gameplay behavior variable key", key)?;
+        validate_gameplay_behavior_value(
+            &format!("gameplay behavior `{behavior_id}` variables.{key}"),
+            value,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_cooldowns(
+    behavior_id: &str,
+    cooldowns: &[GameplayBehaviorCooldown],
+) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    for cooldown in cooldowns {
+        validate_path_component("gameplay behavior cooldown id", &cooldown.id)?;
+        if !ids.insert(cooldown.id.as_str()) {
+            return Err(anyhow!(
+                "duplicate cooldown id `{}` in gameplay behavior `{behavior_id}`",
+                cooldown.id
+            ));
+        }
+        validate_gameplay_behavior_duration(
+            behavior_id,
+            "cooldown",
+            &cooldown.id,
+            cooldown.duration_ms,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_timers(
+    behavior_id: &str,
+    timers: &[GameplayBehaviorTimer],
+) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    for timer in timers {
+        validate_path_component("gameplay behavior timer id", &timer.id)?;
+        if !ids.insert(timer.id.as_str()) {
+            return Err(anyhow!(
+                "duplicate timer id `{}` in gameplay behavior `{behavior_id}`",
+                timer.id
+            ));
+        }
+        validate_gameplay_behavior_duration(behavior_id, "timer", &timer.id, timer.duration_ms)?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_duration(
+    behavior_id: &str,
+    field: &str,
+    id: &str,
+    duration_ms: u64,
+) -> Result<()> {
+    if duration_ms == 0 || duration_ms > MAX_GAMEPLAY_BEHAVIOR_TIMER_MS {
+        return Err(anyhow!(
+            "gameplay behavior `{behavior_id}` {field} `{id}` durationMs must be between 1 and {MAX_GAMEPLAY_BEHAVIOR_TIMER_MS}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_refs(field: &str, refs: &[String]) -> Result<()> {
+    for reference in refs {
+        validate_repo_relative_source_ref(field, reference)?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_reasons(field: &str, reasons: &[String]) -> Result<()> {
+    for reason in reasons {
+        require_bounded_display_text(field, reason)?;
+    }
+    Ok(())
+}
+
+fn require_supported_gameplay_behavior_key(field: &str, key: &str) -> Result<()> {
+    validate_path_component("gameplay behavior field key", key)?;
+    let forbidden = [
+        "script",
+        "command",
+        "commandBridge",
+        "trustedWrite",
+        "dynamicImport",
+        "pluginLoader",
+        "eval",
+    ];
+    if forbidden.iter().any(|blocked| key.contains(blocked)) {
+        return Err(anyhow!(
+            "gameplay behavior {field} key `{key}` is forbidden because #612 does not authorize scripts, command bridges, plugin loading, or trusted browser writes"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_behavior_value(field: &str, value: &serde_json::Value) -> Result<()> {
+    match value {
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {
+            Ok(())
+        }
+        serde_json::Value::String(text) => {
+            require_bounded_display_text(field, text)?;
+            if text.contains("..") || text.contains('\\') {
+                return Err(anyhow!(
+                    "{field} must not contain traversal or backslash paths"
+                ));
+            }
+            if text.contains("eval(")
+                || text.contains("dynamic import")
+                || text.contains("execute_script")
+                || text.contains("plugin_loader")
+                || text.contains("commandBridge")
+                || text.contains("trustedWrite")
+            {
+                return Err(anyhow!(
+                    "{field} contains unsupported script, plugin, command bridge, or trusted-write text"
+                ));
+            }
+            Ok(())
+        }
+        serde_json::Value::Array(values) => {
+            if values.len() > MAX_GAMEPLAY_BEHAVIOR_STEPS {
+                return Err(anyhow!("{field} arrays must be bounded"));
+            }
+            for nested in values {
+                validate_gameplay_behavior_value(field, nested)?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Object(map) => {
+            for (key, nested) in map {
+                require_supported_gameplay_behavior_key(field, key)?;
+                validate_gameplay_behavior_value(field, nested)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 const AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION: &str = "agent-generated-level-draft-v1";
 const AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
     "agent-generated-level-draft-read-model-v1";
@@ -65386,6 +65831,114 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("level-visual-semantic-diff-v1.md"));
+    }
+
+    #[test]
+    fn gameplay_behavior_model_v1_accepts_ready_partial_and_blocked_fixtures() {
+        let ready = GameplayBehaviorModelArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json"
+        ))
+        .expect("ready gameplay behavior model parses");
+        assert_eq!(ready.schema_version, "gameplay-behavior-model.v1");
+        assert_eq!(ready.status, GameplayBehaviorStatus::Ready);
+        assert_eq!(ready.behaviors.len(), 7);
+        assert!(ready
+            .behaviors
+            .iter()
+            .any(|behavior| behavior.id == "dash-ability-trigger"));
+
+        let partial = GameplayBehaviorModelArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-behavior-model-v1/behavior-model.partial.fixture.json"
+        ))
+        .expect("partial gameplay behavior model parses");
+        assert_eq!(partial.status, GameplayBehaviorStatus::Partial);
+        assert!(partial.behaviors[0].blocked_reasons[0].contains("#614"));
+
+        let blocked = GameplayBehaviorModelArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-behavior-model-v1/behavior-model.blocked.fixture.json"
+        ))
+        .expect("blocked gameplay behavior model parses");
+        assert_eq!(blocked.status, GameplayBehaviorStatus::Blocked);
+        assert!(blocked.blocked_reasons[0].contains("script execution remains unauthorized"));
+    }
+
+    #[test]
+    fn gameplay_behavior_model_v1_rejects_invalid_fixture_and_boundary_drift() {
+        let invalid = GameplayBehaviorModelArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-behavior-model-v1/invalid/behavior-model.invalid.fixture.json"
+        ))
+        .expect_err("invalid gameplay behavior fixture is rejected");
+        assert!(
+            invalid.to_string().contains("unsupported kind")
+                || invalid.to_string().contains("must not contain traversal")
+                || invalid.to_string().contains("durationMs")
+                || invalid
+                    .to_string()
+                    .contains("duplicate gameplay behavior id")
+                || invalid
+                    .to_string()
+                    .contains("failed to parse Gameplay Behavior Model JSON"),
+            "unexpected invalid fixture error: {invalid}"
+        );
+
+        let duplicate = r#"{
+          "schemaVersion":"gameplay-behavior-model.v1",
+          "behaviorPackId":"dup-pack",
+          "scope":"local-fixture",
+          "status":"ready",
+          "behaviors":[
+            {"id":"same","label":"a","status":"ready","target":{"entityId":"a"},"triggers":[{"kind":"on_start"}],"conditions":[],"actions":[{"kind":"set_flag","flag":"x","value":true}],"variables":{},"cooldowns":[],"timers":[],"evidenceRefs":[],"blockedReasons":[]},
+            {"id":"same","label":"b","status":"ready","target":{"entityId":"b"},"triggers":[{"kind":"on_start"}],"conditions":[],"actions":[{"kind":"set_flag","flag":"y","value":true}],"variables":{},"cooldowns":[],"timers":[],"evidenceRefs":[],"blockedReasons":[]}
+          ],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let duplicate_error = GameplayBehaviorModelArtifact::from_json_str(duplicate)
+            .expect_err("duplicate behavior ids are rejected");
+        assert!(duplicate_error
+            .to_string()
+            .contains("duplicate gameplay behavior id"));
+
+        let unsupported_action = r#"{
+          "schemaVersion":"gameplay-behavior-model.v1",
+          "behaviorPackId":"unsupported-pack",
+          "scope":"local-fixture",
+          "status":"ready",
+          "behaviors":[{"id":"bad-action","label":"bad","status":"ready","target":{"entityId":"player"},"triggers":[{"kind":"on_start"}],"conditions":[],"actions":[{"kind":"execute_script"}],"variables":{},"cooldowns":[],"timers":[],"evidenceRefs":[],"blockedReasons":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let unsupported_error = GameplayBehaviorModelArtifact::from_json_str(unsupported_action)
+            .expect_err("unsupported action kind is rejected");
+        assert!(unsupported_error.to_string().contains("unsupported kind"));
+
+        let blocked_without_reason = r#"{
+          "schemaVersion":"gameplay-behavior-model.v1",
+          "behaviorPackId":"blocked-pack",
+          "scope":"local-fixture",
+          "status":"blocked",
+          "behaviors":[],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let blocked_error = GameplayBehaviorModelArtifact::from_json_str(blocked_without_reason)
+            .expect_err("blocked status requires reasons");
+        assert!(blocked_error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn gameplay_behavior_model_v1_docs_audit_no_script_boundary() {
+        let doc = include_str!("../../../docs/gameplay-behavior-model-v1.md");
+        assert!(doc.contains("Issue: #612"));
+        assert!(doc.contains("data-first contract"));
+        assert!(doc.contains("must not contain executable script bodies"));
+        assert!(doc.contains("GL10.2.2 should validate duplicate ids"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#612 — Gameplay Behavior Model v1"));
+        assert!(scope.contains("arbitrary JS/Rust/Python/Lua/WASM script execution"));
     }
 
     #[test]
