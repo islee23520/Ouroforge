@@ -19,6 +19,31 @@ cargo run -p ouroforge-cli -- asset validate examples/playable-demo-v2/collect-a
 ```
 
 
+
+## Production 2D vertical-slice fixture refresh (#591 P2D8.11.1)
+
+This fixture is the canonical tiny Production 2D vertical-slice source fixture for
+Milestone 8 follow-up evidence. The scene metadata now records the demo title,
+scenario id, bounded frame-budget defaults, and a `demo-start` checkpoint start
+state. The e2e smoke creates and restores that checkpoint through the runtime
+save/load API while proving movement, camera/render evidence, tilemap cells,
+collision/trigger flags, HUD values, animation state, VFX/audio intent evidence,
+and scenario assertions.
+
+Fresh-clone source validation/smoke commands:
+
+```bash
+cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/collect-and-exit/ouroforge.project.json
+cargo run -p ouroforge-cli -- seed validate examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml
+cargo run -p ouroforge-cli -- asset validate examples/playable-demo-v2/collect-and-exit/asset-manifest.json
+node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+```
+
+Generated run ids and dashboard export paths must be recorded in PR/closure
+evidence, not committed. This fixture does not claim shipped-game maturity,
+production profiler accuracy, native export, hosted services, plugin runtime, or
+Godot replacement status.
+
 ## Visual authoring demo draft fixtures
 
 Visual Authoring Demo v1 uses source-like draft JSON fixtures under

@@ -50,6 +50,30 @@
                 "path": "0.name",
                 "equals": "player_spawn"
               }
+            },
+            {
+              "world_state": {
+                "path": "metadata.title",
+                "equals": "Collect and Exit Vertical Slice Demo"
+              }
+            },
+            {
+              "world_state": {
+                "path": "metadata.startState.checkpointSlot",
+                "equals": "demo-start"
+              }
+            },
+            {
+              "frame_stats": {
+                "path": "runtimeFrameBudgetStatus",
+                "equals": "within-budget"
+              }
+            },
+            {
+              "runtime_events": {
+                "path": "events",
+                "containsType": "runtime.save.loaded"
+              }
             }
           ]
         }

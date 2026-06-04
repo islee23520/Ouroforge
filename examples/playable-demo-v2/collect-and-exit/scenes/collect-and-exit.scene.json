@@ -7,7 +7,42 @@
   },
   "metadata": {
     "fixture": "playable-demo-v2-collect-and-exit",
-    "scope": "one-screen source fixture; generated run evidence is intentionally untracked"
+    "scope": "one-screen source fixture; generated run evidence is intentionally untracked",
+    "title": "Collect and Exit Vertical Slice Demo",
+    "scenarioId": "collect-and-exit-source-smoke",
+    "runContext": {
+      "issue": 591,
+      "prUnit": "P2D8.11.1",
+      "evidenceBoundary": "source-like fixture only; generated runs and dashboard exports remain untracked"
+    },
+    "startState": {
+      "playerEntityId": "player",
+      "spawn": {
+        "x": 32,
+        "y": 80
+      },
+      "initialFlags": {
+        "key_collected": false,
+        "door_open": false,
+        "exit_reached": false,
+        "player_alive": true
+      },
+      "checkpointSlot": "demo-start"
+    },
+    "runtimeDebug": {
+      "frameBudget": {
+        "updateMs": 8,
+        "renderMs": 16,
+        "evidenceMs": 4,
+        "totalMs": 20
+      },
+      "frameTimings": {
+        "updateMs": 2,
+        "renderMs": 6,
+        "evidenceMs": 1,
+        "totalMs": 9
+      }
+    }
   },
   "gameplayRules": {
     "version": "1",

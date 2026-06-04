@@ -58,6 +58,10 @@ function assertScenarioAssertion(evidence, assertion) {
   if (Object.prototype.hasOwnProperty.call(contract, 'greaterThan')) {
     assert.ok(actual > contract.greaterThan, `${target}.${contract.path} > ${contract.greaterThan}`);
   }
+  if (Object.prototype.hasOwnProperty.call(contract, 'containsType')) {
+    assert.ok(Array.isArray(actual), `${target}.${contract.path} is an array`);
+    assert.ok(actual.some((entry) => entry && entry.type === contract.containsType), `${target}.${contract.path} contains ${contract.containsType}`);
+  }
 }
 
 function generatedStateAudit() {
@@ -73,6 +77,7 @@ function generatedStateAudit() {
   const api = createRuntime(scene);
   await api.whenReady();
   const initial = api.getWorldState();
+  const startSave = api.createSave('demo-start');
 
   api.setInput({ right: true });
   const afterKey = api.step(40);
@@ -80,11 +85,12 @@ function generatedStateAudit() {
   const afterExit = api.step(45);
   api.setInput({ right: false });
 
-  const runtimeEvents = api.getEvents();
+  const runtimeEventsBeforeRestore = api.getEvents();
   const evidence = {
     world_state: afterExit,
     frame_stats: api.getFrameStats(),
-    runtime_events: { events: runtimeEvents },
+    runtime_events: { events: runtimeEventsBeforeRestore },
+    runtime_save: startSave,
     animation_evidence: afterExit.entities
       .filter((entity) => entity.components && entity.components.animation)
       .map((entity) => ({ entityId: entity.id, ...entity.components.animation })),
@@ -103,6 +109,12 @@ function generatedStateAudit() {
   assert.equal(afterKey.componentModel.goalFlags.key_collected, true);
   assert.equal(afterKey.componentModel.goalFlags.door_open, true);
   assert.equal(afterExit.componentModel.goalFlags.exit_reached, true);
+  assert.equal(initial.metadata.title, 'Collect and Exit Vertical Slice Demo');
+  assert.equal(initial.metadata.startState.checkpointSlot, 'demo-start');
+  assert.equal(startSave.schemaVersion, 'runtime-save-artifact-v1');
+  assert.equal(startSave.slotId, 'demo-start');
+  assert.equal(startSave.policy.browserWriteAccess, 'none');
+  assert.equal(startSave.state.flags.key_collected, false);
   assert.equal(afterExit.assetManifest.id, 'collect-and-exit-runtime-assets');
   assert.equal(afterExit.assetManifest.assetCount, 2);
   assert.equal(afterExit.assetManifest.errors.length, 0);
@@ -113,8 +125,13 @@ function generatedStateAudit() {
   assert.equal(afterExit.tilemaps.tilemaps[0].authoring.triggerCells[0].trigger, 'key_collected');
   assert.equal(afterExit.tilemaps.tilemaps[0].authoring.goalCells[0].tileId, 'exit_marker');
   assert.ok(afterKeyEvents.some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'collect_key'));
-  assert.ok(runtimeEvents.some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'enter_exit'));
+  assert.ok(runtimeEventsBeforeRestore.some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'enter_exit'));
   assert.deepEqual(evidence.comparison.changedFlags, ['door_open', 'exit_reached', 'key_collected']);
+  const restored = api.loadSave(startSave);
+  assert.equal(restored.componentModel.goalFlags.key_collected, false, 'checkpoint restore resets collected key');
+  assert.equal(restored.componentModel.goalFlags.exit_reached, false, 'checkpoint restore resets exit flag');
+  assert.ok(api.getEvents().some((event) => event.type === 'runtime.save.loaded'));
+  evidence.runtime_events = { events: api.getEvents() };
 
   for (const group of scenarioPack.scenarioGroups) {
     for (const scenario of group.scenarios) {
