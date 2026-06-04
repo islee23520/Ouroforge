@@ -184,7 +184,7 @@ Asset Pipeline v1 is complete after #342 because its ordered follow-up issues
 merged, latest-main verification passed, generated/local artifacts remained
 untracked, and the roadmap/#1 governance refresh recorded the outcome. This is a
 bounded local content-authoring completion claim, not a claim that Ouroforge has
-a production-ready asset pipeline.
+an asset-pipeline readiness guarantee.
 
 Completion does not authorize remote asset hosting, browser uploads/writes,
 marketplace/plugin behavior, native export, production editor behavior, source

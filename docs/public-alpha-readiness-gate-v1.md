@@ -5,8 +5,10 @@ Status: **readiness checklist and report format** for issue #376 PA1.10.1.
 This gate determines whether Ouroforge is prepared for a separate manual
 maintainer-controlled public visibility decision. It does not change repository
 visibility, publish packages, launch Ouroforge, automate releases, or authorize
-production-ready, compatibility-stable, Godot replacement, secure-sandbox,
-native-export, plugin-runtime, source-apply, marketplace, or support-SLA claims.
+current claims of production readiness, compatibility stability, Godot replacement
+status, secure
+sandboxing, native export, plugin runtime, source apply, marketplace support, or
+support SLAs.
 
 ## Gate outcome vocabulary
 
@@ -49,7 +51,7 @@ audits when producing the PA1.10.2 execution report:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-forbidden = [
+forbidden_current_claim_terms = [
     'production-ready', 'compatibility-stable', 'secure sandbox',
     'Godot replacement', 'native export', 'plugin runtime', 'marketplace',
     'source apply', 'support SLA', 'launch approval', 'public visibility changed',
@@ -64,7 +66,7 @@ paths = [
 ]
 for path in paths:
     text = path.read_text()
-    hits = [term for term in forbidden if term.lower() in text.lower()]
+    hits = [term for term in forbidden_current_claim_terms if term.lower() in text.lower()]
     print(f'{path}: {hits or "no direct hits"}')
 PY
 

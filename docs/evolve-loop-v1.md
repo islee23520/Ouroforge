@@ -36,8 +36,8 @@ Evolve Loop v1 must answer bounded questions:
 - Did a human reviewer accept or reject the draft?
 
 Evolve Loop v1 must not answer unbounded questions such as whether an AI should
-merge a change, whether a patch is production-ready, or whether a semantic game
-quality improvement exists without artifact evidence.
+merge a change, whether a patch should leave local review, or whether a
+semantic game quality improvement exists without artifact evidence.
 
 ## 2. Current v0 baseline
 

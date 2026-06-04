@@ -177,7 +177,7 @@ Read-only surfaces must not include controls or APIs for:
 
 The UI copy should say "preview", "blocked", "read-only", "copy command", and
 "requires separate review/apply milestone". It should not say "apply now",
-"approved", "safe to merge", "production ready", "source mutation ready", or
+"approved", "safe to merge", "production-ready", "source-apply-ready", or
 "trusted browser write".
 
 If a future issue prototypes this display in dashboard or Studio code, that issue

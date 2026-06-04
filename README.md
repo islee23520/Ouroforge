@@ -83,7 +83,7 @@ Per-milestone evidence steps live in the matching `docs/*.md`; contribution expe
 | Artifact write policy | [`docs/artifact-write-policy-v1.md`](docs/artifact-write-policy-v1.md) |
 | Public-readiness gates | [`docs/public-readiness-audit.md`](docs/public-readiness-audit.md), [`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), [`docs/public-alpha-readiness-governance-handoff-v1.md`](docs/public-alpha-readiness-governance-handoff-v1.md) |
 | Versioning, changelog, and release artifact policy | [`docs/release-versioning-policy-v1.md`](docs/release-versioning-policy-v1.md), [`docs/release-artifact-policy-v1.md`](docs/release-artifact-policy-v1.md) |
-| Public wording guardrail | [`docs/public-wording-guardrail-v1.md`](docs/public-wording-guardrail-v1.md), [`docs/public-wording-scan-pa1.8.1.md`](docs/public-wording-scan-pa1.8.1.md) |
+| Public wording guardrail | [`docs/public-wording-guardrail-v1.md`](docs/public-wording-guardrail-v1.md), [`docs/public-wording-audit-process-v1.md`](docs/public-wording-audit-process-v1.md), [`docs/public-wording-scan-pa1.8.1.md`](docs/public-wording-scan-pa1.8.1.md), [`docs/public-wording-scan-pa1.8.2.md`](docs/public-wording-scan-pa1.8.2.md) |
 
 The full set of 90+ milestone contracts and demo-evidence notes lives under [`docs/`](docs/).
 
