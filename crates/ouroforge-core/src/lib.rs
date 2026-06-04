@@ -6632,6 +6632,461 @@ fn validate_asset_preview_path(
     }
 }
 
+const QA_SCENARIO_CANDIDATE_SCHEMA_VERSION: &str = "qa-scenario-candidate-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioCandidateArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "candidateId")]
+    pub candidate_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "sourceRisk")]
+    pub source_risk: QaScenarioSourceRisk,
+    #[serde(rename = "targetObjective")]
+    pub target_objective: QaScenarioTargetObjective,
+    #[serde(rename = "sourceRefs")]
+    pub source_refs: QaScenarioSourceRefs,
+    #[serde(rename = "inputStrategy")]
+    pub input_strategy: QaScenarioInputStrategy,
+    pub assertions: Vec<QaScenarioCandidateAssertion>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<QaScenarioExpectedEvidence>,
+    pub budget: QaScenarioCandidateBudget,
+    pub priority: QaScenarioCandidatePriority,
+    pub status: QaScenarioCandidateStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioSourceRisk {
+    #[serde(rename = "riskId")]
+    pub risk_id: String,
+    pub description: String,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioTargetObjective {
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    pub description: String,
+    #[serde(
+        rename = "requirementRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub requirement_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioSourceRefs {
+    #[serde(rename = "seedRef")]
+    pub seed_ref: String,
+    #[serde(rename = "scenarioPackRef")]
+    pub scenario_pack_ref: String,
+    #[serde(
+        rename = "sourceScenarioIds",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub source_scenario_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioInputStrategy {
+    #[serde(rename = "strategyId")]
+    pub strategy_id: String,
+    pub kind: QaScenarioInputStrategyKind,
+    pub description: String,
+    #[serde(rename = "maxInputEvents")]
+    pub max_input_events: u32,
+    #[serde(rename = "replayRef", skip_serializing_if = "Option::is_none")]
+    pub replay_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioInputStrategyKind {
+    DirectInput,
+    ReplayRef,
+    FuzzSeed,
+    ManualReview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioCandidateAssertion {
+    #[serde(rename = "assertionId")]
+    pub assertion_id: String,
+    pub kind: QaScenarioAssertionKind,
+    pub path: String,
+    pub operator: QaScenarioAssertionOperator,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioAssertionKind {
+    WorldState,
+    FrameStats,
+    RuntimeEvents,
+    ConsoleErrors,
+    PerformanceMetrics,
+    CollisionEvidence,
+    VisualCheckpoint,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioAssertionOperator {
+    Exists,
+    Equals,
+    NotEquals,
+    GreaterThan,
+    LessThan,
+    CountEquals,
+    CountGreaterThan,
+    Contains,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    #[serde(rename = "artifactKind")]
+    pub artifact_kind: QaScenarioExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioExpectedEvidenceKind {
+    ScenarioResult,
+    ScenarioInputReplay,
+    WorldState,
+    FrameStats,
+    RuntimeProbe,
+    ConsoleLog,
+    CandidateSummary,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaScenarioCandidateBudget {
+    #[serde(rename = "maxSteps")]
+    pub max_steps: u32,
+    #[serde(rename = "maxRuns")]
+    pub max_runs: u32,
+    #[serde(rename = "maxDurationMs")]
+    pub max_duration_ms: u64,
+    #[serde(rename = "maxArtifacts")]
+    pub max_artifacts: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioCandidatePriority {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaScenarioCandidateStatus {
+    Proposed,
+    Blocked,
+    Deferred,
+}
+
+impl QaScenarioCandidateArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: QaScenarioCandidateArtifact =
+            serde_json::from_str(input).context("failed to parse QA Scenario Candidate JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != QA_SCENARIO_CANDIDATE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "qa scenario candidate schemaVersion must be {QA_SCENARIO_CANDIDATE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("qa scenario candidate candidateId", &self.candidate_id)?;
+        validate_path_component("qa scenario candidate runId", &self.run_id)?;
+        self.source_risk.validate()?;
+        self.target_objective.validate()?;
+        self.source_refs.validate()?;
+        self.input_strategy.validate()?;
+        if self.assertions.is_empty() {
+            return Err(anyhow!(
+                "qa scenario candidate assertions must not be empty"
+            ));
+        }
+        let mut assertion_ids = BTreeSet::new();
+        for assertion in &self.assertions {
+            assertion.validate()?;
+            if !assertion_ids.insert(assertion.assertion_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa scenario candidate assertionId: {}",
+                    assertion.assertion_id
+                ));
+            }
+        }
+        if self.expected_evidence.is_empty() {
+            return Err(anyhow!(
+                "qa scenario candidate expectedEvidence must not be empty"
+            ));
+        }
+        let mut evidence_ids = BTreeSet::new();
+        for evidence in &self.expected_evidence {
+            evidence.validate(&self.candidate_id)?;
+            if !evidence_ids.insert(evidence.evidence_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa scenario candidate evidenceId: {}",
+                    evidence.evidence_id
+                ));
+            }
+        }
+        self.budget.validate()?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("qa scenario candidate blockedReasons", reason)?;
+        }
+        match self.status {
+            QaScenarioCandidateStatus::Blocked if self.blocked_reasons.is_empty() => Err(anyhow!(
+                "qa scenario candidate blocked status requires blockedReasons"
+            )),
+            QaScenarioCandidateStatus::Proposed if !self.blocked_reasons.is_empty() => Err(
+                anyhow!("qa scenario candidate proposed status must not include blockedReasons"),
+            ),
+            _ => {
+                for guardrail in &self.guardrails {
+                    require_bounded_display_text("qa scenario candidate guardrail", guardrail)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl QaScenarioSourceRisk {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("qa scenario candidate sourceRisk.riskId", &self.risk_id)?;
+        require_bounded_display_text(
+            "qa scenario candidate sourceRisk.description",
+            &self.description,
+        )?;
+        for reference in &self.evidence_refs {
+            validate_evidence_artifact_path(reference)?;
+        }
+        Ok(())
+    }
+}
+
+impl QaScenarioTargetObjective {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "qa scenario candidate targetObjective.objectiveId",
+            &self.objective_id,
+        )?;
+        require_bounded_display_text(
+            "qa scenario candidate targetObjective.description",
+            &self.description,
+        )?;
+        for reference in &self.requirement_refs {
+            validate_repo_relative_source_ref("qa scenario candidate requirementRefs", reference)?;
+        }
+        Ok(())
+    }
+}
+
+impl QaScenarioSourceRefs {
+    fn validate(&self) -> Result<()> {
+        validate_repo_relative_source_ref(
+            "qa scenario candidate sourceRefs.seedRef",
+            &self.seed_ref,
+        )?;
+        validate_repo_relative_source_ref(
+            "qa scenario candidate sourceRefs.scenarioPackRef",
+            &self.scenario_pack_ref,
+        )?;
+        if self.source_scenario_ids.is_empty() {
+            return Err(anyhow!(
+                "qa scenario candidate sourceRefs.sourceScenarioIds must not be empty"
+            ));
+        }
+        validate_unique_path_components(
+            "qa scenario candidate sourceRefs.sourceScenarioIds",
+            "scenario id",
+            &self.source_scenario_ids,
+        )
+    }
+}
+
+impl QaScenarioInputStrategy {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "qa scenario candidate inputStrategy.strategyId",
+            &self.strategy_id,
+        )?;
+        require_bounded_display_text(
+            "qa scenario candidate inputStrategy.description",
+            &self.description,
+        )?;
+        if self.max_input_events == 0 || self.max_input_events > 1_000 {
+            return Err(anyhow!(
+                "qa scenario candidate inputStrategy.maxInputEvents must be between 1 and 1000"
+            ));
+        }
+        match self.kind {
+            QaScenarioInputStrategyKind::ReplayRef if self.replay_ref.is_none() => Err(anyhow!(
+                "qa scenario candidate replay_ref input strategy requires replayRef"
+            )),
+            QaScenarioInputStrategyKind::DirectInput
+            | QaScenarioInputStrategyKind::FuzzSeed
+            | QaScenarioInputStrategyKind::ManualReview
+                if self.replay_ref.is_some() =>
+            {
+                Err(anyhow!(
+                    "qa scenario candidate non-replay input strategy must not include replayRef"
+                ))
+            }
+            _ => {
+                if let Some(reference) = &self.replay_ref {
+                    validate_repo_relative_source_ref(
+                        "qa scenario candidate inputStrategy.replayRef",
+                        reference,
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl QaScenarioCandidateAssertion {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "qa scenario candidate assertions.assertionId",
+            &self.assertion_id,
+        )?;
+        validate_qa_scenario_assertion_path(&self.path)?;
+        match self.operator {
+            QaScenarioAssertionOperator::Exists if self.value.is_some() => Err(anyhow!(
+                "qa scenario candidate exists assertions must not include value"
+            )),
+            QaScenarioAssertionOperator::Equals
+            | QaScenarioAssertionOperator::NotEquals
+            | QaScenarioAssertionOperator::GreaterThan
+            | QaScenarioAssertionOperator::LessThan
+            | QaScenarioAssertionOperator::CountEquals
+            | QaScenarioAssertionOperator::CountGreaterThan
+            | QaScenarioAssertionOperator::Contains
+                if self.value.is_none() =>
+            {
+                Err(anyhow!(
+                    "qa scenario candidate non-exists assertions require value"
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl QaScenarioExpectedEvidence {
+    fn validate(&self, candidate_id: &str) -> Result<()> {
+        validate_path_component(
+            "qa scenario candidate expectedEvidence.evidenceId",
+            &self.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&self.path_hint)?;
+        let expected_prefix = format!("evidence/scenarios/{candidate_id}/");
+        if !self.path_hint.starts_with(&expected_prefix) {
+            return Err(anyhow!(
+                "qa scenario candidate expectedEvidence.pathHint must stay under {expected_prefix}"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl QaScenarioCandidateBudget {
+    fn validate(&self) -> Result<()> {
+        if self.max_steps == 0 || self.max_steps > 1_000 {
+            return Err(anyhow!(
+                "qa scenario candidate budget.maxSteps must be between 1 and 1000"
+            ));
+        }
+        if self.max_runs == 0 || self.max_runs > 100 {
+            return Err(anyhow!(
+                "qa scenario candidate budget.maxRuns must be between 1 and 100"
+            ));
+        }
+        if self.max_duration_ms == 0 || self.max_duration_ms > 600_000 {
+            return Err(anyhow!(
+                "qa scenario candidate budget.maxDurationMs must be between 1 and 600000"
+            ));
+        }
+        if self.max_artifacts == 0 || self.max_artifacts > 1_000 {
+            return Err(anyhow!(
+                "qa scenario candidate budget.maxArtifacts must be between 1 and 1000"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_qa_scenario_assertion_path(value: &str) -> Result<()> {
+    require_bounded_display_text("qa scenario candidate assertions.path", value)?;
+    if value.starts_with('.') || value.starts_with('/') || value.contains("..") {
+        return Err(anyhow!(
+            "qa scenario candidate assertions.path must be a bounded relative observation path"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_repo_relative_source_ref(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(anyhow!("{field} must be relative"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must not escape the repository")),
+        }
+    }
+    if value.starts_with('.') || value.starts_with("/") || value.contains("//") {
+        return Err(anyhow!("{field} must be a stable repository-relative ref"));
+    }
+    Ok(())
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -39968,6 +40423,104 @@ scenarios:
         assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn qa_scenario_candidate_accepts_bounded_fixture() {
+        let fixture = include_str!(
+            "../../../examples/qa-scenario-candidate-v1/scenario-candidate.sample.json"
+        );
+        let candidate = QaScenarioCandidateArtifact::from_json_str(fixture)
+            .expect("scenario candidate fixture parses");
+
+        assert_eq!(candidate.schema_version, "qa-scenario-candidate-v1");
+        assert_eq!(candidate.candidate_id, "qa14_2_collect_and_exit_gap");
+        assert_eq!(candidate.priority, QaScenarioCandidatePriority::High);
+        assert_eq!(candidate.status, QaScenarioCandidateStatus::Proposed);
+        assert_eq!(candidate.assertions.len(), 2);
+        assert!(candidate
+            .expected_evidence
+            .iter()
+            .any(|evidence| evidence.artifact_kind
+                == QaScenarioExpectedEvidenceKind::ScenarioInputReplay));
+        assert!(candidate
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("No hidden workers")));
+    }
+
+    #[test]
+    fn qa_scenario_candidate_rejects_overbroad_unsupported_and_blocked_shapes() {
+        let overbroad = include_str!(
+            "../../../examples/qa-scenario-candidate-v1/invalid/overbroad-candidate.json"
+        );
+        let error = QaScenarioCandidateArtifact::from_json_str(overbroad)
+            .expect_err("overbroad budget/input is rejected");
+        assert!(
+            error.to_string().contains("maxInputEvents")
+                || error.to_string().contains("maxSteps")
+                || error.to_string().contains("maxRuns")
+        );
+
+        let unsupported = include_str!(
+            "../../../examples/qa-scenario-candidate-v1/invalid/unsupported-candidate.json"
+        );
+        let error = QaScenarioCandidateArtifact::from_json_str(unsupported)
+            .expect_err("unsupported assertion kind rejected");
+        assert!(
+            error.to_string().contains("subjective_fun")
+                || error.to_string().contains("failed to parse")
+        );
+
+        let blocked = include_str!(
+            "../../../examples/qa-scenario-candidate-v1/invalid/blocked-candidate.json"
+        );
+        let error = QaScenarioCandidateArtifact::from_json_str(blocked)
+            .expect_err("blocked candidate without reasons rejected");
+        assert!(error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn qa_scenario_candidate_rejects_missing_target_and_expected_evidence() {
+        let missing_target = QaScenarioCandidateArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-scenario-candidate-v1",
+                "candidateId": "qa14_2_missing_target",
+                "runId": "run_scenario_candidate_smoke",
+                "sourceRisk": { "riskId": "risk", "description": "Risk is bounded." },
+                "targetObjective": { "objectiveId": "", "description": "Missing objective id." },
+                "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+                "inputStrategy": { "strategyId": "bounded", "kind": "direct_input", "description": "Bounded inputs.", "maxInputEvents": 4 },
+                "assertions": [{ "assertionId": "exists", "kind": "world_state", "path": "flags.goal_collected", "operator": "exists" }],
+                "expectedEvidence": [{ "evidenceId": "result", "artifactKind": "scenario_result", "pathHint": "evidence/scenarios/qa14_2_missing_target/scenario-result.json" }],
+                "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+                "priority": "medium",
+                "status": "proposed"
+            })
+            .to_string(),
+        )
+        .expect_err("missing objective id rejected");
+        assert!(missing_target.to_string().contains("objectiveId"));
+
+        let missing_evidence = QaScenarioCandidateArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-scenario-candidate-v1",
+                "candidateId": "qa14_2_missing_evidence",
+                "runId": "run_scenario_candidate_smoke",
+                "sourceRisk": { "riskId": "risk", "description": "Risk is bounded." },
+                "targetObjective": { "objectiveId": "objective", "description": "Objective is bounded." },
+                "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+                "inputStrategy": { "strategyId": "bounded", "kind": "direct_input", "description": "Bounded inputs.", "maxInputEvents": 4 },
+                "assertions": [{ "assertionId": "exists", "kind": "world_state", "path": "flags.goal_collected", "operator": "exists" }],
+                "expectedEvidence": [],
+                "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+                "priority": "medium",
+                "status": "proposed"
+            })
+            .to_string(),
+        )
+        .expect_err("missing expected evidence rejected");
+        assert!(missing_evidence.to_string().contains("expectedEvidence"));
     }
 
     #[test]

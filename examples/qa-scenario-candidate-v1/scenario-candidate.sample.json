@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "qa-scenario-candidate-v1",
+  "candidateId": "qa14_2_collect_and_exit_gap",
+  "runId": "run_scenario_candidate_smoke",
+  "sourceRisk": {
+    "riskId": "objective-regression",
+    "description": "Goal flag and exit transition could diverge after replay input changes.",
+    "evidenceRefs": ["evidence/scenarios/collect-and-exit/scenario-result.json"]
+  },
+  "targetObjective": {
+    "objectiveId": "collect-goal-then-exit",
+    "description": "Confirm the player can collect the goal and trigger the exit transition.",
+    "requirementRefs": ["docs/scenario-coverage-v2.md"]
+  },
+  "sourceRefs": {
+    "seedRef": "seeds/engine-feature-physics-reload-composition.yaml",
+    "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json",
+    "sourceScenarioIds": ["collect-and-exit"]
+  },
+  "inputStrategy": {
+    "strategyId": "bounded-replay-and-probe",
+    "kind": "replay_ref",
+    "description": "Reuse an existing replay, then add bounded probe assertions for the objective state.",
+    "maxInputEvents": 24,
+    "replayRef": "seeds/replays/scenario-replay-move-right.yaml"
+  },
+  "assertions": [
+    {
+      "assertionId": "goal-flag-present",
+      "kind": "world_state",
+      "path": "flags.goal_collected",
+      "operator": "equals",
+      "value": true
+    },
+    {
+      "assertionId": "no-console-errors",
+      "kind": "console_errors",
+      "path": "logs",
+      "operator": "count_equals",
+      "value": 0
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "scenario-result",
+      "artifactKind": "scenario_result",
+      "pathHint": "evidence/scenarios/qa14_2_collect_and_exit_gap/scenario-result.json"
+    },
+    {
+      "evidenceId": "input-replay",
+      "artifactKind": "scenario_input_replay",
+      "pathHint": "evidence/scenarios/qa14_2_collect_and_exit_gap/input-replay.json"
+    }
+  ],
+  "budget": {
+    "maxSteps": 24,
+    "maxRuns": 2,
+    "maxDurationMs": 10000,
+    "maxArtifacts": 8
+  },
+  "priority": "high",
+  "status": "proposed",
+  "guardrails": [
+    "Candidate is untrusted until reviewed or selected by bounded run policy.",
+    "No hidden workers, command bridge, trusted mutation, auto-fix, auto-apply, or auto-merge.",
+    "QA outputs remain evidence/backlog inputs only."
+  ]
+}

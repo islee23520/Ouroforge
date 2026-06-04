@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "qa-scenario-candidate-v1",
+  "candidateId": "qa14_2_unsupported",
+  "runId": "run_scenario_candidate_smoke",
+  "sourceRisk": { "riskId": "objective-regression", "description": "Unsupported assertion shape." },
+  "targetObjective": { "objectiveId": "collect-goal", "description": "Collect the goal." },
+  "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+  "inputStrategy": { "strategyId": "bounded", "kind": "direct_input", "description": "Bounded inputs.", "maxInputEvents": 4 },
+  "assertions": [{ "assertionId": "fun", "kind": "subjective_fun", "path": "fun", "operator": "equals", "value": true }],
+  "expectedEvidence": [{ "evidenceId": "result", "artifactKind": "scenario_result", "pathHint": "evidence/scenarios/qa14_2_unsupported/scenario-result.json" }],
+  "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+  "priority": "medium",
+  "status": "proposed"
+}

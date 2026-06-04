@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "qa-scenario-candidate-v1",
+  "candidateId": "qa14_2_blocked",
+  "runId": "run_scenario_candidate_smoke",
+  "sourceRisk": { "riskId": "missing-replay", "description": "Replay is missing." },
+  "targetObjective": { "objectiveId": "collect-goal", "description": "Collect the goal." },
+  "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+  "inputStrategy": { "strategyId": "replay", "kind": "replay_ref", "description": "Requires replay.", "maxInputEvents": 4, "replayRef": "seeds/replays/missing.yaml" },
+  "assertions": [{ "assertionId": "exists", "kind": "world_state", "path": "flags.goal_collected", "operator": "exists" }],
+  "expectedEvidence": [{ "evidenceId": "result", "artifactKind": "scenario_result", "pathHint": "evidence/scenarios/qa14_2_blocked/scenario-result.json" }],
+  "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+  "priority": "medium",
+  "status": "blocked"
+}
