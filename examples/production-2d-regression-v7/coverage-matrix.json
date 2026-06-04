@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "production-2d-regression-coverage-v1",
+  "issue": 592,
+  "id": "production-2d-regression-v7-coverage-matrix",
+  "scope": "Source-like regression coverage for bounded Production 2D engine behavior; generated runs, dashboard exports, screenshots, temp projects, and local tool state remain untracked.",
+  "guardrails": [
+    "local-first trusted validation and generated evidence boundaries remain Rust/local owned",
+    "browser dashboard and Studio surfaces are read-only or draft-only and cannot write trusted state",
+    "no Godot replacement, production-ready engine, native export, hosted/cloud, plugin runtime, or shipped-game claim",
+    "#1 and #23 remain open"
+  ],
+  "features": [
+    {
+      "id": "renderer-ordering",
+      "status": "covered",
+      "prUnit": "P2D8.12.1",
+      "scenarioIds": ["renderer-camera-ordering"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/runtime-feature-regressions.json"
+      ]
+    },
+    {
+      "id": "camera-follow-clamp-parallax",
+      "status": "covered",
+      "prUnit": "P2D8.12.1",
+      "scenarioIds": ["renderer-camera-ordering"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/runtime-feature-regressions.json"
+      ]
+    },
+    {
+      "id": "collision-physics",
+      "status": "covered",
+      "prUnit": "P2D8.12.1",
+      "scenarioIds": ["collision-input-save-replay"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/runtime-feature-regressions.json"
+      ]
+    },
+    {
+      "id": "input-action-mapping-and-replay",
+      "status": "covered",
+      "prUnit": "P2D8.12.1",
+      "scenarioIds": ["collision-input-save-replay"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/runtime-feature-regressions.json"
+      ]
+    },
+    {
+      "id": "save-load-snapshot-replay-divergence",
+      "status": "covered",
+      "prUnit": "P2D8.12.1",
+      "scenarioIds": ["collision-input-save-replay"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/runtime-feature-regressions.json"
+      ]
+    },
+    {
+      "id": "animation-vfx",
+      "status": "covered",
+      "prUnit": "P2D8.12.2",
+      "scenarioIds": ["animation-vfx-audio-intent"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/media-performance-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/media-performance-regressions.json"
+      ]
+    },
+    {
+      "id": "audio-intent-events",
+      "status": "covered",
+      "prUnit": "P2D8.12.2",
+      "scenarioIds": ["animation-vfx-audio-intent"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/media-performance-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/media-performance-regressions.json"
+      ],
+      "knownGap": "Audio evidence is browser intent evidence only; audible output is not verified."
+    },
+    {
+      "id": "frame-budget-profiler",
+      "status": "covered",
+      "prUnit": "P2D8.12.2",
+      "scenarioIds": ["frame-budget-profiler-evidence"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/media-performance-regressions.test.cjs",
+        "examples/production-2d-regression-v7/scenarios/media-performance-regressions.json"
+      ],
+      "knownGap": "Browser observations are evidence inputs, not trusted profiler authority."
+    },
+    {
+      "id": "dashboard-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "P2D8.12.3",
+      "scenarioIds": ["dashboard-present-missing-malformed-fields"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/coverage-read-model-compatibility.test.cjs"
+      ]
+    },
+    {
+      "id": "studio-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "P2D8.12.3",
+      "scenarioIds": ["studio-present-missing-malformed-fields"],
+      "evidenceRefs": [
+        "examples/production-2d-regression-v7/coverage-read-model-compatibility.test.cjs"
+      ]
+    }
+  ],
+  "knownGaps": [
+    { "id": "3d", "status": "out-of-scope", "reason": "Reserved for the 3D capability gate." },
+    { "id": "native-export", "status": "out-of-scope", "reason": "Reserved for build/export/packaging milestones." },
+    { "id": "plugin-runtime", "status": "out-of-scope", "reason": "Reserved for plugin/extension milestones." },
+    { "id": "hosted-cloud", "status": "out-of-scope", "reason": "No hosted/cloud/server/auth/account behavior in this milestone." }
+  ]
+}
