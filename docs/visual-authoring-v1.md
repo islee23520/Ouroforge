@@ -126,7 +126,10 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    references without production-editor claims. VA1.10.1 source-like draft
    examples live under `examples/visual-edit-draft-v1/valid/` and cover key
    move, HUD text change, tile obstacle add/remove, and asset frame replacement
-   intent while keeping generated transaction/run outputs untracked.
+   intent while keeping generated transaction/run outputs untracked. VA1.10.2
+   records ignored local smoke ids for preview, accepted review, review-gated
+   apply, rerun, compare, and dashboard export evidence without committing those
+   generated artifacts.
 10. **Scenario Coverage v5** — add regression coverage for draft validation,
     transaction preview, visual diff evidence, review-gated apply, rollback,
     generated-state policy, and read-only Studio boundaries.

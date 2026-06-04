@@ -3,7 +3,7 @@
   "draftId": "draft-collect-and-exit-asset-frame-demo",
   "target": {
     "type": "asset-reference",
-    "path": "examples/playable-demo-v2/collect-and-exit/asset-manifest.json",
+    "path": "asset-manifest.json",
     "id": "collect_and_exit_demo_assets"
   },
   "proposedOperations": [

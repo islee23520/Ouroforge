@@ -3,8 +3,7 @@
   "draftId": "draft-collect-and-exit-scene-demo",
   "target": {
     "type": "scene",
-    "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
-    "id": "collect-and-exit-scene"
+    "path": "scenes/collect-and-exit.scene.json"
   },
   "proposedOperations": [
     {
@@ -36,7 +35,7 @@
       }
     }
   ],
-  "beforeHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "beforeHash": "fnv1a64-canonical-json-v1:5b620d469b2bebae",
   "expectedAfterSummary": "Collect-and-exit scene draft demonstrates key movement and HUD text authoring before trusted preview/apply evidence is generated.",
   "linkedEvidence": [
     "runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"

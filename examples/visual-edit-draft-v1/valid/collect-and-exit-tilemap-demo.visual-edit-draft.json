@@ -3,7 +3,7 @@
   "draftId": "draft-collect-and-exit-tilemap-demo",
   "target": {
     "type": "tilemap",
-    "path": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+    "path": "assets/tilemaps/collect-and-exit.tilemap.json",
     "id": "collect_and_exit_tilemap"
   },
   "proposedOperations": [
