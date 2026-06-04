@@ -17,16 +17,37 @@ fixtures.
   and run/dashboard outputs stay untracked.
 - `scenes/collect-and-exit.scene.json` contains the player, floor, key trigger,
   gated door/exit trigger, HUD values, animation metadata, audio intent, runtime
-  asset refs, and visual tilemap evidence.
+  asset refs, visual tilemap evidence, the demo title/start-state metadata,
+  bounded frame-budget defaults, and the `demo-start` checkpoint slot.
 - `seeds/collect-and-exit.yaml` records the bounded acceptance contract.
 - `scenarios/collect-and-exit.json` asserts the completed key/exit evidence path
-  plus HUD, animation, and audio evidence.
-- `e2e-smoke.test.cjs` drives the runtime in-process and deletes temporary smoke
+  plus HUD, animation, audio, frame-budget, start-state, and save/load event
+  evidence.
+- `e2e-smoke.test.cjs` drives the runtime in-process, creates/restores the
+  `demo-start` checkpoint through the save/load API, and deletes temporary smoke
   evidence before exit.
 - `asset-evidence-smoke.test.cjs` verifies the asset-backed demo evidence shape
   against dashboard and Studio asset inspector renderers while keeping generated
   dashboard data in a temporary directory.
 
+
+
+## P2D8.11.2 runtime integration commands
+
+The demo is wired through the browser runtime query-loader and the in-process
+source fixture smoke. These commands exercise the same source fixture through two
+paths without committing generated outputs:
+
+```bash
+node examples/game-runtime/playable-demo-v2.test.cjs
+node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+```
+
+Expected runtime evidence includes `metadata.title`, `metadata.startState`,
+`runtimeFrameBudgetStatus: within-budget`, trigger events for key/exit, and a
+`runtime.save.loaded` event after restoring `demo-start`. The save artifact is
+browser-observable evidence only; trusted persistence remains Rust/local and any
+run/dashboard export ids belong in PR or issue evidence, not source control.
 
 ## Visual authoring demo drafts
 

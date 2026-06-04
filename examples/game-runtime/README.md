@@ -131,6 +131,9 @@ node examples/game-runtime/playable-demo-v2.test.cjs
 ```
 
 The query parameter accepts only local JSON scene paths and falls back to
-`scene.json` for protocols, traversal, or unsupported paths. This keeps the demo
-observable through the existing runtime probe without adding browser-side writes,
-command execution, generated evidence commits, or broader engine systems.
+`scene.json` for protocols, traversal, or unsupported paths. The collect-and-exit
+query smoke also verifies the fixture title/start-state metadata, bounded
+frame-budget evidence, trigger path, and `demo-start` save/load checkpoint. This
+keeps the demo observable through the existing runtime probe without adding
+browser-side writes, command execution, generated evidence commits, or broader
+engine systems.

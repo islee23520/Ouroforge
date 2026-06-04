@@ -38,6 +38,9 @@ function createRuntime() {
   let state = await api.whenReady();
 
   assert.equal(state.sceneId, 'collect-and-exit-scene');
+  assert.equal(state.metadata.title, 'Collect and Exit Vertical Slice Demo');
+  assert.equal(state.metadata.scenarioId, 'collect-and-exit-source-smoke');
+  assert.equal(state.metadata.startState.checkpointSlot, 'demo-start');
   assert.equal(state.componentModel.counts.hudValue, 3);
   assert.equal(state.componentModel.goalFlags.key_collected, false);
   assert.equal(state.componentModel.goalFlags.door_open, undefined);
@@ -79,6 +82,9 @@ function createRuntime() {
   assert.equal(state.runtimeFrameBudget.authority, 'browser_runtime_evidence_input_not_profiler_truth');
   assert.equal(frameStats.runtimeFrameBudgetStatus, 'within-budget');
   assert.equal(frameStats.runtimeFrameBudgetViolationCount, 0);
+  const startSave = api.createSave(state.metadata.startState.checkpointSlot);
+  assert.equal(startSave.slotId, 'demo-start');
+  assert.equal(startSave.policy.browserWriteAccess, 'none');
   assert.equal(state.assetManifest.errors.length, 0);
   assert.ok(state.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
   assert.equal(state.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
@@ -99,6 +105,11 @@ function createRuntime() {
   assert.equal(state.componentModel.goalFlags.exit_reached, true);
   assert.ok(api.getEvents().some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'enter_exit'));
   assert.equal(state.physics.grounded.player, true);
+
+  state = api.loadSave(startSave);
+  assert.equal(state.componentModel.goalFlags.key_collected, false);
+  assert.equal(state.componentModel.goalFlags.exit_reached, false);
+  assert.ok(api.getEvents().some((event) => event.type === 'runtime.save.loaded'));
 
   console.log('playable demo v2 runtime smoke test passed');
 })().catch((error) => {
