@@ -89,8 +89,9 @@ specific blocker and maintainer-approved replacement ordering:
    report shape, hard-block behavior, fixtures, and verification notes are
    documented in `docs/source-file-class-validator-v1.md`.
 2. **Patch Diff Integrity** — validate unified diff shape, file paths, hunk
-   consistency, expected old/new hashes where available, maximum size, allowed
-   file classes, and no hidden binary or generated-state changes.
+   consistency, maximum size, allowed file classes, and no hidden binary or
+   generated-state changes. Implemented report and validation read-model shapes
+   are documented in `docs/patch-diff-integrity-v1.md`.
 3. **Source Patch Preview Artifact** — write an inert generated preview artifact
    that records proposed file changes, hashes, rationale, evidence refs,
    unsupported claims, and review prerequisites without applying the patch.

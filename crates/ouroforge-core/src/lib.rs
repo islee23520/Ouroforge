@@ -10734,6 +10734,58 @@ impl PatchDiffIntegrityValidation {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffIntegrityReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "fileCount")]
+    pub file_count: usize,
+    #[serde(rename = "hunkCount")]
+    pub hunk_count: usize,
+    #[serde(rename = "changedLines")]
+    pub changed_lines: usize,
+    #[serde(rename = "warningCount")]
+    pub warning_count: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "targetSummaries")]
+    pub target_summaries: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+pub fn patch_diff_integrity_read_model(
+    validation: &PatchDiffIntegrityValidation,
+) -> PatchDiffIntegrityReadModel {
+    PatchDiffIntegrityReadModel {
+        schema_version: "patch-diff-integrity-read-model-v1".to_string(),
+        status: validation.status.clone(),
+        file_count: validation.report.file_count,
+        hunk_count: validation.report.hunk_count,
+        changed_lines: validation.report.counts.added + validation.report.counts.removed,
+        warning_count: validation.report.warnings.len(),
+        blocked_reasons: validation.blocked_reasons.clone(),
+        target_summaries: validation
+            .file_class_validation
+            .targets
+            .iter()
+            .map(|target| {
+                let class = serde_json::to_value(&target.class)
+                    .ok()
+                    .and_then(|value| value.as_str().map(ToOwned::to_owned))
+                    .unwrap_or_else(|| "unknown".to_string());
+                let decision = serde_json::to_value(&target.decision)
+                    .ok()
+                    .and_then(|value| value.as_str().map(ToOwned::to_owned))
+                    .unwrap_or_else(|| "unknown".to_string());
+                format!("{}: {class}/{decision}", target.path)
+            })
+            .collect(),
+        guardrails: validation.guardrails.clone(),
+    }
+}
+
 pub fn inspect_unified_patch_diff_for_preview(
     diff_text: &str,
     limits: PatchDiffIntegrityLimits,

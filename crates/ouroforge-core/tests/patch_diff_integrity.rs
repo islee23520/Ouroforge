@@ -1,7 +1,7 @@
 use ouroforge_core::{
     inspect_unified_patch_diff_for_preview, parse_unified_patch_diff_integrity,
-    validate_unified_patch_diff_for_preview, PatchDiffFileStatus, PatchDiffIntegrityLimits,
-    PatchDiffIntegrityWarningKind,
+    patch_diff_integrity_read_model, validate_unified_patch_diff_for_preview, PatchDiffFileStatus,
+    PatchDiffIntegrityLimits, PatchDiffIntegrityWarningKind,
 };
 
 fn warning_kinds(
@@ -198,6 +198,42 @@ fn patch_diff_integrity_blocks_file_and_line_limit_overflows() {
 }
 
 #[test]
+fn patch_diff_integrity_validation_serializes_read_model_shape() {
+    let validation = inspect_unified_patch_diff_for_preview(
+        include_str!("../../../examples/patch-diff-integrity-v1/unsafe/generated-target.diff"),
+        PatchDiffIntegrityLimits::default(),
+    )
+    .expect("unsafe fixture still produces a validation read-model");
+
+    let value = serde_json::to_value(&validation).expect("validation serializes");
+    assert_eq!(value["schemaVersion"], "patch-diff-integrity-validation-v1");
+    assert_eq!(value["status"], "blocked");
+    assert_eq!(value["report"]["schemaVersion"], "patch-diff-integrity-v1");
+    assert_eq!(
+        value["fileClassValidation"]["schemaVersion"],
+        "source-patch-target-class-validation-v1"
+    );
+    assert_eq!(value["limits"]["maxFiles"], 32);
+    assert_eq!(value["limits"]["maxChangedLines"], 5000);
+    assert!(value["blockedReasons"]
+        .as_array()
+        .expect("blocked reasons array")
+        .iter()
+        .any(|reason| reason
+            .as_str()
+            .expect("blocked reason string")
+            .contains("generated")));
+    assert!(value["guardrails"]
+        .as_array()
+        .expect("guardrails array")
+        .iter()
+        .any(|guardrail| guardrail
+            .as_str()
+            .expect("guardrail string")
+            .contains("no source patch apply")));
+}
+
+#[test]
 fn patch_diff_integrity_allows_valid_fixture_for_later_preview_checks() {
     let validation = validate_unified_patch_diff_for_preview(
         include_str!("../../../examples/patch-diff-integrity-v1/valid/two-file-basic.diff"),
@@ -207,6 +243,37 @@ fn patch_diff_integrity_allows_valid_fixture_for_later_preview_checks() {
     assert_eq!(validation.status, "passed");
     assert!(validation.blocked_reasons.is_empty());
     assert!(validation
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("no source patch apply")));
+}
+
+#[test]
+fn patch_diff_integrity_read_model_summarizes_validation_without_relaxing_guardrails() {
+    let validation = inspect_unified_patch_diff_for_preview(
+        include_str!("../../../examples/patch-diff-integrity-v1/unsafe/generated-target.diff"),
+        PatchDiffIntegrityLimits::default(),
+    )
+    .expect("unsafe fixture still parses for read-model reporting");
+
+    let read_model = patch_diff_integrity_read_model(&validation);
+    assert_eq!(
+        read_model.schema_version,
+        "patch-diff-integrity-read-model-v1"
+    );
+    assert_eq!(read_model.status, "blocked");
+    assert_eq!(read_model.file_count, 1);
+    assert_eq!(read_model.hunk_count, 1);
+    assert_eq!(read_model.changed_lines, 2);
+    assert!(read_model
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("generated or local root runs")));
+    assert!(read_model
+        .target_summaries
+        .iter()
+        .any(|summary| summary.contains("generated-local-state/blocked")));
+    assert!(read_model
         .guardrails
         .iter()
         .any(|guardrail| guardrail.contains("no source patch apply")));
