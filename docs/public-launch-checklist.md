@@ -57,6 +57,8 @@ After a manual public-visibility decision, maintainers should use [`docs/public-
 
 ## Manual decision checklist
 
+Before completing the checklist, create or update a dated decision record using [`docs/public-visibility-decision-record-v1.md`](public-visibility-decision-record-v1.md). The record is governance evidence only; repository visibility remains a manual GitHub settings action outside this issue and outside any PR.
+
 - [ ] All historical public-readiness PRs and #217 refresh PRs above are merged into `main`.
 - [ ] `LICENSE` is present and license choice is confirmed.
 - [ ] `SECURITY.md` contains an acceptable vulnerability-reporting path for the visibility date.
