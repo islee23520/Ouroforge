@@ -1142,3 +1142,9 @@ assert.match(sourceMutationRoadmap, /Source Mutation Preview v1 is complete as a
 assert.match(sourceMutationRoadmap, /source patch application to the trusted\s+maintainer worktree[\s\S]*remain\s+out of scope/);
 assert.match(sourceMutationPreviewDoc, /Status after #366: complete as inert preview\/review\/sandbox evidence/);
 assert.match(sourceMutationPreviewDoc, /does \*\*not\*\* authorize trusted\s+source apply/);
+
+const sourceMutationGovernanceHandoff = fs.readFileSync('docs/source-mutation-preview-governance-handoff.md', 'utf8');
+assert.match(sourceMutationGovernanceHandoff, /Source Mutation Preview v1 is complete as inert\s+preview\/review\/sandbox evidence/);
+assert.match(sourceMutationGovernanceHandoff, /Source patch apply to the trusted maintainer worktree remains blocked/);
+assert.match(sourceMutationGovernanceHandoff, /#1 and #23 remain open/);
+assert.doesNotMatch(sourceMutationGovernanceHandoff, /can apply patches|can merge branches|trusted file write control|executes commands from the browser/i);
