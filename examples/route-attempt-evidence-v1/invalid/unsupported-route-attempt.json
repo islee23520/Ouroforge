@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "route-attempt-evidence-v1",
+  "attemptId": "qa14_6_unsupported_route",
+  "runId": "run_route_attempt_smoke",
+  "objectiveId": "flight-objective",
+  "scenarioId": "collect-and-exit",
+  "startState": { "stateId": "start", "worldStateRef": "evidence/scenarios/collect-and-exit/world-state-start.json" },
+  "strategyId": "flight-search",
+  "strategyKind": "graph_search",
+  "actionSequence": [{ "actionId": "jump", "kind": "jump", "frame": 0 }],
+  "route": [{ "nodeId": "start", "x": 0, "y": 0 }],
+  "outcome": "unsupported",
+  "evidenceRefs": ["evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "budgetUsed": { "maxActions": 4, "actionsUsed": 1, "maxRouteNodes": 4, "routeNodesUsed": 1, "maxDurationMs": 1000, "durationMs": 100 }
+}

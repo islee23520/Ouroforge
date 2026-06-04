@@ -6636,6 +6636,287 @@ fn validate_asset_preview_path(
     }
 }
 
+const ROUTE_ATTEMPT_EVIDENCE_SCHEMA_VERSION: &str = "route-attempt-evidence-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptEvidenceArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "attemptId")]
+    pub attempt_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "startState")]
+    pub start_state: RouteAttemptStartState,
+    #[serde(rename = "strategyId")]
+    pub strategy_id: String,
+    #[serde(rename = "strategyKind")]
+    pub strategy_kind: RouteAttemptStrategyKind,
+    #[serde(rename = "actionSequence")]
+    pub action_sequence: Vec<RouteAttemptAction>,
+    pub route: Vec<RouteAttemptRouteNode>,
+    pub outcome: RouteAttemptOutcome,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blockers: Vec<RouteAttemptBlocker>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(rename = "budgetUsed")]
+    pub budget_used: RouteAttemptBudgetUsed,
+    #[serde(rename = "unsupportedReason", skip_serializing_if = "Option::is_none")]
+    pub unsupported_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptStartState {
+    #[serde(rename = "stateId")]
+    pub state_id: String,
+    #[serde(rename = "worldStateRef")]
+    pub world_state_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteAttemptStrategyKind {
+    SimpleHeuristic,
+    GraphSearch,
+    ManualTrace,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptAction {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub kind: RouteAttemptActionKind,
+    #[serde(rename = "frame", skip_serializing_if = "Option::is_none")]
+    pub frame: Option<u32>,
+    #[serde(rename = "target", skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteAttemptActionKind {
+    MoveLeft,
+    MoveRight,
+    MoveUp,
+    MoveDown,
+    Jump,
+    Wait,
+    Interact,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptRouteNode {
+    #[serde(rename = "nodeId")]
+    pub node_id: String,
+    pub x: i32,
+    pub y: i32,
+    #[serde(rename = "evidenceRef", skip_serializing_if = "Option::is_none")]
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteAttemptOutcome {
+    Passed,
+    Failed,
+    Blocked,
+    Inconclusive,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptBlocker {
+    #[serde(rename = "blockerId")]
+    pub blocker_id: String,
+    pub reason: String,
+    #[serde(rename = "evidenceRef", skip_serializing_if = "Option::is_none")]
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteAttemptBudgetUsed {
+    #[serde(rename = "maxActions")]
+    pub max_actions: u32,
+    #[serde(rename = "actionsUsed")]
+    pub actions_used: u32,
+    #[serde(rename = "maxRouteNodes")]
+    pub max_route_nodes: u32,
+    #[serde(rename = "routeNodesUsed")]
+    pub route_nodes_used: u32,
+    #[serde(rename = "maxDurationMs")]
+    pub max_duration_ms: u64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+}
+
+impl RouteAttemptEvidenceArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: RouteAttemptEvidenceArtifact =
+            serde_json::from_str(input).context("failed to parse Route Attempt Evidence JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != ROUTE_ATTEMPT_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "route attempt evidence schemaVersion must be {ROUTE_ATTEMPT_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("route attempt attemptId", &self.attempt_id)?;
+        validate_path_component("route attempt runId", &self.run_id)?;
+        validate_path_component("route attempt objectiveId", &self.objective_id)?;
+        validate_path_component("route attempt scenarioId", &self.scenario_id)?;
+        self.start_state.validate()?;
+        validate_path_component("route attempt strategyId", &self.strategy_id)?;
+        if self.action_sequence.is_empty() {
+            return Err(anyhow!("route attempt actionSequence must not be empty"));
+        }
+        let mut action_ids = BTreeSet::new();
+        for action in &self.action_sequence {
+            action.validate()?;
+            if !action_ids.insert(action.action_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate route attempt actionId: {}",
+                    action.action_id
+                ));
+            }
+        }
+        if self.route.is_empty() {
+            return Err(anyhow!("route attempt route must not be empty"));
+        }
+        let mut node_ids = BTreeSet::new();
+        for node in &self.route {
+            node.validate()?;
+            if !node_ids.insert(node.node_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate route attempt route nodeId: {}",
+                    node.node_id
+                ));
+            }
+        }
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("route attempt evidenceRefs must not be empty"));
+        }
+        for reference in &self.evidence_refs {
+            validate_evidence_artifact_path(reference)?;
+        }
+        self.budget_used.validate()?;
+        if self.budget_used.actions_used != self.action_sequence.len() as u32 {
+            return Err(anyhow!(
+                "route attempt budgetUsed.actionsUsed must match actionSequence length"
+            ));
+        }
+        if self.budget_used.route_nodes_used != self.route.len() as u32 {
+            return Err(anyhow!(
+                "route attempt budgetUsed.routeNodesUsed must match route length"
+            ));
+        }
+        for blocker in &self.blockers {
+            blocker.validate()?;
+        }
+        match self.outcome {
+            RouteAttemptOutcome::Blocked if self.blockers.is_empty() => {
+                Err(anyhow!("route attempt blocked outcome requires blockers"))
+            }
+            RouteAttemptOutcome::Unsupported if self.unsupported_reason.is_none() => Err(anyhow!(
+                "route attempt unsupported outcome requires unsupportedReason"
+            )),
+            RouteAttemptOutcome::Passed
+                if !self.blockers.is_empty() || self.unsupported_reason.is_some() =>
+            {
+                Err(anyhow!(
+                    "route attempt passed outcome must not include blockers or unsupportedReason"
+                ))
+            }
+            _ => {
+                if let Some(reason) = &self.unsupported_reason {
+                    require_bounded_display_text("route attempt unsupportedReason", reason)?;
+                }
+                for guardrail in &self.guardrails {
+                    require_bounded_display_text("route attempt guardrail", guardrail)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl RouteAttemptStartState {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("route attempt startState.stateId", &self.state_id)?;
+        validate_evidence_artifact_path(&self.world_state_ref)
+    }
+}
+
+impl RouteAttemptAction {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("route attempt actionSequence.actionId", &self.action_id)?;
+        if let Some(target) = &self.target {
+            require_bounded_display_text("route attempt actionSequence.target", target)?;
+        }
+        Ok(())
+    }
+}
+
+impl RouteAttemptRouteNode {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("route attempt route.nodeId", &self.node_id)?;
+        if let Some(reference) = &self.evidence_ref {
+            validate_evidence_artifact_path(reference)?;
+        }
+        Ok(())
+    }
+}
+
+impl RouteAttemptBlocker {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("route attempt blockers.blockerId", &self.blocker_id)?;
+        require_bounded_display_text("route attempt blockers.reason", &self.reason)?;
+        if let Some(reference) = &self.evidence_ref {
+            validate_evidence_artifact_path(reference)?;
+        }
+        Ok(())
+    }
+}
+
+impl RouteAttemptBudgetUsed {
+    fn validate(&self) -> Result<()> {
+        if self.max_actions == 0 || self.actions_used == 0 || self.actions_used > self.max_actions {
+            return Err(anyhow!(
+                "route attempt budgetUsed actions must be bounded and actionsUsed <= maxActions"
+            ));
+        }
+        if self.max_route_nodes == 0
+            || self.route_nodes_used == 0
+            || self.route_nodes_used > self.max_route_nodes
+        {
+            return Err(anyhow!(
+                "route attempt budgetUsed route nodes must be bounded and routeNodesUsed <= maxRouteNodes"
+            ));
+        }
+        if self.max_duration_ms == 0 || self.duration_ms > self.max_duration_ms {
+            return Err(anyhow!(
+                "route attempt budgetUsed duration must be bounded and durationMs <= maxDurationMs"
+            ));
+        }
+        Ok(())
+    }
+}
+
 const QA_SCENARIO_CANDIDATE_SCHEMA_VERSION: &str = "qa-scenario-candidate-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -40717,6 +40998,57 @@ scenarios:
         assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn route_attempt_evidence_accepts_success_fixture_and_outcomes() {
+        let fixture = include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        );
+        let attempt = RouteAttemptEvidenceArtifact::from_json_str(fixture)
+            .expect("route attempt fixture parses");
+
+        assert_eq!(attempt.schema_version, "route-attempt-evidence-v1");
+        assert_eq!(attempt.objective_id, "collect-goal-then-exit");
+        assert_eq!(
+            attempt.strategy_kind,
+            RouteAttemptStrategyKind::SimpleHeuristic
+        );
+        assert_eq!(attempt.outcome, RouteAttemptOutcome::Passed);
+        assert_eq!(attempt.action_sequence.len(), 2);
+        assert_eq!(attempt.route.len(), 2);
+        assert!(attempt
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("not proof of global objective solvability")));
+    }
+
+    #[test]
+    fn route_attempt_evidence_rejects_blocked_unsupported_and_malformed_shapes() {
+        let blocked = include_str!(
+            "../../../examples/route-attempt-evidence-v1/invalid/blocked-route-attempt.json"
+        );
+        let error = RouteAttemptEvidenceArtifact::from_json_str(blocked)
+            .expect_err("blocked route attempts require blockers");
+        assert!(error.to_string().contains("blockers"));
+
+        let unsupported = include_str!(
+            "../../../examples/route-attempt-evidence-v1/invalid/unsupported-route-attempt.json"
+        );
+        let error = RouteAttemptEvidenceArtifact::from_json_str(unsupported)
+            .expect_err("unsupported route attempts require reason");
+        assert!(error.to_string().contains("unsupportedReason"));
+
+        let malformed = include_str!(
+            "../../../examples/route-attempt-evidence-v1/invalid/malformed-route-attempt.json"
+        );
+        let error = RouteAttemptEvidenceArtifact::from_json_str(malformed)
+            .expect_err("malformed route attempts are rejected");
+        assert!(
+            error.to_string().contains("route")
+                || error.to_string().contains("evidenceRefs")
+                || error.to_string().contains("budgetUsed")
+        );
     }
 
     #[test]
