@@ -1,0 +1,9 @@
+diff --git a/examples/patch-diff-integrity-v1/new-fixture.txt b/examples/patch-diff-integrity-v1/new-fixture.txt
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/examples/patch-diff-integrity-v1/new-fixture.txt
+@@ -0,0 +1,3 @@
++alpha
++beta
++gamma

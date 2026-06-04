@@ -10228,6 +10228,473 @@ pub struct PatchDraftArtifact {
     pub drafts: Vec<PatchDraft>,
 }
 
+pub const PATCH_DIFF_INTEGRITY_SCHEMA_VERSION: &str = "patch-diff-integrity-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PatchDiffFileStatus {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Copied,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PatchDiffIntegrityWarningKind {
+    MissingFileHeader,
+    MissingHunk,
+    MalformedGitHeader,
+    MalformedFileHeader,
+    MalformedHunkHeader,
+    HunkLineCountMismatch,
+    BinaryPatch,
+    ModeChange,
+    RenameMetadata,
+    CopyMetadata,
+    UnexpectedContent,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffLineCounts {
+    pub added: usize,
+    pub removed: usize,
+    pub context: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffHunkIntegrity {
+    #[serde(rename = "oldStart")]
+    pub old_start: u32,
+    #[serde(rename = "oldLines")]
+    pub old_lines: u32,
+    #[serde(rename = "newStart")]
+    pub new_start: u32,
+    #[serde(rename = "newLines")]
+    pub new_lines: u32,
+    #[serde(rename = "actualOldLines")]
+    pub actual_old_lines: u32,
+    #[serde(rename = "actualNewLines")]
+    pub actual_new_lines: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
+    pub counts: PatchDiffLineCounts,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffFileIntegrity {
+    #[serde(rename = "oldPath")]
+    pub old_path: String,
+    #[serde(rename = "newPath")]
+    pub new_path: String,
+    pub status: PatchDiffFileStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<String>,
+    #[serde(rename = "oldMode", default, skip_serializing_if = "Option::is_none")]
+    pub old_mode: Option<String>,
+    #[serde(rename = "newMode", default, skip_serializing_if = "Option::is_none")]
+    pub new_mode: Option<String>,
+    #[serde(rename = "isBinary")]
+    pub is_binary: bool,
+    pub hunks: Vec<PatchDiffHunkIntegrity>,
+    pub counts: PatchDiffLineCounts,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffIntegrityWarning {
+    pub kind: PatchDiffIntegrityWarningKind,
+    #[serde(rename = "lineNumber")]
+    pub line_number: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PatchDiffIntegrityReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "fileCount")]
+    pub file_count: usize,
+    #[serde(rename = "hunkCount")]
+    pub hunk_count: usize,
+    #[serde(rename = "hasWarnings")]
+    pub has_warnings: bool,
+    pub counts: PatchDiffLineCounts,
+    pub files: Vec<PatchDiffFileIntegrity>,
+    pub warnings: Vec<PatchDiffIntegrityWarning>,
+}
+
+pub fn parse_unified_patch_diff_integrity(diff_text: &str) -> Result<PatchDiffIntegrityReport> {
+    let mut parser = UnifiedPatchDiffIntegrityParser::default();
+    parser.parse(diff_text)
+}
+
+#[derive(Default)]
+struct UnifiedPatchDiffIntegrityParser {
+    files: Vec<PatchDiffFileIntegrity>,
+    warnings: Vec<PatchDiffIntegrityWarning>,
+    current_file: Option<PatchDiffFileIntegrity>,
+    current_hunk: Option<PatchDiffHunkIntegrity>,
+}
+
+impl UnifiedPatchDiffIntegrityParser {
+    fn parse(&mut self, diff_text: &str) -> Result<PatchDiffIntegrityReport> {
+        for (line_index, line) in diff_text.lines().enumerate() {
+            let line_number = line_index + 1;
+            if line.starts_with("diff --git ") {
+                self.finish_current_hunk(line_number);
+                self.finish_current_file(line_number);
+                self.current_file = Some(parse_diff_git_header(line).unwrap_or_else(|| {
+                    self.warn(
+                        PatchDiffIntegrityWarningKind::MalformedGitHeader,
+                        line_number,
+                        None,
+                        "diff --git header did not contain two paths".to_string(),
+                    );
+                    empty_patch_diff_file()
+                }));
+            } else if line.starts_with("--- ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.old_path = normalize_diff_path(line.trim_start_matches("--- ").trim());
+                    file.status = derive_patch_diff_status(file);
+                }
+            } else if line.starts_with("+++ ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.new_path = normalize_diff_path(line.trim_start_matches("+++ ").trim());
+                    file.status = derive_patch_diff_status(file);
+                }
+            } else if line.starts_with("@@ ") {
+                self.ensure_current_file(line_number);
+                self.finish_current_hunk(line_number);
+                match parse_unified_hunk_header(line) {
+                    Some(hunk) => self.current_hunk = Some(hunk),
+                    None => self.warn(
+                        PatchDiffIntegrityWarningKind::MalformedHunkHeader,
+                        line_number,
+                        self.current_path(),
+                        "hunk header could not be parsed".to_string(),
+                    ),
+                }
+            } else if let Some(rest) = line.strip_prefix("index ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.index = Some(rest.trim().to_string());
+                }
+            } else if let Some(rest) = line.strip_prefix("old mode ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.old_mode = Some(rest.trim().to_string());
+                }
+                self.warn(
+                    PatchDiffIntegrityWarningKind::ModeChange,
+                    line_number,
+                    self.current_path(),
+                    "mode metadata is recorded but not rejected by parser v1".to_string(),
+                );
+            } else if let Some(rest) = line.strip_prefix("new mode ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.new_mode = Some(rest.trim().to_string());
+                }
+                self.warn(
+                    PatchDiffIntegrityWarningKind::ModeChange,
+                    line_number,
+                    self.current_path(),
+                    "mode metadata is recorded but not rejected by parser v1".to_string(),
+                );
+            } else if line.starts_with("deleted file mode ") || line.starts_with("new file mode ") {
+                self.ensure_current_file(line_number);
+                self.warn(
+                    PatchDiffIntegrityWarningKind::ModeChange,
+                    line_number,
+                    self.current_path(),
+                    "file mode metadata is recorded as a parser warning".to_string(),
+                );
+            } else if line.starts_with("rename from ") || line.starts_with("rename to ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.status = PatchDiffFileStatus::Renamed;
+                }
+                self.warn(
+                    PatchDiffIntegrityWarningKind::RenameMetadata,
+                    line_number,
+                    self.current_path(),
+                    "rename metadata is recorded but not rejected by parser v1".to_string(),
+                );
+            } else if line.starts_with("copy from ") || line.starts_with("copy to ") {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.status = PatchDiffFileStatus::Copied;
+                }
+                self.warn(
+                    PatchDiffIntegrityWarningKind::CopyMetadata,
+                    line_number,
+                    self.current_path(),
+                    "copy metadata is recorded but not rejected by parser v1".to_string(),
+                );
+            } else if line.starts_with("Binary files ") || line == "GIT binary patch" {
+                self.ensure_current_file(line_number);
+                if let Some(file) = &mut self.current_file {
+                    file.is_binary = true;
+                }
+                self.warn(
+                    PatchDiffIntegrityWarningKind::BinaryPatch,
+                    line_number,
+                    self.current_path(),
+                    "binary patch content is recorded but not parsed into hunks".to_string(),
+                );
+            } else if let Some(hunk) = &mut self.current_hunk {
+                match line.as_bytes().first().copied() {
+                    Some(b'+') => {
+                        hunk.counts.added += 1;
+                        hunk.actual_new_lines += 1;
+                    }
+                    Some(b'-') => {
+                        hunk.counts.removed += 1;
+                        hunk.actual_old_lines += 1;
+                    }
+                    Some(b' ') => {
+                        hunk.counts.context += 1;
+                        hunk.actual_old_lines += 1;
+                        hunk.actual_new_lines += 1;
+                    }
+                    Some(b'\\') => {}
+                    _ => self.warn(
+                        PatchDiffIntegrityWarningKind::UnexpectedContent,
+                        line_number,
+                        self.current_path(),
+                        "content inside hunk did not start with expected unified diff prefix"
+                            .to_string(),
+                    ),
+                }
+            } else if !line.trim().is_empty() {
+                self.warn(
+                    PatchDiffIntegrityWarningKind::UnexpectedContent,
+                    line_number,
+                    self.current_path(),
+                    "line was outside a recognized diff file or hunk section".to_string(),
+                );
+            }
+        }
+
+        let final_line = diff_text.lines().count().saturating_add(1);
+        self.finish_current_hunk(final_line);
+        self.finish_current_file(final_line);
+
+        let file_count = self.files.len();
+        let hunk_count = self.files.iter().map(|file| file.hunks.len()).sum();
+        let counts = self
+            .files
+            .iter()
+            .fold(PatchDiffLineCounts::default(), |mut counts, file| {
+                counts.added += file.counts.added;
+                counts.removed += file.counts.removed;
+                counts.context += file.counts.context;
+                counts
+            });
+        let warnings = std::mem::take(&mut self.warnings);
+
+        Ok(PatchDiffIntegrityReport {
+            schema_version: PATCH_DIFF_INTEGRITY_SCHEMA_VERSION.to_string(),
+            file_count,
+            hunk_count,
+            has_warnings: !warnings.is_empty(),
+            counts,
+            files: std::mem::take(&mut self.files),
+            warnings,
+        })
+    }
+
+    fn ensure_current_file(&mut self, line_number: usize) {
+        if self.current_file.is_none() {
+            self.warn(
+                PatchDiffIntegrityWarningKind::MissingFileHeader,
+                line_number,
+                None,
+                "diff content appeared before a diff --git header".to_string(),
+            );
+            self.current_file = Some(empty_patch_diff_file());
+        }
+    }
+
+    fn finish_current_hunk(&mut self, line_number: usize) {
+        if let Some(hunk) = self.current_hunk.take() {
+            let current_path = self.current_path();
+            let count_matches =
+                hunk.old_lines == hunk.actual_old_lines && hunk.new_lines == hunk.actual_new_lines;
+            if !count_matches {
+                self.warn(
+                    PatchDiffIntegrityWarningKind::HunkLineCountMismatch,
+                    line_number,
+                    current_path,
+                    format!(
+                        "hunk expected -{} +{} lines but observed -{} +{} lines",
+                        hunk.old_lines,
+                        hunk.new_lines,
+                        hunk.actual_old_lines,
+                        hunk.actual_new_lines
+                    ),
+                );
+            }
+            if let Some(file) = &mut self.current_file {
+                file.counts.added += hunk.counts.added;
+                file.counts.removed += hunk.counts.removed;
+                file.counts.context += hunk.counts.context;
+                file.hunks.push(hunk);
+            }
+        }
+    }
+
+    fn finish_current_file(&mut self, line_number: usize) {
+        if let Some(mut file) = self.current_file.take() {
+            if file.old_path.is_empty() || file.new_path.is_empty() {
+                self.warn(
+                    PatchDiffIntegrityWarningKind::MalformedFileHeader,
+                    line_number,
+                    Some(first_non_empty_path(&file).unwrap_or_else(|| "<unknown>".to_string())),
+                    "file diff was missing old or new file header".to_string(),
+                );
+            }
+            if file.hunks.is_empty() && !file.is_binary {
+                self.warn(
+                    PatchDiffIntegrityWarningKind::MissingHunk,
+                    line_number,
+                    Some(first_non_empty_path(&file).unwrap_or_else(|| "<unknown>".to_string())),
+                    "file diff contained no hunks".to_string(),
+                );
+            }
+            file.status = derive_patch_diff_status(&file);
+            self.files.push(file);
+        }
+    }
+
+    fn warn(
+        &mut self,
+        kind: PatchDiffIntegrityWarningKind,
+        line_number: usize,
+        path: Option<String>,
+        message: String,
+    ) {
+        self.warnings.push(PatchDiffIntegrityWarning {
+            kind,
+            line_number,
+            path,
+            message,
+        });
+    }
+
+    fn current_path(&self) -> Option<String> {
+        self.current_file.as_ref().and_then(first_non_empty_path)
+    }
+}
+
+fn empty_patch_diff_file() -> PatchDiffFileIntegrity {
+    PatchDiffFileIntegrity {
+        old_path: String::new(),
+        new_path: String::new(),
+        status: PatchDiffFileStatus::Unknown,
+        index: None,
+        old_mode: None,
+        new_mode: None,
+        is_binary: false,
+        hunks: Vec::new(),
+        counts: PatchDiffLineCounts::default(),
+    }
+}
+
+fn first_non_empty_path(file: &PatchDiffFileIntegrity) -> Option<String> {
+    if !file.new_path.is_empty() && file.new_path != "/dev/null" {
+        Some(file.new_path.clone())
+    } else if !file.old_path.is_empty() && file.old_path != "/dev/null" {
+        Some(file.old_path.clone())
+    } else {
+        None
+    }
+}
+
+fn derive_patch_diff_status(file: &PatchDiffFileIntegrity) -> PatchDiffFileStatus {
+    if matches!(
+        file.status,
+        PatchDiffFileStatus::Renamed | PatchDiffFileStatus::Copied
+    ) {
+        return file.status.clone();
+    }
+    match (file.old_path.as_str(), file.new_path.as_str()) {
+        ("/dev/null", new_path) if !new_path.is_empty() => PatchDiffFileStatus::Added,
+        (old_path, "/dev/null") if !old_path.is_empty() => PatchDiffFileStatus::Deleted,
+        (old_path, new_path) if old_path.is_empty() || new_path.is_empty() => {
+            PatchDiffFileStatus::Unknown
+        }
+        (old_path, new_path) if old_path != new_path => PatchDiffFileStatus::Renamed,
+        _ => PatchDiffFileStatus::Modified,
+    }
+}
+
+fn parse_diff_git_header(line: &str) -> Option<PatchDiffFileIntegrity> {
+    let mut parts = line.split_whitespace();
+    if parts.next()? != "diff" || parts.next()? != "--git" {
+        return None;
+    }
+    let old_path = normalize_diff_path(parts.next()?);
+    let new_path = normalize_diff_path(parts.next()?);
+    let mut file = empty_patch_diff_file();
+    file.old_path = old_path;
+    file.new_path = new_path;
+    file.status = derive_patch_diff_status(&file);
+    Some(file)
+}
+
+fn normalize_diff_path(path: &str) -> String {
+    let path = path.trim();
+    if path == "/dev/null" {
+        return path.to_string();
+    }
+    path.strip_prefix("a/")
+        .or_else(|| path.strip_prefix("b/"))
+        .unwrap_or(path)
+        .to_string()
+}
+
+fn parse_unified_hunk_header(line: &str) -> Option<PatchDiffHunkIntegrity> {
+    let after_open = line.strip_prefix("@@ ")?;
+    let (range_text, section) = after_open.split_once(" @@")?;
+    let mut ranges = range_text.split_whitespace();
+    let (old_start, old_lines) = parse_unified_hunk_range(ranges.next()?, '-')?;
+    let (new_start, new_lines) = parse_unified_hunk_range(ranges.next()?, '+')?;
+    if ranges.next().is_some() {
+        return None;
+    }
+    Some(PatchDiffHunkIntegrity {
+        old_start,
+        old_lines,
+        new_start,
+        new_lines,
+        actual_old_lines: 0,
+        actual_new_lines: 0,
+        section: section.trim().strip_prefix(' ').map(str::to_string),
+        counts: PatchDiffLineCounts::default(),
+    })
+}
+
+fn parse_unified_hunk_range(range: &str, prefix: char) -> Option<(u32, u32)> {
+    let range = range.strip_prefix(prefix)?;
+    let (start, count) = match range.split_once(',') {
+        Some((start, count)) => (start.parse().ok()?, count.parse().ok()?),
+        None => (range.parse().ok()?, 1),
+    };
+    Some((start, count))
+}
+
 pub const VISUAL_EDIT_DRAFT_SCHEMA_VERSION: &str = "visual-edit-draft-v1";
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_OPERATIONS: usize = 128;
 pub const VISUAL_EDIT_TILEMAP_DRAFT_MAX_RECTANGLE_CELLS: u32 = 4096;
@@ -20136,12 +20603,7 @@ pub fn classify_source_file_path_str(path: &str) -> SourceFileClassReport {
             vec!["absolute, rooted, prefixed, or parent-dir path"],
         );
     }
-    // Check the raw separator-split segments rather than the collected
-    // `Path::components()`: `Component::Normal` filtering already drops empty
-    // segments produced by repeated separators (e.g. `examples//scenes/foo`),
-    // so an emptiness check on `components` can never fire. Reject any empty
-    // raw segment so repeated/leading/trailing separators stay unsafe-path.
-    if normalized.split('/').any(|segment| segment.is_empty()) {
+    if components.iter().any(|component| component.is_empty()) {
         return source_class_report(
             normalized,
             SourceFileClassLabel::UnsafePath,
@@ -31526,6 +31988,54 @@ scenarios:
     }
 
     #[test]
+    fn patch_diff_integrity_v1_parses_valid_fixture_reports_without_applying() {
+        let diff =
+            include_str!("../../../examples/patch-diff-integrity-v1/valid/two-file-basic.diff");
+        let report = parse_unified_patch_diff_integrity(diff).expect("diff parses");
+
+        assert_eq!(report.schema_version, PATCH_DIFF_INTEGRITY_SCHEMA_VERSION);
+        assert_eq!(report.file_count, 2);
+        assert_eq!(report.hunk_count, 2);
+        assert!(!report.has_warnings, "{:?}", report.warnings);
+        assert_eq!(report.counts.added, 3);
+        assert_eq!(report.counts.removed, 2);
+        assert_eq!(report.counts.context, 3);
+        assert!(report.files.iter().any(|file| {
+            file.old_path == "docs/example.md"
+                && file.new_path == "docs/example.md"
+                && file.status == PatchDiffFileStatus::Modified
+        }));
+        assert!(report.files.iter().any(|file| {
+            file.old_path == "examples/source-file-class-v1/README.md"
+                && file.new_path == "examples/source-file-class-v1/README.md"
+                && file.status == PatchDiffFileStatus::Modified
+        }));
+    }
+
+    #[test]
+    fn patch_diff_integrity_v1_records_malformed_fixture_warnings_without_apply() {
+        let diff = include_str!(
+            "../../../examples/patch-diff-integrity-v1/invalid/hunk_count_mismatch.diff"
+        );
+        let report = parse_unified_patch_diff_integrity(diff).expect("diff report is generated");
+
+        assert_eq!(report.file_count, 1);
+        assert!(report.has_warnings);
+        assert!(report.warnings.iter().any(|warning| {
+            warning.kind == PatchDiffIntegrityWarningKind::HunkLineCountMismatch
+        }));
+
+        let orphan =
+            include_str!("../../../examples/patch-diff-integrity-v1/invalid/orphan_hunk.diff");
+        let orphan_report =
+            parse_unified_patch_diff_integrity(orphan).expect("orphan report is generated");
+        assert!(orphan_report
+            .warnings
+            .iter()
+            .any(|warning| { warning.kind == PatchDiffIntegrityWarningKind::MissingFileHeader }));
+    }
+
+    #[test]
     fn project_asset_reference_integrity_reports_warnings_without_remote_fetch() {
         let root = unique_temp_dir("project-asset-reference-integrity-warnings");
         fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
@@ -31863,27 +32373,6 @@ scenarios:
         let opaque = classify_source_file_path_str("examples/assets/player.png");
         assert_eq!(opaque.class, SourceFileClassLabel::BinaryOpaque);
         assert!(opaque.is_blocked());
-
-        // Repeated separators must stay unsafe-path: `Path::components()` collapses
-        // `//`, so the guard must inspect the raw separator-split segments.
-        let repeated_separator =
-            classify_source_file_path_str("examples//playable-demo-v2/scenes/foo.scene.json");
-        assert_eq!(repeated_separator.class, SourceFileClassLabel::UnsafePath);
-        assert!(repeated_separator.is_blocked());
-        assert!(repeated_separator
-            .blocked_reasons
-            .iter()
-            .any(|reason| reason.contains("empty path component")));
-
-        // Backslash-normalized repeated separators are equally unsafe.
-        let backslash_repeated = classify_source_file_path_str("examples\\\\demo\\scene.json");
-        assert_eq!(backslash_repeated.class, SourceFileClassLabel::UnsafePath);
-        assert!(backslash_repeated.is_blocked());
-
-        // Trailing separator leaves an empty final segment and must be rejected.
-        let trailing_separator = classify_source_file_path_str("examples/demo/scene.json/");
-        assert_eq!(trailing_separator.class, SourceFileClassLabel::UnsafePath);
-        assert!(trailing_separator.is_blocked());
     }
 
     #[test]

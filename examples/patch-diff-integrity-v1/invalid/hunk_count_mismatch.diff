@@ -1,0 +1,7 @@
+diff --git a/docs/example.md b/docs/example.md
+index 3b18e5a..5f6c7d8 100644
+--- a/docs/example.md
++++ b/docs/example.md
+@@ -1,2 +1,2 @@
+ old context
++extra added line
