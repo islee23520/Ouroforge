@@ -114,3 +114,4 @@ should remain ignored/untracked.
 ## Documents
 
 - [Canonical Demo Script v1](canonical-demo-script-v1.md) — non-destructive local demo command sequence, smoke wrapper, and command audit.
+- [Canonical Demo Readiness Evidence v1](canonical-demo-readiness-evidence-v1.md) — PA1.3.3 cleanup, failure-mode, generated-state, and closure evidence.

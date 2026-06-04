@@ -4,7 +4,8 @@ Status: **demo flow contract and smoke script contract** for issue #369 PA1.3.1/
 
 This document defines the canonical non-destructive Ouroforge demo command
 sequence. PA1.3.2 implements the local smoke wrapper at
-`scripts/canonical-demo-smoke.sh`; PA1.3.3 owns final evidence docs. It does not add automation that applies source
+`scripts/canonical-demo-smoke.sh`; PA1.3.3 owns final evidence docs in
+`docs/canonical-demo-readiness-evidence-v1.md`. It does not add automation that applies source
 patches, writes trusted browser state, publishes packages, merges branches,
 changes repository visibility, or claims production readiness.
 
