@@ -350,6 +350,20 @@ const run = {
       audioEvents: [{ name: '<coin>', intentKind: '<sound>', busId: '<sfx>', volume: 80 }],
       audioWarnings: [{ warning: '<audible_output_not_verified>', requestId: '<audio-1-1>' }],
     },
+    runtime_frame_budget: {
+      schemaVersion: 'ouroforge.runtime-frame-budget.v1',
+      frameId: '<frame-0003>',
+      sceneId: '<scene-render-test>',
+      scenarioId: '<scaffold-smoke>',
+      timings: { updateMs: 3, renderMs: 18.5, evidenceMs: 1, totalMs: 24.25 },
+      budget: { updateMs: 8, renderMs: 16, evidenceMs: 4, totalMs: 20 },
+      counts: { entityCount: 3, drawCallCount: 1, layerCount: 2, collisionPairCount: 1, activeAnimationCount: 1, activeVfxCount: 1, audioEventCount: 1 },
+      status: 'violated',
+      slowFrame: true,
+      violations: [{ field: '<renderMs>', actualMs: 18.5, budgetMs: 16 }],
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation', 'remote telemetry'] },
+      authority: 'browser_runtime_evidence_input_not_profiler_truth',
+    },
     events: {
       present: true,
       animationEntityCount: 1,
@@ -861,6 +875,16 @@ assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /state &
 assert.doesNotMatch(dashboard.renderAnimationVfxSummary(run.engine_summaries), /<run-dust>|<run>/);
 assert.match(dashboard.renderAnimationVfxSummary({}), /No animation\/VFX read model/);
 assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /Audio intent events/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /Runtime|Frame|Status|Budget violations/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /&lt;frame-0003&gt;/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /&lt;renderMs&gt;/);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /browser observations are evidence inputs, not trusted authority/i);
+assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /remote telemetry/);
+assert.doesNotMatch(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /<frame-0003>|<renderMs>/);
+assert.match(dashboard.renderRuntimeProfilerSummary({}), /No runtime profiler\/frame-budget read model/);
+const xssProfilerSummary = dashboard.renderRuntimeProfilerSummary({ present: true, runtime_frame_budget: { frameId: '<script>frame</script>', sceneId: '<img>', scenarioId: '<svg>', timings: { renderMs: '<b>' }, budget: { renderMs: '<i>' }, counts: { entityCount: '<p>' }, status: '<script>bad</script>', violations: [{ field: '<script>render</script>', actualMs: '<img>', budgetMs: '<svg>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, authority: '<b>authority</b>' } });
+assert.doesNotMatch(xssProfilerSummary, /<script>|<img>|<svg>|<b>|<i>|<p>/);
+assert.match(xssProfilerSummary, /&lt;script&gt;render&lt;\/script&gt;/);
 assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /Browser limitation warnings/);
 assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /&lt;sfx&gt;/);
 assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /&lt;audible_output_not_verified&gt;/);

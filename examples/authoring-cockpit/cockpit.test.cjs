@@ -540,6 +540,20 @@ const run = {
     animation: { animatedEntityCount: 1, activeStateCount: 1 },
     vfx: { present: true, vfxEntityCount: 1, vfxEmitterCount: 1, vfxEventCount: 1, entities: [{ entityId: 'player', emitterCount: 1, emitters: [{ id: 'run-dust', kind: 'trail' }] }] },
     audio: { audioEntityCount: 1, audioEventCount: 1, audioWarningCount: 1, browserAudioAuthority: 'intent_evidence_only' },
+    runtime_frame_budget: {
+      schemaVersion: 'ouroforge.runtime-frame-budget.v1',
+      frameId: '<frame-12>',
+      sceneId: 'trigger-flags-v1-fixture',
+      scenarioId: '<scaffold-smoke>',
+      timings: { updateMs: 3, renderMs: 18.5, evidenceMs: 1, totalMs: 24.25 },
+      budget: { updateMs: 8, renderMs: 16, evidenceMs: 4, totalMs: 20 },
+      counts: { entityCount: 3, drawCallCount: 1, layerCount: 2, collisionPairCount: 1, activeAnimationCount: 1, activeVfxCount: 1, audioEventCount: 1 },
+      status: 'violated',
+      slowFrame: true,
+      violations: [{ field: '<renderMs>', actualMs: 18.5, budgetMs: 16 }],
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'browser runtime control', 'remote telemetry'] },
+      authority: 'browser_runtime_evidence_input_not_profiler_truth',
+    },
     physics: {
       colliderEntityCount: 2,
       collisionEventCount: 1,
@@ -707,7 +721,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goa
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 25);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 26);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -929,6 +943,17 @@ assert.match(cockpit.renderCameraLayerInspectionSurface(run), /World-to-screen s
 assert.match(cockpit.renderCameraLayerInspectionSurface(run), /scene mutation/);
 assert.doesNotMatch(cockpit.renderCameraLayerInspectionSurface(run), /<follow-player>/);
 assert.match(cockpit.renderCameraLayerInspectionSurface({ engine_summaries: { present: true, camera: '<bad>' } }), /missing or malformed/);
+assert.match(cockpit.renderStudioNavigation(run), /Runtime profiler inspection/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /Runtime profiler inspection/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /&lt;frame-12&gt;/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /&lt;renderMs&gt;/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /remote telemetry/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface(run), /evidence inputs, not trusted profiler authority/);
+assert.doesNotMatch(cockpit.renderRuntimeProfilerInspectionSurface(run), /<frame-12>|<renderMs>/);
+assert.match(cockpit.renderRuntimeProfilerInspectionSurface({ engine_summaries: { present: true, runtime_frame_budget: '<bad>' } }), /missing or malformed/);
+const xssRuntimeProfiler = cockpit.renderRuntimeProfilerInspectionSurface({ engine_summaries: { present: true, runtime_frame_budget: { frameId: '<script>frame</script>', sceneId: '<img>', scenarioId: '<svg>', timings: { renderMs: '<b>' }, budget: { renderMs: '<i>' }, counts: { entityCount: '<p>' }, status: '<script>bad</script>', violations: [{ field: '<script>render</script>', actualMs: '<img>', budgetMs: '<svg>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, authority: '<b>authority</b>' } } });
+assert.doesNotMatch(xssRuntimeProfiler, /<script>|<img>|<svg>|<b>|<i>|<p>/);
+assert.match(xssRuntimeProfiler, /&lt;script&gt;render&lt;\/script&gt;/);
 assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);
@@ -974,6 +999,7 @@ assert.match(cockpit.renderIntegration(run), /Replay controls/);
 assert.match(cockpit.renderIntegration(run), /Run comparison/);
 assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
 assert.match(cockpit.renderIntegration(run), /Render breakdown inspection/);
+assert.match(cockpit.renderIntegration(run), /Runtime profiler inspection/);
 assert.match(cockpit.renderIntegration(run), /Expressive scene inspection/);
 assert.match(cockpit.renderIntegration(run), /Collision\/transition\/event inspection/);
 assert.match(cockpit.renderIntegration(run), /Component counts/);

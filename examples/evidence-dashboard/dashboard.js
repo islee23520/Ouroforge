@@ -319,6 +319,44 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><h4>Audio intent events</h4><ul class="run-meta-list">${eventRows}</ul><h4>Browser limitation warnings</h4><ul class="run-meta-list">${warningRows}</ul><p class="run-meta">Read-only audio intent evidence only; the dashboard cannot verify audible output, write scene state, execute commands, or control the browser audio device.</p>`;
   }
 
+
+  function renderRuntimeProfilerSummary(summary = {}) {
+    const profiler = summary?.runtime_frame_budget || summary?.runtimeFrameBudget || summary?.runtime_profiler || summary?.runtimeProfiler || {};
+    if (!summary?.present || !profiler || typeof profiler !== 'object' || Array.isArray(profiler)) {
+      return '<p class="empty-state">No runtime profiler/frame-budget read model is available.</p>';
+    }
+    const timings = profiler.timings && typeof profiler.timings === 'object' && !Array.isArray(profiler.timings) ? profiler.timings : {};
+    const budget = profiler.budget && typeof profiler.budget === 'object' && !Array.isArray(profiler.budget) ? profiler.budget : {};
+    const counts = profiler.counts && typeof profiler.counts === 'object' && !Array.isArray(profiler.counts) ? profiler.counts : {};
+    const violations = Array.isArray(profiler.violations) ? profiler.violations : [];
+    const boundary = profiler.readOnlyInspection || profiler.read_only_inspection || {};
+    const disallowed = Array.isArray(boundary.disallowedActions || boundary.disallowed_actions)
+      ? (boundary.disallowedActions || boundary.disallowed_actions).join(', ')
+      : 'trusted writes, command bridge, live mutation, remote telemetry';
+    const status = profiler.status || (violations.length ? 'violated' : 'within-budget');
+    const rows = [
+      ['Frame', profiler.frameId || profiler.frame_id || 'unknown'],
+      ['Scene', profiler.sceneId || profiler.scene_id || 'unknown'],
+      ['Scenario', profiler.scenarioId || profiler.scenario_id || 'none'],
+      ['Status', status],
+      ['Slow frame', profiler.slowFrame ?? profiler.slow_frame ?? violations.length > 0],
+      ['Update ms', `${timings.updateMs ?? timings.update_ms ?? 'missing'} / ${budget.updateMs ?? budget.update_ms ?? 'missing'}`],
+      ['Render ms', `${timings.renderMs ?? timings.render_ms ?? 'missing'} / ${budget.renderMs ?? budget.render_ms ?? 'missing'}`],
+      ['Evidence ms', `${timings.evidenceMs ?? timings.evidence_ms ?? 'missing'} / ${budget.evidenceMs ?? budget.evidence_ms ?? 'missing'}`],
+      ['Total ms', `${timings.totalMs ?? timings.total_ms ?? 'missing'} / ${budget.totalMs ?? budget.total_ms ?? 'missing'}`],
+      ['Entities', counts.entityCount ?? counts.entity_count ?? 0],
+      ['Draw calls', counts.drawCallCount ?? counts.draw_call_count ?? 0],
+      ['Layers', counts.layerCount ?? counts.layer_count ?? 0],
+      ['Collision pairs', counts.collisionPairCount ?? counts.collision_pair_count ?? 0],
+      ['Animations/VFX/Audio', `${counts.activeAnimationCount ?? counts.active_animation_count ?? 0} / ${counts.activeVfxCount ?? counts.active_vfx_count ?? 0} / ${counts.audioEventCount ?? counts.audio_event_count ?? 0}`],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const violationRows = violations.length
+      ? violations.map((violation) => `<li><strong>${escapeText(violation?.field || 'metric')}</strong>: actual ${escapeText(violation?.actualMs ?? violation?.actual_ms ?? 'missing')}ms / budget ${escapeText(violation?.budgetMs ?? violation?.budget_ms ?? 'missing')}ms</li>`).join('')
+      : '<li>No frame-budget violations recorded.</li>';
+    const authority = profiler.authority || 'browser_runtime_evidence_input_not_profiler_truth';
+    return `<div class="field-grid">${rows}</div><h4>Budget violations</h4><ul class="run-meta-list">${violationRows}</ul><p class="run-meta">Read-only runtime profiler evidence only; browser observations are evidence inputs, not trusted authority. Authority: ${escapeText(authority)}. Disallowed actions: ${escapeText(disallowed)}.</p>`;
+  }
+
   function renderInputActionSummary(summary = {}) {
     const input = summary?.input || {};
     if (!summary?.present || !input.present) {
@@ -1759,6 +1797,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Animation and VFX evidence</h3>${renderAnimationVfxSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Audio intent evidence</h3>${renderAudioEvidenceSummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Runtime profiler evidence</h3>${renderRuntimeProfilerSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Input action mapping</h3>${renderInputActionSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
@@ -1859,7 +1898,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
