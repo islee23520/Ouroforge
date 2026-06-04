@@ -855,6 +855,60 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function tilemapDraftCellSummary(cells) {
+    if (!Array.isArray(cells) || cells.length === 0) return 'none';
+    return cells.slice(0, 3).map((cell) => {
+      if (!cell || typeof cell !== 'object' || Array.isArray(cell)) return 'malformed cell';
+      const layer = cell.layerId || cell.layer_id || 'unknown layer';
+      const x = cell.x ?? '?';
+      const y = cell.y ?? '?';
+      const tile = cell.tileId || cell.tile_id || 'unknown tile';
+      const trigger = cell.trigger ? ` trigger ${cell.trigger}` : '';
+      return `${layer}[${x},${y}] ${tile}${trigger}`;
+    }).join('; ');
+  }
+
+  function renderTilemapDraftControl(record) {
+    const blockedReasons = Array.isArray(record.blockedReasons)
+      ? record.blockedReasons
+      : Array.isArray(record.blocked_reasons)
+        ? record.blocked_reasons
+        : [];
+    const status = record.validationStatus || record.validation_status || record.status || 'preview-only';
+    const blocked = blockedReasons.length || status === 'blocked';
+    const targetPath = record.tilemapPath || record.tilemap_path || record.targetPath || record.target_path || '<tilemap-json>';
+    const layer = record.layerId || record.layer_id || 'unknown';
+    const collisionCells = record.collisionCells || record.collision_cells || [];
+    const triggerCells = record.triggerCells || record.trigger_cells || [];
+    const x = record.x ?? record.cellX ?? record.cell_x ?? (Array.isArray(collisionCells) && collisionCells[0]?.x) ?? (Array.isArray(triggerCells) && triggerCells[0]?.x) ?? '';
+    const y = record.y ?? record.cellY ?? record.cell_y ?? (Array.isArray(collisionCells) && collisionCells[0]?.y) ?? (Array.isArray(triggerCells) && triggerCells[0]?.y) ?? '';
+    const tileId = record.tileId || record.tile_id || (Array.isArray(collisionCells) && collisionCells[0]?.tileId) || (Array.isArray(triggerCells) && triggerCells[0]?.tileId) || '';
+    const draftJson = JSON.stringify({
+      schemaVersion: record.schemaVersion || record.schema_version || 'tilemap-draft-control-v1',
+      operationId: record.operationId || record.operation_id || 'tilemap operation',
+      kind: record.kind || 'preview',
+      target: { type: 'tilemap', path: targetPath, layerId: layer },
+      cell: { x, y, tileId },
+      collisionCells: Array.isArray(collisionCells) ? collisionCells : [],
+      triggerCells: Array.isArray(triggerCells) ? triggerCells : [],
+      validationStatus: status,
+      blockedReasons,
+    }, null, 2);
+    const blockedMarkup = blocked
+      ? `<p class="warn">Blocked: ${escapeText(blockedReasons.join('; ') || status)}</p>`
+      : '<p class="hint">Draft controls are preview-only and require Rust validation plus review-gated apply outside the browser.</p>';
+    return `<div class="tilemap-draft-control" data-draft-control="tilemap">
+      <h4>Inert tilemap draft controls</h4>
+      ${blockedMarkup}
+      <label>Layer <input type="text" readonly value="${escapeText(layer)}"></label>
+      <label>X <input type="text" readonly value="${escapeText(x)}"></label>
+      <label>Y <input type="text" readonly value="${escapeText(y)}"></label>
+      <label>Tile <input type="text" readonly value="${escapeText(tileId || 'unselected')}"></label>
+      <pre>${escapeText(draftJson)}</pre>
+      <button type="button" disabled aria-disabled="true">Preview only — no browser apply</button>
+    </div>`;
+  }
+
   function renderTilemapDraftPreviewSurface(run) {
     const preview = run?.tilemap_draft_preview || run?.tilemapDraftPreview || {};
     if (!preview.present) {
@@ -869,10 +923,15 @@ const OuroforgeCockpit = (() => {
       const cells = record.triggerCells || record.trigger_cells || [];
       return total + (Array.isArray(cells) ? cells.length : 0);
     }, 0);
+    const blockedCount = records.reduce((total, record) => {
+      const reasons = record.blockedReasons || record.blocked_reasons || [];
+      return total + ((Array.isArray(reasons) && reasons.length) || record.validationStatus === 'blocked' || record.validation_status === 'blocked' ? 1 : 0);
+    }, 0);
     const cards = [
       ['Previews', preview.preview_count ?? preview.previewCount ?? records.length],
       ['Collision cells', preview.collision_cell_count ?? preview.collisionCellCount ?? collisionCount],
       ['Trigger cells', preview.trigger_cell_count ?? preview.triggerCellCount ?? triggerCount],
+      ['Blocked drafts', preview.blocked_count ?? preview.blockedCount ?? blockedCount],
       ['Status', preview.status || 'preview-only'],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const rows = records.slice(0, 10).map((record) => {
@@ -882,10 +941,11 @@ const OuroforgeCockpit = (() => {
       const afterHash = record.afterTilemapHash || record.after_tilemap_hash || {};
       const beforeText = beforeHash.algorithm && beforeHash.value ? `${beforeHash.algorithm}:${beforeHash.value}` : 'before hash unrecorded';
       const afterText = afterHash.algorithm && afterHash.value ? `${afterHash.algorithm}:${afterHash.value}` : 'after hash unrecorded';
-      return `<div class="surface-row"><strong>${escapeText(record.operationId || record.operation_id || 'tilemap operation')}</strong> ${surfaceState(true, record.kind || 'preview')}<br><small>layer ${escapeText(record.layerId || record.layer_id || 'unknown')} · affected ${escapeText(record.affectedCells ?? record.affected_cells ?? 0)} cell(s) · collision ${escapeText(Array.isArray(collisionCells) ? collisionCells.length : 0)} · trigger ${escapeText(Array.isArray(triggerCells) ? triggerCells.length : 0)}<br>${escapeText(record.summary || 'No summary recorded.')}<br>${escapeText(beforeText)} → ${escapeText(afterText)}</small></div>`;
+      const cellText = `collision ${tilemapDraftCellSummary(collisionCells)} · trigger ${tilemapDraftCellSummary(triggerCells)}`;
+      return `<div class="surface-row"><strong>${escapeText(record.operationId || record.operation_id || 'tilemap operation')}</strong> ${surfaceState(true, record.kind || 'preview')}<br><small>layer ${escapeText(record.layerId || record.layer_id || 'unknown')} · affected ${escapeText(record.affectedCells ?? record.affected_cells ?? 0)} cell(s) · collision ${escapeText(Array.isArray(collisionCells) ? collisionCells.length : 0)} · trigger ${escapeText(Array.isArray(triggerCells) ? triggerCells.length : 0)}<br>${escapeText(record.summary || 'No summary recorded.')}<br>${escapeText(cellText)}<br>${escapeText(beforeText)} → ${escapeText(afterText)}</small>${renderTilemapDraftControl(record)}</div>`;
     }).join('') || '<div class="surface-row">No tilemap draft preview records exported.</div>';
     return `<section id="tilemap-draft-preview" class="panel"><h2>Tilemap draft previews</h2>
-      <p class="hint">Escaped read-only tilemap draft preview data from Rust-exported evidence. This panel cannot write tilemaps, execute local commands, apply reviews, or persist browser state.</p>
+      <p class="hint">Escaped read-only tilemap draft preview data from Rust-exported evidence. This panel renders inert draft controls only; it cannot write tilemaps, execute local commands, apply reviews, or persist browser state.</p>
       <div class="field-grid">${cards}</div>${rows}
       <p class="hint">${escapeText(preview.boundary || 'Tilemap draft previews are display-only and must stay review-gated before apply.')}</p>
     </section>`;
@@ -1755,7 +1815,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
