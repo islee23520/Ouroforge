@@ -88,6 +88,7 @@ Tracked project source artifacts may include:
 Generated artifacts must stay untracked, including:
 
 - `runs/` output;
+- `sandbox/` source patch preview/evaluator output;
 - `target/` build output;
 - generated dashboard export data;
 - `.openchrome/`, `.omc/`, `.omx/`, and `.claude/` local/runtime state;

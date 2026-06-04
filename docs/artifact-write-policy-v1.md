@@ -33,7 +33,7 @@ storage model.
 | `mutation apply-scene --transaction-output` | operator-provided transaction artifact path | rejects exact/canonical/same-file target scene aliases before writing; then applies validated scene edit | protected by #286; preserve |
 | `dashboard export --output` | operator-provided dashboard JSON path, default ignored dashboard data path | creates parent directories and overwrites dashboard export JSON only after generated-output/source-like guard passes | protected from source-like redirection by EF1.3.2 |
 | `compare ... --output-dir` / comparison writer | requested output directory, often generated run/mutation directory | writes generated comparison artifact only after generated-output/source-like guard passes | protected from source-like output directories by EF1.3.2 |
-| patch draft / sandbox writers | generated mutation/sandbox paths | write inert preview/sandbox artifacts without modifying trusted main worktree | generated preview; preserve blocked source-apply boundary |
+| patch draft / sandbox writers | generated mutation/sandbox paths such as `sandbox/<id>/worktree`, `sandbox/<id>/evidence/report.json`, and `sandbox/<id>/evidence/test-execution-report.json` | write inert preview/sandbox artifacts and bounded sandbox test evidence without modifying trusted main worktree | generated preview; preserve blocked source-apply boundary |
 | project scaffold writer | requested new scaffold destination | creates tracked-style project files plus scaffold `.gitignore` | allowed because command contract creates source-like project tree |
 | project/manifest validation | read-only | no writes | no change |
 
@@ -68,7 +68,8 @@ it, for example:
 - dashboard export refreshing an ignored `dashboard-data.json`;
 - verdict or evidence index regeneration inside a run directory;
 - comparison artifacts under generated run/mutation output directories;
-- local `.omx/tmp/...` evidence used for PR or issue comments.
+- sandbox preview/evaluation reports under `sandbox/<id>/evidence/`;
+- local `.omx/tmp/...` and `.omx/context/...` evidence used for PR or issue comments.
 
 These overwrites must not be used to justify writing generated evidence into
 tracked source-like files.
@@ -84,7 +85,10 @@ Generated/local roots remain untracked by default:
 - `.omx/`;
 - `.claude/`;
 - dashboard export data such as `examples/evidence-dashboard/dashboard-data.json`
-  and project-local `dashboard-data/`.
+  and project-local `dashboard-data/`;
+- source patch preview/evaluator sandboxes such as `sandbox/<id>/worktree`,
+  `sandbox/<id>/evidence/`, and generated test-execution reports unless an
+  issue explicitly scopes a tiny checked-in fixture.
 
 The scaffolded project `.gitignore` must stay aligned with the repository policy
 for these roots. If policy drift is found, EF1.3.3 must reconcile the docs and

@@ -1,14 +1,16 @@
 # Source Mutation Sandbox Boundary v1
 
 Source Mutation Sandbox Boundary v1 is a Source Mutation Design Gate v1 control
-artifact. It defines the isolation expectations required before evaluating any
-future source patch preview. It does not implement worktree automation, source
-mutation apply, arbitrary patch apply, command runners, schedulers, browser
-writes, command bridges, or merge automation.
+artifact. It defines the isolation expectations required when evaluating a
+source patch preview. The current implementation supports only bounded
+sandbox-only preview application and allowlisted required-test execution. It
+does not implement trusted source mutation apply, arbitrary patch apply, broad
+worktree automation, schedulers, browser writes, command bridges, or merge
+automation.
 
 The sandbox boundary exists because source patch evaluation can otherwise leak
 state across the trusted repository, generated run artifacts, local credentials,
-network access, dependency installation, and browser/CDP observations. A future
+network access, dependency installation, and browser/CDP observations. Every
 implementation milestone must keep evaluation isolated, reviewable, reversible,
 and auditable before any source mutation apply path is considered.
 
@@ -19,14 +21,14 @@ and auditable before any source mutation apply path is considered.
 - The evaluation branch/ref is explicit and tied to the patch preview base ref.
 - The worktree starts clean: no unstaged source changes, no untracked source-like
   files, and ignored local/generated roots documented before evaluation.
-- Source mutation apply remains blocked under this design gate; a sandbox may be
-  designed for future dry-run evaluation only.
+- Source mutation apply remains blocked under this design gate; the sandbox is a
+  dry-run evaluation location only.
 - Browser and Studio surfaces remain read-only; they may display sandbox evidence
   but must not create worktrees, write files, or run commands.
 
 ## Worktree and branch requirements
 
-A future sandbox evaluation design should require:
+A sandbox evaluation design must require:
 
 | Requirement | Purpose |
 | --- | --- |
@@ -41,7 +43,7 @@ A future sandbox evaluation design should require:
 
 ## Isolation invariants
 
-A future sandbox boundary must reject or hold evaluation when:
+A sandbox boundary must reject or hold evaluation when:
 
 - the worktree path is inside an ignored generated root such as `runs/` or
   `target/`;
@@ -56,7 +58,7 @@ A future sandbox boundary must reject or hold evaluation when:
 
 ## Required sandbox preflight evidence
 
-Before any future evaluation, the sandbox design should capture:
+Before evaluation, the sandbox design should capture:
 
 1. source repository path and isolated worktree path;
 2. branch/ref and base commit;
@@ -67,17 +69,19 @@ Before any future evaluation, the sandbox design should capture:
 7. allowed command list for this evaluation; and
 8. explicit no-credential/no-network/no-install-script policy acknowledgement.
 
-The evidence is review context only. This document does not create the worktree,
-run commands, or apply patches.
+The evidence is review context only. A bounded Rust-owned evaluator may create
+sandbox-local generated files, copy/apply preview diffs inside the sandbox
+worktree, and run allowlisted required-test `argv` vectors there; that evidence
+must not be treated as trusted-worktree apply authority.
 
 ## No-implementation boundary
 
 This sandbox boundary does not authorize:
 
-- source mutation application;
-- arbitrary patch apply;
-- worktree automation or cleanup automation;
-- command runners, schedulers, daemons, or hidden shell execution;
+- source mutation application to the trusted worktree;
+- arbitrary patch apply outside the validated preview/sandbox path;
+- broad worktree automation or cleanup automation beyond declared sandbox roots;
+- shell command runners, schedulers, daemons, or hidden shell execution;
 - browser-side trusted writes or command bridges;
 - dependency installation or dependency mutation;
 - credentialed commands, implicit network access, CI/workflow mutation, native
@@ -89,10 +93,9 @@ context anchor. This document does not close, replace, or narrow either issue.
 
 ## Allowed command policy
 
-A future sandbox evaluator may only run commands that are declared before
-execution, require no credentials, require no network, avoid dependency
-installation, and operate inside the isolated worktree or generated evidence
-roots. The policy is allowlist-first: an omitted command is disallowed until a
+A sandbox evaluator may only run commands that are declared before execution,
+require no credentials, require no network, avoid dependency installation, and
+operate inside the isolated worktree or generated evidence roots. The policy is allowlist-first: an omitted command is disallowed until a
 reviewer records why it is necessary, bounded, and safe for the specific patch
 preview.
 
@@ -106,9 +109,9 @@ preview.
 | Static analysis | Check-only linters such as `cargo clippy --all-targets --all-features -- -D warnings` when they use already-present dependencies and local caches. |
 | Evidence packaging | Commands that copy or serialize bounded logs, status, hashes, and generated reports into approved generated evidence roots. |
 
-Allowed commands must be recorded with command text, working directory, expected
-outputs, timeout/failure expectations, and whether they may write generated
-artifacts. Any command that can mutate source files must be converted to a
+Allowed commands must be recorded with command text, normalized `argv`, matched
+allowlist policy id, working directory, expected outputs, timeout/failure
+expectations, and whether they may write generated artifacts. Any command that can mutate source files must be converted to a
 check-only mode or rejected.
 
 ### Disallowed command classes
@@ -147,7 +150,7 @@ review instead of broadening the allowlist implicitly.
 
 ## Failure and cleanup policy
 
-A future sandbox evaluation must fail closed. Any failed preflight, rejected
+A sandbox evaluation must fail closed. Any failed preflight, rejected
 command, stale hash, missing evidence artifact, unexpected source-like write,
 credential/network/install-script requirement, or cleanup ambiguity stops the
 evaluation and records a reviewer-facing failure instead of retrying with a
@@ -193,7 +196,7 @@ or equivalent reviewer-visible status, not `passed`.
 
 ### Evidence capture expectations
 
-A future sandbox evaluation should capture a bounded evidence bundle containing:
+A sandbox evaluation should capture a bounded evidence bundle containing:
 
 - preflight repository/worktree/ref/hash/status evidence;
 - allowed command policy acknowledgement and command list;
@@ -207,3 +210,22 @@ A future sandbox evaluation should capture a bounded evidence bundle containing:
 
 The evidence bundle is review material only. It does not authorize merge,
 auto-accept, source mutation application, or closure of #1 or #23.
+
+## Implemented generated-state audit for SMP1.6
+
+The SMP1.6 sandbox evaluator writes only generated/local artifacts under the
+declared sandbox root, for example:
+
+- `sandbox/<evaluation-id>/worktree/...` for the isolated preview copy;
+- `sandbox/<evaluation-id>/evidence/report.json` for sandbox apply evidence;
+- `sandbox/<evaluation-id>/evidence/test-execution-report.json` for allowlisted
+  required-test execution summaries; and
+- `sandbox/<evaluation-id>/cleanup.json` or equivalent cleanup metadata when the
+  governing issue scopes cleanup evidence.
+
+These paths are generated evidence, not source fixtures, unless a later issue
+explicitly scopes a tiny deterministic checked-in fixture. They must stay
+untracked with `runs/`, `target/`, dashboard exports, `.omx/`, `.openchrome/`,
+`.omc/`, and `.claude/`. PR and issue closure evidence must include `git status
+--short`, `git diff --check`, and a statement that no generated sandbox, preview,
+report, dashboard, run, or local tool artifact was committed.
