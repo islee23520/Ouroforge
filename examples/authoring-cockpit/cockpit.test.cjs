@@ -254,6 +254,22 @@ const run = {
       },
     ],
   },
+  studio_draft_authoring: {
+    present: true,
+    boundary: 'Temporary in-memory draft state only; browser cannot write files or execute commands.',
+    drafts: [{
+      schemaVersion: 'visual-edit-draft-v1',
+      draftId: 'studio-draft-scene-1',
+      target: { type: 'scene', path: 'scenes/main.scene.json', id: 'main' },
+      proposedOperations: [{ id: 'op-move-player', kind: 'update', path: 'entities.player.components.transform.x', summary: 'Move player preview only', value: 48 }],
+      beforeHash: 'fnv1a64-canonical-json-v1:beforehash',
+      expectedAfterSummary: 'Player moves right after trusted CLI preview.',
+      linkedEvidence: ['evidence/world.json'],
+      validationStatus: 'partial',
+      blockedReasons: ['awaiting Rust preview'],
+      author: { type: 'studio', id: 'browser-memory', source: 'in-memory' },
+    }],
+  },
   asset_inspector: {
     present: true,
     status: 'warning',
@@ -437,7 +453,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 19);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 20);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -830,6 +846,19 @@ assert.match(tilemapDraftPreviewMarkup, /coin_trigger|trigger 1/);
 assert.match(tilemapDraftPreviewMarkup, /browser cannot write tilemaps, execute commands, or apply reviews/);
 assert.doesNotMatch(tilemapDraftPreviewMarkup, /<button/i);
 assert.match(cockpit.renderTilemapDraftPreviewSurface({}), /No tilemap draft preview read model/);
+
+const studioDraftMarkup = cockpit.renderStudioDraftAuthoringSurface(run);
+assert.match(studioDraftMarkup, /Studio draft authoring/);
+assert.match(studioDraftMarkup, /studio-draft-scene-1/);
+assert.match(studioDraftMarkup, /Copyable draft JSON/);
+assert.match(studioDraftMarkup, /edit draft-preview/);
+assert.match(studioDraftMarkup, /browser cannot write files or execute commands/);
+assert.doesNotMatch(studioDraftMarkup, /<button|onclick|localStorage|fetch\(/i);
+assert.equal(cockpit.studioDraftAuthoringState(run).drafts.length, 1);
+assert.match(cockpit.renderStudioDraftAuthoringSurface({}), /No Studio draft authoring read model/);
+const xssStudioDraft = { studio_draft_authoring: { present: true, boundary: '<script>boundary</script>', drafts: [{ draftId: '<img src=x onerror=alert(1)>', target: { type: '<script>scene</script>', path: '<b>path</b>' }, proposedOperations: [{ id: '<script>op</script>', kind: '<b>update</b>', path: '<i>path</i>', summary: '<script>summary</script>' }], expectedAfterSummary: '<script>after</script>', validationStatus: '<script>status</script>', blockedReasons: ['<script>blocked</script>'] }] } };
+assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<script>summary</script>'), 'studio draft summaries must be escaped');
+assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<img src=x onerror=alert(1)>'), 'studio draft ids must be escaped');
 const assetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(run);
 assert.match(assetInspectorMarkup, /Asset inspector/);
 assert.match(assetInspectorMarkup, /player_sprite/);

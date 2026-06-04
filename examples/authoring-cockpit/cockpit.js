@@ -315,6 +315,7 @@ const OuroforgeCockpit = (() => {
       { id: 'runtime-event-inspection', label: 'Collision/transition/event inspection', present: Boolean(run?.engine_summaries?.collision?.present || run?.engine_summaries?.transition?.present || run?.engine_summaries?.events?.present), detail: run?.engine_summaries?.source_world_state || 'collision/transition/event summary unavailable' },
       { id: 'runtime-asset-loading', label: 'Runtime asset loading', present: Boolean(run?.asset_loading?.present || run?.assetLoading?.present), detail: `${run?.asset_loading?.attempt_count ?? run?.assetLoading?.attemptCount ?? 0} load attempt(s)` },
       { id: 'asset-preview-evidence', label: 'Asset preview evidence', present: Boolean(run?.asset_preview?.present || run?.assetPreview?.present), detail: `${run?.asset_preview?.preview_count ?? run?.assetPreview?.previewCount ?? 0} preview record(s)` },
+      { id: 'studio-draft-authoring', label: 'Studio draft authoring', present: Boolean(studioDraftAuthoringState(run).present), detail: `${studioDraftAuthoringState(run).drafts.length} temporary draft(s)` },
       { id: 'visual-diff-preview', label: 'Visual diff preview', present: Boolean(run?.visual_diff_preview?.present || run?.visualDiffPreview?.present), detail: `${run?.visual_diff_preview?.summary_count ?? run?.visualDiffPreview?.summaryCount ?? (run?.visual_diff_preview?.summaries || run?.visualDiffPreview?.summaries || []).length ?? 0} summary row(s)` },
       { id: 'studio-asset-inspector', label: 'Asset inspector', present: Boolean(run?.asset_inspector?.present || run?.assetInspector?.present), detail: `${run?.asset_inspector?.asset_count ?? run?.assetInspector?.assetCount ?? 0} asset row(s)` },
       { id: 'loop-cockpit', label: 'Loop cockpit', present: Boolean(normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length), detail: `${normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length} loop(s)` },
@@ -679,6 +680,116 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Escaped read-only visual diff summaries from Rust-generated draft/transaction evidence. This panel has no apply buttons, trusted writes, command execution, local server bridge, or browser persistence.</p>
       <div class="field-grid">${cards}</div>${rows}
       <p class="hint">${escapeText(preview.boundary || 'Visual diff previews are display-only; trusted writes remain Rust CLI review-gated.')}</p>
+    </section>`;
+  }
+
+
+  function studioDraftAuthoringState(run) {
+    const source = run?.studio_draft_authoring || run?.studioDraftAuthoring || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      return {
+        present: false,
+        boundary: 'Studio draft authoring state is browser-memory only; no trusted writes or command execution.',
+        drafts: [],
+        readError: null,
+      };
+    }
+    const rawDrafts = Array.isArray(source.drafts) ? source.drafts : Array.isArray(source.records) ? source.records : [];
+    const drafts = rawDrafts.map((draft, index) => {
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+        return {
+          draftId: `malformed-draft-${index + 1}`,
+          target: { type: 'malformed', path: 'unavailable' },
+          proposedOperations: [],
+          validationStatus: 'blocked',
+          blockedReasons: ['malformed draft read-model entry'],
+          malformed: true,
+          original: draft,
+        };
+      }
+      const target = draft.target && typeof draft.target === 'object' && !Array.isArray(draft.target)
+        ? draft.target
+        : { type: 'unknown', path: 'unknown' };
+      const operations = Array.isArray(draft.proposedOperations)
+        ? draft.proposedOperations
+        : Array.isArray(draft.proposed_operations)
+          ? draft.proposed_operations
+          : [];
+      const blockedReasons = Array.isArray(draft.blockedReasons)
+        ? draft.blockedReasons
+        : Array.isArray(draft.blocked_reasons)
+          ? draft.blocked_reasons
+          : [];
+      return {
+        ...draft,
+        draftId: draft.draftId || draft.draft_id || `studio-draft-${index + 1}`,
+        target,
+        proposedOperations: operations,
+        validationStatus: draft.validationStatus || draft.validation_status || 'unvalidated',
+        blockedReasons,
+        expectedAfterSummary: draft.expectedAfterSummary || draft.expected_after_summary || '',
+        linkedEvidence: Array.isArray(draft.linkedEvidence) ? draft.linkedEvidence : Array.isArray(draft.linked_evidence) ? draft.linked_evidence : [],
+        reviewGate: draft.reviewGate || draft.review_gate || null,
+        author: draft.author && typeof draft.author === 'object' ? draft.author : null,
+      };
+    });
+    return {
+      present: Boolean(source.present ?? drafts.length),
+      boundary: source.boundary || 'Studio draft authoring state is temporary browser/read-model data only; copy JSON/commands manually and run trusted CLI outside the browser.',
+      drafts,
+      readError: typeof source.read_error === 'string' ? source.read_error : typeof source.readError === 'string' ? source.readError : null,
+    };
+  }
+
+  function studioDraftPreviewCommand(draft, run) {
+    const project = projectContext(run);
+    const manifest = project?.manifestPath || draft?.projectPath || '<project-manifest-or-root>';
+    const draftPath = draft?.draftPath || '<draft-json>';
+    return `cargo run -p ouroforge-cli -- edit draft-preview ${draftPath} --project ${manifest}`;
+  }
+
+  function renderStudioDraftAuthoringSurface(run) {
+    const state = studioDraftAuthoringState(run);
+    if (!state.present && !state.drafts.length) {
+      return `<section id="studio-draft-authoring" class="panel"><h2>Studio draft authoring</h2><p class="empty">No Studio draft authoring read model is loaded yet.</p><p class="hint">${escapeText(state.boundary)}</p></section>`;
+    }
+    const readError = state.readError ? `<p class="error">${escapeText(state.readError)}</p>` : '';
+    const rows = state.drafts.map((draft) => {
+      const operationRows = draft.proposedOperations.slice(0, 4).map((operation) => `<li>${escapeText(operation.id || 'operation')} · ${escapeText(operation.kind || 'unknown')} · ${escapeText(operation.path || 'unknown path')}<br><small>${escapeText(operation.summary || '')}</small></li>`).join('') || '<li>No proposed operations recorded.</li>';
+      const blocked = draft.blockedReasons.length
+        ? `<p class="warn">Blocked: ${escapeText(draft.blockedReasons.join('; '))}</p>`
+        : '<p class="hint">No blocked reasons recorded.</p>';
+      const reviewGate = draft.reviewGate && typeof draft.reviewGate === 'object'
+        ? `<p class="hint">Review gate: proposal ${escapeText(draft.reviewGate.proposalId || draft.reviewGate.proposal_id || 'unlinked')} · patch ${escapeText(draft.reviewGate.patchDraftId || draft.reviewGate.patch_draft_id || 'unlinked')} · decision ${escapeText(draft.reviewGate.reviewDecisionId || draft.reviewGate.review_decision_id || 'unlinked')}</p>`
+        : '<p class="hint">No review gate is implied by this temporary draft state.</p>';
+      const draftJson = JSON.stringify({
+        schemaVersion: draft.schemaVersion || draft.schema_version || 'visual-edit-draft-v1',
+        draftId: draft.draftId,
+        target: draft.target,
+        proposedOperations: draft.proposedOperations,
+        beforeHash: draft.beforeHash || draft.before_hash || 'unknown',
+        expectedAfterSummary: draft.expectedAfterSummary,
+        linkedEvidence: draft.linkedEvidence,
+        reviewGate: draft.reviewGate || undefined,
+        author: draft.author || { type: 'studio', id: 'browser-memory', source: 'in-memory' },
+        validationStatus: draft.validationStatus,
+        blockedReasons: draft.blockedReasons,
+      }, null, 2);
+      return `<article class="surface-row">
+        <strong>${escapeText(draft.draftId)}</strong> ${surfaceState(draft.validationStatus !== 'blocked' && !draft.malformed, draft.validationStatus)}
+        <br><small>target ${escapeText(draft.target?.type || 'unknown')} · ${escapeText(draft.target?.path || 'unknown path')} · ${escapeText(draft.target?.id || 'no id')}</small>
+        <p>${escapeText(draft.expectedAfterSummary || 'No after summary recorded.')}</p>
+        ${blocked}
+        ${reviewGate}
+        <h4>Proposed operations</h4><ul>${operationRows}</ul>
+        <h4>Copyable draft JSON</h4><pre>${escapeText(draftJson)}</pre>
+        <h4>Copyable CLI preview command</h4><code>${escapeText(studioDraftPreviewCommand(draft, run))}</code>
+      </article>`;
+    }).join('');
+    return `<section id="studio-draft-authoring" class="panel"><h2>Studio draft authoring</h2>
+      <p class="hint">${escapeText(state.boundary)} The cockpit renders temporary draft data and inert copyable text only; it does not write trusted files, persist browser draft state, execute commands, upload assets, or apply edits.</p>
+      ${readError}
+      ${rows}
     </section>`;
   }
 
@@ -1497,7 +1608,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1582,7 +1693,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
