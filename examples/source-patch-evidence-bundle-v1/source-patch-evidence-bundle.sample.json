@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "source-patch-evidence-bundle-v1",
+  "bundleId": "source-patch-bundle-demo-001",
+  "patchPreviewId": "patch-preview-demo-001",
+  "status": "complete",
+  "previewRef": {
+    "kind": "source-patch-preview",
+    "path": "mutation/source-patch-previews/patch-preview-demo-001.json",
+    "hash": "sha256:previewfixturehash"
+  },
+  "fileClassReportRef": {
+    "kind": "file-class-report",
+    "path": "evidence/source-file-class-report.json"
+  },
+  "diffIntegrityReportRef": {
+    "kind": "diff-integrity-report",
+    "path": "evidence/patch-diff-integrity-report.json"
+  },
+  "sandboxReportRef": {
+    "kind": "sandbox-dry-run-report",
+    "path": "sandbox/patch-preview-demo-001/evidence/report.json"
+  },
+  "testSummaryRef": {
+    "kind": "test-summary",
+    "path": "sandbox/patch-preview-demo-001/evidence/tests.json"
+  },
+  "reviewDecisionRef": {
+    "kind": "review-decision",
+    "path": "mutation/review-decisions.json"
+  },
+  "forbiddenActionNotices": [
+    { "action": "apply_patch", "reason": "source patch apply to the trusted worktree remains unimplemented" },
+    { "action": "merge_branch", "reason": "review evidence is not merge authorization" },
+    { "action": "execute_command", "reason": "bundle links command text only; commands are not executed by the bundle" },
+    { "action": "write_trusted_file", "reason": "dashboard and Studio render bundle evidence read-only" }
+  ],
+  "guardrails": [
+    "source patch evidence bundle is read-only audit data",
+    "no source patch apply to the trusted main worktree",
+    "sandbox and test evidence remains explicit and allowlist-scoped",
+    "generated bundle output remains untracked unless fixture-scoped"
+  ]
+}

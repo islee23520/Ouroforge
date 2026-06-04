@@ -11196,6 +11196,268 @@ pub fn source_patch_review_read_model(
     }
 }
 
+pub const SOURCE_PATCH_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "source-patch-evidence-bundle-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchEvidenceBundleStatus {
+    Complete,
+    Partial,
+    Blocked,
+    Stale,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceArtifactRef {
+    pub kind: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleForbiddenNotice {
+    pub action: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "bundleId")]
+    pub bundle_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    pub status: SourcePatchEvidenceBundleStatus,
+    #[serde(rename = "previewRef")]
+    pub preview_ref: SourcePatchEvidenceArtifactRef,
+    #[serde(rename = "fileClassReportRef")]
+    pub file_class_report_ref: SourcePatchEvidenceArtifactRef,
+    #[serde(rename = "diffIntegrityReportRef")]
+    pub diff_integrity_report_ref: SourcePatchEvidenceArtifactRef,
+    #[serde(
+        rename = "sandboxReportRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sandbox_report_ref: Option<SourcePatchEvidenceArtifactRef>,
+    #[serde(
+        rename = "testSummaryRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub test_summary_ref: Option<SourcePatchEvidenceArtifactRef>,
+    #[serde(
+        rename = "reviewDecisionRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_decision_ref: Option<SourcePatchEvidenceArtifactRef>,
+    #[serde(rename = "forbiddenActionNotices")]
+    pub forbidden_action_notices: Vec<SourcePatchEvidenceBundleForbiddenNotice>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "bundleId")]
+    pub bundle_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "artifactCount")]
+    pub artifact_count: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchEvidenceBundleValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_source_patch_evidence_bundle(
+    bundle: &SourcePatchEvidenceBundleArtifact,
+) -> SourcePatchEvidenceBundleValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+    if bundle.schema_version != SOURCE_PATCH_EVIDENCE_BUNDLE_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_EVIDENCE_BUNDLE_SCHEMA_VERSION}"
+        ));
+    }
+    push_if_blank(&mut blocked_reasons, "bundleId", &bundle.bundle_id);
+    push_if_blank(
+        &mut blocked_reasons,
+        "patchPreviewId",
+        &bundle.patch_preview_id,
+    );
+    inspect_source_patch_bundle_ref("previewRef", &bundle.preview_ref, &mut blocked_reasons);
+    inspect_source_patch_bundle_ref(
+        "fileClassReportRef",
+        &bundle.file_class_report_ref,
+        &mut blocked_reasons,
+    );
+    inspect_source_patch_bundle_ref(
+        "diffIntegrityReportRef",
+        &bundle.diff_integrity_report_ref,
+        &mut blocked_reasons,
+    );
+    for (field, artifact_ref) in [
+        ("sandboxReportRef", bundle.sandbox_report_ref.as_ref()),
+        ("testSummaryRef", bundle.test_summary_ref.as_ref()),
+        ("reviewDecisionRef", bundle.review_decision_ref.as_ref()),
+    ] {
+        if let Some(artifact_ref) = artifact_ref {
+            inspect_source_patch_bundle_ref(field, artifact_ref, &mut blocked_reasons);
+        }
+    }
+    if bundle.preview_ref.kind != "source-patch-preview" {
+        blocked_reasons.push("previewRef.kind must be source-patch-preview".to_string());
+    }
+    if bundle.file_class_report_ref.kind != "file-class-report" {
+        blocked_reasons.push("fileClassReportRef.kind must be file-class-report".to_string());
+    }
+    if bundle.diff_integrity_report_ref.kind != "diff-integrity-report" {
+        blocked_reasons
+            .push("diffIntegrityReportRef.kind must be diff-integrity-report".to_string());
+    }
+    if matches!(bundle.status, SourcePatchEvidenceBundleStatus::Complete)
+        && (bundle.sandbox_report_ref.is_none()
+            || bundle.test_summary_ref.is_none()
+            || bundle.review_decision_ref.is_none())
+    {
+        blocked_reasons.push(
+            "complete bundle requires sandboxReportRef, testSummaryRef, and reviewDecisionRef"
+                .to_string(),
+        );
+    }
+    if matches!(
+        bundle.status,
+        SourcePatchEvidenceBundleStatus::Blocked | SourcePatchEvidenceBundleStatus::Stale
+    ) && bundle.blocked_reasons.is_empty()
+    {
+        blocked_reasons.push("blocked or stale bundle requires blockedReasons".to_string());
+    }
+    if bundle.forbidden_action_notices.is_empty() {
+        blocked_reasons.push("forbiddenActionNotices must not be empty".to_string());
+    }
+    for (index, notice) in bundle.forbidden_action_notices.iter().enumerate() {
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("forbiddenActionNotices[{index}].action"),
+            &notice.action,
+        );
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("forbiddenActionNotices[{index}].reason"),
+            &notice.reason,
+        );
+    }
+    for required in [
+        "apply_patch",
+        "merge_branch",
+        "execute_command",
+        "write_trusted_file",
+    ] {
+        if !bundle
+            .forbidden_action_notices
+            .iter()
+            .any(|notice| notice.action == required)
+        {
+            blocked_reasons.push(format!("forbiddenActionNotices must include {required}"));
+        }
+    }
+    if !bundle.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("read-only") || guardrail.contains("display-only")
+    }) {
+        blocked_reasons.push("guardrails must state bundle surfaces are read-only".to_string());
+    }
+    if !bundle.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("no source patch apply") || guardrail.contains("does not apply")
+    }) {
+        blocked_reasons
+            .push("guardrails must state source patch apply remains forbidden".to_string());
+    }
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+    SourcePatchEvidenceBundleValidation {
+        schema_version: "source-patch-evidence-bundle-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed"
+        } else {
+            "blocked"
+        }
+        .to_string(),
+        bundle_id: bundle.bundle_id.clone(),
+        patch_preview_id: bundle.patch_preview_id.clone(),
+        artifact_count: source_patch_bundle_artifact_count(bundle),
+        blocked_reasons,
+        guardrails: vec![
+            "source patch evidence bundle is inert audit data; it does not apply patches"
+                .to_string(),
+            "dashboard and Studio surfaces may render bundle links read-only only".to_string(),
+            "sandbox/test evidence stays explicit and allowlist-scoped".to_string(),
+            "generated bundle output remains untracked unless fixture-scoped".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_evidence_bundle(
+    bundle: &SourcePatchEvidenceBundleArtifact,
+) -> Result<SourcePatchEvidenceBundleValidation> {
+    let validation = inspect_source_patch_evidence_bundle(bundle);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch evidence bundle blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+fn inspect_source_patch_bundle_ref(
+    field: &str,
+    artifact_ref: &SourcePatchEvidenceArtifactRef,
+    blocked_reasons: &mut Vec<String>,
+) {
+    push_if_blank(
+        blocked_reasons,
+        &format!("{field}.kind"),
+        &artifact_ref.kind,
+    );
+    if let Err(error) =
+        validate_relative_artifact_path(&format!("{field}.path"), &artifact_ref.path)
+    {
+        blocked_reasons.push(error.to_string());
+    }
+    if let Some(hash) = &artifact_ref.hash {
+        require_sha256_like(blocked_reasons, &format!("{field}.hash"), hash);
+    }
+}
+
+fn source_patch_bundle_artifact_count(bundle: &SourcePatchEvidenceBundleArtifact) -> usize {
+    3 + bundle.sandbox_report_ref.iter().count()
+        + bundle.test_summary_ref.iter().count()
+        + bundle.review_decision_ref.iter().count()
+}
+
 pub fn validate_source_patch_review_decision_link(
     link: &SourcePatchReviewDecisionLink,
 ) -> Result<SourcePatchReviewDecisionLinkValidation> {
