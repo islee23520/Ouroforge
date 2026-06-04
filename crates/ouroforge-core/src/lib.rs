@@ -25296,7 +25296,8 @@ fn dashboard_lifecycle_stage_from_json_file(
             } else {
                 present_state.to_string()
             };
-            let evidence_refs = collect_json_evidence_refs(&records);
+            let mut evidence_refs = collect_json_evidence_refs(&records);
+            push_unique_ref(&mut evidence_refs, artifact_path);
             dashboard_lifecycle_stage_from_records(
                 id,
                 label,
@@ -37789,6 +37790,12 @@ scenarios:
             visual_stage.artifact_path.as_deref(),
             Some("mutation/visual-edit-applications.json")
         );
+        assert!(
+            visual_stage
+                .evidence_refs
+                .contains(&"mutation/visual-edit-applications.json".to_string()),
+            "visual draft lifecycle stage must preserve the generated application artifact ref"
+        );
         let cockpit = dashboard_review_cockpit(&lifecycle, &[]);
         assert_eq!(cockpit.applications.id, "applications");
         assert_eq!(cockpit.applications.record_count, 2);
@@ -37802,6 +37809,13 @@ scenarios:
             .artifact_path
             .as_deref()
             .is_some_and(|path| path.contains("visual-edit-applications.json")));
+        assert!(
+            cockpit
+                .applications
+                .evidence_refs
+                .contains(&"mutation/visual-edit-applications.json".to_string()),
+            "review cockpit must carry visual draft application evidence refs forward"
+        );
         let journal = update_journal(&artifacts.run_dir).expect("journal updates");
         assert!(journal.contains("### Visual Draft Applications"));
         assert!(journal.contains("Rerun context is inert/display-only"));
