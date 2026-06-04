@@ -4,6 +4,8 @@ Date: 2026-06-02
 Branch: `issue-49-demo-fresh-clone-evidence`; refreshed on `al2-8-1-public-readiness-evidence`
 Status: pre-release MVP evidence for public-readiness review; this is not a launch announcement.
 
+Current refresh audit: [`docs/public-demo-evidence-refresh-audit-v1.md`](public-demo-evidence-refresh-audit-v1.md) inventories stale demo references for issue #370 PA1.4.1 without generating or committing runtime artifacts.
+
 ## Demo media
 
 The screenshots below were refreshed on 2026-06-02 from the static local MVP surfaces with Chrome headless and a local `python3 -m http.server` process. They are committed as public demo references, not generated run evidence. The refreshed dashboard and cockpit captures use the AL2.8.1 generated dashboard export, including Platformer and Engine Expansion v1 smoke runs.
