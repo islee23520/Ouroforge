@@ -101,9 +101,11 @@ required test may run only when all of the following are true:
 5. the normalized command matches the default source-patch test command
    allowlist.
 
-Execution uses the sandbox worktree as `current_dir` and writes bounded stdout,
-stderr, exit-code, command, `argv`, matched policy id, blocked reasons, and
-guardrails to `sandbox/<id>/evidence/test-execution-report.json`. Failed or
+Execution uses the sandbox worktree as `current_dir`. Cargo commands require a
+`Cargo.toml` inside that sandbox worktree and use sandbox-local build output so
+parent trusted workspaces cannot satisfy the check. The evaluator writes bounded
+stdout, stderr, exit-code, command, `argv`, matched policy id, blocked reasons,
+and guardrails to `sandbox/<id>/evidence/test-execution-report.json`. Failed or
 blocked commands are evidence for reviewers; they do not authorize broadening the
 allowlist, retrying through a shell, applying patches to the trusted worktree, or
 triggering browser/Studio command execution.

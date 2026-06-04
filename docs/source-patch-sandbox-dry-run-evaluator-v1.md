@@ -16,14 +16,18 @@ The evaluator is split into explicit stages:
 1. `SourcePatchSandboxEvaluatorPlan` validates the sandbox id, run-relative
    `sandbox/<id>/...` layout, cleanup policy, preview refs, and required-test
    allowlist metadata.
-2. `apply_source_patch_preview_in_sandbox` copies preview targets from the
-   trusted repo into `sandbox/<id>/worktree`, applies unified diff hunks there
-   with Rust code, writes `sandbox/<id>/evidence/report.json`, and hashes trusted
-   targets before and after to prove they were not written.
+2. `apply_source_patch_preview_in_sandbox` requires the preview artifact to pass
+   current file-class and diff-integrity validation, then copies a generated
+   repo/worktree snapshot into `sandbox/<id>/worktree` while skipping generated
+   roots such as `target/`, `runs/`, and `sandbox/`. It applies unified diff
+   hunks there with Rust code, writes `sandbox/<id>/evidence/report.json`, and
+   hashes trusted targets before and after to prove they were not written.
 3. `run_source_patch_sandbox_allowlisted_tests` executes only declared
    `requiredTests` argv vectors that match the source patch test command
    allowlist and forbidden-command classifier. Commands run with `current_dir`
-   set to `sandbox/<id>/worktree` and evidence is written to
+   set to `sandbox/<id>/worktree`; Cargo commands additionally require a sandbox
+   `Cargo.toml` and use a sandbox-local `CARGO_TARGET_DIR` so they cannot fall
+   back to the trusted parent workspace. Evidence is written to
    `sandbox/<id>/evidence/test-execution-report.json`.
 
 All stages fail closed. Stale target hashes, invalid layout paths, missing
