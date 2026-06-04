@@ -37,10 +37,13 @@ cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/collect
 cargo run -p ouroforge-cli -- seed validate examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml
 cargo run -p ouroforge-cli -- asset validate examples/playable-demo-v2/collect-and-exit/asset-manifest.json
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+node examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs
 ```
 
-Generated run ids and dashboard export paths must be recorded in PR/closure
-evidence, not committed. This fixture does not claim shipped-game maturity,
+The read-model smoke writes temporary dashboard data outside the repository, renders
+dashboard/Studio read models, deletes the temp output, and audits fixture-local
+generated roots remain absent. Generated run ids and dashboard export paths must be
+recorded in PR/closure evidence, not committed. This fixture does not claim shipped-game maturity,
 production profiler accuracy, native export, hosted services, plugin runtime, or
 Godot replacement status.
 
@@ -110,6 +113,7 @@ before exit:
 
 ```bash
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+node examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs
 ```
 
 AP1.9.3 adds an asset evidence compatibility smoke that runs the asset-backed

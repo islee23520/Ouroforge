@@ -41,12 +41,15 @@ paths without committing generated outputs:
 ```bash
 node examples/game-runtime/playable-demo-v2.test.cjs
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+node examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs
 ```
 
 Expected runtime evidence includes `metadata.title`, `metadata.startState`,
 `runtimeFrameBudgetStatus: within-budget`, trigger events for key/exit, and a
-`runtime.save.loaded` event after restoring `demo-start`. The save artifact is
-browser-observable evidence only; trusted persistence remains Rust/local and any
+`runtime.save.loaded` event after restoring `demo-start`. The read-model smoke also
+writes temporary dashboard data outside the repository, renders dashboard/Studio
+read models, deletes the temp output, and audits that fixture-local generated
+roots remain absent. The save artifact is browser-observable evidence only; trusted persistence remains Rust/local and any
 run/dashboard export ids belong in PR or issue evidence, not source control.
 
 ## Visual authoring demo drafts
@@ -136,6 +139,7 @@ Run the focused Node checks:
 ```bash
 node examples/game-runtime/playable-demo-v2.test.cjs
 node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs
+node examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs
 node examples/playable-demo-v2/collect-and-exit/asset-evidence-smoke.test.cjs
 ```
 
