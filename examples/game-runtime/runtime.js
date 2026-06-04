@@ -271,6 +271,8 @@
       metadata: objectValue(entity.metadata),
     };
     if (typeof sprite.asset === 'string') normalized.sprite.asset = sprite.asset;
+    if (typeof sprite.frameId === 'string') normalized.sprite.frameId = sprite.frameId;
+    if (typeof sprite.frame === 'string') normalized.sprite.frameId = sprite.frame;
     if (components.status || componentDefaults.status) {
       normalized.components.status = statusComponent(components.status, componentDefaults.status);
     }

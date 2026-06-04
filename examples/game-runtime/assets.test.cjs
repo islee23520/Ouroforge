@@ -115,3 +115,34 @@ const rejectedTracker = createAssetTracker({ ImageCtor: null, now: () => 3000 })
 rejectedTracker.load(scene);
 assert.equal(rejectedTracker.metadata()[0].status, 'rejected');
 assert.equal(rejectedTracker.metadata()[0].failureReason, 'Image constructor unavailable');
+
+FakeImage.loaded = [];
+let atlasTick = 4000;
+const atlasManifest = {
+  schemaVersion: 'asset-manifest-v1',
+  id: 'runtime-atlas-assets',
+  assets: [
+    { id: 'player-sheet-image', type: 'image', path: 'assets/sprites/player-sheet.png' },
+    {
+      id: 'player-atlas',
+      type: 'sprite_atlas',
+      path: 'assets/atlases/player.atlas.json',
+      atlas: { imageAssetId: 'player-sheet-image', frames: [{ id: 'idle_0', rect: { x: 16, y: 0, width: 16, height: 16 } }] },
+    },
+  ],
+};
+const atlasScene = { assetManifest: atlasManifest, entities: [{ id: 'player', sprite: { asset: 'player-atlas', frameId: 'idle_0' } }] };
+assert.deepEqual(collectSpriteAssets(atlasScene), ['player-sheet-image']);
+const normalizedAtlas = normalizeManifest(atlasManifest);
+assert.deepEqual(normalizedAtlas.errors, []);
+assert.equal(normalizedAtlas.byId.get('player-atlas').kind, 'sprite_atlas');
+assert.equal(normalizedAtlas.byId.get('player-atlas').atlas.frames[0].id, 'idle_0');
+const atlasTracker = createAssetTracker({ ImageCtor: FakeImage, now: () => { atlasTick += 5; return atlasTick; } });
+atlasTracker.load(atlasScene);
+assert.deepEqual(FakeImage.loaded, ['assets/sprites/player-sheet.png']);
+const spriteRef = atlasTracker.spriteFor('player-atlas', 'idle_0');
+assert.ok(spriteRef.image);
+assert.deepEqual(spriteRef.frame, { x: 16, y: 0, width: 16, height: 16 });
+assert.equal(spriteRef.imageAssetId, 'player-sheet-image');
+assert.equal(atlasTracker.spriteFor('player-atlas', 'missing'), null);
+assert.equal(atlasTracker.metadata().at(-1).failureReason, 'Sprite atlas frame unresolved: missing');

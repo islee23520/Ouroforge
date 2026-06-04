@@ -263,3 +263,28 @@ assert.ok(compareBreakdowns(breakdown, changedBreakdown).changes.some((change) =
     assert.ok(drawnColors.includes(color), `entity ${color} must draw despite duplicate/missing id (no id-keyed collapse)`);
   }
 }
+
+{
+  const atlasContext = createContext();
+  const atlasImage = { id: 'player-sheet-image' };
+  drawRuntime({
+    canvas: { width: 64, height: 64 },
+    context: atlasContext,
+    renderer: normalizeRenderer({ layers: [{ id: 'actors', order: 0 }] }),
+    world: {
+      sceneId: 'atlas-render-test',
+      tick: 1,
+      bounds: { width: 64, height: 64 },
+      entities: [{ id: 'atlas-player', sprite: { asset: 'player-atlas', frameId: 'idle_0', layer: 'actors' }, components: { transform: { x: 8, y: 12 }, size: { width: 16, height: 16 } } }],
+    },
+    assets: { spriteFor: () => ({ image: atlasImage, frame: { x: 16, y: 0, width: 16, height: 16 } }), imageFor: () => null },
+    animation: { activeSpriteFrame: () => null },
+  });
+  assert.deepEqual(atlasContext.calls.find((call) => call[0] === 'drawImage'), ['drawImage', atlasImage, 16, 0, 16, 16, 8, 12, 16, 16]);
+  const atlasBreakdown = renderBreakdown({
+    world: { sceneId: 'atlas-render-test', entities: [{ id: 'atlas-player', sprite: { asset: 'player-atlas', frameId: 'idle_0', layer: 'actors' }, components: { transform: { x: 8, y: 12 }, size: { width: 16, height: 16 } } }] },
+    renderer: normalizeRenderer({ layers: [{ id: 'actors', order: 0 }] }),
+  });
+  assert.equal(atlasBreakdown.elements[0].assetRef, 'player-atlas');
+  assert.equal(atlasBreakdown.elements[0].assetFrameRef, 'idle_0');
+}

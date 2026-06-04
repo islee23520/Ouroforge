@@ -1,6 +1,7 @@
 (function attachAssets(root) {
   const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'svg', 'webp']);
   const AUDIO_EXTENSIONS = new Set(['ogg', 'mp3', 'wav']);
+  const ATLAS_EXTENSIONS = new Set(['json']);
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -31,8 +32,30 @@
   function kindSupportsPath(kind, path) {
     const ext = extensionFor(path);
     if (kind === 'image' || kind === 'sprite') return IMAGE_EXTENSIONS.has(ext);
+    if (kind === 'sprite_atlas') return ATLAS_EXTENSIONS.has(ext);
     if (kind === 'audio') return AUDIO_EXTENSIONS.has(ext);
     return false;
+  }
+
+
+  function normalizeAtlas(atlas = null) {
+    if (!isPlainObject(atlas)) return null;
+    const frames = Array.isArray(atlas.frames) ? atlas.frames.map((frame) => {
+      const rect = isPlainObject(frame.rect) ? frame.rect : frame;
+      return {
+        id: typeof frame.id === 'string' ? frame.id : (typeof frame.frameId === 'string' ? frame.frameId : ''),
+        rect: {
+          x: Number.isFinite(rect.x) ? rect.x : 0,
+          y: Number.isFinite(rect.y) ? rect.y : 0,
+          width: Number.isFinite(rect.width) && rect.width > 0 ? rect.width : 0,
+          height: Number.isFinite(rect.height) && rect.height > 0 ? rect.height : 0,
+        },
+      };
+    }).filter((frame) => frame.id && frame.rect.width > 0 && frame.rect.height > 0) : [];
+    return {
+      imageAssetId: typeof atlas.imageAssetId === 'string' ? atlas.imageAssetId : '',
+      frames,
+    };
   }
 
   function normalizeManifest(manifest = null) {
@@ -48,8 +71,8 @@
       errors: [],
       enabled: true,
     };
-    if (normalized.schemaVersion !== '1') {
-      normalized.errors.push('asset manifest schemaVersion must be 1');
+    if (normalized.schemaVersion !== '1' && normalized.schemaVersion !== 'asset-manifest-v1') {
+      normalized.errors.push('asset manifest schemaVersion must be 1 or asset-manifest-v1');
     }
     const ids = new Set();
     const paths = new Set();
@@ -57,15 +80,21 @@
       if (!isPlainObject(asset)) continue;
       const entry = {
         id: typeof asset.id === 'string' ? asset.id : '',
-        kind: typeof asset.kind === 'string' ? asset.kind : 'image',
+        kind: typeof asset.kind === 'string' ? asset.kind : (typeof asset.type === 'string' ? asset.type : 'image'),
         path: typeof asset.path === 'string' ? asset.path : '',
         metadata: isPlainObject(asset.metadata) ? clone(asset.metadata) : {},
+        atlas: normalizeAtlas(asset.atlas),
       };
       if (!entry.id) normalized.errors.push('asset manifest entry id must not be empty');
       if (ids.has(entry.id)) normalized.errors.push(`duplicate asset manifest entry id: ${entry.id}`);
       if (paths.has(entry.path)) normalized.errors.push(`duplicate asset manifest entry path: ${entry.path}`);
       if (!safeLocalAssetPath(entry.path)) normalized.errors.push(`asset manifest entry ${entry.id} must use a safe local assets/ path`);
       if (!kindSupportsPath(entry.kind, entry.path)) normalized.errors.push(`asset manifest entry ${entry.id} has unsupported ${entry.kind} path`);
+      if (entry.kind === 'sprite_atlas') {
+        if (!entry.atlas) normalized.errors.push(`sprite atlas ${entry.id} requires atlas metadata`);
+        if (entry.atlas && !entry.atlas.imageAssetId) normalized.errors.push(`sprite atlas ${entry.id} requires atlas.imageAssetId`);
+        if (entry.atlas && entry.atlas.frames.length === 0) normalized.errors.push(`sprite atlas ${entry.id} requires atlas frames`);
+      }
       ids.add(entry.id);
       paths.add(entry.path);
       normalized.entries.push(entry);
@@ -105,10 +134,12 @@
     }
     const refsArray = Array.from(refs).sort();
     if (!normalizedManifest.enabled) return refsArray;
-    return refsArray
-      .map((ref) => normalizedManifest.byId.get(ref))
-      .filter((entry) => entry && (entry.kind === 'image' || entry.kind === 'sprite'))
-      .map((entry) => entry.id);
+    return refsArray.flatMap((ref) => {
+      const entry = normalizedManifest.byId.get(ref);
+      if (!entry) return [];
+      if (entry.kind === 'sprite_atlas') return entry.atlas && entry.atlas.imageAssetId ? [entry.atlas.imageAssetId] : [];
+      return (entry.kind === 'image' || entry.kind === 'sprite') ? [entry.id] : [];
+    });
   }
 
   function createAssetTracker(options = {}) {
@@ -119,11 +150,13 @@
     let manifest = normalizeManifest(options.manifest);
     const records = new Map();
     const unresolvedRefs = new Set();
+    const invalidSpriteRefs = new Map();
 
     function configureManifest(nextManifest) {
       manifest = normalizeManifest(nextManifest);
       records.clear();
       unresolvedRefs.clear();
+      invalidSpriteRefs.clear();
       return manifestSummary();
     }
 
@@ -133,7 +166,11 @@
         enabled: manifest.enabled,
         assetCount: manifest.entries.length,
         errors: manifest.errors.slice().sort(),
-        assets: manifest.entries.map((entry) => ({ id: entry.id, kind: entry.kind, path: entry.path })),
+        assets: manifest.entries.map((entry) => {
+          const summary = { id: entry.id, kind: entry.kind, path: entry.path };
+          if (entry.atlas) summary.atlas = clone(entry.atlas);
+          return summary;
+        }),
       };
     }
 
@@ -243,7 +280,25 @@
         width: null,
         height: null,
       }));
-      return loaded.concat(unresolved);
+      const invalid = Array.from(invalidSpriteRefs.values()).sort((a, b) => compareCodeUnits(a.id, b.id));
+      return loaded.concat(unresolved, invalid);
+    }
+
+    function rejectSpriteRef(ref, frameId, reason) {
+      const id = [ref || 'asset', frameId || 'frame'].join(':');
+      invalidSpriteRefs.set(id, {
+        attemptId: `reject-${String(id).replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'sprite-frame'}`,
+        id,
+        path: null,
+        kind: 'image',
+        status: 'rejected',
+        startedAtUnixMs: now(),
+        endedAtUnixMs: now(),
+        loadDurationMs: 1,
+        failureReason: reason,
+        width: null,
+        height: null,
+      });
     }
 
     function imageFor(ref) {
@@ -252,11 +307,33 @@
         unresolvedRefs.add(ref);
         return null;
       }
+      if (entry.kind === 'sprite_atlas') {
+        return entry.atlas ? imageFor(entry.atlas.imageAssetId) : null;
+      }
       const record = records.get(entry.id);
       return record && record.status === 'loaded' ? record.image : null;
     }
 
-    return Object.freeze({ collectSpriteAssets, configureManifest, manifestSummary, load, metadata, imageFor });
+    function spriteFor(ref, frameId = null) {
+      const entry = entryFor(ref);
+      if (!entry) {
+        unresolvedRefs.add(ref);
+        return null;
+      }
+      if (entry.kind !== 'sprite_atlas') return { image: imageFor(ref), frame: null, assetId: entry.id, imageAssetId: entry.id };
+      if (!entry.atlas) {
+        rejectSpriteRef(ref, frameId, 'Sprite atlas metadata missing');
+        return null;
+      }
+      const frame = entry.atlas.frames.find((candidate) => candidate.id === frameId) || null;
+      if (!frame) {
+        rejectSpriteRef(ref, frameId, `Sprite atlas frame unresolved: ${frameId || 'missing frameId'}`);
+        return null;
+      }
+      return { image: imageFor(entry.atlas.imageAssetId), frame: clone(frame.rect), assetId: entry.id, imageAssetId: entry.atlas.imageAssetId, frameId: frame.id };
+    }
+
+    return Object.freeze({ collectSpriteAssets, configureManifest, manifestSummary, load, metadata, imageFor, spriteFor });
   }
 
   const api = Object.freeze({ collectSpriteAssets, createAssetTracker, normalizeManifest });

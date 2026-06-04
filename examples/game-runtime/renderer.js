@@ -248,6 +248,7 @@
         size: size(components.size, { width: 16, height: 16 }),
         primitiveCategory: primitiveCategory(entity),
         assetRef: entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null,
+        assetFrameRef: entity.sprite && typeof entity.sprite.frameId === 'string' ? entity.sprite.frameId : null,
         debugLabel: `${item.entityId} on layer ${item.layer}`,
         visible: true,
       };
@@ -345,11 +346,18 @@
       : null;
     const frameAsset = activeFrame && typeof activeFrame.asset === 'string' ? activeFrame.asset : null;
     const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
+    const spriteFrameId = entity.sprite && typeof entity.sprite.frameId === 'string' ? entity.sprite.frameId : null;
     const preferFrameColor = activeFrame && typeof activeFrame.color === 'string' && !frameAsset;
-    const image = !preferFrameColor && assets && typeof assets.imageFor === 'function'
-      ? assets.imageFor(frameAsset || spriteAsset)
+    const spriteImage = !preferFrameColor && assets && typeof assets.spriteFor === 'function' && spriteAsset
+      ? assets.spriteFor(spriteAsset, spriteFrameId)
       : null;
-    if (image) {
+    const image = spriteImage && spriteImage.image ? spriteImage.image : (!preferFrameColor && assets && typeof assets.imageFor === 'function'
+      ? assets.imageFor(frameAsset || spriteAsset)
+      : null);
+    if (image && spriteImage && spriteImage.frame) {
+      const frame = spriteImage.frame;
+      context.drawImage(image, frame.x, frame.y, frame.width, frame.height, x, y, entitySize.width, entitySize.height);
+    } else if (image) {
       context.drawImage(image, x, y, entitySize.width, entitySize.height);
     } else {
       context.fillStyle = (activeFrame && activeFrame.color) || (entity.sprite && entity.sprite.color) || '#f2f6f8';
