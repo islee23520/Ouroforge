@@ -1,7 +1,8 @@
 use ouroforge_core::{
-    inspect_source_patch_review_decision_link, validate_source_patch_review_decision_link,
-    SourcePatchPreviewEvidenceRef, SourcePatchPreviewRequiredTest, SourcePatchReviewDecisionLink,
-    SourcePatchReviewStatus, SOURCE_PATCH_REVIEW_DECISION_SCHEMA_VERSION,
+    inspect_source_patch_review_decision_link, source_patch_review_read_model,
+    validate_source_patch_review_decision_link, SourcePatchPreviewEvidenceRef,
+    SourcePatchPreviewRequiredTest, SourcePatchReviewDecisionLink, SourcePatchReviewStatus,
+    SOURCE_PATCH_REVIEW_DECISION_SCHEMA_VERSION,
 };
 
 fn required_test() -> SourcePatchPreviewRequiredTest {
@@ -98,4 +99,32 @@ fn source_patch_review_link_blocks_apply_or_command_authority_drift() {
     let message = error.to_string();
     assert!(message.contains("source patch apply"));
     assert!(message.contains("do not apply"));
+}
+
+#[test]
+fn source_patch_review_read_model_is_display_only() {
+    let link = fixture_link(SourcePatchReviewStatus::Reviewed);
+    let model = source_patch_review_read_model(&link);
+    assert_eq!(model.schema_version, "source-patch-review-read-model-v1");
+    assert_eq!(model.status, "passed");
+    assert!(model
+        .evidence_summary
+        .iter()
+        .any(|entry| entry.starts_with("file-class:")));
+    assert!(model
+        .allowed_actions
+        .iter()
+        .any(|action| action == "inspect_review_evidence"));
+    assert!(model
+        .forbidden_actions
+        .iter()
+        .any(|action| action == "apply_patch"));
+    assert!(model
+        .forbidden_actions
+        .iter()
+        .any(|action| action == "merge_branch"));
+    assert!(model
+        .forbidden_actions
+        .iter()
+        .any(|action| action == "execute_command"));
 }

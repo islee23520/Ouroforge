@@ -312,3 +312,16 @@ Issue #355 is satisfied when:
 
 This document is documentation only. It authorizes no product behavior changes by
 itself.
+
+## Source patch review read model v1
+
+SMP1.7.3 exposes source patch review decisions as read-only evidence state. A
+review read model may show the review decision id, patch preview id, review
+status, file-class report, diff-integrity report, sandbox report, required test
+commands, and blocked reasons. It is display-only: dashboard, cockpit, and Studio
+surfaces may inspect evidence and copy required test commands, but they must not
+apply patches, merge branches, execute commands, write trusted files, or add a
+browser command bridge.
+
+A `reviewed` source patch review status is not source apply authorization. Later
+source apply work must use a separate explicitly-scoped design and review gate.

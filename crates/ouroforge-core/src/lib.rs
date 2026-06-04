@@ -10964,6 +10964,29 @@ pub struct SourcePatchReviewDecisionLink {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct SourcePatchReviewReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "reviewStatus")]
+    pub review_status: SourcePatchReviewStatus,
+    pub status: String,
+    #[serde(rename = "evidenceSummary")]
+    pub evidence_summary: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "allowedActions")]
+    pub allowed_actions: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SourcePatchReviewDecisionLinkValidation {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
@@ -11124,6 +11147,51 @@ pub fn inspect_source_patch_review_decision_link(
             "file-class, diff-integrity, sandbox, and required-test evidence stay explicit"
                 .to_string(),
             "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+        ],
+    }
+}
+
+pub fn source_patch_review_read_model(
+    link: &SourcePatchReviewDecisionLink,
+) -> SourcePatchReviewReadModel {
+    let validation = inspect_source_patch_review_decision_link(link);
+    let mut evidence_summary = link
+        .linked_evidence
+        .iter()
+        .map(|evidence| format!("{}:{}", evidence.kind, evidence.path))
+        .collect::<Vec<_>>();
+    evidence_summary.push(format!("file-class:{}", link.file_class_report_ref));
+    evidence_summary.push(format!("diff-integrity:{}", link.diff_integrity_report_ref));
+    evidence_summary.push(format!("sandbox:{}", link.sandbox_report_ref));
+    evidence_summary.extend(
+        link.required_tests
+            .iter()
+            .map(|test| format!("required-test:{}", test.command)),
+    );
+    SourcePatchReviewReadModel {
+        schema_version: "source-patch-review-read-model-v1".to_string(),
+        review_decision_id: link.review_decision_id.clone(),
+        patch_preview_id: link.patch_preview_id.clone(),
+        review_status: link.status.clone(),
+        status: validation.status,
+        evidence_summary,
+        blocked_reasons: validation.blocked_reasons,
+        allowed_actions: vec![
+            "inspect_review_evidence".to_string(),
+            "copy_required_test_commands".to_string(),
+            "record_manual_follow_up".to_string(),
+        ],
+        forbidden_actions: vec![
+            "apply_patch".to_string(),
+            "merge_branch".to_string(),
+            "execute_command".to_string(),
+            "write_trusted_file".to_string(),
+            "browser_command_bridge".to_string(),
+        ],
+        guardrails: vec![
+            "read model is display-only and command-inert".to_string(),
+            "reviewed status does not apply source patches or merge branches".to_string(),
+            "dashboard and Studio surfaces may not write trusted files".to_string(),
         ],
     }
 }
