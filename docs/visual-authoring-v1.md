@@ -1,10 +1,11 @@
 # Visual Authoring v1 Scope and Contract
 
-Status: **planned local-first safe edit-draft milestone after Asset Pipeline v1**.
+Status: **completed local-first safe edit-draft milestone (#343-#354)**.
 Asset Pipeline v1 is complete as recorded in
-`docs/asset-pipeline-v1-governance-handoff.md`; #1 and #23 remain open.
+`docs/asset-pipeline-v1-governance-handoff.md`; Visual Authoring v1 completion is
+recorded by #354; #1 and #23 remain open.
 
-Visual Authoring v1 / Safe Local Edit Cockpit is the next bounded milestone for
+Visual Authoring v1 / Safe Local Edit Cockpit is the bounded milestone for
 helping authors assemble visual edit drafts without making Studio a trusted
 writer. Studio may hold draft state in memory, display previews, and expose
 copyable JSON or CLI commands. Rust-trusted CLI flows own validation,
@@ -43,15 +44,15 @@ Visual Authoring v1 starts from the completed local-first baseline:
 That baseline supports richer local project content and evidence-native review,
 but it still keeps persistence and command execution outside the browser.
 
-## Why this milestone comes next
+## Why this milestone followed Asset Pipeline v1
 
-After Asset Pipeline v1, authors can reason about scenes, tilemaps, asset refs,
+After Asset Pipeline v1, authors could reason about scenes, tilemaps, asset refs,
 runtime evidence, preview evidence, and read-only Studio inspection. The next
-safe authoring step is not a production editor or browser write path; it is a
+safe authoring step was not a production editor or browser write path; it was a
 local edit-draft workflow that lets authors compose intended changes visually
 while preserving trusted persistence in Rust.
 
-Visual Authoring v1 should answer:
+Visual Authoring v1 answered:
 
 1. What inert draft data describes intended scene, tilemap, and asset-reference
    edits?
@@ -64,9 +65,9 @@ Visual Authoring v1 should answer:
 5. Which closure gates prove generated/local state remains untracked and #1/#23
    remain open?
 
-## Target outcome
+## Completed outcome
 
-The milestone target is a safe draft-to-review loop:
+The completed milestone provides a safe draft-to-review loop:
 
 ```text
 in-memory Studio draft state
@@ -84,7 +85,7 @@ trusted persistence or command boundary.
 
 ## Dependency order
 
-Follow-up Visual Authoring v1 issues should be completed in this order:
+Visual Authoring v1 issues were completed in this order:
 
 1. **Visual Edit Draft Model v1** — define the data-only draft schema, ids,
    operation categories, provenance, diagnostics, fixture policy, and read-model
@@ -335,12 +336,11 @@ Visual Authoring v1 does not authorize:
 
 ## Closure policy for this milestone
 
-Visual Authoring v1 is complete only after the roadmap/#1 governance refresh for
-that milestone records that all ordered follow-up issues have merged, latest-main
-verification passed, generated/local artifacts remain untracked, and #1/#23 are
-still open.
+Visual Authoring v1 is complete after the roadmap/#1 governance refresh for
+#354 recorded that all ordered follow-up issues merged, latest-main verification
+passed, generated/local artifacts remained untracked, and #1/#23 were still open.
 
-Completion of this milestone would be a bounded local safe-edit-draft claim. It
-would not claim a production editor, visual scripting environment, browser write
-path, native export flow, source mutation capability, plugin marketplace, hosted
+Completion of this milestone is a bounded local safe-edit-draft claim. It does
+not claim a production editor, visual scripting environment, browser write path,
+native export flow, source mutation capability, plugin marketplace, hosted
 service, public launch, or Godot replacement.

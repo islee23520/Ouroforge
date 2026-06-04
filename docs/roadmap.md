@@ -13,13 +13,16 @@ recovery preflight, evidence bundles, agent handoffs, and Studio loop cockpit
 inspection, a completed Engine Expressiveness v2 playable-authoring
 surface for richer scene components, deterministic collision/triggers/HUD
 state, collect-and-exit demo evidence, regression coverage, and read-only
-Studio inspection, and a completed Asset Pipeline v1 content-authoring foundation
+Studio inspection, a completed Asset Pipeline v1 content-authoring foundation
 for local asset manifests, atlas/tilemap metadata, reference integrity, runtime
 loading evidence, preview/read-model evidence, Studio asset inspection, demo asset
-refresh, and asset regression coverage:
+refresh, and asset regression coverage, and a completed Visual Authoring v1 safe
+local edit-draft cockpit for source-like drafts, Rust validation/preflight,
+transaction previews, visual diff previews, review-gated apply evidence, demo
+smoke ids, Scenario Coverage v5, and read-only Studio/dashboard wording:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -92,6 +95,12 @@ The current implementation has completed these documented milestone surfaces:
   `docs/playable-demo-v2-collect-and-exit.md`,
   `docs/scenario-coverage-v4-asset-pipeline.md`,
   `docs/asset-pipeline-v1-governance-handoff.md`)
+- Visual Authoring v1 / Safe Local Edit Cockpit
+  (`docs/visual-authoring-v1.md`,
+  `docs/visual-edit-draft-model-v1.md`,
+  `docs/edit-draft-transaction-cli-v1.md`,
+  `docs/playable-demo-v2-collect-and-exit.md`,
+  `docs/visual-authoring-v1-governance-handoff.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -111,6 +120,15 @@ remote asset hosting, browser uploads/writes, marketplace/plugin behavior,
 native export, production editor claims, source mutation apply, or public launch
 automation.
 
+Visual Authoring v1 completion covers local source-like visual edit draft
+fixtures, Rust-owned draft validation/preflight, transaction preview, visual diff
+summary evidence, review-gated apply lifecycle evidence, ignored generated demo
+smoke ids, Scenario Coverage v5, and read-only Studio/dashboard compatibility
+wording. It remains a bounded Safe Local Edit Cockpit milestone: it does not add
+browser trusted writes, command bridges, production editor behavior, visual
+scripting, source mutation apply, plugin runtime, native export, hosted/cloud
+services, public launch automation, or Godot replacement claims.
+
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
 file-class, preview-artifact, review-gate, rollback/audit, sandbox/worktree, and
@@ -123,21 +141,20 @@ authorizes more.
 
 ## Near-term governance and public-readiness work
 
-This roadmap/#1 governance refresh records the completed Asset Pipeline v1
-control and implementation milestone while preserving conservative public wording
-and leaving #1/#23 open. Asset Pipeline v1 (#332-#342) is now complete as a
-local-first content-authoring foundation; it is not a public-readiness or
-production-editor claim.
+This roadmap/#1 governance refresh records the completed Visual Authoring v1 /
+Safe Local Edit Cockpit milestone while preserving conservative public wording
+and leaving #1/#23 open. Visual Authoring v1 (#343-#354) is now complete as a
+local-first draft/preview/review evidence milestone; it is not a public-readiness
+or production-editor claim.
 
-After #342, the next milestone candidates should stay inside the same
-local-first, Rust-trusted, browser-read-only boundary. Recommended sequence is
-Visual Authoring v1 (#343-#354), then Source Mutation Preview v1 implementation
-slices (#356-#366) as inert preview/evidence work only, then Public Alpha
-Readiness (#367-#377), and Public Alpha Launch Governance (#378-#387), only when
-each is backed by fixed PR units, regression coverage, generated-state audits,
-and explicit non-goals. Native Export Design Gate and Plugin Design Gate remain
-possible later governance topics, but neither is authorized as implementation
-scope by the Asset Pipeline completion handoff.
+After #354, the next recommended milestone is Source Mutation Preview v1
+implementation slices (#356-#366) as inert preview/evidence work only. Public
+Alpha Readiness (#367-#377) and Public Alpha Launch Governance (#378-#387) remain
+later governance tracks, only when backed by fixed PR units, regression coverage,
+generated-state audits, and explicit non-goals. Native Export Design Gate, Plugin
+Design Gate, and Visual Authoring v2 remain possible later governance topics, but
+none is authorized as implementation scope by the Visual Authoring v1 completion
+handoff.
 
 The public-readiness docs remain governance inputs, not automated launch paths:
 
@@ -173,10 +190,10 @@ code path.
   has an explicit implementation decision, sandbox/evidence enforcement, and
   review approval; the completed design gate and completed Asset Pipeline v1 are
   not that authorization.
-- Treat Visual Authoring v1 as the preferred next content-authoring milestone
-  because it can build on asset manifests and read-only evidence without adding
-  browser trusted writes, marketplace/plugin scope, native export, or source
-  mutation authority.
+- Treat Source Mutation Preview v1 as the preferred next milestone after Visual
+  Authoring v1, but only as inert preview/evidence work. It must not authorize
+  source mutation apply, browser trusted writes, command bridges, dependency/CI
+  mutation, marketplace/plugin scope, native export, or public launch automation.
 
 ## Active anchors
 
