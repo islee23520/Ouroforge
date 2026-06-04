@@ -20,6 +20,16 @@ fn source_patch_evidence_bundle_round_trips_complete_fixture_without_apply_autho
     );
     assert_eq!(bundle.status, SourcePatchEvidenceBundleStatus::Complete);
     assert_eq!(bundle.patch_preview_id, "patch-preview-demo-001");
+    assert_eq!(bundle.patch_summary.target_count, 2);
+    assert_eq!(bundle.file_class_summary.highest_risk, "review_held");
+    assert_eq!(
+        bundle.risk_ids,
+        vec!["source_patch_preview", "review_held_target"]
+    );
+    assert_eq!(bundle.linked_evidence.len(), 6);
+    assert_eq!(bundle.dry_run_summary.status, "passed");
+    assert_eq!(bundle.required_test_summary.total, 2);
+    assert_eq!(bundle.review_summary.status, "reviewed");
     assert!(bundle
         .forbidden_action_notices
         .iter()
@@ -44,6 +54,8 @@ fn source_patch_evidence_bundle_supports_partial_blocked_and_stale_states() {
     partial.sandbox_report_ref = None;
     partial.test_summary_ref = None;
     partial.review_decision_ref = None;
+    partial.dry_run_summary.report_ref = None;
+    partial.review_summary.decision_ref = None;
     validate_source_patch_evidence_bundle(&partial).expect("partial bundle may omit later refs");
 
     let mut blocked = partial.clone();
@@ -65,6 +77,10 @@ fn source_patch_evidence_bundle_blocks_missing_refs_and_forbidden_notices() {
         .forbidden_action_notices
         .retain(|notice| notice.action != "merge_branch");
     bundle.guardrails = vec!["audit data".to_string()];
+    bundle.patch_summary.target_count = 0;
+    bundle.risk_ids.clear();
+    bundle.linked_evidence.clear();
+    bundle.required_test_summary.commands = vec!["git merge feature".to_string()];
 
     let validation = inspect_source_patch_evidence_bundle(&bundle);
     assert_eq!(validation.status, "blocked");
@@ -80,6 +96,22 @@ fn source_patch_evidence_bundle_blocks_missing_refs_and_forbidden_notices() {
         .blocked_reasons
         .iter()
         .any(|reason| reason.contains("read-only")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("patchSummary.targetCount")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("riskIds")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("linkedEvidence")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("source patch apply, merge")));
 }
 
 #[test]
@@ -154,6 +186,14 @@ fn source_patch_evidence_bundle_writes_generated_artifact_and_exports_to_dashboa
     assert_eq!(
         artifact.value.as_ref().unwrap()["bundleId"],
         bundle.bundle_id
+    );
+    assert_eq!(
+        artifact.value.as_ref().unwrap()["patchSummary"]["targetCount"],
+        bundle.patch_summary.target_count
+    );
+    assert_eq!(
+        artifact.value.as_ref().unwrap()["reviewSummary"]["status"],
+        bundle.review_summary.status
     );
     assert!(artifact
         .value

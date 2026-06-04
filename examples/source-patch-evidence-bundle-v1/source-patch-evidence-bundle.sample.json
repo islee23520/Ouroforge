@@ -3,6 +3,72 @@
   "bundleId": "source-patch-bundle-demo-001",
   "patchPreviewId": "patch-preview-demo-001",
   "status": "complete",
+  "patchSummary": {
+    "title": "Review generated source patch preview for demo scene docs",
+    "expectedBehaviorChange": "Documentation-only preview evidence; no trusted worktree patch is applied.",
+    "targetCount": 2,
+    "changedLines": 18
+  },
+  "fileClassSummary": {
+    "allowed": 1,
+    "reviewHeld": 1,
+    "blocked": 0,
+    "highestRisk": "review_held"
+  },
+  "riskIds": [
+    "source_patch_preview",
+    "review_held_target"
+  ],
+  "linkedEvidence": [
+    {
+      "kind": "source-patch-preview",
+      "path": "mutation/source-patch-previews/patch-preview-demo-001.json",
+      "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "kind": "file-class-report",
+      "path": "evidence/source-file-class-report.json"
+    },
+    {
+      "kind": "diff-integrity-report",
+      "path": "evidence/patch-diff-integrity-report.json"
+    },
+    {
+      "kind": "sandbox-dry-run-report",
+      "path": "sandbox/patch-preview-demo-001/evidence/report.json"
+    },
+    {
+      "kind": "test-summary",
+      "path": "sandbox/patch-preview-demo-001/evidence/tests.json"
+    },
+    {
+      "kind": "review-decision",
+      "path": "mutation/review-decisions.json"
+    }
+  ],
+  "dryRunSummary": {
+    "status": "passed",
+    "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
+    "reportRef": {
+      "kind": "sandbox-dry-run-report",
+      "path": "sandbox/patch-preview-demo-001/evidence/report.json"
+    }
+  },
+  "requiredTestSummary": {
+    "total": 2,
+    "commands": [
+      "cargo fmt --check",
+      "cargo test -p ouroforge-core"
+    ],
+    "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+  },
+  "reviewSummary": {
+    "status": "reviewed",
+    "decisionRef": {
+      "kind": "review-decision",
+      "path": "mutation/review-decisions.json"
+    }
+  },
   "previewRef": {
     "kind": "source-patch-preview",
     "path": "mutation/source-patch-previews/patch-preview-demo-001.json",
@@ -29,10 +95,22 @@
     "path": "mutation/review-decisions.json"
   },
   "forbiddenActionNotices": [
-    { "action": "apply_patch", "reason": "source patch apply to the trusted worktree remains unimplemented" },
-    { "action": "merge_branch", "reason": "review evidence is not merge authorization" },
-    { "action": "execute_command", "reason": "bundle links command text only; commands are not executed by the bundle" },
-    { "action": "write_trusted_file", "reason": "dashboard and Studio render bundle evidence read-only" }
+    {
+      "action": "apply_patch",
+      "reason": "source patch apply to the trusted worktree remains unimplemented"
+    },
+    {
+      "action": "merge_branch",
+      "reason": "review evidence is not merge authorization"
+    },
+    {
+      "action": "execute_command",
+      "reason": "bundle links command text only; commands are not executed by the bundle"
+    },
+    {
+      "action": "write_trusted_file",
+      "reason": "dashboard and Studio render bundle evidence read-only"
+    }
   ],
   "guardrails": [
     "source patch evidence bundle is read-only audit data",

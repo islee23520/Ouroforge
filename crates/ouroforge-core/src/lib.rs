@@ -11225,6 +11225,72 @@ pub struct SourcePatchEvidenceBundleForbiddenNotice {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundlePatchSummary {
+    pub title: String,
+    #[serde(rename = "expectedBehaviorChange")]
+    pub expected_behavior_change: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "changedLines")]
+    pub changed_lines: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleFileClassSummary {
+    pub allowed: usize,
+    #[serde(rename = "reviewHeld")]
+    pub review_held: usize,
+    pub blocked: usize,
+    #[serde(rename = "highestRisk")]
+    pub highest_risk: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleDryRunSummary {
+    pub status: String,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+    #[serde(rename = "reportRef", default, skip_serializing_if = "Option::is_none")]
+    pub report_ref: Option<SourcePatchEvidenceArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleRequiredTestSummary {
+    pub total: usize,
+    pub commands: Vec<String>,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchEvidenceBundleReviewSummary {
+    pub status: String,
+    #[serde(
+        rename = "decisionRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub decision_ref: Option<SourcePatchEvidenceArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SourcePatchEvidenceBundleArtifact {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
@@ -11233,6 +11299,20 @@ pub struct SourcePatchEvidenceBundleArtifact {
     #[serde(rename = "patchPreviewId")]
     pub patch_preview_id: String,
     pub status: SourcePatchEvidenceBundleStatus,
+    #[serde(rename = "patchSummary")]
+    pub patch_summary: SourcePatchEvidenceBundlePatchSummary,
+    #[serde(rename = "fileClassSummary")]
+    pub file_class_summary: SourcePatchEvidenceBundleFileClassSummary,
+    #[serde(rename = "riskIds")]
+    pub risk_ids: Vec<String>,
+    #[serde(rename = "linkedEvidence")]
+    pub linked_evidence: Vec<SourcePatchEvidenceArtifactRef>,
+    #[serde(rename = "dryRunSummary")]
+    pub dry_run_summary: SourcePatchEvidenceBundleDryRunSummary,
+    #[serde(rename = "requiredTestSummary")]
+    pub required_test_summary: SourcePatchEvidenceBundleRequiredTestSummary,
+    #[serde(rename = "reviewSummary")]
+    pub review_summary: SourcePatchEvidenceBundleReviewSummary,
     #[serde(rename = "previewRef")]
     pub preview_ref: SourcePatchEvidenceArtifactRef,
     #[serde(rename = "fileClassReportRef")]
@@ -11306,6 +11386,7 @@ pub fn inspect_source_patch_evidence_bundle(
         "patchPreviewId",
         &bundle.patch_preview_id,
     );
+    inspect_source_patch_bundle_summary_fields(bundle, &mut blocked_reasons);
     inspect_source_patch_bundle_ref("previewRef", &bundle.preview_ref, &mut blocked_reasons);
     inspect_source_patch_bundle_ref(
         "fileClassReportRef",
@@ -11499,6 +11580,138 @@ pub fn validate_source_patch_evidence_bundle(
         ));
     }
     Ok(validation)
+}
+
+fn inspect_source_patch_bundle_summary_fields(
+    bundle: &SourcePatchEvidenceBundleArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    push_if_blank(
+        blocked_reasons,
+        "patchSummary.title",
+        &bundle.patch_summary.title,
+    );
+    push_if_blank(
+        blocked_reasons,
+        "patchSummary.expectedBehaviorChange",
+        &bundle.patch_summary.expected_behavior_change,
+    );
+    if bundle.patch_summary.target_count == 0 {
+        blocked_reasons.push("patchSummary.targetCount must be greater than zero".to_string());
+    }
+    if bundle.file_class_summary.allowed
+        + bundle.file_class_summary.review_held
+        + bundle.file_class_summary.blocked
+        == 0
+    {
+        blocked_reasons.push("fileClassSummary must count at least one target".to_string());
+    }
+    push_if_blank(
+        blocked_reasons,
+        "fileClassSummary.highestRisk",
+        &bundle.file_class_summary.highest_risk,
+    );
+    if bundle.risk_ids.is_empty() {
+        blocked_reasons.push("riskIds must not be empty".to_string());
+    }
+    if bundle.linked_evidence.is_empty() {
+        blocked_reasons.push("linkedEvidence must not be empty".to_string());
+    }
+    for (index, artifact_ref) in bundle.linked_evidence.iter().enumerate() {
+        inspect_source_patch_bundle_ref(
+            &format!("linkedEvidence[{index}]"),
+            artifact_ref,
+            blocked_reasons,
+        );
+    }
+    push_if_blank(
+        blocked_reasons,
+        "dryRunSummary.status",
+        &bundle.dry_run_summary.status,
+    );
+    push_if_blank(
+        blocked_reasons,
+        "dryRunSummary.allowlistPolicyId",
+        &bundle.dry_run_summary.allowlist_policy_id,
+    );
+    if bundle.dry_run_summary.allowlist_policy_id != "source-patch-preview-safe-local-checks-v1" {
+        blocked_reasons.push(
+            "dryRunSummary.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+                .to_string(),
+        );
+    }
+    if let Some(report_ref) = &bundle.dry_run_summary.report_ref {
+        inspect_source_patch_bundle_ref("dryRunSummary.reportRef", report_ref, blocked_reasons);
+    }
+    if matches!(bundle.status, SourcePatchEvidenceBundleStatus::Complete)
+        && bundle.dry_run_summary.report_ref.is_none()
+    {
+        blocked_reasons.push("complete bundle requires dryRunSummary.reportRef".to_string());
+    }
+    if matches!(
+        bundle.status,
+        SourcePatchEvidenceBundleStatus::Blocked | SourcePatchEvidenceBundleStatus::Stale
+    ) && bundle.dry_run_summary.blocked_reasons.is_empty()
+        && bundle.blocked_reasons.is_empty()
+    {
+        blocked_reasons.push(
+            "blocked or stale bundle requires blockedReasons or dryRunSummary.blockedReasons"
+                .to_string(),
+        );
+    }
+    if bundle.required_test_summary.total == 0 {
+        blocked_reasons.push("requiredTestSummary.total must be greater than zero".to_string());
+    }
+    if bundle.required_test_summary.commands.is_empty() {
+        blocked_reasons.push("requiredTestSummary.commands must not be empty".to_string());
+    }
+    if bundle.required_test_summary.total != bundle.required_test_summary.commands.len() {
+        blocked_reasons.push("requiredTestSummary.total must equal commands length".to_string());
+    }
+    if bundle.required_test_summary.allowlist_policy_id
+        != "source-patch-preview-safe-local-checks-v1"
+    {
+        blocked_reasons.push(
+            "requiredTestSummary.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+                .to_string(),
+        );
+    }
+    for (index, command) in bundle.required_test_summary.commands.iter().enumerate() {
+        push_if_blank(
+            blocked_reasons,
+            &format!("requiredTestSummary.commands[{index}]"),
+            command,
+        );
+        let argv = command
+            .split_whitespace()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        if !argv.is_empty() {
+            let test_command = SourcePatchTestCommand {
+                command: command.clone(),
+                argv,
+            };
+            if let Some(forbidden) = classify_source_patch_forbidden_test_command(&test_command) {
+                blocked_reasons.push(format!(
+                    "requiredTestSummary.commands[{index}] forbidden: {}",
+                    forbidden.reason
+                ));
+            }
+        }
+    }
+    push_if_blank(
+        blocked_reasons,
+        "reviewSummary.status",
+        &bundle.review_summary.status,
+    );
+    if let Some(decision_ref) = &bundle.review_summary.decision_ref {
+        inspect_source_patch_bundle_ref("reviewSummary.decisionRef", decision_ref, blocked_reasons);
+    }
+    if matches!(bundle.status, SourcePatchEvidenceBundleStatus::Complete)
+        && bundle.review_summary.decision_ref.is_none()
+    {
+        blocked_reasons.push("complete bundle requires reviewSummary.decisionRef".to_string());
+    }
 }
 
 fn inspect_source_patch_bundle_ref(
