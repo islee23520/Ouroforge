@@ -24241,6 +24241,12 @@ pub fn inspect_source_apply_worktree_context(
         blocked_reasons.push(format!(
             "missing-git-context: worktreeRoot must be inside repositoryRoot: {error}"
         ));
+    } else {
+        blocked_reasons.extend(source_apply_git_context_blockers(
+            input,
+            repository_root,
+            worktree_root,
+        ));
     }
 
     for target in &input.targets {
@@ -24326,6 +24332,83 @@ pub fn write_source_apply_worktree_context_evidence(
         }),
     )?;
     Ok(report)
+}
+
+fn source_apply_git_context_blockers(
+    input: &SourceApplyWorktreeContextInput,
+    repository_root: &Path,
+    worktree_root: &Path,
+) -> Vec<String> {
+    let mut blocked_reasons = Vec::new();
+    let git_top_level =
+        match source_apply_git_stdout(worktree_root, &["rev-parse", "--show-toplevel"]) {
+            Ok(path) => PathBuf::from(path),
+            Err(error) => return vec![format!("missing-git-context: {error}")],
+        };
+    let canonical_git_top_level = match git_top_level.canonicalize() {
+        Ok(path) => path,
+        Err(error) => {
+            return vec![format!(
+                "missing-git-context: failed to canonicalize git top-level {}: {error}",
+                git_top_level.display()
+            )]
+        }
+    };
+    for (label, expected) in [
+        ("repositoryRoot", repository_root),
+        ("worktreeRoot", worktree_root),
+    ] {
+        match expected.canonicalize() {
+            Ok(canonical) if canonical == canonical_git_top_level => {}
+            Ok(canonical) => blocked_reasons.push(format!(
+                "missing-git-context: git top-level {} must match {label} {}",
+                canonical_git_top_level.display(),
+                canonical.display()
+            )),
+            Err(error) => blocked_reasons.push(format!(
+                "missing-git-context: failed to canonicalize {label}: {error}"
+            )),
+        }
+    }
+    match source_apply_git_stdout(worktree_root, &["rev-parse", "HEAD"]) {
+        Ok(head) if head == input.current_head_commit => {}
+        Ok(head) => blocked_reasons.push(format!(
+            "branch-head-mismatch: currentHeadCommit differs from git HEAD {head}"
+        )),
+        Err(error) => blocked_reasons.push(format!("missing-git-context: {error}")),
+    }
+    match source_apply_git_stdout(worktree_root, &["branch", "--show-current"]) {
+        Ok(branch) if branch == input.branch => {}
+        Ok(branch) if branch.is_empty() => {
+            blocked_reasons.push("branch-head-mismatch: git worktree is detached".to_string())
+        }
+        Ok(branch) => blocked_reasons.push(format!(
+            "branch-head-mismatch: branch differs from git branch {branch}"
+        )),
+        Err(error) => blocked_reasons.push(format!("missing-git-context: {error}")),
+    }
+    blocked_reasons
+}
+
+fn source_apply_git_stdout(worktree_root: &Path, args: &[&str]) -> Result<String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(worktree_root)
+        .output()
+        .with_context(|| {
+            format!(
+                "failed to inspect git context with `git {}`",
+                args.join(" ")
+            )
+        })?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "`git {}` failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
 fn inspect_source_apply_worktree_target(
@@ -36229,19 +36312,62 @@ scenarios:
         root: &Path,
         targets: Vec<SourceApplyWorktreeContextTargetInput>,
     ) -> SourceApplyWorktreeContextInput {
+        let head = source_apply_git_fixture(root);
         SourceApplyWorktreeContextInput {
             policy_id: "source-apply-worktree-boundary-v1".to_string(),
             repository_root: root.to_string_lossy().to_string(),
             worktree_root: root.to_string_lossy().to_string(),
             branch: "issue-701-fixture".to_string(),
-            expected_head_commit: "head123".to_string(),
-            current_head_commit: "head123".to_string(),
+            expected_head_commit: head.clone(),
+            current_head_commit: head,
             lock_status: SourceApplyWorktreeLockStatus {
                 active: false,
                 attempt_id: "attempt-1".to_string(),
             },
             targets,
         }
+    }
+
+    fn source_apply_git_fixture(root: &Path) -> String {
+        run_git_fixture(root, &["init"]);
+        run_git_fixture(root, &["config", "user.email", "source-apply@example.test"]);
+        run_git_fixture(root, &["config", "user.name", "Source Apply Fixture"]);
+        run_git_fixture(root, &["add", "."]);
+        run_git_fixture(root, &["commit", "-m", "source apply fixture"]);
+        run_git_fixture(root, &["branch", "-M", "issue-701-fixture"]);
+        git_fixture_stdout(root, &["rev-parse", "HEAD"])
+    }
+
+    fn run_git_fixture(root: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap_or_else(|error| panic!("git {} starts: {error}", args.join(" ")));
+        assert!(
+            output.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn git_fixture_stdout(root: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap_or_else(|error| panic!("git {} starts: {error}", args.join(" ")));
+        assert!(
+            output.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout)
+            .expect("git stdout is utf8")
+            .trim()
+            .to_string()
     }
 
     #[test]
@@ -36350,6 +36476,36 @@ scenarios:
             reasons.contains("path-traversal") || reasons.contains("file-class blocked"),
             "{reasons}"
         );
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_blocks_non_git_worktree() {
+        let root = unique_temp_dir("source-apply-context-non-git");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        let input = SourceApplyWorktreeContextInput {
+            policy_id: "source-apply-worktree-boundary-v1".to_string(),
+            repository_root: root.to_string_lossy().to_string(),
+            worktree_root: root.to_string_lossy().to_string(),
+            branch: "issue-701-fixture".to_string(),
+            expected_head_commit: "head123".to_string(),
+            current_head_commit: "head123".to_string(),
+            lock_status: SourceApplyWorktreeLockStatus {
+                active: false,
+                attempt_id: "attempt-1".to_string(),
+            },
+            targets: vec![SourceApplyWorktreeContextTargetInput {
+                path: "seeds/platformer.yaml".to_string(),
+                git_status: "clean".to_string(),
+                expected_file_class_decision: SourceFileClassDecision::Allowed,
+                authorized_creation: false,
+            }],
+        };
+        let report = inspect_source_apply_worktree_context(&input);
+        assert!(report.is_blocked());
+        let reasons = report.blocked_reasons.join(" | ");
+        assert!(reasons.contains("missing-git-context"), "{reasons}");
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
