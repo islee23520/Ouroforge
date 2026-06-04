@@ -4,6 +4,7 @@
   const rawKeys = {};
   const actionInput = {};
   const events = [];
+  const saveSlots = new Map();
   const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
   const snapshotFactory = (window.OuroforgeSnapshots || {
     createSnapshotRegistry: () => ({
@@ -163,6 +164,25 @@
 
   function objectValue(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? clone(value) : {};
+  }
+
+  function stableJson(value) {
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+    if (value && typeof value === 'object') {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+  }
+
+  function fnv1a64(value) {
+    let hash = 0xcbf29ce484222325n;
+    const prime = 0x100000001b3n;
+    const inputText = stableJson(value);
+    for (let index = 0; index < inputText.length; index += 1) {
+      hash ^= BigInt(inputText.charCodeAt(index));
+      hash = BigInt.asUintN(64, hash * prime);
+    }
+    return hash.toString(16).padStart(16, '0');
   }
 
   function stringList(value = []) {
@@ -1098,7 +1118,7 @@
   }
 
   function snapshot() {
-    const snapshotId = snapshots.capture({ world, input, events, rendererState }, world.tick);
+    const snapshotId = snapshots.capture({ world, input, rawKeys, actionInput, events, rendererState }, world.tick);
     record('runtime.snapshot.captured', { snapshotId, tick: world.tick });
     renderDebug();
     return { snapshotId, metadata: snapshots.metadata(snapshotId) };
@@ -1107,10 +1127,122 @@
   function restore(snapshotId) {
     const snapshotValue = snapshots.restore(snapshotId);
     Object.assign(world, clone(snapshotValue.world || world));
+    for (const key of Object.keys(input)) input[key] = false;
     Object.assign(input, clone(snapshotValue.input || input));
+    for (const key of Object.keys(rawKeys)) delete rawKeys[key];
+    Object.assign(rawKeys, clone(snapshotValue.rawKeys || {}));
+    for (const actionId of Object.keys(actionInput)) delete actionInput[actionId];
+    Object.assign(actionInput, clone(snapshotValue.actionInput || {}));
     events.splice(0, events.length, ...clone(snapshotValue.events || []));
     if (snapshotValue.rendererState) rendererState = clone(snapshotValue.rendererState);
     record('runtime.snapshot.restored', { snapshotId, tick: world.tick });
+    renderDebug();
+    return api.getWorldState();
+  }
+
+  function runtimeState(slotId = 'slot-1') {
+    const scopedEntities = world.entities.map((entity) => ({
+      entityId: entity.id,
+      transform: clone(entity.components && entity.components.transform ? entity.components.transform : {}),
+      velocity: clone(entity.components && entity.components.velocity ? entity.components.velocity : {}),
+      status: clone(entity.components && entity.components.status ? entity.components.status : {}),
+    }));
+    const state = {
+      schemaVersion: 'runtime-state-v1',
+      stateId: `${String(slotId)}-tick-${world.tick}`,
+      runId: world.runId || 'browser-runtime-local',
+      sceneId: world.sceneId,
+      tick: world.tick,
+      recordedAtUnixMs: Date.now(),
+      flags: clone(world.goalFlags || {}),
+      inventory: [],
+      progress: {},
+      entities: scopedEntities,
+      camera: cameraEvidence(),
+      input: {
+        rawInput: { directions: clone(input), keys: clone(rawKeys) },
+        actionInput: clone(actionInput),
+        actionState: resolvedActionState(),
+      },
+    };
+    state.digest = {
+      algorithm: 'fnv1a64-canonical-json-v1',
+      value: fnv1a64({
+        sceneId: state.sceneId,
+        tick: state.tick,
+        flags: state.flags,
+        entities: state.entities,
+        camera: state.camera,
+        input: state.input,
+      }),
+    };
+    return state;
+  }
+
+  function safeSaveSlotId(slotId = 'slot-1') {
+    const safeSlotId = String(slotId || 'slot-1');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(safeSlotId) || safeSlotId.includes('..')) {
+      throw new Error('runtime save slotId must be a path-safe generated evidence file stem');
+    }
+    return safeSlotId;
+  }
+
+  function createSave(slotId = 'slot-1') {
+    const safeSlotId = safeSaveSlotId(slotId);
+    const state = runtimeState(safeSlotId);
+    const save = {
+      schemaVersion: 'runtime-save-artifact-v1',
+      saveId: `${safeSlotId}-tick-${world.tick}`,
+      runId: state.runId,
+      slotId: safeSlotId,
+      createdAtUnixMs: Date.now(),
+      state,
+      policy: {
+        artifactPath: `evidence/runtime-state/saves/${safeSlotId}.save.json`,
+        rootKind: 'generated_evidence',
+        trustedWriter: 'rust-local-runtime-save-v1',
+        browserWriteAccess: 'none',
+        retention: 'generated run evidence; untracked unless fixture-scoped',
+      },
+    };
+    saveSlots.set(safeSlotId, clone(save));
+    record('runtime.save.created', { saveId: save.saveId, slotId: safeSlotId, stateDigest: state.digest });
+    return clone(save);
+  }
+
+  function applyRuntimeState(state) {
+    if (!state || typeof state !== 'object' || state.schemaVersion !== 'runtime-state-v1') {
+      throw new Error('runtime state schemaVersion must be runtime-state-v1');
+    }
+    if (state.sceneId && state.sceneId !== world.sceneId) {
+      throw new Error(`runtime save sceneId ${state.sceneId} does not match current scene ${world.sceneId}`);
+    }
+    world.tick = Number.isFinite(state.tick) ? Math.max(0, Math.floor(state.tick)) : world.tick;
+    world.goalFlags = clone(state.flags || {});
+    const entitiesById = new Map(world.entities.map((entity) => [entity.id, entity]));
+    for (const savedEntity of Array.isArray(state.entities) ? state.entities : []) {
+      const entity = entitiesById.get(savedEntity.entityId);
+      if (!entity || !entity.components) continue;
+      if (savedEntity.transform) entity.components.transform = clone(savedEntity.transform);
+      if (savedEntity.velocity) entity.components.velocity = clone(savedEntity.velocity);
+      if (savedEntity.status && entity.components.status) entity.components.status = clone(savedEntity.status);
+    }
+    const savedInput = state.input || {};
+    const savedRaw = savedInput.rawInput || {};
+    for (const key of Object.keys(input)) input[key] = Boolean(savedRaw.directions && savedRaw.directions[key]);
+    for (const key of Object.keys(rawKeys)) delete rawKeys[key];
+    Object.assign(rawKeys, clone(savedRaw.keys || {}));
+    for (const actionId of Object.keys(actionInput)) delete actionInput[actionId];
+    Object.assign(actionInput, clone(savedInput.actionInput || {}));
+  }
+
+  function loadSave(saveOrSlotId) {
+    const save = typeof saveOrSlotId === 'string' ? saveSlots.get(safeSaveSlotId(saveOrSlotId)) : saveOrSlotId;
+    if (!save || typeof save !== 'object' || save.schemaVersion !== 'runtime-save-artifact-v1') {
+      throw new Error('runtime save artifact schemaVersion must be runtime-save-artifact-v1');
+    }
+    applyRuntimeState(save.state);
+    record('runtime.save.loaded', { saveId: save.saveId, slotId: save.slotId, stateDigest: save.state && save.state.digest });
     renderDebug();
     return api.getWorldState();
   }
@@ -1234,6 +1366,9 @@
     setInput,
     snapshot,
     restore,
+    runtimeState,
+    createSave,
+    loadSave,
     loadScene,
     reload,
     transition,
