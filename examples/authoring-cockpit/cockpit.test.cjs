@@ -1496,6 +1496,9 @@ assert.deepEqual(gameplayBehaviorFixture.behaviors.map((behavior) => behavior.id
 assert.doesNotMatch(JSON.stringify(gameplayBehaviorFixture), /execute_script|plugin_loader|dynamic_import|eval\(|commandBridge|trustedWrite/);
 assert.match(docsReadme, /gameplay-behavior-model-v1\.md/);
 assert.match(docsReadme, /no executable scripts, plugin loaders, or command bridges/);
+assert.match(gameplayBehaviorModelDoc, /read-model\/export compatibility notes/);
+assert.match(gameplayBehaviorModelDoc, /gameplay-behavior-model-read-model\.v1/);
+assert.match(gameplayBehaviorModelDoc, /no runtime execution, no\s+script execution, no command bridge, no browser trusted writes, no source\s+apply/);
 const studio3dInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-3d-inspection-surface-v1.md'), 'utf8');
 assert.match(studio3dInspectionDoc, /Issue: #607/);
 assert.match(studio3dInspectionDoc, /no-write, no-command, no-3D-editor boundary/);

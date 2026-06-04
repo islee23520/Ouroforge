@@ -75,14 +75,26 @@ commands, unrestricted source-apply instructions, or auto-merge/auto-apply
 instructions. Unsupported script-like examples belong only in invalid fixtures as
 inert negative test data.
 
-## Compatibility and read-model notes
+## Compatibility and read-model/export compatibility notes
 
 Gameplay behavior artifacts should be additive to existing Seeds, scenes,
 project manifests, runs, scenarios, dashboard exports, Studio read models, 2D/3D
-fixtures, and source-like fixtures. Follow-up read models should expose behavior
-ids, target summaries, trigger/condition/action counts, status, evidence refs,
-and blocked reasons without interpreting arbitrary code or creating write
-authority.
+fixtures, and source-like fixtures. Read models expose behavior ids, target
+summaries, trigger/condition/action counts, status, evidence refs, and blocked
+reasons without interpreting arbitrary code or creating write authority.
+
+The read-model shape is display/export data only:
+
+- `schemaVersion: "gameplay-behavior-model-read-model.v1"`;
+- `behaviorPackId` and aggregate `status`;
+- `behaviorCount`, `readyCount`, `partialCount`, `blockedCount`, and
+  `unsupportedCount`;
+- `behaviorIds`, `targetRefs`, `triggerKinds`, `conditionKinds`, and
+  `actionKinds` for dashboard/Studio indexing;
+- `linkedEvidenceRefs` and `blockedReasons` for audit display;
+- a boundary string that explicitly says read-only, no runtime execution, no
+  script execution, no command bridge, no browser trusted writes, no source
+  apply, and no production-stable scripting API claim.
 
 Rust/local validation owns trusted persistence, behavior draft/apply validation,
 generated evidence writing, source-like fixture validation, and CLI contracts.
