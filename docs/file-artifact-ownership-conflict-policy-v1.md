@@ -61,6 +61,20 @@ Allowed states are:
 
 Blocked or escalated entries must include `blockedReasons`. `escalation-hold` entries must include escalation metadata.
 
+## Conflict validation
+
+Rust/local validation rejects unresolved conflicts before a policy can be accepted:
+
+- duplicate entry ids;
+- write/write target overlap between different owners unless both entries are blocked, deferred, or escalated;
+- read/write ambiguity over the same target path or overlapping paths unless both entries are blocked, deferred, or escalated;
+- generated-output-root targets outside `generatedState.roots`;
+- unsafe, absolute, hidden, local-tool, or traversal paths;
+- missing owner agents, unsupported roles, or malformed target references;
+- one work package reference assigned to conflicting owners.
+
+The conflict check treats policy entries as evidence metadata only. A blocked, deferred, or escalated conflict is accepted as explicit evidence that work must stop or be escalated; it is not a hidden lock, write permission, auto-apply path, or automatic resolution.
+
 ## Fixture set
 
 Tracked fixtures live under `examples/multi-agent-pipeline-v1/`:
