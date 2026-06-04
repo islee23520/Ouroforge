@@ -1,0 +1,208 @@
+{
+  "schemaVersion": "agentic-level-design-regression-suite-v1",
+  "suiteId": "scenario_coverage_v10_agentic_level_design",
+  "issue": 641,
+  "status": "ready",
+  "rows": [
+    {
+      "area": "intent_validation",
+      "validFixture": "examples/level-intent-v1/level-intent.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/level-intent-v1/level-intent.partial.fixture.json",
+        "examples/level-intent-v1/level-intent.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/level-intent-v1/invalid/contradictory-constraints.fixture.json",
+        "examples/level-intent-v1/invalid/missing-objectives.fixture.json"
+      ],
+      "testFilter": "cargo test level_intent_v1",
+      "expectedBoundary": "planning input only; no generation or trusted write"
+    },
+    {
+      "area": "generation_plan_validation",
+      "validFixture": "examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/scene-generation-plan-v1/scene-generation-plan.stale.fixture.json",
+        "examples/scene-generation-plan-v1/scene-generation-plan.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/scene-generation-plan-v1/invalid/missing-intent.fixture.json",
+        "examples/scene-generation-plan-v1/invalid/malformed-expected-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test scene_generation_plan_v1",
+      "expectedBoundary": "advisory plan only; no draft generation or trusted write"
+    },
+    {
+      "area": "layout_constraints",
+      "validFixture": "examples/spatial-layout-constraint-solver-v1/spatial-layout.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/spatial-layout-constraint-solver-v1/spatial-layout.violated.fixture.json",
+        "examples/spatial-layout-constraint-solver-v1/spatial-layout.unsupported.fixture.json",
+        "examples/spatial-layout-constraint-solver-v1/spatial-layout.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/spatial-layout-constraint-solver-v1/invalid/contradictory-result.fixture.json",
+        "examples/spatial-layout-constraint-solver-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test spatial_layout_solver_v1",
+      "expectedBoundary": "deterministic validation evidence only"
+    },
+    {
+      "area": "tilemap_terrain_draft",
+      "validFixture": "examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.stale.fixture.json",
+        "examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.unsupported.fixture.json",
+        "examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/tilemap-terrain-generation-draft-v1/invalid/duplicate-placement.fixture.json",
+        "examples/tilemap-terrain-generation-draft-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test tilemap_terrain_generation_draft_v1",
+      "expectedBoundary": "preview only; no tilemap writes"
+    },
+    {
+      "area": "entity_objective_encounter_placement",
+      "validFixture": "examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.stale.fixture.json",
+        "examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.unsupported.fixture.json",
+        "examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/entity-objective-encounter-placement-draft-v1/invalid/overlap.fixture.json",
+        "examples/entity-objective-encounter-placement-draft-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test entity_objective_placement_draft_v1",
+      "expectedBoundary": "preview only; review-gated apply remains separate"
+    },
+    {
+      "area": "reachability_pathing",
+      "validFixture": "examples/reachability-pathing-evidence-v1/reachability.valid.fixture.json",
+      "edgeFixtures": [
+        "examples/reachability-pathing-evidence-v1/reachability.unreachable.fixture.json",
+        "examples/reachability-pathing-evidence-v1/reachability.unsupported.fixture.json",
+        "examples/reachability-pathing-evidence-v1/reachability.stale.fixture.json",
+        "examples/reachability-pathing-evidence-v1/reachability.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/reachability-pathing-evidence-v1/invalid/duplicate-cell.fixture.json",
+        "examples/reachability-pathing-evidence-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test reachability_pathing_evidence_v1",
+      "expectedBoundary": "bounded local graph search; no scene writes"
+    },
+    {
+      "area": "objective_completion_proof",
+      "validFixture": "examples/objective-completion-proof-v1/objective.complete.fixture.json",
+      "edgeFixtures": [
+        "examples/objective-completion-proof-v1/objective.unreachable.fixture.json",
+        "examples/objective-completion-proof-v1/objective.stale.fixture.json",
+        "examples/objective-completion-proof-v1/objective.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/objective-completion-proof-v1/invalid/result-drift.fixture.json",
+        "examples/objective-completion-proof-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test objective_completion_proof_v1",
+      "expectedBoundary": "local scenario and reachability evidence only"
+    },
+    {
+      "area": "difficulty_pacing_heuristic",
+      "validFixture": "examples/difficulty-pacing-heuristic-evidence-v1/heuristics.within-target.fixture.json",
+      "edgeFixtures": [
+        "examples/difficulty-pacing-heuristic-evidence-v1/heuristics.out-of-target.fixture.json",
+        "examples/difficulty-pacing-heuristic-evidence-v1/heuristics.stale.fixture.json",
+        "examples/difficulty-pacing-heuristic-evidence-v1/heuristics.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/difficulty-pacing-heuristic-evidence-v1/invalid/warning-drift.fixture.json",
+        "examples/difficulty-pacing-heuristic-evidence-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test difficulty_pacing_heuristic_v1",
+      "expectedBoundary": "advisory metrics, not subjective game quality proof"
+    },
+    {
+      "area": "visual_semantic_diff",
+      "validFixture": "examples/level-visual-semantic-diff-v1/diff.compared.fixture.json",
+      "edgeFixtures": [
+        "examples/level-visual-semantic-diff-v1/diff.unchanged.fixture.json",
+        "examples/level-visual-semantic-diff-v1/diff.partial.fixture.json",
+        "examples/level-visual-semantic-diff-v1/diff.stale.fixture.json",
+        "examples/level-visual-semantic-diff-v1/diff.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/level-visual-semantic-diff-v1/invalid/status-drift.fixture.json",
+        "examples/level-visual-semantic-diff-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test level_visual_semantic_diff_v1",
+      "expectedBoundary": "read-only diff evidence; no browser trusted diff computation"
+    },
+    {
+      "area": "agent_generated_level_draft",
+      "validFixture": "examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json",
+      "edgeFixtures": [
+        "examples/agent-generated-level-draft-v1/level-draft.partial.fixture.json",
+        "examples/agent-generated-level-draft-v1/level-draft.missing-evidence.fixture.json",
+        "examples/agent-generated-level-draft-v1/level-draft.stale.fixture.json",
+        "examples/agent-generated-level-draft-v1/level-draft.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/agent-generated-level-draft-v1/invalid/duplicate-operation.fixture.json",
+        "examples/agent-generated-level-draft-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test agent_generated_level_draft_v1",
+      "expectedBoundary": "untrusted generated draft; review-gated apply required"
+    },
+    {
+      "area": "review_gated_level_apply",
+      "validFixture": "examples/review-gated-level-apply-v1/level-apply.ready.fixture.json",
+      "edgeFixtures": [
+        "examples/review-gated-level-apply-v1/level-apply.missing-review.fixture.json",
+        "examples/review-gated-level-apply-v1/level-apply.rejected.fixture.json",
+        "examples/review-gated-level-apply-v1/level-apply.stale.fixture.json",
+        "examples/review-gated-level-apply-v1/level-apply.blocked.fixture.json"
+      ],
+      "malformedFixtures": [
+        "examples/review-gated-level-apply-v1/invalid/self-approval.fixture.json",
+        "examples/review-gated-level-apply-v1/invalid/malformed-evidence.fixture.json"
+      ],
+      "testFilter": "cargo test review_gated_level_apply_v1",
+      "expectedBoundary": "accepted non-self review plus rollback metadata; no auto-apply"
+    },
+    {
+      "area": "studio_dashboard_read_model",
+      "validFixture": "examples/agentic-level-design-demo-v1/demo-chain.fixture.json",
+      "edgeFixtures": [
+        "docs/studio-level-design-inspection-surface-v1.md",
+        "examples/authoring-cockpit/cockpit.test.cjs"
+      ],
+      "malformedFixtures": [
+        "examples/authoring-cockpit/cockpit.test.cjs"
+      ],
+      "testFilter": "node examples/agentic-level-design-demo-v1/demo-smoke.test.cjs",
+      "expectedBoundary": "escaped read-only Studio inspection; no browser trusted writes"
+    }
+  ],
+  "generatedStatePolicy": {
+    "trackedFixtureOnly": true,
+    "untrackedRoots": [
+      "examples/agentic-level-design-regression-suite-v1/runs",
+      "examples/agentic-level-design-regression-suite-v1/dashboard-data",
+      "examples/agentic-level-design-regression-suite-v1/tmp"
+    ]
+  },
+  "guardrails": [
+    "evidence-gated level authoring only",
+    "no autonomous full game generation",
+    "no browser trusted writes",
+    "no command bridge",
+    "no auto-apply",
+    "no auto-merge",
+    "no self-approval",
+    "no production editor",
+    "no visual scripting",
+    "generated outputs remain untracked"
+  ]
+}

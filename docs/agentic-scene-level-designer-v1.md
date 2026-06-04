@@ -93,7 +93,8 @@ proves a safer dependency order:
     ([Studio Level Design Inspection Surface v1](studio-level-design-inspection-surface-v1.md)).
 13. #640 - Agentic Level Design Demo v1
     ([Agentic Level Design Demo v1](agentic-level-design-demo-v1.md)).
-14. #641 - Scenario Coverage v10: Agentic Level Design Regression Suite.
+14. #641 - Scenario Coverage v10: Agentic Level Design Regression Suite
+    ([Scenario Coverage v10](scenario-coverage-v10-agentic-level-design.md)).
 15. #642 - Roadmap and #1 Governance Refresh after Agentic Scene and Level
     Designer v1.
 

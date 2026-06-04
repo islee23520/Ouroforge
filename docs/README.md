@@ -88,6 +88,7 @@ surfaces. They do not create browser trusted writes or source apply authority:
 - [`visual-authoring-v1.md`](visual-authoring-v1.md), [`visual-edit-draft-model-v1.md`](visual-edit-draft-model-v1.md)
 - [`studio-3d-inspection-surface-v1.md`](studio-3d-inspection-surface-v1.md) — read-only escaped Studio 3D evidence inspection; no 3D editor, trusted write, command bridge, viewport persistence, production 3D, or Godot replacement claim.
 - [`agentic-level-design-demo-v1.md`](agentic-level-design-demo-v1.md) — deterministic Agentic Scene and Level Designer v1 demo chain; no autonomous full game generation, browser trusted write, command bridge, production editor, or Godot replacement claim.
+- [`scenario-coverage-v10-agentic-level-design.md`](scenario-coverage-v10-agentic-level-design.md) — Agentic Scene and Level Designer v1 regression coverage matrix for valid, malformed, missing, stale, unsupported, blocked, Studio, and generated-state cases.
 
 ## Source preview, sandbox, and apply-boundary references
 
