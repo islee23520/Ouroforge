@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
-const { normalizeRenderer, renderOrder, renderBreakdown, compareBreakdowns, debugState, drawRuntime } = require('./renderer.js');
+const { normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime } = require('./renderer.js');
+const tilemap = require('./tilemap.js');
 
 function createContext() {
   const calls = [];
@@ -11,6 +12,8 @@ function createContext() {
     fillRect(...args) { calls.push(['fillRect', this.fillStyle, ...args]); },
     drawImage(...args) { calls.push(['drawImage', ...args]); },
     fillText(...args) { calls.push(['fillText', this.fillStyle, ...args]); },
+    strokeStyle: null,
+    strokeRect(...args) { calls.push(['strokeRect', this.strokeStyle, ...args]); },
   };
   return context;
 }
@@ -96,6 +99,73 @@ assert.deepEqual(context.calls.filter((call) => call[0] === 'fillRect').slice(0,
 ]);
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'player'));
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'scene=renderer-test tick=3'));
+
+const queueRenderer = normalizeRenderer({
+  version: '1',
+  camera: { x: 0, y: 0 },
+  viewport: { width: 160, height: 90 },
+  background: '#101827',
+  layers: [
+    { id: 'background', order: -10 },
+    { id: 'actors', order: 0 },
+  ],
+  debug: { showBounds: true, showCamera: true, showEntityIds: true },
+}, { width: 320, height: 180 });
+const queueTilemaps = tilemap.normalizeTilemaps([{
+  id: 'level',
+  tileSize: { width: 16, height: 16 },
+  grid: { width: 1, height: 1 },
+  tiles: [{ id: 'grass', color: '#22c55e' }],
+  layers: [{ id: 'ground', order: -5, data: ['grass'] }],
+}]);
+const queue = renderQueue({
+  world: { sceneId: 'queue-test', tick: 6, bounds: { width: 320, height: 180 }, entities, tilemaps: queueTilemaps },
+  renderer: queueRenderer,
+  tilemap,
+  frameId: 'frame-queue',
+});
+assert.equal(queue.schemaVersion, 'ouroforge.scene-render-queue.v1');
+assert.equal(queue.validation.status, 'ready');
+assert.deepEqual(queue.renderables.map((renderable) => [renderable.id, renderable.drawOrder, renderable.primitiveKind, renderable.visible]), [
+  ['entity-sky', 0, 'rect', true],
+  ['tilemap-level-ground', 1, 'tilemap', true],
+  ['entity-sprite-hidden', 2, 'rect', false],
+  ['entity-player', 3, 'rect', true],
+  ['entity-zebra', 4, 'rect', true],
+  ['entity-debug-hidden', 5, 'rect', true],
+  ['debug-camera', 6, 'debug_camera', true],
+  ['debug-bounds-debug-hidden', 7, 'debug_bounds', true],
+  ['debug-bounds-player', 8, 'debug_bounds', true],
+  ['debug-bounds-sky', 9, 'debug_bounds', true],
+  ['debug-bounds-sprite-hidden', 10, 'debug_bounds', true],
+  ['debug-bounds-zebra', 11, 'debug_bounds', true],
+  ['debug-label-debug-hidden', 12, 'debug_label', true],
+  ['debug-label-player', 13, 'debug_label', true],
+  ['debug-label-sky', 14, 'debug_label', true],
+  ['debug-label-sprite-hidden', 15, 'debug_label', true],
+  ['debug-label-zebra', 16, 'debug_label', true],
+]);
+assert.deepEqual(queue.readOnlyInspection.disallowedActions, ['trusted writes', 'command bridge', 'live mutation']);
+
+const queueContext = createContext();
+drawRuntime({
+  canvas: { width: 320, height: 180 },
+  context: queueContext,
+  renderer: queueRenderer,
+  world: { sceneId: 'queue-test', tick: 6, bounds: { width: 320, height: 180 }, entities, tilemaps: queueTilemaps },
+  assets: { imageFor: () => null },
+  animation: { activeSpriteFrame: () => null },
+  tilemap,
+});
+assert.deepEqual(queueContext.calls.filter((call) => call[0] === 'fillRect').slice(0, 5), [
+  ['fillRect', '#101827', 0, 0, 320, 180],
+  ['fillRect', '#0f172a', 0, 0, 320, 180],
+  ['fillRect', '#22c55e', 0, 0, 16, 16],
+  ['fillRect', '#5eead4', 24, 20, 16, 16],
+  ['fillRect', '#facc15', 40, 20, 8, 8],
+]);
+assert.ok(queueContext.calls.some((call) => call[0] === 'fillText' && call[2] === 'camera=0,0'));
+assert.ok(queueContext.calls.some((call) => call[0] === 'strokeRect'));
 
 const uiContext = createContext();
 drawRuntime({

@@ -84,6 +84,93 @@
       ));
   }
 
+  function renderQueue({ world = {}, renderer = normalizeRenderer(), tilemap = null, frameId = `tick-${world.tick ?? 0}` } = {}) {
+    const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: 320, height: 180 });
+    const orders = layerOrderMap(activeRenderer);
+    const visibility = layerVisibilityMap(activeRenderer);
+    const tilemapLayers = tilemap && typeof tilemap.orderedLayers === 'function'
+      ? tilemap.orderedLayers(world.tilemaps || [])
+      : [];
+    const layers = activeRenderer.layers.map((layer) => ({ id: layer.id, order: layer.order, visible: layer.visible !== false, kind: 'scene' }));
+    for (const item of tilemapLayers) {
+      if (!layers.some((layer) => layer.id === item.layerId)) {
+        layers.push({ id: item.layerId, order: item.order, visible: item.layer && item.layer.visible !== false, kind: 'tilemap' });
+      }
+    }
+    const renderables = [];
+    for (const item of tilemapLayers) {
+      renderables.push({
+        id: `tilemap-${item.tilemapId}-${item.layerId}`,
+        sourceKind: 'tilemap-layer',
+        sourceId: `${item.tilemapId}:${item.layerId}`,
+        layer: item.layerId,
+        layerOrder: Number.isFinite(item.order) ? item.order : 0,
+        localOrder: 0,
+        stableKey: `${item.tilemapId}:${item.layerId}`,
+        drawOrder: 0,
+        primitiveKind: 'tilemap',
+        visible: !(item.layer && item.layer.visible === false),
+        fallbackReason: item.layer && item.layer.visible === false ? 'tilemap layer hidden' : null,
+      });
+    }
+    for (const entity of Array.isArray(world.entities) ? world.entities : []) {
+      const sprite = entity.sprite || {};
+      const layer = sprite.layer || 'default';
+      const visible = sprite.visible !== false && visibility.get(layer) !== false;
+      renderables.push({
+        id: `entity-${entity.id || 'missing-id'}`,
+        sourceKind: 'entity',
+        sourceId: String(entity.id || ''),
+        layer,
+        layerOrder: orders.get(layer) || 0,
+        localOrder: Number.isFinite(sprite.order) ? sprite.order : 0,
+        stableKey: String(entity.id || ''),
+        drawOrder: 0,
+        primitiveKind: primitiveCategory(entity),
+        visible,
+        fallbackReason: visible ? null : (sprite.visible === false ? 'sprite hidden' : 'renderer layer hidden'),
+      });
+    }
+    if (activeRenderer.debug.showCamera || activeRenderer.debug.showBounds || activeRenderer.debug.showEntityIds) {
+      const debugLayer = { id: '__debug_overlay', order: 1000000, visible: true, kind: 'debug-overlay' };
+      layers.push(debugLayer);
+      if (activeRenderer.debug.showCamera) {
+        renderables.push({ id: 'debug-camera', sourceKind: 'debug-overlay', sourceId: 'camera', layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 0, stableKey: 'debug-camera', drawOrder: 0, primitiveKind: 'debug_camera', visible: true, fallbackReason: null });
+      }
+      if (activeRenderer.debug.showBounds) {
+        for (const entity of Array.isArray(world.entities) ? world.entities : []) {
+          const entityId = String(entity.id || '');
+          renderables.push({ id: `debug-bounds-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 10, stableKey: `debug-bounds-${entityId}`, drawOrder: 0, primitiveKind: 'debug_bounds', visible: true, fallbackReason: null });
+        }
+      }
+      if (activeRenderer.debug.showEntityIds) {
+        for (const entity of Array.isArray(world.entities) ? world.entities : []) {
+          const entityId = String(entity.id || '');
+          renderables.push({ id: `debug-label-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 20, stableKey: `debug-label-${entityId}`, drawOrder: 0, primitiveKind: 'debug_label', visible: true, fallbackReason: null });
+        }
+      }
+    }
+    renderables.sort((left, right) => (
+      left.layerOrder - right.layerOrder
+      || compareCodeUnits(left.layer, right.layer)
+      || left.localOrder - right.localOrder
+      || compareCodeUnits(left.stableKey, right.stableKey)
+    ));
+    renderables.forEach((renderable, drawOrder) => { renderable.drawOrder = drawOrder; });
+    const warnings = renderables
+      .filter((renderable) => renderable.visible === false && !renderable.fallbackReason)
+      .map((renderable) => `hidden renderable ${renderable.id} should include fallbackReason`);
+    return {
+      schemaVersion: 'ouroforge.scene-render-queue.v1',
+      frameId: String(frameId),
+      sceneId: String(world.sceneId || 'unknown-scene'),
+      layers,
+      renderables,
+      validation: { status: warnings.length ? 'warning' : 'ready', blockedReasons: [], warnings },
+      readOnlyInspection: { trustedEmitter: 'browser-runtime-renderer', browserStudioMode: 'read-only evidence inspection', disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+    };
+  }
+
   function primitiveCategory(entity = {}) {
     const components = entity.components || {};
     if (components.uiText || components.hudValue) return 'text';
@@ -183,67 +270,126 @@
     };
   }
 
+  function drawTilemapLayer({ context, renderer, item, assets }) {
+    if (!context || !item || !item.tilemap || !item.layer) return [];
+    const camera = renderer && renderer.camera ? renderer.camera : { x: 0, y: 0 };
+    const { tilemap: tilemapModel, layer } = item;
+    const drawn = [];
+    for (let cell = 0; cell < layer.data.length; cell += 1) {
+      const tileId = layer.data[cell];
+      if (!tileId) continue;
+      const tile = tilemapModel.tileIndex && tilemapModel.tileIndex[tileId];
+      if (!tile) continue;
+      const column = cell % tilemapModel.grid.width;
+      const row = Math.floor(cell / tilemapModel.grid.width);
+      const x = (column * tilemapModel.tileSize.width) - camera.x;
+      const y = (row * tilemapModel.tileSize.height) - camera.y;
+      const image = tile.asset && assets && typeof assets.imageFor === 'function' ? assets.imageFor(tile.asset) : null;
+      if (image) {
+        context.drawImage(image, x, y, tilemapModel.tileSize.width, tilemapModel.tileSize.height);
+      } else {
+        context.fillStyle = tile.color;
+        context.fillRect(x, y, tilemapModel.tileSize.width, tilemapModel.tileSize.height);
+      }
+      drawn.push({ tilemapId: tilemapModel.id, layerId: layer.id, tileId, x, y });
+    }
+    return drawn;
+  }
+
+  function drawEntityRenderable({ context, renderer, entity, assets, animation }) {
+    const components = entity.components || {};
+    const transform = point(components.transform);
+    const entitySize = size(components.size, { width: 16, height: 16 });
+    const x = transform.x - renderer.camera.x;
+    const y = transform.y - renderer.camera.y;
+    const activeFrame = animation && typeof animation.activeSpriteFrame === 'function'
+      ? animation.activeSpriteFrame(components.animation)
+      : null;
+    const frameAsset = activeFrame && typeof activeFrame.asset === 'string' ? activeFrame.asset : null;
+    const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
+    const preferFrameColor = activeFrame && typeof activeFrame.color === 'string' && !frameAsset;
+    const image = !preferFrameColor && assets && typeof assets.imageFor === 'function'
+      ? assets.imageFor(frameAsset || spriteAsset)
+      : null;
+    if (image) {
+      context.drawImage(image, x, y, entitySize.width, entitySize.height);
+    } else {
+      context.fillStyle = (activeFrame && activeFrame.color) || (entity.sprite && entity.sprite.color) || '#f2f6f8';
+      context.fillRect(x, y, entitySize.width, entitySize.height);
+    }
+    if (components.uiText && typeof components.uiText.text === 'string') {
+      context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
+      context.font = '10px ui-monospace, monospace';
+      context.fillText(components.uiText.text, x, y + Math.max(10, entitySize.height));
+    }
+    if (components.hudValue && typeof components.hudValue === 'object') {
+      const label = typeof components.hudValue.label === 'string' ? components.hudValue.label : '';
+      const value = typeof components.hudValue.value === 'string' ? components.hudValue.value : '';
+      const hudText = label ? `${label}: ${value}` : value;
+      if (hudText) {
+        context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
+        context.font = '10px ui-monospace, monospace';
+        const lineOffset = components.uiText && typeof components.uiText.text === 'string' ? 22 : Math.max(10, entitySize.height);
+        context.fillText(hudText, x, y + lineOffset);
+      }
+    }
+  }
+
+  function drawDebugRenderable({ context, renderer, entity, primitiveKind, world }) {
+    context.fillStyle = '#f2f6f8';
+    context.font = '10px ui-monospace, monospace';
+    if (primitiveKind === 'debug_camera') {
+      context.fillText(`camera=${renderer.camera.x},${renderer.camera.y}`, 8, 28);
+      return;
+    }
+    if (!entity) return;
+    const components = entity.components || {};
+    const transform = point(components.transform);
+    const entitySize = size(components.size, { width: 16, height: 16 });
+    const x = transform.x - renderer.camera.x;
+    const y = transform.y - renderer.camera.y;
+    if (primitiveKind === 'debug_bounds') {
+      if (typeof context.strokeRect === 'function') {
+        context.strokeStyle = '#f2f6f8';
+        context.strokeRect(x, y, entitySize.width, entitySize.height);
+      }
+      return;
+    }
+    if (primitiveKind === 'debug_label') {
+      context.fillText(entity.id || world.sceneId || 'entity', x, y - 2);
+    }
+  }
+
   function drawRuntime({ canvas, context, world, renderer, assets, animation, tilemap }) {
     if (!canvas || !context || !world) return [];
     const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: canvas.width, height: canvas.height });
-    const ordered = renderOrder(world.entities || [], activeRenderer);
+    const queue = renderQueue({ world, renderer: activeRenderer, tilemap, frameId: `tick-${world.tick ?? 0}` });
+    const entitiesById = new Map((world.entities || []).map((entity) => [String(entity.id || ''), entity]));
+    const tilemapLayersById = new Map((tilemap && typeof tilemap.orderedLayers === 'function' ? tilemap.orderedLayers(world.tilemaps || []) : [])
+      .map((item) => [`${item.tilemapId}:${item.layerId}`, item]));
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = activeRenderer.background;
     context.fillRect(0, 0, canvas.width, canvas.height);
-    if (tilemap && typeof tilemap.drawTilemaps === 'function') {
-      tilemap.drawTilemaps({ context, renderer: activeRenderer, tilemaps: world.tilemaps || [], assets });
-    }
-    for (const item of ordered) {
-      const entity = item.entity;
-      const components = entity.components || {};
-      const transform = point(components.transform);
-      const entitySize = size(components.size, { width: 16, height: 16 });
-      const x = transform.x - activeRenderer.camera.x;
-      const y = transform.y - activeRenderer.camera.y;
-      const activeFrame = animation && typeof animation.activeSpriteFrame === 'function'
-        ? animation.activeSpriteFrame(components.animation)
-        : null;
-      const frameAsset = activeFrame && typeof activeFrame.asset === 'string' ? activeFrame.asset : null;
-      const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
-      const preferFrameColor = activeFrame && typeof activeFrame.color === 'string' && !frameAsset;
-      const image = !preferFrameColor && assets && typeof assets.imageFor === 'function'
-        ? assets.imageFor(frameAsset || spriteAsset)
-        : null;
-      if (image) {
-        context.drawImage(image, x, y, entitySize.width, entitySize.height);
-      } else {
-        context.fillStyle = (activeFrame && activeFrame.color) || (entity.sprite && entity.sprite.color) || '#f2f6f8';
-        context.fillRect(x, y, entitySize.width, entitySize.height);
-      }
-      if (components.uiText && typeof components.uiText.text === 'string') {
-        context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
-        context.font = '10px ui-monospace, monospace';
-        context.fillText(components.uiText.text, x, y + Math.max(10, entitySize.height));
-      }
-      if (components.hudValue && typeof components.hudValue === 'object') {
-        const label = typeof components.hudValue.label === 'string' ? components.hudValue.label : '';
-        const value = typeof components.hudValue.value === 'string' ? components.hudValue.value : '';
-        const hudText = label ? `${label}: ${value}` : value;
-        if (hudText) {
-          context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
-          context.font = '10px ui-monospace, monospace';
-          const lineOffset = components.uiText && typeof components.uiText.text === 'string' ? 22 : Math.max(10, entitySize.height);
-          context.fillText(hudText, x, y + lineOffset);
-        }
-      }
-      if (activeRenderer.debug.showEntityIds) {
-        context.fillStyle = '#f2f6f8';
-        context.font = '10px ui-monospace, monospace';
-        context.fillText(entity.id, x, y - 2);
+    for (const renderable of queue.renderables) {
+      if (renderable.visible === false) continue;
+      if (renderable.sourceKind === 'tilemap-layer') {
+        drawTilemapLayer({ context, renderer: activeRenderer, item: tilemapLayersById.get(renderable.sourceId), assets });
+      } else if (renderable.sourceKind === 'entity') {
+        const entity = entitiesById.get(renderable.sourceId);
+        if (entity) drawEntityRenderable({ context, renderer: activeRenderer, entity, assets, animation });
+      } else if (renderable.sourceKind === 'debug-overlay') {
+        drawDebugRenderable({ context, renderer: activeRenderer, entity: entitiesById.get(renderable.sourceId), primitiveKind: renderable.primitiveKind, world });
       }
     }
     context.fillStyle = '#f2f6f8';
     context.font = '10px ui-monospace, monospace';
     context.fillText(`scene=${world.sceneId} tick=${world.tick}`, 8, 14);
-    return ordered.map(({ entityId, layer, layerOrder, spriteOrder }) => ({ entityId, layer, layerOrder, spriteOrder }));
+    return queue.renderables
+      .filter((renderable) => renderable.sourceKind === 'entity' && renderable.visible !== false)
+      .map((renderable) => ({ entityId: renderable.sourceId, layer: renderable.layer, layerOrder: renderable.layerOrder, spriteOrder: renderable.localOrder }));
   }
 
-  const api = Object.freeze({ normalizeRenderer, renderOrder, renderBreakdown, compareBreakdowns, debugState, drawRuntime, clone });
+  const api = Object.freeze({ normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, clone });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeRenderer = api;
 })(typeof window !== 'undefined' ? window : globalThis);
