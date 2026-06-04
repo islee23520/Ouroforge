@@ -25,6 +25,13 @@ A useful private report should include:
 - reproduction steps that avoid exposing secrets or private data;
 - expected impact and suggested mitigation, if known.
 
+## Public alpha trust boundary
+
+For the current public-alpha security/trust boundary, including local-first
+execution, browser read-only surfaces, no-command-bridge/no-source-apply
+authority, generated-state boundaries, and conservative security wording, see
+[`docs/public-alpha-security-trust-boundary-v1.md`](docs/public-alpha-security-trust-boundary-v1.md).
+
 ## Local execution boundary
 
 Ouroforge runs local commands and local browser automation as part of its evidence-native MVP:
