@@ -66,6 +66,10 @@ effects, unsupported triggers/effects/costs, invalid cooldowns, invalid costs,
 invalid durations, unsafe targets, unsafe payload keys, traversal-like refs, and
 blocked/unsupported statuses without reasons.
 
+## Read-model/export compatibility notes
+
+GL10.4.3 adds `gameplay-ability-action-read-model.v1` as a read-only evidence summary for ability pack status, ability/action ids, runtime status counts, target refs, trigger/effect/cost kinds, linked evidence refs, blocked reasons, and the no-runtime-execution boundary. Scenario, dashboard, Studio, and probe consumers may display that read model without gaining trusted write or runtime dispatch authority.
+
 ## Compatibility and generated-state notes
 
 Gameplay ability/action artifacts should be additive to existing Seeds, scenes,

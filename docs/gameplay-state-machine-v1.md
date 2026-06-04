@@ -66,6 +66,10 @@ unsupported triggers/guards/actions, unsafe targets, unsafe payload keys,
 traversal-like refs, unbounded state/transition lists, and blocked/unsupported
 statuses without reasons.
 
+## Read-model/export compatibility notes
+
+GL10.4.3 adds `gameplay-state-machine-read-model.v1` as a read-only evidence summary for state pack status, machine ids, state ids, transition ids, trigger/guard/action kinds, linked evidence refs, blocked reasons, and the no-runtime-execution boundary. Scenario, dashboard, Studio, and probe consumers may display that read model without gaining trusted write or runtime dispatch authority.
+
 ## Compatibility and generated-state notes
 
 Gameplay state-machine artifacts should be additive to existing Seeds, scenes,
