@@ -1170,6 +1170,104 @@ fn asset_validate_reports_sprite_atlas_read_only_summary() {
 }
 
 #[test]
+fn asset_audit_internal_sprites_reports_json_privacy_boundary() {
+    let temp = unique_temp_dir("ouroforge-cli-internal-sprite-audit-test");
+    fs::create_dir_all(temp.join("ro-sprites-anim/body/male/Novice_job0"))
+        .expect("male sprite dir");
+    fs::create_dir_all(temp.join("ro-sprites-anim/body/female/Novice_job0"))
+        .expect("female sprite dir");
+    for relative_path in [
+        "ro-sprites-anim/body/male/Novice_job0/act0_dir0_f0.png",
+        "ro-sprites-anim/body/male/Novice_job0/act1_dir0_f0.png",
+        "ro-sprites-anim/body/female/Novice_job0/act0_dir0_f0.png",
+        "ro-sprites-anim/body/female/Novice_job0/act1_dir0_f0.png",
+    ] {
+        fs::write(temp.join(relative_path), b"synthetic-fixture").expect("sprite fixture writes");
+    }
+
+    let output = run_cli(
+        &temp,
+        &[
+            "asset",
+            "audit-internal-sprites",
+            temp.to_str().unwrap(),
+            "--profile",
+            "ro-vibe-v1",
+            "--json",
+        ],
+    );
+    let report: serde_json::Value = serde_json::from_str(&output).expect("audit json parses");
+
+    assert_eq!(report["profile"], "ro-vibe-v1");
+    assert_eq!(report["referenceRoot"], "internal-local-root");
+    assert_eq!(report["referenceRootRedacted"], true);
+    assert_eq!(report["renderReadiness"]["status"], "ready");
+    assert_eq!(
+        report["distributionPolicy"]["licenseScope"],
+        "internal-use-only"
+    );
+    assert_eq!(report["distributionPolicy"]["gitCommitAllowed"], false);
+    assert_eq!(report["distributionPolicy"]["screenshotAllowed"], false);
+    assert_eq!(report["distributionPolicy"]["uploadAllowed"], false);
+    assert_eq!(report["distributionPolicy"]["copiedPrivateFiles"], 0);
+    assert_eq!(report["inventory"]["pngFrames"], 4);
+    assert!(!output.contains(temp.to_str().unwrap()));
+    assert!(!output.contains("synthetic-fixture"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn asset_audit_internal_sprites_reports_missing_issue_notes() {
+    let temp = unique_temp_dir("ouroforge-cli-internal-sprite-missing-test");
+    fs::create_dir_all(temp.join("ro-sprites-anim/body/male/Novice_job0"))
+        .expect("male sprite dir");
+    fs::write(
+        temp.join("ro-sprites-anim/body/male/Novice_job0/act0_dir0_f0.png"),
+        b"synthetic-fixture",
+    )
+    .expect("sprite fixture writes");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "asset",
+            "audit-internal-sprites",
+            temp.to_str().unwrap(),
+            "--profile",
+            "ro-vibe-v1",
+        ],
+    );
+
+    assert!(output.contains("Internal sprite audit: ro-vibe-v1"));
+    assert!(output.contains("Render readiness: blocked"));
+    assert!(output.contains("Missing required files: 3"));
+    assert!(output.contains("Missing internal sprite reference"));
+    assert!(output.contains("Screenshot capture allowed: no"));
+    assert!(output.contains("Git commit allowed: no"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn asset_audit_internal_sprites_rejects_missing_root() {
+    let temp = unique_temp_dir("ouroforge-cli-internal-sprite-absent-test");
+    let output = run_cli_expect_failure(
+        &std::env::temp_dir(),
+        &[
+            "asset",
+            "audit-internal-sprites",
+            temp.to_str().unwrap(),
+            "--profile",
+            "ro-vibe-v1",
+            "--json",
+        ],
+    );
+
+    assert!(output.contains("internal sprite reference root not readable"));
+}
+
+#[test]
 fn asset_validate_accepts_playable_demo_asset_fixture_manifest() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let demo_root = repo_root.join("examples/playable-demo-v2/collect-and-exit");

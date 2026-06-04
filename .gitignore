@@ -5,5 +5,8 @@ examples/evidence-dashboard/dashboard-data.json
 .openchrome/
 .omc/
 .omx/
+.omo/
 .claude/
 /sandbox/
+internal-sprite-audit*.json
+internal-sprite-audit*.txt

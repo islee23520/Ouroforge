@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use ouroforge_core::internal_sprite_audit::{
+    audit_internal_sprite_reference, InternalSpriteAuditProfile, InternalSpriteAuditReport,
+};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event,
     append_mutation_review_decision_for_proposal_from_path, append_visual_edit_draft_application,
@@ -191,7 +194,16 @@ enum ProjectCommand {
 
 #[derive(Debug, Subcommand)]
 enum AssetCommand {
-    Validate { project_root_or_manifest: PathBuf },
+    Validate {
+        project_root_or_manifest: PathBuf,
+    },
+    AuditInternalSprites {
+        reference_root: PathBuf,
+        #[arg(long, default_value = "ro-vibe-v1")]
+        profile: String,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -586,6 +598,22 @@ fn main() -> Result<()> {
                 "Asset types: {}",
                 format_asset_type_counts(&report.asset_types)
             );
+        }
+        Commands::Asset {
+            command:
+                AssetCommand::AuditInternalSprites {
+                    reference_root,
+                    profile,
+                    json,
+                },
+        } => {
+            let profile = InternalSpriteAuditProfile::parse(&profile)?;
+            let report = audit_internal_sprite_reference(&reference_root, profile)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print_internal_sprite_audit_report(&report);
+            }
         }
         Commands::Project {
             command:
@@ -1178,6 +1206,53 @@ fn format_asset_type_counts(
         .map(|(asset_type, count)| format!("{}={count}", project_asset_type_label(*asset_type)))
         .collect::<Vec<_>>()
         .join(",")
+}
+
+fn print_internal_sprite_audit_report(report: &InternalSpriteAuditReport) {
+    println!("Internal sprite audit: {}", report.profile);
+    println!("Reference root: {}", report.reference_root);
+    println!("Render readiness: {}", report.render_readiness.status);
+    println!("PNG frames: {}", report.inventory.png_frames);
+    println!("Required files: {}", report.inventory.required_files);
+    println!(
+        "Present required files: {}",
+        report.inventory.present_required_files
+    );
+    println!(
+        "Missing required files: {}",
+        report.missing_required_files.len()
+    );
+    println!(
+        "License scope: {}",
+        report.distribution_policy.license_scope
+    );
+    println!(
+        "Git commit allowed: {}",
+        yes_no(report.distribution_policy.git_commit_allowed)
+    );
+    println!(
+        "Screenshot capture allowed: {}",
+        yes_no(report.distribution_policy.screenshot_allowed)
+    );
+    println!(
+        "Upload allowed: {}",
+        yes_no(report.distribution_policy.upload_allowed)
+    );
+    println!(
+        "Copied private files: {}",
+        report.distribution_policy.copied_private_files
+    );
+    for note in &report.issue_notes {
+        println!("Issue note: {note}");
+    }
+}
+
+const fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 fn project_asset_type_label(asset_type: ProjectAssetType) -> &'static str {
