@@ -9,6 +9,7 @@ release, automate launch actions, or implement product behavior.
 Use this playbook for public GitHub issues during the public-alpha governance
 period. It complements `docs/post-launch-roadmap-triage-v1.md`,
 `docs/public-issue-response-snippets-v1.md`,
+`docs/public-issue-security-forbidden-escalation-v1.md`,
 `docs/public-launch-checklist.md`, and `docs/security-response-playbook-v1.md`.
 When documents overlap, use the most conservative route and keep #1 and #23 open
 unless a separate explicit governance decision says otherwise.
@@ -119,8 +120,11 @@ After classifying an issue, use `docs/public-issue-response-snippets-v1.md` to
 choose whether to keep it open for triage, request information, convert it to a
 scoped issue or documentation-only PR, answer and close, close as duplicate,
 close as out of scope, defer generated-state-only evidence, or redirect
-security-sensitive details. Those snippets are maintainer aids only; they do not
-create support SLAs or accept work automatically.
+security-sensitive details. For Security and Forbidden scope request categories,
+use `docs/public-issue-security-forbidden-escalation-v1.md` before converting or
+closing so public-safe, private-coordination, design-gate, and unsupported-scope
+boundaries are explicit. Those snippets and escalation paths are maintainer aids
+only; they do not create support SLAs or accept work automatically.
 
 ## Docs/template audit for PLG1.4.1
 
