@@ -143,6 +143,10 @@ const run = {
       bundleId: 'bundle-1',
       patchPreviewId: 'preview-1',
       status: 'complete',
+      patchSummary: { title: 'Review docs patch preview', expectedBehaviorChange: 'Docs preview only; no trusted worktree apply.', targetCount: 2, changedLines: 18 },
+      fileClassSummary: { allowed: 1, reviewHeld: 1, blocked: 0, highestRisk: 'review_held' },
+      riskIds: ['source_patch_preview', 'review_held_target'],
+      blockedReasons: ['manual review required before any future apply design'],
       previewRef: { kind: 'source-patch-preview', path: 'mutation/preview.json' },
       fileClassReportRef: { kind: 'file-class-report', path: 'evidence/file-class.json' },
       diffIntegrityReportRef: { kind: 'diff-integrity-report', path: 'evidence/diff.json' },
@@ -1164,6 +1168,10 @@ assert.match(cockpit.renderLoopEvidenceBundleSurface({ summary: { id: 'run-no-bu
 
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Source patch evidence bundle/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /bundle-1/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Review docs patch preview/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review-held:1/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review_held_target/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /manual review required/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /apply_patch/);
 assert.doesNotMatch(cockpit.renderSourcePatchEvidenceBundleSurface(run), /<button|applyCommand|mergeCommand/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /Source patch apply transaction/);

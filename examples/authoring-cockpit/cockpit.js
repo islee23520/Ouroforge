@@ -682,11 +682,21 @@ const OuroforgeCockpit = (() => {
     const rows = bundles.map((artifact) => {
       const value = artifact.value || {};
       const notices = Array.isArray(value.forbiddenActionNotices) ? value.forbiddenActionNotices : [];
+      const patchSummary = value.patchSummary || {};
+      const fileClassSummary = value.fileClassSummary || {};
+      const riskIds = Array.isArray(value.riskIds) ? value.riskIds : [];
+      const blockedReasons = Array.isArray(value.blockedReasons) ? value.blockedReasons : [];
       const refs = [value.previewRef, value.fileClassReportRef, value.diffIntegrityReportRef, value.sandboxReportRef, value.testSummaryRef, value.reviewDecisionRef]
         .filter(Boolean)
         .map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      const fileClassText = `allowed:${fileClassSummary.allowed ?? 0} review-held:${fileClassSummary.reviewHeld ?? 0} blocked:${fileClassSummary.blocked ?? 0} highest-risk:${fileClassSummary.highestRisk || 'unknown'}`;
       return `<div class="surface-row"><strong>${escapeText(value.bundleId || artifact.id || 'source patch bundle')}</strong> ${surfaceState(true, value.status || 'unknown')}<br>
         <small>Preview ${escapeText(value.patchPreviewId || 'unknown')} · ${escapeText(artifact.path || 'mutation/source-patch-evidence-bundle.json')}</small><br>
+        <small>Patch summary: ${escapeText(patchSummary.title || 'not recorded')} · targets ${escapeText(patchSummary.targetCount ?? 'unknown')} · changed lines ${escapeText(patchSummary.changedLines ?? 'unknown')}</small><br>
+        <small>Expected behavior: ${escapeText(patchSummary.expectedBehaviorChange || 'not recorded')}</small><br>
+        <small>File classes: ${escapeText(fileClassText)}</small><br>
+        <small>Risk: ${escapeText(riskIds.join(' · ') || 'none')}</small><br>
+        ${blockedReasons.length ? `<small>Blocked: ${escapeText(blockedReasons.join(' · '))}</small><br>` : ''}
         <small>Refs: ${escapeText(refs.join(' · ') || 'none')}</small><br>
         <small>Forbidden: ${escapeText(notices.map((notice) => notice.action || 'unknown').join(' · ') || 'none')}</small>
       </div>`;

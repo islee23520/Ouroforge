@@ -1155,12 +1155,22 @@ const OuroforgeDashboard = (() => {
       const value = artifact.value || {};
       const notices = Array.isArray(value.forbiddenActionNotices) ? value.forbiddenActionNotices : [];
       const guardrails = Array.isArray(value.guardrails) ? value.guardrails : [];
+      const patchSummary = value.patchSummary || {};
+      const fileClassSummary = value.fileClassSummary || {};
+      const riskIds = Array.isArray(value.riskIds) ? value.riskIds : [];
+      const blockedReasons = Array.isArray(value.blockedReasons) ? value.blockedReasons : [];
       const refs = [value.previewRef, value.fileClassReportRef, value.diffIntegrityReportRef, value.sandboxReportRef, value.testSummaryRef, value.reviewDecisionRef]
         .filter(Boolean)
         .map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      const fileClassText = `allowed:${fileClassSummary.allowed ?? 0} review-held:${fileClassSummary.reviewHeld ?? 0} blocked:${fileClassSummary.blocked ?? 0} highest-risk:${fileClassSummary.highestRisk || 'unknown'}`;
       return `<article class="artifact source-patch-evidence-bundle">
         <h4>${escapeText(value.bundleId || artifact.id || 'source patch bundle')}</h4>
         <div class="run-meta"><span class="${statusClass(value.status || 'unknown')}">${escapeText(value.status || 'unknown')}</span> · preview ${escapeText(value.patchPreviewId || 'unknown')}</div>
+        <div class="run-meta">Patch summary: ${escapeText(patchSummary.title || 'not recorded')} · targets ${escapeText(patchSummary.targetCount ?? 'unknown')} · changed lines ${escapeText(patchSummary.changedLines ?? 'unknown')}</div>
+        <div class="run-meta">Expected behavior: ${escapeText(patchSummary.expectedBehaviorChange || 'not recorded')}</div>
+        <div class="run-meta">File classes: ${escapeText(fileClassText)}</div>
+        <div class="run-meta">Risk: ${escapeText(riskIds.join(' · ') || 'none')}</div>
+        ${blockedReasons.length ? `<div class="artifact-warning">Blocked: ${escapeText(blockedReasons.join(' · '))}</div>` : ''}
         <div class="run-meta">Refs: ${escapeText(refs.join(' · ') || artifact.path || 'none')}</div>
         <div class="run-meta">Forbidden actions: ${escapeText(notices.map((notice) => notice.action || 'unknown').join(' · ') || 'none')}</div>
         <p class="run-meta">${escapeText(guardrails.join(' · ') || 'Read-only bundle evidence; no browser apply/merge/execute/write authority.')}</p>
