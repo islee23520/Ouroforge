@@ -6,6 +6,8 @@ This checklist is the handoff artifact for public-readiness review. It does not 
 
 Public Alpha Launch Governance v1 is scoped in [`docs/public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md); that scope contract keeps future public-alpha work governance-only unless a separate issue authorizes more.
 
+Public Alpha Readiness Gate v1 is defined in [`docs/public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md); it is a readiness checklist and report format only, not a visibility change, launch approval, or publication workflow.
+
 ## Merge prerequisites
 
 Historical readiness remediation has already landed:
