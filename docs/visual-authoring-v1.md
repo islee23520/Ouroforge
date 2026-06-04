@@ -129,7 +129,12 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    intent while keeping generated transaction/run outputs untracked. VA1.10.2
    records ignored local smoke ids for preview, accepted review, review-gated
    apply, rerun, compare, and dashboard export evidence without committing those
-   generated artifacts.
+   generated artifacts. VA1.10.3 audits the demo Studio/dashboard documentation
+   and public wording: these surfaces display Rust-exported evidence and inert
+   command/draft text only, preserve conservative private-MVP language, and make
+   no public-launch, production-editor, hosted Studio, browser-write, command-
+   bridge, native-export, plugin-runtime, visual-scripting, or Godot-replacement
+   claims.
 10. **Scenario Coverage v5** — add regression coverage for draft validation,
     transaction preview, visual diff evidence, review-gated apply, rollback,
     generated-state policy, and read-only Studio boundaries.
@@ -195,6 +200,34 @@ records, and generated-state cleanup.
 Review-Gated Visual Edit Apply v1 records durable local evidence for later review, rerun, regression, and loop inspection. A visual edit application links the draft id, proposal id, patch draft id, accepted review decision id, transaction id, before/after scene hashes, rollback metadata, and reproducible CLI command context. Those links let existing review cockpit, journal, regression promotion, run matrix, loop status, bundle, and handoff surfaces show the operator what evidence exists and what remains missing.
 
 The compatibility rule is intentionally conservative: apply evidence may inform runs, comparisons, regression promotion drafts, and loop blockers, but it does not schedule reruns, promote scenarios, mutate scenario packs, resume loops, or execute commands. Browser and Studio surfaces may render these fields as escaped read-only diagnostics and copyable inert command text only. Rust CLI/manual terminal actions remain the trusted boundary for any durable write or rerun.
+
+
+## Visual Authoring Demo v1 display and public wording audit
+
+The collect-and-exit visual authoring demo is documentation and evidence for a
+local safe-edit workflow, not a public launch or productization milestone. Demo
+Studio and dashboard pages may display Rust-exported read models, generated smoke
+ids, escaped draft summaries, inert JSON, and copyable CLI command text. They
+must describe those values as inspection aids only. Any durable validation,
+transaction creation, review decision, apply, rerun, comparison, rollback, or
+evidence write remains a Rust CLI/manual terminal action outside browser
+JavaScript.
+
+Public-facing wording for this demo must stay conservative:
+
+- say **local demo**, **static cockpit**, **read-only dashboard**, **copyable
+  command text**, **ignored generated evidence**, and **pre-release private MVP**;
+- avoid **public launch**, **production editor**, **hosted Studio**, **visual
+  scripting system**, **plugin runtime/marketplace**, **native export path**,
+  **browser trusted writes**, **command bridge**, **automatic apply/rerun/merge**,
+  and **Godot replacement** claims;
+- identify tracked source-like fixtures separately from generated run,
+  transaction, dashboard, comparison, and smoke outputs; and
+- keep #1 and #23 open as governance/context anchors.
+
+VA1.10.3 documentation changes are intentionally limited to this wording audit
+and related smoke-test coverage. They do not add new Studio controls, dashboard
+write paths, generated tracked artifacts, dependencies, or behavior changes.
 
 ## Verification gates for follow-up issues
 

@@ -92,6 +92,22 @@ which dashboard/Studio read models can inspect as escaped read-only state. No
 browser trusted writes, command bridge, auto-rerun, auto-apply, source mutation,
 or generated output tracking was introduced.
 
+
+## VA1.10.3 Studio/dashboard wording audit
+
+The Visual Authoring Demo v1 Studio/dashboard audit keeps the collect-and-exit
+workflow conservative and local-first:
+
+| Surface | Allowed display | Forbidden claim/action |
+| --- | --- | --- |
+| Dashboard | Rust-exported run ids, preview ids, review decision ids, visual application ids, compare summaries, and generated dashboard export paths as escaped read-only evidence. | No browser writes, command execution, review creation, apply/rerun/compare automation, public release automation, hosted service, or production dashboard claim. |
+| Studio/cockpit | Temporary draft rows, inert copyable JSON/CLI text, visual diff summaries, tilemap/asset-reference preview summaries, and generated smoke ids from exported evidence. | No trusted browser persistence, local server bridge, asset upload/fetch/import, apply controls, review-decision controls, auto-rerun, auto-apply, or production editor claim. |
+| Public roadmap/docs | Bounded local demo language: source-like fixtures plus ignored generated smoke evidence prove a safe workflow slice. | No Godot replacement, production-ready editor, native export, plugin runtime, marketplace, public launch, or secure-sandbox claim. |
+
+VA1.10.3 does not add automation. It documents that all trusted writes remain
+Rust CLI/manual terminal actions with explicit review gates, rollback/evidence
+records, generated-state audit, and #1/#23 preservation.
+
 ## Runtime smoke
 
 Run the focused Node checks:

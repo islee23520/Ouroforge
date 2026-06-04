@@ -12,7 +12,12 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 
 Then open <http://127.0.0.1:8000/examples/evidence-dashboard/>. The UI only
 reads `dashboard-data.json` and links to artifact paths; it does not edit,
-delete, upload, or index run artifacts outside the generated export.
+delete, upload, or index run artifacts outside the generated export. For Visual
+Authoring Demo v1, dashboard wording must stay display-only and conservative:
+it may show generated smoke ids, visual diff summaries, review/apply/rerun/compare
+refs, and Studio-compatible read models, but it must not claim browser trusted
+writes, command execution, hosted/public launch behavior, production editor
+status, plugin runtime, visual scripting, native export, or Godot replacement.
 
 
 
@@ -138,3 +143,23 @@ Evidence-Backed Journal v2 appears through the existing Journal Viewer when
 `journal-authoring-governance-v2`. The dashboard only displays escaped exported
 journal snippets and links; it does not generate summaries, apply mutations, or
 write journal files. See `../../docs/evidence-backed-journal-v2.md`.
+
+
+## Visual Authoring Demo v1 dashboard boundary audit
+
+For #352 VA1.10.3, dashboard display of Visual Authoring Demo v1 evidence is
+limited to escaped, read-only data exported by trusted Rust/local commands:
+
+- preview ids, review decisions, visual edit application ids, run ids, compare
+  summaries, and dashboard export paths may be displayed as evidence links or
+  inert text only;
+- generated smoke artifacts remain local/ignored and are not bundled as public
+  release assets;
+- dashboard JavaScript must not execute copied commands, create review
+  decisions, apply drafts, rerun scenarios, write files, upload/fetch assets, or
+  bridge to a shell/local server;
+- public wording must describe this as a conservative local demo workflow, not a
+  production editor, public launch, hosted service, plugin runtime, visual
+  scripting system, native export path, or Godot replacement.
+
+Use Node syntax/tests plus a wording scan before claiming this audit is current.
