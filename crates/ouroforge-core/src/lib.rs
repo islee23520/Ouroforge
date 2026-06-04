@@ -10921,6 +10921,226 @@ impl SourcePatchPreviewValidation {
     }
 }
 
+pub const SOURCE_PATCH_REVIEW_DECISION_SCHEMA_VERSION: &str = "source-patch-review-decision-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchReviewStatus {
+    Proposed,
+    Blocked,
+    Reviewed,
+    Rejected,
+    Deferred,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchReviewDecisionLink {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    pub status: SourcePatchReviewStatus,
+    #[serde(rename = "linkedEvidence")]
+    pub linked_evidence: Vec<SourcePatchPreviewEvidenceRef>,
+    #[serde(rename = "fileClassReportRef")]
+    pub file_class_report_ref: String,
+    #[serde(rename = "diffIntegrityReportRef")]
+    pub diff_integrity_report_ref: String,
+    #[serde(rename = "sandboxReportRef")]
+    pub sandbox_report_ref: String,
+    #[serde(rename = "requiredTests")]
+    pub required_tests: Vec<SourcePatchPreviewRequiredTest>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchReviewDecisionLinkValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "reviewStatus")]
+    pub review_status: SourcePatchReviewStatus,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchReviewDecisionLinkValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_source_patch_review_decision_link(
+    link: &SourcePatchReviewDecisionLink,
+) -> SourcePatchReviewDecisionLinkValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if link.schema_version != SOURCE_PATCH_REVIEW_DECISION_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_REVIEW_DECISION_SCHEMA_VERSION}"
+        ));
+    }
+    push_if_blank(
+        &mut blocked_reasons,
+        "reviewDecisionId",
+        &link.review_decision_id,
+    );
+    push_if_blank(
+        &mut blocked_reasons,
+        "patchPreviewId",
+        &link.patch_preview_id,
+    );
+    if link.linked_evidence.is_empty() {
+        blocked_reasons.push("linkedEvidence must not be empty".to_string());
+    }
+    for (index, evidence) in link.linked_evidence.iter().enumerate() {
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("linkedEvidence[{index}].kind"),
+            &evidence.kind,
+        );
+        if let Err(error) = validate_relative_artifact_path(
+            &format!("linkedEvidence[{index}].path"),
+            &evidence.path,
+        ) {
+            blocked_reasons.push(error.to_string());
+        }
+    }
+    for (field, path) in [
+        ("fileClassReportRef", link.file_class_report_ref.as_str()),
+        (
+            "diffIntegrityReportRef",
+            link.diff_integrity_report_ref.as_str(),
+        ),
+        ("sandboxReportRef", link.sandbox_report_ref.as_str()),
+    ] {
+        if let Err(error) = validate_relative_artifact_path(field, path) {
+            blocked_reasons.push(error.to_string());
+        }
+    }
+    if link.required_tests.is_empty() {
+        blocked_reasons.push("requiredTests must not be empty".to_string());
+    }
+    for (index, required_test) in link.required_tests.iter().enumerate() {
+        let field = format!("requiredTests[{index}]");
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.command"),
+            &required_test.command,
+        );
+        if !required_test.execution_authority.contains("copyable")
+            || !required_test.execution_authority.contains("not_executed")
+        {
+            blocked_reasons.push(format!(
+                "{field}.executionAuthority must remain copyable/not_executed metadata"
+            ));
+        }
+        if required_test.allowlist_policy_id.as_deref()
+            != Some("source-patch-preview-safe-local-checks-v1")
+        {
+            blocked_reasons.push(format!(
+                "{field}.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+            ));
+        }
+        if required_test.argv.is_empty() {
+            blocked_reasons.push(format!("{field}.argv must not be empty"));
+        } else {
+            let normalized = normalize_source_patch_test_command(&required_test.argv);
+            if required_test.command != normalized {
+                blocked_reasons.push(format!(
+                    "{field}.command must match normalized argv `{normalized}`"
+                ));
+            }
+            let command = SourcePatchTestCommand {
+                command: required_test.command.clone(),
+                argv: required_test.argv.clone(),
+            };
+            if let Some(forbidden) = classify_source_patch_forbidden_test_command(&command) {
+                blocked_reasons.push(format!("{field}.argv forbidden: {}", forbidden.reason));
+            } else if default_source_patch_test_command_allowlist()
+                .match_command(&command)
+                .is_none()
+            {
+                blocked_reasons.push(format!(
+                    "{field}.argv is not in the source patch test command allowlist"
+                ));
+            }
+        }
+    }
+    if matches!(link.status, SourcePatchReviewStatus::Blocked) && link.blocked_reasons.is_empty() {
+        blocked_reasons.push("blocked status requires blockedReasons".to_string());
+    }
+    if !link.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("does not apply")
+            || guardrail.contains("do not apply")
+            || guardrail.contains("no source patch apply")
+    }) {
+        blocked_reasons
+            .push("guardrails must state review decisions do not apply source patches".to_string());
+    }
+    if !link.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("read-only") || guardrail.contains("display")
+    }) {
+        blocked_reasons
+            .push("guardrails must preserve read-only dashboard/Studio display".to_string());
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchReviewDecisionLinkValidation {
+        schema_version: "source-patch-review-decision-link-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        review_decision_id: link.review_decision_id.clone(),
+        patch_preview_id: link.patch_preview_id.clone(),
+        review_status: link.status.clone(),
+        blocked_reasons,
+        guardrails: vec![
+            "source patch review decisions are linkage metadata only; they do not apply patches"
+                .to_string(),
+            "reviewed/accepted semantics never merge, write trusted files, or execute commands"
+                .to_string(),
+            "file-class, diff-integrity, sandbox, and required-test evidence stay explicit"
+                .to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_review_decision_link(
+    link: &SourcePatchReviewDecisionLink,
+) -> Result<SourcePatchReviewDecisionLinkValidation> {
+    let validation = inspect_source_patch_review_decision_link(link);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch review decision link blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
 pub const SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION: &str =
     "source-patch-sandbox-evaluator-plan-v1";
 
