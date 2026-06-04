@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "qa-worker-assignment-v1",
+  "planId": "qa14_4_worker_assignment_unbounded",
+  "runId": "run_qa_worker_assignment_smoke",
+  "assignments": [
+    {
+      "assignmentId": "unbounded-worker",
+      "workerId": "qa-worker-1",
+      "assignedLane": "scenario-playtest",
+      "target": {
+        "targetType": "scenario_candidate",
+        "targetId": "collect-and-exit",
+        "evidenceRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json"
+      },
+      "budget": {
+        "maxRuns": 0,
+        "maxDurationMs": 0,
+        "maxArtifacts": 0,
+        "maxOutputBytes": 0
+      },
+      "timeoutMs": 0,
+      "runCount": 0,
+      "outputRoot": "evidence/qa-workers/qa-worker-1/unbounded/",
+      "cleanupPolicy": {
+        "mode": "retain_on_failure"
+      },
+      "status": "assigned"
+    }
+  ]
+}

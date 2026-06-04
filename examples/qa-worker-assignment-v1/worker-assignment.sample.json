@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "qa-worker-assignment-v1",
+  "planId": "qa14_4_worker_assignment_smoke",
+  "runId": "run_qa_worker_assignment_smoke",
+  "assignments": [
+    {
+      "assignmentId": "scenario-smoke-worker-1",
+      "workerId": "qa-worker-1",
+      "assignedLane": "scenario-playtest",
+      "target": {
+        "targetType": "scenario_candidate",
+        "targetId": "collect-and-exit",
+        "evidenceRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json"
+      },
+      "budget": {
+        "maxRuns": 3,
+        "maxDurationMs": 30000,
+        "maxArtifacts": 20,
+        "maxOutputBytes": 5242880
+      },
+      "timeoutMs": 10000,
+      "runCount": 0,
+      "outputRoot": "evidence/qa-workers/qa-worker-1/scenario-smoke/",
+      "cleanupPolicy": {
+        "mode": "retain_on_failure"
+      },
+      "status": "assigned"
+    },
+    {
+      "assignmentId": "fuzz-budget-worker-2",
+      "workerId": "qa-worker-2",
+      "assignedLane": "fuzz-smoke",
+      "target": {
+        "targetType": "fuzz_target",
+        "targetId": "movement-fuzz-seed-1",
+        "evidenceRef": "evidence/fuzz/movement-fuzz-seed-1/fuzz-target.json"
+      },
+      "budget": {
+        "maxRuns": 2,
+        "maxDurationMs": 20000,
+        "maxArtifacts": 12,
+        "maxOutputBytes": 2097152
+      },
+      "timeoutMs": 8000,
+      "runCount": 2,
+      "outputRoot": "evidence/qa-workers/qa-worker-2/movement-fuzz/",
+      "cleanupPolicy": {
+        "mode": "retain_for_review",
+        "maxRetentionMs": 604800000
+      },
+      "status": "exhausted",
+      "blockedReasons": ["budget exhausted before trusted mutation; evidence requires review"]
+    }
+  ],
+  "guardrails": [
+    "local deterministic assignment artifact only; no remote/cloud worker pool",
+    "no hidden background workers, unbounded spawning, browser command bridge, auto-fix, auto-apply, or auto-merge",
+    "worker outputs remain untrusted evidence/backlog inputs until reviewed"
+  ]
+}

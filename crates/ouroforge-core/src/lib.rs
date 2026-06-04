@@ -6632,6 +6632,288 @@ fn validate_asset_preview_path(
     }
 }
 
+const QA_WORKER_ASSIGNMENT_SCHEMA_VERSION: &str = "qa-worker-assignment-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaWorkerAssignmentArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    pub assignments: Vec<QaWorkerAssignment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaWorkerAssignment {
+    #[serde(rename = "assignmentId")]
+    pub assignment_id: String,
+    #[serde(rename = "workerId")]
+    pub worker_id: String,
+    #[serde(rename = "assignedLane")]
+    pub assigned_lane: String,
+    pub target: QaWorkerAssignmentTarget,
+    pub budget: QaWorkerAssignmentBudget,
+    #[serde(rename = "timeoutMs")]
+    pub timeout_ms: u64,
+    #[serde(rename = "runCount")]
+    pub run_count: u32,
+    #[serde(rename = "outputRoot")]
+    pub output_root: String,
+    #[serde(rename = "cleanupPolicy")]
+    pub cleanup_policy: QaWorkerCleanupPolicy,
+    pub status: QaWorkerAssignmentStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaWorkerAssignmentTarget {
+    #[serde(rename = "targetType")]
+    pub target_type: QaWorkerAssignmentTargetType,
+    #[serde(rename = "targetId")]
+    pub target_id: String,
+    #[serde(rename = "evidenceRef")]
+    pub evidence_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaWorkerAssignmentTargetType {
+    ScenarioCandidate,
+    FuzzTarget,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaWorkerAssignmentBudget {
+    #[serde(rename = "maxRuns")]
+    pub max_runs: u32,
+    #[serde(rename = "maxDurationMs")]
+    pub max_duration_ms: u64,
+    #[serde(rename = "maxArtifacts")]
+    pub max_artifacts: u32,
+    #[serde(rename = "maxOutputBytes")]
+    pub max_output_bytes: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaWorkerCleanupPolicy {
+    pub mode: QaWorkerCleanupMode,
+    #[serde(rename = "maxRetentionMs", skip_serializing_if = "Option::is_none")]
+    pub max_retention_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaWorkerCleanupMode {
+    DeleteOnSuccess,
+    RetainOnFailure,
+    RetainForReview,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QaWorkerAssignmentStatus {
+    Assigned,
+    Passed,
+    Failed,
+    Deferred,
+    Blocked,
+    Exhausted,
+}
+
+impl QaWorkerAssignmentArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: QaWorkerAssignmentArtifact =
+            serde_json::from_str(input).context("failed to parse QA Worker Assignment JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != QA_WORKER_ASSIGNMENT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "qa worker assignment schemaVersion must be {QA_WORKER_ASSIGNMENT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("qa worker assignment planId", &self.plan_id)?;
+        validate_path_component("qa worker assignment runId", &self.run_id)?;
+        if self.assignments.is_empty() {
+            return Err(anyhow!(
+                "qa worker assignment assignments must not be empty"
+            ));
+        }
+        let mut assignment_ids = BTreeSet::new();
+        let mut output_roots = BTreeSet::new();
+        for (index, assignment) in self.assignments.iter().enumerate() {
+            assignment.validate(index)?;
+            if !assignment_ids.insert(assignment.assignment_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa worker assignment assignmentId: {}",
+                    assignment.assignment_id
+                ));
+            }
+            if !output_roots.insert(assignment.output_root.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa worker assignment outputRoot: {}",
+                    assignment.output_root
+                ));
+            }
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("qa worker assignment guardrail", guardrail)?;
+        }
+        Ok(())
+    }
+}
+
+impl QaWorkerAssignment {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("qa worker assignments[{index}].assignmentId"),
+            &self.assignment_id,
+        )?;
+        validate_path_component(
+            &format!("qa worker assignments[{index}].workerId"),
+            &self.worker_id,
+        )?;
+        validate_path_component(
+            &format!("qa worker assignments[{index}].assignedLane"),
+            &self.assigned_lane,
+        )?;
+        self.target.validate(index)?;
+        self.budget.validate(index)?;
+        if self.timeout_ms == 0 {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].timeoutMs must be bounded and greater than zero"
+            ));
+        }
+        if self.run_count > self.budget.max_runs {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].runCount must not exceed budget.maxRuns"
+            ));
+        }
+        validate_qa_worker_output_root(&self.output_root, &self.worker_id)
+            .with_context(|| format!("qa worker assignments[{index}].outputRoot is invalid"))?;
+        self.cleanup_policy.validate(index)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text(
+                &format!("qa worker assignments[{index}].blockedReasons"),
+                reason,
+            )?;
+        }
+        match self.status {
+            QaWorkerAssignmentStatus::Blocked if self.blocked_reasons.is_empty() => Err(anyhow!(
+                "qa worker assignments[{index}] blocked status requires blockedReasons"
+            )),
+            QaWorkerAssignmentStatus::Assigned | QaWorkerAssignmentStatus::Passed
+                if !self.blocked_reasons.is_empty() =>
+            {
+                Err(anyhow!(
+                    "qa worker assignments[{index}] assigned/passed status must not include blockedReasons"
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl QaWorkerAssignmentTarget {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("qa worker assignments[{index}].target.targetId"),
+            &self.target_id,
+        )?;
+        validate_qa_worker_target_ref(&self.evidence_ref, self.target_type).with_context(|| {
+            format!("qa worker assignments[{index}].target.evidenceRef is invalid")
+        })
+    }
+}
+
+impl QaWorkerAssignmentBudget {
+    fn validate(&self, index: usize) -> Result<()> {
+        if self.max_runs == 0 {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].budget.maxRuns must be greater than zero"
+            ));
+        }
+        if self.max_duration_ms == 0 {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].budget.maxDurationMs must be greater than zero"
+            ));
+        }
+        if self.max_artifacts == 0 {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].budget.maxArtifacts must be greater than zero"
+            ));
+        }
+        if self.max_output_bytes == 0 {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].budget.maxOutputBytes must be greater than zero"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl QaWorkerCleanupPolicy {
+    fn validate(&self, index: usize) -> Result<()> {
+        if matches!(self.mode, QaWorkerCleanupMode::RetainForReview)
+            && self.max_retention_ms.unwrap_or_default() == 0
+        {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].cleanupPolicy retain_for_review requires maxRetentionMs"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_qa_worker_target_ref(
+    reference: &str,
+    target_type: QaWorkerAssignmentTargetType,
+) -> Result<()> {
+    validate_evidence_artifact_path(reference)?;
+    if !reference.ends_with(".json") {
+        return Err(anyhow!(
+            "qa worker assignment target evidenceRef must be JSON"
+        ));
+    }
+    let allowed_prefix = match target_type {
+        QaWorkerAssignmentTargetType::ScenarioCandidate => "evidence/scenarios/",
+        QaWorkerAssignmentTargetType::FuzzTarget => "evidence/fuzz/",
+    };
+    if !reference.starts_with(allowed_prefix) {
+        return Err(anyhow!(
+            "qa worker assignment target evidenceRef must match targetType output root {allowed_prefix}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_qa_worker_output_root(output_root: &str, worker_id: &str) -> Result<()> {
+    validate_evidence_artifact_path(output_root)?;
+    let expected_prefix = format!("evidence/qa-workers/{worker_id}/");
+    if !output_root.starts_with(&expected_prefix) {
+        return Err(anyhow!(
+            "qa worker assignment outputRoot must stay under {expected_prefix}"
+        ));
+    }
+    Ok(())
+}
+
 const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1";
 const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
 
@@ -38844,6 +39126,83 @@ scenarios:
         assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn qa_worker_assignment_accepts_bounded_fixture_and_statuses() {
+        let fixture =
+            include_str!("../../../examples/qa-worker-assignment-v1/worker-assignment.sample.json");
+        let artifact = QaWorkerAssignmentArtifact::from_json_str(fixture)
+            .expect("qa worker assignment fixture parses");
+
+        assert_eq!(artifact.schema_version, "qa-worker-assignment-v1");
+        assert_eq!(artifact.assignments.len(), 2);
+        assert_eq!(
+            artifact.assignments[0].target.target_type,
+            QaWorkerAssignmentTargetType::ScenarioCandidate
+        );
+        assert_eq!(
+            artifact.assignments[0].status,
+            QaWorkerAssignmentStatus::Assigned
+        );
+        assert_eq!(
+            artifact.assignments[1].target.target_type,
+            QaWorkerAssignmentTargetType::FuzzTarget
+        );
+        assert_eq!(
+            artifact.assignments[1].status,
+            QaWorkerAssignmentStatus::Exhausted
+        );
+        assert!(artifact
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("no remote/cloud worker pool")));
+    }
+
+    #[test]
+    fn qa_worker_assignment_rejects_unbounded_hidden_or_unsafe_shapes() {
+        let unbounded = include_str!(
+            "../../../examples/qa-worker-assignment-v1/invalid/unbounded-worker-assignment.json"
+        );
+        let error = QaWorkerAssignmentArtifact::from_json_str(unbounded)
+            .expect_err("unbounded assignment fixture is rejected");
+        assert!(error.to_string().contains("maxRuns") || error.to_string().contains("timeoutMs"));
+
+        let hidden_worker = QaWorkerAssignmentArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-worker-assignment-v1",
+                "planId": "qa14_4_hidden_worker",
+                "runId": "run_qa_worker_assignment_smoke",
+                "assignments": [{
+                    "assignmentId": "hidden-worker",
+                    "workerId": "../hidden-worker",
+                    "assignedLane": "scenario-playtest",
+                    "target": { "targetType": "scenario_candidate", "targetId": "collect-and-exit", "evidenceRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json" },
+                    "budget": { "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 1, "maxOutputBytes": 1024 },
+                    "timeoutMs": 1000,
+                    "runCount": 0,
+                    "outputRoot": "evidence/qa-workers/hidden-worker/run/",
+                    "cleanupPolicy": { "mode": "retain_on_failure" },
+                    "status": "assigned"
+                }]
+            })
+            .to_string(),
+        )
+        .expect_err("escaping worker id rejected");
+        assert!(!hidden_worker.to_string().is_empty());
+
+        let unknown_remote_field = QaWorkerAssignmentArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-worker-assignment-v1",
+                "planId": "qa14_4_remote_worker",
+                "runId": "run_qa_worker_assignment_smoke",
+                "remoteWorkerPool": "cloud",
+                "assignments": []
+            })
+            .to_string(),
+        )
+        .expect_err("unknown remote worker fields are rejected");
+        assert!(!unknown_remote_field.to_string().is_empty());
     }
 
     #[test]
