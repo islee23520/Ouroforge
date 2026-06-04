@@ -1323,6 +1323,22 @@ assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
+const productionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.fixture.json', 'utf8'));
+const blockedProductionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.blocked.fixture.json', 'utf8'));
+run.production_task_board = productionTaskBoardFixture;
+const taskBoardMarkup = cockpit.renderProductionTaskBoardSurface(run);
+assert.match(taskBoardMarkup, /Production task board/);
+assert.match(taskBoardMarkup, /multi-agent-production-v1/);
+assert.match(taskBoardMarkup, /task-board-schema/);
+assert.match(taskBoardMarkup, /ready-for-review/);
+assert.match(taskBoardMarkup, /Read-only production task board surface/);
+assert.doesNotMatch(taskBoardMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const blockedTaskBoardMarkup = cockpit.renderProductionTaskBoardSurface({ production_task_board: blockedProductionTaskBoardFixture });
+assert.match(blockedTaskBoardMarkup, /ownership-policy/);
+assert.match(blockedTaskBoardMarkup, /Waiting for #668/);
+assert.match(cockpit.renderEvidencePane(run), /Production task board/);
+assert.match(cockpit.renderProductionTaskBoardSurface({}), /No production task board/);
+
 const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
 run.agent_role_model = agentRoleModelFixture;
 const roleModelMarkup = cockpit.renderAgentRoleModelSurface(run);

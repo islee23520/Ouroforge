@@ -1278,6 +1278,47 @@ const OuroforgeDashboard = (() => {
   }
 
 
+  function normalizeProductionTaskBoards(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderProductionTaskBoards(value = null) {
+    const boards = normalizeProductionTaskBoards(value);
+    if (!boards.length) {
+      return '<section class="panel production-task-boards"><h3>Production task board</h3><p class="empty-state">No production task board is attached to this dashboard data.</p></section>';
+    }
+    const cards = boards.map((board) => {
+      const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+      const forbidden = Array.isArray(board.forbiddenActions) ? board.forbiddenActions : [];
+      const guardrails = Array.isArray(board.guardrails) ? board.guardrails : [];
+      const statusCounts = tasks.reduce((counts, task) => {
+        const status = task?.status || 'unknown';
+        counts[status] = (counts[status] || 0) + 1;
+        return counts;
+      }, {});
+      const statusText = Object.keys(statusCounts).sort().map((status) => `${status}:${statusCounts[status]}`).join(' · ') || 'none';
+      const blockers = tasks.flatMap((task) => Array.isArray(task?.blockedReasons) ? task.blockedReasons.map((reason) => `${task.id || 'task'}: ${reason}`) : []);
+      const taskRows = tasks.length ? tasks.map((task) => {
+        const targets = Array.isArray(task.targetArtifacts) ? task.targetArtifacts : [];
+        const evidence = Array.isArray(task.requiredEvidence) ? task.requiredEvidence : [];
+        return `<li><strong>${escapeText(task.id || 'task')}</strong> · ${escapeText(task.role || 'unknown-role')} · ${escapeText(task.ownerAgent || 'unknown-owner')} · <span class="${statusClass(task.status || 'unknown')}">${escapeText(task.status || 'unknown')}</span><br><span class="run-meta">Targets: ${escapeText(targets.map((target) => target.path || target.id || 'target').join(' · ') || 'missing')} · Evidence: ${escapeText(evidence.join(' · ') || 'missing')}</span></li>`;
+      }).join('') : '<li class="artifact-warning">Missing or malformed tasks list.</li>';
+      return `<article class="artifact production-task-board">
+        <h4>${escapeText(board.boardId || 'unknown-board')}</h4>
+        <p class="run-meta">Read-only production task board. The dashboard does not spawn agents, execute commands, apply changes, write trusted browser state, auto-merge, or self-approve.</p>
+        <div class="run-meta">Schema: ${escapeText(board.schemaVersion || 'unknown')} · tasks ${escapeText(tasks.length)} · statuses ${escapeText(statusText)}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'missing')}</div>
+        <div class="run-meta">Guardrails: ${escapeText(guardrails.join(' · ') || 'missing')}</div>
+        <ul>${taskRows}</ul>
+        <p class="run-meta">${escapeText(board.boundary || 'Production task board display is read-only.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel production-task-boards"><h3>Production task board</h3><div class="artifact-grid">${cards}</div></section>`;
+  }
+
   function normalizeAgentRoleModels(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1591,6 +1632,7 @@ const OuroforgeDashboard = (() => {
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
+      ${renderProductionTaskBoards(run.production_task_boards || run.productionTaskBoards || run.production_task_board || run.productionTaskBoard || null)}
       ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
       ${renderAgentHandoffs(agentHandoffs || run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
@@ -1663,7 +1705,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderProductionTaskBoards, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

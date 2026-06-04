@@ -2760,6 +2760,121 @@ impl ProductionTaskStatus {
     }
 }
 
+pub const PRODUCTION_TASK_BOARD_READ_MODEL_SCHEMA_VERSION: &str =
+    "production-task-board-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ProductionTaskBoardReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "boardId")]
+    pub board_id: String,
+    pub status: String,
+    #[serde(rename = "taskCount")]
+    pub task_count: usize,
+    #[serde(rename = "statusCounts")]
+    pub status_counts: Vec<ProductionTaskStatusCount>,
+    pub blockers: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ProductionTaskStatusCount {
+    pub status: String,
+    pub count: usize,
+}
+
+pub fn production_task_board_read_model_from_json_str(input: &str) -> ProductionTaskBoardReadModel {
+    match ProductionTaskBoard::from_json_str(input) {
+        Ok(board) => ProductionTaskBoardReadModel::from_board(&board),
+        Err(error) => ProductionTaskBoardReadModel::malformed(format!("{error:#}")),
+    }
+}
+
+impl ProductionTaskBoardReadModel {
+    pub fn from_board(board: &ProductionTaskBoard) -> Self {
+        let mut counts = BTreeMap::<String, usize>::new();
+        let mut blockers = Vec::new();
+        for task in &board.tasks {
+            *counts.entry(task.status.as_str().to_string()).or_default() += 1;
+            for blocker in &task.blocked_reasons {
+                blockers.push(format!("{}: {blocker}", task.id));
+            }
+        }
+        let status = if board
+            .tasks
+            .iter()
+            .any(|task| task.status == ProductionTaskStatus::Blocked)
+        {
+            "blocked"
+        } else if board
+            .tasks
+            .iter()
+            .any(|task| task.status == ProductionTaskStatus::Deferred)
+        {
+            "deferred"
+        } else if board
+            .tasks
+            .iter()
+            .any(|task| task.status == ProductionTaskStatus::ReadyForReview)
+        {
+            "ready-for-review"
+        } else if board
+            .tasks
+            .iter()
+            .all(|task| task.status == ProductionTaskStatus::Completed)
+        {
+            "completed"
+        } else {
+            "active"
+        };
+        Self {
+            schema_version: PRODUCTION_TASK_BOARD_READ_MODEL_SCHEMA_VERSION.to_string(),
+            board_id: board.board_id.clone(),
+            status: status.to_string(),
+            task_count: board.tasks.len(),
+            status_counts: counts
+                .into_iter()
+                .map(|(status, count)| ProductionTaskStatusCount { status, count })
+                .collect(),
+            blockers,
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only production task board summary; it does not execute tasks, spawn agents, apply changes, write trusted browser state, or merge PRs.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: PRODUCTION_TASK_BOARD_READ_MODEL_SCHEMA_VERSION.to_string(),
+            board_id: "malformed-production-task-board".to_string(),
+            status: "malformed".to_string(),
+            task_count: 0,
+            status_counts: Vec::new(),
+            blockers: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed production task board summary; it reports validation errors without executing tasks, spawning agents, applying changes, or writing trusted state.".to_string(),
+        }
+    }
+}
+
+impl ProductionTaskStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ProductionTaskStatus::Proposed => "proposed",
+            ProductionTaskStatus::Assigned => "assigned",
+            ProductionTaskStatus::InProgress => "in-progress",
+            ProductionTaskStatus::Blocked => "blocked",
+            ProductionTaskStatus::ReadyForReview => "ready-for-review",
+            ProductionTaskStatus::Accepted => "accepted",
+            ProductionTaskStatus::Rejected => "rejected",
+            ProductionTaskStatus::Deferred => "deferred",
+            ProductionTaskStatus::Completed => "completed",
+        }
+    }
+}
+
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -39312,6 +39427,39 @@ scenarios:
         let valid = ProductionTaskBoard::from_json_str(&board.to_string())
             .expect("assigned to in-progress is a valid metadata transition");
         assert_eq!(valid.tasks[1].status, ProductionTaskStatus::InProgress);
+    }
+
+    #[test]
+    fn production_task_board_read_model_summarizes_ready_blocked_and_malformed_state() {
+        let ready = production_task_board_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+        ));
+        assert_eq!(
+            ready.schema_version,
+            PRODUCTION_TASK_BOARD_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(ready.board_id, "multi-agent-production-v1");
+        assert_eq!(ready.status, "ready-for-review");
+        assert_eq!(ready.task_count, 3);
+        assert!(ready.boundary.contains("does not execute tasks"));
+
+        let blocked = production_task_board_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.blocked.fixture.json",
+        ));
+        assert_eq!(blocked.status, "blocked");
+        assert!(blocked
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("ownership-policy")));
+
+        let malformed = production_task_board_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.malformed.fixture.json",
+        ));
+        assert_eq!(malformed.status, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("requiredEvidence")));
     }
 
     #[test]

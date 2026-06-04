@@ -1093,6 +1093,22 @@ assert.doesNotMatch(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /<mis
 assert.match(dashboard.renderRunDetail(run), /Authoring loop recovery/);
 assert.match(dashboard.renderLoopRecoveryStatus(null), /No recovery status/);
 
+const productionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.fixture.json', 'utf8'));
+const blockedProductionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.blocked.fixture.json', 'utf8'));
+run.production_task_board = productionTaskBoardFixture;
+const taskBoardMarkup = dashboard.renderProductionTaskBoards(productionTaskBoardFixture);
+assert.match(taskBoardMarkup, /Production task board/);
+assert.match(taskBoardMarkup, /multi-agent-production-v1/);
+assert.match(taskBoardMarkup, /task-board-schema/);
+assert.match(taskBoardMarkup, /ready-for-review/);
+assert.match(taskBoardMarkup, /Read-only production task board/);
+assert.doesNotMatch(taskBoardMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const blockedTaskBoardMarkup = dashboard.renderProductionTaskBoards(blockedProductionTaskBoardFixture);
+assert.match(blockedTaskBoardMarkup, /ownership-policy/);
+assert.match(blockedTaskBoardMarkup, /Waiting for #668/);
+assert.match(dashboard.renderRunDetail(run), /Production task board/);
+assert.match(dashboard.renderProductionTaskBoards(null), /No production task board/);
+
 const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
 run.agent_role_model = agentRoleModelFixture;
 const roleModelMarkup = dashboard.renderAgentRoleModels(agentRoleModelFixture);
