@@ -325,3 +325,14 @@ browser command bridge.
 
 A `reviewed` source patch review status is not source apply authorization. Later
 source apply work must use a separate explicitly-scoped design and review gate.
+
+
+## Source Patch Evidence Bundle v1 read-only rendering
+
+SMP1.8.3 permits dashboard and Studio surfaces to render source patch evidence
+bundles as escaped, read-only links and status summaries. Bundle surfaces may show
+the preview id, bundle status, preview/file-class/diff/sandbox/test/review refs,
+blocked reasons, guardrails, and forbidden-action notices. They must not add
+apply controls, merge controls, command execution, browser writes, local server
+bridges, uploads, dependency changes, or any trusted source mutation behavior. A
+complete bundle is audit evidence only; it is not source apply authorization.

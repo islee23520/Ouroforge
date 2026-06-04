@@ -134,6 +134,30 @@ const run = {
     missingRefs: ['comparison:runs/<comparison>.json'],
     boundary: 'Generated local index only; <browser> read-only.',
   }],
+  mutation_artifacts: [{
+    id: 'source-patch-evidence-bundle',
+    kind: 'application/json',
+    path: 'mutation/source-patch-evidence-bundle.json',
+    metadata: { read_only: true },
+    value: {
+      bundleId: 'bundle-1',
+      patchPreviewId: 'preview-1',
+      status: 'complete',
+      previewRef: { kind: 'source-patch-preview', path: 'mutation/preview.json' },
+      fileClassReportRef: { kind: 'file-class-report', path: 'evidence/file-class.json' },
+      diffIntegrityReportRef: { kind: 'diff-integrity-report', path: 'evidence/diff.json' },
+      sandboxReportRef: { kind: 'sandbox-dry-run-report', path: 'sandbox/preview-1/evidence/report.json' },
+      testSummaryRef: { kind: 'test-summary', path: 'sandbox/preview-1/evidence/tests.json' },
+      reviewDecisionRef: { kind: 'review-decision', path: 'mutation/review-decisions.json' },
+      forbiddenActionNotices: [
+        { action: 'apply_patch', reason: 'forbidden' },
+        { action: 'merge_branch', reason: 'forbidden' },
+        { action: 'execute_command', reason: 'forbidden' },
+        { action: 'write_trusted_file', reason: 'forbidden' },
+      ],
+      guardrails: ['read-only bundle evidence', 'no source patch apply'],
+    },
+  }],
   loop_cockpit: {
     schemaVersion: 'studio-loop-cockpit-v1',
     boundary: 'Read-only normalized loop cockpit read model; <browser> cannot execute commands.',
@@ -1061,3 +1085,9 @@ assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /runs:/);
 assert.doesNotMatch(cockpit.renderLoopEvidenceBundleSurface(run), /<loop-bundle>/);
 assert.match(cockpit.renderEvidencePane(run), /Authoring loop evidence bundle/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface({ summary: { id: 'run-no-bundle' } }), /No loop evidence bundle/);
+
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Source patch evidence bundle/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /bundle-1/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /apply_patch/);
+assert.doesNotMatch(cockpit.renderSourcePatchEvidenceBundleSurface(run), /<button|applyCommand|mergeCommand/);
+assert.match(cockpit.renderEvidencePane(run), /Source patch evidence bundle/);

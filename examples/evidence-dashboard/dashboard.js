@@ -1138,6 +1138,36 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function sourcePatchEvidenceBundles(run) {
+    return artifacts(run?.mutation_artifacts).filter((artifact) => artifact.id === 'source-patch-evidence-bundle' || artifact.path === 'mutation/source-patch-evidence-bundle.json');
+  }
+
+  function renderSourcePatchEvidenceBundles(run) {
+    const bundles = sourcePatchEvidenceBundles(run);
+    if (!bundles.length) {
+      return '<section class="panel source-patch-evidence-bundles"><h3>Source patch evidence bundle</h3><p class="empty-state">No source patch evidence bundle is exported for this run.</p><p class="run-meta">Read-only dashboard surface. The browser cannot apply patches, merge branches, execute commands, or write trusted files.</p></section>';
+    }
+    const cards = bundles.map((artifact) => {
+      const value = artifact.value || {};
+      const notices = Array.isArray(value.forbiddenActionNotices) ? value.forbiddenActionNotices : [];
+      const guardrails = Array.isArray(value.guardrails) ? value.guardrails : [];
+      const refs = [value.previewRef, value.fileClassReportRef, value.diffIntegrityReportRef, value.sandboxReportRef, value.testSummaryRef, value.reviewDecisionRef]
+        .filter(Boolean)
+        .map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      return `<article class="artifact source-patch-evidence-bundle">
+        <h4>${escapeText(value.bundleId || artifact.id || 'source patch bundle')}</h4>
+        <div class="run-meta"><span class="${statusClass(value.status || 'unknown')}">${escapeText(value.status || 'unknown')}</span> · preview ${escapeText(value.patchPreviewId || 'unknown')}</div>
+        <div class="run-meta">Refs: ${escapeText(refs.join(' · ') || artifact.path || 'none')}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(notices.map((notice) => notice.action || 'unknown').join(' · ') || 'none')}</div>
+        <p class="run-meta">${escapeText(guardrails.join(' · ') || 'Read-only bundle evidence; no browser apply/merge/execute/write authority.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel source-patch-evidence-bundles"><h3>Source patch evidence bundle</h3>
+      <p class="run-meta">Read-only source patch bundle evidence. This dashboard renders links and forbidden-action notices only; it does not apply patches, merge branches, execute commands, or write trusted files.</p>
+      <div class="artifact-grid">${cards}</div>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null, run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
   }
@@ -1168,6 +1198,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
+      ${renderSourcePatchEvidenceBundles(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1244,7 +1275,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
