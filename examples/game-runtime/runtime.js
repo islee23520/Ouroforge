@@ -116,6 +116,7 @@
     sceneTransitions: [],
     transitionEvents: [],
     audioEvents: [],
+    audioWarnings: [],
     vfxEvents: [],
     reloads: [],
     tilemaps: [],
@@ -357,9 +358,26 @@
     if (components.vfx && Array.isArray(components.vfx.emitters)) normalized.components.vfx = vfxComponent(components.vfx);
     if (components.audio && Array.isArray(components.audio.events)) {
       normalized.components.audio = {
+        buses: Array.isArray(components.audio.buses)
+          ? components.audio.buses
+            .filter((bus) => bus && typeof bus.id === 'string' && typeof bus.kind === 'string')
+            .map((bus) => ({
+              id: bus.id,
+              kind: bus.kind,
+              volume: Number.isFinite(bus.volume) ? bus.volume : 100,
+              muted: bus.muted === true,
+            }))
+          : [],
         events: components.audio.events
-          .filter((event) => event && event.trigger === 'scene_loaded' && typeof event.name === 'string')
-          .map((event) => ({ name: event.name, trigger: event.trigger, action: event.action === 'stop' ? 'stop' : 'play', asset: event.asset })),
+          .filter((event) => event && typeof event.trigger === 'string' && typeof event.name === 'string')
+          .map((event) => ({
+            name: event.name,
+            trigger: event.trigger,
+            action: event.action === 'stop' ? 'stop' : 'play',
+            kind: typeof event.kind === 'string' ? event.kind : 'sound',
+            bus: typeof event.bus === 'string' ? event.bus : null,
+            asset: event.asset,
+          })),
       };
     }
     const normalizedAnimation = animation.normalizeAnimation(components.animation);
@@ -543,6 +561,11 @@
       emitted.sceneId = world.sceneId;
       world.audioEvents.push(emitted);
       if (world.audioEvents.length > 64) world.audioEvents.shift();
+      for (const warning of emitted.limitationWarnings || []) {
+        const record = { tick: world.tick, sceneId: world.sceneId, requestId: emitted.requestId, warning };
+        world.audioWarnings.push(record);
+        if (world.audioWarnings.length > 64) world.audioWarnings.shift();
+      }
       record('runtime.audio.emitted', emitted);
     }
   }
@@ -1006,6 +1029,7 @@
     world.collisions = [];
     world.collisionEvents = [];
     world.audioEvents = [];
+    world.audioWarnings = [];
     world.vfxEvents = [];
     world.tick = 0;
     const assetMetadata = assets.load(world, world.assetManifest);

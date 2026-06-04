@@ -47,6 +47,9 @@ function createRuntime() {
   assert.equal(state.audioEvents[0].sceneId, state.sceneId);
   assert.equal(state.audioEvents[0].name, 'player_spawn');
   assert.equal(state.audioEvents[0].asset, 'collect_sound');
+  assert.equal(state.audioEvents[0].playback, 'intent');
+  assert.ok(state.audioEvents[0].limitationWarnings.includes('audible_output_not_verified'));
+  assert.ok(state.audioWarnings.some((warning) => warning.warning === 'browser_audio_intent_only'));
   assert.equal(state.entities.find((entity) => entity.id === 'player').components.animation.mode, 'sprite_frame');
   assert.equal(state.assetManifest.id, 'collect-and-exit-runtime-assets');
   assert.equal(state.assetManifest.assetCount, 2);
