@@ -156,15 +156,17 @@ Design Gate, and Visual Authoring v2 remain possible later governance topics, bu
 none is authorized as implementation scope by the Visual Authoring v1 completion
 handoff.
 
-The public-readiness docs remain governance inputs, not automated launch paths:
+The public-readiness and post-launch triage docs remain governance inputs, not
+automated launch or roadmap-acceptance paths:
 
 - `docs/public-readiness-audit.md`
 - `docs/public-demo-evidence.md`
 - `docs/public-launch-checklist.md`
+- `docs/post-launch-roadmap-triage-v1.md`
 
-Maintainers should use those documents for a separate manual repository
-visibility decision. Public launch remains a governance action, not an automated
-code path.
+Maintainers should use those documents for separate manual repository visibility
+and post-launch roadmap decisions. Public launch and future milestone acceptance
+remain governance actions, not automated code paths.
 
 ## Product direction
 
