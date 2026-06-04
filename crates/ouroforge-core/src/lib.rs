@@ -26091,6 +26091,18 @@ scenarios:
                 "examples/visual-edit-draft-v1/valid/scene-review-gated.visual-edit-draft.json",
                 VisualEditDraftTargetType::Scene,
             ),
+            (
+                "examples/visual-edit-draft-v1/valid/collect-and-exit-scene-demo.visual-edit-draft.json",
+                VisualEditDraftTargetType::Scene,
+            ),
+            (
+                "examples/visual-edit-draft-v1/valid/collect-and-exit-tilemap-demo.visual-edit-draft.json",
+                VisualEditDraftTargetType::Tilemap,
+            ),
+            (
+                "examples/visual-edit-draft-v1/valid/collect-and-exit-asset-frame-demo.visual-edit-draft.json",
+                VisualEditDraftTargetType::AssetReference,
+            ),
         ] {
             let input = read_visual_edit_draft_fixture(fixture);
             let draft: VisualEditDraftArtifact = serde_json::from_str(&input)

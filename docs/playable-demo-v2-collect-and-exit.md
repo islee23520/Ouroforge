@@ -27,6 +27,36 @@ fixtures.
   against dashboard and Studio asset inspector renderers while keeping generated
   dashboard data in a temporary directory.
 
+
+## Visual authoring demo drafts
+
+Issue #352 adds source-like Visual Authoring Demo v1 draft examples for the
+collect-and-exit fixture. They are checked-in inputs for draft validation and
+workflow review only; generated transaction previews, review records, run ids,
+dashboard exports, screenshots, and compare outputs remain local/generated and
+untracked unless a later issue explicitly scopes a fixture.
+
+| Draft fixture | Demonstrates | Trusted follow-up boundary |
+| --- | --- | --- |
+| `examples/visual-edit-draft-v1/valid/collect-and-exit-scene-demo.visual-edit-draft.json` | Key move and HUD text change intent for `scenes/collect-and-exit.scene.json`. | Rust validates the draft and creates reviewable scene transaction previews; Studio may only show/copy inert draft text. |
+| `examples/visual-edit-draft-v1/valid/collect-and-exit-tilemap-demo.visual-edit-draft.json` | Tile obstacle add/remove intent for `assets/tilemaps/collect-and-exit.tilemap.json`. | Rust validates tilemap bounds, tileset refs, and generated preview summaries before any trusted write path is considered. |
+| `examples/visual-edit-draft-v1/valid/collect-and-exit-asset-frame-demo.visual-edit-draft.json` | Asset frame replacement intent for the manifest-backed `collect_and_exit_atlas` / `player_idle_1` frame. | Rust validates manifest ids, asset type, content hash, and frame metadata; browser surfaces do not upload, fetch, or persist assets. |
+
+The end-to-end demo sequence is intentionally review-gated and local-first:
+
+1. Compose or inspect the source-like draft JSON.
+2. Run trusted Rust validation/preview to create generated transaction evidence.
+3. Review the preview and record an explicit accepted/rejected decision.
+4. Apply only through the review-gated CLI path when authorized.
+5. Rerun the collect-and-exit smoke, compare evidence, and inspect the read-only
+   dashboard/Studio display.
+6. Record generated run/transaction ids in PR or issue evidence without tracking
+   generated outputs.
+
+This demo does not authorize browser trusted writes, local command bridges,
+source mutation, auto-apply, auto-rerun, public launch automation, production
+editor claims, plugin/runtime work, or changes to #1/#23.
+
 ## Runtime smoke
 
 Run the focused Node checks:

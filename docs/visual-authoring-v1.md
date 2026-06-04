@@ -122,7 +122,11 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
 8. **Studio Draft Authoring Surface v1** — expose in-memory draft assembly,
    warnings, preview state, and copyable JSON/commands as escaped UI state only.
 9. **Visual Authoring Demo v1** — demonstrate a local safe edit-draft workflow
-   using deterministic fixtures and evidence without production-editor claims.
+   using deterministic collect-and-exit draft fixtures and generated evidence
+   references without production-editor claims. VA1.10.1 source-like draft
+   examples live under `examples/visual-edit-draft-v1/valid/` and cover key
+   move, HUD text change, tile obstacle add/remove, and asset frame replacement
+   intent while keeping generated transaction/run outputs untracked.
 10. **Scenario Coverage v5** — add regression coverage for draft validation,
     transaction preview, visual diff evidence, review-gated apply, rollback,
     generated-state policy, and read-only Studio boundaries.
