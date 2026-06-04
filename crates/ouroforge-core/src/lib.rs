@@ -11781,6 +11781,512 @@ pub struct SourcePatchStaleTargetGuardArtifact {
     pub guardrails: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "guardId")]
+    pub guard_id: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "guardResultCount")]
+    pub guard_result_count: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchStaleTargetGuardValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_source_patch_stale_target_guard_artifact(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+) -> SourcePatchStaleTargetGuardValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if artifact.schema_version != SOURCE_PATCH_STALE_TARGET_GUARD_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_STALE_TARGET_GUARD_SCHEMA_VERSION}"
+        ));
+    }
+    push_if_blank(&mut blocked_reasons, "guardId", &artifact.guard_id);
+    push_if_blank(&mut blocked_reasons, "createdAt", &artifact.created_at);
+    push_if_blank(
+        &mut blocked_reasons,
+        "transactionId",
+        &artifact.transaction_id,
+    );
+    if let Err(error) = validate_relative_artifact_path("transactionRef", &artifact.transaction_ref)
+    {
+        blocked_reasons.push(error.to_string());
+    }
+    inspect_source_patch_stale_target_guard_base_ref(&artifact.base_ref, &mut blocked_reasons);
+    inspect_source_patch_stale_target_guard_freshness(artifact, &mut blocked_reasons);
+    inspect_source_patch_stale_target_guard_targets(artifact, &mut blocked_reasons);
+    inspect_source_patch_stale_target_guard_results(artifact, &mut blocked_reasons);
+    if let Err(error) =
+        validate_relative_artifact_path("worktreeContextRef", &artifact.worktree_context_ref)
+    {
+        blocked_reasons.push(error.to_string());
+    }
+    inspect_source_patch_stale_target_guard_guardrails(artifact, &mut blocked_reasons);
+
+    match artifact.status {
+        SourcePatchStaleTargetGuardStatus::Fresh => {
+            if !artifact.blocked_reasons.is_empty() {
+                blocked_reasons.push("fresh guard must not carry blockedReasons".to_string());
+            }
+            if !artifact.evidence_freshness.stale_reasons.is_empty() {
+                blocked_reasons.push("fresh guard must not carry staleReasons".to_string());
+            }
+        }
+        SourcePatchStaleTargetGuardStatus::Stale => {
+            if artifact.evidence_freshness.stale_reasons.is_empty()
+                && artifact.blocked_reasons.is_empty()
+            {
+                blocked_reasons
+                    .push("stale status requires staleReasons or blockedReasons".to_string());
+            }
+            blocked_reasons.push(
+                "guard status is stale; trusted apply readiness is not satisfied".to_string(),
+            );
+        }
+        SourcePatchStaleTargetGuardStatus::Blocked => {
+            if artifact.blocked_reasons.is_empty() {
+                blocked_reasons.push("blocked status requires blockedReasons".to_string());
+            }
+            blocked_reasons.push(
+                "guard status is blocked; trusted apply readiness is not satisfied".to_string(),
+            );
+        }
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchStaleTargetGuardValidation {
+        schema_version: "source-patch-stale-target-guard-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "shape_valid_pending_current_target_and_evidence_checks".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        guard_id: artifact.guard_id.clone(),
+        target_count: artifact.targets.len(),
+        guard_result_count: artifact.guard_results.len(),
+        blocked_reasons,
+        guardrails: vec![
+            "stale target guard validation does not apply patches or write trusted files"
+                .to_string(),
+            "current target and linked evidence checks must pass before any separately scoped trusted apply"
+                .to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+            "dependency, CI, build-script, credential, release, export, and generated-state mutation remains blocked"
+                .to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_stale_target_guard_artifact(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+) -> Result<SourcePatchStaleTargetGuardValidation> {
+    let validation = inspect_source_patch_stale_target_guard_artifact(artifact);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch stale target guard blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+pub fn inspect_source_patch_stale_target_guard_artifact_with_roots(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    evidence_root: impl AsRef<Path>,
+    worktree_root: impl AsRef<Path>,
+) -> SourcePatchStaleTargetGuardValidation {
+    let mut validation = inspect_source_patch_stale_target_guard_artifact(artifact);
+    let evidence_root = evidence_root.as_ref();
+    let worktree_root = worktree_root.as_ref();
+    inspect_source_patch_stale_target_guard_linked_evidence(
+        artifact,
+        evidence_root,
+        &mut validation.blocked_reasons,
+    );
+    inspect_source_patch_stale_target_guard_current_targets(
+        artifact,
+        worktree_root,
+        &mut validation.blocked_reasons,
+    );
+    validation.blocked_reasons.sort();
+    validation.blocked_reasons.dedup();
+    validation.status = if validation.blocked_reasons.is_empty() {
+        "fresh_current_targets_and_linked_evidence_no_apply_authority".to_string()
+    } else {
+        "blocked".to_string()
+    };
+    validation
+}
+
+fn inspect_source_patch_stale_target_guard_base_ref(
+    base_ref: &SourcePatchStaleTargetGuardBaseRef,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, value) in [
+        ("baseRef.branch", base_ref.branch.as_str()),
+        ("baseRef.expectedHead", base_ref.expected_head.as_str()),
+        ("baseRef.observedHead", base_ref.observed_head.as_str()),
+        ("baseRef.headStatus", base_ref.head_status.as_str()),
+    ] {
+        push_if_blank(blocked_reasons, field, value);
+    }
+    if base_ref.expected_head != base_ref.observed_head {
+        blocked_reasons.push(
+            "baseRef.observedHead must match expectedHead before trusted apply readiness"
+                .to_string(),
+        );
+    }
+    if !base_ref.head_status.contains("matches") {
+        blocked_reasons
+            .push("baseRef.headStatus must record a matching branch/head observation".to_string());
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_freshness(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    let freshness = &artifact.evidence_freshness;
+    for (field, path) in [
+        (
+            "evidenceFreshness.patchPreviewRef",
+            freshness.patch_preview_ref.as_str(),
+        ),
+        (
+            "evidenceFreshness.fileClassReportRef",
+            freshness.file_class_report_ref.as_str(),
+        ),
+        (
+            "evidenceFreshness.diffIntegrityReportRef",
+            freshness.diff_integrity_report_ref.as_str(),
+        ),
+        (
+            "evidenceFreshness.sandboxReportRef",
+            freshness.sandbox_report_ref.as_str(),
+        ),
+        (
+            "evidenceFreshness.reviewDecisionRef",
+            freshness.review_decision_ref.as_str(),
+        ),
+        (
+            "evidenceFreshness.applyTransactionRef",
+            freshness.apply_transaction_ref.as_str(),
+        ),
+    ] {
+        if let Err(error) = validate_relative_artifact_path(field, path) {
+            blocked_reasons.push(error.to_string());
+        }
+    }
+    push_if_blank(
+        blocked_reasons,
+        "evidenceFreshness.maxAgePolicy",
+        &freshness.max_age_policy,
+    );
+    let policy = freshness.max_age_policy.to_ascii_lowercase();
+    if !policy.contains("expected head") && !policy.contains("fresh") {
+        blocked_reasons.push(
+            "evidenceFreshness.maxAgePolicy must describe expected-head or freshness policy"
+                .to_string(),
+        );
+    }
+    if freshness.apply_transaction_ref != artifact.transaction_ref {
+        blocked_reasons
+            .push("evidenceFreshness.applyTransactionRef must match transactionRef".to_string());
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_targets(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if artifact.targets.is_empty() {
+        blocked_reasons.push("targets must not be empty".to_string());
+    }
+    let mut seen_targets = BTreeSet::<String>::new();
+    for (index, target) in artifact.targets.iter().enumerate() {
+        let field = format!("targets[{index}]");
+        push_if_blank(blocked_reasons, &format!("{field}.path"), &target.path);
+        if !target.path.trim().is_empty() && !seen_targets.insert(target.path.clone()) {
+            blocked_reasons.push(format!("duplicate target path {}", target.path));
+        }
+        if let Err(error) = validate_relative_artifact_path(&format!("{field}.path"), &target.path)
+        {
+            blocked_reasons.push(error.to_string());
+        }
+        push_if_blank(
+            blocked_reasons,
+            &format!("{field}.fileClass"),
+            &target.file_class,
+        );
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.expectedBeforeHash"),
+            &target.expected_before_hash,
+        );
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.observedHash"),
+            &target.observed_hash,
+        );
+        if target.expected_before_hash != target.observed_hash {
+            blocked_reasons.push(format!(
+                "{field}.observedHash must match expectedBeforeHash before trusted apply readiness"
+            ));
+        }
+        let class_report = classify_source_file_path_str(&target.path);
+        let expected_file_class = source_file_class_label_value(&class_report.class);
+        if target.file_class != expected_file_class {
+            blocked_reasons.push(format!(
+                "{field}.fileClass expected {expected_file_class} from current file-class policy for {}",
+                target.path
+            ));
+        }
+        if class_report.decision != SourceFileClassDecision::Allowed {
+            blocked_reasons.push(format!(
+                "{field}.path {} has unsupported file class decision {:?}; stale guards are limited to explicitly allowed source-like classes",
+                target.path, class_report.decision
+            ));
+        }
+        let file_status = target.file_status.to_ascii_lowercase();
+        if !file_status.contains("exists") || !file_status.contains("matches") {
+            blocked_reasons.push(format!(
+                "{field}.fileStatus must record exists_and_matches_expected_before_hash"
+            ));
+        }
+        for stale_marker in [
+            "missing",
+            "changed",
+            "mismatch",
+            "deleted",
+            "unexpected",
+            "created",
+            "stale",
+        ] {
+            if file_status.contains(stale_marker) {
+                blocked_reasons.push(format!("{field}.fileStatus records {stale_marker} target"));
+            }
+        }
+        let mode_status = target.mode_status.to_ascii_lowercase();
+        push_if_blank(
+            blocked_reasons,
+            &format!("{field}.modeStatus"),
+            &target.mode_status,
+        );
+        if mode_status.contains("mismatch") || mode_status.contains("changed") {
+            blocked_reasons.push(format!("{field}.modeStatus records file mode mismatch"));
+        }
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_results(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if artifact.guard_results.is_empty() {
+        blocked_reasons.push("guardResults must not be empty".to_string());
+    }
+    for (index, result) in artifact.guard_results.iter().enumerate() {
+        let field = format!("guardResults[{index}]");
+        push_if_blank(blocked_reasons, &format!("{field}.kind"), &result.kind);
+        push_if_blank(blocked_reasons, &format!("{field}.status"), &result.status);
+        push_if_blank(
+            blocked_reasons,
+            &format!("{field}.summary"),
+            &result.summary,
+        );
+        if let Err(error) =
+            validate_relative_artifact_path(&format!("{field}.evidenceRef"), &result.evidence_ref)
+        {
+            blocked_reasons.push(error.to_string());
+        }
+        if !result.status.eq_ignore_ascii_case("passed") {
+            blocked_reasons.push(format!(
+                "{field}.status must be passed before trusted apply readiness"
+            ));
+        }
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_guardrails(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if !artifact.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("do not apply") || guardrail.contains("does not apply")
+    }) {
+        blocked_reasons
+            .push("guardrails must state the artifact does not apply patches".to_string());
+    }
+    if !artifact.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("read-only") || guardrail.contains("command-inert")
+    }) {
+        blocked_reasons
+            .push("guardrails must preserve read-only/command-inert UI surfaces".to_string());
+    }
+    for required in ["merge", "write", "command", "dependency"] {
+        if !artifact
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.to_ascii_lowercase().contains(required))
+        {
+            blocked_reasons.push(format!(
+                "guardrails must mention forbidden {required} authority"
+            ));
+        }
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_linked_evidence(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    evidence_root: &Path,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, path, status_keys, required_statuses) in [
+        (
+            "evidenceFreshness.patchPreviewRef",
+            artifact.evidence_freshness.patch_preview_ref.as_str(),
+            &["status", "validationStatus", "validation_status"][..],
+            &["passed", "ready", "complete", "valid"][..],
+        ),
+        (
+            "evidenceFreshness.fileClassReportRef",
+            artifact.evidence_freshness.file_class_report_ref.as_str(),
+            &["status", "validationStatus", "validation_status"][..],
+            &["passed", "valid", "complete"][..],
+        ),
+        (
+            "evidenceFreshness.diffIntegrityReportRef",
+            artifact
+                .evidence_freshness
+                .diff_integrity_report_ref
+                .as_str(),
+            &["status", "validationStatus", "validation_status"][..],
+            &["passed", "valid", "complete"][..],
+        ),
+        (
+            "evidenceFreshness.sandboxReportRef",
+            artifact.evidence_freshness.sandbox_report_ref.as_str(),
+            &["status", "result", "validationStatus", "validation_status"][..],
+            &["passed", "success", "succeeded", "complete"][..],
+        ),
+        (
+            "evidenceFreshness.reviewDecisionRef",
+            artifact.evidence_freshness.review_decision_ref.as_str(),
+            &["status", "reviewStatus", "review_status", "decision"][..],
+            &["accepted", "approved", "passed"][..],
+        ),
+        (
+            "evidenceFreshness.applyTransactionRef",
+            artifact.evidence_freshness.apply_transaction_ref.as_str(),
+            &["status", "validationStatus", "validation_status"][..],
+            &["ready_for_trusted_apply", "passed", "ready", "complete"][..],
+        ),
+    ] {
+        inspect_source_patch_stale_target_guard_linked_json(
+            evidence_root,
+            field,
+            path,
+            status_keys,
+            required_statuses,
+            blocked_reasons,
+        );
+    }
+    inspect_source_patch_stale_target_guard_linked_json(
+        evidence_root,
+        "worktreeContextRef",
+        &artifact.worktree_context_ref,
+        &["status", "validationStatus", "validation_status"],
+        &["passed", "ready", "clean", "complete"],
+        blocked_reasons,
+    );
+}
+
+fn inspect_source_patch_stale_target_guard_linked_json(
+    evidence_root: &Path,
+    field: &str,
+    path: &str,
+    status_keys: &[&str],
+    required_statuses: &[&str],
+    blocked_reasons: &mut Vec<String>,
+) {
+    if let Err(error) = validate_relative_artifact_path(field, path) {
+        blocked_reasons.push(error.to_string());
+        return;
+    }
+    let evidence_path = evidence_root.join(path);
+    let value = match read_json_value(&evidence_path) {
+        Ok(value) => value,
+        Err(error) => {
+            blocked_reasons.push(format!(
+                "{field} linked evidence {} must exist and be readable JSON: {error}",
+                evidence_path.display()
+            ));
+            return;
+        }
+    };
+    if !json_object_has_any_string_field_ci(&value, status_keys, required_statuses) {
+        blocked_reasons.push(format!(
+            "{field} linked evidence must record one of statuses in fields {}: {}",
+            status_keys.join(", "),
+            required_statuses.join(", ")
+        ));
+    }
+}
+
+fn inspect_source_patch_stale_target_guard_current_targets(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+    worktree_root: &Path,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (index, target) in artifact.targets.iter().enumerate() {
+        let field = format!("targets[{index}]");
+        if let Err(error) = validate_relative_artifact_path(&format!("{field}.path"), &target.path)
+        {
+            blocked_reasons.push(error.to_string());
+            continue;
+        }
+        let target_path = worktree_root.join(&target.path);
+        if !target_path.is_file() {
+            blocked_reasons.push(format!(
+                "{field}.path {} must exist as a regular file in the trusted worktree",
+                target.path
+            ));
+            continue;
+        }
+        match source_patch_sandbox_file_hash_for_expected(
+            &target_path,
+            &target.expected_before_hash,
+        ) {
+            Ok(actual_hash) if actual_hash == target.expected_before_hash => {}
+            Ok(actual_hash) => blocked_reasons.push(format!(
+                "{field}.path {} current hash {actual_hash} does not match expectedBeforeHash {}",
+                target.path, target.expected_before_hash
+            )),
+            Err(error) => blocked_reasons.push(format!(
+                "{field}.path {} could not be hashed for stale guard: {error}",
+                target.path
+            )),
+        }
+    }
+}
+
 pub const SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION: &str = "source-patch-apply-transaction-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
