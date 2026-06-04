@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const dashboard = require('./dashboard.js');
 
 const run = {
@@ -246,6 +247,7 @@ const run = {
       { id: 'sandboxed', label: 'Sandboxed', state: 'sandboxed', artifact_path: 'sandbox/*/evidence/result.json', record_count: 1, evidence_refs: ['sandbox/patch-draft-1/evidence/result.json'], records: [{ patch_draft_id: 'patch-draft-1' }] },
       { id: 'compared', label: 'Compared', state: 'compared', artifact_path: 'mutation/rerun-orchestration.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ comparison_artifact_path: 'mutation/run-comparison-before--after.json' }] },
       { id: 'scene_applied', label: 'Applied scene mutation', state: 'applied', artifact_path: 'mutation/scene-applications.json', record_count: 1, evidence_refs: [], records: [{ id: 'scene-application-1', proposalId: 'mutation-1', transactionId: 'scene-edit-abc123', reviewDecisionId: 'review-decision-1', targetScenePath: 'examples/project/scenes/main.scene.json', transactionArtifactPath: 'mutation/scene-edit.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'afterhash' }, project: { projectId: 'minimal_2d', manifestPath: 'ouroforge.project.json', manifestHash: { algorithm: 'fnv1a64-file-v1', value: 'manifesthash' }, scenePath: 'scenes/main.scene.json', sceneHash: { algorithm: 'fnv1a64-canonical-json-v1', value: 'beforehash' } }, rollback: { scenePath: 'examples/project/scenes/main.scene.json', restoreHash: { value: 'beforehash' }, strategy: 'restore beforeSceneHash' }, status: 'applied' }] },
+      { id: 'visual_draft_applied', label: 'Applied visual draft', state: 'applied', artifact_path: 'mutation/visual-edit-applications.json', record_count: 1, evidence_refs: ['mutation/visual-edit-applications.json'], records: [{ id: 'visual-edit-application-1', draftId: 'draft-collect-and-exit-scene-demo', proposalId: 'mutation-1', patchDraftId: 'patch-draft-1', reviewDecisionId: 'review-decision-1', transactionId: 'scene-edit-visual-abc123', transactionArtifactPath: 'mutation/visual-scene-edit.json', targetScenePath: 'examples/project/scenes/main.scene.json', beforeSceneHash: { value: 'beforehash' }, afterSceneHash: { value: 'visualafterhash' }, commandContext: { command: 'cargo run -p ouroforge-cli -- edit draft-apply examples/visual-edit-draft-v1/valid/collect-and-exit-scene-demo.visual-edit-draft.json' } }] },
       { id: 'reviewed', label: 'Manual review', state: 'accepted', artifact_path: 'mutation/review-decisions.json', record_count: 1, evidence_refs: ['mutation/rerun-orchestration.json'], records: [{ id: 'review-decision-1', proposal_id: 'mutation-1', patch_draft_id: 'patch-draft-1', state: 'accepted', decision_status: 'accepted', reviewer_type: 'agent', reviewer: 'agent-reviewer', reason: '<script>accepted</script>', evidence_refs: ['mutation/rerun-orchestration.json'], guardrail_checklist: { proposal_is_record_only: true, accepted_does_not_apply: true, browser_read_only: true, evidence_refs_checked: true } }] },
     ],
   },
@@ -504,6 +506,10 @@ assert.match(detail, /Drafted/);
 assert.match(detail, /Sandboxed/);
 assert.match(detail, /Compared/);
 assert.match(detail, /Applied scene mutation/);
+assert.match(detail, /Applied visual draft/);
+assert.match(detail, /Visual draft application/);
+assert.match(detail, /draft-collect-and-exit-scene-demo/);
+assert.match(detail, /Display-only rerun context/);
 assert.match(detail, /Project-scoped scene mutation/);
 assert.match(detail, /minimal_2d/);
 assert.match(detail, /manifesthash/);
@@ -613,6 +619,12 @@ assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
 assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, empty_state: 'No loading evidence' } }), /No loading evidence/);
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
+
+const visualAuthoringDoc = fs.readFileSync(require.resolve('../../docs/visual-authoring-v1.md'), 'utf8');
+assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
+assert.match(visualAuthoringDoc, /Review-gated visual apply/);
+assert.match(visualAuthoringDoc, /Dashboard mutation lifecycle and Studio mutation surfaces show draft\/proposal\/patch\/decision\/transaction ids/);
+assert.match(visualAuthoringDoc, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
 
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.
 const xssRun = {

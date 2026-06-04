@@ -765,6 +765,10 @@ assert.match(visualAuthoringDoc, /Visual Authoring Demo v1 display and public wo
 assert.match(visualAuthoringDoc, /read-only dashboard/);
 assert.match(visualAuthoringDoc, /pre-release private MVP/);
 assert.match(visualAuthoringDoc, /do not add new Studio controls, dashboard\s+write paths, generated tracked artifacts, dependencies, or behavior changes/);
+assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
+assert.match(visualAuthoringDoc, /Studio renders before\/after summaries, operation summaries, collision\/trigger counts/);
+assert.match(visualAuthoringDoc, /Studio may render draft ids, operation summaries, blocked reasons, and copyable inert preview command text only/);
+assert.match(visualAuthoringDoc, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
 const dashboardReadme = fs.readFileSync(require.resolve('../evidence-dashboard/README.md'), 'utf8');
 assert.match(dashboardReadme, /Visual Authoring Demo v1 dashboard boundary audit/);
 assert.match(dashboardReadme, /escaped, read-only data exported by trusted Rust\/local commands/);

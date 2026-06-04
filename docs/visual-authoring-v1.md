@@ -229,6 +229,40 @@ VA1.10.3 documentation changes are intentionally limited to this wording audit
 and related smoke-test coverage. They do not add new Studio controls, dashboard
 write paths, generated tracked artifacts, dependencies, or behavior changes.
 
+
+## Scenario Coverage v5 / VA1.11.3 coverage matrix
+
+VA1.11.3 closes the Scenario Coverage v5 documentation and Node compatibility
+unit by recording the Studio/dashboard coverage matrix. This PR unit is
+documentation and Node-test coverage only: it does not add product behavior, new
+trusted write paths, generated tracked artifacts, dependencies, or broader
+public/product claims.
+
+| Coverage area | Existing source of truth | Studio / dashboard compatibility evidence | Guardrail preserved |
+| --- | --- | --- | --- |
+| Draft schema validation | Visual Edit Draft v1 fixtures and Rust validation tests | Studio may render draft ids, operation summaries, blocked reasons, and copyable inert preview command text only. | Browser draft state remains temporary and cannot persist trusted files. |
+| Unsupported scene path rejection | Scene draft preflight and transaction preview rejection tests | Studio shows unsupported/blocked draft state as escaped diagnostics; dashboard may link the generated rejection evidence if exported. | Unsupported edits fail before writes and are not converted into apply controls. |
+| Tilemap bounds and metadata | Tilemap draft preview fixtures/tests | Studio renders affected cells, hashes, collision/trigger metadata, and blocked bounds notes as read-only rows. | Tilemap previews do not write tilemaps, import assets, or imply review acceptance. |
+| Asset reference type mismatch | Asset-reference draft and manifest validation tests | Studio/dashboard display manifest ids, replacement refs, content hashes, and mismatch diagnostics as escaped evidence. | No browser upload, fetch, asset import, manifest write, or remote dependency is authorized. |
+| Draft-to-transaction hash mismatch | Rust trusted draft-preview hash preflight | Studio can show stale/hash mismatch warnings and copyable CLI text for manual rerun. | Hashes are stale-draft guards, not browser permission tokens. |
+| Review-gated visual apply | Review decision ledger plus `visual_draft_applied` lifecycle evidence | Dashboard mutation lifecycle and Studio mutation surfaces show draft/proposal/patch/decision/transaction ids, before/after hashes, rollback/rerun context, and evidence refs as display-only state. | Review-gated apply remains a Rust CLI/manual terminal write; browser surfaces do not create decisions, apply drafts, rerun, or rollback. |
+| Visual diff preview | `visual-diff-summary-v1` read model and focused Node smoke | Studio renders before/after summaries, operation summaries, collision/trigger counts, source refs, and scenario-impact notes as escaped read-only diagnostics. | Visual diff output is review evidence only and does not create apply, rerun, command-bridge, or browser persistence controls. |
+| Dashboard/Studio generated-state policy | README/docs wording plus `git status --short --ignored` audit | Node smoke tests assert conservative wording and absence of browser persistence/command-execution APIs in static surfaces. | Drafts, transactions, previews, dashboard exports, runs, and smoke outputs remain generated/untracked unless explicitly fixture-scoped. |
+
+VA1.11.3 Node compatibility evidence is the existing static surface gate:
+
+```bash
+node --check examples/evidence-dashboard/dashboard.js
+node examples/evidence-dashboard/dashboard.test.cjs
+node --check examples/authoring-cockpit/cockpit.js
+node examples/authoring-cockpit/cockpit.test.cjs
+```
+
+The matrix above is intentionally conservative. It documents coverage for
+Scenario Coverage v5 and keeps Studio/dashboard surfaces read-only while Rust
+validation, transaction preview, review-gated apply, rollback/evidence writes,
+and generated-state cleanup remain the trusted boundary.
+
 ## Verification gates for follow-up issues
 
 Every Visual Authoring v1 issue should run issue-specific focused checks plus the

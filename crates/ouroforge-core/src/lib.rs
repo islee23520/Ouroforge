@@ -27465,6 +27465,88 @@ scenarios:
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
+    #[test]
+    fn scenario_coverage_v5_rejects_invalid_draft_schema_scene_paths_and_hash_mismatch() {
+        let scene =
+            read_scene(repo_fixture_path("examples/game-runtime/scene.json")).expect("scene reads");
+
+        let mut schema_fixture: serde_json::Value =
+            serde_json::from_str(&read_visual_edit_draft_fixture(
+                "examples/visual-edit-draft-v1/valid/scene.visual-edit-draft.json",
+            ))
+            .expect("valid visual edit draft fixture parses as json");
+        schema_fixture["scenarioCoverageV5UnexpectedField"] =
+            json!("schema drift must remain rejected");
+        let error = serde_json::from_value::<VisualEditDraftArtifact>(schema_fixture)
+            .expect_err("draft schema rejects unknown fields");
+        assert!(
+            error.to_string().contains("unknown field"),
+            "unexpected schema error: {error}"
+        );
+
+        let mut unsupported_scene_path = valid_scene_visual_edit_draft_for_scene(&scene);
+        unsupported_scene_path.proposed_operations[0]
+            .scene_operation
+            .as_mut()
+            .expect("scene operation")
+            .scene_edit_path = "components.collider.sensor".to_string();
+        let error = unsupported_scene_path
+            .validate_scene_preflight(&scene)
+            .expect_err("unsupported scene path rejected before transaction preview");
+        assert!(error
+            .to_string()
+            .contains("unsupported visual edit scene draft path"));
+
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let mut stale_hash = valid_scene_visual_edit_draft_for_scene(&scene);
+        stale_hash.before_hash =
+            "sha256:9999999999999999999999999999999999999999999999999999999999999999".to_string();
+        let error = stale_hash
+            .preview_scene_edit_transactions(&scene_path)
+            .expect_err("draft-to-transaction hash mismatch rejected before output");
+        assert!(error.to_string().contains("beforeHash mismatch"));
+    }
+
+    #[test]
+    fn scenario_coverage_v5_rejects_tilemap_bounds_and_asset_reference_type_mismatch() {
+        let (tilemap_asset, tilemap, tileset, hash) = tilemap_authoring_fixture_parts();
+        let mut outside_bounds = valid_tilemap_visual_edit_draft_for_fixture();
+        outside_bounds.proposed_operations[0]
+            .tilemap_operation
+            .as_mut()
+            .expect("tilemap operation")
+            .x = Some(tilemap.width);
+
+        let error = outside_bounds
+            .validate_tilemap_preflight(&tilemap_asset.id, &tilemap, &tileset, &hash)
+            .expect_err("tilemap bounds violation rejected before preview");
+        assert!(error.to_string().contains("outside tilemap bounds"));
+
+        let root = unique_temp_dir("scenario-coverage-v5-asset-type-mismatch");
+        let manifest = valid_asset_reference_preflight_manifest(&root);
+        let operation = VisualEditAssetReferenceDraftOperation {
+            kind: VisualEditAssetReferenceDraftOperationKind::SpriteAssetReference,
+            target_reference_path: "scenes.collect-and-exit.entities.player.sprite.assetId"
+                .to_string(),
+            replacement_asset_id: "pickup_audio".to_string(),
+            expected_asset_type: Some(ProjectAssetType::Audio),
+            expected_content_hash: None,
+            frame_id: None,
+            event_id: None,
+            metadata: BTreeMap::new(),
+            summary: Some(
+                "Scenario coverage v5 locks asset-reference type mismatch rejection.".to_string(),
+            ),
+        };
+
+        let error = operation
+            .preflight(&manifest, &root)
+            .expect_err("asset reference type mismatch rejected");
+        assert!(error.to_string().contains("expected one of"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
     fn valid_asset_reference_preflight_manifest(root: &Path) -> ProjectAssetManifest {
         fs::create_dir_all(root.join("assets/sprites")).expect("sprites dir");
         fs::create_dir_all(root.join("assets/atlases")).expect("atlases dir");
