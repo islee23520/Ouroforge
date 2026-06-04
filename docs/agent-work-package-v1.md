@@ -34,6 +34,18 @@ Supported statuses are `assigned`, `blocked`, `stale`, `ready-for-review`, and `
 - `agent-work-package.overbroad.fixture.json` — negative overbroad-scope example.
 - `agent-work-package.unsafe.fixture.json` — negative unsafe-path/browser-bridge example.
 
+## Read-model compatibility
+
+`agent-work-package-read-model-v1` is the normalized display summary for dashboards and Studio/cockpit surfaces. It reports:
+
+- package id, task id, role, and status;
+- allowed artifact, acceptance criterion, verification command, and expected evidence counts;
+- blocker text for `blocked` or `stale` packages;
+- ownership ref paths, handoff target path, and optional state snapshot path;
+- `malformedReasons` when Rust/local validation rejects a malformed package.
+
+The read model is still display-only. It does not execute verification command text, spawn hidden agents, apply work, write trusted browser state, auto-merge, or self-approve. Dashboard and cockpit surfaces accept both full fixture-shaped work packages (`agent_work_package`, `agent_work_packages`, and camelCase aliases) and read-model-shaped malformed summaries so missing or malformed state remains visible instead of being silently repaired.
+
 ## Boundary
 
 Work packages are displayable planning/evidence data only. They are not command runners and do not create hidden background agents, auto-apply changes, auto-merge, self-approve, write trusted browser state, or claim autonomous arbitrary game completion.
