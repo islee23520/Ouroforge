@@ -1,0 +1,146 @@
+{
+  "schemaVersion": "agentic-level-design-demo-v1",
+  "demoId": "agentic_level_design_collect_and_exit_intro",
+  "title": "Collect and Exit Intro Level Design Demo",
+  "status": "ready",
+  "targetProjectRef": "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+  "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+  "stages": [
+    {
+      "stageId": "intent",
+      "kind": "level_intent",
+      "artifactRef": "examples/level-intent-v1/level-intent.valid.fixture.json",
+      "expectedSchemaVersion": "level-intent-v1",
+      "expectedStatus": "draft",
+      "expectedId": "intent_collect_and_exit_intro"
+    },
+    {
+      "stageId": "generation_plan",
+      "kind": "scene_generation_plan",
+      "artifactRef": "examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json",
+      "expectedSchemaVersion": "scene-generation-plan-v1",
+      "expectedStatus": "planned",
+      "expectedId": "plan_collect_and_exit_intro"
+    },
+    {
+      "stageId": "layout_constraints",
+      "kind": "spatial_layout_constraints",
+      "artifactRef": "examples/spatial-layout-constraint-solver-v1/spatial-layout.valid.fixture.json",
+      "expectedSchemaVersion": "spatial-layout-constraint-solver-v1",
+      "expectedStatus": "validated",
+      "expectedId": "solver_collect_and_exit_intro"
+    },
+    {
+      "stageId": "tilemap_draft",
+      "kind": "tilemap_terrain_draft",
+      "artifactRef": "examples/tilemap-terrain-generation-draft-v1/tilemap-terrain-draft.valid.fixture.json",
+      "expectedSchemaVersion": "tilemap-terrain-generation-draft-v1",
+      "expectedStatus": "drafted",
+      "expectedId": "draft_collect_and_exit_tilemap_intro"
+    },
+    {
+      "stageId": "placement_draft",
+      "kind": "entity_objective_encounter_placement",
+      "artifactRef": "examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.valid.fixture.json",
+      "expectedSchemaVersion": "entity-objective-encounter-placement-draft-v1",
+      "expectedStatus": "drafted",
+      "expectedId": "draft_collect_and_exit_entities_intro"
+    },
+    {
+      "stageId": "reachability_pathing",
+      "kind": "reachability_pathing",
+      "artifactRef": "examples/reachability-pathing-evidence-v1/reachability.valid.fixture.json",
+      "expectedSchemaVersion": "reachability-pathing-evidence-v1",
+      "expectedStatus": "validated",
+      "expectedId": "reach_collect_and_exit_intro"
+    },
+    {
+      "stageId": "objective_proof",
+      "kind": "objective_completion_proof",
+      "artifactRef": "examples/objective-completion-proof-v1/objective.complete.fixture.json",
+      "expectedSchemaVersion": "objective-completion-proof-v1",
+      "expectedStatus": "proven",
+      "expectedId": "objective_collect_and_exit_complete"
+    },
+    {
+      "stageId": "difficulty_pacing",
+      "kind": "difficulty_pacing_heuristic",
+      "artifactRef": "examples/difficulty-pacing-heuristic-evidence-v1/heuristics.within-target.fixture.json",
+      "expectedSchemaVersion": "difficulty-pacing-heuristic-evidence-v1",
+      "expectedStatus": "computed",
+      "expectedId": "heuristics_collect_intro_within_target"
+    },
+    {
+      "stageId": "visual_semantic_diff",
+      "kind": "level_visual_semantic_diff",
+      "artifactRef": "examples/level-visual-semantic-diff-v1/diff.compared.fixture.json",
+      "expectedSchemaVersion": "level-visual-semantic-diff-v1",
+      "expectedStatus": "compared",
+      "expectedId": "level_diff_collect_intro_compared"
+    },
+    {
+      "stageId": "agent_level_draft",
+      "kind": "agent_generated_level_draft",
+      "artifactRef": "examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json",
+      "expectedSchemaVersion": "agent-generated-level-draft-v1",
+      "expectedStatus": "drafted",
+      "expectedId": "agent_level_draft_collect_and_exit_intro"
+    },
+    {
+      "stageId": "review_gated_apply",
+      "kind": "review_gated_level_apply",
+      "artifactRef": "examples/review-gated-level-apply-v1/level-apply.ready.fixture.json",
+      "expectedSchemaVersion": "review-gated-level-apply-v1",
+      "expectedStatus": "ready_for_trusted_apply",
+      "expectedId": "level_apply_collect_and_exit_intro"
+    }
+  ],
+  "studioInspection": {
+    "schemaVersion": "studio-level-design-inspection-v1",
+    "status": "ready",
+    "boundary": "Read-only demo inspection; no browser trusted writes, no command bridge, no auto-apply, no auto-merge, no self-approval, no production editor, no visual scripting, and no autonomous full game generation.",
+    "panelStageRefs": [
+      "intent",
+      "generation_plan",
+      "placement_draft",
+      "reachability_pathing",
+      "objective_proof",
+      "difficulty_pacing",
+      "visual_semantic_diff",
+      "review_gated_apply"
+    ]
+  },
+  "commands": [
+    "node examples/agentic-level-design-demo-v1/demo-smoke.test.cjs",
+    "cargo test agent_generated_level_draft_v1",
+    "cargo test review_gated_level_apply_v1",
+    "node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+    "node examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs"
+  ],
+  "generatedStatePolicy": {
+    "untrackedRoots": [
+      "examples/agentic-level-design-demo-v1/runs",
+      "examples/agentic-level-design-demo-v1/dashboard-data",
+      "examples/agentic-level-design-demo-v1/screenshots",
+      "examples/agentic-level-design-demo-v1/tmp"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "knownGaps": [
+    "Demo chains existing deterministic fixtures; it does not generate a new level autonomously.",
+    "Review-gated apply is represented by trusted metadata; this fixture does not mutate project files.",
+    "Difficulty and pacing evidence is advisory and does not prove subjective game quality."
+  ],
+  "guardrails": [
+    "evidence-gated level authoring only",
+    "no autonomous full game generation",
+    "no browser trusted writes",
+    "no command bridge",
+    "no auto-apply",
+    "no auto-merge",
+    "no self-approval",
+    "no production editor",
+    "no visual scripting",
+    "generated outputs remain untracked"
+  ]
+}

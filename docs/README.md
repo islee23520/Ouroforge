@@ -87,6 +87,7 @@ surfaces. They do not create browser trusted writes or source apply authority:
 - [`studio-v1.md`](studio-v1.md), [`studio-v2-cockpit.md`](studio-v2-cockpit.md), [`studio-v3-project-workspace-cockpit.md`](studio-v3-project-workspace-cockpit.md), [`studio-review-cockpit-v1.md`](studio-review-cockpit-v1.md), [`studio-evidence-fidelity-surfaces.md`](studio-evidence-fidelity-surfaces.md), [`studio-asset-inspector-v1.md`](studio-asset-inspector-v1.md)
 - [`visual-authoring-v1.md`](visual-authoring-v1.md), [`visual-edit-draft-model-v1.md`](visual-edit-draft-model-v1.md)
 - [`studio-3d-inspection-surface-v1.md`](studio-3d-inspection-surface-v1.md) — read-only escaped Studio 3D evidence inspection; no 3D editor, trusted write, command bridge, viewport persistence, production 3D, or Godot replacement claim.
+- [`agentic-level-design-demo-v1.md`](agentic-level-design-demo-v1.md) — deterministic Agentic Scene and Level Designer v1 demo chain; no autonomous full game generation, browser trusted write, command bridge, production editor, or Godot replacement claim.
 
 ## Source preview, sandbox, and apply-boundary references
 
