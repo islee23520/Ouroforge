@@ -10443,6 +10443,26 @@ pub struct SourcePatchTestCommandPolicy {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourcePatchForbiddenTestCommandKind {
+    ShellExecution,
+    NetworkAccess,
+    InstallOrBootstrap,
+    CredentialAccess,
+    DependencyMutation,
+    DestructiveFilesystem,
+    SourceApplyOrMerge,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchForbiddenTestCommandReport {
+    pub kind: SourcePatchForbiddenTestCommandKind,
+    pub reason: String,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourcePatchTestCommandMatch {
     #[serde(rename = "policyId")]
@@ -10465,6 +10485,9 @@ impl SourcePatchTestCommandAllowlist {
         &self,
         command: &SourcePatchTestCommand,
     ) -> Option<SourcePatchTestCommandMatch> {
+        if classify_source_patch_forbidden_test_command(command).is_some() {
+            return None;
+        }
         let normalized_argv = command
             .argv
             .iter()
@@ -10485,6 +10508,150 @@ impl SourcePatchTestCommandAllowlist {
             })
         })
     }
+}
+
+pub fn classify_source_patch_forbidden_test_command(
+    command: &SourcePatchTestCommand,
+) -> Option<SourcePatchForbiddenTestCommandReport> {
+    classify_forbidden_source_patch_test_argv(&command.argv)
+}
+
+fn classify_forbidden_source_patch_test_argv(
+    argv: &[String],
+) -> Option<SourcePatchForbiddenTestCommandReport> {
+    let normalized = argv
+        .iter()
+        .map(|arg| arg.trim().to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    let program = normalized.first().map(String::as_str).unwrap_or("");
+    let joined = normalized.join(" ");
+
+    if argv.iter().any(|arg| contains_shell_metacharacter(arg))
+        || matches!(
+            program,
+            "bash" | "sh" | "zsh" | "fish" | "pwsh" | "powershell"
+        )
+        || normalized.iter().any(|arg| arg == "-c")
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::ShellExecution,
+            "arbitrary shell execution or shell metacharacter composition is not allowed",
+        ));
+    }
+    if matches!(
+        program,
+        "curl" | "wget" | "ssh" | "scp" | "rsync" | "nc" | "netcat" | "ftp" | "sftp"
+    ) || joined.contains("http://")
+        || joined.contains("https://")
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::NetworkAccess,
+            "network, remote service, or hosted API commands are not allowed",
+        ));
+    }
+    if (program == "npm"
+        && normalized
+            .get(1)
+            .is_some_and(|arg| arg == "install" || arg == "i"))
+        || (program == "pnpm" && normalized.get(1).is_some_and(|arg| arg == "install"))
+        || (program == "yarn" && normalized.get(1).is_some_and(|arg| arg == "install"))
+        || (program == "cargo" && normalized.get(1).is_some_and(|arg| arg == "install"))
+        || (program == "pip" && normalized.get(1).is_some_and(|arg| arg == "install"))
+        || matches!(program, "brew" | "curl-bash")
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::InstallOrBootstrap,
+            "install, bootstrap, or package acquisition commands are not allowed",
+        ));
+    }
+    if (program == "cargo"
+        && normalized
+            .get(1)
+            .is_some_and(|arg| arg == "add" || arg == "update"))
+        || (program == "npm"
+            && normalized.get(1).is_some_and(|arg| {
+                matches!(
+                    arg.as_str(),
+                    "update" | "upgrade" | "add" | "audit" | "dedupe"
+                )
+            }))
+        || (program == "pnpm"
+            && normalized
+                .get(1)
+                .is_some_and(|arg| matches!(arg.as_str(), "update" | "upgrade" | "add")))
+        || (program == "yarn"
+            && normalized
+                .get(1)
+                .is_some_and(|arg| matches!(arg.as_str(), "upgrade" | "add")))
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::DependencyMutation,
+            "dependency mutation commands are not allowed",
+        ));
+    }
+    if (program == "gh" && normalized.iter().any(|arg| arg == "auth"))
+        || matches!(program, "aws" | "gcloud" | "az" | "op" | "security")
+        || normalized.iter().any(|arg| {
+            matches!(
+                arg.as_str(),
+                "token" | "secret" | "credential" | "credentials"
+            )
+        })
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::CredentialAccess,
+            "credential, token, or cloud-auth commands are not allowed",
+        ));
+    }
+    if (program == "rm"
+        && normalized
+            .iter()
+            .any(|arg| arg.contains('r') || arg == "-rf"))
+        || (program == "git"
+            && normalized
+                .get(1)
+                .is_some_and(|arg| matches!(arg.as_str(), "clean" | "reset" | "checkout")))
+        || matches!(program, "trash" | "unlink")
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::DestructiveFilesystem,
+            "destructive filesystem or worktree reset commands are not allowed",
+        ));
+    }
+    if (program == "git"
+        && normalized.get(1).is_some_and(|arg| {
+            matches!(
+                arg.as_str(),
+                "apply" | "am" | "merge" | "rebase" | "cherry-pick" | "push"
+            )
+        }))
+        || joined.contains("auto-merge")
+        || joined.contains("auto-apply")
+    {
+        return Some(forbidden_source_patch_test_command_report(
+            SourcePatchForbiddenTestCommandKind::SourceApplyOrMerge,
+            "source patch apply, merge, rebase, push, or auto-apply commands are not allowed",
+        ));
+    }
+    None
+}
+
+fn forbidden_source_patch_test_command_report(
+    kind: SourcePatchForbiddenTestCommandKind,
+    reason: &str,
+) -> SourcePatchForbiddenTestCommandReport {
+    SourcePatchForbiddenTestCommandReport {
+        kind,
+        reason: reason.to_string(),
+        boundary: "source patch command policy rejects before sandbox execution; no command is run"
+            .to_string(),
+    }
+}
+
+fn contains_shell_metacharacter(arg: &str) -> bool {
+    ["&&", "||", "$(", "`", ";", "|", ">", "<"]
+        .iter()
+        .any(|needle| arg.contains(needle))
 }
 
 fn argv_matches_policy_prefix(argv: &[String], policy_prefix: &[String]) -> bool {
@@ -10763,7 +10930,13 @@ pub fn inspect_source_patch_test_command_allowlist(
                 "{field}.command must match normalized argv `{normalized}`"
             ));
         }
-        if !source_patch_test_command_matches_allowlist(command) {
+        let test_command = SourcePatchTestCommand {
+            command: command.command.clone(),
+            argv: command.argv.clone(),
+        };
+        if let Some(forbidden) = classify_source_patch_forbidden_test_command(&test_command) {
+            blocked_reasons.push(format!("{field}.argv forbidden: {}", forbidden.reason));
+        } else if !source_patch_test_command_matches_allowlist(command) {
             blocked_reasons.push(format!(
                 "{field}.argv is not in the source patch test command allowlist"
             ));

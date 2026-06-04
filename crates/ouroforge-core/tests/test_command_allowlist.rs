@@ -129,3 +129,70 @@ fn safe_allowlist_keeps_commands_as_inert_policy_data() {
         SourcePatchTestCommandMatchKind::Exact | SourcePatchTestCommandMatchKind::Prefix
     )));
 }
+
+#[test]
+fn forbidden_command_classifier_rejects_shell_network_install_credentials_and_destructive_actions()
+{
+    let cases = [
+        (
+            command("bash -c cargo test", &["bash", "-c", "cargo test"]),
+            "shell execution",
+        ),
+        (
+            command(
+                "curl https://example.invalid",
+                &["curl", "https://example.invalid"],
+            ),
+            "network",
+        ),
+        (command("npm install", &["npm", "install"]), "install"),
+        (
+            command("cargo add anyhow", &["cargo", "add", "anyhow"]),
+            "dependency",
+        ),
+        (
+            command("gh auth token", &["gh", "auth", "token"]),
+            "credential",
+        ),
+        (
+            command("rm -rf target", &["rm", "-rf", "target"]),
+            "destructive",
+        ),
+        (
+            command("git apply patch.diff", &["git", "apply", "patch.diff"]),
+            "source patch apply",
+        ),
+    ];
+
+    for (candidate, expected_reason) in cases {
+        let report = ouroforge_core::classify_source_patch_forbidden_test_command(&candidate)
+            .expect("candidate is forbidden");
+        assert!(
+            report.reason.contains(expected_reason),
+            "reason `{}` should contain `{expected_reason}`",
+            report.reason
+        );
+        assert!(report.boundary.contains("no command is run"));
+    }
+}
+
+#[test]
+fn forbidden_classifier_runs_before_allowlist_prefix_matching() {
+    let allowlist = default_source_patch_test_command_allowlist();
+    let candidate = command(
+        "cargo test -p ouroforge-core bad; rm -rf target",
+        &[
+            "cargo",
+            "test",
+            "-p",
+            "ouroforge-core",
+            "bad; rm -rf target",
+        ],
+    );
+
+    assert!(ouroforge_core::classify_source_patch_forbidden_test_command(&candidate).is_some());
+    assert!(
+        allowlist.match_command(&candidate).is_none(),
+        "forbidden shell composition must not pass a broad cargo-test prefix"
+    );
+}
