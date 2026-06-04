@@ -1196,6 +1196,16 @@ assert.match(production2dCoreDoc, /Production 2D Engine Core v1 is recorded comp
 assert.match(production2dCoreDoc, /escaped read-only Studio 2D inspection surfaces \(#593\)/);
 assert.match(production2dCoreDoc, /no 3D\s+implementation, native export, plugin runtime, hosted\/cloud\/server\/auth behavior/);
 assert.match(production2dCoreDoc, /recommended next dependency-ordered technical branch is 3D Capability Gate v1\s+\(#596-#608\)/);
+assert.match(production2dCoreDoc, /production-2d-engine-core-governance-handoff\.md/);
+const production2dGovernanceHandoff = fs.readFileSync(require.resolve('../../docs/production-2d-engine-core-governance-handoff.md'), 'utf8');
+assert.match(production2dGovernanceHandoff, /#1 handoff comment: <https:\/\/github\.com\/shaun0927\/Ouroforge\/issues\/1#issuecomment-4624951606>/);
+assert.match(production2dGovernanceHandoff, /Production 2D Engine Core v1 is complete as a bounded local-first 2D vertical-\s*slice evidence milestone/);
+assert.match(production2dGovernanceHandoff, /P2D8\.14\.1 roadmap\/docs refresh: PR #1082 merged at\s+`a03cb41920facbefd48763970d09f1144f6cd754`/);
+assert.match(production2dGovernanceHandoff, /Generated-state audit showed only expected ignored local\/tool output categories/);
+assert.match(production2dGovernanceHandoff, /does not authorize 3D implementation outside the scoped gate,\s+native export, plugin runtime, hosted\/cloud\/server\/auth behavior, browser trusted\s+writes, command bridges, unrestricted source apply/);
+assert.match(production2dGovernanceHandoff, /next dependency-ordered technical branch is \*\*3D Capability Gate v1\s+\(#596-#608\)\*\*/);
+assert.match(production2dGovernanceHandoff, /#1 remains open as the broad roadmap\/vision anchor/);
+assert.match(production2dGovernanceHandoff, /#23 remains open as the repo-memory\/design context anchor/);
 assert.match(cockpitReadme, /Visual Authoring Demo v1 Studio boundary audit/);
 assert.match(cockpitReadme, /no production editor, public launch, native export, plugin\s+runtime, hosted service, visual scripting, command bridge, or Godot replacement/);
 assert.match(cockpitReadme, /VA1\.10\.3 changes documentation only/);

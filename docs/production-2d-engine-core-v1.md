@@ -195,3 +195,5 @@ positioning is authorized.
 The recommended next dependency-ordered technical branch is 3D Capability Gate v1
 (#596-#608), starting with a scoped capability contract and preserving the same
 live issue checks, generated-state audit, and #1/#23 anchor requirements.
+
+See `docs/production-2d-engine-core-governance-handoff.md` for the #594 handoff comment URL, verification summary, generated-state audit, and next-branch recommendation.
