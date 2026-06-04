@@ -2,7 +2,7 @@
   "schemaVersion": "source-patch-apply-transaction-v1",
   "transactionId": "apply-transaction-702-sa15-4-1",
   "createdAt": "2026-06-04T00:00:00Z",
-  "status": "blocked",
+  "status": "ready_for_trusted_apply",
   "evidence": {
     "patchPreviewId": "patch-preview-702-sa15-4-1",
     "patchPreviewRef": "mutation/source-patch-previews/patch-preview-702-sa15-4-1.json",
@@ -23,9 +23,9 @@
   },
   "targets": [
     {
-      "path": "crates/ouroforge-core/src/lib.rs",
-      "fileClass": "trusted_rust_source",
-      "reviewLevel": "independent_review_required",
+      "path": "examples/source-patch-apply-transaction-v1/scenario-regression.json",
+      "fileClass": "scenario_regression_fixture",
+      "reviewLevel": "elevated_source_like_data_review",
       "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "expectedAfterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "sandboxAfterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
@@ -44,7 +44,7 @@
     "preApplyCommit": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
     "targetBeforeHashes": [
       {
-        "path": "crates/ouroforge-core/src/lib.rs",
+        "path": "examples/source-patch-apply-transaction-v1/scenario-regression.json",
         "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
       }
     ],
@@ -65,9 +65,6 @@
       "path": "evidence/post-apply/source-patch-apply-transaction-702-sa15-4-1.json",
       "required": true
     }
-  ],
-  "blockedReasons": [
-    "SA15.4.1 models the transaction artifact only; trusted apply remains future-scoped"
   ],
   "guardrails": [
     "apply transaction artifacts do not apply patches, merge branches, or write trusted files",

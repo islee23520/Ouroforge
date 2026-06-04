@@ -1,0 +1,4 @@
+{
+  "scenarioId": "source-patch-apply-transaction-fixture",
+  "description": "Fixture target used only to validate source-like transaction metadata."
+}

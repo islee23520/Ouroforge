@@ -46,3 +46,18 @@ Validation and readiness enforcement are intentionally left to the next PR unit
 Issue #1 remains the broad roadmap/vision anchor and issue #23 remains the
 repo-memory/design context anchor. This transaction model does not close, modify,
 or narrow either issue.
+
+## Validation readiness (SA15.4.2)
+
+`validate_source_patch_apply_transaction_artifact` checks transaction readiness
+without applying, writing, merging, or running commands. A transaction is blocked
+when required preview/review/sandbox/file-class/diff-integrity refs are missing,
+refs escape artifact roots, target hashes are malformed or inconsistent,
+rollback before-hash coverage is incomplete, target paths are duplicated or not
+classified as explicitly allowed source-like file classes, verification commands
+are not allowlisted copyable metadata, post-apply evidence refs are absent, or
+non-apply/read-only guardrails are missing.
+
+A passed validation means only that the transaction metadata is complete enough
+for a future separately scoped trusted apply implementation to consider. It does
+not itself authorize source writes.

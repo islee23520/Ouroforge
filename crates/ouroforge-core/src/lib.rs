@@ -11808,6 +11808,470 @@ pub struct SourcePatchApplyTransactionArtifact {
     pub guardrails: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "verificationCommandCount")]
+    pub verification_command_count: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchApplyTransactionValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
+pub fn inspect_source_patch_apply_transaction_artifact(
+    artifact: &SourcePatchApplyTransactionArtifact,
+) -> SourcePatchApplyTransactionValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if artifact.schema_version != SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION}"
+        ));
+    }
+    push_if_blank(
+        &mut blocked_reasons,
+        "transactionId",
+        &artifact.transaction_id,
+    );
+    push_if_blank(&mut blocked_reasons, "createdAt", &artifact.created_at);
+    inspect_source_patch_apply_transaction_evidence(&artifact.evidence, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_base_ref(&artifact.base_ref, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_targets(artifact, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_diff_summary(artifact, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_rollback_ref(artifact, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_verification_commands(artifact, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_post_apply_refs(artifact, &mut blocked_reasons);
+    inspect_source_patch_apply_transaction_guardrails(artifact, &mut blocked_reasons);
+
+    match artifact.status {
+        SourcePatchApplyTransactionStatus::Blocked => {
+            if artifact.blocked_reasons.is_empty() {
+                blocked_reasons.push("blocked status requires blockedReasons".to_string());
+            }
+            blocked_reasons.push(
+                "transaction status is blocked; trusted apply readiness is not satisfied"
+                    .to_string(),
+            );
+        }
+        SourcePatchApplyTransactionStatus::ReadyForTrustedApply => {
+            if !artifact.blocked_reasons.is_empty() {
+                blocked_reasons.push(
+                    "ready_for_trusted_apply transaction must not carry blockedReasons".to_string(),
+                );
+            }
+        }
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchApplyTransactionValidation {
+        schema_version: "source-patch-apply-transaction-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        transaction_id: artifact.transaction_id.clone(),
+        target_count: artifact.targets.len(),
+        verification_command_count: artifact.verification_commands.len(),
+        blocked_reasons,
+        guardrails: vec![
+            "apply transaction validation is readiness metadata only; it does not apply patches"
+                .to_string(),
+            "validated transactions still require a separate trusted apply implementation before writes"
+                .to_string(),
+            "verification commands are allowlist-checked metadata, not executed by validation"
+                .to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_apply_transaction_artifact(
+    artifact: &SourcePatchApplyTransactionArtifact,
+) -> Result<SourcePatchApplyTransactionValidation> {
+    let validation = inspect_source_patch_apply_transaction_artifact(artifact);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch apply transaction blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+fn inspect_source_patch_apply_transaction_evidence(
+    evidence: &SourcePatchApplyTransactionEvidenceLinks,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, value) in [
+        (
+            "evidence.patchPreviewId",
+            evidence.patch_preview_id.as_str(),
+        ),
+        (
+            "evidence.sandboxReportId",
+            evidence.sandbox_report_id.as_str(),
+        ),
+        (
+            "evidence.reviewDecisionId",
+            evidence.review_decision_id.as_str(),
+        ),
+        (
+            "evidence.fileClassReportId",
+            evidence.file_class_report_id.as_str(),
+        ),
+        (
+            "evidence.diffIntegrityReportId",
+            evidence.diff_integrity_report_id.as_str(),
+        ),
+    ] {
+        push_if_blank(blocked_reasons, field, value);
+    }
+    for (field, path) in [
+        (
+            "evidence.patchPreviewRef",
+            evidence.patch_preview_ref.as_str(),
+        ),
+        (
+            "evidence.sandboxReportRef",
+            evidence.sandbox_report_ref.as_str(),
+        ),
+        (
+            "evidence.reviewDecisionRef",
+            evidence.review_decision_ref.as_str(),
+        ),
+        (
+            "evidence.fileClassReportRef",
+            evidence.file_class_report_ref.as_str(),
+        ),
+        (
+            "evidence.diffIntegrityReportRef",
+            evidence.diff_integrity_report_ref.as_str(),
+        ),
+    ] {
+        if let Err(error) = validate_relative_artifact_path(field, path) {
+            blocked_reasons.push(error.to_string());
+        }
+    }
+}
+
+fn inspect_source_patch_apply_transaction_base_ref(
+    base_ref: &SourcePatchApplyTransactionBaseRef,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, value) in [
+        ("baseRef.branch", base_ref.branch.as_str()),
+        ("baseRef.previewCommit", base_ref.preview_commit.as_str()),
+        (
+            "baseRef.trustedApplyCommit",
+            base_ref.trusted_apply_commit.as_str(),
+        ),
+        (
+            "baseRef.staleTargetPolicy",
+            base_ref.stale_target_policy.as_str(),
+        ),
+    ] {
+        push_if_blank(blocked_reasons, field, value);
+    }
+    if !base_ref
+        .stale_target_policy
+        .to_ascii_lowercase()
+        .contains("re-read")
+        && !base_ref
+            .stale_target_policy
+            .to_ascii_lowercase()
+            .contains("stale")
+    {
+        blocked_reasons
+            .push("baseRef.staleTargetPolicy must describe stale/re-read protection".to_string());
+    }
+}
+
+fn inspect_source_patch_apply_transaction_targets(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if artifact.targets.is_empty() {
+        blocked_reasons.push("targets must not be empty".to_string());
+    }
+    let mut seen_targets = BTreeSet::<String>::new();
+    for (index, target) in artifact.targets.iter().enumerate() {
+        let field = format!("targets[{index}]");
+        push_if_blank(blocked_reasons, &format!("{field}.path"), &target.path);
+        if !target.path.trim().is_empty() && !seen_targets.insert(target.path.clone()) {
+            blocked_reasons.push(format!("duplicate target path {}", target.path));
+        }
+        if let Err(error) = validate_relative_artifact_path(&format!("{field}.path"), &target.path)
+        {
+            blocked_reasons.push(error.to_string());
+        }
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.beforeHash"),
+            &target.before_hash,
+        );
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.expectedAfterHash"),
+            &target.expected_after_hash,
+        );
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.sandboxAfterHash"),
+            &target.sandbox_after_hash,
+        );
+        if target.expected_after_hash != target.sandbox_after_hash {
+            blocked_reasons.push(format!(
+                "{field}.expectedAfterHash must match sandboxAfterHash before trusted apply readiness"
+            ));
+        }
+        let class_report = classify_source_file_path_str(&target.path);
+        let expected_file_class = source_file_class_label_value(&class_report.class);
+        if target.file_class != expected_file_class {
+            blocked_reasons.push(format!(
+                "{field}.fileClass expected {expected_file_class} from current file-class policy for {}",
+                target.path
+            ));
+        }
+        if class_report.decision != SourceFileClassDecision::Allowed {
+            blocked_reasons.push(format!(
+                "{field}.path {} has unsupported file class decision {:?}; apply transactions are limited to explicitly allowed source-like classes",
+                target.path, class_report.decision
+            ));
+        }
+        if target.review_level.trim().is_empty() {
+            blocked_reasons.push(format!("{field}.reviewLevel must not be empty"));
+        }
+    }
+}
+
+fn inspect_source_patch_apply_transaction_diff_summary(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    push_if_blank(
+        blocked_reasons,
+        "diffSummary.summary",
+        &artifact.diff_summary.summary,
+    );
+    if artifact.diff_summary.files_changed != artifact.targets.len() {
+        blocked_reasons.push(format!(
+            "diffSummary.filesChanged {} must match target count {}",
+            artifact.diff_summary.files_changed,
+            artifact.targets.len()
+        ));
+    }
+    if artifact.diff_summary.additions + artifact.diff_summary.deletions == 0 {
+        blocked_reasons.push("diffSummary must record additions or deletions".to_string());
+    }
+    if artifact.diff_summary.diff_integrity_report_ref
+        != artifact.evidence.diff_integrity_report_ref
+    {
+        blocked_reasons.push(
+            "diffSummary.diffIntegrityReportRef must match evidence.diffIntegrityReportRef"
+                .to_string(),
+        );
+    }
+}
+
+fn inspect_source_patch_apply_transaction_rollback_ref(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, path) in [
+        (
+            "rollbackRef.rollbackPlanRef",
+            artifact.rollback_ref.rollback_plan_ref.as_str(),
+        ),
+        (
+            "rollbackRef.cleanupPolicyRef",
+            artifact.rollback_ref.cleanup_policy_ref.as_str(),
+        ),
+    ] {
+        if let Err(error) = validate_relative_artifact_path(field, path) {
+            blocked_reasons.push(error.to_string());
+        }
+    }
+    push_if_blank(
+        blocked_reasons,
+        "rollbackRef.preApplyBranch",
+        &artifact.rollback_ref.pre_apply_branch,
+    );
+    push_if_blank(
+        blocked_reasons,
+        "rollbackRef.preApplyCommit",
+        &artifact.rollback_ref.pre_apply_commit,
+    );
+    if artifact.rollback_ref.pre_apply_commit != artifact.base_ref.trusted_apply_commit {
+        blocked_reasons
+            .push("rollbackRef.preApplyCommit must match baseRef.trustedApplyCommit".to_string());
+    }
+
+    let mut rollback_hashes = BTreeMap::<String, String>::new();
+    for (index, hash) in artifact
+        .rollback_ref
+        .target_before_hashes
+        .iter()
+        .enumerate()
+    {
+        let field = format!("rollbackRef.targetBeforeHashes[{index}]");
+        if let Err(error) = validate_relative_artifact_path(&format!("{field}.path"), &hash.path) {
+            blocked_reasons.push(error.to_string());
+        }
+        require_sha256_like(
+            blocked_reasons,
+            &format!("{field}.beforeHash"),
+            &hash.before_hash,
+        );
+        if rollback_hashes
+            .insert(hash.path.clone(), hash.before_hash.clone())
+            .is_some()
+        {
+            blocked_reasons.push(format!("duplicate rollback before hash for {}", hash.path));
+        }
+    }
+    for target in &artifact.targets {
+        match rollback_hashes.get(&target.path) {
+            Some(before_hash) if before_hash == &target.before_hash => {}
+            Some(_) => blocked_reasons.push(format!(
+                "rollbackRef.targetBeforeHashes for {} must match target beforeHash",
+                target.path
+            )),
+            None => blocked_reasons.push(format!(
+                "rollbackRef.targetBeforeHashes missing target {}",
+                target.path
+            )),
+        }
+    }
+}
+
+fn inspect_source_patch_apply_transaction_verification_commands(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if artifact.verification_commands.is_empty() {
+        blocked_reasons.push("verificationCommands must not be empty".to_string());
+    }
+    for (index, command) in artifact.verification_commands.iter().enumerate() {
+        let field = format!("verificationCommands[{index}]");
+        push_if_blank(
+            blocked_reasons,
+            &format!("{field}.command"),
+            &command.command,
+        );
+        if command.argv.is_empty() {
+            blocked_reasons.push(format!("{field}.argv must not be empty"));
+            continue;
+        }
+        let normalized = normalize_source_patch_test_command(&command.argv);
+        if command.command != normalized {
+            blocked_reasons.push(format!(
+                "{field}.command must match normalized argv `{normalized}`"
+            ));
+        }
+        if command.allowlist_policy_id != "source-patch-preview-safe-local-checks-v1" {
+            blocked_reasons.push(format!(
+                "{field}.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+            ));
+        }
+        if !command.execution_authority.contains("copyable")
+            || !command.execution_authority.contains("not_executed")
+        {
+            blocked_reasons.push(format!(
+                "{field}.executionAuthority must remain copyable/not_executed metadata"
+            ));
+        }
+        if command.expected_status.trim().is_empty() {
+            blocked_reasons.push(format!("{field}.expectedStatus must not be empty"));
+        }
+        let test_command = SourcePatchTestCommand {
+            command: command.command.clone(),
+            argv: command.argv.clone(),
+        };
+        if let Some(forbidden) = classify_source_patch_forbidden_test_command(&test_command) {
+            blocked_reasons.push(format!("{field}.argv forbidden: {}", forbidden.reason));
+        } else if default_source_patch_test_command_allowlist()
+            .match_command(&test_command)
+            .is_none()
+        {
+            blocked_reasons.push(format!(
+                "{field}.argv is not in the source patch test command allowlist"
+            ));
+        }
+    }
+}
+
+fn inspect_source_patch_apply_transaction_post_apply_refs(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if artifact.post_apply_scenario_refs.is_empty() {
+        blocked_reasons.push("postApplyScenarioRefs must not be empty".to_string());
+    }
+    for (index, artifact_ref) in artifact.post_apply_scenario_refs.iter().enumerate() {
+        let field = format!("postApplyScenarioRefs[{index}]");
+        push_if_blank(
+            blocked_reasons,
+            &format!("{field}.kind"),
+            &artifact_ref.kind,
+        );
+        if let Err(error) =
+            validate_relative_artifact_path(&format!("{field}.path"), &artifact_ref.path)
+        {
+            blocked_reasons.push(error.to_string());
+        }
+        if !artifact_ref.required {
+            blocked_reasons.push(format!("{field}.required must be true for readiness"));
+        }
+    }
+}
+
+fn inspect_source_patch_apply_transaction_guardrails(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if !artifact.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("do not apply") || guardrail.contains("does not apply")
+    }) {
+        blocked_reasons
+            .push("guardrails must state the artifact does not apply patches".to_string());
+    }
+    if !artifact.guardrails.iter().any(|guardrail| {
+        let guardrail = guardrail.to_ascii_lowercase();
+        guardrail.contains("read-only") || guardrail.contains("command-inert")
+    }) {
+        blocked_reasons
+            .push("guardrails must preserve read-only/command-inert UI surfaces".to_string());
+    }
+    for required in ["merge", "write", "command"] {
+        if !artifact
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.to_ascii_lowercase().contains(required))
+        {
+            blocked_reasons.push(format!(
+                "guardrails must mention forbidden {required} authority"
+            ));
+        }
+    }
+}
+
 pub fn inspect_source_patch_test_command_allowlist(
     artifact: &SourcePatchTestCommandAllowlistArtifact,
 ) -> SourcePatchTestCommandAllowlistValidation {
