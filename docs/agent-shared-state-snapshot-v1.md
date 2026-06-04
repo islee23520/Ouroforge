@@ -25,6 +25,27 @@ Supported status values are `fresh`, `stale`, `partial`, `missing`,
 malformed, or conflicting refs. Stale, partial/missing, malformed, and
 conflicting snapshots must carry the matching visible evidence fields.
 
+## MAP13.7.2 staleness comparison
+
+MAP13.7.2 adds local Rust staleness detection against a separately validated
+current-state fixture. The comparison is read-only and produces
+`schemaVersion: agent-shared-state-snapshot-staleness-report-v1`; it does not
+repair or rewrite the snapshot. The detector compares:
+
+- `projectManifestHash`, `assetManifestHash`, and `scenarioPackHash`;
+- `sceneHashes`, `tilemapHashes`, and `behaviorVersionHashes` by id, path, and
+  hash;
+- `openTasks` and `pendingReviews` as visible set membership;
+- `ownershipMap` artifact paths and owners, surfacing owner drift as
+  `conflictingRefs`.
+
+Observed refs that no longer match the current state are reported in
+`staleRefs`. Current refs absent from the snapshot are reported in
+`missingRefs`. Ownership path collisions with different current owners are
+reported in `conflictingRefs`. If no drift is found, the report status is
+`fresh`; otherwise the report status is `stale`, `partial`, or `conflicting`
+according to the visible evidence fields.
+
 ## Generated-state policy
 
 Generated snapshots live under local generated roots such as
@@ -72,10 +93,14 @@ validation and review-gated apply or promotion.
   conflict evidence is explicit;
 - `agent-shared-state-snapshot.invalid.fixture.json` — unsupported hash format
   is rejected.
+- `agent-shared-state-current-state.fixture.json` — current-state fixture that
+  matches the fresh snapshot;
+- `agent-shared-state-current-state.drift.fixture.json` — current-state fixture
+  that forces manifest, scene, task, review, and ownership staleness.
 
-Issue #670 MAP13.7.1 only defines schema, docs, and fixtures. Staleness
-comparison against current project/task artifacts belongs to MAP13.7.2, and
-read-model/display compatibility belongs to MAP13.7.3.
+Issue #670 MAP13.7.1 defines schema, docs, and snapshot fixtures. MAP13.7.2
+adds local staleness comparison against current project/task artifacts.
+Read-model/display compatibility belongs to MAP13.7.3.
 
 Issues #1 and #23 must remain open unless a separate explicit governance
 decision says otherwise.

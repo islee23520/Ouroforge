@@ -3603,6 +3603,47 @@ pub struct AgentSharedStateSnapshotComparison {
     pub stale_refs: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSharedStateSnapshotCurrentState {
+    #[serde(rename = "projectManifestHash")]
+    pub project_manifest_hash: String,
+    #[serde(rename = "sceneHashes")]
+    pub scene_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "tilemapHashes", default)]
+    pub tilemap_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "assetManifestHash")]
+    pub asset_manifest_hash: String,
+    #[serde(rename = "behaviorVersionHashes", default)]
+    pub behavior_version_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "scenarioPackHash")]
+    pub scenario_pack_hash: String,
+    #[serde(rename = "openTasks")]
+    pub open_tasks: Vec<String>,
+    #[serde(rename = "ownershipMap")]
+    pub ownership_map: Vec<AgentSharedStateSnapshotOwnership>,
+    #[serde(rename = "pendingReviews", default)]
+    pub pending_reviews: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AgentSharedStateSnapshotStalenessReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "snapshotId")]
+    pub snapshot_id: String,
+    pub status: AgentSharedStateSnapshotStatus,
+    #[serde(rename = "staleRefs")]
+    pub stale_refs: Vec<String>,
+    #[serde(rename = "missingRefs")]
+    pub missing_refs: Vec<String>,
+    #[serde(rename = "conflictingRefs")]
+    pub conflicting_refs: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
 impl AgentSharedStateSnapshot {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let snapshot: AgentSharedStateSnapshot = serde_json::from_str(input)
@@ -3775,6 +3816,149 @@ impl AgentSharedStateSnapshot {
         }
         Ok(())
     }
+
+    pub fn detect_staleness_against(
+        &self,
+        current: &AgentSharedStateSnapshotCurrentState,
+    ) -> AgentSharedStateSnapshotStalenessReport {
+        let mut stale_refs = Vec::new();
+        let mut missing_refs = Vec::new();
+        let mut conflicting_refs = Vec::new();
+
+        compare_snapshot_hash(
+            "projectManifestHash",
+            &self.project_manifest_hash,
+            &current.project_manifest_hash,
+            &mut stale_refs,
+        );
+        compare_snapshot_hash(
+            "assetManifestHash",
+            &self.asset_manifest_hash,
+            &current.asset_manifest_hash,
+            &mut stale_refs,
+        );
+        compare_snapshot_hash(
+            "scenarioPackHash",
+            &self.scenario_pack_hash,
+            &current.scenario_pack_hash,
+            &mut stale_refs,
+        );
+        compare_snapshot_hash_refs(
+            "sceneHashes",
+            &self.scene_hashes,
+            &current.scene_hashes,
+            &mut stale_refs,
+            &mut missing_refs,
+        );
+        compare_snapshot_hash_refs(
+            "tilemapHashes",
+            &self.tilemap_hashes,
+            &current.tilemap_hashes,
+            &mut stale_refs,
+            &mut missing_refs,
+        );
+        compare_snapshot_hash_refs(
+            "behaviorVersionHashes",
+            &self.behavior_version_hashes,
+            &current.behavior_version_hashes,
+            &mut stale_refs,
+            &mut missing_refs,
+        );
+        compare_text_set(
+            "openTasks",
+            &self.open_tasks,
+            &current.open_tasks,
+            &mut stale_refs,
+            &mut missing_refs,
+        );
+        compare_text_set(
+            "pendingReviews",
+            &self.pending_reviews,
+            &current.pending_reviews,
+            &mut stale_refs,
+            &mut missing_refs,
+        );
+        compare_snapshot_ownership(
+            &self.ownership_map,
+            &current.ownership_map,
+            &mut stale_refs,
+            &mut missing_refs,
+            &mut conflicting_refs,
+        );
+
+        let status = if !conflicting_refs.is_empty() {
+            AgentSharedStateSnapshotStatus::Conflicting
+        } else if !missing_refs.is_empty() {
+            AgentSharedStateSnapshotStatus::Partial
+        } else if !stale_refs.is_empty() {
+            AgentSharedStateSnapshotStatus::Stale
+        } else {
+            AgentSharedStateSnapshotStatus::Fresh
+        };
+
+        AgentSharedStateSnapshotStalenessReport {
+            schema_version: "agent-shared-state-snapshot-staleness-report-v1".to_string(),
+            snapshot_id: self.snapshot_id.clone(),
+            status,
+            stale_refs,
+            missing_refs,
+            conflicting_refs,
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only agent shared state snapshot staleness report; it compares current local manifest, scene, tilemap, asset, behavior, scenario, task, ownership, and review evidence without executing commands, spawning agents, repairing stale state, mutating task boards, writing trusted browser state, applying changes, or merging PRs.".to_string(),
+        }
+    }
+}
+
+impl AgentSharedStateSnapshotCurrentState {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let current: AgentSharedStateSnapshotCurrentState = serde_json::from_str(input)
+            .context("failed to parse Agent Shared State Snapshot current-state JSON")?;
+        current.validate_schema()?;
+        Ok(current)
+    }
+
+    fn validate_schema(&self) -> Result<()> {
+        validate_snapshot_hash(
+            "agent shared state snapshot current projectManifestHash",
+            &self.project_manifest_hash,
+        )?;
+        validate_snapshot_hash(
+            "agent shared state snapshot current assetManifestHash",
+            &self.asset_manifest_hash,
+        )?;
+        validate_snapshot_hash(
+            "agent shared state snapshot current scenarioPackHash",
+            &self.scenario_pack_hash,
+        )?;
+        validate_nonempty_snapshot_hash_refs(
+            "agent shared state snapshot current sceneHashes",
+            &self.scene_hashes,
+        )?;
+        validate_snapshot_hash_refs(
+            "agent shared state snapshot current tilemapHashes",
+            &self.tilemap_hashes,
+        )?;
+        validate_snapshot_hash_refs(
+            "agent shared state snapshot current behaviorVersionHashes",
+            &self.behavior_version_hashes,
+        )?;
+        validate_nonempty_text_list(
+            "agent shared state snapshot current openTasks",
+            &self.open_tasks,
+        )?;
+        if self.ownership_map.is_empty() {
+            return Err(anyhow!(
+                "agent shared state snapshot current ownershipMap must not be empty"
+            ));
+        }
+        for (index, ownership) in self.ownership_map.iter().enumerate() {
+            ownership.validate(index)?;
+        }
+        validate_optional_text_list(
+            "agent shared state snapshot current pendingReviews",
+            &self.pending_reviews,
+        )
+    }
 }
 
 impl AgentSharedStateSnapshotOwnership {
@@ -3833,6 +4017,120 @@ fn validate_snapshot_hash(field: &str, value: &str) -> Result<()> {
         return Err(anyhow!("{field} must use sha256:<64-hex> format"));
     }
     Ok(())
+}
+
+fn compare_snapshot_hash(field: &str, observed: &str, current: &str, stale_refs: &mut Vec<String>) {
+    if observed != current {
+        stale_refs.push(format!(
+            "{field} stale: observed {observed}, current {current}"
+        ));
+    }
+}
+
+fn compare_snapshot_hash_refs(
+    field: &str,
+    observed: &[AgentSharedStateSnapshotHashRef],
+    current: &[AgentSharedStateSnapshotHashRef],
+    stale_refs: &mut Vec<String>,
+    missing_refs: &mut Vec<String>,
+) {
+    let observed_by_id: BTreeMap<&str, &AgentSharedStateSnapshotHashRef> = observed
+        .iter()
+        .map(|reference| (reference.id.as_str(), reference))
+        .collect();
+    let current_by_id: BTreeMap<&str, &AgentSharedStateSnapshotHashRef> = current
+        .iter()
+        .map(|reference| (reference.id.as_str(), reference))
+        .collect();
+
+    for (id, observed_ref) in &observed_by_id {
+        let Some(current_ref) = current_by_id.get(id) else {
+            stale_refs.push(format!(
+                "{field}.{id} stale: no longer present in current state"
+            ));
+            continue;
+        };
+        if observed_ref.path != current_ref.path {
+            stale_refs.push(format!(
+                "{field}.{id} path stale: observed {}, current {}",
+                observed_ref.path, current_ref.path
+            ));
+        }
+        if observed_ref.hash != current_ref.hash {
+            stale_refs.push(format!(
+                "{field}.{id} hash stale: observed {}, current {}",
+                observed_ref.hash, current_ref.hash
+            ));
+        }
+    }
+
+    for id in current_by_id.keys() {
+        if !observed_by_id.contains_key(id) {
+            missing_refs.push(format!("{field}.{id} missing from snapshot"));
+        }
+    }
+}
+
+fn compare_text_set(
+    field: &str,
+    observed: &[String],
+    current: &[String],
+    stale_refs: &mut Vec<String>,
+    missing_refs: &mut Vec<String>,
+) {
+    let observed: BTreeSet<&str> = observed.iter().map(String::as_str).collect();
+    let current: BTreeSet<&str> = current.iter().map(String::as_str).collect();
+    for value in observed.difference(&current) {
+        stale_refs.push(format!(
+            "{field}.{value} stale: no longer present in current state"
+        ));
+    }
+    for value in current.difference(&observed) {
+        missing_refs.push(format!("{field}.{value} missing from snapshot"));
+    }
+}
+
+fn compare_snapshot_ownership(
+    observed: &[AgentSharedStateSnapshotOwnership],
+    current: &[AgentSharedStateSnapshotOwnership],
+    stale_refs: &mut Vec<String>,
+    missing_refs: &mut Vec<String>,
+    conflicting_refs: &mut Vec<String>,
+) {
+    let observed_by_path = snapshot_ownership_by_path(observed);
+    let current_by_path = snapshot_ownership_by_path(current);
+
+    for (path, observed_owner) in &observed_by_path {
+        let Some(current_owner) = current_by_path.get(path) else {
+            stale_refs.push(format!(
+                "ownershipMap.{path} stale: owner {observed_owner} no longer has current artifact ownership"
+            ));
+            continue;
+        };
+        if observed_owner != current_owner {
+            conflicting_refs.push(format!(
+                "ownershipMap.{path} conflicting: observed owner {observed_owner}, current owner {current_owner}"
+            ));
+        }
+    }
+
+    for path in current_by_path.keys() {
+        if !observed_by_path.contains_key(path) {
+            missing_refs.push(format!("ownershipMap.{path} missing from snapshot"));
+        }
+    }
+}
+
+fn snapshot_ownership_by_path(
+    ownership: &[AgentSharedStateSnapshotOwnership],
+) -> BTreeMap<&str, &str> {
+    let mut by_path = BTreeMap::new();
+    for entry in ownership {
+        for reference in &entry.artifact_refs {
+            by_path.insert(reference.path.as_str(), entry.owner.as_str());
+        }
+    }
+    by_path
 }
 
 pub const AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION: &str =
@@ -44994,11 +45292,103 @@ scenarios:
     }
 
     #[test]
+    fn agent_shared_state_snapshot_staleness_detection_reports_current_drift() {
+        let snapshot = AgentSharedStateSnapshot::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ))
+        .expect("snapshot fixture validates");
+        let current = AgentSharedStateSnapshotCurrentState::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-current-state.fixture.json",
+        ))
+        .expect("current-state fixture validates");
+        let fresh_report = snapshot.detect_staleness_against(&current);
+        assert_eq!(fresh_report.status, AgentSharedStateSnapshotStatus::Fresh);
+        assert!(fresh_report.stale_refs.is_empty());
+        assert!(fresh_report.missing_refs.is_empty());
+        assert!(fresh_report.conflicting_refs.is_empty());
+        assert!(fresh_report.boundary.contains("Read-only"));
+        assert!(fresh_report.boundary.contains("without executing commands"));
+        assert!(fresh_report.boundary.contains("repairing stale state"));
+
+        let drifted_current = AgentSharedStateSnapshotCurrentState::from_json_str(
+            &read_json_fixture(
+                "examples/multi-agent-pipeline-v1/agent-shared-state-current-state.drift.fixture.json",
+            ),
+        )
+        .expect("drift current-state fixture validates");
+        let drift_report = snapshot.detect_staleness_against(&drifted_current);
+        assert_eq!(
+            drift_report.status,
+            AgentSharedStateSnapshotStatus::Conflicting
+        );
+        assert!(drift_report
+            .stale_refs
+            .iter()
+            .any(|reference| reference.contains("projectManifestHash stale")));
+        assert!(drift_report
+            .stale_refs
+            .iter()
+            .any(|reference| reference.contains("sceneHashes.scene-main hash stale")));
+        assert!(drift_report
+            .stale_refs
+            .iter()
+            .any(|reference| reference.contains("tilemapHashes.tilemap-main stale")));
+        assert!(drift_report
+            .stale_refs
+            .iter()
+            .any(|reference| reference.contains("openTasks.task-regression-refresh stale")));
+        assert!(drift_report
+            .missing_refs
+            .iter()
+            .any(|reference| reference.contains("sceneHashes.scene-new missing")));
+        assert!(drift_report
+            .missing_refs
+            .iter()
+            .any(|reference| reference.contains("openTasks.task-new-current missing")));
+        assert!(drift_report
+            .missing_refs
+            .iter()
+            .any(|reference| reference.contains("ownershipMap.examples/multi-agent-pipeline-v1/qa-worker-assignment.valid.fixture.json missing")));
+        assert!(
+            drift_report
+                .conflicting_refs
+                .iter()
+                .any(|reference| reference
+                    .contains("observed owner designer, current owner qa-agent"))
+        );
+    }
+
+    #[test]
+    fn agent_shared_state_snapshot_current_state_rejects_malformed_boundaries() {
+        let mut invalid_current: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-current-state.fixture.json",
+        ))
+        .expect("current-state json");
+        invalid_current["sceneHashes"][0]["hash"] = json!("not-a-sha");
+        let error =
+            AgentSharedStateSnapshotCurrentState::from_json_str(&invalid_current.to_string())
+                .expect_err("invalid current-state hash rejects");
+        assert!(format!("{error:#}").contains("sha256"));
+
+        let mut empty_tasks: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-current-state.fixture.json",
+        ))
+        .expect("current-state json");
+        empty_tasks["openTasks"] = json!([]);
+        let task_error =
+            AgentSharedStateSnapshotCurrentState::from_json_str(&empty_tasks.to_string())
+                .expect_err("empty current open tasks reject");
+        assert!(format!("{task_error:#}").contains("openTasks must not be empty"));
+    }
+
+    #[test]
     fn agent_shared_state_snapshot_doc_audits_generated_state_and_governance() {
         let doc = read_repo_text("docs/agent-shared-state-snapshot-v1.md");
         for required in [
             "schemaVersion: agent-shared-state-snapshot-v1",
+            "agent-shared-state-snapshot-staleness-report-v1",
             "read-only context evidence",
+            "current-state fixture",
             "sha256:<64-hex>",
             "beforeContext",
             "afterContext",
