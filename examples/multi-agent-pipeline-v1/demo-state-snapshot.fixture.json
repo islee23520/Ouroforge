@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "multi-agent-demo-state-snapshot-v1",
+  "demoId": "multi-agent-demo-fixture",
+  "snapshotId": "snapshot-before-review-gate",
+  "status": "stale-until-review-refresh",
+  "observedAt": "2026-06-03T16:25:09Z",
+  "taskBoardRef": "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+  "ownershipReportRef": "examples/multi-agent-pipeline-v1/demo-ownership-conflicts.fixture.json",
+  "handoffRef": "examples/multi-agent-pipeline-v1/demo-handoff-v2.fixture.json",
+  "state": {
+    "completedWorkPackages": ["designer-task-board", "owner-conflict-snapshot", "engineer-work-package", "reviewer-decision-gate"],
+    "blockedWorkPackages": ["trusted-apply-placeholder"],
+    "pendingEvidence": ["accepted-review", "rollback-verification", "qa-queue-refresh"],
+    "generatedRoots": ["runs/multi-agent-pipeline", "dashboard-data"]
+  },
+  "staleness": {
+    "status": "stale",
+    "reason": "reviewer decision is fixture metadata and must be refreshed by local validation before trusted promotion"
+  },
+  "guardrails": [
+    "snapshot is read-only fixture evidence",
+    "stale state is surfaced, not silently repaired",
+    "no browser trusted writes or command bridge",
+    "no remote worker pool or cloud orchestration",
+    "no production-ready or Godot replacement claim"
+  ],
+  "boundary": "Read-only state snapshot fixture; it does not mutate task boards, source files, dashboard exports, or local tool state."
+}

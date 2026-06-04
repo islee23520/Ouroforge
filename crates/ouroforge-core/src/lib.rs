@@ -38565,6 +38565,144 @@ scenarios:
     }
 
     #[test]
+    fn multi_agent_demo_pipeline_fixtures_validate_task_board_handoff_and_boundaries() {
+        let role_body =
+            read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
+        let roles = AgentRoleModel::from_json_str(&role_body).expect("role fixture validates");
+        let role_names = roles
+            .roles
+            .iter()
+            .map(|role| role.role.as_str())
+            .collect::<BTreeSet<_>>();
+
+        let plan_body =
+            read_json_fixture("examples/multi-agent-pipeline-v1/demo-task-board.fixture.json");
+        let plan = AuthoringLoopPlan::from_json_str(&plan_body)
+            .expect("multi-agent demo task board fixture validates");
+        assert_eq!(plan.loop_id, "multi-agent-demo-fixture");
+        assert_eq!(plan.steps.len(), 8);
+        assert!(plan.generated_state.tracked_fixture_only);
+        assert!(plan
+            .generated_state
+            .roots
+            .iter()
+            .any(|root| root == "runs/multi-agent-pipeline"));
+        assert!(plan.steps.iter().any(|step| {
+            step.id == "trusted-apply-placeholder"
+                && step.kind == AuthoringLoopStepKind::ApplyAcceptedSceneMutation
+                && !step.rollback_refs.is_empty()
+                && !step.required_decisions.is_empty()
+        }));
+        assert!(plan.steps.iter().any(|step| step.id == "qa-queue-lane"));
+        assert!(plan
+            .steps
+            .iter()
+            .any(|step| step.id == "performance-regression-lane"));
+
+        let handoff_body =
+            read_json_fixture("examples/multi-agent-pipeline-v1/demo-handoff-v2.fixture.json");
+        let handoff = AgentHandoffContract::from_json_str(&handoff_body)
+            .expect("multi-agent demo handoff fixture validates");
+        assert_eq!(handoff.loop_id, plan.loop_id);
+        assert_eq!(handoff.status, AgentHandoffStatus::Ready);
+        assert!(handoff
+            .allowed_commands
+            .iter()
+            .all(|command| command.boundary.contains("inert")
+                || command.boundary.contains("does not execute")));
+        assert!(handoff
+            .forbidden_actions
+            .iter()
+            .any(|action| action.contains("hidden background agents")));
+        assert!(handoff
+            .forbidden_actions
+            .iter()
+            .any(|action| action.contains("remote worker pool")));
+        assert!(handoff
+            .drift_guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("#1 remains open")));
+        assert!(handoff
+            .drift_guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("#23 remains open")));
+
+        let bundle = build_authoring_loop_evidence_bundle(
+            &plan,
+            repo_fixture_path("examples/multi-agent-pipeline-v1"),
+            repo_fixture_path("examples/multi-agent-pipeline-v1/demo-task-board.fixture.json"),
+        )
+        .expect("demo bundle read model builds from fixture-scoped plan");
+        assert_eq!(bundle.loop_id, "multi-agent-demo-fixture");
+        assert_eq!(bundle.status, AuthoringLoopEvidenceBundleStatus::Partial);
+        assert!(
+            !bundle.missing_refs.is_empty(),
+            "tracked fixture intentionally does not materialize generated run artifacts"
+        );
+        assert!(bundle.generated_state.tracked_fixture_only);
+
+        let cockpit = build_studio_loop_cockpit_read_model(
+            std::slice::from_ref(&bundle),
+            std::slice::from_ref(&handoff),
+        );
+        assert_eq!(cockpit.loops.len(), 1);
+        assert_eq!(cockpit.loops[0].loop_id, "multi-agent-demo-fixture");
+        assert_eq!(cockpit.loops[0].handoff_status.as_deref(), Some("ready"));
+        assert_eq!(cockpit.loops[0].bundle_status.as_deref(), Some("partial"));
+        assert!(cockpit.boundary.contains("does not execute commands"));
+
+        let ownership: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-ownership-conflicts.fixture.json",
+        ))
+        .expect("ownership fixture parses");
+        assert_eq!(
+            ownership["schemaVersion"],
+            json!("multi-agent-demo-ownership-report-v1")
+        );
+        let assignments = ownership["assignments"]
+            .as_array()
+            .expect("assignments array");
+        assert!(assignments.iter().all(|assignment| {
+            assignment["role"]
+                .as_str()
+                .is_some_and(|role| role_names.contains(role))
+                && assignment["writeAuthority"] == json!("fixture-metadata-only")
+        }));
+        let conflicts = ownership["conflicts"].as_array().expect("conflicts array");
+        assert!(conflicts.iter().any(|conflict| {
+            conflict["status"] == json!("unresolved")
+                && conflict["blockedReason"]
+                    .as_str()
+                    .is_some_and(|reason| reason.contains("Rust validation"))
+        }));
+        assert!(ownership["boundary"]
+            .as_str()
+            .expect("ownership boundary")
+            .contains("does not lock files"));
+
+        let snapshot: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
+        ))
+        .expect("state snapshot fixture parses");
+        assert_eq!(
+            snapshot["schemaVersion"],
+            json!("multi-agent-demo-state-snapshot-v1")
+        );
+        assert_eq!(snapshot["staleness"]["status"], json!("stale"));
+        assert!(snapshot["guardrails"]
+            .as_array()
+            .expect("guardrails")
+            .iter()
+            .any(|guardrail| guardrail
+                .as_str()
+                .is_some_and(|text| text.contains("no browser trusted writes"))));
+        assert!(snapshot["boundary"]
+            .as_str()
+            .expect("snapshot boundary")
+            .contains("does not mutate task boards"));
+    }
+
+    #[test]
     fn agent_role_model_v1_rejects_unsupported_roles_and_forbidden_outputs() {
         let invalid =
             read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.invalid.fixture.json");

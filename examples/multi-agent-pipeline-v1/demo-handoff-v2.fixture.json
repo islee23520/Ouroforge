@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "agent-handoff-contract-v1",
+  "loopId": "multi-agent-demo-fixture",
+  "currentStep": {
+    "stepId": "reviewer-decision-gate",
+    "kind": "record-review-decision",
+    "status": "completed"
+  },
+  "status": "ready",
+  "nextSafeAction": "Reviewer inspects inert demo work-package evidence and records an explicit decision before any trusted promotion is considered.",
+  "requiredDecisions": [
+    {
+      "id": "reviewer-hold-demo",
+      "kind": "agent-review",
+      "description": "independent reviewer decision required for the demo work package"
+    }
+  ],
+  "blockers": [],
+  "allowedCommands": [
+    {
+      "command": "cargo test -p ouroforge-core multi_agent_demo_pipeline",
+      "argv": ["cargo", "test", "-p", "ouroforge-core", "multi_agent_demo_pipeline"],
+      "boundary": "inert display text only; handoff does not execute commands"
+    }
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto apply",
+    "auto merge",
+    "self approval",
+    "browser command bridge",
+    "remote worker pool",
+    "trusted source write"
+  ],
+  "evidenceRefs": [
+    {
+      "id": "loop-plan",
+      "path": "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+      "description": "tracked fixture-scoped task board"
+    },
+    {
+      "id": "ownership-conflict-report",
+      "path": "examples/multi-agent-pipeline-v1/demo-ownership-conflicts.fixture.json",
+      "description": "tracked fixture-scoped ownership and conflict report"
+    },
+    {
+      "id": "state-snapshot",
+      "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
+      "description": "tracked fixture-scoped state snapshot"
+    }
+  ],
+  "driftGuardrails": [
+    "#1 remains open",
+    "#23 remains open",
+    "demo is evidence-gated local collaboration, not autonomous project mutation",
+    "generated task boards and runs stay ignored unless fixture-scoped"
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline", "dashboard-data"],
+    "trackedFixtureOnly": true
+  },
+  "boundary": "advisory fixture evidence only; it does not execute commands, write files, apply mutations, merge branches, or grant production authority"
+}

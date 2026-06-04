@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "multi-agent-demo-ownership-report-v1",
+  "demoId": "multi-agent-demo-fixture",
+  "status": "blocked-for-conflict-review",
+  "assignments": [
+    {
+      "workPackageId": "designer-task-board",
+      "role": "designer",
+      "owner": "designer-fixture-agent",
+      "artifactIds": ["task-board"],
+      "writeAuthority": "fixture-metadata-only"
+    },
+    {
+      "workPackageId": "engineer-work-package",
+      "role": "gameplay-engineer",
+      "owner": "gameplay-fixture-agent",
+      "artifactIds": ["work-package-proposal"],
+      "writeAuthority": "fixture-metadata-only"
+    },
+    {
+      "workPackageId": "reviewer-decision-gate",
+      "role": "reviewer",
+      "owner": "reviewer-fixture-agent",
+      "artifactIds": ["review-decision-ledger"],
+      "writeAuthority": "fixture-metadata-only"
+    },
+    {
+      "workPackageId": "qa-queue-lane",
+      "role": "qa-agent",
+      "owner": "qa-fixture-agent",
+      "artifactIds": ["qa-queue-evidence"],
+      "writeAuthority": "fixture-metadata-only"
+    },
+    {
+      "workPackageId": "performance-regression-lane",
+      "role": "performance-regression-agent",
+      "owner": "performance-fixture-agent",
+      "artifactIds": ["regression-lane-evidence"],
+      "writeAuthority": "fixture-metadata-only"
+    }
+  ],
+  "conflicts": [
+    {
+      "conflictId": "scene-source-overlap-demo",
+      "artifactId": "validated-placeholder-transaction",
+      "claimants": ["gameplay-fixture-agent", "reviewer-fixture-agent"],
+      "status": "unresolved",
+      "blockedReason": "trusted source-like mutation requires accepted review, rollback evidence, and local Rust validation before promotion"
+    }
+  ],
+  "guardrails": [
+    "ownership report is read-only fixture metadata",
+    "unresolved conflicts block promotion",
+    "no hidden agents or unbounded spawning",
+    "no auto-apply, auto-merge, self-approval, or reviewer bypass",
+    "generated outputs stay under runs/multi-agent-pipeline and are ignored unless fixture-scoped"
+  ],
+  "boundary": "Fixture-scoped ownership evidence only; it does not lock files, spawn agents, apply changes, or write trusted state."
+}

@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "authoring-loop-plan-v1",
+  "loopId": "multi-agent-demo-fixture",
+  "project": {
+    "projectId": "multi_agent_demo_fixture",
+    "manifestPath": "examples/multi-agent-pipeline-v1/demo-project/ouroforge.project.json"
+  },
+  "seed": {
+    "id": "multi-agent-demo-seed",
+    "path": "examples/multi-agent-pipeline-v1/demo-project/seeds/demo.yaml"
+  },
+  "scenarioPack": {
+    "id": "multi-agent-demo-regression",
+    "path": "examples/multi-agent-pipeline-v1/demo-project/scenarios/demo.scenario-pack.json"
+  },
+  "steps": [
+    {
+      "id": "designer-task-board",
+      "kind": "run-scenario-pack",
+      "status": "completed",
+      "expectedArtifacts": [
+        {
+          "id": "task-board",
+          "path": "runs/multi-agent-pipeline/demo/task-board.json",
+          "description": "fixture-scoped task board with role assignments and work-package boundaries"
+        }
+      ]
+    },
+    {
+      "id": "owner-conflict-snapshot",
+      "kind": "compare-runs",
+      "status": "completed",
+      "dependsOn": ["designer-task-board"],
+      "inputs": [
+        {
+          "id": "task-board",
+          "path": "runs/multi-agent-pipeline/demo/task-board.json"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "ownership-conflict-report",
+          "path": "runs/multi-agent-pipeline/demo/ownership-conflict-report.json",
+          "description": "read-only conflict report that blocks overlapping work-package ownership"
+        }
+      ]
+    },
+    {
+      "id": "engineer-work-package",
+      "kind": "generate-proposal",
+      "status": "completed",
+      "dependsOn": ["owner-conflict-snapshot"],
+      "inputs": [
+        {
+          "id": "ownership-conflict-report",
+          "path": "runs/multi-agent-pipeline/demo/ownership-conflict-report.json"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "work-package-proposal",
+          "path": "runs/multi-agent-pipeline/demo/work-packages/gameplay-engineer-proposal.json",
+          "description": "bounded proposal metadata; not trusted source mutation"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-decision-gate",
+      "kind": "record-review-decision",
+      "status": "completed",
+      "dependsOn": ["engineer-work-package"],
+      "inputs": [
+        {
+          "id": "work-package-proposal",
+          "path": "runs/multi-agent-pipeline/demo/work-packages/gameplay-engineer-proposal.json"
+        }
+      ],
+      "requiredDecisions": [
+        {
+          "id": "reviewer-hold-demo",
+          "kind": "agent-review",
+          "description": "independent reviewer hold/acceptance metadata required before trusted promotion"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "review-decision-ledger",
+          "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+          "description": "append-only reviewer decision fixture"
+        }
+      ]
+    },
+    {
+      "id": "trusted-apply-placeholder",
+      "kind": "apply-accepted-scene-mutation",
+      "status": "completed",
+      "dependsOn": ["reviewer-decision-gate"],
+      "inputs": [
+        {
+          "id": "review-decision-ledger",
+          "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json"
+        }
+      ],
+      "requiredDecisions": [
+        {
+          "id": "reviewer-hold-demo",
+          "kind": "agent-review",
+          "description": "fixture records the gate shape only; no trusted apply command is present"
+        }
+      ],
+      "rollbackRefs": [
+        {
+          "id": "rollback-snapshot",
+          "path": "runs/multi-agent-pipeline/demo/snapshots/state-before-placeholder.json"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "validated-placeholder-transaction",
+          "path": "runs/multi-agent-pipeline/demo/transactions/validated-placeholder-transaction.json",
+          "description": "validation metadata only; fixture does not mutate trusted source"
+        }
+      ]
+    },
+    {
+      "id": "qa-queue-lane",
+      "kind": "rerun",
+      "status": "completed",
+      "dependsOn": ["trusted-apply-placeholder"],
+      "inputs": [
+        {
+          "id": "validated-placeholder-transaction",
+          "path": "runs/multi-agent-pipeline/demo/transactions/validated-placeholder-transaction.json"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "qa-queue-evidence",
+          "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json",
+          "description": "bounded QA queue evidence; no worker is spawned by the fixture"
+        }
+      ]
+    },
+    {
+      "id": "performance-regression-lane",
+      "kind": "promote-regression",
+      "status": "completed",
+      "dependsOn": ["qa-queue-lane"],
+      "inputs": [
+        {
+          "id": "qa-queue-evidence",
+          "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json"
+        }
+      ],
+      "requiredDecisions": [
+        {
+          "id": "regression-review-demo",
+          "kind": "regression-promotion",
+          "description": "explicit regression promotion review metadata"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "regression-lane-evidence",
+          "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+          "description": "performance/regression lane summary without production-safety claim"
+        }
+      ]
+    },
+    {
+      "id": "bundle-production-evidence",
+      "kind": "summarize",
+      "status": "completed",
+      "dependsOn": ["performance-regression-lane"],
+      "inputs": [
+        {
+          "id": "regression-lane-evidence",
+          "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json"
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "production-evidence-bundle",
+          "path": "runs/multi-agent-pipeline/demo/bundles/production-evidence-bundle.json",
+          "description": "inspectable evidence bundle for the bounded prototype demo"
+        }
+      ]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline", "dashboard-data"],
+    "trackedFixtureOnly": true
+  }
+}
