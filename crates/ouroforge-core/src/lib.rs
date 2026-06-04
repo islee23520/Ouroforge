@@ -3505,6 +3505,404 @@ pub fn agent_work_package_read_model_from_json_str(input: &str) -> AgentWorkPack
     }
 }
 
+pub const PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "production-evidence-bundle-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionEvidenceBundle {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "bundleId")]
+    pub bundle_id: String,
+    pub milestone: String,
+    pub status: ProductionEvidenceBundleStatus,
+    #[serde(rename = "taskBoardRef")]
+    pub task_board_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "roleModelRef")]
+    pub role_model_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "ownershipPolicyRef")]
+    pub ownership_policy_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "workPackageRefs")]
+    pub work_package_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "handoffRefs")]
+    pub handoff_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "stateSnapshotRefs")]
+    pub state_snapshot_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "reviewDecisionRefs")]
+    pub review_decision_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "qaResultRefs")]
+    pub qa_result_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "performanceRegressionRefs")]
+    pub performance_regression_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "decisionLedgerRefs")]
+    pub decision_ledger_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "outcomeRefs")]
+    pub outcome_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "missingRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_refs: Vec<String>,
+    #[serde(rename = "staleRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_refs: Vec<String>,
+    #[serde(
+        rename = "unresolvedConflicts",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub unresolved_conflicts: Vec<ProductionEvidenceBundleConflict>,
+    #[serde(
+        rename = "missingReviews",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub missing_reviews: Vec<ProductionEvidenceBundleMissingReview>,
+    #[serde(rename = "laneOutputs")]
+    pub lane_outputs: Vec<ProductionEvidenceBundleLaneOutput>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductionEvidenceBundleStatus {
+    Complete,
+    Partial,
+    Blocked,
+    Stale,
+    UnresolvedConflict,
+    MissingReview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionEvidenceBundleConflict {
+    pub id: String,
+    pub summary: String,
+    #[serde(rename = "ownershipRefs")]
+    pub ownership_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "safeNextAction")]
+    pub safe_next_action: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionEvidenceBundleMissingReview {
+    pub id: String,
+    #[serde(rename = "workPackageRef")]
+    pub work_package_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "requiredReviewerRole")]
+    pub required_reviewer_role: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionEvidenceBundleLaneOutput {
+    pub id: String,
+    pub lane: ProductionEvidenceBundleLane,
+    pub status: ProductionEvidenceBundleLaneStatus,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductionEvidenceBundleLane {
+    TaskBoard,
+    RoleModel,
+    Ownership,
+    WorkPackage,
+    Handoff,
+    StateSnapshot,
+    ReviewCritic,
+    Qa,
+    PerformanceRegression,
+    DecisionLedger,
+    Outcome,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductionEvidenceBundleLaneStatus {
+    Present,
+    Partial,
+    Blocked,
+    Stale,
+    Missing,
+}
+
+impl ProductionEvidenceBundle {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let bundle: ProductionEvidenceBundle = serde_json::from_str(input)
+            .context("failed to parse Production Evidence Bundle JSON")?;
+        bundle.validate_schema()?;
+        Ok(bundle)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "production evidence bundle schemaVersion must be {PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("production evidence bundle bundleId", &self.bundle_id)?;
+        require_text("production evidence bundle milestone", &self.milestone)?;
+        self.task_board_ref
+            .validate("production evidence bundle taskBoardRef")?;
+        self.role_model_ref
+            .validate("production evidence bundle roleModelRef")?;
+        self.ownership_policy_ref
+            .validate("production evidence bundle ownershipPolicyRef")?;
+        validate_nonempty_refs(
+            "production evidence bundle workPackageRefs",
+            &self.work_package_refs,
+        )?;
+        validate_nonempty_refs("production evidence bundle handoffRefs", &self.handoff_refs)?;
+        validate_nonempty_refs(
+            "production evidence bundle stateSnapshotRefs",
+            &self.state_snapshot_refs,
+        )?;
+        validate_nonempty_refs(
+            "production evidence bundle reviewDecisionRefs",
+            &self.review_decision_refs,
+        )?;
+        validate_nonempty_refs(
+            "production evidence bundle qaResultRefs",
+            &self.qa_result_refs,
+        )?;
+        validate_nonempty_refs(
+            "production evidence bundle performanceRegressionRefs",
+            &self.performance_regression_refs,
+        )?;
+        validate_nonempty_refs(
+            "production evidence bundle decisionLedgerRefs",
+            &self.decision_ledger_refs,
+        )?;
+        validate_nonempty_refs("production evidence bundle outcomeRefs", &self.outcome_refs)?;
+        validate_nonempty_text_list("production evidence bundle guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "production evidence bundle forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        validate_optional_text_list(
+            "production evidence bundle blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        validate_optional_text_list("production evidence bundle missingRefs", &self.missing_refs)?;
+        validate_optional_text_list("production evidence bundle staleRefs", &self.stale_refs)?;
+        for (index, conflict) in self.unresolved_conflicts.iter().enumerate() {
+            conflict.validate_schema(index)?;
+        }
+        for (index, missing_review) in self.missing_reviews.iter().enumerate() {
+            missing_review.validate_schema(index)?;
+        }
+        if self.lane_outputs.is_empty() {
+            return Err(anyhow!(
+                "production evidence bundle laneOutputs must not be empty"
+            ));
+        }
+        for (index, lane_output) in self.lane_outputs.iter().enumerate() {
+            lane_output.validate_schema(index)?;
+        }
+        self.generated_state.validate()?;
+        require_text("production evidence bundle boundary", &self.boundary)?;
+        self.validate_status_requirements()?;
+        self.validate_guardrail_language()?;
+        Ok(())
+    }
+
+    fn validate_status_requirements(&self) -> Result<()> {
+        match self.status {
+            ProductionEvidenceBundleStatus::Complete => {
+                if !self.blocked_reasons.is_empty()
+                    || !self.missing_refs.is_empty()
+                    || !self.stale_refs.is_empty()
+                    || !self.unresolved_conflicts.is_empty()
+                    || !self.missing_reviews.is_empty()
+                {
+                    return Err(anyhow!(
+                        "complete production evidence bundle must not include blockedReasons, missingRefs, staleRefs, unresolvedConflicts, or missingReviews"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::Partial => {
+                if self.missing_refs.is_empty() {
+                    return Err(anyhow!(
+                        "partial production evidence bundle requires missingRefs"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "blocked production evidence bundle requires blockedReasons"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::Stale => {
+                if self.stale_refs.is_empty() {
+                    return Err(anyhow!(
+                        "stale production evidence bundle requires staleRefs"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::UnresolvedConflict => {
+                if self.unresolved_conflicts.is_empty() {
+                    return Err(anyhow!(
+                        "unresolved-conflict production evidence bundle requires unresolvedConflicts"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::MissingReview => {
+                if self.missing_reviews.is_empty() {
+                    return Err(anyhow!(
+                        "missing-review production evidence bundle requires missingReviews"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_guardrail_language(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "browser command bridge",
+            "cloud orchestration",
+        ] {
+            if !forbidden.contains(phrase) {
+                return Err(anyhow!(
+                    "production evidence bundle forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        for phrase in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not write trusted browser state",
+            "does not claim production readiness",
+            "does not claim godot replacement",
+        ] {
+            if !boundary.contains(phrase) {
+                return Err(anyhow!(
+                    "production evidence bundle boundary must state it {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ProductionEvidenceBundleStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ProductionEvidenceBundleStatus::Complete => "complete",
+            ProductionEvidenceBundleStatus::Partial => "partial",
+            ProductionEvidenceBundleStatus::Blocked => "blocked",
+            ProductionEvidenceBundleStatus::Stale => "stale",
+            ProductionEvidenceBundleStatus::UnresolvedConflict => "unresolved-conflict",
+            ProductionEvidenceBundleStatus::MissingReview => "missing-review",
+        }
+    }
+}
+
+impl ProductionEvidenceBundleConflict {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("production evidence bundle unresolvedConflicts[{index}].id"),
+            &self.id,
+        )?;
+        require_text(
+            &format!("production evidence bundle unresolvedConflicts[{index}].summary"),
+            &self.summary,
+        )?;
+        validate_nonempty_refs(
+            &format!("production evidence bundle unresolvedConflicts[{index}].ownershipRefs"),
+            &self.ownership_refs,
+        )?;
+        require_text(
+            &format!("production evidence bundle unresolvedConflicts[{index}].safeNextAction"),
+            &self.safe_next_action,
+        )
+    }
+}
+
+impl ProductionEvidenceBundleMissingReview {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("production evidence bundle missingReviews[{index}].id"),
+            &self.id,
+        )?;
+        self.work_package_ref.validate(&format!(
+            "production evidence bundle missingReviews[{index}].workPackageRef"
+        ))?;
+        validate_path_component(
+            &format!("production evidence bundle missingReviews[{index}].requiredReviewerRole"),
+            &self.required_reviewer_role,
+        )
+    }
+}
+
+impl ProductionEvidenceBundleLaneOutput {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("production evidence bundle laneOutputs[{index}].id"),
+            &self.id,
+        )?;
+        validate_nonempty_refs(
+            &format!("production evidence bundle laneOutputs[{index}].evidenceRefs"),
+            &self.evidence_refs,
+        )?;
+        validate_optional_text_list(
+            &format!("production evidence bundle laneOutputs[{index}].blockedReasons"),
+            &self.blocked_reasons,
+        )?;
+        if self.status == ProductionEvidenceBundleLaneStatus::Blocked
+            && self.blocked_reasons.is_empty()
+        {
+            return Err(anyhow!(
+                "production evidence bundle laneOutputs[{index}] blocked status requires blockedReasons"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_nonempty_refs(field: &str, refs: &[AuthoringLoopArtifactRef]) -> Result<()> {
+    if refs.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    for (index, reference) in refs.iter().enumerate() {
+        reference.validate(&format!("{field}[{index}]"))?;
+    }
+    Ok(())
+}
+
+fn validate_optional_text_list(field: &str, values: &[String]) -> Result<()> {
+    for (index, value) in values.iter().enumerate() {
+        require_text(&format!("{field}[{index}]"), value)?;
+    }
+    Ok(())
+}
+
 impl AgentWorkPackageReadModel {
     pub fn from_package(package: &AgentWorkPackage) -> Self {
         let blockers = if package.blocked_reasons.is_empty() {
@@ -42437,6 +42835,170 @@ scenarios:
             .iter()
             .any(|reason| reason.contains("acceptanceCriteria")));
         assert!(malformed.boundary.contains("validation errors"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_v1_accepts_fixture_states_and_boundaries() {
+        for (fixture, expected_status) in [
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+                ProductionEvidenceBundleStatus::Complete,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.partial.fixture.json",
+                ProductionEvidenceBundleStatus::Partial,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.blocked.fixture.json",
+                ProductionEvidenceBundleStatus::Blocked,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.stale.fixture.json",
+                ProductionEvidenceBundleStatus::Stale,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.unresolved-conflict.fixture.json",
+                ProductionEvidenceBundleStatus::UnresolvedConflict,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/production-evidence-bundle.missing-review.fixture.json",
+                ProductionEvidenceBundleStatus::MissingReview,
+            ),
+        ] {
+            let bundle = ProductionEvidenceBundle::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(bundle.schema_version, PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION);
+            assert_eq!(bundle.status, expected_status);
+            assert!(!bundle.work_package_refs.is_empty());
+            assert!(!bundle.handoff_refs.is_empty());
+            assert!(!bundle.review_decision_refs.is_empty());
+            assert!(!bundle.qa_result_refs.is_empty());
+            assert!(!bundle.performance_regression_refs.is_empty());
+            assert!(!bundle.decision_ledger_refs.is_empty());
+            assert!(!bundle.outcome_refs.is_empty());
+            assert_eq!(bundle.lane_outputs.len(), 11);
+            assert!(bundle.generated_state.tracked_fixture_only);
+            assert!(bundle
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            let forbidden = bundle.forbidden_actions.join(" ");
+            for required in [
+                "hidden background agents",
+                "auto-apply",
+                "auto-merge",
+                "self-approval",
+                "browser command bridge",
+                "cloud orchestration",
+            ] {
+                assert!(
+                    forbidden.contains(required),
+                    "{fixture} missing forbidden boundary {required}"
+                );
+            }
+            assert!(bundle.boundary.contains("does not execute commands"));
+            assert!(bundle.boundary.contains("does not spawn agents"));
+            assert!(bundle
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(bundle
+                .boundary
+                .contains("does not claim production readiness"));
+            assert!(bundle
+                .boundary
+                .contains("does not claim Godot replacement"));
+        }
+    }
+
+    #[test]
+    fn production_evidence_bundle_v1_rejects_malformed_and_overclaimed_fixtures() {
+        let invalid = ProductionEvidenceBundle::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.invalid.fixture.json",
+        ))
+        .expect_err("invalid bundle fixture rejects");
+        let invalid_text = format!("{invalid:#}");
+        assert!(
+            invalid_text.contains("complete production evidence bundle")
+                || invalid_text.contains("forbiddenActions"),
+            "unexpected invalid bundle error: {invalid_text}"
+        );
+
+        let mut partial: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.partial.fixture.json",
+        ))
+        .expect("partial bundle json");
+        partial["missingRefs"] = json!([]);
+        let partial_error = ProductionEvidenceBundle::from_json_str(&partial.to_string())
+            .expect_err("partial bundle without missingRefs rejects");
+        assert!(format!("{partial_error:#}").contains("requires missingRefs"));
+
+        let mut blocked_lane: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+        ))
+        .expect("complete bundle json");
+        blocked_lane["laneOutputs"][0]["status"] = json!("blocked");
+        let lane_error = ProductionEvidenceBundle::from_json_str(&blocked_lane.to_string())
+            .expect_err("blocked lane without blocker rejects");
+        assert!(format!("{lane_error:#}").contains("blocked status requires blockedReasons"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_v1_is_studio_inspection_compatible() {
+        let bundle: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+        ))
+        .expect("production evidence bundle json");
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "productionEvidenceBundle": bundle }).to_string(),
+        );
+        let bundle_section = model
+            .sections
+            .iter()
+            .find(|section| section.id == "production-evidence-bundle")
+            .expect("production evidence bundle section");
+        assert_eq!(bundle_section.status, "present");
+        assert_eq!(bundle_section.item_count, 1);
+        assert!(model
+            .boundary
+            .contains("Read-only Studio multi-agent pipeline"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/production-evidence-bundle-v1.md");
+        for required in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not write trusted browser state",
+            "browser command bridges",
+            "cloud orchestration",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "does not claim production readiness",
+            "does not claim Godot replacement",
+            "Generated task boards",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(
+                doc.contains(required),
+                "production evidence bundle doc missing {required}"
+            );
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
     }
 
     #[test]
