@@ -19139,6 +19139,41 @@ pub struct GameplayBehaviorDefinition {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct GameplayBehaviorModelReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "behaviorPackId")]
+    pub behavior_pack_id: String,
+    pub status: String,
+    #[serde(rename = "behaviorCount")]
+    pub behavior_count: usize,
+    #[serde(rename = "readyCount")]
+    pub ready_count: usize,
+    #[serde(rename = "partialCount")]
+    pub partial_count: usize,
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "behaviorIds")]
+    pub behavior_ids: Vec<String>,
+    #[serde(rename = "targetRefs")]
+    pub target_refs: Vec<String>,
+    #[serde(rename = "triggerKinds")]
+    pub trigger_kinds: Vec<String>,
+    #[serde(rename = "conditionKinds")]
+    pub condition_kinds: Vec<String>,
+    #[serde(rename = "actionKinds")]
+    pub action_kinds: Vec<String>,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct GameplayBehaviorCooldown {
     pub id: String,
     #[serde(rename = "durationMs")]
@@ -19169,6 +19204,80 @@ impl GameplayBehaviorModelArtifact {
             serde_json::from_str(input).context("failed to parse Gameplay Behavior Model JSON")?;
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    pub fn read_model_from_json_str(input: &str) -> Result<GameplayBehaviorModelReadModel> {
+        let artifact = Self::from_json_str(input)?;
+        Ok(artifact.read_model())
+    }
+
+    pub fn read_model(&self) -> GameplayBehaviorModelReadModel {
+        let mut target_refs = BTreeSet::new();
+        let mut trigger_kinds = BTreeSet::new();
+        let mut condition_kinds = BTreeSet::new();
+        let mut action_kinds = BTreeSet::new();
+        let mut linked_evidence_refs = BTreeSet::new();
+        let mut blocked_reasons = Vec::new();
+
+        for reference in &self.evidence_refs {
+            linked_evidence_refs.insert(reference.clone());
+        }
+        for reason in &self.blocked_reasons {
+            blocked_reasons.push(reason.clone());
+        }
+        for behavior in &self.behaviors {
+            for value in behavior.target.values() {
+                target_refs.insert(value.clone());
+            }
+            collect_gameplay_behavior_step_kinds(&behavior.triggers, &mut trigger_kinds);
+            collect_gameplay_behavior_step_kinds(&behavior.conditions, &mut condition_kinds);
+            collect_gameplay_behavior_step_kinds(&behavior.actions, &mut action_kinds);
+            for reference in &behavior.evidence_refs {
+                linked_evidence_refs.insert(reference.clone());
+            }
+            for reason in &behavior.blocked_reasons {
+                blocked_reasons.push(format!("{}: {reason}", behavior.id));
+            }
+        }
+
+        GameplayBehaviorModelReadModel {
+            schema_version: "gameplay-behavior-model-read-model.v1".to_string(),
+            behavior_pack_id: self.behavior_pack_id.clone(),
+            status: gameplay_behavior_status_label(self.status).to_string(),
+            behavior_count: self.behaviors.len(),
+            ready_count: self
+                .behaviors
+                .iter()
+                .filter(|behavior| behavior.status == GameplayBehaviorStatus::Ready)
+                .count(),
+            partial_count: self
+                .behaviors
+                .iter()
+                .filter(|behavior| behavior.status == GameplayBehaviorStatus::Partial)
+                .count(),
+            blocked_count: self
+                .behaviors
+                .iter()
+                .filter(|behavior| behavior.status == GameplayBehaviorStatus::Blocked)
+                .count(),
+            unsupported_count: self
+                .behaviors
+                .iter()
+                .filter(|behavior| behavior.status == GameplayBehaviorStatus::Unsupported)
+                .count(),
+            behavior_ids: self
+                .behaviors
+                .iter()
+                .map(|behavior| behavior.id.clone())
+                .collect(),
+            target_refs: target_refs.into_iter().collect(),
+            trigger_kinds: trigger_kinds.into_iter().collect(),
+            condition_kinds: condition_kinds.into_iter().collect(),
+            action_kinds: action_kinds.into_iter().collect(),
+            linked_evidence_refs: linked_evidence_refs.into_iter().collect(),
+            blocked_reasons,
+            boundary: "Read-only Gameplay Behavior Model summary; no runtime execution, no script execution, no eval, no dynamic import, no plugin loader, no command bridge, no browser trusted writes, no source apply, and no production-stable scripting API claim.".to_string(),
+        }
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -19307,6 +19416,26 @@ fn gameplay_action_kinds() -> BTreeSet<&'static str> {
         "play_animation",
         "spawn_local_effect",
     ])
+}
+
+fn gameplay_behavior_status_label(status: GameplayBehaviorStatus) -> &'static str {
+    match status {
+        GameplayBehaviorStatus::Ready => "ready",
+        GameplayBehaviorStatus::Partial => "partial",
+        GameplayBehaviorStatus::Blocked => "blocked",
+        GameplayBehaviorStatus::Unsupported => "unsupported",
+    }
+}
+
+fn collect_gameplay_behavior_step_kinds(
+    steps: &[BTreeMap<String, serde_json::Value>],
+    output: &mut BTreeSet<String>,
+) {
+    for step in steps {
+        if let Some(kind) = step.get("kind").and_then(|value| value.as_str()) {
+            output.insert(kind.to_string());
+        }
+    }
 }
 
 fn validate_gameplay_behavior_reason_state(
@@ -65846,6 +65975,40 @@ scenarios:
             .behaviors
             .iter()
             .any(|behavior| behavior.id == "dash-ability-trigger"));
+
+        let read_model = GameplayBehaviorModelArtifact::read_model_from_json_str(include_str!(
+            "../../../examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json"
+        ))
+        .expect("ready gameplay behavior read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "gameplay-behavior-model-read-model.v1"
+        );
+        assert_eq!(read_model.behavior_pack_id, ready.behavior_pack_id);
+        assert_eq!(read_model.status, "ready");
+        assert_eq!(read_model.behavior_count, 7);
+        assert_eq!(read_model.ready_count, 7);
+        assert_eq!(read_model.partial_count, 0);
+        assert!(read_model
+            .behavior_ids
+            .contains(&"dash-ability-trigger".to_string()));
+        assert!(read_model.target_refs.contains(&"player".to_string()));
+        assert!(read_model.trigger_kinds.contains(&"on_input".to_string()));
+        assert!(read_model
+            .condition_kinds
+            .contains(&"cooldown_ready".to_string()));
+        assert!(read_model
+            .action_kinds
+            .contains(&"complete_objective".to_string()));
+        assert!(read_model
+            .linked_evidence_refs
+            .contains(&"docs/gameplay-behavior-model-v1.md".to_string()));
+        assert!(read_model.boundary.contains("Read-only"));
+        assert!(read_model.boundary.contains("no runtime execution"));
+        assert!(read_model.boundary.contains("no script execution"));
+        assert!(read_model.boundary.contains("no command bridge"));
+        assert!(read_model.boundary.contains("no browser trusted writes"));
+        assert!(read_model.boundary.contains("no source apply"));
 
         let partial = GameplayBehaviorModelArtifact::from_json_str(include_str!(
             "../../../examples/gameplay-behavior-model-v1/behavior-model.partial.fixture.json"
