@@ -3505,6 +3505,66 @@ pub fn agent_work_package_read_model_from_json_str(input: &str) -> AgentWorkPack
     }
 }
 
+pub const AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION: &str =
+    "agent-decision-ledger-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AgentDecisionLedgerReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "ledgerId")]
+    pub ledger_id: String,
+    pub milestone: String,
+    pub status: String,
+    #[serde(rename = "decisionCount")]
+    pub decision_count: usize,
+    #[serde(rename = "acceptedCount")]
+    pub accepted_count: usize,
+    #[serde(rename = "rejectedCount")]
+    pub rejected_count: usize,
+    #[serde(rename = "deferredCount")]
+    pub deferred_count: usize,
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: usize,
+    #[serde(rename = "supersededCount")]
+    pub superseded_count: usize,
+    #[serde(rename = "evidenceRefCount")]
+    pub evidence_ref_count: usize,
+    #[serde(rename = "rejectedAlternativeCount")]
+    pub rejected_alternative_count: usize,
+    #[serde(rename = "linkedTaskIds")]
+    pub linked_task_ids: Vec<String>,
+    #[serde(rename = "workPackageRefPaths")]
+    pub work_package_ref_paths: Vec<String>,
+    #[serde(rename = "handoffRefPaths")]
+    pub handoff_ref_paths: Vec<String>,
+    #[serde(rename = "reviewGateRefPaths")]
+    pub review_gate_ref_paths: Vec<String>,
+    #[serde(rename = "qaResultRefPaths")]
+    pub qa_result_ref_paths: Vec<String>,
+    #[serde(rename = "performanceRegressionRefPaths")]
+    pub performance_regression_ref_paths: Vec<String>,
+    #[serde(rename = "evidenceBundleRefPaths")]
+    pub evidence_bundle_ref_paths: Vec<String>,
+    #[serde(rename = "appendOnlySequence")]
+    pub append_only_sequence: u64,
+    #[serde(rename = "appendOnlyHash")]
+    pub append_only_hash: String,
+    #[serde(rename = "staleRefs")]
+    pub stale_refs: Vec<String>,
+    pub blockers: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn agent_decision_ledger_read_model_from_json_str(input: &str) -> AgentDecisionLedgerReadModel {
+    match AgentDecisionLedger::from_json_str(input) {
+        Ok(ledger) => AgentDecisionLedgerReadModel::from_ledger(&ledger),
+        Err(error) => AgentDecisionLedgerReadModel::malformed(format!("{error:#}")),
+    }
+}
+
 pub const AGENT_DECISION_LEDGER_SCHEMA_VERSION: &str = "agent-decision-ledger-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -3951,6 +4011,137 @@ impl AgentDecisionLedgerPipelineRefs {
             &self.evidence_bundle_refs,
         )
     }
+}
+
+impl AgentDecisionLedgerReadModel {
+    pub fn from_ledger(ledger: &AgentDecisionLedger) -> Self {
+        let mut linked_task_ids = ledger
+            .decisions
+            .iter()
+            .map(|decision| decision.task_id.clone())
+            .collect::<Vec<_>>();
+        linked_task_ids.sort();
+        linked_task_ids.dedup();
+
+        let mut blockers = Vec::new();
+        blockers.extend(ledger.stale_refs.iter().cloned());
+        for decision in &ledger.decisions {
+            blockers.extend(
+                decision
+                    .blocked_reasons
+                    .iter()
+                    .map(|reason| format!("{}: {reason}", decision.decision_id)),
+            );
+        }
+        if ledger.status == AgentDecisionLedgerStatus::AppendOnlyViolation {
+            blockers.extend(ledger.malformed_reasons.iter().cloned());
+        }
+
+        Self {
+            schema_version: AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION.to_string(),
+            ledger_id: ledger.ledger_id.clone(),
+            milestone: ledger.milestone.clone(),
+            status: ledger.status.as_str().to_string(),
+            decision_count: ledger.decisions.len(),
+            accepted_count: ledger
+                .decisions
+                .iter()
+                .filter(|decision| decision.outcome == AgentDecisionOutcome::Accepted)
+                .count(),
+            rejected_count: ledger
+                .decisions
+                .iter()
+                .filter(|decision| decision.outcome == AgentDecisionOutcome::Rejected)
+                .count(),
+            deferred_count: ledger
+                .decisions
+                .iter()
+                .filter(|decision| decision.outcome == AgentDecisionOutcome::Deferred)
+                .count(),
+            blocked_count: ledger
+                .decisions
+                .iter()
+                .filter(|decision| decision.outcome == AgentDecisionOutcome::Blocked)
+                .count(),
+            superseded_count: ledger
+                .decisions
+                .iter()
+                .filter(|decision| decision.outcome == AgentDecisionOutcome::Superseded)
+                .count(),
+            evidence_ref_count: ledger
+                .decisions
+                .iter()
+                .map(|decision| decision.evidence_refs.len())
+                .sum(),
+            rejected_alternative_count: ledger
+                .decisions
+                .iter()
+                .map(|decision| decision.alternatives_rejected.len())
+                .sum(),
+            linked_task_ids,
+            work_package_ref_paths: artifact_ref_paths(&ledger.pipeline_refs.work_package_refs),
+            handoff_ref_paths: artifact_ref_paths(&ledger.pipeline_refs.handoff_refs),
+            review_gate_ref_paths: artifact_ref_paths(&ledger.pipeline_refs.review_gate_refs),
+            qa_result_ref_paths: artifact_ref_paths(&ledger.pipeline_refs.qa_result_refs),
+            performance_regression_ref_paths: artifact_ref_paths(
+                &ledger.pipeline_refs.performance_regression_refs,
+            ),
+            evidence_bundle_ref_paths: artifact_ref_paths(&ledger.pipeline_refs.evidence_bundle_refs),
+            append_only_sequence: ledger.append_only.sequence,
+            append_only_hash: ledger.append_only.entry_order_hash.clone(),
+            stale_refs: ledger.stale_refs.clone(),
+            blockers,
+            malformed_reasons: ledger.malformed_reasons.clone(),
+            boundary: "Read-only agent decision ledger summary; it links decisions to task, work package, handoff, review, QA, regression, and evidence-bundle refs without executing commands, spawning agents, applying changes, writing trusted browser state, auto-merging, self-approving, or repairing append-only drift.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION.to_string(),
+            ledger_id: "malformed-agent-decision-ledger".to_string(),
+            milestone: "malformed-agent-decision-ledger".to_string(),
+            status: "malformed".to_string(),
+            decision_count: 0,
+            accepted_count: 0,
+            rejected_count: 0,
+            deferred_count: 0,
+            blocked_count: 0,
+            superseded_count: 0,
+            evidence_ref_count: 0,
+            rejected_alternative_count: 0,
+            linked_task_ids: Vec::new(),
+            work_package_ref_paths: Vec::new(),
+            handoff_ref_paths: Vec::new(),
+            review_gate_ref_paths: Vec::new(),
+            qa_result_ref_paths: Vec::new(),
+            performance_regression_ref_paths: Vec::new(),
+            evidence_bundle_ref_paths: Vec::new(),
+            append_only_sequence: 0,
+            append_only_hash: String::new(),
+            stale_refs: Vec::new(),
+            blockers: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed agent decision ledger summary; it reports validation errors without executing commands, spawning agents, applying changes, writing trusted state, auto-merging, or self-approving.".to_string(),
+        }
+    }
+}
+
+impl AgentDecisionLedgerStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentDecisionLedgerStatus::Active => "active",
+            AgentDecisionLedgerStatus::Stale => "stale",
+            AgentDecisionLedgerStatus::Malformed => "malformed",
+            AgentDecisionLedgerStatus::AppendOnlyViolation => "append-only-violation",
+        }
+    }
+}
+
+fn artifact_ref_paths(refs: &[AuthoringLoopArtifactRef]) -> Vec<String> {
+    refs.iter()
+        .map(|reference| reference.path.clone())
+        .collect()
 }
 
 impl AgentDecisionLedgerAppendOnly {
@@ -4869,6 +5060,20 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ],
             &mut malformed_reasons,
         );
+        let decision_ledgers = pipeline_values(
+            value,
+            &[
+                "agent_decision_ledgers",
+                "agentDecisionLedgers",
+                "agent_decision_ledger",
+                "agentDecisionLedger",
+                "decision_ledgers",
+                "decisionLedgers",
+                "decision_ledger",
+                "decisionLedger",
+            ],
+            &mut malformed_reasons,
+        );
 
         let mut sections = vec![
             pipeline_collection_section(
@@ -4921,7 +5126,12 @@ impl StudioMultiAgentPipelineInspectionReadModel {
                 &task_boards,
                 |task| pipeline_text_contains_any(task, &["performance", "regression"]),
             ),
-            pipeline_decision_section(&task_boards, &evidence_bundles),
+            pipeline_decision_section(
+                &task_boards,
+                &evidence_bundles,
+                &decision_ledgers,
+                &mut malformed_reasons,
+            ),
             pipeline_collection_section(
                 "production-evidence-bundle",
                 "Production evidence bundle",
@@ -5123,9 +5333,23 @@ fn pipeline_lane_section(
 fn pipeline_decision_section(
     task_boards: &[&serde_json::Value],
     evidence_bundles: &[&serde_json::Value],
+    decision_ledgers: &[&serde_json::Value],
+    malformed_reasons: &mut Vec<String>,
 ) -> StudioMultiAgentPipelineInspectionSection {
     let mut count = 0;
     let mut blockers = Vec::new();
+    let mut section_malformed = Vec::new();
+    for (index, ledger_value) in decision_ledgers.iter().enumerate() {
+        let model = agent_decision_ledger_read_model_from_json_str(&ledger_value.to_string());
+        count += model.decision_count;
+        blockers.extend(model.blockers);
+        section_malformed.extend(
+            model
+                .malformed_reasons
+                .into_iter()
+                .map(|reason| format!("decision-ledger[{index}]: {reason}")),
+        );
+    }
     for board in task_boards {
         if let Some(tasks) = board
             .get("tasks")
@@ -5162,12 +5386,19 @@ fn pipeline_decision_section(
             .and_then(|raw| raw.as_array())
             .map_or(0, Vec::len);
     }
+    malformed_reasons.extend(section_malformed.iter().cloned());
     StudioMultiAgentPipelineInspectionSection {
         id: "decision-ledger".to_string(),
         label: "Decision ledger".to_string(),
-        status: if !blockers.is_empty() {
+        status: if !section_malformed.is_empty() {
+            "malformed"
+        } else if !blockers.is_empty() {
             "blocked"
-        } else if count == 0 && task_boards.is_empty() && evidence_bundles.is_empty() {
+        } else if count == 0
+            && task_boards.is_empty()
+            && evidence_bundles.is_empty()
+            && decision_ledgers.is_empty()
+        {
             "missing"
         } else if count == 0 {
             "empty"
@@ -5177,7 +5408,7 @@ fn pipeline_decision_section(
         .to_string(),
         item_count: count,
         blockers,
-        malformed_reasons: Vec::new(),
+        malformed_reasons: section_malformed,
     }
 }
 
@@ -44040,6 +44271,141 @@ scenarios:
         let hash_error = AgentDecisionLedger::from_json_str(&bad_hash.to_string())
             .expect_err("ledger hash shape rejects drift");
         assert!(format!("{hash_error:#}").contains("fnv1a64-ledger-v1"));
+    }
+
+    #[test]
+    fn agent_decision_ledger_read_model_links_pipeline_refs_and_statuses() {
+        let active = agent_decision_ledger_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ));
+        assert_eq!(
+            active.schema_version,
+            AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(active.ledger_id, "demo-agent-decision-ledger");
+        assert_eq!(active.status, "active");
+        assert_eq!(active.decision_count, 2);
+        assert_eq!(active.accepted_count, 1);
+        assert_eq!(active.blocked_count, 1);
+        assert_eq!(active.evidence_ref_count, 3);
+        assert_eq!(active.rejected_alternative_count, 2);
+        assert!(active
+            .linked_task_ids
+            .iter()
+            .any(|task| task == "task-review-qa-handoff"));
+        assert!(active
+            .work_package_ref_paths
+            .iter()
+            .any(|path| path.contains("agent-work-package.valid")));
+        assert!(active
+            .handoff_ref_paths
+            .iter()
+            .any(|path| path.contains("agent-handoff-v2.valid")));
+        assert!(active
+            .review_gate_ref_paths
+            .iter()
+            .any(|path| path.contains("review-decision-ledger")));
+        assert!(active
+            .qa_result_ref_paths
+            .iter()
+            .any(|path| path.contains("qa-queue-evidence")));
+        assert!(active
+            .performance_regression_ref_paths
+            .iter()
+            .any(|path| path.contains("regression-lane-evidence")));
+        assert!(active
+            .evidence_bundle_ref_paths
+            .iter()
+            .any(|path| path.contains("production-evidence-bundle.complete")));
+        assert_eq!(active.append_only_sequence, 2);
+        assert!(active.append_only_hash.starts_with("fnv1a64-ledger-v1:"));
+        assert!(active.boundary.contains("Read-only agent decision ledger"));
+        assert!(active.boundary.contains("without executing commands"));
+        assert!(active.boundary.contains("applying changes"));
+        assert!(active.boundary.contains("writing trusted browser state"));
+
+        let stale = agent_decision_ledger_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.stale.fixture.json",
+        ));
+        assert_eq!(stale.status, "stale");
+        assert!(stale
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("stale regression lane evidence")));
+
+        let append_violation = agent_decision_ledger_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.append-only-violation.fixture.json",
+        ));
+        assert_eq!(append_violation.status, "append-only-violation");
+        assert!(append_violation
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("append-only sequence")));
+
+        let invalid = agent_decision_ledger_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.invalid.fixture.json",
+        ));
+        assert_eq!(invalid.status, "malformed");
+        assert!(invalid
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("unknown variant")));
+    }
+
+    #[test]
+    fn studio_pipeline_inspection_links_agent_decision_ledgers() {
+        let active: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("active ledger json");
+        let stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.stale.fixture.json",
+        ))
+        .expect("stale ledger json");
+        let malformed: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.malformed.fixture.json",
+        ))
+        .expect("malformed ledger json");
+        let append_violation: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.append-only-violation.fixture.json",
+        ))
+        .expect("append-only violation ledger json");
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({
+                "agentDecisionLedgers": [active, stale, malformed, append_violation]
+            })
+            .to_string(),
+        );
+        let decisions = model
+            .sections
+            .iter()
+            .find(|section| section.id == "decision-ledger")
+            .expect("decision-ledger section");
+        assert_eq!(decisions.status, "malformed");
+        assert_eq!(decisions.item_count, 8);
+        assert!(decisions
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("stale regression lane evidence")));
+        assert!(decisions
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("append-only sequence")));
+        assert!(decisions
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("decision-002 missing refreshed evidence refs")));
+        assert_eq!(model.status, "malformed");
+
+        let missing = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "agentDecisionLedgers": [] }).to_string(),
+        );
+        let missing_decisions = missing
+            .sections
+            .iter()
+            .find(|section| section.id == "decision-ledger")
+            .expect("missing decision-ledger section");
+        assert_eq!(missing_decisions.status, "missing");
     }
 
     #[test]

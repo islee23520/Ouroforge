@@ -54,9 +54,13 @@ The ledger is inert audit evidence:
 - it does not claim Godot replacement capability.
 
 Browser/dashboard/Studio surfaces may display escaped read-only ledger summaries
-only. Rust/local validation owns trusted artifact validation and any generated
-evidence writing. Agent outputs remain untrusted until Rust/local validation and
-review-gated apply or promotion.
+only. The Rust read model `agent-decision-ledger-read-model-v1` exposes ledger
+status, decision/outcome counts, append-only sequence and hash metadata, stale or
+malformed blockers, and links to work packages, handoffs, review gates, QA,
+performance/regression, and production evidence bundles without repairing drift
+or granting write authority. Rust/local validation owns trusted artifact
+validation and any generated evidence writing. Agent outputs remain untrusted
+until Rust/local validation and review-gated apply or promotion.
 
 ## Status fixtures
 
