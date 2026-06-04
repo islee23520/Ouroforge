@@ -202,9 +202,15 @@ recorded as complete in `docs/roadmap.md` and
 `docs/production-2d-engine-core-v1.md` as a bounded local 2D vertical-slice
 evidence milestone; it is not a production-ready, shipped-game, broad
 compatibility, secure-sandbox, native-export, plugin-runtime, hosted/cloud,
-source-apply, public-launch, or Godot replacement claim. The next recommended
-technical branch is the scoped 3D Capability Gate v1 issue sequence, not broad
-engine parity.
+source-apply, public-launch, or Godot replacement claim. Multi-Agent Production
+Pipeline v1 is now recorded as complete in `docs/roadmap.md`,
+`docs/multi-agent-production-pipeline-v1.md`, and
+`docs/multi-agent-production-pipeline-governance-handoff.md` as a local
+evidence-gated collaboration/accountability milestone; it is not hidden-agent
+orchestration, cloud execution, auto-apply/auto-merge authority, release
+automation, public-launch approval, or production readiness. The next
+recommended technical branch is the scoped Autonomous QA / Playtest Swarm v1
+sequence, not unrestricted autonomous project mutation.
 
 ## Contributor guide
 

@@ -24,10 +24,15 @@ completed Production 2D Engine Core v1 milestone for bounded local 2D engine
 evidence: render queue/camera/layers/tilemap integration, collision/physics,
 input actions/replay, save-load/runtime-state digests, animation/VFX/audio
 evidence, frame-budget profiling, a vertical-slice demo, Scenario Coverage v7,
-and read-only Studio inspection:
+and read-only Studio inspection, and a completed Multi-Agent Production Pipeline
+v1 milestone for local evidence-gated collaboration/accountability artifacts:
+role models, task boards, ownership, work packages, handoffs, shared state,
+review/critic gates, QA queues, performance/regression lanes, decision ledgers,
+production evidence bundles, read-only Studio/dashboard/cockpit inspection, a
+deterministic demo, and Scenario Coverage v12:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -113,6 +118,21 @@ The current implementation has completed these documented milestone surfaces:
   `docs/playable-demo-v2-collect-and-exit.md`,
   `docs/scenario-coverage-v3.md`,
   `docs/production-2d-studio-inspection-v1.md`)
+- Multi-Agent Production Pipeline v1 / evidence-gated local collaboration
+  (`docs/multi-agent-production-pipeline-v1.md`,
+  `docs/agent-role-model-v1.md`,
+  `docs/file-artifact-ownership-conflict-policy-v1.md`,
+  `docs/agent-work-package-v1.md`,
+  `docs/agent-handoff-v2.md`,
+  `docs/agent-shared-state-snapshot-v1.md`,
+  `docs/review-critic-gate-v1.md`,
+  `docs/qa-agent-work-queue-v1.md`,
+  `docs/performance-regression-lane-v1.md`,
+  `docs/production-evidence-bundle-v1.md`,
+  `docs/studio-multi-agent-pipeline-inspection-v1.md`,
+  `docs/multi-agent-prototype-production-demo-v1.md`,
+  `docs/multi-agent-pipeline-coverage-matrix-v1.md`,
+  `docs/multi-agent-production-pipeline-governance-handoff.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -154,6 +174,26 @@ does not add 3D implementation, native export, plugin runtime, hosted/cloud
 behavior, unrestricted source apply, command bridges, public launch automation,
 production-ready status, broad compatibility-stable API promises, shipped-game
 claims, secure-sandbox guarantees, or Godot replacement positioning.
+
+
+Multi-Agent Production Pipeline v1 completion covers the #664-#679 evidence
+chain: scope/contract, role model, task board, ownership, work packages,
+handoffs, shared state snapshots, review/critic gates, QA queue,
+performance/regression lane, build/release design gate, decision ledger,
+production evidence bundle, read-only Studio/dashboard/cockpit inspection, demo,
+and Scenario Coverage v12. It remains a local-first accountability framework: it
+does not add hidden/background agents, unbounded spawning, hosted/cloud
+orchestration, browser command bridges, trusted browser writes, auto-apply,
+auto-merge, self-approval, reviewer bypass, dependency/CI/workflow mutation,
+release automation, production readiness, public-launch approval, or current
+Godot replacement positioning.
+
+After #680, the recommended next milestone candidate is Autonomous QA / Playtest
+Swarm v1 because it extends the completed evidence-gated pipeline while staying
+bounded to local QA/playtest evidence, classification, rerun policy, mutation
+backlog candidates, and read-only inspection. Safe Source Mutation Apply,
+Build/Export/Packaging, Full Studio Editor, and demo game work remain later
+candidates requiring separate scope contracts and guardrails.
 
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
