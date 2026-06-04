@@ -377,7 +377,33 @@ const run = {
     source_world_state: 'evidence/world.json',
     scene: { sceneId: 'trigger-flags-v1-fixture', entityCount: 3, tick: 1 },
     renderer: { version: '1', renderedEntities: 3, camera: { x: 0, y: 0 } },
-    render_breakdown: { elements: [{ renderableId: 'entity:player' }], absenceDiagnostics: [{ entityId: 'hidden', reason: 'hidden' }] },
+    render_breakdown: {
+      present: true,
+      frameId: 12,
+      sceneId: 'trigger-flags-v1-fixture',
+      elementCount: 1,
+      absenceDiagnosticCount: 1,
+      elements: [{
+        renderableId: 'entity:player',
+        entityId: 'player',
+        frameId: 12,
+        drawOrder: 4,
+        layer: 'actors',
+        primitiveCategory: 'sprite',
+        debugLabel: 'player sprite',
+      }],
+      absenceDiagnostics: [{
+        entityId: 'hidden',
+        renderableId: 'entity:hidden',
+        reason: 'sprite.visible=false',
+        layer: 'actors',
+        detail: 'Entity is intentionally hidden by scene data.',
+      }],
+      readOnlyInspection: {
+        disallowedActions: ['writes', 'commands', 'scene mutation', 'browser runtime control'],
+      },
+      boundary: 'Render breakdown inspection is read-only evidence from runtime world state.',
+    },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 0 },
@@ -454,7 +480,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 20);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 21);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -655,6 +681,15 @@ assert.match(cockpit.renderEngineExpansionSurface(run), /Render breakdown/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /1 element\(s\), 1 absence diagnostic\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity:player/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite\.visible=false/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /browser runtime control/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: '<bad>' } }), /missing or malformed/);
+const xssRenderBreakdown = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: '<script>frame</script>', sceneId: '<img>', elements: [{ renderableId: '<script>renderable</script>', entityId: '<img src=x onerror=alert(1)>', frameId: '<svg>', drawOrder: '<b>', layer: '<i>', primitiveCategory: '<p>', debugLabel: '<script>label</script>' }], absenceDiagnostics: [{ entityId: '<script>hidden</script>', reason: '<img>', layer: '<svg>', detail: '<b>detail</b>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, boundary: '<script>boundary</script>' } } });
+assert.doesNotMatch(xssRenderBreakdown, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssRenderBreakdown, /&lt;script&gt;renderable&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);
@@ -670,6 +705,7 @@ assert.match(cockpit.renderIntegration(run), /Regression promotions/);
 assert.match(cockpit.renderIntegration(run), /Replay controls/);
 assert.match(cockpit.renderIntegration(run), /Run comparison/);
 assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
+assert.match(cockpit.renderIntegration(run), /Render breakdown inspection/);
 assert.match(cockpit.renderIntegration(run), /Expressive scene inspection/);
 assert.match(cockpit.renderIntegration(run), /Collision\/transition\/event inspection/);
 assert.match(cockpit.renderIntegration(run), /Component counts/);

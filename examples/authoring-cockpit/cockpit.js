@@ -311,6 +311,7 @@ const OuroforgeCockpit = (() => {
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
       { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
+      { id: 'render-breakdown-inspection', label: 'Render breakdown inspection', present: Boolean(run?.engine_summaries?.render_breakdown?.present || run?.engine_summaries?.renderBreakdown?.present), detail: `${(run?.engine_summaries?.render_breakdown?.elements || run?.engine_summaries?.renderBreakdown?.elements || []).length} renderable row(s)` },
       { id: 'expressive-scene-inspection', label: 'Expressive scene inspection', present: Boolean(run?.engine_summaries?.components?.present || run?.engine_summaries?.triggers?.present || run?.engine_summaries?.hud?.present), detail: run?.engine_summaries?.source_world_state || 'component/trigger/HUD summary unavailable' },
       { id: 'runtime-event-inspection', label: 'Collision/transition/event inspection', present: Boolean(run?.engine_summaries?.collision?.present || run?.engine_summaries?.transition?.present || run?.engine_summaries?.events?.present), detail: run?.engine_summaries?.source_world_state || 'collision/transition/event summary unavailable' },
       { id: 'runtime-asset-loading', label: 'Runtime asset loading', present: Boolean(run?.asset_loading?.present || run?.assetLoading?.present), detail: `${run?.asset_loading?.attempt_count ?? run?.assetLoading?.attemptCount ?? 0} load attempt(s)` },
@@ -362,6 +363,57 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Preview-only read model from exported evidence. The cockpit does not own scene state or persist edits; use generated Rust commands for validation-gated changes.</p>
       <div class="field-grid">${cards}</div>
       <p class="hint">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>
+    </section>`;
+  }
+
+  function renderBreakdownValue(record, snakeKey, camelKey, fallback = 'unknown') {
+    const value = record?.[snakeKey] ?? record?.[camelKey];
+    if (value === null || value === undefined || value === '') return fallback;
+    return value;
+  }
+
+  function renderRenderBreakdownInspectionSurface(run) {
+    const summary = run?.engine_summaries;
+    const breakdown = summary?.render_breakdown || summary?.renderBreakdown || null;
+    if (!summary?.present || !breakdown || typeof breakdown !== 'object' || Array.isArray(breakdown)) {
+      return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2><p class="empty">Render breakdown evidence is missing or malformed for this run.</p><p class="hint">Read-only inspection only: this panel does not write files, execute commands, mutate scenes, or control the browser runtime.</p></section>`;
+    }
+    const elements = Array.isArray(breakdown.elements) ? breakdown.elements : [];
+    const absenceDiagnostics = Array.isArray(breakdown.absenceDiagnostics || breakdown.absence_diagnostics)
+      ? (breakdown.absenceDiagnostics || breakdown.absence_diagnostics)
+      : [];
+    const readOnlyInspection = breakdown.readOnlyInspection || breakdown.read_only_inspection || {};
+    const disallowedActions = Array.isArray(readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
+      ? (readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
+      : ['writes', 'commands', 'scene mutation', 'browser runtime control'];
+    const cards = [
+      ['Frame', renderBreakdownValue(breakdown, 'frame_id', 'frameId', 'unrecorded')],
+      ['Scene', renderBreakdownValue(breakdown, 'scene_id', 'sceneId', summary?.scene?.sceneId || 'unrecorded')],
+      ['Element count', breakdown.element_count ?? breakdown.elementCount ?? elements.length],
+      ['Absence diagnostics', breakdown.absence_diagnostic_count ?? breakdown.absenceDiagnosticCount ?? absenceDiagnostics.length],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const elementRows = elements.slice(0, 24).map((element) => {
+      const renderableId = renderBreakdownValue(element, 'renderable_id', 'renderableId', renderBreakdownValue(element, 'entity_id', 'entityId', 'unknown renderable'));
+      const entityId = renderBreakdownValue(element, 'entity_id', 'entityId', renderableId);
+      const frameId = renderBreakdownValue(element, 'frame_id', 'frameId', renderBreakdownValue(breakdown, 'frame_id', 'frameId', 'unrecorded'));
+      const drawOrder = renderBreakdownValue(element, 'draw_order', 'drawOrder', 'unrecorded');
+      const primitiveCategory = renderBreakdownValue(element, 'primitive_category', 'primitiveCategory', renderBreakdownValue(element, 'primitive', 'primitive', 'unknown primitive'));
+      const debugLabel = renderBreakdownValue(element, 'debug_label', 'debugLabel', 'no debug label');
+      return `<div class="surface-row"><strong>${escapeText(renderableId)}</strong> ${surfaceState(true, primitiveCategory)}<br><small>entity ${escapeText(entityId)} · frame ${escapeText(frameId)} · draw order ${escapeText(drawOrder)} · layer ${escapeText(renderBreakdownValue(element, 'layer', 'layer', 'default'))} · debug ${escapeText(debugLabel)}</small></div>`;
+    }).join('') || '<div class="surface-row">No renderable draw-order rows exported.</div>';
+    const absenceRows = absenceDiagnostics.slice(0, 24).map((diagnostic) => {
+      const target = renderBreakdownValue(diagnostic, 'renderable_id', 'renderableId', renderBreakdownValue(diagnostic, 'entity_id', 'entityId', 'unknown entity'));
+      const reason = renderBreakdownValue(diagnostic, 'reason', 'reason', 'unrecorded reason');
+      const detail = renderBreakdownValue(diagnostic, 'detail', 'detail', 'no detail');
+      return `<div class="surface-row"><strong>${escapeText(target)}</strong> ${surfaceState(true, reason)}<br><small>layer ${escapeText(renderBreakdownValue(diagnostic, 'layer', 'layer', 'default'))} · detail ${escapeText(detail)}</small></div>`;
+    }).join('') || '<div class="surface-row">No absence diagnostics exported.</div>';
+    return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2>
+      <p class="hint">Read-only render breakdown from runtime world-state evidence. This surface performs no writes, no commands, no scene mutation, and no browser runtime control.</p>
+      <div class="field-grid">${cards}</div>
+      <h3>Renderable draw order</h3>${elementRows}
+      <h3>Absence diagnostics</h3>${absenceRows}
+      <p class="hint">Disallowed actions: ${escapeText(disallowedActions.join(' · '))}</p>
+      <p class="hint">${escapeText(breakdown.boundary || readOnlyInspection.boundary || 'Display-only render breakdown inspection.')}</p>
     </section>`;
   }
 
@@ -1746,7 +1798,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1831,7 +1883,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
