@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-animation-invalid-missing-target",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "nodes": [{
+      "id": "root",
+      "localTransform": {
+        "translation": { "x": 0, "y": 0, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      }
+    }],
+    "animationClips": [{
+      "id": "orphan-clip",
+      "targetNodeId": "missing-node",
+      "channel": "translation",
+      "durationFrames": 4,
+      "keyframes": [
+        { "frame": 0, "value": { "x": 0, "y": 0, "z": 0 } },
+        { "frame": 4, "value": { "x": 1, "y": 0, "z": 0 } }
+      ]
+    }]
+  }
+}

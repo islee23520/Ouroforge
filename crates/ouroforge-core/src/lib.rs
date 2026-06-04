@@ -36124,6 +36124,18 @@ pub struct Scene3dGraph {
     pub colliders: Vec<Scene3dCollider>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cameras: Vec<Scene3dCamera>,
+    #[serde(
+        default,
+        rename = "animationClips",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub animation_clips: Vec<Scene3dAnimationClip>,
+    #[serde(
+        default,
+        rename = "animationStates",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub animation_states: Vec<Scene3dAnimationState>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -36262,6 +36274,60 @@ pub struct Scene3dCamera {
     pub transform: Scene3dTransform,
     pub projection: Scene3dProjection,
     pub viewport: Scene3dViewport,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dAnimationClip {
+    pub id: String,
+    #[serde(rename = "targetNodeId")]
+    pub target_node_id: String,
+    pub channel: String,
+    #[serde(rename = "durationFrames")]
+    pub duration_frames: i64,
+    #[serde(default)]
+    pub looped: bool,
+    pub keyframes: Vec<Scene3dAnimationKeyframe>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dAnimationKeyframe {
+    pub frame: i64,
+    pub value: Scene3dVector,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dAnimationState {
+    #[serde(rename = "clipId")]
+    pub clip_id: String,
+    #[serde(rename = "targetNodeId")]
+    pub target_node_id: String,
+    pub channel: String,
+    #[serde(rename = "currentFrame")]
+    pub current_frame: i64,
+    #[serde(rename = "currentTimeMs")]
+    pub current_time_ms: i64,
+    pub playing: bool,
+    #[serde(default)]
+    pub looped: bool,
+    #[serde(
+        default,
+        rename = "missingClipWarning",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub missing_clip_warning: Option<String>,
+    #[serde(
+        default,
+        rename = "malformedClipWarnings",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub malformed_clip_warnings: Vec<String>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -39682,6 +39748,7 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
     let material_ids = validate_scene_3d_material_refs(graph)?;
     let collider_ids = validate_scene_3d_colliders(graph)?;
     validate_scene_3d_cameras(graph, &node_ids)?;
+    validate_scene_3d_animations(graph, &node_ids)?;
     for node in &graph.nodes {
         if let Some(parent) = &node.parent {
             validate_path_component(&format!("scene3d node {} parent", node.id), parent)?;
@@ -39874,6 +39941,197 @@ fn validate_scene_3d_cameras(graph: &Scene3dGraph, node_ids: &BTreeSet<&str>) ->
         ));
     }
     Ok(())
+}
+
+fn validate_scene_3d_animations(graph: &Scene3dGraph, node_ids: &BTreeSet<&str>) -> Result<()> {
+    const MAX_3D_ANIMATION_CLIPS: usize = 32;
+    const MAX_3D_ANIMATION_STATES: usize = 32;
+    const MAX_3D_ANIMATION_KEYFRAMES: usize = 128;
+
+    if graph.animation_clips.len() > MAX_3D_ANIMATION_CLIPS {
+        return Err(anyhow!(
+            "scene3d animationClips must not exceed {MAX_3D_ANIMATION_CLIPS}"
+        ));
+    }
+    if graph.animation_states.len() > MAX_3D_ANIMATION_STATES {
+        return Err(anyhow!(
+            "scene3d animationStates must not exceed {MAX_3D_ANIMATION_STATES}"
+        ));
+    }
+
+    let mut clip_ids = BTreeSet::new();
+    let mut clips_by_id = BTreeMap::new();
+    for clip in &graph.animation_clips {
+        validate_path_component("scene3d animation clip id", &clip.id)?;
+        if !clip_ids.insert(clip.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d animation clip id: {}", clip.id));
+        }
+        validate_scene_3d_animation_channel(
+            &format!("scene3d animation clip {}", clip.id),
+            &clip.channel,
+        )?;
+        validate_path_component(
+            &format!("scene3d animation clip {} targetNodeId", clip.id),
+            &clip.target_node_id,
+        )?;
+        if !node_ids.contains(clip.target_node_id.as_str()) {
+            return Err(anyhow!(
+                "scene3d animation clip {} references missing targetNodeId: {}",
+                clip.id,
+                clip.target_node_id
+            ));
+        }
+        if clip.duration_frames <= 0 {
+            return Err(anyhow!(
+                "scene3d animation clip {} durationFrames must be positive",
+                clip.id
+            ));
+        }
+        if clip.keyframes.is_empty() {
+            return Err(anyhow!(
+                "scene3d animation clip {} keyframes must not be empty",
+                clip.id
+            ));
+        }
+        if clip.keyframes.len() > MAX_3D_ANIMATION_KEYFRAMES {
+            return Err(anyhow!(
+                "scene3d animation clip {} keyframes must not exceed {MAX_3D_ANIMATION_KEYFRAMES}",
+                clip.id
+            ));
+        }
+        let mut previous_frame = None;
+        for keyframe in &clip.keyframes {
+            if keyframe.frame < 0 || keyframe.frame > clip.duration_frames {
+                return Err(anyhow!(
+                    "scene3d animation clip {} keyframe frame must be between 0 and durationFrames",
+                    clip.id
+                ));
+            }
+            if let Some(previous) = previous_frame {
+                if keyframe.frame <= previous {
+                    return Err(anyhow!(
+                        "scene3d animation clip {} keyframes must be strictly increasing",
+                        clip.id
+                    ));
+                }
+            }
+            previous_frame = Some(keyframe.frame);
+            validate_scene_3d_vector(
+                &format!(
+                    "scene3d animation clip {} keyframe {} value",
+                    clip.id, keyframe.frame
+                ),
+                &keyframe.value,
+            )?;
+            if clip.channel == "scale"
+                && (keyframe.value.x == 0 || keyframe.value.y == 0 || keyframe.value.z == 0)
+            {
+                return Err(anyhow!(
+                    "scene3d animation clip {} scale keyframe axes must be non-zero",
+                    clip.id
+                ));
+            }
+        }
+        validate_scene_metadata(
+            &format!("scene3d animation clip {} metadata", clip.id),
+            &clip.metadata,
+        )?;
+        clips_by_id.insert(clip.id.as_str(), clip);
+    }
+
+    for state in &graph.animation_states {
+        validate_path_component("scene3d animation state clipId", &state.clip_id)?;
+        validate_path_component(
+            &format!("scene3d animation state {} targetNodeId", state.clip_id),
+            &state.target_node_id,
+        )?;
+        validate_scene_3d_animation_channel(
+            &format!("scene3d animation state {}", state.clip_id),
+            &state.channel,
+        )?;
+        if state.current_frame < 0 {
+            return Err(anyhow!(
+                "scene3d animation state {} currentFrame must not be negative",
+                state.clip_id
+            ));
+        }
+        if state.current_time_ms < 0 {
+            return Err(anyhow!(
+                "scene3d animation state {} currentTimeMs must not be negative",
+                state.clip_id
+            ));
+        }
+        if !state.malformed_clip_warnings.is_empty() {
+            for (index, warning) in state.malformed_clip_warnings.iter().enumerate() {
+                require_bounded_display_text(
+                    &format!(
+                        "scene3d animation state {} malformedClipWarnings[{index}]",
+                        state.clip_id
+                    ),
+                    warning,
+                )?;
+            }
+        }
+        if let Some(clip) = clips_by_id.get(state.clip_id.as_str()) {
+            if state.target_node_id != clip.target_node_id {
+                return Err(anyhow!(
+                    "scene3d animation state {} targetNodeId does not match clip targetNodeId {}",
+                    state.clip_id,
+                    clip.target_node_id
+                ));
+            }
+            if state.channel != clip.channel {
+                return Err(anyhow!(
+                    "scene3d animation state {} channel does not match clip channel {}",
+                    state.clip_id,
+                    clip.channel
+                ));
+            }
+            if state.current_frame > clip.duration_frames {
+                return Err(anyhow!(
+                    "scene3d animation state {} currentFrame exceeds clip durationFrames",
+                    state.clip_id
+                ));
+            }
+        } else {
+            let warning = state.missing_clip_warning.as_deref().ok_or_else(|| {
+                anyhow!(
+                    "scene3d animation state {} references missing clip without missingClipWarning",
+                    state.clip_id
+                )
+            })?;
+            require_bounded_display_text(
+                &format!(
+                    "scene3d animation state {} missingClipWarning",
+                    state.clip_id
+                ),
+                warning,
+            )?;
+            if !node_ids.contains(state.target_node_id.as_str()) {
+                return Err(anyhow!(
+                    "scene3d animation state {} references missing targetNodeId: {}",
+                    state.clip_id,
+                    state.target_node_id
+                ));
+            }
+        }
+        validate_scene_metadata(
+            &format!("scene3d animation state {} metadata", state.clip_id),
+            &state.metadata,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn validate_scene_3d_animation_channel(field: &str, channel: &str) -> Result<()> {
+    validate_path_component(&format!("{field} channel"), channel)?;
+    match channel {
+        "translation" | "rotation" | "scale" => Ok(()),
+        other => Err(anyhow!(
+            "{field} has unsupported animation channel: {other}"
+        )),
+    }
 }
 
 fn validate_scene_3d_projection(camera_id: &str, projection: &Scene3dProjection) -> Result<()> {
@@ -69983,6 +70241,80 @@ scenarios:
         assert!(empty_error
             .to_string()
             .contains("colliderRef references missing collider"));
+    }
+
+    #[test]
+    fn scene_3d_animation_v1_accepts_bounded_clip_and_state_fixture() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-animation-valid.scene.json",
+        ))
+        .expect("3D animation fixture parses");
+
+        validate_scene(&scene).expect("3D animation fixture validates");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.animation_clips.len(), 1);
+        let clip = &graph.animation_clips[0];
+        assert_eq!(clip.id, "cube-rise");
+        assert_eq!(clip.target_node_id, "animated-cube");
+        assert_eq!(clip.channel, "translation");
+        assert_eq!(clip.duration_frames, 12);
+        assert!(clip.looped);
+        assert_eq!(clip.keyframes.len(), 3);
+        assert_eq!(clip.keyframes[1].value, Scene3dVector { x: 0, y: 3, z: 0 });
+
+        assert_eq!(graph.animation_states.len(), 2);
+        assert_eq!(graph.animation_states[0].clip_id, "cube-rise");
+        assert_eq!(graph.animation_states[0].current_frame, 6);
+        assert!(graph.animation_states[0].playing);
+        assert_eq!(
+            graph.animation_states[1].missing_clip_warning.as_deref(),
+            Some("clip missing from bounded fixture catalog")
+        );
+        assert_eq!(graph.animation_states[1].malformed_clip_warnings.len(), 1);
+    }
+
+    #[test]
+    fn scene_3d_animation_v1_rejects_missing_target_malformed_clip_and_state_drift() {
+        for (fixture, expected) in [
+            (
+                "examples/3d-capability-gate-v1/scene-3d-animation-invalid-missing-target.scene.json",
+                "references missing targetNodeId",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-animation-invalid-malformed-clip.scene.json",
+                "scale keyframe axes must be non-zero",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-animation-invalid-state-drift.scene.json",
+                "channel does not match clip channel",
+            ),
+        ] {
+            let scene: SceneDocument = serde_json::from_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
+            let error =
+                validate_scene(&scene).expect_err("fixture rejected by animation validation");
+            assert!(
+                error.to_string().contains(expected),
+                "{fixture} error {error:#} contains {expected}"
+            );
+        }
+
+        let mut missing_without_warning: serde_json::Value =
+            serde_json::from_str(&read_json_fixture(
+                "examples/3d-capability-gate-v1/scene-3d-animation-valid.scene.json",
+            ))
+            .expect("valid animation fixture json");
+        missing_without_warning["scene3d"]["animationStates"][1]
+            .as_object_mut()
+            .expect("state object")
+            .remove("missingClipWarning");
+        let scene: SceneDocument = serde_json::from_str(&missing_without_warning.to_string())
+            .expect("missing-warning animation scene parses");
+        let error =
+            validate_scene(&scene).expect_err("missing clip state requires an explicit warning");
+        assert!(error
+            .to_string()
+            .contains("references missing clip without missingClipWarning"));
     }
 
     #[test]

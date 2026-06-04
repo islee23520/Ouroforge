@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-animation-valid",
+  "bounds": {
+    "width": 640,
+    "height": 360
+  },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "nodes": [
+      {
+        "id": "animated-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "metadata": {
+          "fixtureScope": "bounded 3D animation state model fixture"
+        }
+      },
+      {
+        "id": "warning-target",
+        "localTransform": {
+          "translation": { "x": 4, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        }
+      }
+    ],
+    "animationClips": [
+      {
+        "id": "cube-rise",
+        "targetNodeId": "animated-cube",
+        "channel": "translation",
+        "durationFrames": 12,
+        "looped": true,
+        "keyframes": [
+          { "frame": 0, "value": { "x": 0, "y": 0, "z": 0 } },
+          { "frame": 6, "value": { "x": 0, "y": 3, "z": 0 } },
+          { "frame": 12, "value": { "x": 0, "y": 0, "z": 0 } }
+        ],
+        "metadata": {
+          "capabilityGate": "transform clip only; no skeletal animation, graph editor, retargeting, or IK"
+        }
+      }
+    ],
+    "animationStates": [
+      {
+        "clipId": "cube-rise",
+        "targetNodeId": "animated-cube",
+        "channel": "translation",
+        "currentFrame": 6,
+        "currentTimeMs": 100,
+        "playing": true,
+        "looped": true
+      },
+      {
+        "clipId": "missing-preview-clip",
+        "targetNodeId": "warning-target",
+        "channel": "rotation",
+        "currentFrame": 0,
+        "currentTimeMs": 0,
+        "playing": false,
+        "looped": false,
+        "missingClipWarning": "clip missing from bounded fixture catalog",
+        "malformedClipWarnings": [
+          "state retained for read-only warning evidence"
+        ]
+      }
+    ],
+    "metadata": {
+      "generatedStateBoundary": "tracked fixture only; runtime playback evidence remains generated and untracked"
+    }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D animation state fixture, not skeletal authoring or production animation graph evidence"
+  }
+}

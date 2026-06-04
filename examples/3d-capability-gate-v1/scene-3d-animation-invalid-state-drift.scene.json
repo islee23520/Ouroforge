@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-animation-invalid-state-drift",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "nodes": [{
+      "id": "root",
+      "localTransform": {
+        "translation": { "x": 0, "y": 0, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      }
+    }],
+    "animationClips": [{
+      "id": "spin",
+      "targetNodeId": "root",
+      "channel": "rotation",
+      "durationFrames": 10,
+      "keyframes": [
+        { "frame": 0, "value": { "x": 0, "y": 0, "z": 0 } },
+        { "frame": 10, "value": { "x": 0, "y": 90, "z": 0 } }
+      ]
+    }],
+    "animationStates": [{
+      "clipId": "spin",
+      "targetNodeId": "root",
+      "channel": "translation",
+      "currentFrame": 2,
+      "currentTimeMs": 33,
+      "playing": true,
+      "looped": false
+    }]
+  }
+}
