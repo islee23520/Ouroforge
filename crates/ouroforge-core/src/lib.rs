@@ -32489,6 +32489,7 @@ pub struct RunDashboardReadModel {
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
     pub fuzzing_plans: RunDashboardFuzzingPlans,
     pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
+    pub route_attempts: RunDashboardRouteAttempts,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -32794,6 +32795,24 @@ pub struct RunDashboardQaWorkerAssignments {
     pub malformed_count: usize,
     pub evidence_refs: Vec<String>,
     pub plans: Vec<QaWorkerAssignmentArtifact>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardRouteAttempts {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub attempt_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub blocked_count: usize,
+    pub inconclusive_count: usize,
+    pub unsupported_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub attempts: Vec<RouteAttemptEvidenceArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -33156,6 +33175,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
+    let route_attempts = read_dashboard_route_attempts(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -33215,6 +33235,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         qa_worker_assignments,
         fuzzing_plans,
         qa_scenario_candidates,
+        route_attempts,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -33741,6 +33762,140 @@ fn dashboard_artifact_is_qa_worker_assignment(artifact: &EvidenceArtifact) -> bo
         || artifact.id.contains("worker-assignment")
         || artifact.path.contains("qa-worker-assignment")
         || artifact.path.contains("worker-assignment")
+}
+
+fn dashboard_artifact_is_route_attempt(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("route_attempt_evidence")
+        || artifact.id.contains("route-attempt")
+        || artifact.id.contains("route_attempt")
+        || artifact.path.contains("route-attempt")
+        || artifact.path.contains("route_attempt")
+}
+
+fn read_dashboard_route_attempts(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardRouteAttempts> {
+    let artifacts =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_route_attempt)?;
+    let boundary = "Read-only route attempt evidence; dashboard/Studio surfaces must not run solvers, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim objective solvability or quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardRouteAttempts {
+            present: false,
+            empty_state: "No route attempt evidence is indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            attempt_count: 0,
+            passed_count: 0,
+            failed_count: 0,
+            blocked_count: 0,
+            inconclusive_count: 0,
+            unsupported_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            attempts: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut attempts = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<RouteAttemptEvidenceArtifact>(value.clone()) {
+            Ok(attempt) if validate_route_attempt_evidence_refs(run_dir, &attempt).is_ok() => {
+                evidence_refs.push(attempt.start_state.world_state_ref.clone());
+                evidence_refs.extend(attempt.evidence_refs.clone());
+                evidence_refs.extend(
+                    attempt
+                        .route
+                        .iter()
+                        .filter_map(|node| node.evidence_ref.clone()),
+                );
+                evidence_refs.extend(
+                    attempt
+                        .blockers
+                        .iter()
+                        .filter_map(|blocker| blocker.evidence_ref.clone()),
+                );
+                attempts.push(attempt);
+            }
+            _ => malformed_count += 1,
+        }
+    }
+    attempts.sort_by(|left, right| {
+        (left.run_id.as_str(), left.attempt_id.as_str())
+            .cmp(&(right.run_id.as_str(), right.attempt_id.as_str()))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let attempt_count = attempts.len();
+    let passed_count = attempts
+        .iter()
+        .filter(|attempt| attempt.outcome == RouteAttemptOutcome::Passed)
+        .count();
+    let failed_count = attempts
+        .iter()
+        .filter(|attempt| attempt.outcome == RouteAttemptOutcome::Failed)
+        .count();
+    let blocked_count = attempts
+        .iter()
+        .filter(|attempt| attempt.outcome == RouteAttemptOutcome::Blocked)
+        .count();
+    let inconclusive_count = attempts
+        .iter()
+        .filter(|attempt| attempt.outcome == RouteAttemptOutcome::Inconclusive)
+        .count();
+    let unsupported_count = attempts
+        .iter()
+        .filter(|attempt| attempt.outcome == RouteAttemptOutcome::Unsupported)
+        .count();
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if unsupported_count > 0 {
+        "unsupported"
+    } else if failed_count > 0 {
+        "failed"
+    } else if inconclusive_count > 0 {
+        "inconclusive"
+    } else if attempt_count > 0 && passed_count == attempt_count {
+        "passed"
+    } else if attempt_count > 0 {
+        "attempted"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardRouteAttempts {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        attempt_count,
+        passed_count,
+        failed_count,
+        blocked_count,
+        inconclusive_count,
+        unsupported_count,
+        malformed_count,
+        evidence_refs,
+        attempts,
+        artifacts,
+        boundary,
+    })
 }
 
 fn read_dashboard_qa_worker_assignments(
@@ -41323,6 +41478,104 @@ scenarios:
         let missing_objective = validate_route_attempt_evidence_refs(&artifacts.run_dir, &attempt)
             .expect_err("objective evidence is required");
         assert!(missing_objective.to_string().contains("objectiveId"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn route_attempt_dashboard_read_model_links_route_objective_and_world_state_evidence() {
+        let (missing_root, missing_artifacts) = create_test_run("route-attempt-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.route_attempts.present);
+        assert_eq!(missing.route_attempts.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("route-attempt-dashboard-present");
+        let mut attempt = RouteAttemptEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        ))
+        .expect("success fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        attempt.run_id = json_string(&run, "id").expect("run id present");
+
+        let mut refs = vec![attempt.start_state.world_state_ref.clone()];
+        refs.extend(attempt.evidence_refs.clone());
+        refs.extend(
+            attempt
+                .route
+                .iter()
+                .filter_map(|node| node.evidence_ref.clone()),
+        );
+        refs.sort();
+        refs.dedup();
+        for reference in &refs {
+            fs::create_dir_all(
+                artifacts
+                    .run_dir
+                    .join(Path::new(reference).parent().expect("reference has parent")),
+            )
+            .expect("reference parent exists");
+            let mut value = json!({
+                "runId": attempt.run_id,
+                "scenarioId": attempt.scenario_id,
+                "objectiveId": attempt.objective_id,
+                "artifact": "route_attempt_link_fixture"
+            });
+            if reference == &attempt.start_state.world_state_ref {
+                value["stateId"] = json!(attempt.start_state.state_id);
+            }
+            write_json(&artifacts.run_dir.join(reference), &value).expect("route reference writes");
+            add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("route-dashboard-link-{}", reference.replace('/', "-")),
+                "application/json",
+                reference,
+                json!({ "artifact": "route_attempt_link_fixture" }),
+            )
+            .expect("route reference indexed");
+        }
+
+        let route_path = "evidence/route-attempts/route-attempt.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/route-attempts"))
+            .expect("route attempt evidence dir exists");
+        write_json(&artifacts.run_dir.join(route_path), &json!(attempt))
+            .expect("route attempt writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "route-attempt-evidence",
+            "application/json",
+            route_path,
+            json!({ "artifact": "route_attempt_evidence" }),
+        )
+        .expect("route attempt indexed");
+
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.route_attempts.present);
+        assert_eq!(dashboard.route_attempts.status, "passed");
+        assert_eq!(dashboard.route_attempts.attempt_count, 1);
+        assert_eq!(dashboard.route_attempts.passed_count, 1);
+        assert!(dashboard
+            .route_attempts
+            .evidence_refs
+            .contains(&route_path.to_string()));
+        assert!(dashboard
+            .route_attempts
+            .evidence_refs
+            .contains(&"evidence/scenarios/collect-and-exit/world-state-start.json".to_string()));
+        assert!(dashboard
+            .route_attempts
+            .boundary
+            .contains("must not run solvers"));
+
+        write_json(
+            &artifacts.run_dir.join(route_path),
+            &json!({ "schemaVersion": "bad" }),
+        )
+        .expect("malformed route attempt writes");
+        let malformed = read_dashboard_run(&artifacts.run_dir).expect("malformed dashboard reads");
+        assert!(malformed.route_attempts.present);
+        assert_eq!(malformed.route_attempts.status, "malformed");
+        assert_eq!(malformed.route_attempts.malformed_count, 1);
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

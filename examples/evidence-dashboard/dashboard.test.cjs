@@ -101,6 +101,29 @@ const run = {
       { invariantId: '<script>bad</script>', invariantType: 'finite_transform', status: 'passed', targetPath: 'player.transform', evidenceRefs: ['evidence/scenarios/scaffold-smoke/world-state.json'] },
     ] }],
   },
+  route_attempts: {
+    present: true,
+    status: 'passed',
+    attempt_count: 1,
+    passed_count: 1,
+    failed_count: 0,
+    blocked_count: 0,
+    inconclusive_count: 0,
+    unsupported_count: 0,
+    malformed_count: 0,
+    evidence_refs: ['evidence/route-attempts/route-attempt.json', 'evidence/scenarios/collect-and-exit/world-state-start.json'],
+    boundary: 'Read-only route attempt evidence; dashboard must not run solvers.',
+    attempts: [{
+      attemptId: 'qa14_6_collect_goal_route',
+      runId: 'run-1',
+      objectiveId: 'collect-goal-then-exit',
+      scenarioId: 'collect-and-exit',
+      startState: { stateId: 'start-left-of-goal', worldStateRef: 'evidence/scenarios/collect-and-exit/world-state-start.json' },
+      strategyKind: 'simple_heuristic',
+      outcome: 'passed',
+      budgetUsed: { maxActions: 8, actionsUsed: 2, maxRouteNodes: 8, routeNodesUsed: 2 },
+    }],
+  },
   qa_scenario_candidates: {
     present: true,
     status: 'proposed',
@@ -783,6 +806,9 @@ assert.match(dashboard.renderSourceApplyWorktreeContext(run), /browser\/dashboar
 assert.match(dashboard.renderRuntimeInvariants(run), /Runtime invariant evidence refs/);
 assert.match(dashboard.renderRuntimeInvariants(run), /health was negative/);
 assert.match(dashboard.renderRuntimeInvariants(run), /qa14_5_runtime_dashboard/);
+assert.match(dashboard.renderRouteAttempts(run), /Route attempt evidence refs/);
+assert.match(dashboard.renderRouteAttempts(run), /qa14_6_collect_goal_route/);
+assert.match(dashboard.renderRouteAttempts(run), /collect-goal-then-exit/);
 assert.match(dashboard.renderQaScenarioCandidates(run), /QA scenario candidate refs/);
 assert.match(dashboard.renderQaScenarioCandidates(run), /qa14_2_collect_and_exit_gap/);
 assert.match(dashboard.renderQaScenarioCandidates(run), /collect-goal-then-exit/);
@@ -801,6 +827,7 @@ assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
 assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
+assert.match(dashboard.renderRunDetail(run), /Route attempt evidence/);
 assert.match(dashboard.renderRunDetail(run), /QA scenario candidates/);
 assert.match(dashboard.renderRunDetail(run), /Adversarial input fuzzing plans/);
 assert.match(dashboard.renderRunDetail(run), /QA worker assignments/);
@@ -810,6 +837,7 @@ assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, emp
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
 assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
+assert.match(dashboard.renderRouteAttempts({ route_attempts: { present: false, empty_state: 'No route attempt evidence' } }), /No route attempt evidence/);
 assert.match(dashboard.renderQaScenarioCandidates({ qa_scenario_candidates: { present: false, empty_state: 'No candidate evidence' } }), /No candidate evidence/);
 assert.match(dashboard.renderFuzzingPlans({ fuzzing_plans: { present: false, empty_state: 'No fuzzing plan evidence' } }), /No fuzzing plan evidence/);
 assert.match(dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: false, empty_state: 'No worker assignment evidence' } }), /No worker assignment evidence/);
@@ -835,6 +863,29 @@ const xssRun = {
   asset_loading: { present: true, attempt_count: 1, loaded_count: 0, failed_count: 1, rejected_count: 0, fallback_count: 0, evidence_refs: ['javascript:alert(1)'], boundary: '<script>boundary</script>', records: [{ attemptId: '<script>attempt</script>', assetId: '<img src=x onerror=alert(1)>', path: '<b>bad</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] },
   asset_preview: { present: true, preview_count: 1, warning_count: 1, evidence_refs: ['javascript:alert(1)'], boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>', image: { width: '<script>', height: '<img>' } }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>', path: '<b>bad</b>' }] },
   source_apply_worktree_context: { present: true, status: '<script>blocked</script>', target_count: 1, blocked_count: 1, evidence_refs: ['javascript:alert(1)'], boundary: '<script>context-boundary</script>', reports: [{ status: '<script>blocked</script>', policyId: '<script>policy</script>', branch: '<script>branch</script>', headCommit: '<script>head</script>', worktreeRoot: '<b>worktree</b>', lockStatus: { active: true, attemptId: '<script>attempt</script>' }, blockedReasons: ['<script>blocked reason</script>'], guardrails: ['<script>guardrail</script>'], targets: [{ path: '<img src=x onerror=alert(1)>', gitStatus: '<script>modified</script>', rootZone: '<script>root</script>', fileClassDecision: '<script>allowed</script>', blockedReasons: ['<script>target reason</script>'] }] }] },
+  route_attempts: {
+    present: true,
+    status: 'passed',
+    attempt_count: 1,
+    passed_count: 1,
+    failed_count: 0,
+    blocked_count: 0,
+    inconclusive_count: 0,
+    unsupported_count: 0,
+    malformed_count: 0,
+    evidence_refs: ['evidence/route-attempts/route-attempt.json', 'evidence/scenarios/collect-and-exit/world-state-start.json'],
+    boundary: 'Read-only route attempt evidence; dashboard must not run solvers.',
+    attempts: [{
+      attemptId: 'qa14_6_collect_goal_route',
+      runId: 'run-1',
+      objectiveId: 'collect-goal-then-exit',
+      scenarioId: 'collect-and-exit',
+      startState: { stateId: 'start-left-of-goal', worldStateRef: 'evidence/scenarios/collect-and-exit/world-state-start.json' },
+      strategyKind: 'simple_heuristic',
+      outcome: 'passed',
+      budgetUsed: { maxActions: 8, actionsUsed: 2, maxRouteNodes: 8, routeNodesUsed: 2 },
+    }],
+  },
   qa_scenario_candidates: {
     present: true,
     status: '<script>proposed</script>',
@@ -891,6 +942,7 @@ assert.ok(!sourceApplyXss.includes('<img src=x onerror=alert(1)>'), 'source appl
 const invariantXss = dashboard.renderRuntimeInvariants({ runtime_invariants: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], summaries: [{ modelId: '<script>model</script>', runId: '<script>run</script>' }], evidence: [{ checks: [{ invariantId: '<script>check</script>', invariantType: '<script>type</script>', status: '<script>status</script>', targetPath: '<script>target</script>', message: '<script>message</script>' }] }] } });
 assert.ok(!invariantXss.includes('<script>check</script>'), 'runtime invariant check ids must be escaped');
 assert.ok(!invariantXss.includes('<script>boundary</script>'), 'runtime invariant boundary must be escaped');
+const routeAttemptXss = dashboard.renderRouteAttempts({ route_attempts: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], attempts: [{ attemptId: '<script>attempt</script>', outcome: '<script>outcome</script>', strategyKind: '<script>strategy</script>', objectiveId: '<script>objective</script>', scenarioId: '<script>scenario</script>', startState: { stateId: '<script>state</script>' }, budgetUsed: { actionsUsed: '<script>actions</script>' }, blockers: [{ reason: '<script>blocked</script>' }] }] } });
 const candidateXss = dashboard.renderQaScenarioCandidates({ qa_scenario_candidates: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], candidates: [{ candidateId: '<script>candidate</script>', priority: '<script>priority</script>', status: '<script>status</script>', sourceRisk: { riskId: '<script>risk</script>' }, targetObjective: { objectiveId: '<script>objective</script>', description: '<script>description</script>' }, inputStrategy: { kind: '<script>input</script>' }, budget: { maxRuns: '<script>runs</script>' }, blockedReasons: ['<script>blocked</script>'], expectedEvidence: [{ evidenceId: '<script>evidence</script>' }] }] } });
 assert.ok(!candidateXss.includes('<script>candidate</script>'), 'scenario candidate ids must be escaped');
 assert.ok(!candidateXss.includes('<script>boundary</script>'), 'scenario candidate boundary must be escaped');
