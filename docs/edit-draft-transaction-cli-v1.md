@@ -1,6 +1,6 @@
 # Edit Draft to Transaction CLI v1
 
-Status: **implemented for Visual Authoring v1 / issue #348**.
+Status: **implemented for Visual Authoring v1 / issues #348 and #350**.
 
 The edit-draft CLI is the Rust-trusted boundary for turning visual edit draft
 JSON into reviewable transaction previews and, for accepted scene-only changes,
@@ -48,11 +48,18 @@ cargo run -p ouroforge-cli -- edit draft-apply <draft.json> \
 ```
 
 `draft-apply` is review-gated and scene-only. It requires an explicit review
-decision id, verifies the proposal/decision through the existing mutation review
-ledger, requires exactly one scene operation, validates the target scene/hash,
-and writes the transaction artifact only through the trusted Rust CLI boundary.
-Accepted apply output preserves rollback/application metadata from the existing
-scene-only mutation path.
+decision id, verifies the draft `reviewGate` proposal, patch draft, accepted
+decision, and review hashes through the existing mutation review ledger, requires
+exactly one scene operation, validates the target scene/hash, and writes the
+transaction artifact only through the trusted Rust CLI boundary. Accepted apply
+output preserves rollback/application metadata from the existing scene-only
+mutation path and appends `mutation/visual-edit-applications.json` with draft,
+proposal, patch draft, decision, transaction, before/after hash, rollback, and
+display-only command-context evidence.
+
+The stored command context is a reproducibility/rerun aid only. Dashboards and
+Studio may render it as escaped text for manual copy, but they must not execute
+it, auto-rerun scenarios, auto-apply drafts, or infer trusted state from it.
 
 ## Safety boundaries
 
@@ -63,12 +70,27 @@ scene-only mutation path.
 - `draft-apply` supports scene drafts only in this milestone and requires a
   review decision. Tilemap and asset-reference apply paths are not authorized by
   #348.
+- `mutation/visual-edit-applications.json` is an audit/read-model artifact. It
+  may feed journals, regression review, and loop/status inspection, but it does
+  not grant any browser or Studio authority to replay commands.
 - Generated draft, transaction, preview, evidence, and run output belongs under
   ignored generated roots such as `runs/`, `.omx/`, or other explicitly ignored
   local state. Do not commit generated smoke output.
 - This milestone does not authorize source mutation, browser apply, auto-apply,
   auto-accept, auto-merge, dependency/CI mutation, production editor claims, or
   narrowing/closing #1 or #23.
+
+## VA1.8.3 rerun, regression, and loop compatibility
+
+The review-gated visual edit apply lifecycle is compatible with existing review, rerun, regression, and loop surfaces by recording local evidence for later operators to inspect without adding automation:
+
+- `reviewGate.proposalId`, `reviewGate.patchDraftId`, and `reviewGate.reviewDecisionId` bind the draft to review evidence before apply.
+- The apply response and `mutation/visual-edit-applications.json` record draft/proposal/patch-draft/decision ids, transaction id, target scene path, before/after scene hashes, rollback metadata, and reproducible `commandContext`.
+- Rerun context remains explicit command text/evidence only. A human or loop operator may use the recorded command context and transaction artifact as inputs to existing rerun/compare workflows, but Ouroforge does not auto-rerun scenarios from `draft-apply`, dashboard, Studio, or loop read-model surfaces.
+- Regression promotion remains the existing review-gated Rust CLI flow. Visual edit apply evidence may be linked as provenance, but it does not promote scenarios, write scenario packs, or mark matrix status by itself.
+- Authoring loop status/read models may display the visual edit application, rollback refs, command context, rerun/compare refs, and blockers as escaped read-only state. Browser surfaces must not resume loops, execute commands, apply mutations, promote regressions, repair refs, or hide failed/stale evidence.
+
+This compatibility layer is documentation and evidence linkage only. It does not add auto-rerun, browser apply, browser command execution, hidden retries, source mutation, or any new trusted write path.
 
 ## Smoke evidence procedure
 

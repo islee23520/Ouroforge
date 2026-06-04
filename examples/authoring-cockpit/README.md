@@ -57,6 +57,8 @@ apply buttons, browser persistence, trusted writes, command execution, local
 server bridge, or review-decision controls; any trusted write remains routed
 through Rust CLI transactions and review-gated apply.
 
+Review-gated visual edit application evidence may appear in exported lifecycle data such as `mutation/visual-edit-applications.json`, review cockpit cards, journal sections, loop status/read-model summaries, or handoff evidence refs. The cockpit may render draft/proposal/patch-draft/decision ids, transaction links, before/after hashes, rollback metadata, rerun/compare refs, and reproducible command context as escaped read-only diagnostics. It must not turn those fields into apply, rerun, promote, resume, repair, or command-execution controls.
+
 ## Studio v3 demo surfaces
 
 The cockpit composes completed local surfaces only:

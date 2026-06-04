@@ -175,6 +175,10 @@ Loop state should make interruption visible, not hidden:
 - resume should require compatible plan/run/project context;
 - handoff artifacts should tell the next operator what happened and what remains.
 
+## Visual edit application read-model compatibility
+
+Review-gated visual edit applies are compatible with the loop as evidence, not as automation. When `mutation/visual-edit-applications.json` is present, loop status, evidence bundles, and handoff records may reference the visual application id, draft/proposal/review decision ids, transaction artifact, rollback hash, and inert apply command context. The loop must still stop at explicit manual gates: VA1.8.3 does not add auto-rerun after apply, auto-promotion after comparison, browser command execution, or hidden retries. Missing or malformed visual application artifacts should be reported as blocked/partial evidence instead of inferred from scene files or review decisions.
+
 ## Evidence bundle and handoff policy
 
 #308 adds the generated local loop evidence bundle index. Bundles live under `runs/authoring-loop-bundles/<loop-id>/bundle.json`, validate referenced generated artifacts, report explicit missing/stale refs, and are exported to dashboard/cockpit as read-only evidence. They are not storage backends, package exports, browser write surfaces, servers, or retention policies. #309 adds Agent Handoff Contract v1 under `runs/agent-handoffs/<loop-id>/handoff.json`; it records next safe action, blockers, required decisions, inert allowed command text, forbidden actions, evidence refs, guardrails, and an advisory/no-execution boundary for read-only dashboard/cockpit display.

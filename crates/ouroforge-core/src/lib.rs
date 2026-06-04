@@ -10141,7 +10141,7 @@ fn push_unique_ref(refs: &mut Vec<String>, value: &str) {
 fn classify_failure_category(
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
-    journal: &str,
+    _journal: &str,
     evidence_refs: &[String],
 ) -> (MutationClassificationCategory, String) {
     if evidence_refs.is_empty() {
@@ -10158,7 +10158,6 @@ fn classify_failure_category(
             .and_then(|value| value.as_str())
             .unwrap_or_default()
             .to_string(),
-        journal.to_string(),
         evidence_refs.join(" "),
     ]
     .join(" ")
@@ -14943,6 +14942,11 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
             Ok(index) => (index.applications, None),
             Err(error) => (Vec::new(), Some(error.to_string())),
         };
+    let (visual_applications, visual_application_read_error) =
+        match read_visual_edit_draft_applications(run_dir) {
+            Ok(index) => (index.applications, None),
+            Err(error) => (Vec::new(), Some(error.to_string())),
+        };
     let comparison = read_dashboard_comparison(run_dir);
     let regression_promotions = read_regression_promotion_records(run_dir);
     let mut journal = render_journal(
@@ -14953,6 +14957,10 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
         &reviews,
         &applications,
         application_read_error.as_deref(),
+        (
+            &visual_applications,
+            visual_application_read_error.as_deref(),
+        ),
         &comparison,
         &regression_promotions,
     ));
@@ -15281,6 +15289,7 @@ fn render_authoring_governance_journal_section(
     reviews: &[MutationReviewDecision],
     applications: &[SceneOnlyMutationApplicationRecord],
     application_read_error: Option<&str>,
+    visual_applications: (&[VisualEditDraftApplicationRecord], Option<&str>),
     comparison: &RunDashboardComparison,
     promotions: &[RegressionPromotionPackResult],
 ) -> String {
@@ -15441,6 +15450,51 @@ fn render_authoring_governance_journal_section(
                     project.project_id, project.manifest_path, project.scene_path
                 ));
             }
+        }
+    }
+
+    out.push_str(
+        "
+### Visual Draft Applications
+
+",
+    );
+    let (visual_applications, visual_application_read_error) = visual_applications;
+    if let Some(error) = visual_application_read_error {
+        out.push_str(&format!(
+            "- Visual draft application artifact is present but malformed: {}\n",
+            error
+        ));
+    } else if visual_applications.is_empty() {
+        out.push_str(
+            "- No visual draft applications recorded.
+",
+        );
+    } else {
+        for application in visual_applications {
+            out.push_str(&format!(
+                "- `{}`: status `{}` draft `{}` proposal `{}` patch draft `{}` decision `{}` transaction `{}`
+",
+                application.id,
+                application.status,
+                application.draft_id,
+                application.proposal_id,
+                application.patch_draft_id,
+                application.review_decision_id,
+                application.transaction_id
+            ));
+            out.push_str(&format!(
+                "  - Transaction artifact: `{}`; target scene `{}`; before `{}`; after `{}`
+",
+                application.transaction_artifact_path,
+                application.target_scene_path,
+                application.before_scene_hash.value,
+                application.after_scene_hash.value
+            ));
+            out.push_str(&format!(
+                "  - Rerun context is inert/display-only: `{}`\n",
+                application.command_context.command
+            ));
         }
     }
 
@@ -24308,6 +24362,10 @@ fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboar
             "mutation/scene-applications.json",
         ),
         (
+            "mutation-visual-edit-applications",
+            "mutation/visual-edit-applications.json",
+        ),
+        (
             "mutation-review-decisions",
             "mutation/review-decisions.json",
         ),
@@ -24987,6 +25045,14 @@ fn read_dashboard_mutation_lifecycle(
         ),
         dashboard_lifecycle_stage_from_json_file(
             run_dir,
+            "visual_draft_applied",
+            "Applied visual draft",
+            "applied",
+            "mutation/visual-edit-applications.json",
+            "applications",
+        ),
+        dashboard_lifecycle_stage_from_json_file(
+            run_dir,
             "reviewed",
             "Manual review",
             "pending_review",
@@ -25011,11 +25077,7 @@ fn dashboard_review_cockpit(
         dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "proposed", "Proposals");
     let decisions =
         dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "reviewed", "Review decisions");
-    let applications = dashboard_review_cockpit_stage_from_lifecycle(
-        lifecycle,
-        "scene_applied",
-        "Review-gated applications",
-    );
+    let applications = dashboard_review_cockpit_application_stage(lifecycle);
     let comparisons =
         dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "compared", "Rerun comparisons");
     let promotions = dashboard_review_cockpit_promotion_stage(promotions);
@@ -25055,6 +25117,43 @@ fn dashboard_review_cockpit(
         command_hints: lifecycle.command_hints.clone(),
         boundary: "read-only exported evidence; commands are inert text only".to_string(),
     }
+}
+
+fn dashboard_review_cockpit_application_stage(
+    lifecycle: &RunDashboardMutationLifecycle,
+) -> RunDashboardReviewCockpitStage {
+    let mut scene = dashboard_review_cockpit_stage_from_lifecycle(
+        lifecycle,
+        "scene_applied",
+        "Review-gated applications",
+    );
+    let visual = dashboard_review_cockpit_stage_from_lifecycle(
+        lifecycle,
+        "visual_draft_applied",
+        "Visual draft applications",
+    );
+    if scene.state == "missing" {
+        return visual;
+    }
+    if visual.state == "missing" {
+        return scene;
+    }
+    scene.id = "applications".to_string();
+    scene.label = "Review-gated applications".to_string();
+    scene.record_count += visual.record_count;
+    scene.record_ids.extend(visual.record_ids);
+    scene.record_ids.sort();
+    scene.record_ids.dedup();
+    scene.evidence_refs.extend(visual.evidence_refs);
+    scene.evidence_refs.sort();
+    scene.evidence_refs.dedup();
+    scene.artifact_path = Some(
+        "mutation/scene-applications.json + mutation/visual-edit-applications.json".to_string(),
+    );
+    if scene.state == "missing" {
+        scene.state = visual.state;
+    }
+    scene
 }
 
 fn dashboard_review_cockpit_stage_from_lifecycle(
@@ -25978,6 +26077,10 @@ scenarios:
                 "examples/visual-edit-draft-v1/valid/scene-operations.visual-edit-draft.json",
                 VisualEditDraftTargetType::Scene,
             ),
+            (
+                "examples/visual-edit-draft-v1/valid/scene-review-gated.visual-edit-draft.json",
+                VisualEditDraftTargetType::Scene,
+            ),
         ] {
             let input = read_visual_edit_draft_fixture(fixture);
             let draft: VisualEditDraftArtifact = serde_json::from_str(&input)
@@ -25993,6 +26096,16 @@ scenarios:
             draft
                 .validate()
                 .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            if fixture.contains("review-gated") {
+                let review_gate = draft.review_gate.as_ref().unwrap_or_else(|| {
+                    panic!("{fixture} must carry reviewGate fixture linkage")
+                });
+                assert_eq!(review_gate.proposal_id, "proposal-visual-rerun-context");
+                assert_eq!(
+                    draft.expected_after_summary,
+                    "Accepted visual edit application records inert command context for a later manual rerun without scheduling rerun or regression promotion."
+                );
+            }
 
             let serialized = serde_json::to_string_pretty(&draft).expect("draft serializes");
             let round_trip: VisualEditDraftArtifact =
@@ -34541,6 +34654,7 @@ scenarios:
             &[decision],
             &[application],
             None,
+            (&[], None),
             &comparison,
             &[promotion],
         );
@@ -34565,8 +34679,15 @@ scenarios:
             artifacts: Vec::new(),
         };
 
-        let journal =
-            render_authoring_governance_journal_section(&[], &[], &[], None, &comparison, &[]);
+        let journal = render_authoring_governance_journal_section(
+            &[],
+            &[],
+            &[],
+            None,
+            (&[], None),
+            &comparison,
+            &[],
+        );
 
         assert!(journal.contains("No mutation proposals recorded"));
         assert!(journal.contains("No review decisions recorded"));
@@ -34615,6 +34736,10 @@ scenarios:
             &[],
             &[],
             Some("failed to parse scene applications mutation/scene-applications.json"),
+            (
+                &[],
+                Some("failed to parse visual edit applications mutation/visual-edit-applications.json"),
+            ),
             &comparison,
             &[],
         );
@@ -37546,7 +37671,42 @@ scenarios:
 
         let index = read_visual_edit_draft_applications(&artifacts.run_dir)
             .expect("visual edit application index reads");
-        assert_eq!(index.applications, vec![application]);
+        assert_eq!(index.applications, vec![application.clone()]);
+        let lifecycle =
+            read_dashboard_mutation_lifecycle(&artifacts.run_dir, std::slice::from_ref(&proposal));
+        let visual_stage = lifecycle
+            .stages
+            .iter()
+            .find(|stage| stage.id == "visual_draft_applied")
+            .expect("visual draft application stage exported");
+        assert_eq!(visual_stage.state, "applied");
+        assert_eq!(visual_stage.record_count, 1);
+        assert_eq!(
+            visual_stage.artifact_path.as_deref(),
+            Some("mutation/visual-edit-applications.json")
+        );
+        let cockpit = dashboard_review_cockpit(&lifecycle, &[]);
+        assert_eq!(cockpit.applications.id, "applications");
+        assert_eq!(cockpit.applications.record_count, 2);
+        assert!(cockpit
+            .applications
+            .record_ids
+            .iter()
+            .any(|id| id.starts_with("visual-edit-application-")));
+        assert!(cockpit
+            .applications
+            .artifact_path
+            .as_deref()
+            .is_some_and(|path| path.contains("visual-edit-applications.json")));
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+        assert!(journal.contains("### Visual Draft Applications"));
+        assert!(journal.contains("Rerun context is inert/display-only"));
+        assert!(journal.contains("cargo run -p ouroforge-cli -- edit draft-apply draft.json"));
+        assert!(read_dashboard_run(&artifacts.run_dir)
+            .expect("dashboard reads")
+            .mutation_artifacts
+            .iter()
+            .any(|artifact| artifact.id == "mutation-visual-edit-applications"));
         let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
         assert!(ledger
             .iter()

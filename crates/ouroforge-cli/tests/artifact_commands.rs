@@ -761,11 +761,50 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
         visual_applications["applications"][0]["commandContext"]["schemaVersion"],
         "visual-edit-draft-apply-command-context-v1"
     );
+    assert_eq!(
+        visual_applications["applications"][0]["commandContext"]["runDir"]
+            .as_str()
+            .unwrap(),
+        run_dir.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        visual_applications["applications"][0]["commandContext"]["transactionOutput"]
+            .as_str()
+            .unwrap(),
+        transaction_output.to_string_lossy().as_ref()
+    );
+    assert!(
+        visual_applications["applications"][0]["commandContext"]["command"]
+            .as_str()
+            .unwrap()
+            .contains("edit draft-apply")
+    );
     assert!(
         visual_applications["applications"][0]["commandContext"]["guardrail"]
             .as_str()
             .unwrap()
             .contains("must not execute")
+    );
+    assert!(
+        !run_dir.join("mutation/rerun-orchestration.json").exists(),
+        "review-gated visual edit apply records rerun context only and must not auto-rerun"
+    );
+    assert!(
+        !run_dir
+            .join("mutation/run-comparison-before--after.json")
+            .exists(),
+        "review-gated visual edit apply must not auto-create rerun comparisons"
+    );
+    assert!(
+        !run_dir.join("regression-promotions").exists(),
+        "review-gated visual edit apply must not auto-promote regressions"
+    );
+    let scenario_pack: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(temp.join("scenarios/regression.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        scenario_pack["scenarioGroups"][0]["scenarios"][0]["id"], "preview-smoke",
+        "visual edit apply must not mutate regression fixtures or scenario packs"
     );
 
     fs::remove_dir_all(temp).ok();

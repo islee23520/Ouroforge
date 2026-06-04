@@ -14,7 +14,9 @@ The cockpit reads these existing/exported fields:
 
 - `run.review_cockpit` — normalized lifecycle summary for proposal, review,
   application, comparison, promotion, and matrix stages;
-- `run.mutation_lifecycle` — detailed proposal/review/application records;
+- `run.mutation_lifecycle` — detailed proposal/review/application records,
+  including `visual_draft_applied` records from
+  `mutation/visual-edit-applications.json` when visual draft apply has run;
 - `run.regression_promotions` — promotion records written by the Rust CLI;
 - top-level `regression_matrix`, copied onto the selected run by the static
   loader for display;
@@ -29,8 +31,8 @@ The cockpit displays:
 
 1. proposal rationale cards with evidence ids and expected effect;
 2. review decision cards with reviewer, state, reason, and evidence refs;
-3. review-gated scene application cards with transaction/project/rollback
-   provenance;
+3. review-gated scene and visual draft application cards with
+   transaction/project/rollback provenance plus inert rerun command context;
 4. regression promotion status cards and display-only dry-run command text;
 5. regression matrix cards with current status, last pass/fail, and linked
    mutation/review/promotion context counts;
@@ -43,6 +45,8 @@ Allowed:
 - display exported lifecycle state;
 - render evidence links through the existing static artifact path policy;
 - show copyable command strings as inert text;
+- show visual draft apply command context as escaped, display-only
+  reproducibility evidence;
 - show missing/malformed data explicitly.
 
 Not allowed:

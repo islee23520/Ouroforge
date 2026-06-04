@@ -949,9 +949,11 @@ const OuroforgeCockpit = (() => {
     }
     const proposed = mutationStage(lifecycle, 'proposed');
     const applied = mutationStage(lifecycle, 'scene_applied');
+    const visualApplied = mutationStage(lifecycle, 'visual_draft_applied');
     const runDir = run?.summary?.run_dir || (run?.summary?.id ? `runs/${run.summary.id}` : 'runs/run-1');
     const proposedRecords = Array.isArray(proposed?.records) ? proposed.records : [];
     const appliedRecords = Array.isArray(applied?.records) ? applied.records : [];
+    const visualAppliedRecords = Array.isArray(visualApplied?.records) ? visualApplied.records : [];
     const firstApplication = appliedRecords[0] || {};
     const targetScenePath = firstApplication.targetScenePath || DEFAULT_SCENE_PATH;
     const transactionPath = firstApplication.transactionArtifactPath || 'mutation/scene-transaction.json';
@@ -976,6 +978,10 @@ const OuroforgeCockpit = (() => {
         : '<br><small>legacy/no review decision linkage recorded</small>';
       return `<div class="surface-row"><strong>${escapeText(record.id || 'scene application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>proposal ${escapeText(record.proposalId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small>${decisionLine}<br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small>${projectLine}${rollbackLine}</div>`;
     }).join('') || '<p class="empty compact">No scene-only mutation application records loaded yet.</p>';
+    const visualApplicationRows = visualAppliedRecords.slice(0, 3).map((record) => {
+      const command = record.commandContext?.command || 'no command context recorded';
+      return `<div class="surface-row"><strong>${escapeText(record.id || 'visual draft application')}</strong> ${surfaceState(record.status !== 'failed', record.status || 'applied')}<br><small>draft ${escapeText(record.draftId || 'unknown')} · proposal ${escapeText(record.proposalId || 'unknown')} · patch draft ${escapeText(record.patchDraftId || 'unknown')}</small><br><small>review decision ${escapeText(record.reviewDecisionId || 'unknown')} · transaction ${escapeText(record.transactionId || 'unknown')}</small><br><small>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</small><br><small>display-only rerun context: ${escapeText(command)}</small></div>`;
+    }).join('') || '<p class="empty compact">No visual draft application records loaded yet.</p>';
     // A recorded application's reviewDecisionId is, by definition, already
     // consumed: the Rust preflight rejects reusing a decision ("review-gated
     // scene apply decision ... was already used"). Embedding it here would make
@@ -989,12 +995,14 @@ const OuroforgeCockpit = (() => {
       <div class="field-grid">
         <div><strong>Proposal stage</strong><br>${surfaceState(Boolean(proposed && proposed.state !== 'missing'), proposed?.state || 'missing')}<br><small>${escapeText(proposed?.record_count || 0)} record(s)</small></div>
         <div><strong>Scene application stage</strong><br>${surfaceState(Boolean(applied && applied.state !== 'missing'), applied?.state || 'missing')}<br><small>${escapeText(applied?.record_count || 0)} record(s)</small></div>
+        <div><strong>Visual draft application stage</strong><br>${surfaceState(Boolean(visualApplied && visualApplied.state !== 'missing'), visualApplied?.state || 'missing')}<br><small>${escapeText(visualApplied?.record_count || 0)} record(s)</small></div>
         <div><strong>Project-scoped applications</strong><br>${escapeText(projectMutationRecords.length)} record(s)</div>
         <div><strong>Target scene</strong><br>${escapeText(targetScenePath)}</div>
         <div><strong>Project manifest</strong><br>${escapeText(projectPath || 'legacy/no project context')}</div>
       </div>
       <h4>Proposal context</h4><ul>${proposedRows}</ul>
       <h4>Application records</h4>${applicationRows}
+      <h4>Visual draft application records</h4>${visualApplicationRows}
       <h4>Display-only scene mutation commands</h4>
       <div class="command-list">
         ${projectCommand}

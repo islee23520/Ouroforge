@@ -650,6 +650,9 @@ const OuroforgeDashboard = (() => {
       const projectMutationContext = stage.id === 'scene_applied' && Array.isArray(stage.records)
         ? stage.records.map(renderProjectMutationRecord).join('')
         : '';
+      const visualDraftContext = stage.id === 'visual_draft_applied' && Array.isArray(stage.records)
+        ? stage.records.map(renderVisualDraftApplicationRecord).join('')
+        : '';
       return `<article class="lifecycle-card">
       <div class="journal-entry-header">
         <h4>${escapeText(stage.label || stage.id)}</h4>
@@ -660,6 +663,7 @@ const OuroforgeDashboard = (() => {
       ${stage.read_error ? `<div class="artifact-warning">${escapeText(stage.read_error)}</div>` : ''}
       ${renderRefLinks('Evidence refs', stage.evidence_refs, run)}
       ${projectMutationContext}
+      ${visualDraftContext}
       ${renderReviewDecisionRecords(stage, run)}
       ${Array.isArray(stage.records) && stage.records.length ? `<pre>${escapeText(JSON.stringify(stage.records, null, 2))}</pre>` : '<p class="empty-state compact">No lifecycle records for this stage.</p>'}
     </article>`;
@@ -796,6 +800,25 @@ const OuroforgeDashboard = (() => {
         <dt>Review decision</dt><dd>${escapeText(decisionId || 'legacy/no review decision linkage recorded')}</dd>
         <dt>Rollback</dt><dd>${escapeText(rollback?.scenePath || 'unavailable')} → ${escapeText(rollback?.restoreHash?.value || 'unavailable')}</dd>
       </dl>
+    </div>`;
+  }
+
+  function renderVisualDraftApplicationRecord(record) {
+    if (!record || typeof record !== 'object') return '';
+    const commandContext = record.commandContext && typeof record.commandContext === 'object' ? record.commandContext : null;
+    return `<div class="project-mutation-context">
+      <strong>Visual draft application</strong>
+      <dl>
+        <dt>Draft</dt><dd>${escapeText(record.draftId || 'unknown')}</dd>
+        <dt>Proposal</dt><dd>${escapeText(record.proposalId || 'unknown')}</dd>
+        <dt>Patch draft</dt><dd>${escapeText(record.patchDraftId || 'unknown')}</dd>
+        <dt>Review decision</dt><dd>${escapeText(record.reviewDecisionId || 'unknown')}</dd>
+        <dt>Transaction</dt><dd>${escapeText(record.transactionId || 'unknown')} (${escapeText(record.transactionArtifactPath || 'no artifact')})</dd>
+        <dt>Target scene</dt><dd>${escapeText(record.targetScenePath || 'unknown')}</dd>
+        <dt>Scene hash</dt><dd>${escapeText(record.beforeSceneHash?.value || 'before unknown')} → ${escapeText(record.afterSceneHash?.value || 'after unknown')}</dd>
+        <dt>Rerun context</dt><dd>${escapeText(commandContext?.command || 'not recorded')}</dd>
+      </dl>
+      <p class="run-meta">Display-only rerun context; dashboard UI does not execute this command, apply drafts, or write trusted state.</p>
     </div>`;
   }
 

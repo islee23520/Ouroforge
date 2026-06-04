@@ -24,6 +24,7 @@ A draft artifact uses `schemaVersion: "visual-edit-draft-v1"` and includes:
 | `beforeHash` | Expected hash for stale-draft detection. Generic fixtures may use `sha256:<64 hex>`; scene preflight uses the trusted scene hash form `fnv1a64-canonical-json-v1:<16 hex>`; tilemap preflight may use `fnv1a64-file-v1:<16 hex>` when checking the current asset file hash. |
 | `expectedAfterSummary` | Human-readable summary of the intended after state. |
 | `linkedEvidence[]` | Project-relative evidence refs that justify or explain the draft. |
+| `reviewGate` | Optional VA1.8 review linkage with `proposalId`, `patchDraftId`, and `reviewDecisionId`; required by `draft-apply` but not proof that a write already happened. |
 | `author` | Human/agent/Studio/system source metadata. |
 | `validationStatus` | `unvalidated`, `partial`, or `blocked`. |
 | `blockedReasons[]` | Required when status is `blocked`; absent for `unvalidated`. |
@@ -51,7 +52,7 @@ operations. It still does not authorize tilemap file writes or browser apply.
 VA1.5 adds asset-reference operation metadata, Rust-owned manifest/integrity
 preflight, and preview-only summaries for bounded sprite, sprite-frame, audio,
 font, and tilemap tileset references. It still does not authorize asset writes,
-remote fetches, Studio authoring UI, or apply behavior.
+remote fetches, Studio authoring UI, or apply behavior. VA1.8 adds optional `reviewGate` linkage so a draft can name the accepted proposal/patch-draft/review decision that later `draft-apply` must verify before trusted scene writes. The field is an apply precondition and audit link, not a browser permission token or proof that an application record exists.
 
 ## Read-model compatibility
 
@@ -74,6 +75,7 @@ safe to write. In particular:
 - `validationStatus: "blocked"` means the draft should remain display-only and
   must include reviewer-facing blocked reasons.
 - `linkedEvidence[]` is advisory provenance, not proof that an apply is allowed.
+- `reviewGate` links to review evidence for Rust preflight; read-only surfaces must still look for apply records such as `mutation/visual-edit-applications.json` before displaying an applied status.
 - `beforeHash` is a stale-draft guard for later Rust validation, not a browser
   permission token.
 

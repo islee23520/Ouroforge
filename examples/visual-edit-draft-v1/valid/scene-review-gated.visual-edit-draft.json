@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-scene-review-gated-rerun-context",
+  "target": {
+    "type": "scene",
+    "path": "scenes/collect-and-exit.scene.json",
+    "id": "collect-and-exit"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-move-player-rerun-context",
+      "kind": "update",
+      "path": "entities.player.components.transform.x",
+      "summary": "Move player x through a review-gated visual edit draft while preserving manual rerun context.",
+      "value": 48,
+      "sceneOperation": {
+        "kind": "transform_move",
+        "entityId": "player",
+        "sceneEditPath": "components.transform.x",
+        "value": 48
+      }
+    }
+  ],
+  "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "reviewGate": {
+    "proposalId": "proposal-visual-rerun-context",
+    "patchDraftId": "patch-draft-visual-rerun-context",
+    "reviewDecisionId": "review-decision-visual-rerun-context"
+  },
+  "expectedAfterSummary": "Accepted visual edit application records inert command context for a later manual rerun without scheduling rerun or regression promotion.",
+  "linkedEvidence": ["runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "author": {
+    "type": "agent",
+    "id": "visual-authoring-assistant",
+    "source": "cli-test"
+  },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

@@ -115,7 +115,10 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    review evidence only; scenario impact still requires separate run evidence.
 7. **Review-Gated Visual Edit Apply v1** — apply only reviewed/accepted visual
    edit transactions through the trusted CLI boundary with rollback/audit
-   evidence; no auto-apply or browser apply.
+   evidence. The trusted apply record is exported as a `visual_draft_applied`
+   lifecycle stage and journal evidence for rerun/regression/loop inspection,
+   but the command context remains inert display-only text; no auto-rerun,
+   auto-apply, or browser apply is authorized.
 8. **Studio Draft Authoring Surface v1** — expose in-memory draft assembly,
    warnings, preview state, and copyable JSON/commands as escaped UI state only.
 9. **Visual Authoring Demo v1** — demonstrate a local safe edit-draft workflow
@@ -178,6 +181,12 @@ implementation issues:
 Any implementation issue that adds persistence must include focused regression
 tests for malformed drafts, stale evidence, denied review states, rollback/audit
 records, and generated-state cleanup.
+
+## Review-gated apply compatibility notes
+
+Review-Gated Visual Edit Apply v1 records durable local evidence for later review, rerun, regression, and loop inspection. A visual edit application links the draft id, proposal id, patch draft id, accepted review decision id, transaction id, before/after scene hashes, rollback metadata, and reproducible CLI command context. Those links let existing review cockpit, journal, regression promotion, run matrix, loop status, bundle, and handoff surfaces show the operator what evidence exists and what remains missing.
+
+The compatibility rule is intentionally conservative: apply evidence may inform runs, comparisons, regression promotion drafts, and loop blockers, but it does not schedule reruns, promote scenarios, mutate scenario packs, resume loops, or execute commands. Browser and Studio surfaces may render these fields as escaped read-only diagnostics and copyable inert command text only. Rust CLI/manual terminal actions remain the trusted boundary for any durable write or rerun.
 
 ## Verification gates for follow-up issues
 
