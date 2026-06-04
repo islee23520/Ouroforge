@@ -926,6 +926,17 @@ assert.ok(!xssAssetInspectorMarkup.includes('<script>reason</script>'), 'asset i
 assert.ok(!xssAssetInspectorMarkup.includes('<script>frame</script>'), 'asset inspector atlas frames must be escaped');
 assert.ok(!xssAssetInspectorMarkup.includes('<script>tileset</script>'), 'asset inspector tilemaps must be escaped');
 assert.match(xssAssetInspectorMarkup, /&lt;script&gt;status&lt;\/script&gt;/);
+
+const sourcePatchCoverageMatrix = fs.readFileSync(require.resolve('../../docs/source-patch-preview-coverage-matrix-v1.md'), 'utf8');
+assert.match(sourcePatchCoverageMatrix, /Scenario Coverage v6 \/ SMP1\.11\.3 coverage matrix/);
+assert.match(sourcePatchCoverageMatrix, /Forbidden file classes/);
+assert.match(sourcePatchCoverageMatrix, /Sandbox dry-run pass\/fail/);
+assert.match(sourcePatchCoverageMatrix, /Dashboard display/);
+assert.match(sourcePatchCoverageMatrix, /Studio\/cockpit display/);
+assert.match(sourcePatchCoverageMatrix, /No source patch apply to the trusted main worktree/);
+assert.match(sourcePatchCoverageMatrix, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
+assert.match(sourcePatchCoverageMatrix, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
+
 const cockpitReadme = fs.readFileSync(require.resolve('./README.md'), 'utf8');
 assert.match(cockpitReadme, /Studio Draft Authoring Surface v1/);
 assert.match(cockpitReadme, /scene, tilemap, and\s+asset-reference draft rows/);

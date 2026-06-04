@@ -838,6 +838,17 @@ assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchStaleTargetGuards(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(dashboard.renderRunDetail(run), /Source patch evidence bundle/);
 
+
+const sourcePatchCoverageMatrix = fs.readFileSync(require.resolve('../../docs/source-patch-preview-coverage-matrix-v1.md'), 'utf8');
+assert.match(sourcePatchCoverageMatrix, /Scenario Coverage v6 \/ SMP1\.11\.3 coverage matrix/);
+assert.match(sourcePatchCoverageMatrix, /Forbidden file classes/);
+assert.match(sourcePatchCoverageMatrix, /Sandbox dry-run pass\/fail/);
+assert.match(sourcePatchCoverageMatrix, /Dashboard display/);
+assert.match(sourcePatchCoverageMatrix, /Studio\/cockpit display/);
+assert.match(sourcePatchCoverageMatrix, /No source patch apply to the trusted main worktree/);
+assert.match(sourcePatchCoverageMatrix, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
+assert.match(sourcePatchCoverageMatrix, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
+
 const demoDisplayAudit = JSON.parse(fs.readFileSync('examples/source-mutation-preview-demo-v1/display-audit.sample.json', 'utf8'));
 const demoDisplayAuditDoc = fs.readFileSync('docs/source-mutation-preview-demo-v1-audit.md', 'utf8');
 assert.equal(demoDisplayAudit.status, 'read-only-display-audited');
