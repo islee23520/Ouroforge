@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "production-task-board-v1",
+  "boardId": "multi-agent-production-v1-malformed",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "tasks": [
+    {
+      "id": "missing-evidence",
+      "kind": "design-contract",
+      "role": "designer",
+      "ownerAgent": "designer-alpha",
+      "status": "assigned",
+      "targetArtifacts": [
+        {
+          "id": "missing-evidence-output",
+          "path": "docs/missing-evidence.md"
+        }
+      ],
+      "acceptanceCriteria": ["required evidence intentionally missing"]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline"],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": ["malformed fixture"],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "browser command bridge"
+  ],
+  "boundary": "Malformed fixture only; it does not execute work."
+}

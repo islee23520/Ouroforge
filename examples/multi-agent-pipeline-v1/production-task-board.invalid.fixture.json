@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "production-task-board-v1",
+  "boardId": "multi-agent-production-v1-invalid",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "tasks": [
+    {
+      "id": "bad-hidden-worker",
+      "kind": "hidden-worker",
+      "role": "designer",
+      "ownerAgent": "designer-alpha",
+      "status": "assigned",
+      "targetArtifacts": [
+        {
+          "id": "bad-output",
+          "path": "runs/multi-agent-pipeline/bad/output.json"
+        }
+      ],
+      "acceptanceCriteria": ["should be rejected"],
+      "requiredEvidence": ["should be rejected"]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline"],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": ["invalid fixture"],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "browser command bridge"
+  ],
+  "boundary": "Invalid fixture only; it does not execute work."
+}

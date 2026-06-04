@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "production-task-board-v1",
+  "boardId": "multi-agent-production-v1-stale",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "tasks": [
+    {
+      "id": "stale-review",
+      "kind": "review-gate",
+      "role": "reviewer",
+      "ownerAgent": "reviewer-epsilon",
+      "status": "deferred",
+      "targetArtifacts": [
+        {
+          "id": "stale-review-record",
+          "path": "runs/multi-agent-pipeline/reviews/stale-review.json",
+          "description": "generated stale review record path"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Stale board snapshots are visible as deferred state",
+        "Deferred state cannot promote or apply outputs"
+      ],
+      "requiredEvidence": [
+        "Fresh task board snapshot",
+        "Reviewer re-check of #1 and #23 governance anchors"
+      ],
+      "blockedReasons": [
+        "Snapshot was recorded before the latest merged scope contract"
+      ],
+      "timestamps": {
+        "createdAt": "2026-06-04T15:55:00Z",
+        "updatedAt": "2026-06-04T15:55:00Z"
+      }
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline", "target"],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Stale state is display evidence only",
+    "Task board does not execute work or spawn agents"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "browser command bridge"
+  ],
+  "boundary": "Stale fixture board only; it does not execute work, refresh itself, spawn agents, or mutate trusted state."
+}

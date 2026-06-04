@@ -2337,6 +2337,224 @@ impl RoleSeparationRequirement {
     }
 }
 
+pub const PRODUCTION_TASK_BOARD_SCHEMA_VERSION: &str = "production-task-board-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionTaskBoard {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "boardId")]
+    pub board_id: String,
+    pub milestone: String,
+    pub tasks: Vec<ProductionTaskBoardTask>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionTaskBoardTask {
+    pub id: String,
+    pub kind: ProductionTaskKind,
+    pub role: String,
+    #[serde(rename = "ownerAgent")]
+    pub owner_agent: String,
+    pub status: ProductionTaskStatus,
+    #[serde(rename = "dependsOn", default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+    #[serde(
+        rename = "targetArtifacts",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub target_artifacts: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "acceptanceCriteria")]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(rename = "requiredEvidence")]
+    pub required_evidence: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamps: Option<ProductionTaskTimestamps>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductionTaskKind {
+    DesignContract,
+    SceneDesign,
+    GameplayImplementation,
+    AssetImport,
+    QaScenario,
+    PerformanceRegression,
+    ReviewGate,
+    CriticGate,
+    ReleaseCandidateGate,
+    Summary,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductionTaskStatus {
+    Proposed,
+    Assigned,
+    InProgress,
+    Blocked,
+    ReadyForReview,
+    Accepted,
+    Rejected,
+    Deferred,
+    Completed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionTaskTimestamps {
+    #[serde(rename = "createdAt", default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(rename = "updatedAt", default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(
+        rename = "assignedAt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub assigned_at: Option<String>,
+    #[serde(
+        rename = "completedAt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub completed_at: Option<String>,
+}
+
+impl ProductionTaskBoard {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let board: ProductionTaskBoard =
+            serde_json::from_str(input).context("failed to parse Production Task Board JSON")?;
+        board.validate_schema()?;
+        Ok(board)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != PRODUCTION_TASK_BOARD_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "production task board schemaVersion must be {PRODUCTION_TASK_BOARD_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("production task board boardId", &self.board_id)?;
+        require_text("production task board milestone", &self.milestone)?;
+        if self.tasks.is_empty() {
+            return Err(anyhow!("production task board tasks must not be empty"));
+        }
+        for (index, task) in self.tasks.iter().enumerate() {
+            task.validate_schema(index)?;
+        }
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("production task board guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "production task board forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("production task board boundary", &self.boundary)?;
+        let forbidden_text = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for required_forbidden in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "browser command bridge",
+        ] {
+            if !forbidden_text.contains(required_forbidden) {
+                return Err(anyhow!(
+                    "production task board forbiddenActions must include {required_forbidden} boundary"
+                ));
+            }
+        }
+        if !self
+            .boundary
+            .to_ascii_lowercase()
+            .contains("does not execute")
+        {
+            return Err(anyhow!(
+                "production task board boundary must state that the board does not execute work"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ProductionTaskBoardTask {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("production task board tasks[{index}].id"),
+            &self.id,
+        )?;
+        validate_path_component(
+            &format!("production task board tasks[{index}].role"),
+            &self.role,
+        )?;
+        if !SUPPORTED_AGENT_ROLES.contains(&self.role.as_str()) {
+            return Err(anyhow!(
+                "production task board tasks[{index}].role '{}' is unsupported",
+                self.role
+            ));
+        }
+        validate_path_component(
+            &format!("production task board tasks[{index}].ownerAgent"),
+            &self.owner_agent,
+        )?;
+        for dependency in &self.depends_on {
+            validate_path_component(
+                &format!("production task board tasks[{index}].dependsOn"),
+                dependency,
+            )?;
+        }
+        if self.target_artifacts.is_empty() {
+            return Err(anyhow!(
+                "production task board tasks[{index}].targetArtifacts must not be empty"
+            ));
+        }
+        for artifact in &self.target_artifacts {
+            artifact.validate(&format!(
+                "production task board tasks[{index}].targetArtifacts"
+            ))?;
+        }
+        validate_nonempty_text_list(
+            &format!("production task board tasks[{index}].acceptanceCriteria"),
+            &self.acceptance_criteria,
+        )?;
+        validate_nonempty_text_list(
+            &format!("production task board tasks[{index}].requiredEvidence"),
+            &self.required_evidence,
+        )?;
+        if matches!(self.status, ProductionTaskStatus::Blocked) && self.blocked_reasons.is_empty() {
+            return Err(anyhow!(
+                "production task board tasks[{index}] blocked status requires blockedReasons"
+            ));
+        }
+        if matches!(self.status, ProductionTaskStatus::Completed)
+            && self
+                .timestamps
+                .as_ref()
+                .is_none_or(|timestamps| timestamps.completed_at.is_none())
+        {
+            return Err(anyhow!(
+                "production task board tasks[{index}] completed status requires timestamps.completedAt"
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -38717,6 +38935,64 @@ scenarios:
             .iter()
             .any(|action| action == "remote worker pool"));
         assert!(model.generated_state.tracked_fixture_only);
+    }
+
+    #[test]
+    fn production_task_board_v1_accepts_schema_fixtures_and_inert_boundaries() {
+        for fixture in [
+            "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+            "examples/multi-agent-pipeline-v1/production-task-board.blocked.fixture.json",
+            "examples/multi-agent-pipeline-v1/production-task-board.stale.fixture.json",
+        ] {
+            let body = read_json_fixture(fixture);
+            let board = ProductionTaskBoard::from_json_str(&body)
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(board.schema_version, PRODUCTION_TASK_BOARD_SCHEMA_VERSION);
+            assert!(board.generated_state.tracked_fixture_only);
+            assert!(board
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(board.boundary.contains("does not execute"));
+            assert!(board
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "hidden background agents"));
+            assert!(board
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(board
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "browser command bridge"));
+        }
+    }
+
+    #[test]
+    fn production_task_board_v1_rejects_invalid_and_malformed_fixtures() {
+        let invalid = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.invalid.fixture.json",
+        );
+        let invalid_error = ProductionTaskBoard::from_json_str(&invalid)
+            .expect_err("unsupported task kind rejects invalid fixture");
+        let invalid_error_text = format!("{invalid_error:#}");
+        assert!(
+            invalid_error_text.contains("unknown variant"),
+            "unexpected invalid fixture error: {invalid_error_text}"
+        );
+
+        let malformed = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.malformed.fixture.json",
+        );
+        let malformed_error = ProductionTaskBoard::from_json_str(&malformed)
+            .expect_err("missing required evidence rejects malformed fixture");
+        let malformed_error_text = format!("{malformed_error:#}");
+        assert!(
+            malformed_error_text.contains("missing field `requiredEvidence`"),
+            "unexpected malformed fixture error: {malformed_error_text}"
+        );
     }
 
     #[test]

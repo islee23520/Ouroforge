@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "production-task-board-v1",
+  "boardId": "multi-agent-production-v1",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "tasks": [
+    {
+      "id": "scope-contract",
+      "kind": "design-contract",
+      "role": "designer",
+      "ownerAgent": "designer-alpha",
+      "status": "completed",
+      "targetArtifacts": [
+        {
+          "id": "scope-doc",
+          "path": "docs/multi-agent-production-pipeline-v1.md",
+          "description": "canonical local-first multi-agent pipeline scope contract"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Scope doc defines bounded local-first collaboration and trusted Rust/local boundary",
+        "Non-goals forbid hidden agents, auto-apply, auto-merge, command bridges, release automation, and Godot replacement claims"
+      ],
+      "requiredEvidence": [
+        "PR evidence links scope doc and focused regression",
+        "#1 and #23 remain open"
+      ],
+      "timestamps": {
+        "createdAt": "2026-06-04T16:00:00Z",
+        "updatedAt": "2026-06-04T16:15:05Z",
+        "assignedAt": "2026-06-04T16:00:00Z",
+        "completedAt": "2026-06-04T16:15:05Z"
+      }
+    },
+    {
+      "id": "task-board-schema",
+      "kind": "design-contract",
+      "role": "gameplay-engineer",
+      "ownerAgent": "engineer-beta",
+      "status": "ready-for-review",
+      "dependsOn": ["scope-contract"],
+      "targetArtifacts": [
+        {
+          "id": "task-board-fixture",
+          "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+          "description": "fixture-scoped task board artifact"
+        },
+        {
+          "id": "task-board-doc",
+          "path": "docs/production-task-board-v1.md",
+          "description": "task board schema documentation"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Task ids, roles, owners, statuses, dependencies, targets, acceptance criteria, evidence, blockers, and timestamps are represented",
+        "Task board remains artifact/state only and does not execute work or spawn agents"
+      ],
+      "requiredEvidence": [
+        "Focused Rust schema parse test",
+        "Generated-state audit showing only fixture-scoped board is tracked"
+      ],
+      "timestamps": {
+        "createdAt": "2026-06-04T16:16:00Z",
+        "updatedAt": "2026-06-04T16:16:00Z",
+        "assignedAt": "2026-06-04T16:16:00Z"
+      }
+    },
+    {
+      "id": "qa-queue-contract",
+      "kind": "qa-scenario",
+      "role": "qa-agent",
+      "ownerAgent": "qa-gamma",
+      "status": "assigned",
+      "dependsOn": ["task-board-schema"],
+      "targetArtifacts": [
+        {
+          "id": "qa-queue-fixture",
+          "path": "runs/multi-agent-pipeline/qa/queue.json",
+          "description": "generated QA queue path that remains ignored unless fixture-scoped later"
+        }
+      ],
+      "acceptanceCriteria": [
+        "QA queue issue receives its own fixture-scoped contract before display or execution",
+        "No browser or hidden worker may execute queue items"
+      ],
+      "requiredEvidence": [
+        "Later #672 issue evidence",
+        "No-hidden-agent and no-auto-apply audit"
+      ],
+      "timestamps": {
+        "createdAt": "2026-06-04T16:16:00Z",
+        "updatedAt": "2026-06-04T16:16:00Z",
+        "assignedAt": "2026-06-04T16:16:00Z"
+      }
+    }
+  ],
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data/multi-agent-pipeline",
+      "target"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Task board is local artifact/state only, not hidden agent execution",
+    "Agent outputs remain untrusted until Rust/local validation and review-gated apply or promotion",
+    "Browser/dashboard/Studio surfaces may inspect task state only when separately scoped as read-only/draft-only",
+    "#1 and #23 remain open governance anchors"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser file writes",
+    "remote worker pool",
+    "release automation"
+  ],
+  "boundary": "Fixture-scoped production task board artifact only; it does not execute work, spawn agents, apply changes, merge PRs, write trusted browser state, or mutate source files."
+}
