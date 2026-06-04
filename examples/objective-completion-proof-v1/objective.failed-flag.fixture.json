@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "objective-completion-proof-v1",
+  "proofId": "objective_collect_and_exit_failed_flag",
+  "objectiveId": "collect_and_exit",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "placementDraftId": "placement_collect_intro",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "scenarioRef": "examples/scenarios/collect-and-exit.scenario.json",
+  "scenarioId": "collect-and-exit",
+  "verdictRef": "evidence/scenarios/collect-and-exit/verdict.json",
+  "behaviorEvidenceRefs": [
+    "evidence/behavior/collect-and-exit/events.json"
+  ],
+  "route": [
+    { "stepId": "key_to_exit", "summary": "Reach exit after key collection." }
+  ],
+  "requiredActions": [
+    { "actionId": "open_exit", "kind": "interact" }
+  ],
+  "requiredEvents": [
+    "key_collected",
+    "exit_opened"
+  ],
+  "expectedFlags": [
+    { "flag": "exit_open", "value": true }
+  ],
+  "expectedStateTransitions": [
+    { "state": "objective", "from": "active", "to": "complete" }
+  ],
+  "observedEvents": [
+    "key_collected",
+    "exit_opened"
+  ],
+  "observedFlags": [
+    { "flag": "exit_open", "value": false }
+  ],
+  "observedStateTransitions": [
+    { "state": "objective", "from": "active", "to": "complete" }
+  ],
+  "result": {
+    "status": "failed",
+    "objectiveComplete": false,
+    "winConditionMet": false,
+    "lossConditionTriggered": true,
+    "failedFlags": ["exit_open"],
+    "summary": "objective proof observed a failed flag or loss condition"
+  },
+  "expectedEvidence": [
+    {
+      "evidenceId": "failed-flag-report",
+      "kind": "verdict",
+      "pathHint": "evidence/objective-completion/objective_collect_and_exit_failed_flag/verdict.json"
+    }
+  ],
+  "status": "failed"
+}

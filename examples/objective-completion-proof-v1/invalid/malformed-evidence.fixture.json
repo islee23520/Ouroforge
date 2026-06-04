@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "objective-completion-proof-v1",
+  "proofId": "objective_bad_evidence",
+  "objectiveId": "collect_and_exit",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "placementDraftId": "placement_collect_intro",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "scenarioRef": "examples/scenarios/collect-and-exit.scenario.json",
+  "scenarioId": "collect-and-exit",
+  "verdictRef": "evidence/scenarios/collect-and-exit/verdict.json",
+  "behaviorEvidenceRefs": ["evidence/behavior/collect-and-exit/events.json"],
+  "route": [{ "stepId": "start_to_key", "summary": "Walk from start to key." }],
+  "requiredActions": [{ "actionId": "collect_key", "kind": "collect" }],
+  "requiredEvents": ["key_collected"],
+  "expectedFlags": [{ "flag": "has_key", "value": true }],
+  "expectedStateTransitions": [{ "state": "objective", "from": "active", "to": "complete" }],
+  "observedEvents": ["key_collected"],
+  "observedFlags": [{ "flag": "has_key", "value": true }],
+  "observedStateTransitions": [{ "state": "objective", "from": "active", "to": "complete" }],
+  "result": {
+    "status": "complete",
+    "objectiveComplete": true,
+    "winConditionMet": true,
+    "lossConditionTriggered": false,
+    "summary": "objective proof completed under scoped local evidence"
+  },
+  "expectedEvidence": [
+    {
+      "evidenceId": "bad-report",
+      "kind": "read_model",
+      "pathHint": "evidence/wrong/objective_bad_evidence/read-model.json"
+    }
+  ],
+  "status": "proven"
+}

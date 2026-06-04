@@ -79,7 +79,8 @@ proves a safer dependency order:
    ([Entity Objective Encounter Placement Draft v1](entity-objective-encounter-placement-draft-v1.md)).
 6. #633 - Reachability and Pathing Evidence v1
    ([Reachability Pathing Evidence v1](reachability-pathing-evidence-v1.md)).
-7. #634 - Objective Completion and Win Loss Proof v1.
+7. #634 - Objective Completion and Win Loss Proof v1
+   ([Objective Completion Proof v1](objective-completion-proof-v1.md)).
 8. #635 - Difficulty, Pacing, and Balance Heuristic Evidence v1.
 9. #636 - Level Visual Diff and Semantic Comparison v1.
 10. #637 - Agent-Generated Level Draft v1.

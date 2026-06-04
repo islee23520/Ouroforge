@@ -17499,6 +17499,698 @@ fn reachability_evidence_status_label(status: ReachabilityEvidenceStatus) -> &'s
     }
 }
 
+const OBJECTIVE_COMPLETION_PROOF_SCHEMA_VERSION: &str = "objective-completion-proof-v1";
+const OBJECTIVE_COMPLETION_PROOF_READ_MODEL_SCHEMA_VERSION: &str =
+    "objective-completion-proof-read-model-v1";
+const MAX_OBJECTIVE_PROOF_ITEMS: usize = 64;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveCompletionProofArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proofId")]
+    pub proof_id: String,
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "placementDraftId")]
+    pub placement_draft_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "reachabilityEvidenceRef")]
+    pub reachability_evidence_ref: String,
+    #[serde(rename = "scenarioRef")]
+    pub scenario_ref: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "verdictRef")]
+    pub verdict_ref: String,
+    #[serde(rename = "behaviorEvidenceRefs")]
+    pub behavior_evidence_refs: Vec<String>,
+    pub route: Vec<ObjectiveProofRouteStep>,
+    #[serde(rename = "requiredActions")]
+    pub required_actions: Vec<ObjectiveProofAction>,
+    #[serde(rename = "requiredEvents")]
+    pub required_events: Vec<String>,
+    #[serde(rename = "expectedFlags")]
+    pub expected_flags: Vec<ObjectiveProofFlag>,
+    #[serde(rename = "expectedStateTransitions")]
+    pub expected_state_transitions: Vec<ObjectiveProofStateTransition>,
+    #[serde(rename = "observedEvents")]
+    pub observed_events: Vec<String>,
+    #[serde(rename = "observedFlags")]
+    pub observed_flags: Vec<ObjectiveProofFlag>,
+    #[serde(rename = "observedStateTransitions")]
+    pub observed_state_transitions: Vec<ObjectiveProofStateTransition>,
+    pub result: ObjectiveCompletionProofResult,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<ObjectiveCompletionExpectedEvidence>,
+    pub status: ObjectiveCompletionProofStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveProofRouteStep {
+    #[serde(rename = "stepId")]
+    pub step_id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveProofAction {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub kind: ObjectiveProofActionKind,
+    #[serde(
+        rename = "unsupportedReason",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unsupported_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveProofActionKind {
+    Move,
+    Collect,
+    Interact,
+    Trigger,
+    Exit,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveProofFlag {
+    pub flag: String,
+    pub value: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveProofStateTransition {
+    pub state: String,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveCompletionProofResult {
+    pub status: ObjectiveCompletionProofResultStatus,
+    #[serde(rename = "objectiveComplete")]
+    pub objective_complete: bool,
+    #[serde(rename = "winConditionMet")]
+    pub win_condition_met: bool,
+    #[serde(rename = "lossConditionTriggered")]
+    pub loss_condition_triggered: bool,
+    #[serde(
+        rename = "missingEvents",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub missing_events: Vec<String>,
+    #[serde(rename = "failedFlags", default, skip_serializing_if = "Vec::is_empty")]
+    pub failed_flags: Vec<String>,
+    #[serde(
+        rename = "missingTransitions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub missing_transitions: Vec<String>,
+    #[serde(
+        rename = "unsupportedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub unsupported_reasons: Vec<String>,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveCompletionProofResultStatus {
+    Complete,
+    Failed,
+    MissingEvidence,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveCompletionExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: ObjectiveCompletionExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveCompletionExpectedEvidenceKind {
+    ReachabilityEvidence,
+    BehaviorEvidence,
+    ScenarioResult,
+    Verdict,
+    JournalSummary,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveCompletionProofStatus {
+    Proven,
+    Failed,
+    MissingEvidence,
+    Unsupported,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveCompletionProofReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proofId")]
+    pub proof_id: String,
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    pub status: String,
+    #[serde(rename = "resultStatus")]
+    pub result_status: String,
+    #[serde(rename = "objectiveComplete")]
+    pub objective_complete: bool,
+    #[serde(rename = "winConditionMet")]
+    pub win_condition_met: bool,
+    #[serde(rename = "lossConditionTriggered")]
+    pub loss_condition_triggered: bool,
+    #[serde(rename = "requiredActionCount")]
+    pub required_action_count: usize,
+    #[serde(rename = "requiredEventCount")]
+    pub required_event_count: usize,
+    #[serde(rename = "missingEvidenceCount")]
+    pub missing_evidence_count: usize,
+    #[serde(rename = "failedFlagCount")]
+    pub failed_flag_count: usize,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "journalSummary")]
+    pub journal_summary: String,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl ObjectiveCompletionProofArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: ObjectiveCompletionProofArtifact = serde_json::from_str(input)
+            .context("failed to parse Objective Completion Proof JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != OBJECTIVE_COMPLETION_PROOF_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "objective completion proof schemaVersion must be {OBJECTIVE_COMPLETION_PROOF_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("objective completion proof proofId", &self.proof_id)?;
+        validate_path_component("objective completion proof objectiveId", &self.objective_id)?;
+        validate_path_component("objective completion proof intentId", &self.intent_id)?;
+        validate_path_component("objective completion proof planId", &self.plan_id)?;
+        validate_path_component(
+            "objective completion proof placementDraftId",
+            &self.placement_draft_id,
+        )?;
+        validate_repo_relative_source_ref(
+            "objective completion proof targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "objective completion proof targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        validate_evidence_artifact_path(&self.reachability_evidence_ref)?;
+        validate_repo_relative_source_ref(
+            "objective completion proof scenarioRef",
+            &self.scenario_ref,
+        )?;
+        validate_path_component("objective completion proof scenarioId", &self.scenario_id)?;
+        validate_evidence_artifact_path(&self.verdict_ref)?;
+        validate_objective_behavior_refs(&self.behavior_evidence_refs)?;
+        validate_objective_route(&self.route)?;
+        validate_objective_actions(&self.required_actions)?;
+        validate_objective_text_refs("objective completion requiredEvents", &self.required_events)?;
+        validate_objective_flags("objective completion expectedFlags", &self.expected_flags)?;
+        validate_objective_flags("objective completion observedFlags", &self.observed_flags)?;
+        validate_objective_transitions(
+            "objective completion expectedStateTransitions",
+            &self.expected_state_transitions,
+        )?;
+        validate_objective_transitions(
+            "objective completion observedStateTransitions",
+            &self.observed_state_transitions,
+        )?;
+        validate_objective_text_refs("objective completion observedEvents", &self.observed_events)?;
+        validate_objective_expected_evidence(&self.proof_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("objective completion blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("objective completion guardrails", guardrail)?;
+        }
+        let expected = evaluate_objective_completion(self)?;
+        if self.result != expected {
+            return Err(anyhow!("objective completion result drift"));
+        }
+        validate_objective_completion_status(self.status, &self.result, &self.blocked_reasons)
+    }
+}
+
+pub fn objective_completion_proof_read_model_from_json_str(
+    input: &str,
+) -> Result<ObjectiveCompletionProofReadModel> {
+    let artifact = ObjectiveCompletionProofArtifact::from_json_str(input)?;
+    Ok(objective_completion_proof_read_model(&artifact))
+}
+
+pub fn objective_completion_proof_read_model(
+    artifact: &ObjectiveCompletionProofArtifact,
+) -> ObjectiveCompletionProofReadModel {
+    let linked_evidence_refs = std::iter::once(artifact.reachability_evidence_ref.clone())
+        .chain(std::iter::once(artifact.verdict_ref.clone()))
+        .chain(artifact.behavior_evidence_refs.iter().cloned())
+        .chain(
+            artifact
+                .expected_evidence
+                .iter()
+                .map(|evidence| evidence.path_hint.clone()),
+        )
+        .collect();
+    ObjectiveCompletionProofReadModel {
+        schema_version: OBJECTIVE_COMPLETION_PROOF_READ_MODEL_SCHEMA_VERSION.to_string(),
+        proof_id: artifact.proof_id.clone(),
+        objective_id: artifact.objective_id.clone(),
+        status: objective_completion_proof_status_label(artifact.status).to_string(),
+        result_status: objective_completion_result_status_label(artifact.result.status).to_string(),
+        objective_complete: artifact.result.objective_complete,
+        win_condition_met: artifact.result.win_condition_met,
+        loss_condition_triggered: artifact.result.loss_condition_triggered,
+        required_action_count: artifact.required_actions.len(),
+        required_event_count: artifact.required_events.len(),
+        missing_evidence_count: artifact.result.missing_events.len()
+            + artifact.result.missing_transitions.len(),
+        failed_flag_count: artifact.result.failed_flags.len(),
+        linked_evidence_refs,
+        journal_summary: format!(
+            "Objective {} proof {} is {}; result {}.",
+            artifact.objective_id,
+            artifact.proof_id,
+            objective_completion_proof_status_label(artifact.status),
+            objective_completion_result_status_label(artifact.result.status)
+        ),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only objective completion and win/loss proof evidence; local scenario, verdict, reachability, and behavior evidence only, unsupported mechanics are explicit, no subjective quality guarantee, no scene writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_objective_route(route: &[ObjectiveProofRouteStep]) -> Result<()> {
+    if route.is_empty() || route.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "objective completion route must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} steps"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for step in route {
+        validate_path_component("objective completion route.stepId", &step.step_id)?;
+        require_bounded_display_text("objective completion route.summary", &step.summary)?;
+        if !ids.insert(step.step_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate objective completion route.stepId: {}",
+                step.step_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_objective_actions(actions: &[ObjectiveProofAction]) -> Result<()> {
+    if actions.is_empty() || actions.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "objective completion requiredActions must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} actions"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for action in actions {
+        validate_path_component(
+            "objective completion requiredActions.actionId",
+            &action.action_id,
+        )?;
+        if action.kind == ObjectiveProofActionKind::Unsupported
+            && action.unsupported_reason.is_none()
+        {
+            return Err(anyhow!(
+                "objective completion unsupported action requires unsupportedReason"
+            ));
+        }
+        if let Some(reason) = &action.unsupported_reason {
+            require_bounded_display_text(
+                "objective completion requiredActions.unsupportedReason",
+                reason,
+            )?;
+        }
+        if !ids.insert(action.action_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate objective completion requiredActions.actionId: {}",
+                action.action_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_objective_behavior_refs(refs: &[String]) -> Result<()> {
+    if refs.is_empty() || refs.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "objective completion behaviorEvidenceRefs must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} refs"
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for evidence_ref in refs {
+        validate_evidence_artifact_path(evidence_ref)?;
+        if !seen.insert(evidence_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate objective completion behaviorEvidenceRefs: {evidence_ref}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_objective_text_refs(label: &str, refs: &[String]) -> Result<()> {
+    if refs.is_empty() || refs.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "{label} must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} entries"
+        ));
+    }
+    validate_unique_path_components(label, "ref", refs)
+}
+
+fn validate_objective_flags(label: &str, flags: &[ObjectiveProofFlag]) -> Result<()> {
+    if flags.is_empty() || flags.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "{label} must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} flags"
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for flag in flags {
+        validate_path_component(label, &flag.flag)?;
+        if !seen.insert(flag.flag.as_str()) {
+            return Err(anyhow!("duplicate {label}: {}", flag.flag));
+        }
+    }
+    Ok(())
+}
+
+fn validate_objective_transitions(
+    label: &str,
+    transitions: &[ObjectiveProofStateTransition],
+) -> Result<()> {
+    if transitions.is_empty() || transitions.len() > MAX_OBJECTIVE_PROOF_ITEMS {
+        return Err(anyhow!(
+            "{label} must contain between 1 and {MAX_OBJECTIVE_PROOF_ITEMS} transitions"
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for transition in transitions {
+        validate_path_component(label, &transition.state)?;
+        validate_path_component(label, &transition.from)?;
+        validate_path_component(label, &transition.to)?;
+        if !seen.insert(transition) {
+            return Err(anyhow!(
+                "duplicate {label}: {}:{}->{}",
+                transition.state,
+                transition.from,
+                transition.to
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_objective_expected_evidence(
+    proof_id: &str,
+    values: &[ObjectiveCompletionExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "objective completion expectedEvidence must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/objective-completion/{proof_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "objective completion expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "objective completion expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate objective completion expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate objective completion expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_objective_completion(
+    artifact: &ObjectiveCompletionProofArtifact,
+) -> Result<ObjectiveCompletionProofResult> {
+    let unsupported_reasons = artifact
+        .required_actions
+        .iter()
+        .filter(|action| action.kind == ObjectiveProofActionKind::Unsupported)
+        .map(|action| {
+            action
+                .unsupported_reason
+                .clone()
+                .unwrap_or_else(|| "objective mechanic is unsupported by proof v1".to_string())
+        })
+        .collect::<Vec<_>>();
+    if !unsupported_reasons.is_empty() {
+        let mut result = objective_completion_result(
+            ObjectiveCompletionProofResultStatus::Unsupported,
+            false,
+            false,
+            false,
+            "objective proof contains unsupported mechanics",
+        );
+        result.unsupported_reasons = unsupported_reasons;
+        return Ok(result);
+    }
+
+    let observed_events = artifact.observed_events.iter().collect::<BTreeSet<_>>();
+    let missing_events = artifact
+        .required_events
+        .iter()
+        .filter(|event| !observed_events.contains(event))
+        .cloned()
+        .collect::<Vec<_>>();
+    let observed_flags = artifact
+        .observed_flags
+        .iter()
+        .map(|flag| (flag.flag.as_str(), flag.value))
+        .collect::<BTreeMap<_, _>>();
+    let failed_flags = artifact
+        .expected_flags
+        .iter()
+        .filter(|flag| observed_flags.get(flag.flag.as_str()) != Some(&flag.value))
+        .map(|flag| flag.flag.clone())
+        .collect::<Vec<_>>();
+    let observed_transitions = artifact
+        .observed_state_transitions
+        .iter()
+        .collect::<BTreeSet<_>>();
+    let missing_transitions = artifact
+        .expected_state_transitions
+        .iter()
+        .filter(|transition| !observed_transitions.contains(transition))
+        .map(|transition| {
+            format!(
+                "{}:{}->{}",
+                transition.state, transition.from, transition.to
+            )
+        })
+        .collect::<Vec<_>>();
+
+    if !missing_events.is_empty() || !missing_transitions.is_empty() {
+        let mut result = objective_completion_result(
+            ObjectiveCompletionProofResultStatus::MissingEvidence,
+            false,
+            false,
+            false,
+            "objective proof is missing required event or transition evidence",
+        );
+        result.missing_events = missing_events;
+        result.failed_flags = failed_flags;
+        result.missing_transitions = missing_transitions;
+        return Ok(result);
+    }
+    if !failed_flags.is_empty() {
+        let mut result = objective_completion_result(
+            ObjectiveCompletionProofResultStatus::Failed,
+            false,
+            false,
+            true,
+            "objective proof observed a failed flag or loss condition",
+        );
+        result.failed_flags = failed_flags;
+        return Ok(result);
+    }
+    Ok(objective_completion_result(
+        ObjectiveCompletionProofResultStatus::Complete,
+        true,
+        true,
+        false,
+        "objective proof completed under scoped local evidence",
+    ))
+}
+
+fn objective_completion_result(
+    status: ObjectiveCompletionProofResultStatus,
+    objective_complete: bool,
+    win_condition_met: bool,
+    loss_condition_triggered: bool,
+    summary: &str,
+) -> ObjectiveCompletionProofResult {
+    ObjectiveCompletionProofResult {
+        status,
+        objective_complete,
+        win_condition_met,
+        loss_condition_triggered,
+        missing_events: Vec::new(),
+        failed_flags: Vec::new(),
+        missing_transitions: Vec::new(),
+        unsupported_reasons: Vec::new(),
+        summary: summary.to_string(),
+    }
+}
+
+fn validate_objective_completion_status(
+    status: ObjectiveCompletionProofStatus,
+    result: &ObjectiveCompletionProofResult,
+    blocked_reasons: &[String],
+) -> Result<()> {
+    match status {
+        ObjectiveCompletionProofStatus::Proven
+            if blocked_reasons.is_empty()
+                && result.status == ObjectiveCompletionProofResultStatus::Complete =>
+        {
+            Ok(())
+        }
+        ObjectiveCompletionProofStatus::Failed
+            if blocked_reasons.is_empty()
+                && result.status == ObjectiveCompletionProofResultStatus::Failed =>
+        {
+            Ok(())
+        }
+        ObjectiveCompletionProofStatus::MissingEvidence
+            if blocked_reasons.is_empty()
+                && result.status == ObjectiveCompletionProofResultStatus::MissingEvidence =>
+        {
+            Ok(())
+        }
+        ObjectiveCompletionProofStatus::Unsupported
+            if blocked_reasons.is_empty()
+                && result.status == ObjectiveCompletionProofResultStatus::Unsupported =>
+        {
+            Ok(())
+        }
+        ObjectiveCompletionProofStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        ObjectiveCompletionProofStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        ObjectiveCompletionProofStatus::Proven => Err(anyhow!(
+            "objective completion proven status requires complete result and no blockedReasons"
+        )),
+        ObjectiveCompletionProofStatus::Failed => Err(anyhow!(
+            "objective completion failed status requires failed result and no blockedReasons"
+        )),
+        ObjectiveCompletionProofStatus::MissingEvidence => Err(anyhow!(
+            "objective completion missing_evidence status requires missing_evidence result and no blockedReasons"
+        )),
+        ObjectiveCompletionProofStatus::Unsupported => Err(anyhow!(
+            "objective completion unsupported status requires unsupported result and no blockedReasons"
+        )),
+        ObjectiveCompletionProofStatus::Stale => Err(anyhow!(
+            "objective completion stale status requires blockedReasons"
+        )),
+        ObjectiveCompletionProofStatus::Blocked => Err(anyhow!(
+            "objective completion blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn objective_completion_proof_status_label(status: ObjectiveCompletionProofStatus) -> &'static str {
+    match status {
+        ObjectiveCompletionProofStatus::Proven => "proven",
+        ObjectiveCompletionProofStatus::Failed => "failed",
+        ObjectiveCompletionProofStatus::MissingEvidence => "missing_evidence",
+        ObjectiveCompletionProofStatus::Unsupported => "unsupported",
+        ObjectiveCompletionProofStatus::Stale => "stale",
+        ObjectiveCompletionProofStatus::Blocked => "blocked",
+    }
+}
+
+fn objective_completion_result_status_label(
+    status: ObjectiveCompletionProofResultStatus,
+) -> &'static str {
+    match status {
+        ObjectiveCompletionProofResultStatus::Complete => "complete",
+        ObjectiveCompletionProofResultStatus::Failed => "failed",
+        ObjectiveCompletionProofResultStatus::MissingEvidence => "missing_evidence",
+        ObjectiveCompletionProofResultStatus::Unsupported => "unsupported",
+        ObjectiveCompletionProofResultStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -61868,6 +62560,144 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("reachability-pathing-evidence-v1.md"));
+    }
+
+    #[test]
+    fn objective_completion_proof_v1_accepts_complete_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/objective-completion-proof-v1/objective.complete.fixture.json"
+        );
+        let artifact = ObjectiveCompletionProofArtifact::from_json_str(fixture)
+            .expect("complete objective proof parses");
+        assert_eq!(artifact.schema_version, "objective-completion-proof-v1");
+        assert_eq!(artifact.proof_id, "objective_collect_and_exit_complete");
+        assert_eq!(artifact.status, ObjectiveCompletionProofStatus::Proven);
+        assert_eq!(
+            artifact.result.status,
+            ObjectiveCompletionProofResultStatus::Complete
+        );
+        assert!(artifact.result.objective_complete);
+        assert!(artifact.result.win_condition_met);
+        assert!(!artifact.result.loss_condition_triggered);
+
+        let read_model = objective_completion_proof_read_model_from_json_str(fixture)
+            .expect("objective proof read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "objective-completion-proof-read-model-v1"
+        );
+        assert_eq!(read_model.status, "proven");
+        assert_eq!(read_model.result_status, "complete");
+        assert_eq!(read_model.required_action_count, 4);
+        assert_eq!(read_model.required_event_count, 3);
+        assert!(read_model.journal_summary.contains("collect_and_exit"));
+        assert!(read_model.boundary.contains("local scenario"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+        assert!(read_model.boundary.contains("no auto-merge"));
+    }
+
+    #[test]
+    fn objective_completion_proof_v1_accepts_failure_and_blocker_fixtures() {
+        for (fixture, expected_status, expected_result) in [
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.unreachable.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::Failed,
+                ObjectiveCompletionProofResultStatus::Failed,
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.missing-event.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::MissingEvidence,
+                ObjectiveCompletionProofResultStatus::MissingEvidence,
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.failed-flag.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::Failed,
+                ObjectiveCompletionProofResultStatus::Failed,
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.unsupported.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::Unsupported,
+                ObjectiveCompletionProofResultStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.stale.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::Stale,
+                ObjectiveCompletionProofResultStatus::Complete,
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/objective.blocked.fixture.json"
+                ),
+                ObjectiveCompletionProofStatus::Blocked,
+                ObjectiveCompletionProofResultStatus::Complete,
+            ),
+        ] {
+            let artifact = ObjectiveCompletionProofArtifact::from_json_str(fixture)
+                .expect("objective proof fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            assert_eq!(artifact.result.status, expected_result);
+            if matches!(
+                expected_status,
+                ObjectiveCompletionProofStatus::Stale | ObjectiveCompletionProofStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn objective_completion_proof_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/invalid/result-drift.fixture.json"
+                ),
+                "result drift",
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/invalid/unsafe-ref.fixture.json"
+                ),
+                "must not escape",
+            ),
+        ] {
+            let error = ObjectiveCompletionProofArtifact::from_json_str(fixture)
+                .expect_err("invalid objective proof fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn objective_completion_proof_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/objective-completion-proof-v1.md");
+        assert!(doc.contains("does not infer unsupported mechanics"));
+        assert!(doc.contains("does not prove subjective level quality"));
+        assert!(doc.contains("no scene write"));
+        assert!(doc.contains("no trusted apply"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("objective-completion-proof-v1.md"));
     }
 
     #[test]
