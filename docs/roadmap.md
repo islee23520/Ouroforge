@@ -217,3 +217,8 @@ Ouroforge is not currently trying to be:
 
 Any shift in those boundaries requires a design issue, explicit maintainer
 approval, and evidence that the change belongs in the current roadmap.
+
+
+## Current roadmap anchors
+
+- Godot-Plus Demo Game v1 scope contract: [`docs/godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md).
