@@ -377,6 +377,7 @@ const run = {
     source_world_state: 'evidence/world.json',
     scene: { sceneId: 'trigger-flags-v1-fixture', entityCount: 3, tick: 1 },
     renderer: { version: '1', renderedEntities: 3, camera: { x: 0, y: 0 } },
+    render_breakdown: { elements: [{ renderableId: 'entity:player' }], absenceDiagnostics: [{ entityId: 'hidden', reason: 'hidden' }] },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 0 },
@@ -650,6 +651,8 @@ assert.match(xssRuntimeEvents, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /Render breakdown/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /1 element\(s\), 1 absence diagnostic\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);

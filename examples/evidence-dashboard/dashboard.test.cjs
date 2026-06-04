@@ -100,6 +100,14 @@ const run = {
         authoring: { collisionCellCount: 3, triggerCellCount: 1, hazardCellCount: 1, goalCellCount: 1 },
       }],
     },
+    render_breakdown: {
+      present: true,
+      frameId: 'frame-0003',
+      sceneId: '<scene-render-test>',
+      elements: [{ renderableId: '<entity:player>', entityId: 'player', drawOrder: 0, layer: 'actors', primitiveCategory: 'sprite' }],
+      absenceDiagnostics: [{ entityId: '<hidden>', reason: 'hidden', detail: 'sprite.visible=false' }],
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+    },
     gameplay: {
       present: true,
       declaredFlagCount: 2,
@@ -556,6 +564,11 @@ assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /Collision ce
 assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /3 collision \/ 1 trigger \/ 1 hazard \/ 1 goal/);
 assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /&lt;platformer-ground&gt;/);
 assert.match(dashboard.renderTilemapSummary({}), /No tilemap world-state summary/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Renderable elements/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;entity:player&gt;/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /trusted writes, command bridge, live mutation/);
+assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<entity:player>/);
+assert.match(dashboard.renderRenderBreakdownSummary({}), /No scene render breakdown evidence/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /HUD value components/);

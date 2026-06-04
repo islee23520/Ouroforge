@@ -196,6 +196,19 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><ul class="run-meta-list">${tilemapRows}</ul><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}. Read-only: the dashboard displays exported evidence only and cannot edit tilemaps.</p>`;
   }
 
+  function renderRenderBreakdownSummary(summary = {}) {
+    const breakdown = summary?.render_breakdown || summary?.renderBreakdown || {};
+    if (!summary?.present || !breakdown.present) return '<p class="empty-state">No scene render breakdown evidence is available.</p>';
+    const elements = Array.isArray(breakdown.elements) ? breakdown.elements : [];
+    const absence = Array.isArray(breakdown.absenceDiagnostics || breakdown.absence_diagnostics) ? (breakdown.absenceDiagnostics || breakdown.absence_diagnostics) : [];
+    const boundary = breakdown.readOnlyInspection || breakdown.read_only_inspection || {};
+    const disallowed = Array.isArray(boundary.disallowedActions || boundary.disallowed_actions) ? (boundary.disallowedActions || boundary.disallowed_actions).join(', ') : 'trusted writes, command bridge, live mutation';
+    const rows = [['Frame', breakdown.frameId || breakdown.frame_id || 'unknown'], ['Scene', breakdown.sceneId || breakdown.scene_id || 'unknown'], ['Renderable elements', elements.length], ['Absence diagnostics', absence.length]].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const elementRows = elements.slice(0, 6).map((element) => `<li><strong>${escapeText(element?.renderableId || element?.entityId || 'renderable')}</strong>: draw ${escapeText(element?.drawOrder ?? '?')} · ${escapeText(element?.layer || 'default')} · ${escapeText(element?.primitiveCategory || 'unknown')}</li>`).join('') || '<li>No renderable elements recorded.</li>';
+    const absenceRows = absence.slice(0, 6).map((diag) => `<li><strong>${escapeText(diag?.entityId || diag?.renderableId || 'renderable')}</strong>: ${escapeText(diag?.reason || 'unknown')} · ${escapeText(diag?.detail || '')}</li>`).join('') || '<li>No hidden, skipped, fallback, or malformed diagnostics recorded.</li>';
+    return `<div class="field-grid">${rows}</div><h4>Renderables</h4><ul class="run-meta-list">${elementRows}</ul><h4>Absence diagnostics</h4><ul class="run-meta-list">${absenceRows}</ul><p class="run-meta">Read-only inspection only; disallowed actions: ${escapeText(disallowed)}.</p>`;
+  }
+
   function renderGameplaySummary(summary = {}) {
     const gameplay = summary?.gameplay || {};
     if (!summary?.present || !gameplay.present) {
@@ -1101,6 +1114,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Tilemap authoring evidence</h3>${renderTilemapSummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Scene render breakdown</h3>${renderRenderBreakdownSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
@@ -1181,7 +1195,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

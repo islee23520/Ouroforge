@@ -21318,6 +21318,75 @@ pub struct SceneRenderOrderEntry {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct SceneRenderBreakdown {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub camera: ScenePoint,
+    pub viewport: SceneSize,
+    pub elements: Vec<SceneRenderBreakdownElement>,
+    #[serde(rename = "absenceDiagnostics")]
+    pub absence_diagnostics: Vec<SceneRenderAbsenceDiagnostic>,
+    #[serde(rename = "readOnlyInspection")]
+    pub read_only_inspection: SceneRenderBreakdownInspectionBoundary,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderBreakdownElement {
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    #[serde(rename = "renderableId")]
+    pub renderable_id: String,
+    #[serde(rename = "entityId")]
+    pub entity_id: String,
+    pub layer: String,
+    #[serde(rename = "layerOrder")]
+    pub layer_order: i64,
+    #[serde(rename = "spriteOrder")]
+    pub sprite_order: i64,
+    #[serde(rename = "drawOrder")]
+    pub draw_order: usize,
+    pub camera: ScenePoint,
+    pub transform: ScenePoint,
+    pub size: SceneSize,
+    #[serde(rename = "primitiveCategory")]
+    pub primitive_category: String,
+    #[serde(rename = "assetRef", skip_serializing_if = "Option::is_none")]
+    pub asset_ref: Option<String>,
+    #[serde(rename = "debugLabel")]
+    pub debug_label: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderAbsenceDiagnostic {
+    #[serde(rename = "renderableId")]
+    pub renderable_id: String,
+    #[serde(rename = "entityId")]
+    pub entity_id: String,
+    pub reason: String,
+    pub layer: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderBreakdownInspectionBoundary {
+    #[serde(rename = "trustedEmitter")]
+    pub trusted_emitter: String,
+    #[serde(rename = "browserStudioMode")]
+    pub browser_studio_mode: String,
+    #[serde(rename = "disallowedActions")]
+    pub disallowed_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SceneTilemap {
     pub id: String,
     #[serde(rename = "tileSize")]
@@ -23974,7 +24043,9 @@ fn validate_scene_renderer(scene: &SceneDocument, renderer: &SceneRenderer) -> R
     Ok(())
 }
 
-pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
+fn scene_layer_order_and_visibility(
+    scene: &SceneDocument,
+) -> (BTreeMap<&str, i64>, BTreeSet<&str>) {
     let layer_order = scene
         .renderer
         .as_ref()
@@ -23983,14 +24054,9 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
                 .layers
                 .iter()
                 .map(|layer| (layer.id.as_str(), layer.order))
-                .collect::<std::collections::BTreeMap<_, _>>()
+                .collect::<BTreeMap<_, _>>()
         })
         .unwrap_or_default();
-
-    // Entities on a layer marked `visible: false` are not rendered. The browser
-    // renderer already honors this (examples/game-runtime/renderer.js), so the
-    // canonical render order must too, otherwise hidden-layer entities leak into
-    // the evidence as renderable.
     let hidden_layers = scene
         .renderer
         .as_ref()
@@ -24000,10 +24066,14 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
                 .iter()
                 .filter(|layer| !layer.visible)
                 .map(|layer| layer.id.as_str())
-                .collect::<std::collections::BTreeSet<_>>()
+                .collect::<BTreeSet<_>>()
         })
         .unwrap_or_default();
+    (layer_order, hidden_layers)
+}
 
+pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
+    let (layer_order, hidden_layers) = scene_layer_order_and_visibility(scene);
     let mut entries = scene
         .entities
         .iter()
@@ -24017,11 +24087,10 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
                 .layer
                 .clone()
                 .unwrap_or_else(|| "default".to_string());
-            let layer_order = layer_order.get(layer.as_str()).copied().unwrap_or(0);
             SceneRenderOrderEntry {
                 entity_id: entity.id.clone(),
+                layer_order: layer_order.get(layer.as_str()).copied().unwrap_or(0),
                 layer,
-                layer_order,
                 sprite_order: entity.sprite.order.unwrap_or(0),
             }
         })
@@ -24034,6 +24103,123 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
         ))
     });
     entries
+}
+
+pub fn scene_render_breakdown(
+    scene: &SceneDocument,
+    frame_id: impl Into<String>,
+) -> SceneRenderBreakdown {
+    let renderer = scene.renderer.as_ref();
+    let camera = renderer
+        .map(|renderer| renderer.camera.clone())
+        .unwrap_or_default();
+    let viewport = renderer
+        .map(|renderer| renderer.viewport.clone())
+        .unwrap_or_else(|| SceneSize {
+            width: scene.bounds.width,
+            height: scene.bounds.height,
+        });
+    let (layer_order, hidden_layers) = scene_layer_order_and_visibility(scene);
+    let mut elements = scene
+        .entities
+        .iter()
+        .filter(|entity| {
+            entity.sprite.visible
+                && !hidden_layers.contains(entity.sprite.layer.as_deref().unwrap_or("default"))
+        })
+        .map(|entity| {
+            let layer = entity
+                .sprite
+                .layer
+                .clone()
+                .unwrap_or_else(|| "default".to_string());
+            let primitive_category =
+                if entity.components.ui_text.is_some() || entity.components.hud_value.is_some() {
+                    "text"
+                } else if entity.sprite.asset.is_some() {
+                    "sprite"
+                } else {
+                    "rect"
+                };
+            SceneRenderBreakdownElement {
+                scene_id: scene.id.clone(),
+                renderable_id: format!("entity:{}", entity.id),
+                entity_id: entity.id.clone(),
+                layer: layer.clone(),
+                layer_order: layer_order.get(layer.as_str()).copied().unwrap_or(0),
+                sprite_order: entity.sprite.order.unwrap_or(0),
+                draw_order: 0,
+                camera: camera.clone(),
+                transform: entity.components.transform.clone(),
+                size: entity.components.size.clone(),
+                primitive_category: primitive_category.to_string(),
+                asset_ref: entity.sprite.asset.clone(),
+                debug_label: format!("{} on layer {}", entity.id, layer),
+                visible: true,
+            }
+        })
+        .collect::<Vec<_>>();
+    elements.sort_by(|left, right| {
+        (left.layer_order, left.sprite_order, left.entity_id.as_str()).cmp(&(
+            right.layer_order,
+            right.sprite_order,
+            right.entity_id.as_str(),
+        ))
+    });
+    for (index, element) in elements.iter_mut().enumerate() {
+        element.draw_order = index;
+    }
+
+    let absence_diagnostics = scene
+        .entities
+        .iter()
+        .filter_map(|entity| {
+            let layer = entity
+                .sprite
+                .layer
+                .as_deref()
+                .unwrap_or("default")
+                .to_string();
+            if !entity.sprite.visible {
+                Some(SceneRenderAbsenceDiagnostic {
+                    renderable_id: format!("entity:{}", entity.id),
+                    entity_id: entity.id.clone(),
+                    reason: "hidden".to_string(),
+                    layer,
+                    detail: "sprite.visible=false".to_string(),
+                })
+            } else if hidden_layers.contains(layer.as_str()) {
+                Some(SceneRenderAbsenceDiagnostic {
+                    renderable_id: format!("entity:{}", entity.id),
+                    entity_id: entity.id.clone(),
+                    reason: "layer_hidden".to_string(),
+                    layer,
+                    detail: "renderer layer visible=false".to_string(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    SceneRenderBreakdown {
+        schema_version: "ouroforge.scene-render-breakdown.v1".to_string(),
+        frame_id: frame_id.into(),
+        scene_id: scene.id.clone(),
+        camera,
+        viewport,
+        elements,
+        absence_diagnostics,
+        read_only_inspection: SceneRenderBreakdownInspectionBoundary {
+            trusted_emitter: "rust-local-scene-contract".to_string(),
+            browser_studio_mode: "read-only evidence inspection".to_string(),
+            disallowed_actions: vec![
+                "trusted writes".to_string(),
+                "command bridge".to_string(),
+                "live mutation".to_string(),
+            ],
+        },
+    }
 }
 
 fn validate_scene_asset_ref(
@@ -43343,6 +43529,73 @@ scenarios:
         assert_eq!(
             serde_json::to_string(&order).expect("render order serializes"),
             r#"[{"entityId":"sky","layer":"background","layerOrder":-10,"spriteOrder":0},{"entityId":"player","layer":"actors","layerOrder":0,"spriteOrder":5},{"entityId":"zebra","layer":"actors","layerOrder":0,"spriteOrder":5}]"#
+        );
+    }
+
+    #[test]
+    fn scene_render_breakdown_contract_explains_order_and_absence() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "breakdown-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 8, "y": 4 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "background", "order": -10 },
+                    { "id": "actors", "order": 0 },
+                    { "id": "debug", "order": 10, "visible": false }
+                ]
+            },
+            "entities": [
+                { "id": "zebra", "sprite": { "color": "#facc15", "layer": "actors", "order": 5 }, "components": { "transform": { "x": 40, "y": 20 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 8, "height": 8 }, "controllable": false } },
+                { "id": "player", "sprite": { "color": "#5eead4", "asset": "assets/sprites/player.svg", "layer": "actors", "order": 5 }, "components": { "transform": { "x": 24, "y": 20 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 16 }, "controllable": true } },
+                { "id": "sky", "sprite": { "color": "#0f172a", "layer": "background", "order": 0 }, "components": { "transform": { "x": 0, "y": 0 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 320, "height": 180 }, "controllable": false } },
+                { "id": "debug-hidden", "sprite": { "color": "#ffffff", "layer": "debug", "order": 0 }, "components": { "transform": { "x": 0, "y": 0 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 8, "height": 8 }, "controllable": false } },
+                { "id": "sprite-hidden", "sprite": { "color": "#ffffff", "layer": "actors", "order": 1, "visible": false }, "components": { "transform": { "x": 0, "y": 0 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 8, "height": 8 }, "controllable": false } }
+            ]
+        })).expect("breakdown fixture parses");
+        validate_scene(&scene).expect("breakdown scene validates");
+        let breakdown = scene_render_breakdown(&scene, "frame-0003");
+        assert_eq!(
+            breakdown.schema_version,
+            "ouroforge.scene-render-breakdown.v1"
+        );
+        assert_eq!(breakdown.frame_id, "frame-0003");
+        assert_eq!(breakdown.camera, ScenePoint { x: 8, y: 4 });
+        assert_eq!(
+            breakdown
+                .elements
+                .iter()
+                .map(|element| (
+                    element.entity_id.as_str(),
+                    element.draw_order,
+                    element.primitive_category.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("sky", 0, "rect"),
+                ("player", 1, "sprite"),
+                ("zebra", 2, "rect")
+            ]
+        );
+        assert_eq!(
+            breakdown
+                .absence_diagnostics
+                .iter()
+                .map(|diag| (diag.entity_id.as_str(), diag.reason.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("debug-hidden", "layer_hidden"),
+                ("sprite-hidden", "hidden")
+            ]
+        );
+        assert_eq!(
+            serde_json::to_value(&breakdown.read_only_inspection).expect("boundary serializes")
+                ["disallowedActions"],
+            json!(["trusted writes", "command bridge", "live mutation"])
         );
     }
 

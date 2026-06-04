@@ -348,6 +348,7 @@ const OuroforgeCockpit = (() => {
     const cards = [
       ['Scene', `${summaryValue(summary, 'scene', 'sceneId')} · ${summaryValue(summary, 'scene', 'entityCount', 0)} entit(ies) · tick ${summaryValue(summary, 'scene', 'tick')}`],
       ['Renderer / camera', `v${summaryValue(summary, 'renderer', 'version')} · ${summaryValue(summary, 'renderer', 'renderedEntities', 0)} rendered · camera ${summaryValue(summary, 'renderer', 'camera')}`],
+      ['Render breakdown', `${(summary?.render_breakdown?.elements || summary?.renderBreakdown?.elements || []).length} element(s), ${(summary?.render_breakdown?.absenceDiagnostics || summary?.render_breakdown?.absence_diagnostics || summary?.renderBreakdown?.absenceDiagnostics || []).length} absence diagnostic(s)`],
       ['Tilemaps', `${summaryValue(summary, 'tilemaps', 'tilemapCount', 0)} tilemap(s), ${summaryValue(summary, 'tilemaps', 'layerCount', 0)} layer(s)`],
       ['Assets', `${summaryValue(summary, 'assets', 'manifestId')} · ${summaryValue(summary, 'assets', 'assetCount', 0)} loaded/ref(s)`],
       ['Animation', `${summaryValue(summary, 'animation', 'animatedEntityCount', 0)} animated entit(ies)`],

@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { normalizeRenderer, renderOrder, debugState, drawRuntime } = require('./renderer.js');
+const { normalizeRenderer, renderOrder, renderBreakdown, compareBreakdowns, debugState, drawRuntime } = require('./renderer.js');
 
 function createContext() {
   const calls = [];
@@ -144,3 +144,16 @@ drawRuntime({
   animation: { activeSpriteFrame: () => null },
 });
 assert.ok(hudValueContext.calls.some((call) => call[0] === 'fillText' && call[2] === 'HP: 3/3'));
+
+
+const breakdown = renderBreakdown({ world: { sceneId: 'renderer-test', tick: 3, bounds: { width: 320, height: 180 }, entities }, renderer, frameId: 'frame-0003' });
+assert.equal(breakdown.schemaVersion, 'ouroforge.scene-render-breakdown.v1');
+assert.deepEqual(breakdown.elements.map((element) => [element.entityId, element.drawOrder, element.primitiveCategory]), [['sky', 0, 'rect'], ['player', 1, 'rect'], ['zebra', 2, 'rect']]);
+assert.deepEqual(breakdown.absenceDiagnostics.map((diag) => [diag.entityId, diag.reason]), [['debug-hidden', 'layer_hidden'], ['sprite-hidden', 'hidden']]);
+assert.deepEqual(renderBreakdown({ world: { sceneId: 'renderer-test', entities }, renderer, filter: { layer: 'actors' } }).elements.map((element) => element.entityId), ['player', 'zebra']);
+assert.deepEqual(breakdown.readOnlyInspection.disallowedActions, ['trusted writes', 'command bridge', 'live mutation']);
+const malformedBreakdown = renderBreakdown({ world: { sceneId: 'malformed-renderer-test', entities: [{ sprite: { color: '#fff', layer: 'actors' }, components: {} }] }, renderer });
+assert.ok(malformedBreakdown.absenceDiagnostics.some((diag) => diag.reason === 'malformed'));
+assert.ok(malformedBreakdown.absenceDiagnostics.some((diag) => diag.reason === 'fallback'));
+const changedBreakdown = renderBreakdown({ world: { sceneId: 'renderer-test', tick: 4, bounds: { width: 320, height: 180 }, entities: entities.map((entity) => entity.id === 'zebra' ? { ...entity, sprite: { ...entity.sprite, order: 0 } } : entity) }, renderer, frameId: 'frame-0004' });
+assert.ok(compareBreakdowns(breakdown, changedBreakdown).changes.some((change) => change.renderableId === 'renderer-test/entity:zebra' && change.field === 'drawOrder'));
