@@ -78,6 +78,99 @@ Public-alpha PR intake: <intake-ready | intake-hold | intake-reject | intake-def
 Decision rationale:
 ```
 
+
+## Dependency-change policy
+
+Dependency changes are not ordinary public-alpha drive-by changes. A PR that
+changes dependency manifests, lockfiles, package-manager configuration, install
+scripts, build scripts, CI/workflows, or registry/publishing metadata must be
+held unless a linked issue explicitly approves that dependency-change scope.
+
+Before dependency review can proceed, the linked issue or PR must provide:
+
+- the exact manifest, lockfile, workflow, or build-script files changed;
+- direct and transitive dependency impact, including removed dependencies;
+- license and maintenance rationale;
+- supply-chain/security evidence such as `cargo audit` and any ecosystem-specific
+  advisory check available without adding new tooling;
+- generated-state and credential audit evidence;
+- rollback/removal plan if the dependency is rejected before merge;
+- confirmation that no release, publication, signing, upload, install, or network
+  automation is added unless separately authorized.
+
+Dependency PRs without this evidence should use `intake-hold` and be redirected
+to a smaller approval issue. This policy does not approve any dependency change
+by itself.
+
+## Lore commit-message expectation
+
+Lore-format commit messages are **required for maintainer-created merge/squash
+commits** in this repository. Public contributors are not required to rewrite
+personal branch history before review, but they are expected to provide the same
+decision context in the PR body when their commits do not already follow Lore.
+
+Maintainers should ensure the final merge/squash commit records the decision
+using the repository Lore trailers:
+
+- `Constraint:` for the external rule or issue boundary;
+- `Rejected:` for alternatives future maintainers should not re-explore;
+- `Confidence:` and `Scope-risk:` for review posture;
+- `Directive:` for forward-looking warnings;
+- `Tested:` and `Not-tested:` for evidence and gaps.
+
+If a public PR cannot supply enough decision context for a Lore merge commit,
+use `intake-hold` until the author or maintainer adds the missing rationale to
+the PR discussion.
+
+## Review and merge readiness criteria
+
+A public-alpha PR is review-ready when:
+
+1. the linked issue/scope is explicit and still open when required by its closure
+   gate;
+2. the PR body completes the drift lock and public-alpha contributor guardrails;
+3. changed files match the stated scope and no forbidden-scope gate is triggered;
+4. dependency, CI, workflow, build-script, credential, generated-state, and
+   security-sensitive changes are absent or explicitly authorized by the linked
+   issue;
+5. focused verification matches the changed files;
+6. broad verification is run for code, templates, security, dependency, or
+   public-alpha governance changes unless a documented docs-only rationale is
+   sufficient;
+7. public-facing wording scan results are reviewed as conservative boundaries,
+   not blind failures;
+8. generated/local artifact audit is recorded;
+9. #1 and #23 remain open unless a separate explicit governance decision says
+   otherwise.
+
+A public-alpha PR is merge-ready only after:
+
+- required reviews or maintainer approval are complete;
+- required checks are green or the maintainer records an explicit non-blocking
+  explanation for unavailable external checks;
+- the final commit message or squash body can satisfy the Lore protocol;
+- the PR does not close #1 or #23 unless separately authorized;
+- issue closure, if any, is left to that issue's final evidence gate rather than
+  inferred from merge alone.
+
+## Merge-readiness reviewer template
+
+```markdown
+Public-alpha merge readiness: <ready | hold | reject | defer>
+
+- Linked issue/scope still valid:
+- Dependency/CI/workflow/build-script changes absent or approved:
+- Lore decision context sufficient for final merge commit:
+- Focused verification:
+- Broad verification:
+- Wording/generated-state/security audits:
+- Required reviews/checks:
+- #1 open:
+- #23 open:
+
+Merge rationale or blocker:
+```
+
 ## Relationship to the PR template
 
 `.github/PULL_REQUEST_TEMPLATE.md` is the contributor-facing prompt for this
@@ -88,6 +181,5 @@ blank, changes files outside the stated scope, or attempts forbidden work.
 
 This policy does not implement merge automation, branch protection, release
 workflows, repository visibility changes, issue locking, security advisories,
-dependency review process details, Lore commit-message policy, or final
-review/merge readiness criteria. Those latter policy details are reserved for
-#382 / PLG1.5.2.
+dependency changes, or product behavior. It records manual intake, dependency,
+Lore, and review-readiness expectations only.

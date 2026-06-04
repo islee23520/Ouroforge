@@ -57,7 +57,7 @@ playbooks, or checklists unless a later issue explicitly authorizes more.
 | 2 | Visibility decision record | #379 | Go/no-go/hold template, review fields, examples, and manual visibility boundary. |
 | 3 | Hold and rollback criteria | #380 | [`public-alpha-launch-hold-criteria-v1.md`](public-alpha-launch-hold-criteria-v1.md) and [`public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md): blockers, manual response/rollback options, deferral, and evidence needed before reconsideration. |
 | 4 | Public issue intake | #381 | Issue triage policy/snippets/templates for public-alpha requests without support guarantees. |
-| 5 | Public PR intake | #382 | [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md) plus later dependency/Lore/review-readiness policy: PR intake checklist, maintainer expectations, and forbidden-scope handling. |
+| 5 | Public PR intake | #382 | [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md): PR intake checklist, dependency/Lore expectations, review-readiness criteria, maintainer expectations, and forbidden-scope handling. |
 | 6 | Security response | Security playbook docs | Vulnerability-reporting flow, escalation boundaries, and no public security guarantee overclaim. |
 | 7 | Demo stability monitoring | Demo monitoring docs | Manual/CI-adjacent evidence policy, generated-state cleanup, Chrome caveats, and refresh cadence. |
 | 8 | Public alpha communication pack | #385 | Conservative announcement/README/FAQ wording drafts; no actual publication. |

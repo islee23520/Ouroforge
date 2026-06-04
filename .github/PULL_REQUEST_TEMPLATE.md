@@ -23,6 +23,8 @@
 
 - [ ] This PR does not publish, release, announce, toggle visibility, mutate GitHub settings, or automate launch/rollback/merge behavior.
 - [ ] This PR does not introduce dependency changes unless the linked issue explicitly approves them.
+- [ ] If this PR changes dependency/CI/workflow/build-script files, it includes the approval issue and supply-chain/security evidence required by `docs/public-pr-intake-policy-v1.md`.
+- [ ] The PR body provides enough decision context for a maintainer Lore-format squash/merge commit.
 - [ ] This PR does not commit generated demo/run/dashboard/screenshot/local-tool state unless a fixture-scoped issue explicitly authorizes it.
 - [ ] Public-facing wording has been checked for forbidden overclaims or the PR is not public-facing.
 - [ ] Security-sensitive details, secrets, private paths, and private screenshots are not included.
