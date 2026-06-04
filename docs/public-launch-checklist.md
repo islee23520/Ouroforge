@@ -7,6 +7,7 @@ This checklist is the handoff artifact for public-readiness review. It does not 
 Public Alpha Launch Governance v1 is scoped in [`docs/public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md); that scope contract keeps future public-alpha work governance-only unless a separate issue authorizes more.
 
 Manual launch hold criteria are defined in [`docs/public-alpha-launch-hold-criteria-v1.md`](public-alpha-launch-hold-criteria-v1.md). A hold outcome keeps visibility unchanged and requires blocker evidence before a later review.
+Manual response and rollback criteria are defined in [`docs/public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md). Those criteria document conservative manual options only; they do not automate rollback or repository settings changes.
 
 Public Alpha Readiness Gate v1 is defined in [`docs/public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md); it is a readiness checklist and report format only, not a visibility change, launch approval, or publication workflow.
 

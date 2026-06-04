@@ -8,6 +8,10 @@ announcement, publish packages, mutate GitHub settings, or automate rollback.
 All launch and rollback actions remain manual maintainer decisions outside this
 PR and outside issue #380.
 
+Manual response and rollback options after a blocker or future public-alpha
+visibility review are defined in
+[`public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md).
+
 ## Scope boundary
 
 Use this checklist before a dated visibility decision record or public-alpha
