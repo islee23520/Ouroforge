@@ -124,6 +124,13 @@ playback, read-only `scene3dAnimation` evidence, and `scene3d_animation`
 scenario assertions for reached/playing/stopped playback checks. The behavior is
 documented in [`3d-animation-playback-v1.md`](./3d-animation-playback-v1.md).
 
+Issue #603 starts the 3D runtime probe contract as a design/docs gate. The
+additive probe extension preserves existing `window.__OUROFORGE__` v2 methods
+and 2D response shapes while defining optional/versioned 3D world-state, frame
+stat, and event fields for bounded scene, camera, transform, render, collision,
+and animation inspection. The behavior is documented in
+[`3d-runtime-probe-contract-v1.md`](./3d-runtime-probe-contract-v1.md).
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard

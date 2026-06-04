@@ -71346,6 +71346,55 @@ scenarios:
     }
 
     #[test]
+    fn scene_3d_runtime_probe_contract_v1_documents_additive_read_only_boundary() {
+        let doc = read_repo_text("docs/3d-runtime-probe-contract-v1.md");
+        for required in [
+            "Issue #603",
+            "window.__OUROFORGE__",
+            "getWorldState()",
+            "getFrameStats()",
+            "getEvents()",
+            "scene3dTransforms",
+            "scene3dCamera",
+            "scene3dRender",
+            "scene3dCollision",
+            "scene3dAnimation",
+            "runtime.scene3d.collision.trigger",
+            "runtime.scene3d.animation.state",
+            "legacy",
+            "missing",
+            "malformed",
+            "unavailable",
+            "present",
+            "Missing 3D state is allowed for 2D-only scenarios",
+            "must not break existing 2D consumers",
+            "Browser probe state is evidence input only",
+            "Rust/local code owns trusted scene validation",
+            "trusted browser file writes",
+            "command bridges",
+            "auto-apply",
+            "auto-merge",
+            "dependency, CI, workflow, or build-script mutation",
+            "Godot replacement",
+            "#1/#23 protection checks",
+        ] {
+            assert!(
+                doc.contains(required),
+                "3D runtime probe contract doc missing {required}"
+            );
+        }
+
+        let runtime_probe_doc = read_repo_text("docs/runtime-probe-contract-v2.md");
+        assert!(runtime_probe_doc.contains("Additive 3D Probe Extension"));
+        assert!(runtime_probe_doc.contains("3d-runtime-probe-contract-v1.md"));
+        assert!(runtime_probe_doc.contains("preserving the v2 method set"));
+
+        let gate_doc = read_repo_text("docs/3d-capability-gate-v1.md");
+        assert!(gate_doc.contains("Issue #603 starts the 3D runtime probe contract"));
+        assert!(gate_doc.contains("2D response shapes"));
+    }
+
+    #[test]
     fn scene_3d_camera_state_summary_v1_exports_deterministic_read_model() {
         let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
             "examples/3d-capability-gate-v1/scene-3d-camera-valid.scene.json",

@@ -56,7 +56,7 @@ Read these for the foundational local loop and generated artifact contracts:
 
 - [`architecture.md`](architecture.md)
 - [`runtime-v1.md`](runtime-v1.md) and [`runtime-v1-demo.md`](runtime-v1-demo.md)
-- [`runtime-probe-contract-v2.md`](runtime-probe-contract-v2.md)
+- [`runtime-probe-contract-v2.md`](runtime-probe-contract-v2.md) and [`3d-runtime-probe-contract-v1.md`](3d-runtime-probe-contract-v1.md)
 - [`scenario-evaluator-v1.md`](scenario-evaluator-v1.md) and [`scenario-evaluator-v1-demo.md`](scenario-evaluator-v1-demo.md)
 - [`evidence-backed-journal-v2.md`](evidence-backed-journal-v2.md)
 - [`mutation-proposal-quality-v2.md`](mutation-proposal-quality-v2.md)

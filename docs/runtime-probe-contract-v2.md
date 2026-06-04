@@ -87,6 +87,22 @@ low-risk, record v2 contract metadata in runtime probe evidence.
 Other runtime examples may be treated as legacy until they either conform or
 produce explicit missing/malformed probe evidence.
 
+
+## Additive 3D Probe Extension
+
+The 3D runtime probe slice is defined in
+[`3d-runtime-probe-contract-v1.md`](./3d-runtime-probe-contract-v1.md). It
+extends the existing `getWorldState()`, `getFrameStats()`, and `getEvents()`
+responses with optional/versioned 3D fields for bounded local scenes while
+preserving the v2 method set and existing 2D response shapes.
+
+3D probe state is browser-read-only evidence input. Missing 3D fields are valid
+for legacy or 2D-only scenarios; they become failures only when an explicit 3D
+scenario/evidence contract requires them. Runtime probe extensions must not add
+trusted browser persistence, command bridges, source mutation authority, native
+export, plugin runtime, hosted/cloud behavior, production 3D claims, or Godot
+replacement claims.
+
 ## Browser and Trust Boundary
 
 The probe API must not:
