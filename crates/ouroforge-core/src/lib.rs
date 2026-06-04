@@ -20028,6 +20028,456 @@ pub fn validate_scene_only_mutation_operation(
     })
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourceFileClassDecision {
+    Allowed,
+    NeedsApproval,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourceFileClassLabel {
+    DeterministicSceneFixture,
+    ScenarioRegressionFixture,
+    RuntimeDemoConfig,
+    DeterministicSourceLikeTemplate,
+    DocumentationGovernance,
+    RustTrustBoundary,
+    TestsEvidenceReader,
+    BrowserStudioDisplay,
+    DependencyManifest,
+    CiWorkflowSecrets,
+    BuildScriptTooling,
+    AuthNetworkCloud,
+    PluginExtension,
+    NativeExportPackaging,
+    GeneratedLocalState,
+    BinaryOpaque,
+    UnsafePath,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceFileClassReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub path: String,
+    pub class: SourceFileClassLabel,
+    pub decision: SourceFileClassDecision,
+    #[serde(rename = "reviewLevel")]
+    pub review_level: String,
+    pub rationale: String,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourceFileClassReport {
+    pub fn is_blocked(&self) -> bool {
+        self.decision == SourceFileClassDecision::Blocked
+    }
+
+    pub fn needs_approval(&self) -> bool {
+        self.decision == SourceFileClassDecision::NeedsApproval
+    }
+}
+
+pub fn classify_source_file_path(path: impl AsRef<Path>) -> SourceFileClassReport {
+    classify_source_file_path_str(&path.as_ref().to_string_lossy())
+}
+
+pub fn classify_source_file_path_str(path: &str) -> SourceFileClassReport {
+    let normalized = path.replace('\\', "/");
+    let path_ref = Path::new(&normalized);
+    let components: Vec<String> = path_ref
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(value) => Some(value.to_string_lossy().to_string()),
+            _ => None,
+        })
+        .collect();
+    let lower_components: Vec<String> = components
+        .iter()
+        .map(|value| value.to_ascii_lowercase())
+        .collect();
+    let file_name = lower_components.last().map(String::as_str).unwrap_or("");
+    let extension = path_ref
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase());
+
+    if normalized.trim().is_empty() {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::UnsafePath,
+            SourceFileClassDecision::Blocked,
+            "Reject by default",
+            "empty source patch target path is unsafe",
+            vec!["empty target path"],
+        );
+    }
+    if path_ref.is_absolute()
+        || path_ref.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::UnsafePath,
+            SourceFileClassDecision::Blocked,
+            "Reject by default",
+            "source patch target path must be repository-relative and traversal-free",
+            vec!["absolute, rooted, prefixed, or parent-dir path"],
+        );
+    }
+    if components.iter().any(|component| component.is_empty()) {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::UnsafePath,
+            SourceFileClassDecision::Blocked,
+            "Reject by default",
+            "source patch target path contains an empty component",
+            vec!["empty path component"],
+        );
+    }
+    if let Some(root) = lower_components.first() {
+        if source_file_generated_roots().contains(&root.as_str())
+            || normalized == "examples/evidence-dashboard/dashboard-data.json"
+        {
+            return source_class_report(
+                normalized,
+                SourceFileClassLabel::GeneratedLocalState,
+                SourceFileClassDecision::Blocked,
+                "Reject by default",
+                "ignored local/generated state is not source patch input",
+                vec![format!("generated or local root {root}")],
+            );
+        }
+        if root.starts_with('.') && root != ".github" {
+            return source_class_report(
+                normalized,
+                SourceFileClassLabel::UnsafePath,
+                SourceFileClassDecision::Blocked,
+                "Reject by default",
+                "hidden repository roots are not eligible for source patch preview",
+                vec![format!("hidden root {root}")],
+            );
+        }
+    }
+    if lower_components
+        .iter()
+        .skip(1)
+        .any(|component| component.starts_with('.'))
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::UnsafePath,
+            SourceFileClassDecision::Blocked,
+            "Reject by default",
+            "hidden nested path components are ambiguous for source patch preview",
+            vec!["hidden nested path component"],
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some(".github") {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::CiWorkflowSecrets,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "CI/workflow and secrets-adjacent config can change automation authority",
+            vec!["ci, workflow, or secrets configuration"],
+        );
+    }
+    if source_file_dependency_manifest_names().contains(&file_name) {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::DependencyManifest,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "dependency manifests and lockfiles require supply-chain review",
+            vec!["dependency manifest or lockfile"],
+        );
+    }
+    if file_name == "build.rs"
+        || matches!(
+            extension.as_deref(),
+            Some("sh" | "bash" | "zsh" | "ps1" | "bat" | "cmd")
+        )
+        || lower_components
+            .iter()
+            .any(|component| component == "scripts")
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::BuildScriptTooling,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "build scripts and host-executed tooling can execute local commands",
+            vec!["build script, shell script, or host-executed tooling"],
+        );
+    }
+    if lower_components.iter().any(|component| {
+        matches!(
+            component.as_str(),
+            "auth" | "oauth" | "server" | "servers" | "cloud" | "network" | "net" | "deploy"
+        )
+    }) {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::AuthNetworkCloud,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "auth/network/cloud/server code is outside the local-first preview boundary",
+            vec!["auth, network, cloud, deploy, or server path"],
+        );
+    }
+    if lower_components.iter().any(|component| {
+        matches!(
+            component.as_str(),
+            "plugin" | "plugins" | "marketplace" | "extension" | "extensions"
+        )
+    }) && lower_components.first().map(String::as_str) != Some("docs")
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::PluginExtension,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "plugin or dynamic extension code expands execution authority",
+            vec!["plugin, marketplace, or extension runtime path"],
+        );
+    }
+    if lower_components.iter().any(|component| {
+        matches!(
+            component.as_str(),
+            "native" | "export" | "exports" | "packaging" | "release" | "releases" | "dist"
+        )
+    }) && lower_components.first().map(String::as_str) != Some("docs")
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::NativeExportPackaging,
+            SourceFileClassDecision::Blocked,
+            "Separate governance approval",
+            "native export, packaging, and release code is out of preview scope",
+            vec!["native export, packaging, release, or distribution path"],
+        );
+    }
+    if matches!(
+        extension.as_deref(),
+        Some(
+            "png"
+                | "jpg"
+                | "jpeg"
+                | "gif"
+                | "webp"
+                | "ico"
+                | "wasm"
+                | "bin"
+                | "zip"
+                | "gz"
+                | "tar"
+                | "mp3"
+                | "ogg"
+                | "wav"
+                | "ttf"
+                | "otf"
+                | "woff"
+                | "woff2"
+        )
+    ) {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::BinaryOpaque,
+            SourceFileClassDecision::Blocked,
+            "Reject by default",
+            "binary or opaque generated assets are not reviewer-visible source patch targets",
+            vec!["binary or opaque file extension"],
+        );
+    }
+    if lower_components
+        .iter()
+        .any(|component| component == "tests")
+        || file_name.ends_with(".test.cjs")
+        || file_name.ends_with("_test.rs")
+        || file_name.ends_with(".spec.js")
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::TestsEvidenceReader,
+            SourceFileClassDecision::NeedsApproval,
+            "Elevated behavior review",
+            "tests and evidence readers can hide failures or spoof confidence",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("crates") {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::RustTrustBoundary,
+            SourceFileClassDecision::NeedsApproval,
+            "Separate governance approval",
+            "Rust trust-boundary code owns validation, persistence, and artifact writes",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("docs")
+        || file_name == "readme.md"
+        || file_name == "agents.md"
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::DocumentationGovernance,
+            SourceFileClassDecision::NeedsApproval,
+            "Standard design review",
+            "documentation and governance wording can alter roadmap or public claims",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("examples")
+        && lower_components.get(1).is_some_and(|component| {
+            matches!(
+                component.as_str(),
+                "evidence-dashboard" | "authoring-cockpit"
+            )
+        })
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::BrowserStudioDisplay,
+            SourceFileClassDecision::NeedsApproval,
+            "Elevated behavior review",
+            "browser/dashboard/Studio display code must remain read-only and command-inert",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("seeds")
+        && matches!(extension.as_deref(), Some("yaml" | "yml"))
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::DeterministicSceneFixture,
+            SourceFileClassDecision::Allowed,
+            "Elevated source-like data review",
+            "deterministic seed fixtures may be previewed later with stale-target and rollback controls",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("examples")
+        && (file_name.contains("scenario") || file_name.contains("regression"))
+        && matches!(extension.as_deref(), Some("json" | "yaml" | "yml" | "md"))
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::ScenarioRegressionFixture,
+            SourceFileClassDecision::Allowed,
+            "Elevated source-like data review",
+            "scenario and deterministic regression fixtures are source-like data",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components.first().map(String::as_str) == Some("examples")
+        && (file_name.ends_with(".scene.json")
+            || file_name == "scene.json"
+            || file_name == "manifest.json"
+            || normalized.contains("/scenes/")
+            || normalized.contains("/assets/"))
+        && matches!(
+            extension.as_deref(),
+            Some("json" | "yaml" | "yml" | "md" | "toml")
+        )
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::RuntimeDemoConfig,
+            SourceFileClassDecision::Allowed,
+            "Elevated source-like data review",
+            "bounded local demo configuration may be previewed later as data, not executable authority",
+            Vec::<String>::new(),
+        );
+    }
+    if lower_components
+        .iter()
+        .any(|component| component == "templates")
+        && matches!(
+            extension.as_deref(),
+            Some("json" | "yaml" | "yml" | "md" | "txt")
+        )
+    {
+        return source_class_report(
+            normalized,
+            SourceFileClassLabel::DeterministicSourceLikeTemplate,
+            SourceFileClassDecision::Allowed,
+            "Elevated source-like data review",
+            "deterministic promoted templates may be previewed only with provenance",
+            Vec::<String>::new(),
+        );
+    }
+    source_class_report(
+        normalized,
+        SourceFileClassLabel::Unknown,
+        SourceFileClassDecision::Blocked,
+        "Reject by default",
+        "unclassified source patch targets default to reject/hold",
+        vec!["unknown file class"],
+    )
+}
+
+fn source_class_report(
+    path: String,
+    class: SourceFileClassLabel,
+    decision: SourceFileClassDecision,
+    review_level: &str,
+    rationale: &str,
+    blocked_reasons: Vec<impl Into<String>>,
+) -> SourceFileClassReport {
+    SourceFileClassReport {
+        schema_version: "source-file-class-v1".to_string(),
+        path,
+        class,
+        decision,
+        review_level: review_level.to_string(),
+        rationale: rationale.to_string(),
+        blocked_reasons: blocked_reasons.into_iter().map(Into::into).collect(),
+        guardrails: vec![
+            "preview classification only; no source patch apply".to_string(),
+            "no merge, auto-merge, auto-apply, or hidden command execution".to_string(),
+            "generated/local state remains untracked unless explicitly fixture-scoped".to_string(),
+            "#1 and #23 remain open".to_string(),
+        ],
+    }
+}
+
+fn source_file_generated_roots() -> &'static [&'static str] {
+    &[
+        "runs",
+        "target",
+        "dashboard-data",
+        ".omx",
+        ".openchrome",
+        ".omc",
+        ".claude",
+    ]
+}
+
+fn source_file_dependency_manifest_names() -> &'static [&'static str] {
+    &[
+        "cargo.toml",
+        "cargo.lock",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "npm-shrinkwrap.json",
+    ]
+}
+
 pub fn reject_generated_artifact_source_collision(
     output_path: &Path,
     artifact_label: &str,
@@ -31239,6 +31689,110 @@ scenarios:
             .expect("generated classified asset may live under generated root");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_file_class_v1_classifies_fixture_matrix() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/source-file-class-v1/classification-cases.json");
+        let fixture: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(fixture_path).expect("classification fixture reads"),
+        )
+        .expect("classification fixture parses");
+        assert_eq!(
+            fixture
+                .get("schemaVersion")
+                .and_then(|value| value.as_str()),
+            Some("source-file-class-fixture-v1")
+        );
+        let cases = fixture
+            .get("cases")
+            .and_then(|value| value.as_array())
+            .expect("cases array");
+        assert!(cases.len() >= 10, "fixture covers the source class matrix");
+        for case in cases {
+            let path = case
+                .get("path")
+                .and_then(|value| value.as_str())
+                .expect("case path");
+            let expected_class = case
+                .get("class")
+                .and_then(|value| value.as_str())
+                .expect("case class");
+            let expected_decision = case
+                .get("decision")
+                .and_then(|value| value.as_str())
+                .expect("case decision");
+            let report = classify_source_file_path_str(path);
+            assert_eq!(report.schema_version, "source-file-class-v1");
+            assert_eq!(
+                serde_json::to_value(&report.class).expect("class serializes"),
+                json!(expected_class),
+                "class for {path}"
+            );
+            assert_eq!(
+                serde_json::to_value(&report.decision).expect("decision serializes"),
+                json!(expected_decision),
+                "decision for {path}"
+            );
+            assert!(
+                report
+                    .guardrails
+                    .iter()
+                    .any(|guardrail| guardrail.contains("no source patch apply")),
+                "guardrail for {path}"
+            );
+            if report.is_blocked() {
+                assert!(
+                    !report.blocked_reasons.is_empty(),
+                    "blocked class should explain why: {path}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn source_file_class_v1_rejects_unsafe_hidden_generated_and_opaque_paths() {
+        let unsafe_absolute = classify_source_file_path_str("/tmp/Ouroforge/README.md");
+        assert_eq!(unsafe_absolute.class, SourceFileClassLabel::UnsafePath);
+        assert!(unsafe_absolute.is_blocked());
+        assert!(unsafe_absolute
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("absolute")));
+
+        let generated = classify_source_file_path_str("target/debug/build.log");
+        assert_eq!(generated.class, SourceFileClassLabel::GeneratedLocalState);
+        assert!(generated.is_blocked());
+        assert!(generated
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("generated")));
+
+        let hidden_nested = classify_source_file_path_str("examples/demo/.cache/state.json");
+        assert_eq!(hidden_nested.class, SourceFileClassLabel::UnsafePath);
+        assert!(hidden_nested.is_blocked());
+
+        let opaque = classify_source_file_path_str("examples/assets/player.png");
+        assert_eq!(opaque.class, SourceFileClassLabel::BinaryOpaque);
+        assert!(opaque.is_blocked());
+    }
+
+    #[test]
+    fn source_file_class_v1_marks_trust_boundary_and_display_surfaces_as_needs_approval() {
+        let rust = classify_source_file_path_str("crates/ouroforge-cli/src/main.rs");
+        assert_eq!(rust.class, SourceFileClassLabel::RustTrustBoundary);
+        assert!(rust.needs_approval());
+        assert!(rust.rationale.contains("validation"));
+
+        let docs = classify_source_file_path_str("README.md");
+        assert_eq!(docs.class, SourceFileClassLabel::DocumentationGovernance);
+        assert!(docs.needs_approval());
+
+        let studio = classify_source_file_path_str("examples/evidence-dashboard/dashboard.js");
+        assert_eq!(studio.class, SourceFileClassLabel::BrowserStudioDisplay);
+        assert!(studio.needs_approval());
+        assert!(studio.rationale.contains("read-only"));
     }
 
     #[test]
