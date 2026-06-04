@@ -1508,6 +1508,21 @@
         ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })
         : null;
       state.runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, state.renderQueue);
+      const runtimeStateEvidence = runtimeState(frameId);
+      state.runtimeState = {
+        schemaVersion: 'runtime-state-read-model-v1',
+        stateId: runtimeStateEvidence.stateId,
+        sceneId: runtimeStateEvidence.sceneId,
+        tick: runtimeStateEvidence.tick,
+        digest: runtimeStateEvidence.digest,
+        authority: 'browser_runtime_evidence_input_not_trusted_persistence',
+        readOnlyInspection: {
+          trustedEmitter: 'browser-runtime-world-state',
+          browserStudioMode: 'read-only runtime state evidence inspection',
+          disallowedActions: ['trusted writes', 'command bridge', 'live mutation'],
+        },
+      };
+      state.runtimeEvents = clone(events);
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
       state.componentModel = componentModelDebugState(world.entities);

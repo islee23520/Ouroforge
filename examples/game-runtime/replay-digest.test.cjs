@@ -56,6 +56,10 @@ assert.equal(diverged.status, 'diverged');
 assert.equal(diverged.firstDivergence.frameId, 'frame-3');
 assert.notEqual(diverged.actual.value, expected.digest.value);
 assert.ok(second.getEvents().some((event) => event.type === 'runtime.replay.digest_compared'));
+const worldState = second.getWorldState();
+assert.equal(worldState.runtimeState.schemaVersion, 'runtime-state-read-model-v1');
+assert.match(worldState.runtimeState.digest.value, /^[0-9a-f]{16}$/);
+assert.ok(worldState.runtimeEvents.some((event) => event.type === 'runtime.replay.digest_compared'));
 
 assert.throws(() => second.replayStateDigest('../source'), /path-safe generated evidence file stem/);
 assert.throws(() => second.compareReplayDigest({ algorithm: 'bad', value: '123' }), /expected digest/);

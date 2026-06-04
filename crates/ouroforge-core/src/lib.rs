@@ -36844,6 +36844,7 @@ pub struct RunDashboardEngineSummaries {
     pub audio: serde_json::Value,
     pub physics: serde_json::Value,
     pub input: serde_json::Value,
+    pub runtime_state: serde_json::Value,
     pub collision: serde_json::Value,
     pub gameplay: serde_json::Value,
     pub triggers: serde_json::Value,
@@ -39562,6 +39563,89 @@ fn dashboard_collision_summary(world_state: &serde_json::Value) -> serde_json::V
     })
 }
 
+fn dashboard_runtime_state_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let runtime_state = world_state
+        .get("runtimeState")
+        .filter(|value| value.is_object());
+    let runtime_events = world_state
+        .get("runtimeEvents")
+        .or_else(|| world_state.get("events"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let save_events = runtime_events
+        .iter()
+        .filter(|event| {
+            event
+                .get("type")
+                .and_then(|value| value.as_str())
+                .is_some_and(|kind| kind == "runtime.save.created" || kind == "runtime.save.loaded")
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let replay_events = runtime_events
+        .iter()
+        .filter(|event| {
+            event.get("type").and_then(|value| value.as_str())
+                == Some("runtime.replay.digest_compared")
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let save_created_count = save_events
+        .iter()
+        .filter(|event| {
+            event.get("type").and_then(|value| value.as_str()) == Some("runtime.save.created")
+        })
+        .count();
+    let save_loaded_count = save_events
+        .iter()
+        .filter(|event| {
+            event.get("type").and_then(|value| value.as_str()) == Some("runtime.save.loaded")
+        })
+        .count();
+    let snapshots = world_state
+        .get("snapshots")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let present = runtime_state.is_some()
+        || !save_events.is_empty()
+        || !replay_events.is_empty()
+        || !snapshots.is_empty();
+    let latest_save = save_events.last().cloned().unwrap_or(json!(null));
+    let latest_replay = replay_events.last().cloned().unwrap_or(json!(null));
+    json!({
+        "present": present,
+        "emptyState": if present { "" } else { "No runtime save/load/replay state read model is available." },
+        "stateId": runtime_state.and_then(|value| value.get("stateId")).cloned().unwrap_or(json!(null)),
+        "sceneId": runtime_state.and_then(|value| value.get("sceneId")).cloned().unwrap_or_else(|| world_state.get("sceneId").cloned().unwrap_or(json!(null))),
+        "tick": runtime_state.and_then(|value| value.get("tick")).cloned().unwrap_or_else(|| world_state.get("tick").cloned().unwrap_or(json!(null))),
+        "digest": runtime_state.and_then(|value| value.get("digest")).cloned().unwrap_or(json!(null)),
+        "authority": runtime_state
+            .and_then(|value| value.get("authority"))
+            .cloned()
+            .unwrap_or(json!("browser_runtime_evidence_input_not_trusted_persistence")),
+        "snapshotCount": snapshots.len(),
+        "saveEventCount": save_events.len(),
+        "saveCreatedCount": save_created_count,
+        "saveLoadedCount": save_loaded_count,
+        "replayDigestComparedCount": replay_events.len(),
+        "latestSaveEvent": latest_save,
+        "latestReplayDigestComparison": latest_replay,
+        "saveEvents": save_events,
+        "replayEvents": replay_events,
+        "snapshots": snapshots,
+        "readOnlyInspection": runtime_state
+            .and_then(|value| value.get("readOnlyInspection").or_else(|| value.get("read_only_inspection")))
+            .cloned()
+            .unwrap_or_else(|| json!({
+                "trustedEmitter": "browser-runtime-world-state",
+                "browserStudioMode": "read-only runtime state evidence inspection",
+                "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+            }))
+    })
+}
+
 fn dashboard_input_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let action_state = world_state.get("actionState").cloned().unwrap_or(json!({}));
     let raw_input = world_state.get("rawInput").cloned().unwrap_or(json!({}));
@@ -39783,6 +39867,7 @@ fn read_dashboard_engine_summaries(
             audio: json!({}),
             physics: json!({}),
             input: json!({ "present": false, "emptyState": "No input action read model is available." }),
+            runtime_state: json!({ "present": false, "emptyState": "No runtime save/load/replay state read model is available." }),
             collision: json!({}),
             gameplay: json!({}),
             triggers: json!({}),
@@ -39855,6 +39940,7 @@ fn read_dashboard_engine_summaries(
             "blockedMovement": world_state.pointer("/physics/blockedMovement").cloned().unwrap_or(json!({}))
         }),
         input: dashboard_input_summary(world_state),
+        runtime_state: dashboard_runtime_state_summary(world_state),
         collision: dashboard_collision_summary(world_state),
         gameplay: dashboard_gameplay_summary(world_state),
         triggers: dashboard_trigger_summary(world_state),
@@ -62679,6 +62765,45 @@ scenarios:
         assert!(malformed.summary.project.is_none());
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_runtime_state_summary_surfaces_save_load_replay_digest_fields() {
+        let world_state = json!({
+            "sceneId": "foundation-scene",
+            "tick": 5,
+            "runtimeState": {
+                "schemaVersion": "runtime-state-read-model-v1",
+                "stateId": "tick-5-tick-5",
+                "sceneId": "foundation-scene",
+                "tick": 5,
+                "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "authority": "browser_runtime_evidence_input_not_trusted_persistence",
+                "readOnlyInspection": { "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
+            },
+            "runtimeEvents": [
+                { "tick": 4, "type": "runtime.save.created", "payload": { "saveId": "slot-1-tick-4", "slotId": "slot-1", "stateDigest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" } } },
+                { "tick": 5, "type": "runtime.save.loaded", "payload": { "saveId": "slot-1-tick-4", "slotId": "slot-1", "stateDigest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" } } },
+                { "tick": 5, "type": "runtime.replay.digest_compared", "payload": { "frameId": "frame-5", "status": "matched", "expected": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" }, "actual": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" } } }
+            ],
+            "snapshots": [{ "snapshotId": "snapshot-4", "tick": 4 }]
+        });
+        let summary = dashboard_runtime_state_summary(&world_state);
+        assert_eq!(summary["present"], json!(true));
+        assert_eq!(summary["stateId"], json!("tick-5-tick-5"));
+        assert_eq!(summary["digest"]["value"], json!("0123456789abcdef"));
+        assert_eq!(summary["snapshotCount"], json!(1));
+        assert_eq!(summary["saveCreatedCount"], json!(1));
+        assert_eq!(summary["saveLoadedCount"], json!(1));
+        assert_eq!(summary["replayDigestComparedCount"], json!(1));
+        assert_eq!(
+            summary["latestReplayDigestComparison"]["payload"]["status"],
+            json!("matched")
+        );
+        assert_eq!(
+            summary["readOnlyInspection"]["disallowedActions"],
+            json!(["trusted writes", "command bridge", "live mutation"])
+        );
     }
 
     #[test]
