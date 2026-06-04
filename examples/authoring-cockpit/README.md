@@ -151,6 +151,21 @@ or hostile data, and they must not execute commands, write files, persist browse
 state, own source scene truth, or replace Rust validation. Refresh exported
 `dashboard-data.json` after running `dashboard export` to inspect newer evidence.
 
+## Studio 2D Engine Inspection Surface v1
+
+When `dashboard-data.json` includes Production 2D read models, the cockpit also
+displays read-only inspection panels for camera/layer state, render breakdowns,
+input actions, runtime save/state and replay digests, frame-budget/profiler
+evidence, collision/transition/runtime events, animation/VFX rows, and audio
+intent evidence. These panels are escaped static diagnostics over Rust-exported
+data. They show empty or malformed states without crashing, and they do not write
+files, execute commands, persist browser state, control the runtime as trusted
+authority, apply mutations, rerun tests, upload/fetch assets, or bridge to a
+local server.
+
+See `../../docs/studio-2d-engine-inspection-surface-v1.md` for the #593 boundary
+audit and verification checklist.
+
 ## QA and evidence loop
 
 The cockpit includes Run QA and project workspace panels with local display-only commands:

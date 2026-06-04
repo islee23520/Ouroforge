@@ -28795,15 +28795,14 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 .and_then(|evidence| evidence.get(evidence_path))
                 .and_then(|value| value.as_str())
             {
-                Some(path) => {
-                    if !run_dir.join(path).is_file() {
-                        failures.push(json!({
-                            "kind": "missing_scenario_evidence",
-                            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                            "path": path
-                        }));
-                    }
+                Some(path) if !run_dir.join(path).is_file() => {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
                 }
+                Some(_) => {}
                 // A passed scenario must carry its required evidence refs; an
                 // absent or non-string ref is itself a consistency failure rather
                 // than something to silently ignore.
