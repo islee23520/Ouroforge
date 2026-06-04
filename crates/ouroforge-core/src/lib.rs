@@ -6637,6 +6637,9 @@ fn validate_asset_preview_path(
 }
 
 const ROUTE_ATTEMPT_EVIDENCE_SCHEMA_VERSION: &str = "route-attempt-evidence-v1";
+const MAX_ROUTE_ATTEMPT_ACTIONS: u32 = 1_000;
+const MAX_ROUTE_ATTEMPT_ROUTE_NODES: u32 = 1_000;
+const MAX_ROUTE_ATTEMPT_DURATION_MS: u64 = 600_000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -6815,6 +6818,8 @@ impl RouteAttemptEvidenceArtifact {
             validate_evidence_artifact_path(reference)?;
         }
         self.budget_used.validate()?;
+        self.validate_strategy_action_support()?;
+        self.validate_action_sequence_order()?;
         if self.budget_used.actions_used != self.action_sequence.len() as u32 {
             return Err(anyhow!(
                 "route attempt budgetUsed.actionsUsed must match actionSequence length"
@@ -6853,6 +6858,145 @@ impl RouteAttemptEvidenceArtifact {
             }
         }
     }
+
+    fn validate_strategy_action_support(&self) -> Result<()> {
+        if self.strategy_kind == RouteAttemptStrategyKind::GraphSearch
+            && self
+                .action_sequence
+                .iter()
+                .any(|action| matches!(action.kind, RouteAttemptActionKind::Interact))
+            && self.outcome != RouteAttemptOutcome::Unsupported
+        {
+            return Err(anyhow!(
+                "route attempt graph_search strategy must mark unsupported mechanics with unsupported outcome"
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_action_sequence_order(&self) -> Result<()> {
+        let mut last_frame = None;
+        for action in &self.action_sequence {
+            if let Some(frame) = action.frame {
+                if let Some(previous) = last_frame {
+                    if frame < previous {
+                        return Err(anyhow!(
+                            "route attempt actionSequence frames must be nondecreasing"
+                        ));
+                    }
+                }
+                last_frame = Some(frame);
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_route_attempt_evidence_refs(
+    run_dir: impl AsRef<Path>,
+    attempt: &RouteAttemptEvidenceArtifact,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    attempt.validate()?;
+    let index = read_evidence_index(run_dir)?;
+    let indexed_paths = index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut references = Vec::new();
+    references.push(attempt.start_state.world_state_ref.as_str());
+    references.extend(attempt.evidence_refs.iter().map(String::as_str));
+    references.extend(
+        attempt
+            .route
+            .iter()
+            .filter_map(|node| node.evidence_ref.as_deref()),
+    );
+    references.extend(
+        attempt
+            .blockers
+            .iter()
+            .filter_map(|blocker| blocker.evidence_ref.as_deref()),
+    );
+    references.sort();
+    references.dedup();
+
+    let mut objective_seen = false;
+    for reference in references {
+        if !indexed_paths.contains(reference) {
+            return Err(anyhow!(
+                "route attempt reference is missing from evidence index: {reference}"
+            ));
+        }
+        let value = read_json_value(run_dir.join(reference))
+            .with_context(|| format!("route attempt reference is unreadable: {reference}"))?;
+        validate_route_attempt_linked_reference_freshness(attempt, reference, &value)?;
+        if json_string(&value, "objectiveId")
+            .or_else(|| json_string(&value, "objective_id"))
+            .as_deref()
+            == Some(attempt.objective_id.as_str())
+        {
+            objective_seen = true;
+        }
+    }
+    if !objective_seen {
+        return Err(anyhow!(
+            "route attempt objectiveId must be backed by indexed evidence: {}",
+            attempt.objective_id
+        ));
+    }
+    Ok(())
+}
+
+fn validate_route_attempt_linked_reference_freshness(
+    attempt: &RouteAttemptEvidenceArtifact,
+    reference: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    match json_string(value, "runId").or_else(|| json_string(value, "run_id")) {
+        Some(run_id) if run_id == attempt.run_id => {}
+        Some(run_id) => {
+            return Err(anyhow!(
+                "route attempt reference is stale for runId {run_id}; expected {} at {reference}",
+                attempt.run_id
+            ));
+        }
+        None => {
+            return Err(anyhow!(
+                "route attempt reference is missing a runId/run_id: {reference}"
+            ));
+        }
+    }
+
+    if let Some(scenario_id) =
+        json_string(value, "scenarioId").or_else(|| json_string(value, "scenario_id"))
+    {
+        if scenario_id != attempt.scenario_id {
+            return Err(anyhow!(
+                "route attempt reference scenarioId drift at {reference}: {scenario_id} != {}",
+                attempt.scenario_id
+            ));
+        }
+    }
+
+    if reference == attempt.start_state.world_state_ref {
+        match json_string(value, "stateId").or_else(|| json_string(value, "state_id")) {
+            Some(state_id) if state_id == attempt.start_state.state_id => {}
+            Some(state_id) => {
+                return Err(anyhow!(
+                    "route attempt startState is stale at {reference}: {state_id} != {}",
+                    attempt.start_state.state_id
+                ));
+            }
+            None => {
+                return Err(anyhow!(
+                    "route attempt startState reference is missing a stateId/state_id: {reference}"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 impl RouteAttemptStartState {
@@ -6895,22 +7039,30 @@ impl RouteAttemptBlocker {
 
 impl RouteAttemptBudgetUsed {
     fn validate(&self) -> Result<()> {
-        if self.max_actions == 0 || self.actions_used == 0 || self.actions_used > self.max_actions {
+        if self.max_actions == 0
+            || self.max_actions > MAX_ROUTE_ATTEMPT_ACTIONS
+            || self.actions_used == 0
+            || self.actions_used > self.max_actions
+        {
             return Err(anyhow!(
-                "route attempt budgetUsed actions must be bounded and actionsUsed <= maxActions"
+                "route attempt budgetUsed actions must be bounded and actionsUsed <= maxActions <= {MAX_ROUTE_ATTEMPT_ACTIONS}"
             ));
         }
         if self.max_route_nodes == 0
+            || self.max_route_nodes > MAX_ROUTE_ATTEMPT_ROUTE_NODES
             || self.route_nodes_used == 0
             || self.route_nodes_used > self.max_route_nodes
         {
             return Err(anyhow!(
-                "route attempt budgetUsed route nodes must be bounded and routeNodesUsed <= maxRouteNodes"
+                "route attempt budgetUsed route nodes must be bounded and routeNodesUsed <= maxRouteNodes <= {MAX_ROUTE_ATTEMPT_ROUTE_NODES}"
             ));
         }
-        if self.max_duration_ms == 0 || self.duration_ms > self.max_duration_ms {
+        if self.max_duration_ms == 0
+            || self.max_duration_ms > MAX_ROUTE_ATTEMPT_DURATION_MS
+            || self.duration_ms > self.max_duration_ms
+        {
             return Err(anyhow!(
-                "route attempt budgetUsed duration must be bounded and durationMs <= maxDurationMs"
+                "route attempt budgetUsed duration must be bounded and durationMs <= maxDurationMs <= {MAX_ROUTE_ATTEMPT_DURATION_MS}"
             ));
         }
         Ok(())
@@ -41049,6 +41201,130 @@ scenarios:
                 || error.to_string().contains("evidenceRefs")
                 || error.to_string().contains("budgetUsed")
         );
+    }
+
+    #[test]
+    fn route_attempt_evidence_rejects_unbounded_budget_and_invalid_action_sequences() {
+        let mut attempt = RouteAttemptEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        ))
+        .expect("success fixture parses");
+
+        attempt.budget_used.max_actions = MAX_ROUTE_ATTEMPT_ACTIONS + 1;
+        let error = attempt
+            .validate()
+            .expect_err("unbounded action budget rejected");
+        assert!(error.to_string().contains("maxActions"));
+
+        let mut attempt = RouteAttemptEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        ))
+        .expect("success fixture parses");
+        attempt.action_sequence[0].frame = Some(12);
+        attempt.action_sequence[1].frame = Some(1);
+        let error = attempt
+            .validate()
+            .expect_err("nondecreasing action frames are required");
+        assert!(error.to_string().contains("nondecreasing"));
+
+        let mut graph = RouteAttemptEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        ))
+        .expect("success fixture parses");
+        graph.strategy_kind = RouteAttemptStrategyKind::GraphSearch;
+        let error = graph
+            .validate()
+            .expect_err("graph search cannot silently pass unsupported interact mechanics");
+        assert!(error.to_string().contains("unsupported mechanics"));
+    }
+
+    #[test]
+    fn route_attempt_evidence_ref_validation_accepts_indexed_refs_and_blocks_stale_state() {
+        let (root, artifacts) = create_test_run("route-attempt-refs");
+        let mut attempt = RouteAttemptEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/route-attempt-evidence-v1/route-attempt-success.sample.json"
+        ))
+        .expect("success fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        attempt.run_id = json_string(&run, "id").expect("run id present");
+
+        let mut refs = vec![attempt.start_state.world_state_ref.clone()];
+        refs.extend(attempt.evidence_refs.clone());
+        refs.extend(
+            attempt
+                .route
+                .iter()
+                .filter_map(|node| node.evidence_ref.clone()),
+        );
+        refs.sort();
+        refs.dedup();
+        for reference in &refs {
+            fs::create_dir_all(
+                artifacts
+                    .run_dir
+                    .join(Path::new(reference).parent().expect("reference has parent")),
+            )
+            .expect("reference parent exists");
+            let state_id = if reference == &attempt.start_state.world_state_ref {
+                Some(attempt.start_state.state_id.as_str())
+            } else {
+                None
+            };
+            let mut value = json!({
+                "runId": attempt.run_id,
+                "scenarioId": attempt.scenario_id,
+                "objectiveId": attempt.objective_id,
+                "artifact": "route_attempt_link_fixture"
+            });
+            if let Some(state_id) = state_id {
+                value["stateId"] = json!(state_id);
+            }
+            write_json(&artifacts.run_dir.join(reference), &value).expect("route reference writes");
+            add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("route-link-{}", reference.replace('/', "-")),
+                "application/json",
+                reference,
+                json!({ "artifact": "route_attempt_link_fixture" }),
+            )
+            .expect("route reference indexed");
+        }
+
+        validate_route_attempt_evidence_refs(&artifacts.run_dir, &attempt)
+            .expect("fresh indexed refs validate");
+
+        write_json(
+            &artifacts.run_dir.join(&attempt.start_state.world_state_ref),
+            &json!({
+                "runId": attempt.run_id,
+                "scenarioId": attempt.scenario_id,
+                "objectiveId": attempt.objective_id,
+                "stateId": "stale-start",
+                "artifact": "route_attempt_link_fixture"
+            }),
+        )
+        .expect("stale start writes");
+        let stale = validate_route_attempt_evidence_refs(&artifacts.run_dir, &attempt)
+            .expect_err("stale start state rejected");
+        assert!(stale.to_string().contains("startState is stale"));
+
+        attempt.objective_id = "missing-objective".to_string();
+        write_json(
+            &artifacts.run_dir.join(&attempt.start_state.world_state_ref),
+            &json!({
+                "runId": attempt.run_id,
+                "scenarioId": attempt.scenario_id,
+                "objectiveId": "different-objective",
+                "stateId": attempt.start_state.state_id,
+                "artifact": "route_attempt_link_fixture"
+            }),
+        )
+        .expect("objective drift writes");
+        let missing_objective = validate_route_attempt_evidence_refs(&artifacts.run_dir, &attempt)
+            .expect_err("objective evidence is required");
+        assert!(missing_objective.to_string().contains("objectiveId"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
