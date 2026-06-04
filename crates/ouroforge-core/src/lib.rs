@@ -63369,6 +63369,41 @@ scenarios:
     }
 
     #[test]
+    fn dashboard_runtime_state_summary_handles_missing_and_malformed_input() {
+        // Absent runtime-state evidence renders the absence state, not defaults.
+        let empty = dashboard_runtime_state_summary(&json!({}));
+        assert_eq!(empty["present"], json!(false));
+        assert_eq!(
+            empty["emptyState"],
+            json!("No runtime save/load/replay state read model is available.")
+        );
+        assert_eq!(empty["saveEventCount"], json!(0));
+        assert_eq!(empty["snapshotCount"], json!(0));
+        assert_eq!(empty["replayDigestComparedCount"], json!(0));
+        assert_eq!(empty["stateId"], json!(null));
+
+        // Wrong-typed runtimeState/runtimeEvents/snapshots are ignored, not crashed on.
+        let malformed = dashboard_runtime_state_summary(&json!({
+            "runtimeState": "not-an-object",
+            "runtimeEvents": { "type": "runtime.save.created" },
+            "snapshots": "not-an-array"
+        }));
+        assert_eq!(malformed["present"], json!(false));
+        assert_eq!(malformed["stateId"], json!(null));
+        assert_eq!(malformed["saveEventCount"], json!(0));
+        assert_eq!(malformed["snapshotCount"], json!(0));
+
+        // Event entries without a usable type string are not miscounted.
+        let untyped_events = dashboard_runtime_state_summary(&json!({
+            "runtimeEvents": [{ "tick": 1 }, { "type": 42 }, "not-an-object"]
+        }));
+        assert_eq!(untyped_events["present"], json!(false));
+        assert_eq!(untyped_events["saveCreatedCount"], json!(0));
+        assert_eq!(untyped_events["saveLoadedCount"], json!(0));
+        assert_eq!(untyped_events["replayDigestComparedCount"], json!(0));
+    }
+
+    #[test]
     fn dashboard_camera_summary_surfaces_camera_scoped_layers() {
         // Layers emitted under worldState.camera (no renderer.layers) must still
         // be surfaced, mirroring how cameras resolves camera.cameras.
