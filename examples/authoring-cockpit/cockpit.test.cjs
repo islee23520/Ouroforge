@@ -537,7 +537,15 @@ const run = {
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 0 },
     audio: { audioEntityCount: 0, audioEventCount: 0 },
-    physics: { colliderEntityCount: 2, collisionEventCount: 1 },
+    physics: {
+      colliderEntityCount: 2,
+      collisionEventCount: 1,
+      grounded: { player: true },
+      contacts: { player: [{ pairId: 'floor:player', otherEntityId: 'floor', normal: { x: 0, y: -1 } }] },
+      contactPairs: [{ pairId: 'floor:player', normal: { x: 0, y: -1 } }],
+      contactPairCount: 1,
+      blockedMovement: { player: { x: false, y: true } },
+    },
     collision: {
       present: true,
       rules: { player_key: { a: 'player', b: 'key', event: 'collect_key' } },
@@ -861,6 +869,8 @@ assert.doesNotMatch(xssExpressive, /<script>|<img>|<svg>|<b>/);
 assert.match(xssExpressive, /&lt;script&gt;/);
 assert.match(cockpit.renderStudioNavigation(run), /Collision\/transition\/event inspection/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Collision rules/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Physics contacts/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /floor:player/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Declared scene transitions/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /to_boss/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /runtime\.scene\.transition/);

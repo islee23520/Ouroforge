@@ -36358,7 +36358,12 @@ fn read_dashboard_engine_summaries(
         physics: json!({
             "collisionCount": dashboard_array_len(world_state.get("collisions")),
             "collisionEventCount": dashboard_array_len(world_state.get("collisionEvents")),
-            "colliderEntityCount": dashboard_entities_with_component(world_state, "collider")
+            "colliderEntityCount": dashboard_entities_with_component(world_state, "collider"),
+            "grounded": world_state.pointer("/physics/grounded").cloned().unwrap_or(json!({})),
+            "contacts": world_state.pointer("/physics/contacts").cloned().unwrap_or(json!({})),
+            "contactPairs": world_state.pointer("/physics/contactPairs").cloned().unwrap_or(json!([])),
+            "contactPairCount": dashboard_array_len(world_state.pointer("/physics/contactPairs")),
+            "blockedMovement": world_state.pointer("/physics/blockedMovement").cloned().unwrap_or(json!({}))
         }),
         collision: dashboard_collision_summary(world_state),
         gameplay: dashboard_gameplay_summary(world_state),
@@ -57695,6 +57700,12 @@ scenarios:
                 "collisionRules": { "defaultLayer": "default" },
                 "collisions": [{ "pairId": "goal:player" }],
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
+                "physics": {
+                    "grounded": { "player": true },
+                    "contacts": { "player": [{ "pairId": "floor:player", "otherEntityId": "floor", "normal": { "x": 0, "y": -1 } }] },
+                    "contactPairs": [{ "pairId": "floor:player", "normal": { "x": 0, "y": -1 } }],
+                    "blockedMovement": { "player": { "x": false, "y": true } }
+                },
                 "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
                 "goalFlags": { "coin_collected": true, "door_open": true, "player_alive": true },
                 "sceneTransitions": [{ "id": "to_level_2", "toScene": "scenes/level-2.scene.json", "label": "Level 2" }],
@@ -57850,6 +57861,15 @@ scenarios:
         assert_eq!(
             model.engine_summaries.physics["collisionEventCount"],
             json!(1)
+        );
+        assert_eq!(model.engine_summaries.physics["contactPairCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.physics["grounded"]["player"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.physics["blockedMovement"]["player"]["y"],
+            json!(true)
         );
         assert_eq!(
             model.engine_summaries.collision["rules"]["defaultLayer"],
