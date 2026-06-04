@@ -111,7 +111,10 @@ preview.
 
 Allowed commands must be recorded with command text, normalized `argv`, matched
 allowlist policy id, working directory, expected outputs, timeout/failure
-expectations, and whether they may write generated artifacts. Any command that can mutate source files must be converted to a
+expectations, and whether they may write generated artifacts. Cargo commands
+must find a manifest inside the sandbox worktree and use sandbox-local build
+output so they cannot pass by discovering the trusted parent workspace. Any
+command that can mutate source files must be converted to a
 check-only mode or rejected.
 
 ### Disallowed command classes

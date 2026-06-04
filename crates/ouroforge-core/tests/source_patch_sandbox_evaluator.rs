@@ -1,10 +1,10 @@
 use ouroforge_core::{
     apply_source_patch_preview_in_sandbox, inspect_source_patch_sandbox_evaluator_plan,
-    run_source_patch_sandbox_allowlisted_tests, validate_source_patch_sandbox_evaluator_plan,
-    SourcePatchPreviewApplyStatus, SourcePatchPreviewArtifact, SourcePatchPreviewRequiredTest,
-    SourcePatchSandboxCleanupPolicy, SourcePatchSandboxEvaluationInputs,
-    SourcePatchSandboxEvaluatorPlan, SourcePatchSandboxLayoutPolicy,
-    SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION,
+    reject_generated_artifact_source_collision, run_source_patch_sandbox_allowlisted_tests,
+    validate_source_patch_sandbox_evaluator_plan, SourcePatchPreviewApplyStatus,
+    SourcePatchPreviewArtifact, SourcePatchPreviewRequiredTest, SourcePatchSandboxCleanupPolicy,
+    SourcePatchSandboxEvaluationInputs, SourcePatchSandboxEvaluatorPlan,
+    SourcePatchSandboxLayoutPolicy, SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION,
 };
 use serde_json::json;
 use std::fs;
@@ -161,6 +161,11 @@ fn source_patch_sandbox_apply_writes_only_sandbox_worktree_and_report() {
     let trusted_target = repo_root.join(target_rel);
     fs::create_dir_all(trusted_target.parent().expect("target parent")).expect("create repo");
     fs::create_dir_all(&run_dir).expect("create run dir");
+    fs::write(repo_root.join("Cargo.toml"), "[workspace]\n").expect("write manifest");
+    fs::write(repo_root.join("README.md"), "trusted readme\n").expect("write copied source");
+    fs::create_dir_all(repo_root.join("target/debug")).expect("create skipped target");
+    fs::write(repo_root.join("target/debug/build.log"), "generated\n")
+        .expect("write skipped generated file");
     fs::write(&trusted_target, "pub fn demo() {\n    1\n}\n").expect("write trusted target");
 
     let snapshot_hash = test_file_hash(&trusted_target);
@@ -184,6 +189,19 @@ fn source_patch_sandbox_apply_writes_only_sandbox_worktree_and_report() {
         fs::read_to_string(sandbox_target).expect("read sandbox"),
         "pub fn demo() {\n    2\n}\n"
     );
+    assert_eq!(
+        fs::read_to_string(run_dir.join("sandbox/patch-preview-1/worktree/Cargo.toml"))
+            .expect("sandbox manifest copied"),
+        "[workspace]\n"
+    );
+    assert_eq!(
+        fs::read_to_string(run_dir.join("sandbox/patch-preview-1/worktree/README.md"))
+            .expect("sandbox source file copied"),
+        "trusted readme\n"
+    );
+    assert!(!run_dir
+        .join("sandbox/patch-preview-1/worktree/target/debug/build.log")
+        .exists());
     let report: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(run_dir.join("sandbox/patch-preview-1/evidence/report.json"))
             .expect("report written"),
@@ -215,8 +233,12 @@ fn source_patch_sandbox_apply_rejects_stale_target_without_trusted_write() {
     fs::create_dir_all(&run_dir).expect("create run dir");
     fs::write(&trusted_target, "pub fn demo() {\n    1\n}\n").expect("write trusted target");
 
-    let mut artifact = fixture_apply_artifact(target_rel, "fnv1a64-file-v1:0000000000000000");
-    artifact.targets[0].before_hash = "fnv1a64-file-v1:0000000000000000".to_string();
+    let mut artifact = fixture_apply_artifact(
+        target_rel,
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    );
+    artifact.targets[0].before_hash =
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
     let error =
         apply_source_patch_preview_in_sandbox(&artifact, &fixture_plan(), &repo_root, &run_dir)
             .expect_err("stale target is rejected before sandbox write");
@@ -321,6 +343,86 @@ fn source_patch_sandbox_allowlisted_tests_reject_forbidden_commands_before_execu
     fs::remove_dir_all(temp).expect("cleanup temp");
 }
 
+#[test]
+fn source_patch_sandbox_apply_requires_passed_preview_validation() {
+    let temp = sandbox_test_dir("apply-requires-validation");
+    let repo_root = temp.join("repo");
+    let run_dir = temp.join("run");
+    let target_rel = "target/debug/generated.rs";
+    let trusted_target = repo_root.join(target_rel);
+    fs::create_dir_all(trusted_target.parent().expect("target parent")).expect("create repo");
+    fs::create_dir_all(&run_dir).expect("create run dir");
+    fs::write(&trusted_target, "pub fn demo() {\n    1\n}\n").expect("write trusted target");
+
+    let mut artifact = fixture_apply_artifact(
+        target_rel,
+        "sha256:26487e8eab103e0b035c5075ec7a50319e7e65b92c843c5e44d66b2e35d7b3d4",
+    );
+    artifact.targets[0].file_class = "generated_local_state".to_string();
+    artifact.targets[0].classification_status = "blocked_by_design".to_string();
+    artifact.targets[0].blocked_reasons = vec!["generated target".to_string()];
+
+    let error =
+        apply_source_patch_preview_in_sandbox(&artifact, &fixture_plan(), &repo_root, &run_dir)
+            .expect_err("blocked preview validation prevents sandbox apply");
+
+    assert!(error
+        .to_string()
+        .contains("source patch preview validation blocked"));
+    assert!(!run_dir
+        .join("sandbox/patch-preview-1/worktree")
+        .join(target_rel)
+        .exists());
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
+fn source_patch_sandbox_cargo_tests_require_sandbox_manifest_not_parent_workspace() {
+    let temp = sandbox_test_dir("cargo-requires-sandbox-manifest");
+    let repo_root = temp.join("repo");
+    let run_dir = repo_root.join("sandbox-parent-leak");
+    fs::create_dir_all(run_dir.join("sandbox/patch-preview-1/worktree")).expect("create worktree");
+    fs::write(repo_root.join("Cargo.toml"), "[workspace]\n").expect("write parent manifest");
+    let artifact = fixture_apply_artifact(
+        "crates/ouroforge-core/src/lib.rs",
+        "sha256:26487e8eab103e0b035c5075ec7a50319e7e65b92c843c5e44d66b2e35d7b3d4",
+    );
+
+    let error = run_source_patch_sandbox_allowlisted_tests(
+        &fixture_plan(),
+        &artifact.required_tests,
+        &run_dir,
+    )
+    .expect_err("cargo command is blocked without sandbox manifest");
+
+    assert!(error
+        .to_string()
+        .contains("requires sandbox worktree Cargo.toml"));
+    let report_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            run_dir.join("sandbox/patch-preview-1/evidence/test-execution-report.json"),
+        )
+        .expect("blocked report written"),
+    )
+    .expect("blocked report parses");
+    assert!(report_json["blockedReasons"][0]
+        .as_str()
+        .expect("blocked reason")
+        .contains("requires sandbox worktree Cargo.toml"));
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
+fn source_patch_sandbox_root_is_documented_generated_state() {
+    reject_generated_artifact_source_collision(
+        Path::new("sandbox/patch-preview-1/worktree/crates/ouroforge-core/src/lib.rs"),
+        "sandbox preview",
+    )
+    .expect("sandbox root is generated state even for copied source-like paths");
+}
+
 fn fixture_apply_artifact(target_rel: &str, before_hash: &str) -> SourcePatchPreviewArtifact {
     serde_json::from_value(json!({
         "schemaVersion": "patch-preview.v1",
@@ -339,15 +441,15 @@ fn fixture_apply_artifact(target_rel: &str, before_hash: &str) -> SourcePatchPre
             "targetFreshness": "checked"
         },
         "staleTargetPolicy": "reject before sandbox copy",
-        "artifactHash": "fnv1a64-file-v1:1111111111111111",
+        "artifactHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "targets": [{
             "path": target_rel,
             "beforeHash": before_hash,
-            "fileClass": "rust_source",
-            "reviewLevel": "normal",
-            "classificationStatus": "potentially_allowed_later",
-            "classificationRationale": "unit test fixture target",
-            "blockedReasons": []
+            "fileClass": "rust_trust_boundary",
+            "reviewLevel": "Separate governance approval",
+            "classificationStatus": "restricted_separate_approval",
+            "classificationRationale": "unit test fixture Rust trust boundary target",
+            "blockedReasons": ["Rust trust-boundary code requires separate governance approval"]
         }],
         "diffSummary": {
             "summary": "Change demo return value in sandbox copy only",
@@ -370,8 +472,8 @@ fn fixture_apply_artifact(target_rel: &str, before_hash: &str) -> SourcePatchPre
         "linkedEvidence": [{"kind": "unit-test", "path": "evidence/source-file-class-validation.json"}],
         "expectedBehaviorChange": "sandbox copy changes only",
         "requiredTests": [{
-            "command": "cargo test -p ouroforge-core --test source_patch_sandbox_evaluator -- --nocapture",
-            "argv": ["cargo", "test", "-p", "ouroforge-core", "--test", "source_patch_sandbox_evaluator", "--", "--nocapture"],
+            "command": "cargo test -p ouroforge-core --test patch_preview_artifact -- --nocapture",
+            "argv": ["cargo", "test", "-p", "ouroforge-core", "--test", "patch_preview_artifact", "--", "--nocapture"],
             "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
             "executionAuthority": "copyable_not_executed_metadata"
         }],

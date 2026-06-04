@@ -11382,6 +11382,36 @@ fn value_stays_under_sandbox_root(value: &str, sandbox_root: &str) -> bool {
     value == sandbox_root || value.starts_with(&format!("{sandbox_root}/"))
 }
 
+fn validate_source_patch_sandbox_preview_inputs(
+    artifact: &SourcePatchPreviewArtifact,
+    plan: &SourcePatchSandboxEvaluatorPlan,
+) -> Result<SourcePatchPreviewValidation> {
+    let validation =
+        validate_source_patch_preview_artifact(artifact, PatchDiffIntegrityLimits::default())?;
+    if validation.patch_preview_id != plan.inputs.patch_preview_id {
+        return Err(anyhow!(
+            "validated patch preview id {} does not match sandbox plan input {}",
+            validation.patch_preview_id,
+            plan.inputs.patch_preview_id
+        ));
+    }
+    let diff_validation = validation
+        .diff_integrity_validation
+        .as_ref()
+        .ok_or_else(|| anyhow!("source patch sandbox requires diff integrity validation"))?;
+    if validation.file_class_validation.status != "passed" || diff_validation.status != "passed" {
+        return Err(anyhow!(
+            "source patch sandbox requires passed file-class and diff-integrity validation before evaluation"
+        ));
+    }
+    if plan.inputs.allowlist_policy_id != "source-patch-preview-safe-local-checks-v1" {
+        return Err(anyhow!(
+            "source patch sandbox plan allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+        ));
+    }
+    Ok(validation)
+}
+
 pub fn validate_source_patch_sandbox_evaluator_plan(
     plan: &SourcePatchSandboxEvaluatorPlan,
 ) -> Result<SourcePatchSandboxEvaluatorPlanValidation> {
@@ -11402,6 +11432,7 @@ pub fn apply_source_patch_preview_in_sandbox(
     run_dir: impl AsRef<Path>,
 ) -> Result<SourcePatchSandboxApplyResult> {
     validate_source_patch_sandbox_evaluator_plan(plan)?;
+    validate_source_patch_sandbox_preview_inputs(artifact, plan)?;
     if artifact.patch_preview_id != plan.inputs.patch_preview_id {
         return Err(anyhow!(
             "patch preview id {} does not match sandbox plan input {}",
@@ -11494,26 +11525,7 @@ pub fn apply_source_patch_preview_in_sandbox(
         trusted_before_hashes.insert(target.path.clone(), trusted_snapshot_hash);
     }
 
-    for target in &artifact.targets {
-        let trusted_path = trusted_repo_root.join(&target.path);
-        let sandbox_path = worktree_root.join(&target.path);
-        ensure_path_inside(&worktree_root, &sandbox_path)?;
-        if let Some(parent) = sandbox_path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "failed to create source patch sandbox target parent {}",
-                    parent.display()
-                )
-            })?;
-        }
-        fs::copy(&trusted_path, &sandbox_path).with_context(|| {
-            format!(
-                "failed to copy trusted target {} into sandbox {}",
-                trusted_path.display(),
-                sandbox_path.display()
-            )
-        })?;
-    }
+    copy_source_patch_sandbox_worktree(trusted_repo_root, &worktree_root)?;
 
     for diff_file in &diff_files {
         let sandbox_path = worktree_root.join(&diff_file.target_path);
@@ -11596,6 +11608,66 @@ pub fn apply_source_patch_preview_in_sandbox(
     };
     write_json_atomic(&report_path, &json!(result))?;
     Ok(result)
+}
+
+fn copy_source_patch_sandbox_worktree(
+    trusted_repo_root: &Path,
+    worktree_root: &Path,
+) -> Result<()> {
+    copy_source_patch_sandbox_dir(trusted_repo_root, trusted_repo_root, worktree_root)
+}
+
+fn copy_source_patch_sandbox_dir(
+    trusted_repo_root: &Path,
+    source_dir: &Path,
+    worktree_root: &Path,
+) -> Result<()> {
+    for entry in fs::read_dir(source_dir)
+        .with_context(|| format!("failed to read trusted directory {}", source_dir.display()))?
+    {
+        let entry = entry?;
+        let source_path = entry.path();
+        let relative_path = source_path.strip_prefix(trusted_repo_root)?;
+        if source_patch_sandbox_copy_skip_path(relative_path) {
+            continue;
+        }
+        let destination_path = worktree_root.join(relative_path);
+        ensure_path_inside(worktree_root, &destination_path)?;
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            fs::create_dir_all(&destination_path)?;
+            copy_source_patch_sandbox_dir(trusted_repo_root, &source_path, worktree_root)?;
+        } else if file_type.is_file() {
+            if let Some(parent) = destination_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&source_path, &destination_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn source_patch_sandbox_copy_skip_path(relative_path: &Path) -> bool {
+    let first_component = relative_path
+        .components()
+        .find_map(|component| match component {
+            std::path::Component::Normal(value) => Some(value.to_string_lossy()),
+            _ => None,
+        });
+    first_component.is_some_and(|value| {
+        matches!(
+            value.as_ref(),
+            ".git"
+                | "runs"
+                | "sandbox"
+                | "target"
+                | "dashboard-data"
+                | ".omx"
+                | ".openchrome"
+                | ".omc"
+                | ".claude"
+        )
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -11814,17 +11886,28 @@ pub fn run_source_patch_sandbox_allowlisted_tests(
             ));
             continue;
         };
-        let output = Command::new(&required_test.argv[0])
+        if required_test.argv.first().is_some_and(|arg| arg == "cargo")
+            && !worktree_root.join("Cargo.toml").is_file()
+        {
+            blocked_reasons.push(format!(
+                "{field}.argv cargo command requires sandbox worktree Cargo.toml to avoid trusted parent workspace discovery"
+            ));
+            continue;
+        }
+        let mut command_runner = Command::new(&required_test.argv[0]);
+        command_runner
             .args(&required_test.argv[1..])
-            .current_dir(&worktree_root)
-            .output()
-            .with_context(|| {
-                format!(
-                    "failed to run allowlisted sandbox test `{}` in {}",
-                    required_test.command,
-                    worktree_root.display()
-                )
-            })?;
+            .current_dir(&worktree_root);
+        if required_test.argv.first().is_some_and(|arg| arg == "cargo") {
+            command_runner.env("CARGO_TARGET_DIR", worktree_root.join("target"));
+        }
+        let output = command_runner.output().with_context(|| {
+            format!(
+                "failed to run allowlisted sandbox test `{}` in {}",
+                required_test.command,
+                worktree_root.display()
+            )
+        })?;
         let exit_code = output.status.code();
         let status = if output.status.success() {
             "passed"
@@ -11876,7 +11959,8 @@ pub fn run_source_patch_sandbox_allowlisted_tests(
         blocked_reasons,
         guardrails: vec![
             "sandbox tests execute only argv vectors matched by the source patch test command allowlist".to_string(),
-            "sandbox tests run with current_dir set to the sandbox worktree".to_string(),
+            "sandbox tests run with current_dir set to the sandbox worktree and cargo requires a sandbox Cargo.toml".to_string(),
+            "cargo sandbox tests use a sandbox-local CARGO_TARGET_DIR".to_string(),
             "no shell, network, install, credential, dependency, merge, or trusted apply commands are allowed".to_string(),
             "test evidence is written under sandbox evidence only".to_string(),
         ],
@@ -23527,6 +23611,7 @@ fn source_class_report(
 fn source_file_generated_roots() -> &'static [&'static str] {
     &[
         "runs",
+        "sandbox",
         "target",
         "dashboard-data",
         ".omx",
@@ -23659,7 +23744,14 @@ fn is_documented_generated_artifact_path(path: &Path) -> bool {
     first_normal_component.is_some_and(|value| {
         matches!(
             value.as_ref(),
-            "runs" | "target" | "dashboard-data" | ".omx" | ".openchrome" | ".omc" | ".claude"
+            "runs"
+                | "sandbox"
+                | "target"
+                | "dashboard-data"
+                | ".omx"
+                | ".openchrome"
+                | ".omc"
+                | ".claude"
         )
     }) || path.ends_with(Path::new("examples/evidence-dashboard/dashboard-data.json"))
 }
