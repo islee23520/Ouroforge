@@ -115,6 +115,7 @@ should remain ignored/untracked.
 ## Documents
 
 - [Fresh Clone Onboarding Command Audit v1](fresh-clone-onboarding-command-audit-v1.md) — PA1.2.1 quickstart command audit, expected generated state, and cleanup boundary notes.
+- [Contributor Template Audit v1](contributor-template-audit-v1.md) — PA1.7.3 audit of contribution guidance, PR checklist, issue templates, generated-state boundaries, and conservative wording.
 - [Fresh Clone Smoke v1](fresh-clone-smoke-v1.md) — PA1.2.2 isolated fresh-clone-style smoke wrapper, generated-output boundaries, and evidence summary.
 - [Fresh Clone Troubleshooting and Cleanup v1](fresh-clone-troubleshooting-cleanup-v1.md) — PA1.2.3 prerequisite checks, common failures, cleanup commands, and generated-state policy.
 - [Canonical Demo Script v1](canonical-demo-script-v1.md) — non-destructive local demo command sequence, smoke wrapper, and command audit.
