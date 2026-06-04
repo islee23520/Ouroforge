@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+  "planId": "qa14_3_unsupported_action",
+  "runId": "run_fuzzing_plan_smoke",
+  "inputDomain": {
+    "domainId": "movement-buttons",
+    "scenarioId": "collect-and-exit",
+    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+    "allowedKeys": ["left", "right"]
+  },
+  "deterministicSeed": 99,
+  "budget": {
+    "maxSteps": 8,
+    "maxRuns": 1,
+    "maxDurationMs": 2000,
+    "maxArtifacts": 4,
+    "maxOutputBytes": 65536
+  },
+  "actionSet": ["press_key", "execute_script"],
+  "constraints": [
+    { "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }
+  ],
+  "stopCondition": {
+    "conditionId": "budget-only",
+    "description": "Stop at the declared budget."
+  },
+  "expectedEvidence": [
+    {
+      "evidenceId": "seeded-inputs",
+      "artifactKind": "fuzz_input",
+      "pathHint": "evidence/fuzz/qa14_3_unsupported_action/fuzz-inputs.json"
+    }
+  ],
+  "outputRoot": "evidence/fuzz/qa14_3_unsupported_action/",
+  "cleanupPolicy": { "mode": "retain_on_failure" },
+  "status": "planned"
+}

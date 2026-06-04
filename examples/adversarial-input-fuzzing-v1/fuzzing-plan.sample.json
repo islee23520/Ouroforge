@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+  "planId": "qa14_3_seeded_movement_fuzz",
+  "runId": "run_fuzzing_plan_smoke",
+  "inputDomain": {
+    "domainId": "movement-buttons",
+    "scenarioId": "collect-and-exit",
+    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+    "replayEvidenceRef": "evidence/scenarios/collect-and-exit/input-replay.json",
+    "allowedKeys": ["left", "right", "up", "down"]
+  },
+  "deterministicSeed": 424242,
+  "budget": {
+    "maxSteps": 32,
+    "maxRuns": 4,
+    "maxDurationMs": 12000,
+    "maxArtifacts": 12,
+    "maxOutputBytes": 262144
+  },
+  "actionSet": ["press_key", "release_key", "wait_frames", "replay_step", "snapshot_probe"],
+  "constraints": [
+    {
+      "constraintId": "bounded-local-only",
+      "description": "Use deterministic local fuzz input generation only; do not spawn hidden workers."
+    },
+    {
+      "constraintId": "evidence-only",
+      "description": "Record candidate evidence only; do not auto-fix, auto-apply, or auto-merge."
+    }
+  ],
+  "stopCondition": {
+    "conditionId": "budget-or-first-failure",
+    "description": "Stop at maxRuns/maxSteps/maxDurationMs or after the first reproducible failure."
+  },
+  "expectedEvidence": [
+    {
+      "evidenceId": "seeded-inputs",
+      "artifactKind": "fuzz_input",
+      "pathHint": "evidence/fuzz/qa14_3_seeded_movement_fuzz/fuzz-inputs.json"
+    },
+    {
+      "evidenceId": "scenario-replay",
+      "artifactKind": "scenario_input_replay",
+      "pathHint": "evidence/scenarios/collect-and-exit/input-replay.json"
+    },
+    {
+      "evidenceId": "fuzz-summary",
+      "artifactKind": "fuzz_summary",
+      "pathHint": "evidence/fuzz/qa14_3_seeded_movement_fuzz/summary.json"
+    }
+  ],
+  "outputRoot": "evidence/fuzz/qa14_3_seeded_movement_fuzz/",
+  "cleanupPolicy": {
+    "mode": "retain_for_review",
+    "maxRetentionMs": 604800000
+  },
+  "status": "planned",
+  "guardrails": [
+    "No unbounded random runs or generated-state explosions.",
+    "No browser command bridge or trusted mutation.",
+    "QA fuzzing output is evidence/backlog input until reviewed."
+  ]
+}

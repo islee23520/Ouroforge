@@ -6632,6 +6632,383 @@ fn validate_asset_preview_path(
     }
 }
 
+const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdversarialInputFuzzingPlanArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "inputDomain")]
+    pub input_domain: FuzzInputDomain,
+    #[serde(rename = "deterministicSeed")]
+    pub deterministic_seed: u64,
+    pub budget: FuzzBudget,
+    #[serde(rename = "actionSet")]
+    pub action_set: Vec<FuzzAction>,
+    pub constraints: Vec<FuzzConstraint>,
+    #[serde(rename = "stopCondition")]
+    pub stop_condition: FuzzStopCondition,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<FuzzExpectedEvidence>,
+    #[serde(rename = "outputRoot")]
+    pub output_root: String,
+    #[serde(rename = "cleanupPolicy")]
+    pub cleanup_policy: FuzzCleanupPolicy,
+    pub status: FuzzPlanStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzInputDomain {
+    #[serde(rename = "domainId")]
+    pub domain_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(
+        rename = "scenarioCandidateRef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scenario_candidate_ref: Option<String>,
+    #[serde(rename = "replayEvidenceRef", skip_serializing_if = "Option::is_none")]
+    pub replay_evidence_ref: Option<String>,
+    #[serde(rename = "allowedKeys", default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_keys: Vec<ReplayKey>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzBudget {
+    #[serde(rename = "maxSteps")]
+    pub max_steps: u32,
+    #[serde(rename = "maxRuns")]
+    pub max_runs: u32,
+    #[serde(rename = "maxDurationMs")]
+    pub max_duration_ms: u64,
+    #[serde(rename = "maxArtifacts")]
+    pub max_artifacts: u32,
+    #[serde(rename = "maxOutputBytes")]
+    pub max_output_bytes: u64,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum FuzzAction {
+    PressKey,
+    ReleaseKey,
+    WaitFrames,
+    ReplayStep,
+    SnapshotProbe,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzConstraint {
+    #[serde(rename = "constraintId")]
+    pub constraint_id: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzStopCondition {
+    #[serde(rename = "conditionId")]
+    pub condition_id: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    #[serde(rename = "artifactKind")]
+    pub artifact_kind: FuzzExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum FuzzExpectedEvidenceKind {
+    FuzzInput,
+    ScenarioInputReplay,
+    ScenarioResult,
+    WorldState,
+    RuntimeProbe,
+    FuzzSummary,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FuzzCleanupPolicy {
+    pub mode: FuzzCleanupMode,
+    #[serde(rename = "maxRetentionMs", skip_serializing_if = "Option::is_none")]
+    pub max_retention_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum FuzzCleanupMode {
+    DeleteOnSuccess,
+    RetainOnFailure,
+    RetainForReview,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum FuzzPlanStatus {
+    Planned,
+    Blocked,
+    Exhausted,
+}
+
+impl AdversarialInputFuzzingPlanArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: AdversarialInputFuzzingPlanArtifact = serde_json::from_str(input)
+            .context("failed to parse Adversarial Input Fuzzing Plan JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan schemaVersion must be {ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("adversarial input fuzzing plan planId", &self.plan_id)?;
+        validate_path_component("adversarial input fuzzing plan runId", &self.run_id)?;
+        self.input_domain.validate()?;
+        self.budget.validate()?;
+        if self.action_set.is_empty() {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan actionSet must not be empty"
+            ));
+        }
+        let mut actions = BTreeSet::new();
+        for action in &self.action_set {
+            if !actions.insert(*action) {
+                return Err(anyhow!(
+                    "adversarial input fuzzing plan actionSet must not contain duplicates"
+                ));
+            }
+        }
+        if self.constraints.is_empty() {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan constraints must not be empty"
+            ));
+        }
+        let mut constraint_ids = BTreeSet::new();
+        for constraint in &self.constraints {
+            constraint.validate()?;
+            if !constraint_ids.insert(constraint.constraint_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate adversarial input fuzzing plan constraintId: {}",
+                    constraint.constraint_id
+                ));
+            }
+        }
+        self.stop_condition.validate()?;
+        if self.expected_evidence.is_empty() {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan expectedEvidence must not be empty"
+            ));
+        }
+        let mut evidence_ids = BTreeSet::new();
+        for evidence in &self.expected_evidence {
+            evidence.validate()?;
+            if !evidence_ids.insert(evidence.evidence_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate adversarial input fuzzing plan evidenceId: {}",
+                    evidence.evidence_id
+                ));
+            }
+        }
+        validate_fuzz_output_root(&self.output_root, &self.plan_id)?;
+        self.cleanup_policy.validate()?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("adversarial input fuzzing plan blockedReasons", reason)?;
+        }
+        match self.status {
+            FuzzPlanStatus::Blocked if self.blocked_reasons.is_empty() => Err(anyhow!(
+                "adversarial input fuzzing plan blocked status requires blockedReasons"
+            )),
+            FuzzPlanStatus::Planned if !self.blocked_reasons.is_empty() => Err(anyhow!(
+                "adversarial input fuzzing plan planned status must not include blockedReasons"
+            )),
+            _ => {
+                for guardrail in &self.guardrails {
+                    require_bounded_display_text(
+                        "adversarial input fuzzing plan guardrail",
+                        guardrail,
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl FuzzInputDomain {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "adversarial input fuzzing plan inputDomain.domainId",
+            &self.domain_id,
+        )?;
+        validate_path_component(
+            "adversarial input fuzzing plan inputDomain.scenarioId",
+            &self.scenario_id,
+        )?;
+        if self.scenario_candidate_ref.is_none() && self.replay_evidence_ref.is_none() {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan inputDomain requires scenarioCandidateRef or replayEvidenceRef"
+            ));
+        }
+        if let Some(reference) = &self.scenario_candidate_ref {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.starts_with("evidence/scenarios/") || !reference.ends_with(".json") {
+                return Err(anyhow!(
+                    "adversarial input fuzzing plan scenarioCandidateRef must be scenario JSON evidence"
+                ));
+            }
+        }
+        if let Some(reference) = &self.replay_evidence_ref {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.starts_with("evidence/scenarios/") || !reference.ends_with(".json") {
+                return Err(anyhow!(
+                    "adversarial input fuzzing plan replayEvidenceRef must be scenario JSON evidence"
+                ));
+            }
+        }
+        if self.allowed_keys.is_empty() {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan inputDomain.allowedKeys must not be empty"
+            ));
+        }
+        let mut keys = BTreeSet::new();
+        for key in &self.allowed_keys {
+            if !keys.insert(*key) {
+                return Err(anyhow!(
+                    "adversarial input fuzzing plan inputDomain.allowedKeys must not contain duplicates"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl FuzzBudget {
+    fn validate(&self) -> Result<()> {
+        if self.max_steps == 0 {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan budget.maxSteps must be greater than zero"
+            ));
+        }
+        if self.max_runs == 0 {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan budget.maxRuns must be greater than zero"
+            ));
+        }
+        if self.max_duration_ms == 0 {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan budget.maxDurationMs must be greater than zero"
+            ));
+        }
+        if self.max_artifacts == 0 {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan budget.maxArtifacts must be greater than zero"
+            ));
+        }
+        if self.max_output_bytes == 0 {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan budget.maxOutputBytes must be greater than zero"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl FuzzConstraint {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "adversarial input fuzzing plan constraints.constraintId",
+            &self.constraint_id,
+        )?;
+        require_bounded_display_text(
+            "adversarial input fuzzing plan constraints.description",
+            &self.description,
+        )
+    }
+}
+
+impl FuzzStopCondition {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "adversarial input fuzzing plan stopCondition.conditionId",
+            &self.condition_id,
+        )?;
+        require_bounded_display_text(
+            "adversarial input fuzzing plan stopCondition.description",
+            &self.description,
+        )
+    }
+}
+
+impl FuzzExpectedEvidence {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "adversarial input fuzzing plan expectedEvidence.evidenceId",
+            &self.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&self.path_hint)?;
+        if !self.path_hint.starts_with("evidence/fuzz/")
+            && !self.path_hint.starts_with("evidence/scenarios/")
+        {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan expectedEvidence.pathHint must stay under evidence/fuzz or evidence/scenarios"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl FuzzCleanupPolicy {
+    fn validate(&self) -> Result<()> {
+        if matches!(self.mode, FuzzCleanupMode::RetainForReview)
+            && self.max_retention_ms.unwrap_or_default() == 0
+        {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan cleanupPolicy retain_for_review requires maxRetentionMs"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_fuzz_output_root(output_root: &str, plan_id: &str) -> Result<()> {
+    validate_evidence_artifact_path(output_root)?;
+    let expected_prefix = format!("evidence/fuzz/{plan_id}/");
+    if !output_root.starts_with(&expected_prefix) {
+        return Err(anyhow!(
+            "adversarial input fuzzing plan outputRoot must stay under {expected_prefix}"
+        ));
+    }
+    Ok(())
+}
+
 const QA_WORKER_ASSIGNMENT_SCHEMA_VERSION: &str = "qa-worker-assignment-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -39354,6 +39731,116 @@ scenarios:
         assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_accepts_bounded_fixture() {
+        let fixture =
+            include_str!("../../../examples/adversarial-input-fuzzing-v1/fuzzing-plan.sample.json");
+        let plan = AdversarialInputFuzzingPlanArtifact::from_json_str(fixture)
+            .expect("fuzzing plan fixture parses");
+
+        assert_eq!(plan.schema_version, "adversarial-input-fuzzing-plan-v1");
+        assert_eq!(plan.plan_id, "qa14_3_seeded_movement_fuzz");
+        assert_eq!(plan.deterministic_seed, 424242);
+        assert_eq!(plan.budget.max_steps, 32);
+        assert_eq!(plan.budget.max_runs, 4);
+        assert!(plan.action_set.contains(&FuzzAction::PressKey));
+        assert!(plan.action_set.contains(&FuzzAction::SnapshotProbe));
+        assert_eq!(plan.status, FuzzPlanStatus::Planned);
+        assert!(plan
+            .expected_evidence
+            .iter()
+            .any(|evidence| evidence.artifact_kind == FuzzExpectedEvidenceKind::FuzzSummary));
+        assert!(plan
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("No unbounded random runs")));
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_rejects_unbounded_or_unsupported_shapes() {
+        let unbounded = include_str!(
+            "../../../examples/adversarial-input-fuzzing-v1/invalid/unbounded-fuzzing-plan.json"
+        );
+        let error = AdversarialInputFuzzingPlanArtifact::from_json_str(unbounded)
+            .expect_err("unbounded fuzzing plan rejected");
+        assert!(
+            error.to_string().contains("maxSteps")
+                || error.to_string().contains("maxRuns")
+                || error.to_string().contains("maxDurationMs")
+        );
+
+        let unsupported_action = include_str!(
+            "../../../examples/adversarial-input-fuzzing-v1/invalid/unsupported-action-fuzzing-plan.json"
+        );
+        let error = AdversarialInputFuzzingPlanArtifact::from_json_str(unsupported_action)
+            .expect_err("unsupported action rejected by schema");
+        assert!(
+            error.to_string().contains("execute_script")
+                || error.to_string().contains("failed to parse")
+        );
+
+        let missing_blocked_reason = include_str!(
+            "../../../examples/adversarial-input-fuzzing-v1/invalid/blocked-fuzzing-plan.json"
+        );
+        let error = AdversarialInputFuzzingPlanArtifact::from_json_str(missing_blocked_reason)
+            .expect_err("blocked fuzzing plan needs reasons");
+        assert!(error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_rejects_unsafe_output_and_missing_cleanup() {
+        let unsafe_output = AdversarialInputFuzzingPlanArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+                "planId": "qa14_3_unsafe_output",
+                "runId": "run_fuzzing_plan_smoke",
+                "inputDomain": {
+                    "domainId": "movement-buttons",
+                    "scenarioId": "collect-and-exit",
+                    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+                    "allowedKeys": ["left", "right"]
+                },
+                "deterministicSeed": 7,
+                "budget": { "maxSteps": 8, "maxRuns": 1, "maxDurationMs": 2000, "maxArtifacts": 4, "maxOutputBytes": 65536 },
+                "actionSet": ["press_key", "release_key"],
+                "constraints": [{ "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }],
+                "stopCondition": { "conditionId": "budget-only", "description": "Stop at the declared budget." },
+                "expectedEvidence": [{ "evidenceId": "seeded-inputs", "artifactKind": "fuzz_input", "pathHint": "evidence/fuzz/qa14_3_unsafe_output/fuzz-inputs.json" }],
+                "outputRoot": "evidence/qa-workers/worker-1/fuzz/",
+                "cleanupPolicy": { "mode": "retain_on_failure" },
+                "status": "planned"
+            })
+            .to_string(),
+        )
+        .expect_err("output outside fuzz root rejected");
+        assert!(unsafe_output.to_string().contains("outputRoot"));
+
+        let missing_cleanup = AdversarialInputFuzzingPlanArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+                "planId": "qa14_3_missing_cleanup",
+                "runId": "run_fuzzing_plan_smoke",
+                "inputDomain": {
+                    "domainId": "movement-buttons",
+                    "scenarioId": "collect-and-exit",
+                    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+                    "allowedKeys": ["left", "right"]
+                },
+                "deterministicSeed": 7,
+                "budget": { "maxSteps": 8, "maxRuns": 1, "maxDurationMs": 2000, "maxArtifacts": 4, "maxOutputBytes": 65536 },
+                "actionSet": ["press_key", "release_key"],
+                "constraints": [{ "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }],
+                "stopCondition": { "conditionId": "budget-only", "description": "Stop at the declared budget." },
+                "expectedEvidence": [{ "evidenceId": "seeded-inputs", "artifactKind": "fuzz_input", "pathHint": "evidence/fuzz/qa14_3_missing_cleanup/fuzz-inputs.json" }],
+                "outputRoot": "evidence/fuzz/qa14_3_missing_cleanup/",
+                "status": "planned"
+            })
+            .to_string(),
+        )
+        .expect_err("cleanup policy is required");
+        assert!(!missing_cleanup.to_string().is_empty());
     }
 
     #[test]

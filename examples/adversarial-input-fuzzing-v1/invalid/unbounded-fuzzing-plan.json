@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+  "planId": "qa14_3_unbounded_fuzz",
+  "runId": "run_fuzzing_plan_smoke",
+  "inputDomain": {
+    "domainId": "movement-buttons",
+    "scenarioId": "collect-and-exit",
+    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+    "allowedKeys": ["left", "right"]
+  },
+  "deterministicSeed": 0,
+  "budget": {
+    "maxSteps": 0,
+    "maxRuns": 0,
+    "maxDurationMs": 0,
+    "maxArtifacts": 0,
+    "maxOutputBytes": 0
+  },
+  "actionSet": ["press_key"],
+  "constraints": [
+    { "constraintId": "unsafe", "description": "Missing bounded budget." }
+  ],
+  "stopCondition": {
+    "conditionId": "missing-budget",
+    "description": "Invalid because limits are zero."
+  },
+  "expectedEvidence": [
+    {
+      "evidenceId": "seeded-inputs",
+      "artifactKind": "fuzz_input",
+      "pathHint": "evidence/fuzz/qa14_3_unbounded_fuzz/fuzz-inputs.json"
+    }
+  ],
+  "outputRoot": "evidence/fuzz/qa14_3_unbounded_fuzz/",
+  "cleanupPolicy": { "mode": "retain_on_failure" },
+  "status": "planned"
+}
