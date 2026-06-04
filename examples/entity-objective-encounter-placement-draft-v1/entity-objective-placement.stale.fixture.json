@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "entity-objective-encounter-placement-draft-v1",
+  "draftId": "draft_collect_and_exit_entities_stale",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 32, "height": 18 },
+  "placements": [
+    {
+      "placementId": "spawn_player",
+      "kind": "spawn",
+      "entityRef": "player",
+      "rect": { "x": 1, "y": 13, "width": 1, "height": 2 }
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "objective_reach_goal",
+      "kind": "reach_goal",
+      "requiredPlacementRefs": ["spawn_player"]
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:ffffffffffffffff",
+  "expectedAfterSummary": "Stale placement draft must be regenerated against the current scene hash.",
+  "expectedEvidence": [
+    {
+      "evidenceId": "stale_report",
+      "kind": "draft_validation",
+      "pathHint": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_stale/stale-report.json"
+    }
+  ],
+  "status": "stale",
+  "blockedReasons": ["beforeHash no longer matches the target scene fixture"]
+}

@@ -16265,6 +16265,532 @@ fn tilemap_terrain_draft_status_label(status: TilemapTerrainDraftStatus) -> &'st
     }
 }
 
+const ENTITY_OBJECTIVE_PLACEMENT_DRAFT_SCHEMA_VERSION: &str =
+    "entity-objective-encounter-placement-draft-v1";
+const ENTITY_OBJECTIVE_PLACEMENT_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
+    "entity-objective-encounter-placement-draft-read-model-v1";
+const MAX_ENTITY_OBJECTIVE_PLACEMENT_DRAFT_GRID_TILES: u32 = 256;
+const MAX_ENTITY_OBJECTIVE_PLACEMENTS: usize = 128;
+const MAX_ENTITY_OBJECTIVE_DRAFT_OBJECTIVES: usize = 32;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectiveEncounterPlacementDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "solverId")]
+    pub solver_id: String,
+    #[serde(rename = "tilemapDraftId")]
+    pub tilemap_draft_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    pub grid: EntityObjectivePlacementGrid,
+    pub placements: Vec<EntityObjectivePlacementDraftPlacement>,
+    pub objectives: Vec<EntityObjectivePlacementDraftObjective>,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "expectedAfterSummary")]
+    pub expected_after_summary: String,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<EntityObjectivePlacementDraftExpectedEvidence>,
+    pub status: EntityObjectivePlacementDraftStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectivePlacementGrid {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectivePlacementDraftPlacement {
+    #[serde(rename = "placementId")]
+    pub placement_id: String,
+    pub kind: EntityObjectivePlacementKind,
+    #[serde(rename = "entityRef", default, skip_serializing_if = "Option::is_none")]
+    pub entity_ref: Option<String>,
+    #[serde(rename = "assetRef", default, skip_serializing_if = "Option::is_none")]
+    pub asset_ref: Option<String>,
+    #[serde(
+        rename = "behaviorRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub behavior_refs: Vec<String>,
+    #[serde(
+        rename = "objectiveRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub objective_ref: Option<String>,
+    #[serde(
+        rename = "encounterGroupId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub encounter_group_id: Option<String>,
+    pub rect: EntityObjectivePlacementRect,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityObjectivePlacementKind {
+    Spawn,
+    Goal,
+    Pickup,
+    Hazard,
+    Enemy,
+    Npc,
+    Door,
+    Key,
+    Checkpoint,
+    CameraAnchor,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectivePlacementRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectivePlacementDraftObjective {
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    pub kind: EntityObjectiveDraftObjectiveKind,
+    #[serde(rename = "requiredPlacementRefs")]
+    pub required_placement_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityObjectiveDraftObjectiveKind {
+    ReachGoal,
+    CollectPickup,
+    DefeatEncounter,
+    UnlockDoor,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectivePlacementDraftExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: EntityObjectivePlacementDraftEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityObjectivePlacementDraftEvidenceKind {
+    PreviewSummary,
+    DraftValidation,
+    BehaviorLinkage,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityObjectivePlacementDraftStatus {
+    Drafted,
+    Stale,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EntityObjectiveEncounterPlacementDraftReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    pub status: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "placementCount")]
+    pub placement_count: usize,
+    #[serde(rename = "objectiveCount")]
+    pub objective_count: usize,
+    #[serde(rename = "encounterGroupCount")]
+    pub encounter_group_count: usize,
+    #[serde(rename = "behaviorLinkCount")]
+    pub behavior_link_count: usize,
+    #[serde(rename = "expectedEvidenceRefs")]
+    pub expected_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl EntityObjectiveEncounterPlacementDraftArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: EntityObjectiveEncounterPlacementDraftArtifact = serde_json::from_str(input)
+            .context("failed to parse Entity Objective Encounter Placement Draft JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != ENTITY_OBJECTIVE_PLACEMENT_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "entity objective placement draft schemaVersion must be {ENTITY_OBJECTIVE_PLACEMENT_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("entity objective placement draft draftId", &self.draft_id)?;
+        validate_path_component("entity objective placement draft intentId", &self.intent_id)?;
+        validate_path_component("entity objective placement draft planId", &self.plan_id)?;
+        validate_path_component("entity objective placement draft solverId", &self.solver_id)?;
+        validate_path_component(
+            "entity objective placement draft tilemapDraftId",
+            &self.tilemap_draft_id,
+        )?;
+        validate_repo_relative_source_ref(
+            "entity objective placement draft targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "entity objective placement draft targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        self.grid.validate()?;
+        let placement_ids = validate_entity_objective_placements(&self.grid, &self.placements)?;
+        validate_entity_objective_objectives(&placement_ids, &self.objectives)?;
+        parse_visual_edit_draft_hash(
+            "entity objective placement draft beforeHash",
+            &self.before_hash,
+        )?;
+        require_bounded_display_text(
+            "entity objective placement draft expectedAfterSummary",
+            &self.expected_after_summary,
+        )?;
+        validate_entity_objective_expected_evidence(&self.draft_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text(
+                "entity objective placement draft blockedReasons",
+                reason,
+            )?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("entity objective placement draft guardrails", guardrail)?;
+        }
+        validate_entity_objective_status(self.status, &self.placements, &self.blocked_reasons)
+    }
+}
+
+impl EntityObjectivePlacementGrid {
+    fn validate(&self) -> Result<()> {
+        if self.width == 0
+            || self.height == 0
+            || self.width > MAX_ENTITY_OBJECTIVE_PLACEMENT_DRAFT_GRID_TILES
+            || self.height > MAX_ENTITY_OBJECTIVE_PLACEMENT_DRAFT_GRID_TILES
+        {
+            return Err(anyhow!(
+                "entity objective placement draft grid width and height must be between 1 and {MAX_ENTITY_OBJECTIVE_PLACEMENT_DRAFT_GRID_TILES}"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl EntityObjectivePlacementRect {
+    fn validate(&self, grid: &EntityObjectivePlacementGrid) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!(
+                "entity objective placement draft rect width and height must be positive"
+            ));
+        }
+        let end_x = self
+            .x
+            .checked_add(self.width)
+            .ok_or_else(|| anyhow!("entity objective placement draft rect x + width overflows"))?;
+        let end_y = self
+            .y
+            .checked_add(self.height)
+            .ok_or_else(|| anyhow!("entity objective placement draft rect y + height overflows"))?;
+        if end_x > grid.width || end_y > grid.height {
+            return Err(anyhow!(
+                "entity objective placement draft rect exceeds grid bounds"
+            ));
+        }
+        Ok(())
+    }
+
+    fn overlaps(self, other: Self) -> bool {
+        self.x < other.x.saturating_add(other.width)
+            && self.x.saturating_add(self.width) > other.x
+            && self.y < other.y.saturating_add(other.height)
+            && self.y.saturating_add(self.height) > other.y
+    }
+}
+
+pub fn entity_objective_encounter_placement_draft_read_model_from_json_str(
+    input: &str,
+) -> Result<EntityObjectiveEncounterPlacementDraftReadModel> {
+    let artifact = EntityObjectiveEncounterPlacementDraftArtifact::from_json_str(input)?;
+    Ok(entity_objective_encounter_placement_draft_read_model(
+        &artifact,
+    ))
+}
+
+pub fn entity_objective_encounter_placement_draft_read_model(
+    artifact: &EntityObjectiveEncounterPlacementDraftArtifact,
+) -> EntityObjectiveEncounterPlacementDraftReadModel {
+    let encounter_groups = artifact
+        .placements
+        .iter()
+        .filter_map(|placement| placement.encounter_group_id.as_deref())
+        .collect::<BTreeSet<_>>();
+    let behavior_link_count = artifact
+        .placements
+        .iter()
+        .map(|placement| placement.behavior_refs.len())
+        .sum();
+    EntityObjectiveEncounterPlacementDraftReadModel {
+        schema_version: ENTITY_OBJECTIVE_PLACEMENT_DRAFT_READ_MODEL_SCHEMA_VERSION.to_string(),
+        draft_id: artifact.draft_id.clone(),
+        status: entity_objective_status_label(artifact.status).to_string(),
+        target_scene_ref: artifact.target_scene_ref.clone(),
+        placement_count: artifact.placements.len(),
+        objective_count: artifact.objectives.len(),
+        encounter_group_count: encounter_groups.len(),
+        behavior_link_count,
+        expected_evidence_refs: artifact
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.path_hint.clone())
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only entity objective encounter placement draft preview; no scene writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_entity_objective_placements<'a>(
+    grid: &EntityObjectivePlacementGrid,
+    placements: &'a [EntityObjectivePlacementDraftPlacement],
+) -> Result<BTreeSet<&'a str>> {
+    if placements.is_empty() || placements.len() > MAX_ENTITY_OBJECTIVE_PLACEMENTS {
+        return Err(anyhow!(
+            "entity objective placement draft placements must contain between 1 and {MAX_ENTITY_OBJECTIVE_PLACEMENTS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for placement in placements {
+        validate_path_component(
+            "entity objective placement draft placements.placementId",
+            &placement.placement_id,
+        )?;
+        if let Some(entity_ref) = &placement.entity_ref {
+            validate_path_component(
+                "entity objective placement draft placements.entityRef",
+                entity_ref,
+            )?;
+        }
+        if let Some(asset_ref) = &placement.asset_ref {
+            validate_repo_relative_source_ref(
+                "entity objective placement draft placements.assetRef",
+                asset_ref,
+            )?;
+        }
+        validate_unique_path_components(
+            "entity objective placement draft placements.behaviorRefs",
+            "behaviorRef",
+            &placement.behavior_refs,
+        )?;
+        if let Some(objective_ref) = &placement.objective_ref {
+            validate_path_component(
+                "entity objective placement draft placements.objectiveRef",
+                objective_ref,
+            )?;
+        }
+        if let Some(encounter_group_id) = &placement.encounter_group_id {
+            validate_path_component(
+                "entity objective placement draft placements.encounterGroupId",
+                encounter_group_id,
+            )?;
+        }
+        placement.rect.validate(grid)?;
+        if !ids.insert(placement.placement_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate entity objective placement draft placements.placementId: {}",
+                placement.placement_id
+            ));
+        }
+    }
+    validate_entity_objective_overlap(placements)?;
+    Ok(ids)
+}
+
+fn validate_entity_objective_overlap(
+    placements: &[EntityObjectivePlacementDraftPlacement],
+) -> Result<()> {
+    for (index, placement) in placements.iter().enumerate() {
+        if placement.kind == EntityObjectivePlacementKind::CameraAnchor {
+            continue;
+        }
+        for other in placements.iter().skip(index + 1) {
+            if other.kind == EntityObjectivePlacementKind::CameraAnchor {
+                continue;
+            }
+            if placement.rect.overlaps(other.rect) {
+                return Err(anyhow!(
+                    "entity objective placement draft overlap between {} and {}",
+                    placement.placement_id,
+                    other.placement_id
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_entity_objective_objectives(
+    placement_ids: &BTreeSet<&str>,
+    objectives: &[EntityObjectivePlacementDraftObjective],
+) -> Result<()> {
+    if objectives.is_empty() || objectives.len() > MAX_ENTITY_OBJECTIVE_DRAFT_OBJECTIVES {
+        return Err(anyhow!(
+            "entity objective placement draft objectives must contain between 1 and {MAX_ENTITY_OBJECTIVE_DRAFT_OBJECTIVES} entries"
+        ));
+    }
+    let mut objective_ids = BTreeSet::new();
+    for objective in objectives {
+        validate_path_component(
+            "entity objective placement draft objectives.objectiveId",
+            &objective.objective_id,
+        )?;
+        validate_unique_path_components(
+            "entity objective placement draft objectives.requiredPlacementRefs",
+            "placementRef",
+            &objective.required_placement_refs,
+        )?;
+        if objective.required_placement_refs.is_empty() {
+            return Err(anyhow!(
+                "entity objective placement draft objective requires placement refs"
+            ));
+        }
+        for reference in &objective.required_placement_refs {
+            if !placement_ids.contains(reference.as_str()) {
+                return Err(anyhow!(
+                    "entity objective placement draft objective references missing placement: {reference}"
+                ));
+            }
+        }
+        if !objective_ids.insert(objective.objective_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate entity objective placement draft objectives.objectiveId: {}",
+                objective.objective_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_entity_objective_expected_evidence(
+    draft_id: &str,
+    values: &[EntityObjectivePlacementDraftExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "entity objective placement draft expectedEvidence must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/entity-objective-placement-drafts/{draft_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "entity objective placement draft expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "entity objective placement draft expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate entity objective placement draft expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate entity objective placement draft expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_entity_objective_status(
+    status: EntityObjectivePlacementDraftStatus,
+    placements: &[EntityObjectivePlacementDraftPlacement],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_unsupported = placements
+        .iter()
+        .any(|placement| placement.kind == EntityObjectivePlacementKind::Unsupported);
+    match status {
+        EntityObjectivePlacementDraftStatus::Drafted if blocked_reasons.is_empty() && !has_unsupported => Ok(()),
+        EntityObjectivePlacementDraftStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        EntityObjectivePlacementDraftStatus::Unsupported if blocked_reasons.is_empty() && has_unsupported => Ok(()),
+        EntityObjectivePlacementDraftStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        EntityObjectivePlacementDraftStatus::Drafted => Err(anyhow!(
+            "entity objective drafted status cannot include blocked or unsupported placements"
+        )),
+        EntityObjectivePlacementDraftStatus::Stale => Err(anyhow!(
+            "entity objective stale status requires blockedReasons describing stale target hashes"
+        )),
+        EntityObjectivePlacementDraftStatus::Unsupported => Err(anyhow!(
+            "entity objective unsupported status requires at least one unsupported placement and no blockedReasons"
+        )),
+        EntityObjectivePlacementDraftStatus::Blocked => Err(anyhow!(
+            "entity objective blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn entity_objective_status_label(status: EntityObjectivePlacementDraftStatus) -> &'static str {
+    match status {
+        EntityObjectivePlacementDraftStatus::Drafted => "drafted",
+        EntityObjectivePlacementDraftStatus::Stale => "stale",
+        EntityObjectivePlacementDraftStatus::Unsupported => "unsupported",
+        EntityObjectivePlacementDraftStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -60337,6 +60863,133 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("tilemap-terrain-generation-draft-v1.md"));
+    }
+
+    #[test]
+    fn entity_objective_placement_draft_v1_accepts_valid_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.valid.fixture.json"
+        );
+        let artifact = EntityObjectiveEncounterPlacementDraftArtifact::from_json_str(fixture)
+            .expect("valid entity objective placement fixture parses");
+        assert_eq!(
+            artifact.schema_version,
+            "entity-objective-encounter-placement-draft-v1"
+        );
+        assert_eq!(artifact.draft_id, "draft_collect_and_exit_entities_intro");
+        assert_eq!(
+            artifact.status,
+            EntityObjectivePlacementDraftStatus::Drafted
+        );
+        assert_eq!(artifact.placements.len(), 5);
+        assert_eq!(artifact.objectives.len(), 2);
+
+        let read_model =
+            entity_objective_encounter_placement_draft_read_model_from_json_str(fixture)
+                .expect("entity objective placement read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "entity-objective-encounter-placement-draft-read-model-v1"
+        );
+        assert_eq!(read_model.status, "drafted");
+        assert_eq!(read_model.placement_count, 5);
+        assert_eq!(read_model.objective_count, 2);
+        assert_eq!(read_model.encounter_group_count, 1);
+        assert_eq!(read_model.behavior_link_count, 4);
+        assert!(read_model.boundary.contains("no scene writes"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+        assert!(read_model.boundary.contains("no browser command bridge"));
+    }
+
+    #[test]
+    fn entity_objective_placement_draft_v1_accepts_stale_unsupported_and_blocked() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.stale.fixture.json"
+                ),
+                EntityObjectivePlacementDraftStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.unsupported.fixture.json"
+                ),
+                EntityObjectivePlacementDraftStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/entity-objective-placement.blocked.fixture.json"
+                ),
+                EntityObjectivePlacementDraftStatus::Blocked,
+            ),
+        ] {
+            let artifact = EntityObjectiveEncounterPlacementDraftArtifact::from_json_str(fixture)
+                .expect("non-drafted entity objective placement fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            if matches!(
+                expected_status,
+                EntityObjectivePlacementDraftStatus::Stale
+                    | EntityObjectivePlacementDraftStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn entity_objective_placement_draft_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/invalid/unsafe-target.fixture.json"
+                ),
+                "targetSceneRef",
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/invalid/overlap.fixture.json"
+                ),
+                "overlap",
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/invalid/missing-objective-placement.fixture.json"
+                ),
+                "missing placement",
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/entity-objective-encounter-placement-draft-v1/invalid/status-drift.fixture.json"
+                ),
+                "drafted status",
+            ),
+        ] {
+            let error = EntityObjectiveEncounterPlacementDraftArtifact::from_json_str(fixture)
+                .expect_err("invalid entity objective placement fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn entity_objective_placement_draft_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/entity-objective-encounter-placement-draft-v1.md");
+        assert!(doc.contains("reviewable draft evidence"));
+        assert!(doc.contains("does not write scene files"));
+        assert!(doc.contains("no scene write"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("entity-objective-encounter-placement-draft-v1.md"));
     }
 
     #[test]

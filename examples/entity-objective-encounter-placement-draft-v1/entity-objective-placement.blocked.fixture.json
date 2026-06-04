@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "entity-objective-encounter-placement-draft-v1",
+  "draftId": "draft_collect_and_exit_entities_blocked",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 32, "height": 18 },
+  "placements": [
+    {
+      "placementId": "enemy_patrol",
+      "kind": "enemy",
+      "entityRef": "slime",
+      "encounterGroupId": "encounter_intro",
+      "rect": { "x": 16, "y": 13, "width": 1, "height": 1 }
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "objective_defeat_intro",
+      "kind": "defeat_encounter",
+      "requiredPlacementRefs": ["enemy_patrol"]
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Blocked placement waits for encounter behavior approval.",
+  "expectedEvidence": [
+    {
+      "evidenceId": "blocked_report",
+      "kind": "draft_validation",
+      "pathHint": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_blocked/blocked-report.json"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": ["encounter behavior is not approved for the target scene"]
+}

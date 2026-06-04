@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "entity-objective-encounter-placement-draft-v1",
+  "draftId": "draft_entities_unsafe_target",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "targetSceneRef": "../outside.scene.json",
+  "grid": { "width": 32, "height": 18 },
+  "placements": [{ "placementId": "spawn_player", "kind": "spawn", "rect": { "x": 1, "y": 13, "width": 1, "height": 2 } }],
+  "objectives": [{ "objectiveId": "objective_reach_goal", "kind": "reach_goal", "requiredPlacementRefs": ["spawn_player"] }],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Invalid unsafe target.",
+  "expectedEvidence": [{ "evidenceId": "report", "kind": "draft_validation", "pathHint": "evidence/entity-objective-placement-drafts/draft_entities_unsafe_target/report.json" }],
+  "status": "drafted"
+}

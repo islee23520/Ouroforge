@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "entity-objective-encounter-placement-draft-v1",
+  "draftId": "draft_collect_and_exit_entities_unsupported",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 32, "height": 18 },
+  "placements": [
+    {
+      "placementId": "unsupported_flying_mount",
+      "kind": "unsupported",
+      "entityRef": "flying_mount",
+      "rect": { "x": 12, "y": 8, "width": 2, "height": 2 }
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "objective_reach_goal",
+      "kind": "reach_goal",
+      "requiredPlacementRefs": ["unsupported_flying_mount"]
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Unsupported placement remains a draft-only note.",
+  "expectedEvidence": [
+    {
+      "evidenceId": "unsupported_report",
+      "kind": "draft_validation",
+      "pathHint": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_unsupported/unsupported-report.json"
+    }
+  ],
+  "status": "unsupported"
+}

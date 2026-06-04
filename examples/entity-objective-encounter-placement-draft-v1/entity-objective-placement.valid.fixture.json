@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "entity-objective-encounter-placement-draft-v1",
+  "draftId": "draft_collect_and_exit_entities_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "solverId": "solver_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 32, "height": 18 },
+  "placements": [
+    {
+      "placementId": "spawn_player",
+      "kind": "spawn",
+      "entityRef": "player",
+      "assetRef": "assets/sprites/player.png",
+      "behaviorRefs": ["behavior_player_platformer"],
+      "objectiveRef": "objective_reach_goal",
+      "rect": { "x": 1, "y": 13, "width": 1, "height": 2 }
+    },
+    {
+      "placementId": "pickup_coin",
+      "kind": "pickup",
+      "entityRef": "coin",
+      "assetRef": "assets/sprites/coin.png",
+      "behaviorRefs": ["behavior_pickup_collectible"],
+      "objectiveRef": "objective_collect_coin",
+      "rect": { "x": 10, "y": 12, "width": 1, "height": 1 }
+    },
+    {
+      "placementId": "enemy_patrol",
+      "kind": "enemy",
+      "entityRef": "slime",
+      "assetRef": "assets/sprites/slime.png",
+      "behaviorRefs": ["behavior_patrol_enemy"],
+      "encounterGroupId": "encounter_intro",
+      "rect": { "x": 16, "y": 13, "width": 1, "height": 1 }
+    },
+    {
+      "placementId": "goal_exit",
+      "kind": "goal",
+      "entityRef": "exit",
+      "assetRef": "assets/sprites/exit.png",
+      "behaviorRefs": ["behavior_goal_trigger"],
+      "objectiveRef": "objective_reach_goal",
+      "rect": { "x": 28, "y": 13, "width": 1, "height": 2 }
+    },
+    {
+      "placementId": "camera_intro",
+      "kind": "camera_anchor",
+      "rect": { "x": 8, "y": 4, "width": 8, "height": 6 }
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "objective_reach_goal",
+      "kind": "reach_goal",
+      "requiredPlacementRefs": ["spawn_player", "goal_exit"]
+    },
+    {
+      "objectiveId": "objective_collect_coin",
+      "kind": "collect_pickup",
+      "requiredPlacementRefs": ["pickup_coin"]
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:0123456789abcdef",
+  "expectedAfterSummary": "Preview places player spawn, pickup, intro encounter, exit goal, and camera anchor without applying scene writes.",
+  "expectedEvidence": [
+    {
+      "evidenceId": "preview_summary",
+      "kind": "preview_summary",
+      "pathHint": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_intro/preview-summary.json"
+    },
+    {
+      "evidenceId": "read_model",
+      "kind": "read_model",
+      "pathHint": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_intro/read-model.json"
+    }
+  ],
+  "status": "drafted",
+  "guardrails": ["preview only", "no scene writes", "review-gated apply remains out of scope"]
+}
