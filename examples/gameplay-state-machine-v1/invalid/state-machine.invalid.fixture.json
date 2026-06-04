@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "gameplay-state-machine.v1",
+  "statePackId": "invalid-state-machines",
+  "scope": "local-fixture",
+  "status": "ready",
+  "stateMachines": [
+    {
+      "id": "bad-machine",
+      "label": "Bad",
+      "status": "ready",
+      "target": {},
+      "initialStateId": "missing",
+      "states": [
+        {
+          "id": "idle",
+          "label": "Idle",
+          "entryActions": [
+            {
+              "kind": "execute_script",
+              "evalScript": "eval(alert(1))"
+            }
+          ],
+          "exitActions": [],
+          "blockedReasons": []
+        }
+      ],
+      "transitions": [
+        {
+          "id": "bad-transition",
+          "label": "Bad",
+          "from": "idle",
+          "to": "missing",
+          "trigger": {
+            "kind": "plugin_loader"
+          },
+          "guards": [],
+          "actions": []
+        }
+      ],
+      "evidenceRefs": [
+        "../unsafe"
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "evidenceRefs": [],
+  "blockedReasons": [
+    "negative fixture only"
+  ]
+}

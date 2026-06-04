@@ -20120,6 +20120,421 @@ fn require_supported_gameplay_event_signal_key(field: &str, key: &str) -> Result
     Ok(())
 }
 
+const GAMEPLAY_STATE_MACHINE_SCHEMA_VERSION: &str = "gameplay-state-machine.v1";
+const MAX_GAMEPLAY_STATE_MACHINES: usize = 64;
+const MAX_GAMEPLAY_STATES: usize = 64;
+const MAX_GAMEPLAY_STATE_TRANSITIONS: usize = 128;
+const MAX_GAMEPLAY_STATE_STEPS: usize = 32;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayStateMachineArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "statePackId")]
+    pub state_pack_id: String,
+    pub scope: String,
+    pub status: GameplayStateMachineStatus,
+    #[serde(rename = "stateMachines")]
+    pub state_machines: Vec<GameplayStateMachineDefinition>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayStateMachineDefinition {
+    pub id: String,
+    pub label: String,
+    pub status: GameplayStateMachineStatus,
+    pub target: BTreeMap<String, String>,
+    #[serde(rename = "initialStateId")]
+    pub initial_state_id: String,
+    pub states: Vec<GameplayStateDefinition>,
+    pub transitions: Vec<GameplayStateTransitionDefinition>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayStateDefinition {
+    pub id: String,
+    pub label: String,
+    #[serde(
+        rename = "entryActions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub entry_actions: Vec<BTreeMap<String, serde_json::Value>>,
+    #[serde(rename = "exitActions", default, skip_serializing_if = "Vec::is_empty")]
+    pub exit_actions: Vec<BTreeMap<String, serde_json::Value>>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayStateTransitionDefinition {
+    pub id: String,
+    pub label: String,
+    pub from: String,
+    pub to: String,
+    pub trigger: BTreeMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guards: Vec<BTreeMap<String, serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<BTreeMap<String, serde_json::Value>>,
+    #[serde(rename = "blockedReason", skip_serializing_if = "Option::is_none")]
+    pub blocked_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayStateMachineStatus {
+    Ready,
+    Partial,
+    Blocked,
+    Unsupported,
+}
+
+impl GameplayStateMachineArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: GameplayStateMachineArtifact =
+            serde_json::from_str(input).context("failed to parse Gameplay State Machine JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GAMEPLAY_STATE_MACHINE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "gameplay state machine schemaVersion must be {GAMEPLAY_STATE_MACHINE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("gameplay state machine statePackId", &self.state_pack_id)?;
+        validate_path_component("gameplay state machine scope", &self.scope)?;
+        validate_gameplay_state_machine_reason_state(
+            "gameplay state machine pack",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_behavior_refs(
+            "gameplay state machine evidenceRefs",
+            &self.evidence_refs,
+        )?;
+        validate_gameplay_behavior_reasons(
+            "gameplay state machine blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        if self.state_machines.is_empty() {
+            return Err(anyhow!(
+                "gameplay state machine stateMachines must not be empty"
+            ));
+        }
+        if self.state_machines.len() > MAX_GAMEPLAY_STATE_MACHINES {
+            return Err(anyhow!("gameplay state machine pack must contain at most {MAX_GAMEPLAY_STATE_MACHINES} stateMachines"));
+        }
+        let mut ids = BTreeSet::new();
+        for machine in &self.state_machines {
+            if !ids.insert(machine.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate gameplay state machine id `{}`",
+                    machine.id
+                ));
+            }
+            machine.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl GameplayStateMachineDefinition {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("gameplay state machine id", &self.id)?;
+        require_bounded_display_text("gameplay state machine label", &self.label)?;
+        validate_gameplay_state_machine_reason_state(
+            "gameplay state machine",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_state_machine_target(&self.id, &self.target)?;
+        validate_path_component(
+            "gameplay state machine initialStateId",
+            &self.initial_state_id,
+        )?;
+        if self.states.is_empty() {
+            return Err(anyhow!(
+                "gameplay state machine `{}` states must not be empty",
+                self.id
+            ));
+        }
+        if self.states.len() > MAX_GAMEPLAY_STATES {
+            return Err(anyhow!(
+                "gameplay state machine `{}` states must be bounded",
+                self.id
+            ));
+        }
+        let mut state_ids = BTreeSet::new();
+        for state in &self.states {
+            if !state_ids.insert(state.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate state id `{}` in gameplay state machine `{}`",
+                    state.id,
+                    self.id
+                ));
+            }
+            state.validate()?;
+        }
+        if !state_ids.contains(self.initial_state_id.as_str()) {
+            return Err(anyhow!(
+                "gameplay state machine `{}` initialStateId must reference a declared state",
+                self.id
+            ));
+        }
+        if self.transitions.len() > MAX_GAMEPLAY_STATE_TRANSITIONS {
+            return Err(anyhow!(
+                "gameplay state machine `{}` transitions must be bounded",
+                self.id
+            ));
+        }
+        let mut transition_ids = BTreeSet::new();
+        for transition in &self.transitions {
+            if !transition_ids.insert(transition.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate transition id `{}` in gameplay state machine `{}`",
+                    transition.id,
+                    self.id
+                ));
+            }
+            transition.validate(&self.id, &state_ids)?;
+        }
+        validate_gameplay_behavior_refs(
+            "gameplay state machine evidenceRefs",
+            &self.evidence_refs,
+        )?;
+        validate_gameplay_behavior_reasons(
+            "gameplay state machine blockedReasons",
+            &self.blocked_reasons,
+        )
+    }
+}
+
+impl GameplayStateDefinition {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("gameplay state id", &self.id)?;
+        require_bounded_display_text("gameplay state label", &self.label)?;
+        validate_gameplay_state_steps(
+            &self.id,
+            "entryActions",
+            &self.entry_actions,
+            gameplay_state_action_kinds(),
+        )?;
+        validate_gameplay_state_steps(
+            &self.id,
+            "exitActions",
+            &self.exit_actions,
+            gameplay_state_action_kinds(),
+        )?;
+        validate_gameplay_behavior_reasons("gameplay state blockedReasons", &self.blocked_reasons)
+    }
+}
+
+impl GameplayStateTransitionDefinition {
+    pub fn validate(&self, machine_id: &str, state_ids: &BTreeSet<&str>) -> Result<()> {
+        validate_path_component("gameplay state transition id", &self.id)?;
+        require_bounded_display_text("gameplay state transition label", &self.label)?;
+        validate_path_component("gameplay state transition from", &self.from)?;
+        validate_path_component("gameplay state transition to", &self.to)?;
+        if !state_ids.contains(self.from.as_str()) || !state_ids.contains(self.to.as_str()) {
+            return Err(anyhow!("gameplay state machine `{machine_id}` transition `{}` must reference declared states", self.id));
+        }
+        validate_gameplay_state_step(
+            &self.id,
+            "trigger",
+            &self.trigger,
+            gameplay_state_trigger_kinds(),
+        )?;
+        validate_gameplay_state_steps(
+            &self.id,
+            "guards",
+            &self.guards,
+            gameplay_state_guard_kinds(),
+        )?;
+        validate_gameplay_state_steps(
+            &self.id,
+            "actions",
+            &self.actions,
+            gameplay_state_action_kinds(),
+        )?;
+        if let Some(reason) = &self.blocked_reason {
+            require_bounded_display_text("gameplay state transition blockedReason", reason)?;
+        }
+        Ok(())
+    }
+}
+
+fn gameplay_state_trigger_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "on_event",
+        "on_signal",
+        "on_input",
+        "on_timer",
+        "on_state_elapsed",
+        "on_flag_changed",
+    ])
+}
+
+fn gameplay_state_guard_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "flag_equals",
+        "state_is",
+        "has_item",
+        "cooldown_ready",
+        "entity_alive",
+        "counter_at_least",
+    ])
+}
+
+fn gameplay_state_action_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "set_state",
+        "emit_signal",
+        "set_flag",
+        "start_cooldown",
+        "play_animation",
+        "spawn_local_effect",
+        "complete_objective",
+    ])
+}
+
+fn validate_gameplay_state_machine_reason_state(
+    field: &str,
+    status: GameplayStateMachineStatus,
+    reasons: &[String],
+) -> Result<()> {
+    if matches!(
+        status,
+        GameplayStateMachineStatus::Blocked | GameplayStateMachineStatus::Unsupported
+    ) && reasons.is_empty()
+    {
+        return Err(anyhow!(
+            "{field} with blocked or unsupported status must include blockedReasons"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_state_machine_target(
+    machine_id: &str,
+    target: &BTreeMap<String, String>,
+) -> Result<()> {
+    if target.is_empty() {
+        return Err(anyhow!(
+            "gameplay state machine `{machine_id}` target must not be empty"
+        ));
+    }
+    for (key, value) in target {
+        require_supported_gameplay_state_key("target", key)?;
+        if key.ends_with("Ref") {
+            validate_repo_relative_source_ref("gameplay state machine target ref", value)?;
+        } else {
+            validate_path_component("gameplay state machine target", value)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_state_steps(
+    state_id: &str,
+    field: &str,
+    steps: &[BTreeMap<String, serde_json::Value>],
+    supported_kinds: BTreeSet<&str>,
+) -> Result<()> {
+    if steps.len() > MAX_GAMEPLAY_STATE_STEPS {
+        return Err(anyhow!(
+            "gameplay state `{state_id}` {field} must be bounded"
+        ));
+    }
+    for step in steps {
+        validate_gameplay_state_step(state_id, field, step, supported_kinds.clone())?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_state_step(
+    state_id: &str,
+    field: &str,
+    step: &BTreeMap<String, serde_json::Value>,
+    supported_kinds: BTreeSet<&str>,
+) -> Result<()> {
+    let Some(kind) = step.get("kind").and_then(|value| value.as_str()) else {
+        return Err(anyhow!(
+            "gameplay state `{state_id}` {field} requires string kind"
+        ));
+    };
+    if !supported_kinds.contains(kind) {
+        return Err(anyhow!(
+            "gameplay state `{state_id}` {field} contains unsupported kind `{kind}`"
+        ));
+    }
+    validate_path_component("gameplay state step kind", kind)?;
+    for (key, value) in step {
+        require_supported_gameplay_state_key(field, key)?;
+        validate_gameplay_behavior_value(
+            &format!("gameplay state `{state_id}` {field}.{key}"),
+            value,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_supported_gameplay_state_key(field: &str, key: &str) -> Result<()> {
+    validate_path_component("gameplay state field key", key)?;
+    let normalized: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let forbidden = [
+        "script",
+        "command",
+        "commandbridge",
+        "trustedwrite",
+        "dynamicimport",
+        "pluginloader",
+        "eval",
+    ];
+    if forbidden.iter().any(|blocked| normalized.contains(blocked)) {
+        return Err(anyhow!("gameplay state {field} key `{key}` is forbidden because #614 does not authorize scripts, command bridges, plugin loading, or trusted browser writes"));
+    }
+    Ok(())
+}
+
 const AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION: &str = "agent-generated-level-draft-v1";
 const AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
     "agent-generated-level-draft-read-model-v1";
@@ -66779,6 +67194,83 @@ scenarios:
         let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
         assert!(scope.contains("#613 — Event and Signal System v1"));
         assert!(scope.contains("events and signals describe deterministic observations"));
+    }
+
+    #[test]
+    fn gameplay_state_machine_v1_accepts_ready_partial_and_blocked_fixtures() {
+        let ready = GameplayStateMachineArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-state-machine-v1/state-machine.valid.fixture.json"
+        ))
+        .expect("ready gameplay state machine fixture parses");
+        assert_eq!(ready.schema_version, "gameplay-state-machine.v1");
+        assert_eq!(ready.status, GameplayStateMachineStatus::Ready);
+        assert_eq!(ready.state_machines.len(), 3);
+        assert!(ready
+            .state_machines
+            .iter()
+            .any(|machine| machine.id == "player-dash-state"));
+        assert!(ready.state_machines.iter().any(|machine| machine
+            .transitions
+            .iter()
+            .any(|transition| transition.id == "unlock-blue-door")));
+
+        let partial = GameplayStateMachineArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-state-machine-v1/state-machine.partial.fixture.json"
+        ))
+        .expect("partial gameplay state machine fixture parses");
+        assert_eq!(partial.status, GameplayStateMachineStatus::Partial);
+        assert!(partial.state_machines[0].blocked_reasons[0].contains("GL10.4.2"));
+
+        let blocked = GameplayStateMachineArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-state-machine-v1/state-machine.blocked.fixture.json"
+        ))
+        .expect("blocked gameplay state machine fixture parses");
+        assert_eq!(blocked.status, GameplayStateMachineStatus::Blocked);
+        assert!(blocked.blocked_reasons[0].contains("GL10.4.3"));
+    }
+
+    #[test]
+    fn gameplay_state_machine_v1_rejects_invalid_fixture_and_transition_drift() {
+        let invalid = GameplayStateMachineArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-state-machine-v1/invalid/state-machine.invalid.fixture.json"
+        ))
+        .expect_err("invalid gameplay state machine fixture is rejected");
+        assert!(
+            invalid.to_string().contains("target must not be empty")
+                || invalid.to_string().contains("unsupported kind")
+                || invalid
+                    .to_string()
+                    .contains("failed to parse Gameplay State Machine JSON"),
+            "unexpected invalid fixture error: {invalid}"
+        );
+
+        let bad_transition = r#"{
+          "schemaVersion":"gameplay-state-machine.v1",
+          "statePackId":"bad-transition-pack",
+          "scope":"local-fixture",
+          "status":"ready",
+          "stateMachines":[{"id":"bad","label":"Bad","status":"ready","target":{"entityId":"player"},"initialStateId":"idle","states":[{"id":"idle","label":"Idle","entryActions":[],"exitActions":[],"blockedReasons":[]}],"transitions":[{"id":"to-missing","label":"Bad","from":"idle","to":"missing","trigger":{"kind":"on_input","inputActionId":"dash"},"guards":[],"actions":[]}],"evidenceRefs":[],"blockedReasons":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let transition_error = GameplayStateMachineArtifact::from_json_str(bad_transition)
+            .expect_err("transitions must reference declared states");
+        assert!(transition_error.to_string().contains("declared states"));
+    }
+
+    #[test]
+    fn gameplay_state_machine_v1_docs_audit_no_script_boundary() {
+        let doc = include_str!("../../../docs/gameplay-state-machine-v1.md");
+        assert!(doc.contains("Issue: #614"));
+        assert!(doc.contains("structured data contract"));
+        assert!(doc.contains("player dash readiness"));
+        assert!(doc.contains("does not authorize arbitrary"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#614 — State Machine and Ability Action Model v1"));
+        assert!(scope.contains("state machines describe permitted states"));
     }
 
     #[test]

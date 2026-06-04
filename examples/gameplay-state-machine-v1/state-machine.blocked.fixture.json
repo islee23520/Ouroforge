@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "gameplay-state-machine.v1",
+  "statePackId": "demo-state-machines-blocked",
+  "scope": "local-fixture",
+  "status": "blocked",
+  "stateMachines": [
+    {
+      "id": "guard-alert-state-blocked",
+      "label": "Guard patrol alert",
+      "status": "blocked",
+      "target": {
+        "entityId": "guard-a",
+        "componentId": "ai"
+      },
+      "initialStateId": "patrol",
+      "states": [
+        {
+          "id": "patrol",
+          "label": "Patrol",
+          "entryActions": [
+            {
+              "kind": "play_animation",
+              "animationId": "walk"
+            }
+          ],
+          "exitActions": [],
+          "blockedReasons": []
+        },
+        {
+          "id": "alert",
+          "label": "Alert",
+          "entryActions": [
+            {
+              "kind": "emit_signal",
+              "signalName": "guard_alert"
+            }
+          ],
+          "exitActions": [],
+          "blockedReasons": []
+        }
+      ],
+      "transitions": [
+        {
+          "id": "patrol-to-alert",
+          "label": "Contact triggers alert",
+          "from": "patrol",
+          "to": "alert",
+          "trigger": {
+            "kind": "on_event",
+            "eventType": "collision_contact"
+          },
+          "guards": [
+            {
+              "kind": "entity_alive",
+              "entityId": "guard-a"
+            }
+          ],
+          "actions": [
+            {
+              "kind": "set_flag",
+              "flag": "guard_alerted",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-state-machine-v1.md"
+      ],
+      "blockedReasons": [
+        "Alert runtime evidence belongs to #614 GL10.4.3."
+      ]
+    }
+  ],
+  "evidenceRefs": [
+    "docs/gameplay-state-machine-v1.md"
+  ],
+  "blockedReasons": [
+    "Runtime evidence compatibility is not complete until GL10.4.3."
+  ]
+}

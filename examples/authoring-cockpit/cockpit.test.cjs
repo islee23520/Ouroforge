@@ -1614,6 +1614,23 @@ assert.match(gameplayEventSignalDoc, /read-only, no runtime execution, no\s+scri
 assert.match(gameplayEventSignalDoc, /#1 remains the roadmap\/final-goal anchor/);
 assert.match(gameplayEventSignalDoc, /#23 remains the\s+memory\/governance anchor/);
 assert.doesNotMatch(gameplayEventSignalDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
+const gameplayStateMachineDoc = fs.readFileSync(require.resolve('../../docs/gameplay-state-machine-v1.md'), 'utf8');
+const gameplayStateMachineFixture = JSON.parse(fs.readFileSync(require.resolve('../../examples/gameplay-state-machine-v1/state-machine.valid.fixture.json'), 'utf8'));
+assert.equal(gameplayStateMachineFixture.schemaVersion, 'gameplay-state-machine.v1');
+assert.deepEqual(gameplayStateMachineFixture.stateMachines.map((machine) => machine.id), [
+  'player-dash-state',
+  'guard-alert-state',
+  'door-lock-state'
+]);
+assert.doesNotMatch(JSON.stringify(gameplayStateMachineFixture), /execute_script|plugin_loader|dynamic_import|eval\(|commandBridge|trustedWrite/);
+assert.match(docsReadme, /gameplay-state-machine-v1\.md/);
+assert.match(docsReadme, /structured state-machine artifact schema/);
+assert.match(gameplayStateMachineDoc, /Issue: #614/);
+assert.match(gameplayStateMachineDoc, /GL10\.4\.1 defines the state-machine model and validation fixtures only/);
+assert.match(gameplayStateMachineDoc, /does not authorize arbitrary JS\/Rust\/Python\/Lua\/WASM\s+execution/);
+assert.match(gameplayStateMachineDoc, /#1 remains the roadmap\/final-goal anchor/);
+assert.match(gameplayStateMachineDoc, /#23 remains the\s+memory\/governance anchor/);
+assert.doesNotMatch(gameplayStateMachineDoc, /script runtime is implemented|eval is allowed|plugin loader is supported|command bridge enabled|trusted browser write enabled/);
 const studio3dInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-3d-inspection-surface-v1.md'), 'utf8');
 assert.match(studio3dInspectionDoc, /Issue: #607/);
 assert.match(studio3dInspectionDoc, /no-write, no-command, no-3D-editor boundary/);

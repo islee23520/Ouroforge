@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "gameplay-state-machine.v1",
+  "statePackId": "demo-state-machines-partial",
+  "scope": "local-fixture",
+  "status": "partial",
+  "stateMachines": [
+    {
+      "id": "player-dash-state-partial",
+      "label": "Player dash readiness",
+      "status": "partial",
+      "target": {
+        "entityId": "player",
+        "componentId": "movement"
+      },
+      "initialStateId": "ready",
+      "states": [
+        {
+          "id": "ready",
+          "label": "Dash ready",
+          "entryActions": [
+            {
+              "kind": "emit_signal",
+              "signalName": "dash_ready"
+            }
+          ],
+          "exitActions": [],
+          "blockedReasons": []
+        },
+        {
+          "id": "cooldown",
+          "label": "Dash cooldown",
+          "entryActions": [
+            {
+              "kind": "start_cooldown",
+              "cooldownId": "dash",
+              "durationMs": 500
+            }
+          ],
+          "exitActions": [],
+          "blockedReasons": []
+        }
+      ],
+      "transitions": [
+        {
+          "id": "dash-starts-cooldown",
+          "label": "Dash consumes readiness",
+          "from": "ready",
+          "to": "cooldown",
+          "trigger": {
+            "kind": "on_input",
+            "inputActionId": "dash"
+          },
+          "guards": [
+            {
+              "kind": "cooldown_ready",
+              "cooldownId": "dash"
+            }
+          ],
+          "actions": [
+            {
+              "kind": "emit_signal",
+              "signalName": "dash_started"
+            }
+          ]
+        },
+        {
+          "id": "dash-cooldown-ready",
+          "label": "Dash cooldown returns ready",
+          "from": "cooldown",
+          "to": "ready",
+          "trigger": {
+            "kind": "on_timer",
+            "timerId": "dash-cooldown"
+          },
+          "guards": [],
+          "actions": [
+            {
+              "kind": "emit_signal",
+              "signalName": "dash_ready"
+            }
+          ]
+        }
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-state-machine-v1.md"
+      ],
+      "blockedReasons": [
+        "Ability cost integration belongs to #614 GL10.4.2."
+      ]
+    }
+  ],
+  "evidenceRefs": [
+    "docs/gameplay-state-machine-v1.md"
+  ],
+  "blockedReasons": []
+}
