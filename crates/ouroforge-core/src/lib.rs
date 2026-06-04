@@ -34278,6 +34278,68 @@ pub struct EvaluationVerdict {
     pub metadata: serde_json::Value,
 }
 
+const SCENE3D_SCENARIO_EVIDENCE_FIELDS: &[&str] = &[
+    "scene3d_camera",
+    "scene3d_animation",
+    "scene3d_probe",
+    "scene3d_transform",
+    "scene3d_render",
+    "scene3d_collision",
+];
+
+fn validate_scene3d_scenario_evidence_ref(
+    run_dir: &Path,
+    result: &serde_json::Value,
+    path: &str,
+    evidence_field: &str,
+    target: Option<&str>,
+    failures: &mut Vec<serde_json::Value>,
+) {
+    let full_path = run_dir.join(path);
+    if !full_path.is_file() {
+        let mut failure = json!({
+            "kind": "missing_scenario_evidence",
+            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+            "path": path,
+            "evidence_field": evidence_field
+        });
+        if let Some(target) = target {
+            failure["target"] = json!(target);
+        }
+        failures.push(failure);
+        return;
+    }
+    match read_json_value(&full_path) {
+        Ok(value) if value.is_object() => {}
+        Ok(value) => {
+            let mut failure = json!({
+                "kind": "malformed_scenario_evidence",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "evidence_field": evidence_field,
+                "reason": format!("expected JSON object, found {}", json_type_name(&value))
+            });
+            if let Some(target) = target {
+                failure["target"] = json!(target);
+            }
+            failures.push(failure);
+        }
+        Err(error) => {
+            let mut failure = json!({
+                "kind": "malformed_scenario_evidence",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "evidence_field": evidence_field,
+                "reason": error.to_string()
+            });
+            if let Some(target) = target {
+                failure["target"] = json!(target);
+            }
+            failures.push(failure);
+        }
+    }
+}
+
 pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     let run_dir = run_dir.as_ref();
     let evidence = read_evidence_index(run_dir)?;
@@ -34427,46 +34489,56 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 None => {}
             }
         }
-        for evidence_field in ["scene3d_camera", "scene3d_animation"] {
+        for evidence_field in SCENE3D_SCENARIO_EVIDENCE_FIELDS {
             if let Some(path) = result
                 .get("evidence")
                 .and_then(|evidence| evidence.get(evidence_field))
                 .and_then(|value| value.as_str())
             {
-                if !run_dir.join(path).is_file() {
-                    failures.push(json!({
-                        "kind": "missing_scenario_evidence",
-                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                        "path": path,
-                        "evidence_field": evidence_field
-                    }));
-                }
+                validate_scene3d_scenario_evidence_ref(
+                    run_dir,
+                    result,
+                    path,
+                    evidence_field,
+                    None,
+                    &mut failures,
+                );
             }
         }
         if let Some(assertions) = result.get("assertions").and_then(|value| value.as_array()) {
-            for evidence_field in ["scene3d_camera", "scene3d_animation"] {
-                for assertion in assertions.iter().filter(|assertion| {
-                    assertion.get("target").and_then(|value| value.as_str()) == Some(evidence_field)
-                }) {
-                    match assertion.get("evidence_ref").and_then(|value| value.as_str()) {
-                        Some(path) if !run_dir.join(path).is_file() => {
-                            failures.push(json!({
-                                "kind": "missing_scenario_evidence",
-                                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                                "path": path,
-                                "evidence_field": evidence_field,
-                                "target": evidence_field
-                            }));
-                        }
-                        Some(_) => {}
-                        None => failures.push(json!({
-                            "kind": "missing_scenario_evidence",
-                            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
-                            "evidence_field": evidence_field,
-                            "target": evidence_field,
-                            "reason": "assertion_evidence_ref_absent_or_non_string"
-                        })),
-                    }
+            for assertion in assertions {
+                let Some(target) = assertion.get("target").and_then(|value| value.as_str()) else {
+                    continue;
+                };
+                if !target.starts_with("scene3d_") {
+                    continue;
+                }
+                if !SCENE3D_SCENARIO_EVIDENCE_FIELDS.contains(&target) {
+                    failures.push(json!({
+                        "kind": "unsupported_scenario_assertion_target",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path,
+                        "target": target,
+                        "reason": "unsupported_scene3d_assertion_target"
+                    }));
+                    continue;
+                }
+                match assertion.get("evidence_ref").and_then(|value| value.as_str()) {
+                    Some(path) => validate_scene3d_scenario_evidence_ref(
+                        run_dir,
+                        result,
+                        path,
+                        target,
+                        Some(target),
+                        &mut failures,
+                    ),
+                    None => failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "evidence_field": target,
+                        "target": target,
+                        "reason": "assertion_evidence_ref_absent_or_non_string"
+                    })),
                 }
             }
         }
@@ -36382,6 +36454,46 @@ fn run_scenario<T: CdpTransport>(
         unix_millis()?,
         &scene3d_animation_source,
     )?;
+    let scene3d_probe_source = scene3d_probe_evidence_from_world_state(&world_state);
+    let scene3d_probe_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "scene3d-probe-evidence",
+        "scene3d_probe",
+        unix_millis()?,
+        &scene3d_probe_source,
+    )?;
+    let scene3d_transform_source = scene3d_transform_evidence_from_world_state(&world_state);
+    let scene3d_transform_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "scene3d-transform-evidence",
+        "scene3d_transform",
+        unix_millis()?,
+        &scene3d_transform_source,
+    )?;
+    let scene3d_render_source = scene3d_render_evidence_from_world_state(&world_state);
+    let scene3d_render_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "scene3d-render-evidence",
+        "scene3d_render",
+        unix_millis()?,
+        &scene3d_render_source,
+    )?;
+    let scene3d_collision_source = scene3d_collision_evidence_from_world_state(&world_state);
+    let scene3d_collision_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "scene3d-collision-evidence",
+        "scene3d_collision",
+        unix_millis()?,
+        &scene3d_collision_source,
+    )?;
     let assertion_sources = ScenarioAssertionSources {
         world_state: AssertionSource {
             value: &world_state,
@@ -36446,28 +36558,20 @@ fn run_scenario<T: CdpTransport>(
             evidence_ref: &scene3d_animation_path,
         },
         scene3d_probe: AssertionSource {
-            value: world_state
-                .get("scene3dProbe")
-                .unwrap_or(&serde_json::Value::Null),
-            evidence_ref: &world_state_path,
+            value: &scene3d_probe_source,
+            evidence_ref: &scene3d_probe_path,
         },
         scene3d_transform: AssertionSource {
-            value: world_state
-                .get("scene3dTransforms")
-                .unwrap_or(&serde_json::Value::Null),
-            evidence_ref: &world_state_path,
+            value: &scene3d_transform_source,
+            evidence_ref: &scene3d_transform_path,
         },
         scene3d_render: AssertionSource {
-            value: world_state
-                .get("scene3dRender")
-                .unwrap_or(&serde_json::Value::Null),
-            evidence_ref: &world_state_path,
+            value: &scene3d_render_source,
+            evidence_ref: &scene3d_render_path,
         },
         scene3d_collision: AssertionSource {
-            value: world_state
-                .get("scene3dCollision")
-                .unwrap_or(&serde_json::Value::Null),
-            evidence_ref: &world_state_path,
+            value: &scene3d_collision_source,
+            evidence_ref: &scene3d_collision_path,
         },
     };
     let assertions = evaluate_scenario_assertions(scenario, &assertion_sources);
@@ -36520,6 +36624,10 @@ fn run_scenario<T: CdpTransport>(
                 "transition_evidence": transition_path.clone(),
                 "scene3d_camera": scene3d_camera_path.clone(),
                 "scene3d_animation": scene3d_animation_path.clone(),
+                "scene3d_probe": scene3d_probe_path.clone(),
+                "scene3d_transform": scene3d_transform_path.clone(),
+                "scene3d_render": scene3d_render_path.clone(),
+                "scene3d_collision": scene3d_collision_path.clone(),
                 "audio_evidence": audio_path.clone(),
                 "vfx_evidence": vfx_path.clone(),
                 "asset_load_evidence": asset_load_paths.clone(),
@@ -36555,6 +36663,10 @@ fn run_scenario<T: CdpTransport>(
             "transition_evidence_path": transition_path.clone(),
             "scene3d_camera_path": scene3d_camera_path.clone(),
             "scene3d_animation_path": scene3d_animation_path.clone(),
+            "scene3d_probe_path": scene3d_probe_path.clone(),
+            "scene3d_transform_path": scene3d_transform_path.clone(),
+            "scene3d_render_path": scene3d_render_path.clone(),
+            "scene3d_collision_path": scene3d_collision_path.clone(),
             "audio_evidence_path": audio_path.clone(),
             "vfx_evidence_path": vfx_path.clone(),
             "asset_load_evidence_paths": asset_load_paths.clone(),
@@ -36572,6 +36684,10 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.push(transition_path);
     evidence_paths.push(scene3d_camera_path);
     evidence_paths.push(scene3d_animation_path);
+    evidence_paths.push(scene3d_probe_path);
+    evidence_paths.push(scene3d_transform_path);
+    evidence_paths.push(scene3d_render_path);
+    evidence_paths.push(scene3d_collision_path);
     evidence_paths.push(audio_path);
     evidence_paths.push(vfx_path);
     evidence_paths.extend(asset_load_paths);
@@ -36739,6 +36855,140 @@ fn scene3d_animation_evidence_from_world_state(
             "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "playback mutation", "animation editor tooling"]
         }
     })
+}
+
+fn scene3d_probe_evidence_from_world_state(world_state: &serde_json::Value) -> serde_json::Value {
+    match world_state.get("scene3dProbe") {
+        Some(value) if value.is_object() => value.clone(),
+        Some(value) => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+            "malformedState": format!("scene3dProbe must be a JSON object, found {}", json_type_name(value)),
+            "status": "malformed",
+            "nodeCount": 0,
+            "cameraCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D probe scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "engine parity claim"]
+            }
+        }),
+        None => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+            "emptyState": "No scene3d probe evidence is available in world state.",
+            "status": "missing",
+            "nodeCount": 0,
+            "cameraCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D probe scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "engine parity claim"]
+            }
+        }),
+    }
+}
+
+fn scene3d_transform_evidence_from_world_state(
+    world_state: &serde_json::Value,
+) -> serde_json::Value {
+    match world_state.get("scene3dTransforms") {
+        Some(value) if value.is_object() => value.clone(),
+        Some(value) => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-transform-probe.v1",
+            "malformedState": format!("scene3dTransforms must be a JSON object, found {}", json_type_name(value)),
+            "nodeCount": 0,
+            "transformCount": 0,
+            "transforms": [],
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D transform scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "transform editor tooling"]
+            }
+        }),
+        None => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-transform-probe.v1",
+            "emptyState": "No scene3d transform evidence is available in world state.",
+            "nodeCount": 0,
+            "transformCount": 0,
+            "transforms": [],
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D transform scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "transform editor tooling"]
+            }
+        }),
+    }
+}
+
+fn scene3d_render_evidence_from_world_state(world_state: &serde_json::Value) -> serde_json::Value {
+    match world_state.get("scene3dRender") {
+        Some(value) if value.is_object() => value.clone(),
+        Some(value) => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+            "malformedState": format!("scene3dRender must be a JSON object, found {}", json_type_name(value)),
+            "attemptedObjectCount": 0,
+            "visibleObjectCount": 0,
+            "skippedObjectCount": 0,
+            "failedObjectCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D render scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "production renderer claim"]
+            }
+        }),
+        None => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+            "emptyState": "No scene3d render evidence is available in world state.",
+            "attemptedObjectCount": 0,
+            "visibleObjectCount": 0,
+            "skippedObjectCount": 0,
+            "failedObjectCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D render scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "production renderer claim"]
+            }
+        }),
+    }
+}
+
+fn scene3d_collision_evidence_from_world_state(
+    world_state: &serde_json::Value,
+) -> serde_json::Value {
+    match world_state.get("scene3dCollision") {
+        Some(value) if value.is_object() => value.clone(),
+        Some(value) => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-collision-evidence.v1",
+            "malformedState": format!("scene3dCollision must be a JSON object, found {}", json_type_name(value)),
+            "events": [],
+            "contactCount": 0,
+            "triggerCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D collision scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "full 3D physics engine claim"]
+            }
+        }),
+        None => json!({
+            "present": false,
+            "schemaVersion": "ouroforge.scene3d-collision-evidence.v1",
+            "emptyState": "No scene3d collision evidence is available in world state.",
+            "events": [],
+            "contactCount": 0,
+            "triggerCount": 0,
+            "readOnlyInspection": {
+                "trustedEmitter": "scenario-runtime-probe",
+                "browserStudioMode": "read-only 3D collision scenario evidence",
+                "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "full 3D physics engine claim"]
+            }
+        }),
+    }
 }
 
 fn pending_replay_artifacts_from_replay(
@@ -67148,6 +67398,219 @@ scenarios:
             failure["kind"] == "missing_scenario_evidence"
                 && failure["evidence_field"] == "scene3d_animation"
                 && failure["target"] == "scene3d_animation"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_accepts_scene3d_probe_render_collision_assertions_with_existing_evidence() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-scene3d-evidence-pass-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        let scene3d_evidence = [
+            (
+                "scene3d_probe",
+                "evidence/scenarios/bootstrap-smoke/scene3d-probe-evidence.json",
+                json!({
+                    "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+                    "present": true,
+                    "status": "present",
+                    "nodeCount": 2
+                }),
+            ),
+            (
+                "scene3d_transform",
+                "evidence/scenarios/bootstrap-smoke/scene3d-transform-evidence.json",
+                json!({
+                    "schemaVersion": "ouroforge.scene3d-transform-probe.v1",
+                    "present": true,
+                    "transforms": [{ "nodeId": "cube-node", "worldTransform": { "translation": { "x": 1, "y": 2, "z": 3 } } }],
+                    "transformCount": 1
+                }),
+            ),
+            (
+                "scene3d_render",
+                "evidence/scenarios/bootstrap-smoke/scene3d-render-evidence.json",
+                json!({
+                    "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+                    "present": true,
+                    "visibleObjectCount": 1,
+                    "failedObjectCount": 0
+                }),
+            ),
+            (
+                "scene3d_collision",
+                "evidence/scenarios/bootstrap-smoke/scene3d-collision-evidence.json",
+                json!({
+                    "schemaVersion": "ouroforge.scene3d-collision-evidence.v1",
+                    "present": true,
+                    "triggerCount": 1,
+                    "events": [{ "type": "runtime.scene3d.collision.trigger", "pairId": "goal:player" }]
+                }),
+            ),
+        ];
+        for (artifact, path, body) in scene3d_evidence {
+            fs::write(
+                artifacts.run_dir.join(path),
+                serde_json::to_string_pretty(&body).expect("scene3d evidence serializes"),
+            )
+            .expect("scene3d evidence written");
+            add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("fixture-{artifact}"),
+                "application/json",
+                path,
+                json!({ "artifact": artifact, "scenario_id": "bootstrap-smoke" }),
+            )
+            .expect("scene3d evidence indexed");
+        }
+        let result_path = artifacts
+            .run_dir
+            .join("evidence/scenarios/bootstrap-smoke/scenario-result.json");
+        let mut result = read_json_value(&result_path).expect("scenario result reads");
+        result["evidence"]["scene3d_probe"] =
+            json!("evidence/scenarios/bootstrap-smoke/scene3d-probe-evidence.json");
+        result["evidence"]["scene3d_transform"] =
+            json!("evidence/scenarios/bootstrap-smoke/scene3d-transform-evidence.json");
+        result["evidence"]["scene3d_render"] =
+            json!("evidence/scenarios/bootstrap-smoke/scene3d-render-evidence.json");
+        result["evidence"]["scene3d_collision"] =
+            json!("evidence/scenarios/bootstrap-smoke/scene3d-collision-evidence.json");
+        result["assertions"] = json!([
+            {
+                "target": "scene3d_probe",
+                "path": "status",
+                "operator": "equals",
+                "expected": "present",
+                "actual": "present",
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/scene3d-probe-evidence.json"
+            },
+            {
+                "target": "scene3d_transform",
+                "path": "transforms.0.nodeId",
+                "operator": "equals",
+                "expected": "cube-node",
+                "actual": "cube-node",
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/scene3d-transform-evidence.json"
+            },
+            {
+                "target": "scene3d_render",
+                "path": "visibleObjectCount",
+                "operator": "greaterThan",
+                "expected": 0,
+                "actual": 1,
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/scene3d-render-evidence.json"
+            },
+            {
+                "target": "scene3d_collision",
+                "path": "triggerCount",
+                "operator": "equals",
+                "expected": 1,
+                "actual": 1,
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/scene3d-collision-evidence.json"
+            }
+        ]);
+        fs::write(
+            &result_path,
+            serde_json::to_string_pretty(&result).expect("scenario result serializes"),
+        )
+        .expect("scenario result updated");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "passed");
+        assert!(verdict.failures.is_empty());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_rejects_missing_and_malformed_scene3d_probe_render_evidence_refs() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-scene3d-missing-malformed-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        let malformed_path = "evidence/scenarios/bootstrap-smoke/scene3d-render-evidence.json";
+        fs::write(artifacts.run_dir.join(malformed_path), "not-json")
+            .expect("malformed render evidence written");
+        let result_path = artifacts
+            .run_dir
+            .join("evidence/scenarios/bootstrap-smoke/scenario-result.json");
+        let mut result = read_json_value(&result_path).expect("scenario result reads");
+        result["evidence"]["scene3d_probe"] =
+            json!("evidence/scenarios/bootstrap-smoke/missing-scene3d-probe.json");
+        result["evidence"]["scene3d_render"] = json!(malformed_path);
+        result["assertions"] = json!([
+            {
+                "target": "scene3d_probe",
+                "path": "status",
+                "operator": "equals",
+                "expected": "present",
+                "actual": "present",
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/missing-scene3d-probe.json"
+            },
+            {
+                "target": "scene3d_render",
+                "path": "visibleObjectCount",
+                "operator": "greaterThan",
+                "expected": 0,
+                "actual": 1,
+                "passed": true,
+                "evidence_ref": malformed_path
+            }
+        ]);
+        fs::write(
+            &result_path,
+            serde_json::to_string_pretty(&result).expect("scenario result serializes"),
+        )
+        .expect("scenario result updated");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict.failures.iter().any(|failure| {
+            failure["kind"] == "missing_scenario_evidence"
+                && failure["evidence_field"] == "scene3d_probe"
+                && failure["target"] == "scene3d_probe"
+        }));
+        assert!(verdict.failures.iter().any(|failure| {
+            failure["kind"] == "malformed_scenario_evidence"
+                && failure["evidence_field"] == "scene3d_render"
+                && failure["target"] == "scene3d_render"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_rejects_unsupported_scene3d_assertion_targets() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-scene3d-unsupported-test");
+        write_scenario_result_fixture(&artifacts.run_dir, "passed");
+        let result_path = artifacts
+            .run_dir
+            .join("evidence/scenarios/bootstrap-smoke/scenario-result.json");
+        let mut result = read_json_value(&result_path).expect("scenario result reads");
+        result["assertions"] = json!([{
+            "target": "scene3d_physics_engine_parity",
+            "path": "productionReady",
+            "operator": "equals",
+            "expected": true,
+            "actual": true,
+            "passed": true,
+            "evidence_ref": "evidence/scenarios/bootstrap-smoke/world-state.json"
+        }]);
+        fs::write(
+            &result_path,
+            serde_json::to_string_pretty(&result).expect("scenario result serializes"),
+        )
+        .expect("scenario result updated");
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict.failures.iter().any(|failure| {
+            failure["kind"] == "unsupported_scenario_assertion_target"
+                && failure["target"] == "scene3d_physics_engine_parity"
         }));
         fs::remove_dir_all(root).ok();
     }
