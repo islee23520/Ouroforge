@@ -13,8 +13,9 @@ A queue uses `schemaVersion: qa-agent-work-queue-v1` and includes:
 - `queueId`, `milestone`, and `items`;
 - per-item `queueItemId`, `scenarioTarget`, `riskArea`, `runCommandContext`,
   `expectedEvidence`, `priority`, assigned role/agent, `status`, optional
-  `failureClassification`, task/work-package refs, review gate refs, run and
-  evaluator evidence refs, blocked reasons, and stale run refs;
+  `statusTransition`, optional `failureClassification`, task/work-package refs,
+  review gate refs, run and evaluator evidence refs, blocked reasons, and stale
+  run refs;
 - generated-state roots, guardrails, forbidden actions, and boundary text.
 
 Supported statuses are `pass`, `fail`, `deferred`, `blocked`, `flaky`, and
@@ -47,6 +48,27 @@ Rust/local validation owns trusted queue validation. Browser, dashboard, Studio,
 and cockpit surfaces may display escaped read-only queue summaries only. QA
 outputs remain untrusted until Rust/local validation and accepted review decide
 whether they feed fixes, reruns, or later promotion gates.
+
+## MAP13.9.2 validation rules
+
+Rust validation rejects queue drift before a QA queue can be trusted as local
+evidence:
+
+- `scenarioTarget.scenarioPackRef` must identify a scenario pack JSON fixture or
+  source-like scenario pack, not generated run or dashboard state.
+- `runCommandContext` is inert text only and rejects mutation, apply, merge,
+  publish, deploy, install, dependency mutation, release, credentialed, network
+  fetch, and file-mutating command words such as `gh pr merge`, `git push`,
+  `npm install`, `cargo add`, `curl`, `ssh`, `rm`, or `chmod`.
+- `expectedEvidence` must be unique, remain under generated QA roots, and include
+  scenario plus evaluator expectations; observed run/evaluator evidence refs must
+  also remain under generated QA roots.
+- `staleRunRefs` are explicit generated-root paths, must not duplicate current
+  run/evaluator evidence refs, and `needs-rerun` items require
+  `failureClassification: stale-run-ref`.
+- Optional `statusTransition` is state-machine metadata only. Its `to` status
+  must match the item `status`, and invalid terminal or mutation-shaped jumps
+  such as `pass -> fail` are rejected.
 
 ## Generated-state policy
 

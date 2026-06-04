@@ -14097,6 +14097,12 @@ pub struct QaAgentWorkQueueItem {
     pub assigned_agent: String,
     pub status: QaAgentQueueStatus,
     #[serde(
+        rename = "statusTransition",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub status_transition: Option<QaAgentQueueStatusTransition>,
+    #[serde(
         rename = "failureClassification",
         default,
         skip_serializing_if = "Option::is_none"
@@ -14164,6 +14170,13 @@ pub struct QaAgentRunCommandContext {
     pub boundary: String,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentQueueStatusTransition {
+    pub from: QaAgentQueueStatus,
+    pub to: QaAgentQueueStatus,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum QaAgentQueuePriority {
@@ -14216,8 +14229,9 @@ impl QaAgentWorkQueueArtifact {
             return Err(anyhow!("qa agent work queue items must not be empty"));
         }
         let mut item_ids = BTreeSet::new();
+        self.generated_state.validate()?;
         for (index, item) in self.items.iter().enumerate() {
-            item.validate(index)?;
+            item.validate(index, &self.generated_state)?;
             if !item_ids.insert(item.queue_item_id.as_str()) {
                 return Err(anyhow!(
                     "duplicate qa agent work queue queueItemId: {}",
@@ -14225,7 +14239,6 @@ impl QaAgentWorkQueueArtifact {
                 ));
             }
         }
-        self.generated_state.validate()?;
         validate_nonempty_text_list("qa agent work queue guardrails", &self.guardrails)?;
         validate_nonempty_text_list(
             "qa agent work queue forbiddenActions",
@@ -14279,7 +14292,11 @@ impl QaAgentWorkQueueArtifact {
 }
 
 impl QaAgentWorkQueueItem {
-    fn validate(&self, index: usize) -> Result<()> {
+    fn validate(
+        &self,
+        index: usize,
+        generated_state: &AuthoringLoopGeneratedStatePolicy,
+    ) -> Result<()> {
         validate_path_component(
             &format!("qa agent work queue items[{index}].queueItemId"),
             &self.queue_item_id,
@@ -14296,6 +14313,7 @@ impl QaAgentWorkQueueItem {
             &format!("qa agent work queue items[{index}].expectedEvidence"),
             &self.expected_evidence,
         )?;
+        self.validate_expected_evidence(index, generated_state)?;
         validate_path_component(
             &format!("qa agent work queue items[{index}].assignedRole"),
             &self.assigned_role,
@@ -14324,11 +14342,126 @@ impl QaAgentWorkQueueItem {
             &format!("qa agent work queue items[{index}].blockedReasons"),
             &self.blocked_reasons,
         )?;
+        self.validate_stale_run_refs(index, generated_state)?;
+        if let Some(transition) = &self.status_transition {
+            transition.validate(index, self.status)?;
+        }
+        self.validate_status_shape()
+    }
+
+    fn validate_expected_evidence(
+        &self,
+        index: usize,
+        generated_state: &AuthoringLoopGeneratedStatePolicy,
+    ) -> Result<()> {
+        let mut expected_ids = BTreeSet::new();
+        let mut expected_paths = BTreeSet::new();
+        for (evidence_index, reference) in self.expected_evidence.iter().enumerate() {
+            if !expected_ids.insert(reference.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa agent work queue items[{index}].expectedEvidence id: {}",
+                    reference.id
+                ));
+            }
+            if !expected_paths.insert(reference.path.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa agent work queue items[{index}].expectedEvidence path: {}",
+                    reference.path
+                ));
+            }
+            if !generated_state.roots.iter().any(|root| {
+                reference.path == *root || reference.path.starts_with(&format!("{root}/"))
+            }) {
+                return Err(anyhow!(
+                    "qa agent work queue items[{index}].expectedEvidence[{evidence_index}] must stay under generated QA roots"
+                ));
+            }
+        }
+        let expected_text = self
+            .expected_evidence
+            .iter()
+            .map(|reference| {
+                format!(
+                    "{} {} {}",
+                    reference.id,
+                    reference.path,
+                    reference.description.clone().unwrap_or_default()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase();
+        if !expected_text.contains("scenario") || !expected_text.contains("evaluator") {
+            return Err(anyhow!(
+                "qa agent work queue items[{index}].expectedEvidence must include scenario and evaluator evidence expectations"
+            ));
+        }
+        for (field, refs) in [
+            ("runEvidenceRefs", self.run_evidence_refs.as_slice()),
+            (
+                "evaluatorEvidenceRefs",
+                self.evaluator_evidence_refs.as_slice(),
+            ),
+        ] {
+            for (ref_index, reference) in refs.iter().enumerate() {
+                if !generated_state.roots.iter().any(|root| {
+                    reference.path == *root || reference.path.starts_with(&format!("{root}/"))
+                }) {
+                    return Err(anyhow!(
+                        "qa agent work queue items[{index}].{field}[{ref_index}] must stay under generated QA roots"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_stale_run_refs(
+        &self,
+        index: usize,
+        generated_state: &AuthoringLoopGeneratedStatePolicy,
+    ) -> Result<()> {
         validate_optional_text_list(
             &format!("qa agent work queue items[{index}].staleRunRefs"),
             &self.stale_run_refs,
         )?;
-        self.validate_status_shape()
+        let live_run_paths = self
+            .run_evidence_refs
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .chain(
+                self.evaluator_evidence_refs
+                    .iter()
+                    .map(|reference| reference.path.as_str()),
+            )
+            .collect::<BTreeSet<_>>();
+        let mut stale_paths = BTreeSet::new();
+        for (stale_index, stale_ref) in self.stale_run_refs.iter().enumerate() {
+            validate_project_manifest_path(
+                &format!("qa agent work queue items[{index}].staleRunRefs[{stale_index}]"),
+                stale_ref,
+            )?;
+            if !generated_state
+                .roots
+                .iter()
+                .any(|root| stale_ref == root || stale_ref.starts_with(&format!("{root}/")))
+            {
+                return Err(anyhow!(
+                    "qa agent work queue items[{index}].staleRunRefs[{stale_index}] must stay under generated QA roots"
+                ));
+            }
+            if !stale_paths.insert(stale_ref.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa agent work queue items[{index}].staleRunRefs path: {stale_ref}"
+                ));
+            }
+            if live_run_paths.contains(stale_ref.as_str()) {
+                return Err(anyhow!(
+                    "qa agent work queue items[{index}].staleRunRefs[{stale_index}] must not duplicate current evidence refs"
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn validate_status_shape(&self) -> Result<()> {
@@ -14380,6 +14513,11 @@ impl QaAgentWorkQueueItem {
                 }
             }
             QaAgentQueueStatus::NeedsRerun => {
+                if self.failure_classification != Some(QaAgentFailureClassification::StaleRunRef) {
+                    return Err(anyhow!(
+                        "needs-rerun qa agent work queue item requires stale-run-ref failureClassification"
+                    ));
+                }
                 if self.stale_run_refs.is_empty() && self.blocked_reasons.is_empty() {
                     return Err(anyhow!(
                         "needs-rerun qa agent work queue item requires staleRunRefs or blockedReasons"
@@ -14395,7 +14533,34 @@ impl QaAgentScenarioTarget {
     fn validate(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field}.scenarioId"), &self.scenario_id)?;
         self.scenario_pack_ref
-            .validate(&format!("{field}.scenarioPackRef"))
+            .validate(&format!("{field}.scenarioPackRef"))?;
+        let pack_path = self.scenario_pack_ref.path.to_ascii_lowercase();
+        let pack_text = format!(
+            "{} {} {}",
+            self.scenario_pack_ref.id,
+            self.scenario_pack_ref.path,
+            self.scenario_pack_ref
+                .description
+                .clone()
+                .unwrap_or_default()
+        )
+        .to_ascii_lowercase();
+        if !pack_text.contains("scenario") {
+            return Err(anyhow!(
+                "{field}.scenarioPackRef must identify a scenario pack target"
+            ));
+        }
+        if !(pack_path.ends_with(".json") || pack_path.ends_with(".scenarios.json")) {
+            return Err(anyhow!(
+                "{field}.scenarioPackRef path must point to a JSON scenario pack"
+            ));
+        }
+        if pack_path.starts_with("runs/") || pack_path.starts_with("dashboard-data/") {
+            return Err(anyhow!(
+                "{field}.scenarioPackRef must not point at generated run or dashboard state"
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -14404,6 +14569,45 @@ impl QaAgentRiskArea {
         validate_path_component(&format!("{field}.riskId"), &self.risk_id)?;
         validate_path_component(&format!("{field}.category"), &self.category)?;
         require_bounded_display_text(&format!("{field}.summary"), &self.summary)
+    }
+}
+
+impl QaAgentQueueStatus {
+    fn can_transition_to(self, next: Self) -> bool {
+        match (self, next) {
+            (current, next) if current == next => true,
+            (QaAgentQueueStatus::Deferred, QaAgentQueueStatus::NeedsRerun)
+            | (QaAgentQueueStatus::Deferred, QaAgentQueueStatus::Blocked)
+            | (QaAgentQueueStatus::Blocked, QaAgentQueueStatus::Deferred)
+            | (QaAgentQueueStatus::Blocked, QaAgentQueueStatus::NeedsRerun)
+            | (QaAgentQueueStatus::NeedsRerun, QaAgentQueueStatus::Pass)
+            | (QaAgentQueueStatus::NeedsRerun, QaAgentQueueStatus::Fail)
+            | (QaAgentQueueStatus::NeedsRerun, QaAgentQueueStatus::Flaky)
+            | (QaAgentQueueStatus::NeedsRerun, QaAgentQueueStatus::Blocked)
+            | (QaAgentQueueStatus::Fail, QaAgentQueueStatus::NeedsRerun)
+            | (QaAgentQueueStatus::Flaky, QaAgentQueueStatus::NeedsRerun)
+            | (QaAgentQueueStatus::Flaky, QaAgentQueueStatus::Fail)
+            | (QaAgentQueueStatus::Flaky, QaAgentQueueStatus::Pass) => true,
+            _ => false,
+        }
+    }
+}
+
+impl QaAgentQueueStatusTransition {
+    fn validate(&self, index: usize, status: QaAgentQueueStatus) -> Result<()> {
+        if self.to != status {
+            return Err(anyhow!(
+                "qa agent work queue items[{index}].statusTransition.to must match status"
+            ));
+        }
+        if !self.from.can_transition_to(self.to) {
+            return Err(anyhow!(
+                "qa agent work queue items[{index}] invalid status transition {:?} -> {:?}",
+                self.from,
+                self.to
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -14422,10 +14626,53 @@ impl QaAgentRunCommandContext {
             .collect::<Vec<_>>()
             .join(" ")
             .to_ascii_lowercase();
-        for forbidden in [" apply ", " merge ", " publish ", " deploy ", " install "] {
-            if format!(" {combined} ").contains(forbidden) {
+        let command_tokens = combined
+            .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
+            .filter(|token| !token.is_empty())
+            .collect::<BTreeSet<_>>();
+        for forbidden in [
+            "apply",
+            "apply-scene",
+            "merge",
+            "publish",
+            "deploy",
+            "install",
+            "mutation",
+            "add",
+            "remove",
+            "rm",
+            "mv",
+            "push",
+            "commit",
+            "workflow",
+            "release",
+            "chmod",
+            "curl",
+            "wget",
+            "ssh",
+            "scp",
+            "sudo",
+        ] {
+            if command_tokens.contains(forbidden) {
                 return Err(anyhow!(
-                    "qa agent work queue runCommandContext must not request mutation, merge, publish, deploy, or install commands"
+                    "qa agent work queue runCommandContext must not request mutation, apply, merge, publish, deploy, install, credentialed, release, or file-mutating commands"
+                ));
+            }
+        }
+        for forbidden_phrase in [
+            "gh pr merge",
+            "gh workflow",
+            "git push",
+            "git commit",
+            "npm install",
+            "pnpm install",
+            "yarn install",
+            "cargo add",
+            "cargo install",
+        ] {
+            if combined.contains(forbidden_phrase) {
+                return Err(anyhow!(
+                    "qa agent work queue runCommandContext must not request mutation, apply, merge, publish, deploy, install, credentialed, release, or file-mutating commands"
                 ));
             }
         }
@@ -54931,6 +55178,103 @@ scenarios:
         let boundary_error = QaAgentWorkQueueArtifact::from_json_str(&unsafe_boundary.to_string())
             .expect_err("unsafe QA queue boundary rejects");
         assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn qa_agent_work_queue_v1_rejects_validation_drift_and_mutation_attempts() {
+        let valid = || -> serde_json::Value {
+            serde_json::from_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+            ))
+            .expect("queue json")
+        };
+
+        let mut generated_scenario_target = valid();
+        generated_scenario_target["items"][0]["scenarioTarget"]["scenarioPackRef"]["path"] =
+            json!("runs/multi-agent-pipeline/generated.scenarios.json");
+        let scenario_error =
+            QaAgentWorkQueueArtifact::from_json_str(&generated_scenario_target.to_string())
+                .expect_err("generated scenario target rejects");
+        assert!(format!("{scenario_error:#}").contains("scenarioPackRef"));
+
+        let mut missing_evaluator_expectation = valid();
+        missing_evaluator_expectation["items"][0]["expectedEvidence"] = json!([
+            {
+                "id": "scenario-result",
+                "path": "runs/multi-agent-pipeline/demo/qa/scenario-result.json",
+                "description": "expected scenario result"
+            }
+        ]);
+        let expectation_error =
+            QaAgentWorkQueueArtifact::from_json_str(&missing_evaluator_expectation.to_string())
+                .expect_err("missing evaluator expectation rejects");
+        assert!(format!("{expectation_error:#}").contains("expectedEvidence"));
+
+        let mut unsafe_run_evidence = valid();
+        unsafe_run_evidence["items"][0]["runEvidenceRefs"][0]["path"] =
+            json!("examples/multi-agent-pipeline-v1/generated-run.json");
+        let run_ref_error =
+            QaAgentWorkQueueArtifact::from_json_str(&unsafe_run_evidence.to_string())
+                .expect_err("run evidence outside generated roots rejects");
+        assert!(format!("{run_ref_error:#}").contains("runEvidenceRefs"));
+
+        let mut mutation_command = valid();
+        mutation_command["items"][0]["runCommandContext"]["command"] =
+            json!("gh pr merge 123 --squash --delete-branch");
+        mutation_command["items"][0]["runCommandContext"]["argv"] =
+            json!(["gh", "pr", "merge", "123", "--squash", "--delete-branch"]);
+        let mutation_error = QaAgentWorkQueueArtifact::from_json_str(&mutation_command.to_string())
+            .expect_err("merge command context rejects");
+        assert!(format!("{mutation_error:#}").contains("runCommandContext"));
+
+        let mut stale_duplicate = serde_json::from_str::<serde_json::Value>(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.stale.fixture.json",
+        ))
+        .expect("stale queue json");
+        stale_duplicate["items"][0]["staleRunRefs"] =
+            json!(["runs/multi-agent-pipeline/demo/qa/scenario-result.json"]);
+        let stale_error = QaAgentWorkQueueArtifact::from_json_str(&stale_duplicate.to_string())
+            .expect_err("stale refs cannot duplicate current evidence");
+        assert!(format!("{stale_error:#}").contains("staleRunRefs"));
+
+        let mut wrong_rerun_classification =
+            serde_json::from_str::<serde_json::Value>(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.stale.fixture.json",
+            ))
+            .expect("stale queue json");
+        wrong_rerun_classification["items"][0]["failureClassification"] = json!("runtime-error");
+        let rerun_error =
+            QaAgentWorkQueueArtifact::from_json_str(&wrong_rerun_classification.to_string())
+                .expect_err("needs-rerun classification rejects");
+        assert!(format!("{rerun_error:#}").contains("stale-run-ref"));
+    }
+
+    #[test]
+    fn qa_agent_work_queue_v1_validates_status_transition_shape() {
+        let mut valid_transition = serde_json::from_str::<serde_json::Value>(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.failed.fixture.json",
+        ))
+        .expect("failed queue json");
+        valid_transition["items"][0]["statusTransition"] =
+            json!({ "from": "needs-rerun", "to": "fail" });
+        QaAgentWorkQueueArtifact::from_json_str(&valid_transition.to_string())
+            .expect("needs-rerun to fail transition is valid");
+
+        let mut invalid_transition = valid_transition.clone();
+        invalid_transition["items"][0]["statusTransition"] =
+            json!({ "from": "pass", "to": "fail" });
+        let transition_error =
+            QaAgentWorkQueueArtifact::from_json_str(&invalid_transition.to_string())
+                .expect_err("pass to fail transition rejects");
+        assert!(format!("{transition_error:#}").contains("invalid status transition"));
+
+        let mut mismatched_transition = valid_transition;
+        mismatched_transition["items"][0]["statusTransition"] =
+            json!({ "from": "needs-rerun", "to": "pass" });
+        let mismatch_error =
+            QaAgentWorkQueueArtifact::from_json_str(&mismatched_transition.to_string())
+                .expect_err("transition target must match status");
+        assert!(format!("{mismatch_error:#}").contains("must match status"));
     }
 
     #[test]
