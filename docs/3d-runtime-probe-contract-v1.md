@@ -142,8 +142,17 @@ PR 3D9.8.2 implements the browser-runtime probe side for the local demo runtime:
 - `getFrameStats()` adds 3D camera, transform, collision, render, and animation
   counters without changing existing 2D counters.
 
+PR 3D9.8.3 implements Rust browser-smoke capture/export compatibility:
+
+- runtime probe capture writes `scene3d-probe` and `scene3d-transforms` artifacts
+  from `getWorldState()` when those embedded fields are object-shaped;
+- 2D/legacy captures continue to emit only the existing world-state/frame-stats
+  probe artifacts;
+- 3D captures with missing or malformed embedded 3D probe fields write explicit
+  generated evidence artifacts with `status: missing` or `status: malformed`
+  instead of silently passing.
+
 ## Implementation handoff
 
-PR 3D9.8.3 may capture/export the fields and add malformed/missing read-model
-tests. Follow-up PRs must keep the same conservative wording, generated-state
+Future follow-up PRs must keep the same conservative wording, generated-state
 audit, 2D compatibility checks, and #1/#23 protection checks.

@@ -21024,13 +21024,14 @@ fn capture_runtime_probe<T: CdpTransport>(
         return Ok(());
     }
 
-    capture_runtime_probe_value(
+    let world_state = capture_runtime_probe_value(
         config,
         client,
         "world-state",
         "getWorldState",
         "window.__OUROFORGE__.getWorldState()",
     )?;
+    capture_scene3d_probe_artifacts(config, &world_state)?;
     capture_runtime_probe_value(
         config,
         client,
@@ -21047,8 +21048,17 @@ fn capture_runtime_probe_value<T: CdpTransport>(
     artifact_name: &str,
     call_name: &str,
     expression: &str,
-) -> Result<()> {
+) -> Result<serde_json::Value> {
     let value = client.evaluate_json(expression)?;
+    write_runtime_probe_artifact(config, artifact_name, call_name, &value)
+}
+
+fn write_runtime_probe_artifact(
+    config: &BrowserSmokeConfig,
+    artifact_name: &str,
+    call_name: &str,
+    value: &serde_json::Value,
+) -> Result<serde_json::Value> {
     let suffix = unix_millis()?;
     let rel_path = config.worker_id.probe_json_path(artifact_name, suffix);
     fs::create_dir_all(config.run_dir.join(config.worker_id.evidence_dir())).with_context(
@@ -21062,7 +21072,7 @@ fn capture_runtime_probe_value<T: CdpTransport>(
             )
         },
     )?;
-    write_json(&config.run_dir.join(&rel_path), &value)?;
+    write_json(&config.run_dir.join(&rel_path), value)?;
     add_evidence_artifact(
         &config.run_dir,
         &format!(
@@ -21098,7 +21108,72 @@ fn capture_runtime_probe_value<T: CdpTransport>(
             }
         }),
     )?;
+    Ok(value.clone())
+}
+
+fn capture_scene3d_probe_artifacts(
+    config: &BrowserSmokeConfig,
+    world_state: &serde_json::Value,
+) -> Result<()> {
+    let scene_kind_3d = world_state
+        .get("sceneKind")
+        .or_else(|| world_state.get("scene_kind"))
+        .and_then(|value| value.as_str())
+        == Some("3d");
+    for (field, artifact_name) in [
+        ("scene3dProbe", "scene3d-probe"),
+        ("scene3dTransforms", "scene3d-transforms"),
+    ] {
+        match world_state.get(field) {
+            Some(value) if value.is_object() => {
+                write_runtime_probe_artifact(config, artifact_name, field, value)?;
+            }
+            Some(value) if scene_kind_3d => {
+                let malformed = json!({
+                    "schemaVersion": format!("ouroforge.{artifact_name}.capture.v1"),
+                    "present": false,
+                    "status": "malformed",
+                    "field": field,
+                    "observedType": json_value_type(value),
+                    "boundedObserved": value,
+                    "readOnlyInspection": {
+                        "trustedEmitter": "browser-smoke-runtime-probe-capture",
+                        "browserStudioMode": "read-only 3D runtime probe capture",
+                        "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "trusted persistence"]
+                    }
+                });
+                write_runtime_probe_artifact(config, artifact_name, field, &malformed)?;
+            }
+            None if scene_kind_3d => {
+                let missing = json!({
+                    "schemaVersion": format!("ouroforge.{artifact_name}.capture.v1"),
+                    "present": false,
+                    "status": "missing",
+                    "field": field,
+                    "emptyState": format!("{field} is missing from 3D world-state probe capture."),
+                    "readOnlyInspection": {
+                        "trustedEmitter": "browser-smoke-runtime-probe-capture",
+                        "browserStudioMode": "read-only 3D runtime probe capture",
+                        "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "trusted persistence"]
+                    }
+                });
+                write_runtime_probe_artifact(config, artifact_name, field, &missing)?;
+            }
+            _ => {}
+        }
+    }
     Ok(())
+}
+
+fn json_value_type(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
 }
 
 const CONSOLE_CAPTURE_SCRIPT: &str = r#"
@@ -66928,6 +67003,124 @@ scenarios:
                 && event["payload"]["phase"] == "worker_run"
                 && event["payload"]["failure_path"] == failure.path
         }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn captures_scene3d_runtime_probe_artifacts_from_world_state() {
+        let (root, artifacts) = create_test_run("ouroforge-scene3d-probe-capture-test");
+        let config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8767")
+            .expect("config builds");
+        let mut client = CdpClient::new(RuntimeProbeTransport {
+            responses: std::collections::VecDeque::from(vec![
+                json!({ "result": { "value": true } }),
+                json!({ "result": { "value": {
+                    "tick": 7,
+                    "sceneKind": "3d",
+                    "scene3dProbe": {
+                        "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+                        "present": true,
+                        "status": "present",
+                        "nodeCount": 2
+                    },
+                    "scene3dTransforms": {
+                        "schemaVersion": "ouroforge.scene3d-transform-probe.v1",
+                        "present": true,
+                        "transformCount": 2,
+                        "transforms": [
+                            { "nodeId": "cube", "worldTransform": { "translation": { "x": 1, "y": 2, "z": 3 } } }
+                        ]
+                    }
+                } } }),
+                json!({ "result": { "value": { "tick": 7, "fixedDeltaMs": 16 } } }),
+            ]),
+        });
+
+        capture_runtime_probe(&config, &mut client).expect("probe captured");
+
+        let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
+        assert_eq!(artifacts_list.len(), 4);
+        let scene3d_probe = artifacts_list
+            .iter()
+            .find(|artifact| artifact.path.contains("browser-probe-scene3d-probe"))
+            .expect("scene3d probe artifact captured");
+        let scene3d_transforms = artifacts_list
+            .iter()
+            .find(|artifact| artifact.path.contains("browser-probe-scene3d-transforms"))
+            .expect("scene3d transforms artifact captured");
+        assert_eq!(scene3d_probe.metadata["probe_call"], "scene3dProbe");
+        assert_eq!(
+            scene3d_transforms.metadata["probe_call"],
+            "scene3dTransforms"
+        );
+        assert_eq!(
+            read_json_value(artifacts.run_dir.join(&scene3d_probe.path))
+                .expect("scene3d probe reads")["status"],
+            "present"
+        );
+        assert_eq!(
+            read_json_value(artifacts.run_dir.join(&scene3d_transforms.path))
+                .expect("scene3d transforms reads")["transformCount"],
+            2
+        );
+
+        let events = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(events.iter().any(|event| {
+            event["event"] == "browser.probe.captured"
+                && event["payload"]["probe_call"] == "scene3dProbe"
+        }));
+        assert!(events.iter().any(|event| {
+            event["event"] == "browser.probe.captured"
+                && event["payload"]["probe_call"] == "scene3dTransforms"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn captures_scene3d_runtime_probe_missing_and_malformed_artifacts() {
+        let (root, artifacts) = create_test_run("ouroforge-scene3d-probe-malformed-capture-test");
+        let config = BrowserSmokeConfig::new(&artifacts.run_dir, "http://127.0.0.1:8767")
+            .expect("config builds");
+        let mut client = CdpClient::new(RuntimeProbeTransport {
+            responses: std::collections::VecDeque::from(vec![
+                json!({ "result": { "value": true } }),
+                json!({ "result": { "value": {
+                    "tick": 7,
+                    "sceneKind": "3d",
+                    "scene3dProbe": "not-an-object"
+                } } }),
+                json!({ "result": { "value": { "tick": 7, "fixedDeltaMs": 16 } } }),
+            ]),
+        });
+
+        capture_runtime_probe(&config, &mut client).expect("probe captured");
+
+        let artifacts_list = list_evidence_artifacts(&artifacts.run_dir).expect("evidence lists");
+        assert_eq!(artifacts_list.len(), 4);
+        let scene3d_probe_path = artifacts_list
+            .iter()
+            .find(|artifact| artifact.path.contains("browser-probe-scene3d-probe"))
+            .expect("scene3d malformed probe artifact captured")
+            .path
+            .clone();
+        let scene3d_transforms_path = artifacts_list
+            .iter()
+            .find(|artifact| artifact.path.contains("browser-probe-scene3d-transforms"))
+            .expect("scene3d missing transforms artifact captured")
+            .path
+            .clone();
+        let scene3d_probe =
+            read_json_value(artifacts.run_dir.join(scene3d_probe_path)).expect("probe reads");
+        let scene3d_transforms = read_json_value(artifacts.run_dir.join(scene3d_transforms_path))
+            .expect("transforms reads");
+        assert_eq!(scene3d_probe["status"], "malformed");
+        assert_eq!(scene3d_probe["observedType"], "string");
+        assert_eq!(scene3d_transforms["status"], "missing");
+        assert_eq!(scene3d_transforms["field"], "scene3dTransforms");
+        assert_eq!(
+            scene3d_transforms["readOnlyInspection"]["disallowedActions"][1],
+            "command bridge"
+        );
         fs::remove_dir_all(root).ok();
     }
 
