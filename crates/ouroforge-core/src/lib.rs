@@ -14002,6 +14002,390 @@ fn validate_fuzz_linked_reference_freshness(
     Ok(())
 }
 
+pub const QA_AGENT_WORK_QUEUE_SCHEMA_VERSION: &str = "qa-agent-work-queue-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentWorkQueueArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "queueId")]
+    pub queue_id: String,
+    pub milestone: String,
+    pub items: Vec<QaAgentWorkQueueItem>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentWorkQueueItem {
+    #[serde(rename = "queueItemId")]
+    pub queue_item_id: String,
+    #[serde(rename = "scenarioTarget")]
+    pub scenario_target: QaAgentScenarioTarget,
+    #[serde(rename = "riskArea")]
+    pub risk_area: QaAgentRiskArea,
+    #[serde(rename = "runCommandContext")]
+    pub run_command_context: QaAgentRunCommandContext,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<AuthoringLoopArtifactRef>,
+    pub priority: QaAgentQueuePriority,
+    #[serde(rename = "assignedRole")]
+    pub assigned_role: String,
+    #[serde(rename = "assignedAgent")]
+    pub assigned_agent: String,
+    pub status: QaAgentQueueStatus,
+    #[serde(
+        rename = "failureClassification",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub failure_classification: Option<QaAgentFailureClassification>,
+    #[serde(rename = "taskRef")]
+    pub task_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "workPackageRef")]
+    pub work_package_ref: AuthoringLoopArtifactRef,
+    #[serde(
+        rename = "reviewGateRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_gate_ref: Option<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "runEvidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub run_evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "evaluatorEvidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evaluator_evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(
+        rename = "staleRunRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub stale_run_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentScenarioTarget {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "scenarioPackRef")]
+    pub scenario_pack_ref: AuthoringLoopArtifactRef,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentRiskArea {
+    #[serde(rename = "riskId")]
+    pub risk_id: String,
+    pub category: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct QaAgentRunCommandContext {
+    pub command: String,
+    pub argv: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum QaAgentQueuePriority {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum QaAgentQueueStatus {
+    Pass,
+    Fail,
+    Deferred,
+    Blocked,
+    Flaky,
+    NeedsRerun,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum QaAgentFailureClassification {
+    AssertionFailed,
+    RuntimeError,
+    ConsoleError,
+    PerformanceRegression,
+    Flaky,
+    Blocked,
+    StaleRunRef,
+    MalformedEvidence,
+}
+
+impl QaAgentWorkQueueArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: QaAgentWorkQueueArtifact =
+            serde_json::from_str(input).context("failed to parse QA Agent Work Queue JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != QA_AGENT_WORK_QUEUE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "qa agent work queue schemaVersion must be {QA_AGENT_WORK_QUEUE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("qa agent work queue queueId", &self.queue_id)?;
+        require_text("qa agent work queue milestone", &self.milestone)?;
+        if self.items.is_empty() {
+            return Err(anyhow!("qa agent work queue items must not be empty"));
+        }
+        let mut item_ids = BTreeSet::new();
+        for (index, item) in self.items.iter().enumerate() {
+            item.validate(index)?;
+            if !item_ids.insert(item.queue_item_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa agent work queue queueItemId: {}",
+                    item.queue_item_id
+                ));
+            }
+        }
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("qa agent work queue guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "qa agent work queue forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("qa agent work queue boundary", &self.boundary)?;
+        self.validate_guardrails()
+    }
+
+    fn validate_guardrails(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "unbounded spawning",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "reviewer bypass",
+            "browser command bridge",
+            "trusted browser writes",
+            "remote worker pool",
+            "production readiness",
+            "Godot replacement",
+        ] {
+            if !forbidden.contains(&phrase.to_ascii_lowercase()) {
+                return Err(anyhow!(
+                    "qa agent work queue forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        for phrase in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not mutate trusted files",
+            "does not write trusted browser state",
+            "does not auto-apply",
+            "does not auto-merge",
+            "does not self-approve",
+            "does not claim production readiness",
+            "does not claim godot replacement",
+        ] {
+            if !boundary.contains(phrase) {
+                return Err(anyhow!(
+                    "qa agent work queue boundary must state it {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl QaAgentWorkQueueItem {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("qa agent work queue items[{index}].queueItemId"),
+            &self.queue_item_id,
+        )?;
+        self.scenario_target.validate(&format!(
+            "qa agent work queue items[{index}].scenarioTarget"
+        ))?;
+        self.risk_area
+            .validate(&format!("qa agent work queue items[{index}].riskArea"))?;
+        self.run_command_context.validate(&format!(
+            "qa agent work queue items[{index}].runCommandContext"
+        ))?;
+        validate_nonempty_refs(
+            &format!("qa agent work queue items[{index}].expectedEvidence"),
+            &self.expected_evidence,
+        )?;
+        validate_path_component(
+            &format!("qa agent work queue items[{index}].assignedRole"),
+            &self.assigned_role,
+        )?;
+        validate_path_component(
+            &format!("qa agent work queue items[{index}].assignedAgent"),
+            &self.assigned_agent,
+        )?;
+        self.task_ref
+            .validate(&format!("qa agent work queue items[{index}].taskRef"))?;
+        self.work_package_ref.validate(&format!(
+            "qa agent work queue items[{index}].workPackageRef"
+        ))?;
+        if let Some(reference) = &self.review_gate_ref {
+            reference.validate(&format!("qa agent work queue items[{index}].reviewGateRef"))?;
+        }
+        validate_optional_refs(
+            &format!("qa agent work queue items[{index}].runEvidenceRefs"),
+            &self.run_evidence_refs,
+        )?;
+        validate_optional_refs(
+            &format!("qa agent work queue items[{index}].evaluatorEvidenceRefs"),
+            &self.evaluator_evidence_refs,
+        )?;
+        validate_optional_text_list(
+            &format!("qa agent work queue items[{index}].blockedReasons"),
+            &self.blocked_reasons,
+        )?;
+        validate_optional_text_list(
+            &format!("qa agent work queue items[{index}].staleRunRefs"),
+            &self.stale_run_refs,
+        )?;
+        self.validate_status_shape()
+    }
+
+    fn validate_status_shape(&self) -> Result<()> {
+        match self.status {
+            QaAgentQueueStatus::Pass => {
+                if self.failure_classification.is_some()
+                    || !self.blocked_reasons.is_empty()
+                    || !self.stale_run_refs.is_empty()
+                {
+                    return Err(anyhow!(
+                        "pass qa agent work queue item must not include failureClassification, blockedReasons, or staleRunRefs"
+                    ));
+                }
+                if self.run_evidence_refs.is_empty() || self.evaluator_evidence_refs.is_empty() {
+                    return Err(anyhow!(
+                        "pass qa agent work queue item requires runEvidenceRefs and evaluatorEvidenceRefs"
+                    ));
+                }
+            }
+            QaAgentQueueStatus::Fail => {
+                if self.failure_classification.is_none() {
+                    return Err(anyhow!(
+                        "fail qa agent work queue item requires failureClassification"
+                    ));
+                }
+                if self.run_evidence_refs.is_empty() || self.evaluator_evidence_refs.is_empty() {
+                    return Err(anyhow!(
+                        "fail qa agent work queue item requires runEvidenceRefs and evaluatorEvidenceRefs"
+                    ));
+                }
+            }
+            QaAgentQueueStatus::Deferred | QaAgentQueueStatus::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "deferred or blocked qa agent work queue item requires blockedReasons"
+                    ));
+                }
+            }
+            QaAgentQueueStatus::Flaky => {
+                if self.failure_classification != Some(QaAgentFailureClassification::Flaky) {
+                    return Err(anyhow!(
+                        "flaky qa agent work queue item requires flaky failureClassification"
+                    ));
+                }
+                if self.run_evidence_refs.len() < 2 {
+                    return Err(anyhow!(
+                        "flaky qa agent work queue item requires multiple runEvidenceRefs"
+                    ));
+                }
+            }
+            QaAgentQueueStatus::NeedsRerun => {
+                if self.stale_run_refs.is_empty() && self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "needs-rerun qa agent work queue item requires staleRunRefs or blockedReasons"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl QaAgentScenarioTarget {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.scenarioId"), &self.scenario_id)?;
+        self.scenario_pack_ref
+            .validate(&format!("{field}.scenarioPackRef"))
+    }
+}
+
+impl QaAgentRiskArea {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.riskId"), &self.risk_id)?;
+        validate_path_component(&format!("{field}.category"), &self.category)?;
+        require_bounded_display_text(&format!("{field}.summary"), &self.summary)
+    }
+}
+
+impl QaAgentRunCommandContext {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.command"), &self.command)?;
+        if self.argv.is_empty() {
+            return Err(anyhow!("{field}.argv must not be empty"));
+        }
+        for (index, arg) in self.argv.iter().enumerate() {
+            require_text(&format!("{field}.argv[{index}]"), arg)?;
+        }
+        require_text(&format!("{field}.boundary"), &self.boundary)?;
+        let combined = std::iter::once(self.command.as_str())
+            .chain(self.argv.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase();
+        for forbidden in [" apply ", " merge ", " publish ", " deploy ", " install "] {
+            if format!(" {combined} ").contains(forbidden) {
+                return Err(anyhow!(
+                    "qa agent work queue runCommandContext must not request mutation, merge, publish, deploy, or install commands"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        if !(boundary.contains("inert")
+            && boundary.contains("does not execute")
+            && boundary.contains("does not mutate"))
+        {
+            return Err(anyhow!(
+                "qa agent work queue runCommandContext boundary must state inert command text that does not execute or mutate"
+            ));
+        }
+        Ok(())
+    }
+}
+
 const QA_WORKER_ASSIGNMENT_SCHEMA_VERSION: &str = "qa-worker-assignment-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -54182,6 +54566,161 @@ scenarios:
         )
         .expect_err("cleanup policy is required");
         assert!(!missing_cleanup.to_string().is_empty());
+    }
+
+    #[test]
+    fn qa_agent_work_queue_v1_accepts_fixture_states_and_boundaries() {
+        for (fixture, expected_status) in [
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+                QaAgentQueueStatus::Pass,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.failed.fixture.json",
+                QaAgentQueueStatus::Fail,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.deferred.fixture.json",
+                QaAgentQueueStatus::Deferred,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.flaky.fixture.json",
+                QaAgentQueueStatus::Flaky,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.blocked.fixture.json",
+                QaAgentQueueStatus::Blocked,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/qa-agent-work-queue.stale.fixture.json",
+                QaAgentQueueStatus::NeedsRerun,
+            ),
+        ] {
+            let queue = QaAgentWorkQueueArtifact::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(queue.schema_version, QA_AGENT_WORK_QUEUE_SCHEMA_VERSION);
+            assert_eq!(queue.items.len(), 1);
+            let item = &queue.items[0];
+            assert_eq!(item.status, expected_status);
+            assert_eq!(item.assigned_role, "qa-agent");
+            assert!(!item.expected_evidence.is_empty());
+            assert!(item
+                .scenario_target
+                .scenario_pack_ref
+                .path
+                .contains("scenario"));
+            assert!(item.task_ref.path.contains("production-task-board"));
+            assert!(item.work_package_ref.path.contains("agent-work-package"));
+            assert!(item.run_command_context.boundary.contains("Inert"));
+            assert!(queue.generated_state.tracked_fixture_only);
+            assert!(queue
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(queue.boundary.contains("does not execute commands"));
+            assert!(queue.boundary.contains("does not spawn agents"));
+            assert!(queue.boundary.contains("does not mutate trusted files"));
+            assert!(queue
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(queue.boundary.contains("does not auto-apply"));
+            assert!(queue.boundary.contains("does not auto-merge"));
+            assert!(queue.boundary.contains("does not self-approve"));
+            assert!(queue
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "hidden background agents"));
+            assert!(queue
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "unbounded spawning"));
+            assert!(queue
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "browser command bridge"));
+            assert!(queue
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "trusted browser writes"));
+        }
+    }
+
+    #[test]
+    fn qa_agent_work_queue_v1_rejects_malformed_state_and_boundary_drift() {
+        let malformed = QaAgentWorkQueueArtifact::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.malformed.fixture.json",
+        ))
+        .expect_err("malformed QA queue fixture rejects");
+        assert!(format!("{malformed:#}").contains("scenarioTarget"));
+
+        let mut invalid_pass: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+        ))
+        .expect("queue json");
+        invalid_pass["items"][0]["blockedReasons"] = json!(["hidden blocker"]);
+        let pass_error = QaAgentWorkQueueArtifact::from_json_str(&invalid_pass.to_string())
+            .expect_err("pass item with blockers rejects");
+        assert!(format!("{pass_error:#}").contains("pass qa agent work queue item"));
+
+        let mut unsafe_command = invalid_pass.clone();
+        unsafe_command["items"][0]["blockedReasons"] = json!([]);
+        unsafe_command["items"][0]["runCommandContext"]["command"] =
+            json!("cargo run -p ouroforge-cli -- mutation apply unsafe");
+        let command_error = QaAgentWorkQueueArtifact::from_json_str(&unsafe_command.to_string())
+            .expect_err("mutation command context rejects");
+        assert!(format!("{command_error:#}").contains("must not request mutation"));
+
+        let mut unsafe_boundary: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+        ))
+        .expect("queue json");
+        unsafe_boundary["boundary"] = json!("QA queue can run commands and write browser state.");
+        let boundary_error = QaAgentWorkQueueArtifact::from_json_str(&unsafe_boundary.to_string())
+            .expect_err("unsafe QA queue boundary rejects");
+        assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn qa_agent_work_queue_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/qa-agent-work-queue-v1.md");
+        for required in [
+            "schemaVersion: qa-agent-work-queue-v1",
+            "pass",
+            "fail",
+            "deferred",
+            "blocked",
+            "flaky",
+            "needs-rerun",
+            "does not execute commands",
+            "does not spawn agents",
+            "does not mutate trusted files",
+            "does not write trusted browser state",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "reviewer bypass",
+            "Generated",
+            "MAP13.9.1",
+            "MAP13.9.2",
+            "MAP13.9.3",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(doc.contains(required), "QA queue doc missing {required}");
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
     }
 
     #[test]

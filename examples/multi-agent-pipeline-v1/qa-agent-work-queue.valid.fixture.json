@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "qa-agent-work-queue-v1",
+  "queueId": "demo-qa-agent-work-queue",
+  "milestone": "multi-agent-production-pipeline-v1",
+  "items": [
+    {
+      "queueItemId": "qa-queue-pass-smoke",
+      "scenarioTarget": {
+        "scenarioId": "collect-and-exit",
+        "scenarioPackRef": {
+          "id": "scenario-pack",
+          "path": "examples/scenario-packs/project-smoke.scenarios.json",
+          "description": "project smoke scenario pack"
+        }
+      },
+      "riskArea": {
+        "riskId": "route-regression",
+        "category": "scenario-regression",
+        "summary": "Verify route completion remains stable after multi-agent handoff."
+      },
+      "runCommandContext": {
+        "command": "cargo run -p ouroforge-cli -- run examples/seeds/collect-and-exit.seed.yaml --workers 1 --scenario-pack project-smoke",
+        "argv": [
+          "cargo",
+          "run",
+          "-p",
+          "ouroforge-cli",
+          "--",
+          "run",
+          "examples/seeds/collect-and-exit.seed.yaml",
+          "--workers",
+          "1",
+          "--scenario-pack",
+          "project-smoke"
+        ],
+        "boundary": "Inert QA command text only; this queue artifact does not execute commands and does not mutate trusted files."
+      },
+      "expectedEvidence": [
+        {
+          "id": "scenario-result",
+          "path": "runs/multi-agent-pipeline/demo/qa/scenario-result.json",
+          "description": "expected scenario result"
+        },
+        {
+          "id": "evaluator-summary",
+          "path": "runs/multi-agent-pipeline/demo/qa/evaluator-summary.json",
+          "description": "expected evaluator summary"
+        }
+      ],
+      "priority": "high",
+      "assignedRole": "qa-agent",
+      "assignedAgent": "qa-agent-fixture-1",
+      "status": "pass",
+      "taskRef": {
+        "id": "task-board",
+        "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+        "description": "linked production task board"
+      },
+      "workPackageRef": {
+        "id": "work-package",
+        "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+        "description": "linked QA work package"
+      },
+      "reviewGateRef": {
+        "id": "review-gate",
+        "path": "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        "description": "linked accepted review gate"
+      },
+      "runEvidenceRefs": [
+        {
+          "id": "run-evidence",
+          "path": "runs/multi-agent-pipeline/demo/qa/scenario-result.json",
+          "description": "observed run evidence"
+        }
+      ],
+      "evaluatorEvidenceRefs": [
+        {
+          "id": "evaluator-evidence",
+          "path": "runs/multi-agent-pipeline/demo/qa/evaluator-summary.json",
+          "description": "observed evaluator evidence"
+        }
+      ]
+    }
+  ],
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "QA queue items are explicit reproducible local evidence requests",
+    "QA findings feed review and next-task decisions before promotion",
+    "generated roots remain ignored unless fixture scoped"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "reviewer bypass",
+    "browser command bridge",
+    "trusted browser writes",
+    "remote worker pool",
+    "credentialed commands",
+    "network/install commands",
+    "dependency mutation",
+    "production readiness",
+    "Godot replacement"
+  ],
+  "boundary": "QA agent work queue is inert local evidence; it does not execute commands, does not spawn agents, does not mutate trusted files, does not write trusted browser state, does not auto-apply, does not auto-merge, does not self-approve, does not claim production readiness, and does not claim Godot replacement capability."
+}
