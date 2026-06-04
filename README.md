@@ -10,11 +10,11 @@ loop is intentionally inspectable:
 
 > **Seed → Run → Evidence → Evaluation → Journal → Mutation → (back to Seed)**
 
-> **Status:** pre-release private MVP with public-readiness evidence and
-> launch-governance handoffs recorded for a future manual visibility review. It
+> **Status:** pre-release private MVP with public-readiness and public-alpha
+> launch-governance evidence recorded for a future manual visibility review. It
 > runs one reproducible local demo today. Ouroforge is **not** a Godot
 > replacement and makes no compatibility promises — treat it as an inspectable
-> prototype.
+> prototype, not a public launch or support commitment.
 
 ## What is Ouroforge?
 
@@ -179,17 +179,18 @@ Ouroforge does **not** currently provide:
   reviewer bypass;
 - source patch apply to the trusted maintainer worktree.
 
-Public release requires the evidence gates in
-[`docs/public-readiness-audit.md`](docs/public-readiness-audit.md) and
-[`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), followed by
-a separate manual visibility decision.
+Public release still requires fresh evidence gates in
+[`docs/public-readiness-audit.md`](docs/public-readiness-audit.md),
+[`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), and the
+manual visibility-decision process. The launch-governance and communication-pack
+docs are preparation artifacts, not a visibility toggle or publication event.
 
 ## Roadmap
 
 The roadmap and completed milestone references live in
 [`docs/roadmap.md`](docs/roadmap.md). Public-alpha readiness, launch governance,
-release artifact policy, and post-launch roadmap responses are documented as
-separate references rather than launch approval. Source Mutation Preview v1 is
+release artifact policy, communication-pack, and post-launch roadmap responses
+are documented as separate references rather than launch approval. Source Mutation Preview v1 is
 recorded there as complete but preview-only; it does not authorize trusted source
 apply, branch merge/rebase automation, browser command bridges, dependency/CI
 mutation, native export, plugin runtime, public launch automation, or Godot

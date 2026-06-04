@@ -68,6 +68,21 @@ If implementation findings require moving scope across these areas, record the
 blocker and proposed boundary change in the relevant issue before opening or
 merging changed work.
 
+## Governance outcome snapshot
+
+Public Alpha Launch Governance v1 has produced the governance inputs needed for a
+future manual maintainer visibility review, not a launch. The completed artifacts
+cover visibility decision records, hold/rollback criteria, public issue and PR
+intake, security-response boundaries, demo-stability monitoring policy, and a
+conservative communication pack. The #387 roadmap/#1 refresh records that
+outcome while preserving #1 and #23 as open anchors.
+
+The current outcome is **hold for manual decision**: maintainers may choose to
+rerun the launch checklist and visibility-decision process later, or continue to
+the next technical milestone. No repository visibility, GitHub settings, release,
+package publication, launch announcement, support/SLA process, or product
+capability is changed by this governance outcome.
+
 ## Verification policy
 
 Every PR under this milestone should select verification from the canonical public PR intake policy. Docs/template-only governance PRs may use the focused docs/template path in [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md); code, dependency, CI/workflow, build-script, security-sensitive, generated-state-affecting, or issue-closure gates should use the broad path below as applicable:

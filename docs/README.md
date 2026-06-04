@@ -27,8 +27,11 @@ and sandbox boundary section below.
 
 ## Public-alpha readiness and governance
 
-Use these when reviewing public-readiness changes. They are governance/evidence
-references, not launch approval:
+Use these when reviewing public-readiness and launch-governance changes. They are governance/evidence
+references, not launch approval. As of the #387 roadmap refresh, the launch-governance
+sequence records manual decision inputs and conservative communication material;
+repository visibility, publication, releases, and support commitments remain
+separate maintainer actions:
 
 - [`public-alpha-readiness-v1.md`](public-alpha-readiness-v1.md) — Public Alpha Readiness v1 scope, dependency order, boundaries, and closure gates.
 - [`public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md) — public-alpha gate checklist and failure modes.

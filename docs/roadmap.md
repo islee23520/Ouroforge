@@ -164,23 +164,30 @@ and leaving #1/#23 open. Visual Authoring v1 (#343-#354) is now complete as a
 local-first draft/preview/review evidence milestone; it is not a public-readiness
 or production-editor claim.
 
-After #366, Source Mutation Preview v1 is recorded as complete and still
-preview-only. The next conservative milestone candidates are:
+After #387, Public Alpha Readiness (#367-#377) and Public Alpha Launch
+Governance (#378-#387) are recorded as governance/readiness preparation tracks,
+not launch execution. They produced readiness evidence, manual visibility
+decision inputs, hold/rollback criteria, issue/PR intake policy, security and
+demo-stability boundaries, conservative communication material, and this
+roadmap/#1 refresh. They did not change repository visibility, publish packages,
+announce launch, add support commitments, or implement product behavior.
 
-1. keep source patch apply blocked and open a later Source Mutation Apply Design
-   Gate only if maintainers explicitly want trusted apply semantics;
-2. continue with Public Alpha Readiness (#367-#377) as governance/readiness
-   evidence only, with no visibility change or launch automation; or
-3. defer public-readiness work in favor of another design gate such as Native
-   Export or Plugin capability, again only through fixed scoped issues.
+The current governance outcome is **manual hold / ready for separate maintainer
+decision**. Maintainers can either rerun the visibility checklist and decision
+record on a chosen date, or continue technical roadmap work while keeping launch
+actions manual. The conservative next technical milestone candidate is
+Production 2D Engine Core v1 (#583-#594): camera/layering, rendering, physics,
+input, runtime state/replay, animation/VFX, audio, profiling, vertical slice,
+regression coverage, Studio inspection, and a follow-up roadmap/#1 refresh. That
+candidate must remain issue-scoped and evidence-backed; it is not a production,
+public-launch, native-export, plugin-runtime, source-apply, or Godot replacement
+claim.
 
-Until maintainers make a separate explicit decision, Public Alpha Readiness
-(#367-#377) and Public Alpha Launch Governance (#378-#387) remain governance
-tracks, only when backed by fixed PR units, regression coverage,
-generated-state audits, and explicit non-goals. Native Export Design Gate,
-Plugin Design Gate, and Visual Authoring v2 remain possible later governance
-topics, but none is authorized as implementation scope by this Source Mutation
-Preview completion handoff.
+Other possible later governance topics remain Native Export Design Gate, Plugin
+Design Gate, Source Mutation Apply Design Gate, and Visual Authoring v2. None is
+authorized as implementation scope unless a separate fixed issue sequence opens
+it with explicit non-goals, regression coverage, generated-state audits, and
+manual launch boundaries.
 
 The public-readiness and post-launch triage docs remain governance inputs, not
 automated launch or roadmap-acceptance paths:
@@ -189,6 +196,8 @@ automated launch or roadmap-acceptance paths:
 - `docs/public-demo-evidence.md`
 - `docs/public-launch-checklist.md`
 - `docs/post-launch-roadmap-triage-v1.md`
+- `docs/public-alpha-communication-pack-v1.md`
+- `docs/public-alpha-launch-governance-v1.md`
 
 Maintainers should use those documents for separate manual repository visibility
 and post-launch roadmap decisions. Public launch and future milestone acceptance
