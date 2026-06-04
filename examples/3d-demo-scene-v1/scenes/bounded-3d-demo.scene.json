@@ -157,9 +157,9 @@
         "clipId": "player-slide-to-trigger",
         "targetNodeId": "player-cube",
         "channel": "translation",
-        "currentFrame": 4,
-        "currentTimeMs": 66,
-        "playing": false,
+        "currentFrame": 0,
+        "currentTimeMs": 0,
+        "playing": true,
         "looped": false
       }
     ],

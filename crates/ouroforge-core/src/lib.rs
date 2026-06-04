@@ -65354,7 +65354,7 @@ scenarios:
         assert_eq!(graph.cameras[0].id, "demo-camera");
         assert!(graph.cameras[0].active);
         assert_eq!(graph.animation_clips[0].id, "player-slide-to-trigger");
-        assert_eq!(graph.animation_states[0].current_frame, 4);
+        assert_eq!(graph.animation_states[0].current_frame, 0);
 
         let seed = Seed::from_yaml_str(include_str!(
             "../../../examples/3d-demo-scene-v1/seeds/3d-demo-scene-v1.yaml"
