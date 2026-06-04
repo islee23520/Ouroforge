@@ -229,6 +229,19 @@ enum EditCommand {
         #[arg(long, value_name = "PATH")]
         transaction_output: Option<PathBuf>,
     },
+    DraftApply {
+        draft_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        run_dir: PathBuf,
+        #[arg(long, value_name = "ID")]
+        proposal: String,
+        #[arg(long, value_name = "ID")]
+        decision: String,
+        #[arg(long, value_name = "PATH")]
+        transaction_output: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -987,6 +1000,27 @@ fn main() -> Result<()> {
             )?;
             println!("{}", serde_json::to_string_pretty(&preview)?);
         }
+        Commands::Edit {
+            command:
+                EditCommand::DraftApply {
+                    draft_path,
+                    project,
+                    run_dir,
+                    proposal,
+                    decision,
+                    transaction_output,
+                },
+        } => {
+            let result = apply_visual_edit_draft_cli(
+                &draft_path,
+                &project,
+                &run_dir,
+                &proposal,
+                &decision,
+                &transaction_output,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
     }
 
     Ok(())
@@ -1228,6 +1262,93 @@ fn preflight_visual_edit_transaction_output(
             "not-target-scene-path-or-alias"
         ],
         "guardrail": "preflight only; transaction output is not written by draft-preview",
+    }))
+}
+
+fn apply_visual_edit_draft_cli(
+    draft_path: &Path,
+    project_root_or_manifest: &Path,
+    run_dir: &Path,
+    proposal_id: &str,
+    decision_id: &str,
+    transaction_output: &Path,
+) -> Result<serde_json::Value> {
+    if decision_id.trim().is_empty() {
+        return Err(anyhow!("edit draft-apply requires --decision"));
+    }
+    let draft_input = std::fs::read_to_string(draft_path)
+        .with_context(|| format!("failed to read visual edit draft {}", draft_path.display()))?;
+    let draft: VisualEditDraftArtifact = serde_json::from_str(&draft_input)
+        .with_context(|| format!("failed to parse visual edit draft {}", draft_path.display()))?;
+    if draft.target.target_type != VisualEditDraftTargetType::Scene {
+        return Err(anyhow!(
+            "edit draft-apply supports scene drafts only in #348 VA1.6.3"
+        ));
+    }
+    if draft.proposed_operations.len() != 1 {
+        return Err(anyhow!(
+            "edit draft-apply requires exactly one scene operation; found {}",
+            draft.proposed_operations.len()
+        ));
+    }
+
+    let manifest_path = resolve_project_manifest_path(project_root_or_manifest);
+    let manifest = ProjectManifest::from_path(&manifest_path)?;
+    let project_root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let scene_ref = resolve_visual_edit_scene_target(&draft, &manifest)?;
+    let scene_path = project_root.join(&scene_ref.path);
+    let mut previews = draft
+        .preview_scene_edit_transactions(&scene_path)
+        .with_context(|| {
+            format!(
+                "failed to preflight scene visual edit draft {} against {}",
+                draft_path.display(),
+                scene_path.display()
+            )
+        })?;
+    if previews.len() != 1 {
+        return Err(anyhow!(
+            "edit draft-apply requires exactly one scene transaction preview; found {}",
+            previews.len()
+        ));
+    }
+    reject_transaction_output_target_collision(transaction_output, &scene_path)?;
+    let preview = previews.remove(0);
+    let operation = SceneOnlyMutationOperation {
+        schema_version: "scene-only-mutation-v1".to_string(),
+        proposal_id: proposal_id.to_string(),
+        target_scene_path: scene_path.to_string_lossy().to_string(),
+        project: Some(ProjectSceneMutationContext {
+            project_id: manifest.project.id.clone(),
+            manifest_path: manifest_path.to_string_lossy().to_string(),
+            manifest_hash: hash_project_manifest_file(&manifest_path)?,
+            scene_path: scene_ref.path.clone(),
+            scene_hash: preview.before_scene_hash.clone(),
+        }),
+        edit: preview.edit.clone(),
+        review_decision_id: Some(decision_id.to_string()),
+        expected_before_scene_hash: preview.before_scene_hash.clone(),
+        validation_required: true,
+    };
+    let transaction = apply_scene_only_mutation_operation(run_dir, &operation, transaction_output)?;
+    Ok(serde_json::json!({
+        "schemaVersion": "visual-edit-draft-apply-cli-v1",
+        "draftId": draft.draft_id,
+        "projectId": manifest.project.id,
+        "proposalId": proposal_id,
+        "reviewDecisionId": decision_id,
+        "transactionId": transaction.id,
+        "transactionOutput": transaction_output.to_string_lossy(),
+        "target": {
+            "type": "scene",
+            "path": scene_ref.path,
+            "id": scene_ref.id,
+        },
+        "rollback": transaction.rollback,
+        "guardrail": "review-gated manual CLI apply only; no browser apply, auto-apply, source mutation, or hidden trusted writes",
     }))
 }
 

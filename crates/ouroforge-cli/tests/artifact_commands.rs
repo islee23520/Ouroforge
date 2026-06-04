@@ -530,6 +530,205 @@ fn edit_draft_preview_rejects_tilemap_targets_before_outputs() {
 }
 
 #[test]
+fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
+    let temp = unique_temp_dir("ouroforge-cli-edit-draft-apply-test");
+    write_visual_edit_preview_project(&temp);
+    let scene_path = temp.join("scenes/main.scene.json");
+    let seed_path = temp.join("seeds/smoke.yaml");
+    let run_output = run_cli(&temp, &["run", seed_path.to_str().unwrap()]);
+    let run_dir = run_dir_from_output(&temp, &run_output);
+    run_cli(
+        &temp,
+        &[
+            "evidence",
+            "add",
+            run_dir.to_str().unwrap(),
+            "--id",
+            "draft-apply-evidence",
+            "--kind",
+            "application/json",
+            "--path",
+            "evidence/draft-apply.json",
+            "--json",
+            r#"{"source":"edit-draft-apply-cli-test"}"#,
+        ],
+    );
+    let proposal_json = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "create",
+            run_dir.to_str().unwrap(),
+            "--reason",
+            "review-gated visual edit draft apply",
+            "--evidence",
+            "draft-apply-evidence",
+            "--target",
+            scene_path.to_str().unwrap(),
+            "--path",
+            "components.transform.x",
+            "--from",
+            "32",
+            "--to",
+            "48",
+        ],
+    );
+    let proposal: serde_json::Value = serde_json::from_str(&proposal_json).unwrap();
+    let proposal_id = proposal["id"].as_str().unwrap();
+    let run: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(run_dir.join("run.json")).unwrap()).unwrap();
+    fs::create_dir_all(run_dir.join("mutation")).expect("mutation dir exists");
+    fs::write(
+        run_dir.join("mutation/patch-drafts.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema_version": "1",
+            "run_id": run["id"].as_str().unwrap_or("run-cli-draft-apply"),
+            "drafts": [{
+                "id": "patch-draft-cli-draft-apply-1",
+                "proposal_id": proposal_id,
+                "classification_id": "classification-cli-draft-apply-1",
+                "lifecycle_state": "drafted",
+                "target_path": "scenes/main.scene.json",
+                "rationale": "manual review-gated visual edit draft apply",
+                "evidence_refs": ["evidence/draft-apply.json"],
+                "draft_text": "visual edit draft apply through review-gated CLI"
+            }]
+        }))
+        .unwrap(),
+    )
+    .expect("patch drafts written");
+    let rejected_decision = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            "rejected",
+            "--reason",
+            "manual test rejects before draft apply",
+            "--evidence",
+            "evidence/draft-apply.json",
+        ],
+    );
+    let rejected_decision: serde_json::Value =
+        serde_json::from_str(&rejected_decision).expect("rejected decision json");
+    let rejected_decision_id = rejected_decision["id"].as_str().unwrap().to_string();
+    let accepted_decision = run_cli(
+        &temp,
+        &[
+            "mutation",
+            "review",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            "accepted",
+            "--reason",
+            "manual test accepts draft apply",
+            "--evidence",
+            "evidence/draft-apply.json",
+        ],
+    );
+    let accepted_decision: serde_json::Value =
+        serde_json::from_str(&accepted_decision).expect("accepted decision json");
+    let accepted_decision_id = accepted_decision["id"].as_str().unwrap().to_string();
+    let scene = read_scene(&scene_path).expect("scene reads");
+    let before_hash = hash_scene_document(&scene).expect("scene hashes");
+    let draft_path = temp.join("drafts/scene-draft.visual-edit-draft.json");
+    fs::create_dir_all(temp.join("drafts")).expect("draft dir exists");
+    fs::write(
+        &draft_path,
+        scene_draft_json(
+            "cli-scene-draft-apply",
+            &before_hash.algorithm,
+            &before_hash.value,
+        ),
+    )
+    .expect("draft writes");
+
+    let rejected_transaction = temp.join("runs/draft-apply/rejected.json");
+    let rejected = run_cli_expect_failure(
+        &temp,
+        &[
+            "edit",
+            "draft-apply",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            &rejected_decision_id,
+            "--transaction-output",
+            rejected_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(rejected.contains("requires an accepted decision"));
+    assert!(!rejected_transaction.exists());
+    let scene_before_apply: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    assert_eq!(
+        scene_before_apply.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(32))
+    );
+
+    let transaction_output = temp.join("runs/draft-apply/accepted.json");
+    let applied = run_cli(
+        &temp,
+        &[
+            "edit",
+            "draft-apply",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            &accepted_decision_id,
+            "--transaction-output",
+            transaction_output.to_str().unwrap(),
+        ],
+    );
+    let applied: serde_json::Value = serde_json::from_str(&applied).expect("apply json parses");
+    assert_eq!(applied["schemaVersion"], "visual-edit-draft-apply-cli-v1");
+    assert_eq!(applied["proposalId"], proposal_id);
+    assert_eq!(applied["reviewDecisionId"], accepted_decision_id);
+    assert!(applied["rollback"]["strategy"]
+        .as_str()
+        .expect("rollback strategy")
+        .contains("beforeSceneHash"));
+    assert!(transaction_output.is_file());
+    let edited_scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    assert_eq!(
+        edited_scene.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(48))
+    );
+    let applications: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("mutation/scene-applications.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(applications["applications"][0]["proposalId"], proposal_id);
+    assert_eq!(
+        applications["applications"][0]["reviewDecisionId"],
+        accepted_decision_id
+    );
+    assert!(applications["applications"][0]["rollback"]["strategy"]
+        .as_str()
+        .unwrap()
+        .contains("beforeSceneHash"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
 fn asset_validate_reports_manifest_summary_and_rejects_invalid_assets() {
     let temp = unique_temp_dir("ouroforge-cli-asset-validate-test");
     fs::create_dir_all(temp.join("assets/sprites")).expect("sprite dir");
