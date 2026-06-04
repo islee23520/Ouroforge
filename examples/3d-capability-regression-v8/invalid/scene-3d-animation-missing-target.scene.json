@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "invalid-3d-animation-missing-target",
+  "bounds": {
+    "width": 64,
+    "height": 64
+  },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "activeCameraId": "camera",
+    "nodes": [
+      {
+        "id": "valid-node",
+        "localTransform": {
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "camera",
+        "active": true,
+        "projection": {
+          "kind": "perspective",
+          "fovDegrees": 60,
+          "near": 1,
+          "far": 1000,
+          "aspectMode": "viewport"
+        },
+        "viewport": {
+          "width": 64,
+          "height": 64,
+          "x": 0,
+          "y": 0
+        },
+        "transform": {
+          "translation": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        }
+      }
+    ],
+    "animationClips": [
+      {
+        "id": "missing-target-clip",
+        "targetNodeId": "missing-node",
+        "channel": "translation",
+        "durationFrames": 2,
+        "keyframes": [
+          {
+            "frame": 0,
+            "value": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          {
+            "frame": 2,
+            "value": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            }
+          }
+        ]
+      }
+    ],
+    "animationStates": [
+      {
+        "clipId": "missing-target-clip",
+        "targetNodeId": "missing-node",
+        "channel": "translation",
+        "currentFrame": 0,
+        "playing": true,
+        "currentTimeMs": 0
+      }
+    ]
+  },
+  "metadata": {
+    "expectedValidationError": "animation target node missing-node not found"
+  }
+}

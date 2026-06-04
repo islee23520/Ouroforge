@@ -54,11 +54,13 @@ function evaluateAssertion(evidence, assertion) {
 const scene = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'scenes', 'core-3d-regression.scene.json'), 'utf8'));
 const pack = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'scenarios', '3d-core-regression-v8.json'), 'utf8'));
 const scenarios = pack.scenarioGroups.flatMap((group) => group.scenarios.map((scenario) => ({ groupId: group.id, ...scenario })));
-assert.equal(scenarios.length, 1, 'core 3D regression PR keeps a single focused scenario');
+const coreScenario = scenarios.find((scenario) => scenario.id === 'core-3d-transform-render-collision');
+assert.ok(coreScenario, 'core 3D regression scenario remains present');
+assert.ok(scenarios.some((scenario) => scenario.id === 'probe-animation-evaluator-regression'), 'probe animation evaluator scenario is packed alongside core coverage');
 
 const api = createRuntime();
 let state = api.loadScene(scene);
-for (const step of scenarios[0].steps) {
+for (const step of coreScenario.steps) {
   if (step.wait && Number.isFinite(step.wait.frames)) {
     state = api.step(step.wait.frames);
   } else {
@@ -104,7 +106,7 @@ assert.equal(legacyState.scene3dRender.present, false);
 assert.equal(legacyState.scene3dCollision.present, false);
 assert.equal(typeof legacy.getFrameStats().tick, 'number', '2D frame stats remain compatible');
 
-const verdicts = scenarios.map((scenario) => ({
+const verdicts = [coreScenario].map((scenario) => ({
   scenarioId: scenario.id,
   groupId: scenario.groupId,
   status: 'passed',

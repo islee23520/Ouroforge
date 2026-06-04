@@ -66359,9 +66359,11 @@ scenarios:
         ))
         .expect("Scenario Coverage v8 core 3D seed validates");
         assert_eq!(seed.id, "scenario-coverage-v8.core-3d-regression");
-        assert_eq!(seed.scenarios.len(), 1);
+        assert_eq!(seed.scenarios.len(), 2);
         assert_eq!(seed.scenarios[0].id, "core-3d-transform-render-collision");
         assert_eq!(seed.scenarios[0].assertions.len(), 8);
+        assert_eq!(seed.scenarios[1].id, "probe-animation-evaluator-regression");
+        assert_eq!(seed.scenarios[1].assertions.len(), 6);
         assert!(seed
             .acceptance
             .iter()
@@ -66372,8 +66374,13 @@ scenarios:
         ))
         .expect("Scenario Coverage v8 core 3D scenario pack validates");
         assert_eq!(pack.id, "3d-core-regression-v8");
-        assert_eq!(pack.scenario_groups.len(), 1);
-        assert_eq!(pack.scenario_groups[0].scenarios.len(), 1);
+        assert_eq!(pack.scenario_groups.len(), 2);
+        let scenario_count: usize = pack
+            .scenario_groups
+            .iter()
+            .map(|group| group.scenarios.len())
+            .sum();
+        assert_eq!(scenario_count, 2);
 
         let manifest_path =
             repo_fixture_path("examples/3d-capability-regression-v8/ouroforge.project.json");
@@ -66383,7 +66390,7 @@ scenarios:
         let report = manifest
             .validate_references(manifest_path.parent().expect("manifest parent"))
             .expect("Scenario Coverage v8 project references validate");
-        assert_eq!(report.source_refs, 3);
+        assert_eq!(report.source_refs, 4);
         assert_eq!(
             report.generated_roots,
             vec!["runs", "target", "dashboard-data", "tmp"]
@@ -66395,6 +66402,65 @@ scenarios:
             "fs.mkdtempSync(path.join(os.tmpdir(), 'ouroforge-3d-core-regression-v8-'))"
         ));
         assert!(smoke.contains("fs.rmSync(tempDir, { recursive: true, force: true })"));
+        assert!(smoke.contains("production 3D readiness"));
+        assert!(smoke.contains("Godot replacement evidence"));
+        assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));
+    }
+
+    #[test]
+    fn validates_scenario_coverage_v8_probe_animation_evaluator_fixtures() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-regression-v8/scenes/probe-animation-regression.scene.json",
+        ))
+        .expect("Scenario Coverage v8 probe animation scene parses");
+        validate_scene(&scene).expect("Scenario Coverage v8 probe animation scene validates");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.active_camera_id.as_deref(), Some("probe-camera"));
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.animation_clips.len(), 1);
+        assert_eq!(graph.animation_states.len(), 1);
+        assert_eq!(graph.animation_clips[0].target_node_id, "animated-cube");
+        assert_eq!(graph.animation_states[0].current_frame, 0);
+        assert!(scene
+            .metadata
+            .get("capabilityGate")
+            .and_then(|value| value.as_str())
+            .is_some_and(|value| value.contains("not production 3D readiness")));
+
+        let missing_graph: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-regression-v8/invalid/scene-3d-missing-graph.scene.json",
+        ))
+        .expect("missing scene3d graph fixture parses");
+        let missing_graph_error = validate_scene(&missing_graph)
+            .expect_err("3d scene without scene3d graph is rejected")
+            .to_string();
+        assert!(
+            missing_graph_error.contains("sceneKind 3d requires scene3d graph"),
+            "unexpected missing graph error: {missing_graph_error}"
+        );
+
+        let missing_target: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-regression-v8/invalid/scene-3d-animation-missing-target.scene.json",
+        ))
+        .expect("missing animation target fixture parses");
+        let missing_target_error = validate_scene(&missing_target)
+            .expect_err("animation clip with missing target node is rejected")
+            .to_string();
+        assert!(
+            missing_target_error
+                .contains("scene3d animation clip missing-target-clip references missing targetNodeId: missing-node"),
+            "unexpected missing animation target error: {missing_target_error}"
+        );
+
+        let smoke = read_repo_text(
+            "examples/3d-capability-regression-v8/probe-animation-evaluator-smoke.test.cjs",
+        );
+        assert!(smoke.contains("scenario coverage v8 probe animation evaluator smoke passed"));
+        assert!(smoke.contains(
+            "fs.mkdtempSync(path.join(os.tmpdir(), 'ouroforge-3d-probe-animation-v8-'))"
+        ));
+        assert!(smoke.contains("fs.rmSync(tempDir, { recursive: true, force: true })"));
+        assert!(smoke.contains("not trusted persistence"));
         assert!(smoke.contains("production 3D readiness"));
         assert!(smoke.contains("Godot replacement evidence"));
         assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));

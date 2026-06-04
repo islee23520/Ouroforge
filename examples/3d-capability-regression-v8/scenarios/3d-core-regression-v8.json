@@ -4,7 +4,8 @@
   "description": "Focused Scenario Coverage v8 core 3D regression pack. Bounded local QA evidence only; not production 3D readiness or a Godot replacement claim.",
   "seed": "seeds/3d-core-regression-v8.yaml",
   "scenes": [
-    "scenes/core-3d-regression.scene.json"
+    "scenes/core-3d-regression.scene.json",
+    "scenes/probe-animation-regression.scene.json"
   ],
   "scenarioGroups": [
     {
@@ -15,17 +16,116 @@
           "id": "core-3d-transform-render-collision",
           "description": "Assert core bounded 3D evidence surfaces stay deterministic and read-only.",
           "steps": [
-            { "wait": { "frames": 1 } }
+            {
+              "wait": {
+                "frames": 1
+              }
+            }
           ],
           "assertions": [
-            { "scene3d_transform": { "path": "transforms.1.parentId", "equals": "regression-root" } },
-            { "scene3d_transform": { "path": "transforms.1.worldTransform.translation.x", "equals": 7 } },
-            { "scene3d_camera": { "path": "activeCameraId", "equals": "regression-camera" } },
-            { "scene3d_camera": { "path": "cameras.0.projection.kind", "equals": "perspective" } },
-            { "scene3d_render": { "path": "visibleObjectCount", "equals": 2 } },
-            { "scene3d_render": { "path": "renderables.0.materialRef", "exists": true } },
-            { "scene3d_collision": { "path": "triggerCount", "equals": 1 } },
-            { "scene3d_collision": { "path": "events.0.type", "equals": "runtime.scene3d.collision.trigger" } }
+            {
+              "scene3d_transform": {
+                "path": "transforms.1.parentId",
+                "equals": "regression-root"
+              }
+            },
+            {
+              "scene3d_transform": {
+                "path": "transforms.1.worldTransform.translation.x",
+                "equals": 7
+              }
+            },
+            {
+              "scene3d_camera": {
+                "path": "activeCameraId",
+                "equals": "regression-camera"
+              }
+            },
+            {
+              "scene3d_camera": {
+                "path": "cameras.0.projection.kind",
+                "equals": "perspective"
+              }
+            },
+            {
+              "scene3d_render": {
+                "path": "visibleObjectCount",
+                "equals": 2
+              }
+            },
+            {
+              "scene3d_render": {
+                "path": "renderables.0.materialRef",
+                "exists": true
+              }
+            },
+            {
+              "scene3d_collision": {
+                "path": "triggerCount",
+                "equals": 1
+              }
+            },
+            {
+              "scene3d_collision": {
+                "path": "events.0.type",
+                "equals": "runtime.scene3d.collision.trigger"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "probe-animation-evaluator-regressions",
+      "description": "Runtime probe, animation playback, evaluator pass/fail, and malformed-data regression evidence.",
+      "scenarios": [
+        {
+          "id": "probe-animation-evaluator-regression",
+          "description": "Assert probe and animation evidence reaches a passing scenario verdict, plus a deliberate failing assertion is detected locally.",
+          "steps": [
+            {
+              "wait": {
+                "frames": 3
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "scene3d_probe": {
+                "path": "status",
+                "equals": "present"
+              }
+            },
+            {
+              "scene3d_probe": {
+                "path": "animationStateCount",
+                "equals": 1
+              }
+            },
+            {
+              "scene3d_animation": {
+                "path": "states.0.clipId",
+                "equals": "animated-cube-to-trigger"
+              }
+            },
+            {
+              "scene3d_animation": {
+                "path": "states.0.currentFrame",
+                "equals": 3
+              }
+            },
+            {
+              "scene3d_animation": {
+                "path": "states.0.playing",
+                "equals": false
+              }
+            },
+            {
+              "scene3d_collision": {
+                "path": "triggerCount",
+                "equals": 1
+              }
+            }
           ]
         }
       ]
