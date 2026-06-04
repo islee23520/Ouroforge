@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "gameplay-ability-action.v1",
+  "abilityPackId": "demo-ability-actions",
+  "scope": "local-fixture",
+  "status": "ready",
+  "abilities": [
+    {
+      "id": "player-dash",
+      "actionId": "action-dash",
+      "label": "Player dash",
+      "status": "ready",
+      "runtimeStatus": "available",
+      "target": { "entityId": "player", "componentId": "movement" },
+      "trigger": { "kind": "on_input", "inputActionId": "dash" },
+      "cooldown": { "id": "dash-cooldown", "durationMs": 850, "remainingMs": 0 },
+      "costs": [{ "kind": "stamina", "resourceId": "player-stamina", "amount": 15 }],
+      "durationMs": 180,
+      "effect": { "kind": "movement_impulse", "vectorId": "dash-forward", "magnitude": 7 },
+      "evidenceRefs": ["examples/gameplay-state-machine-v1/state-machine.valid.fixture.json"],
+      "blockedReasons": []
+    },
+    {
+      "id": "guard-alert-strike",
+      "actionId": "action-alert-strike",
+      "label": "Guard alert strike",
+      "status": "ready",
+      "runtimeStatus": "on_cooldown",
+      "target": { "entityId": "guard", "componentId": "combat" },
+      "trigger": { "kind": "on_signal", "signalName": "player_spotted" },
+      "cooldown": { "id": "strike-cooldown", "durationMs": 1400, "remainingMs": 700 },
+      "costs": [{ "kind": "charge", "resourceId": "guard-alert-charge", "amount": 1 }],
+      "durationMs": 250,
+      "effect": { "kind": "damage", "targetEntityId": "player", "amount": 1 },
+      "evidenceRefs": ["examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json"],
+      "blockedReasons": []
+    },
+    {
+      "id": "open-blue-door",
+      "actionId": "action-open-blue-door",
+      "label": "Open blue door",
+      "status": "ready",
+      "runtimeStatus": "available",
+      "target": { "entityId": "blue-door", "componentId": "door-lock" },
+      "trigger": { "kind": "on_event", "eventId": "blue-key-used" },
+      "cooldown": null,
+      "costs": [{ "kind": "item", "resourceId": "blue-key", "amount": 1 }],
+      "effect": { "kind": "open_door", "stateId": "opened" },
+      "evidenceRefs": ["examples/gameplay-state-machine-v1/state-machine.valid.fixture.json"],
+      "blockedReasons": []
+    },
+    {
+      "id": "hazard-pulse",
+      "actionId": "action-hazard-pulse",
+      "label": "Hazard pulse",
+      "status": "ready",
+      "runtimeStatus": "active",
+      "target": { "entityId": "hazard", "componentId": "damage-volume" },
+      "trigger": { "kind": "on_timer", "timerId": "hazard-pulse-timer" },
+      "cooldown": { "id": "hazard-pulse-cooldown", "durationMs": 500, "remainingMs": 0 },
+      "costs": [],
+      "durationMs": 100,
+      "effect": { "kind": "emit_signal", "signalName": "hazard_pulse_active" },
+      "evidenceRefs": ["examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json"],
+      "blockedReasons": []
+    },
+    {
+      "id": "collect-final-gem",
+      "actionId": "action-complete-win-state",
+      "label": "Collect final gem",
+      "status": "ready",
+      "runtimeStatus": "available",
+      "target": { "entityId": "final-gem", "componentId": "collectible" },
+      "trigger": { "kind": "on_collect", "itemId": "final-gem" },
+      "cooldown": null,
+      "costs": [],
+      "effect": { "kind": "complete_objective", "objectiveId": "win-state" },
+      "evidenceRefs": ["examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json"],
+      "blockedReasons": []
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-ability-action-v1.md"],
+  "blockedReasons": []
+}

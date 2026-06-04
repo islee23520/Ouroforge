@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "gameplay-ability-action.v1",
+  "abilityPackId": "invalid-ability-actions",
+  "scope": "local-fixture",
+  "status": "ready",
+  "abilities": [
+    {
+      "id": "unsafe-dash",
+      "actionId": "action-unsafe-dash",
+      "label": "Unsafe dash",
+      "status": "ready",
+      "runtimeStatus": "available",
+      "target": {},
+      "trigger": { "kind": "on_input", "execute_script": "eval('dash')" },
+      "cooldown": { "id": "bad-cooldown", "durationMs": 0, "remainingMs": 99 },
+      "costs": [{ "kind": "script", "resourceId": "plugin_loader", "amount": 0 }],
+      "durationMs": 0,
+      "effect": { "kind": "dynamic_import", "plugin_loader": "commandBridge" },
+      "evidenceRefs": [],
+      "blockedReasons": []
+    }
+  ],
+  "evidenceRefs": [],
+  "blockedReasons": []
+}

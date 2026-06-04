@@ -20535,6 +20535,426 @@ fn require_supported_gameplay_state_key(field: &str, key: &str) -> Result<()> {
     Ok(())
 }
 
+const GAMEPLAY_ABILITY_ACTION_SCHEMA_VERSION: &str = "gameplay-ability-action.v1";
+const MAX_GAMEPLAY_ABILITIES: usize = 128;
+const MAX_GAMEPLAY_ABILITY_STEPS: usize = 32;
+const MAX_GAMEPLAY_ABILITY_COST: u64 = 1_000_000;
+const MAX_GAMEPLAY_ABILITY_DURATION_MS: u64 = 600_000;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayAbilityActionArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "abilityPackId")]
+    pub ability_pack_id: String,
+    pub scope: String,
+    pub status: GameplayAbilityActionStatus,
+    pub abilities: Vec<GameplayAbilityDefinition>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayAbilityDefinition {
+    pub id: String,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub label: String,
+    pub status: GameplayAbilityActionStatus,
+    #[serde(rename = "runtimeStatus")]
+    pub runtime_status: GameplayAbilityRuntimeStatus,
+    pub target: BTreeMap<String, String>,
+    pub trigger: BTreeMap<String, serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cooldown: Option<GameplayAbilityCooldown>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub costs: Vec<GameplayAbilityCost>,
+    #[serde(rename = "durationMs", skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    pub effect: BTreeMap<String, serde_json::Value>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayAbilityCooldown {
+    pub id: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+    #[serde(rename = "remainingMs", skip_serializing_if = "Option::is_none")]
+    pub remaining_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayAbilityCost {
+    pub kind: String,
+    #[serde(rename = "resourceId", skip_serializing_if = "Option::is_none")]
+    pub resource_id: Option<String>,
+    pub amount: u64,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayAbilityActionStatus {
+    Ready,
+    Partial,
+    Blocked,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayAbilityRuntimeStatus {
+    Available,
+    Active,
+    OnCooldown,
+    InsufficientCost,
+    Blocked,
+    Unsupported,
+}
+
+impl GameplayAbilityActionArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: GameplayAbilityActionArtifact =
+            serde_json::from_str(input).context("failed to parse Gameplay Ability Action JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GAMEPLAY_ABILITY_ACTION_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "gameplay ability action schemaVersion must be {GAMEPLAY_ABILITY_ACTION_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component(
+            "gameplay ability action abilityPackId",
+            &self.ability_pack_id,
+        )?;
+        validate_path_component("gameplay ability action scope", &self.scope)?;
+        validate_gameplay_ability_reason_state(
+            "gameplay ability action pack",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_behavior_refs(
+            "gameplay ability action evidenceRefs",
+            &self.evidence_refs,
+        )?;
+        validate_gameplay_behavior_reasons(
+            "gameplay ability action blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        if self.abilities.is_empty() {
+            return Err(anyhow!(
+                "gameplay ability action abilities must not be empty"
+            ));
+        }
+        if self.abilities.len() > MAX_GAMEPLAY_ABILITIES {
+            return Err(anyhow!(
+                "gameplay ability action pack must contain at most {MAX_GAMEPLAY_ABILITIES} abilities"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        let mut action_ids = BTreeSet::new();
+        for ability in &self.abilities {
+            if !ids.insert(ability.id.as_str()) {
+                return Err(anyhow!("duplicate gameplay ability id `{}`", ability.id));
+            }
+            if !action_ids.insert(ability.action_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate gameplay ability actionId `{}`",
+                    ability.action_id
+                ));
+            }
+            ability.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl GameplayAbilityDefinition {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("gameplay ability id", &self.id)?;
+        validate_path_component("gameplay ability actionId", &self.action_id)?;
+        require_bounded_display_text("gameplay ability label", &self.label)?;
+        validate_gameplay_ability_reason_state(
+            "gameplay ability",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_ability_runtime_state(
+            &self.id,
+            self.status,
+            self.runtime_status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_ability_target(&self.id, &self.target)?;
+        validate_gameplay_ability_step(
+            &self.id,
+            "trigger",
+            &self.trigger,
+            gameplay_ability_trigger_kinds(),
+        )?;
+        if let Some(cooldown) = &self.cooldown {
+            cooldown.validate(&self.id)?;
+        }
+        validate_gameplay_ability_costs(&self.id, &self.costs)?;
+        if let Some(duration_ms) = self.duration_ms {
+            validate_gameplay_ability_duration(&self.id, "durationMs", duration_ms)?;
+        }
+        validate_gameplay_ability_step(
+            &self.id,
+            "effect",
+            &self.effect,
+            gameplay_ability_effect_kinds(),
+        )?;
+        validate_gameplay_behavior_refs("gameplay ability evidenceRefs", &self.evidence_refs)?;
+        validate_gameplay_behavior_reasons("gameplay ability blockedReasons", &self.blocked_reasons)
+    }
+}
+
+impl GameplayAbilityCooldown {
+    pub fn validate(&self, ability_id: &str) -> Result<()> {
+        validate_path_component("gameplay ability cooldown id", &self.id)?;
+        validate_gameplay_ability_duration(ability_id, "cooldown.durationMs", self.duration_ms)?;
+        if let Some(remaining_ms) = self.remaining_ms {
+            if remaining_ms > self.duration_ms {
+                return Err(anyhow!(
+                    "gameplay ability `{ability_id}` cooldown remainingMs must not exceed durationMs"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn gameplay_ability_trigger_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "on_input",
+        "on_event",
+        "on_signal",
+        "on_state_entered",
+        "on_timer",
+        "on_contact",
+        "on_collect",
+    ])
+}
+
+fn gameplay_ability_effect_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "movement_impulse",
+        "set_state",
+        "emit_signal",
+        "set_flag",
+        "damage",
+        "heal",
+        "open_door",
+        "complete_objective",
+        "spawn_local_effect",
+        "play_animation",
+    ])
+}
+
+fn gameplay_ability_cost_kinds() -> BTreeSet<&'static str> {
+    BTreeSet::from(["stamina", "mana", "ammo", "item", "charge", "counter"])
+}
+
+fn validate_gameplay_ability_reason_state(
+    field: &str,
+    status: GameplayAbilityActionStatus,
+    reasons: &[String],
+) -> Result<()> {
+    if matches!(
+        status,
+        GameplayAbilityActionStatus::Blocked | GameplayAbilityActionStatus::Unsupported
+    ) && reasons.is_empty()
+    {
+        return Err(anyhow!(
+            "{field} with blocked or unsupported status must include blockedReasons"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_ability_runtime_state(
+    ability_id: &str,
+    status: GameplayAbilityActionStatus,
+    runtime_status: GameplayAbilityRuntimeStatus,
+    blocked_reasons: &[String],
+) -> Result<()> {
+    if matches!(
+        runtime_status,
+        GameplayAbilityRuntimeStatus::Blocked | GameplayAbilityRuntimeStatus::Unsupported
+    ) && blocked_reasons.is_empty()
+    {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` blocked or unsupported runtimeStatus requires blockedReasons"
+        ));
+    }
+    if matches!(status, GameplayAbilityActionStatus::Ready)
+        && matches!(
+            runtime_status,
+            GameplayAbilityRuntimeStatus::Blocked | GameplayAbilityRuntimeStatus::Unsupported
+        )
+    {
+        return Err(anyhow!(
+            "ready gameplay ability `{ability_id}` must not use blocked or unsupported runtimeStatus"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_ability_target(
+    ability_id: &str,
+    target: &BTreeMap<String, String>,
+) -> Result<()> {
+    if target.is_empty() {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` target must not be empty"
+        ));
+    }
+    for (key, value) in target {
+        require_supported_gameplay_ability_key("target", key)?;
+        if key.ends_with("Ref") {
+            validate_repo_relative_source_ref("gameplay ability target ref", value)?;
+        } else {
+            validate_path_component("gameplay ability target", value)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_ability_step(
+    ability_id: &str,
+    field: &str,
+    step: &BTreeMap<String, serde_json::Value>,
+    supported_kinds: BTreeSet<&str>,
+) -> Result<()> {
+    let Some(kind) = step.get("kind").and_then(|value| value.as_str()) else {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` {field} requires string kind"
+        ));
+    };
+    if !supported_kinds.contains(kind) {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` {field} contains unsupported kind `{kind}`"
+        ));
+    }
+    if step.len() > MAX_GAMEPLAY_ABILITY_STEPS {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` {field} payload must be bounded"
+        ));
+    }
+    validate_path_component("gameplay ability step kind", kind)?;
+    for (key, value) in step {
+        require_supported_gameplay_ability_key(field, key)?;
+        validate_gameplay_behavior_value(
+            &format!("gameplay ability `{ability_id}` {field}.{key}"),
+            value,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_gameplay_ability_costs(ability_id: &str, costs: &[GameplayAbilityCost]) -> Result<()> {
+    if costs.len() > MAX_GAMEPLAY_ABILITY_STEPS {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` costs must be bounded"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    let supported = gameplay_ability_cost_kinds();
+    for cost in costs {
+        validate_path_component("gameplay ability cost kind", &cost.kind)?;
+        if !supported.contains(cost.kind.as_str()) {
+            return Err(anyhow!(
+                "gameplay ability `{ability_id}` costs contains unsupported kind `{}`",
+                cost.kind
+            ));
+        }
+        if let Some(resource_id) = &cost.resource_id {
+            validate_path_component("gameplay ability cost resourceId", resource_id)?;
+        }
+        let key = format!(
+            "{}:{}",
+            cost.kind,
+            cost.resource_id.as_deref().unwrap_or("")
+        );
+        if !ids.insert(key) {
+            return Err(anyhow!(
+                "duplicate cost `{}` in gameplay ability `{ability_id}`",
+                cost.kind
+            ));
+        }
+        if cost.amount == 0 || cost.amount > MAX_GAMEPLAY_ABILITY_COST {
+            return Err(anyhow!(
+                "gameplay ability `{ability_id}` cost amount must be between 1 and {MAX_GAMEPLAY_ABILITY_COST}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_ability_duration(
+    ability_id: &str,
+    field: &str,
+    duration_ms: u64,
+) -> Result<()> {
+    if duration_ms == 0 || duration_ms > MAX_GAMEPLAY_ABILITY_DURATION_MS {
+        return Err(anyhow!(
+            "gameplay ability `{ability_id}` {field} must be between 1 and {MAX_GAMEPLAY_ABILITY_DURATION_MS}"
+        ));
+    }
+    Ok(())
+}
+
+fn require_supported_gameplay_ability_key(field: &str, key: &str) -> Result<()> {
+    validate_path_component("gameplay ability field key", key)?;
+    let normalized: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let forbidden = [
+        "script",
+        "command",
+        "commandbridge",
+        "trustedwrite",
+        "dynamicimport",
+        "pluginloader",
+        "eval",
+    ];
+    if forbidden.iter().any(|blocked| normalized.contains(blocked)) {
+        return Err(anyhow!("gameplay ability {field} key `{key}` is forbidden because #614 does not authorize scripts, command bridges, plugin loading, or trusted browser writes"));
+    }
+    Ok(())
+}
+
 const AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION: &str = "agent-generated-level-draft-v1";
 const AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
     "agent-generated-level-draft-read-model-v1";
@@ -67271,6 +67691,100 @@ scenarios:
         let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
         assert!(scope.contains("#614 — State Machine and Ability Action Model v1"));
         assert!(scope.contains("state machines describe permitted states"));
+    }
+
+    #[test]
+    fn gameplay_ability_action_v1_accepts_ready_partial_and_blocked_fixtures() {
+        let ready = GameplayAbilityActionArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-ability-action-v1/ability-action.valid.fixture.json"
+        ))
+        .expect("ready gameplay ability action fixture parses");
+        assert_eq!(ready.schema_version, "gameplay-ability-action.v1");
+        assert_eq!(ready.status, GameplayAbilityActionStatus::Ready);
+        assert_eq!(ready.abilities.len(), 5);
+        assert!(ready
+            .abilities
+            .iter()
+            .any(|ability| ability.action_id == "action-dash"));
+        assert!(ready.abilities.iter().any(|ability| {
+            ability.runtime_status == GameplayAbilityRuntimeStatus::OnCooldown
+                && ability.cooldown.as_ref().is_some_and(|cooldown| {
+                    cooldown.id == "strike-cooldown" && cooldown.remaining_ms == Some(700)
+                })
+        }));
+
+        let partial = GameplayAbilityActionArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-ability-action-v1/ability-action.partial.fixture.json"
+        ))
+        .expect("partial gameplay ability action fixture parses");
+        assert_eq!(partial.status, GameplayAbilityActionStatus::Partial);
+        assert!(partial.abilities[0].blocked_reasons[0].contains("GL10.4.3"));
+
+        let blocked = GameplayAbilityActionArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-ability-action-v1/ability-action.blocked.fixture.json"
+        ))
+        .expect("blocked gameplay ability action fixture parses");
+        assert_eq!(blocked.status, GameplayAbilityActionStatus::Blocked);
+        assert!(blocked.blocked_reasons[0].contains("GL10.4.3"));
+    }
+
+    #[test]
+    fn gameplay_ability_action_v1_rejects_invalid_fixture_and_cost_cooldown_drift() {
+        let invalid = GameplayAbilityActionArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-ability-action-v1/invalid/ability-action.invalid.fixture.json"
+        ))
+        .expect_err("invalid gameplay ability action fixture is rejected");
+        assert!(
+            invalid.to_string().contains("target must not be empty")
+                || invalid.to_string().contains("unsupported kind")
+                || invalid.to_string().contains("durationMs")
+                || invalid
+                    .to_string()
+                    .contains("failed to parse Gameplay Ability Action JSON"),
+            "unexpected invalid fixture error: {invalid}"
+        );
+
+        let bad_cooldown = r#"{
+          "schemaVersion":"gameplay-ability-action.v1",
+          "abilityPackId":"bad-cooldown-pack",
+          "scope":"local-fixture",
+          "status":"ready",
+          "abilities":[{"id":"bad","actionId":"action-bad","label":"Bad","status":"ready","runtimeStatus":"on_cooldown","target":{"entityId":"player"},"trigger":{"kind":"on_input","inputActionId":"dash"},"cooldown":{"id":"bad-cooldown","durationMs":100,"remainingMs":101},"costs":[{"kind":"stamina","resourceId":"stamina","amount":1}],"durationMs":10,"effect":{"kind":"movement_impulse","vectorId":"forward"},"evidenceRefs":[],"blockedReasons":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let cooldown_error = GameplayAbilityActionArtifact::from_json_str(bad_cooldown)
+            .expect_err("cooldown remainingMs must not exceed durationMs");
+        assert!(cooldown_error.to_string().contains("remainingMs"));
+
+        let bad_cost = r#"{
+          "schemaVersion":"gameplay-ability-action.v1",
+          "abilityPackId":"bad-cost-pack",
+          "scope":"local-fixture",
+          "status":"ready",
+          "abilities":[{"id":"bad","actionId":"action-bad","label":"Bad","status":"ready","runtimeStatus":"available","target":{"entityId":"player"},"trigger":{"kind":"on_input","inputActionId":"dash"},"cooldown":null,"costs":[{"kind":"stamina","resourceId":"stamina","amount":0}],"durationMs":10,"effect":{"kind":"movement_impulse","vectorId":"forward"},"evidenceRefs":[],"blockedReasons":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let cost_error = GameplayAbilityActionArtifact::from_json_str(bad_cost)
+            .expect_err("zero cost amount is rejected");
+        assert!(cost_error.to_string().contains("cost amount"));
+    }
+
+    #[test]
+    fn gameplay_ability_action_v1_docs_audit_no_script_boundary() {
+        let doc = include_str!("../../../docs/gameplay-ability-action-v1.md");
+        assert!(doc.contains("Issue: #614"));
+        assert!(doc.contains("structured data contract"));
+        assert!(doc.contains("player dash"));
+        assert!(doc.contains("runtime status"));
+        assert!(doc.contains("does not authorize arbitrary"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#614 — State Machine and Ability Action Model v1"));
+        assert!(scope.contains("abilities/actions describe bounded commands, action ids"));
     }
 
     #[test]

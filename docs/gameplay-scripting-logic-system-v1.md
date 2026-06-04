@@ -59,7 +59,7 @@ Follow-up work must keep these concepts separate:
 - behavior models describe declarative local gameplay intent and bindings;
 - events and signals describe deterministic observations and dispatch contracts;
 - state machines describe permitted states, transitions, guards, and effects;
-- abilities/actions describe bounded commands that the runtime may interpret;
+- abilities/actions describe bounded commands, action ids, triggers, cooldowns, costs, durations, effects, targets, and runtime status that a future runtime may interpret;
 - script module interfaces describe a future expansion boundary only, not an
   executable runtime;
 - sandbox/trust-boundary documents describe threat models and authorization

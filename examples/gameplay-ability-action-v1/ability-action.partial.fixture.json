@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "gameplay-ability-action.v1",
+  "abilityPackId": "partial-ability-actions",
+  "scope": "local-fixture",
+  "status": "partial",
+  "abilities": [
+    {
+      "id": "enemy-patrol-alert-action",
+      "actionId": "action-enemy-alert-transition",
+      "label": "Enemy patrol alert action",
+      "status": "partial",
+      "runtimeStatus": "insufficient_cost",
+      "target": { "entityId": "guard", "componentId": "ai-state" },
+      "trigger": { "kind": "on_state_entered", "stateId": "alert" },
+      "cooldown": { "id": "alert-action-cooldown", "durationMs": 900 },
+      "costs": [{ "kind": "counter", "resourceId": "alert-observations", "amount": 2 }],
+      "durationMs": 300,
+      "effect": { "kind": "set_state", "stateId": "chase" },
+      "evidenceRefs": ["examples/gameplay-state-machine-v1/state-machine.partial.fixture.json"],
+      "blockedReasons": ["GL10.4.3 must connect ability status evidence to the read model before this is complete."]
+    }
+  ],
+  "evidenceRefs": ["docs/gameplay-ability-action-v1.md"],
+  "blockedReasons": []
+}
