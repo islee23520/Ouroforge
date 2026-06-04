@@ -66,6 +66,16 @@
       renderedEntities: [],
     }),
     drawRuntime: () => [],
+    renderBreakdown: ({ world = {}, renderer: state = {}, frameId = `tick-${world.tick ?? 0}` } = {}) => ({
+      schemaVersion: 'ouroforge.scene-render-breakdown.v1',
+      frameId: String(frameId),
+      sceneId: String(world.sceneId || 'unknown'),
+      camera: clone((state && state.camera) || { x: 0, y: 0 }),
+      viewport: clone((state && state.viewport) || world.bounds || { width: 320, height: 180 }),
+      elements: [],
+      absenceDiagnostics: [],
+      readOnlyInspection: { trustedEmitter: 'browser-runtime-evidence-helper', browserStudioMode: 'read-only evidence inspection', disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+    }),
   };
   const defaultScene = {
     schemaVersion: '1',
@@ -881,7 +891,9 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      const frameId = `tick-${world.tick}`;
       state.renderer = renderer.debugState(rendererState, world.entities);
+      state.renderBreakdown = renderer.renderBreakdown({ world: state, renderer: rendererState, frameId });
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
       state.componentModel = componentModelDebugState(world.entities);
@@ -897,7 +909,7 @@
       return state;
     },
     getFrameStats() {
-      return clone({ tick: world.tick, fixedDeltaMs, entityCount: world.entities.length, eventCount: events.length });
+      return clone({ tick: world.tick, fixedDeltaMs, entityCount: world.entities.length, eventCount: events.length, renderBreakdownFrameId: `tick-${world.tick}` });
     },
     getEvents() {
       return clone(events);

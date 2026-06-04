@@ -26014,6 +26014,7 @@ pub struct RunDashboardEngineSummaries {
     pub scene: serde_json::Value,
     pub components: serde_json::Value,
     pub renderer: serde_json::Value,
+    pub render_breakdown: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
@@ -27799,6 +27800,7 @@ fn read_dashboard_engine_summaries(
             scene: json!({}),
             components: json!({}),
             renderer: json!({}),
+            render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
@@ -27833,6 +27835,7 @@ fn read_dashboard_engine_summaries(
             "renderedEntities": dashboard_array_len(world_state.pointer("/renderer/renderedEntities")),
             "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null))
         }),
+        render_breakdown: dashboard_render_breakdown_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
@@ -27876,6 +27879,55 @@ fn read_dashboard_engine_summaries(
                 .unwrap_or(0)
         }),
     }
+}
+
+fn dashboard_render_breakdown_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(breakdown) = world_state.get("renderBreakdown") else {
+        return json!({
+            "present": false,
+            "emptyState": "No scene render breakdown evidence is available."
+        });
+    };
+    if !breakdown.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "Scene render breakdown evidence is malformed."
+        });
+    }
+    let elements = breakdown
+        .get("elements")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let absence = breakdown
+        .get("absenceDiagnostics")
+        .or_else(|| breakdown.get("absence_diagnostics"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let read_only = breakdown
+        .get("readOnlyInspection")
+        .or_else(|| breakdown.get("read_only_inspection"))
+        .cloned()
+        .unwrap_or_else(|| {
+            json!({
+                "trustedEmitter": "unknown",
+                "browserStudioMode": "read-only evidence inspection",
+                "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+            })
+        });
+    json!({
+        "present": true,
+        "schemaVersion": breakdown.get("schemaVersion").cloned().unwrap_or(json!(null)),
+        "frameId": breakdown.get("frameId").or_else(|| breakdown.get("frame_id")).cloned().unwrap_or(json!(null)),
+        "sceneId": breakdown.get("sceneId").or_else(|| breakdown.get("scene_id")).cloned().unwrap_or(json!(null)),
+        "elementCount": elements.len(),
+        "absenceDiagnosticCount": absence.len(),
+        "elements": elements,
+        "absenceDiagnostics": absence,
+        "readOnlyInspection": read_only
+    })
 }
 
 fn dashboard_gameplay_summary(world_state: &serde_json::Value) -> serde_json::Value {
@@ -45394,6 +45446,14 @@ scenarios:
                     }
                 }],
                 "renderer": { "version": "1", "camera": { "x": 0, "y": 0 }, "renderedEntities": [{ "entityId": "player" }] },
+                "renderBreakdown": {
+                    "schemaVersion": "ouroforge.scene-render-breakdown.v1",
+                    "frameId": "tick-4",
+                    "sceneId": "foundation-scene",
+                    "elements": [{ "renderableId": "entity:player", "entityId": "player", "drawOrder": 0, "layer": "actors", "primitiveCategory": "sprite" }],
+                    "absenceDiagnostics": [{ "renderableId": "entity:hidden", "entityId": "hidden", "reason": "hidden", "detail": "sprite.visible=false" }],
+                    "readOnlyInspection": { "trustedEmitter": "browser-runtime-evidence-helper", "browserStudioMode": "read-only evidence inspection", "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
+                },
                 "tilemaps": {
                     "tilemaps": [{
                         "id": "platformer-ground",
@@ -45454,6 +45514,26 @@ scenarios:
         assert_eq!(
             model.engine_summaries.renderer["renderedEntities"],
             json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["present"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["frameId"],
+            json!("tick-4")
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["elementCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["absenceDiagnosticCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["readOnlyInspection"]["disallowedActions"],
+            json!(["trusted writes", "command bridge", "live mutation"])
         );
         assert_eq!(
             model.engine_summaries.components["componentCounts"]["collider"],
@@ -45557,6 +45637,56 @@ scenarios:
         assert!(journal.contains(
             "Trigger components: `1`; goalFlag components: `1`; HUD value components: `2`; trigger collision events: `1`"
         ));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_reports_malformed_render_breakdown() {
+        let (root, artifacts) = create_test_run("dashboard-render-breakdown-malformed");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"pending\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "sceneId": "malformed-breakdown-scene",
+                "tick": 1,
+                "entities": [],
+                "renderBreakdown": "not-an-object"
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(
+            model.engine_summaries.render_breakdown["present"],
+            json!(false)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.render_breakdown["emptyState"],
+            json!("Scene render breakdown evidence is malformed.")
+        );
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

@@ -50,6 +50,13 @@ function createRuntime() {
   assert.equal(state.entities.find((entity) => entity.id === 'player').components.animation.mode, 'sprite_frame');
   assert.equal(state.assetManifest.id, 'collect-and-exit-runtime-assets');
   assert.equal(state.assetManifest.assetCount, 2);
+  assert.equal(state.renderBreakdown.schemaVersion, 'ouroforge.scene-render-breakdown.v1');
+  assert.equal(state.renderBreakdown.frameId, 'tick-0');
+  assert.equal(state.renderBreakdown.sceneId, state.sceneId);
+  assert.ok(state.renderBreakdown.elements.some((element) => element.entityId === 'player'));
+  assert.ok(Array.isArray(state.renderBreakdown.absenceDiagnostics));
+  assert.deepEqual(Array.from(state.renderBreakdown.readOnlyInspection.disallowedActions), ['trusted writes', 'command bridge', 'live mutation']);
+  assert.equal(api.getFrameStats().renderBreakdownFrameId, state.renderBreakdown.frameId);
   assert.equal(state.assetManifest.errors.length, 0);
   assert.ok(state.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
   assert.equal(state.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
@@ -62,6 +69,8 @@ function createRuntime() {
   assert.equal(state.componentModel.goalFlags.key_collected, true);
   assert.equal(state.componentModel.goalFlags.door_open, true);
   assert.equal(state.entities.find((entity) => entity.id === 'key').sprite.visible, false);
+  assert.equal(state.renderBreakdown.frameId, 'tick-40');
+  assert.ok(state.renderBreakdown.absenceDiagnostics.some((diag) => diag.entityId === 'key' && diag.reason === 'hidden'));
   assert.ok(api.getEvents().some((event) => event.type === 'runtime.trigger.entered' && event.payload.triggerId === 'collect_key'));
 
   state = api.step(45);
