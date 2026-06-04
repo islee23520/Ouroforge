@@ -14,14 +14,15 @@ use ouroforge_core::{
     build_studio_loop_cockpit_read_model, create_minimal_2d_project_scaffold,
     create_mutation_proposal, create_run, edit_scene, evaluate_run, evolve_run,
     execute_authoring_loop_step_from_path, hash_project_manifest_file, hash_scene_document,
-    list_agent_handoff_contracts, list_authoring_loop_evidence_bundles, list_dashboard_runs,
-    list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
-    preview_scene_edit_transaction, project_run_metadata_from_manifest,
-    promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
-    read_ledger_events, read_runtime_frame_budget, read_scene,
-    reject_already_applied_visual_edit_draft_decision, reject_generated_artifact_source_collision,
-    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
-    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    list_agent_handoff_contracts, list_agent_handoff_v2_contracts,
+    list_authoring_loop_evidence_bundles, list_dashboard_runs, list_evidence_artifacts,
+    list_mutation_proposals, orchestrate_evolve_rerun_from_path, preview_scene_edit_transaction,
+    project_run_metadata_from_manifest, promote_regression_draft_to_scenario_pack,
+    read_cdp_targets, read_dashboard_run, read_ledger_events, read_runtime_frame_budget,
+    read_scene, reject_already_applied_visual_edit_draft_decision,
+    reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
+    run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
+    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     source_patch_preview_read_model, update_journal, validate_scene_reload,
     validate_source_patch_preview_artifact, validate_visual_edit_draft_review_preflight,
     write_agent_handoff_contract_from_path, write_regression_promotion_draft,
@@ -1007,8 +1008,12 @@ fn main() -> Result<()> {
             let regression_matrix = build_regression_run_matrix(&runs_root)?;
             let loop_evidence_bundles = list_authoring_loop_evidence_bundles(&runs_root)?;
             let agent_handoffs = list_agent_handoff_contracts(&runs_root)?;
-            let loop_cockpit =
-                build_studio_loop_cockpit_read_model(&loop_evidence_bundles, &agent_handoffs);
+            let agent_handoff_v2s = list_agent_handoff_v2_contracts(&runs_root)?;
+            let loop_cockpit = build_studio_loop_cockpit_read_model(
+                &loop_evidence_bundles,
+                &agent_handoffs,
+                &agent_handoff_v2s,
+            );
             let payload = serde_json::json!({
                 "schema": "ouroforge-dashboard-v1",
                 "runs_root": runs_root,
@@ -1016,6 +1021,7 @@ fn main() -> Result<()> {
                 "regression_matrix": regression_matrix,
                 "loop_evidence_bundles": loop_evidence_bundles,
                 "agent_handoffs": agent_handoffs,
+                "agent_handoff_v2s": agent_handoff_v2s,
                 "loop_cockpit": loop_cockpit
             });
             if let Some(parent) = output.parent() {

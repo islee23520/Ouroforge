@@ -1433,18 +1433,28 @@ const OuroforgeDashboard = (() => {
       return '<section class="panel agent-handoffs"><h3>Agent handoff</h3><p class="empty-state">No agent handoff is attached to this dashboard data.</p></section>';
     }
     const cards = handoffs.map((handoff) => {
+      const isV2 = handoff.schemaVersion === 'agent-handoff-v2';
       const blockers = Array.isArray(handoff.blockers) ? handoff.blockers : [];
-      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : [];
+      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : Array.isArray(handoff.decisions) ? handoff.decisions : [];
       const allowed = Array.isArray(handoff.allowedCommands) ? handoff.allowedCommands : [];
       const forbidden = Array.isArray(handoff.forbiddenActions) ? handoff.forbiddenActions : [];
-      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : [];
+      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : Array.isArray(handoff.evidenceLinks) ? handoff.evidenceLinks : [];
       const guardrails = Array.isArray(handoff.driftGuardrails) ? handoff.driftGuardrails : [];
+      const risks = Array.isArray(handoff.openRisks) ? handoff.openRisks : [];
+      const stale = Array.isArray(handoff.staleStateIndicators) ? handoff.staleStateIndicators : [];
+      const checklist = Array.isArray(handoff.acceptanceChecklist) ? handoff.acceptanceChecklist : [];
+      const title = handoff.loopId || handoff.handoffId || handoff.taskId || 'unknown-handoff';
+      const nextAction = handoff.nextSafeAction || handoff.nextRecommendedAction || 'unrecorded';
       return `<article class="artifact agent-handoff">
-        <h4>${escapeText(handoff.loopId || 'unknown-loop')}</h4>
-        <div class="run-meta"><span class="${statusClass(handoff.status || 'unknown')}">${escapeText(handoff.status || 'unknown')}</span> · step ${escapeText(handoff.currentStep?.stepId || 'none')}</div>
-        <div class="run-meta">Next safe action: ${escapeText(handoff.nextSafeAction || 'unrecorded')}</div>
+        <h4>${escapeText(title)}</h4>
+        <div class="run-meta"><span class="${statusClass(handoff.status || 'unknown')}">${escapeText(handoff.status || 'unknown')}</span> · ${isV2 ? `task ${escapeText(handoff.taskId || 'unknown-task')}` : `step ${escapeText(handoff.currentStep?.stepId || 'none')}`}</div>
+        ${isV2 ? `<div class="run-meta">Roles: ${escapeText(handoff.fromRole || 'unknown')} → ${escapeText(handoff.toRole || 'unknown')}</div>` : ''}
+        <div class="run-meta">Next safe action: ${escapeText(nextAction)}</div>
         ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${risks.length ? `<div class="artifact-warning">Open risks: ${escapeText(risks.map((risk) => `${risk.id || 'risk'}:${risk.severity || 'unknown'}:${risk.description || 'missing'}`).join(' · '))}</div>` : '<div class="run-meta">No open risks reported.</div>'}
+        ${stale.length ? `<div class="artifact-warning">Stale state: ${escapeText(stale.map((item) => `${item.id || 'stale'}:${item.reason || 'missing'}:${item.nextAction || 'inspect'}`).join(' · '))}</div>` : '<div class="run-meta">No stale state indicators reported.</div>'}
         ${decisions.length ? `<div class="run-meta">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="run-meta">No required decisions reported.</div>'}
+        <div class="run-meta">Acceptance checklist: ${escapeText(checklist.map((item) => `${item.id || 'item'}:${item.checked ? 'checked' : 'unchecked'}`).join(' · ') || 'none')}</div>
         <div class="run-meta">Allowed command text: ${escapeText(allowed.map((command) => command.command || '').filter(Boolean).join(' · ') || 'none')}</div>
         <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
         <div class="run-meta">Evidence refs: ${escapeText(evidence.map((ref) => `${ref.id || 'ref'}:${ref.path || 'missing'}`).join(' · ') || 'none')}</div>
@@ -1697,7 +1707,10 @@ const OuroforgeDashboard = (() => {
       ${renderProductionTaskBoards(run.production_task_boards || run.productionTaskBoards || run.production_task_board || run.productionTaskBoard || null)}
       ${renderOwnershipPolicies(run.ownership_policies || run.ownershipPolicies || run.ownership_policy || run.ownershipPolicy || null)}
       ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
-      ${renderAgentHandoffs(agentHandoffs || run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null)}
+      ${renderAgentHandoffs(agentHandoffs || [
+        ...normalizeAgentHandoffs(run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null),
+        ...normalizeAgentHandoffs(run.agent_handoff_v2s || run.agentHandoffV2s || null),
+      ])}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
@@ -1735,7 +1748,10 @@ const OuroforgeDashboard = (() => {
       };
       const paint = () => {
         listEl.innerHTML = renderRunList(runs, selected && selected.summary.id);
-        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null, data.agent_handoffs || data.agentHandoffs || null);
+        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null, [
+          ...normalizeAgentHandoffs(data.agent_handoffs || data.agentHandoffs || null),
+          ...normalizeAgentHandoffs(data.agent_handoff_v2s || data.agentHandoffV2s || null),
+        ]);
         listEl.querySelectorAll('[data-run-id]').forEach((button) => {
           button.addEventListener('click', () => {
             selected = runs.find((run) => run.summary.id === button.dataset.runId) || null;

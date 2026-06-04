@@ -1162,6 +1162,16 @@ assert.doesNotMatch(dashboard.renderAgentHandoffs(run.agent_handoffs), /<handoff
 assert.doesNotMatch(dashboard.renderAgentHandoffs(run.agent_handoffs), /<button/i);
 assert.match(dashboard.renderRunDetail(run), /Agent handoff/);
 assert.match(dashboard.renderAgentHandoffs(null), /No agent handoff/);
+
+const handoffV2Fixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-handoff-v2.blocked.fixture.json', 'utf8'));
+const handoffV2Markup = dashboard.renderAgentHandoffs([handoffV2Fixture]);
+assert.match(handoffV2Markup, /handoff-v2-blocked/);
+assert.match(handoffV2Markup, /task-board-schema/);
+assert.match(handoffV2Markup, /Open risks/);
+assert.match(handoffV2Markup, /missing-review-risk/);
+assert.match(handoffV2Markup, /Acceptance checklist/);
+assert.doesNotMatch(handoffV2Markup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(dashboard.renderRunDetail({ agent_handoff_v2s: [handoffV2Fixture] }), /Open risks/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /Authoring loop evidence bundle/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /partial/);
 assert.match(dashboard.renderLoopEvidenceBundles(run.loop_evidence_bundles), /&lt;loop-bundle&gt;/);

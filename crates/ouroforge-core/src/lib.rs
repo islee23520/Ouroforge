@@ -4335,6 +4335,23 @@ pub struct StudioLoopCockpitLoop {
     pub bundle_missing_refs: Vec<String>,
     #[serde(rename = "handoffStatus", skip_serializing_if = "Option::is_none")]
     pub handoff_status: Option<String>,
+    #[serde(rename = "handoffId", skip_serializing_if = "Option::is_none")]
+    pub handoff_id: Option<String>,
+    #[serde(rename = "fromRole", skip_serializing_if = "Option::is_none")]
+    pub from_role: Option<String>,
+    #[serde(rename = "toRole", skip_serializing_if = "Option::is_none")]
+    pub to_role: Option<String>,
+    #[serde(rename = "taskId", skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    #[serde(rename = "artifactRefs")]
+    pub artifact_refs: Vec<AuthoringLoopArtifactRef>,
+    pub assumptions: Vec<String>,
+    #[serde(rename = "openRisks")]
+    pub open_risks: Vec<AgentHandoffRisk>,
+    #[serde(rename = "acceptanceChecklist")]
+    pub acceptance_checklist: Vec<AgentHandoffChecklistItem>,
+    #[serde(rename = "staleStateIndicators")]
+    pub stale_state_indicators: Vec<AgentHandoffStaleStateIndicator>,
     #[serde(rename = "driftGuardrails")]
     pub drift_guardrails: Vec<String>,
     pub boundary: String,
@@ -4343,6 +4360,7 @@ pub struct StudioLoopCockpitLoop {
 pub fn build_studio_loop_cockpit_read_model(
     bundles: &[AuthoringLoopEvidenceBundle],
     handoffs: &[AgentHandoffContract],
+    handoff_v2s: &[AgentHandoffV2],
 ) -> StudioLoopCockpitReadModel {
     let mut loops = BTreeMap::<String, StudioLoopCockpitLoop>::new();
     for bundle in bundles {
@@ -4383,6 +4401,38 @@ pub fn build_studio_loop_cockpit_read_model(
         }
         entry.handoff_status = Some(handoff.status.as_str().to_string());
         entry.drift_guardrails = handoff.drift_guardrails.clone();
+        entry.boundary = format!("{} {}", entry.boundary, handoff.boundary);
+    }
+    for handoff in handoff_v2s {
+        let entry = loops.entry(handoff.task_id.clone()).or_insert_with(|| StudioLoopCockpitLoop {
+            loop_id: handoff.task_id.clone(),
+            status: handoff.status.as_str().to_string(),
+            boundary: "Read-only Studio loop cockpit data; browser displays only and does not execute commands or write files.".to_string(),
+            ..StudioLoopCockpitLoop::default()
+        });
+        entry.status = handoff.status.as_str().to_string();
+        entry.handoff_status = Some(handoff.status.as_str().to_string());
+        entry.handoff_id = Some(handoff.handoff_id.clone());
+        entry.from_role = Some(handoff.from_role.clone());
+        entry.to_role = Some(handoff.to_role.clone());
+        entry.task_id = Some(handoff.task_id.clone());
+        entry.next_safe_action = Some(handoff.next_recommended_action.clone());
+        entry.required_decisions = handoff.decisions.clone();
+        entry.forbidden_actions = handoff.forbidden_actions.clone();
+        entry.evidence_refs = handoff.evidence_links.clone();
+        entry.artifact_refs = handoff.artifact_refs.clone();
+        entry.assumptions = handoff.assumptions.clone();
+        entry.open_risks = handoff.open_risks.clone();
+        entry.acceptance_checklist = handoff.acceptance_checklist.clone();
+        entry.stale_state_indicators = handoff.stale_state_indicators.clone();
+        if entry.plan_path.is_none() {
+            entry.plan_path = handoff
+                .artifact_refs
+                .iter()
+                .chain(handoff.evidence_links.iter())
+                .find(|reference| reference.id == "loop-plan" || reference.id == "task-board")
+                .map(|reference| reference.path.clone());
+        }
         entry.boundary = format!("{} {}", entry.boundary, handoff.boundary);
     }
     StudioLoopCockpitReadModel {
@@ -4582,11 +4632,61 @@ pub fn list_agent_handoff_contracts(
         }
         let body = fs::read_to_string(&path)
             .with_context(|| format!("failed to read agent handoff {}", path.display()))?;
+        let schema_version = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("schemaVersion")
+                    .and_then(|schema| schema.as_str())
+                    .map(str::to_string)
+            });
+        if schema_version.as_deref() == Some(AGENT_HANDOFF_V2_SCHEMA_VERSION) {
+            continue;
+        }
         let handoff = AgentHandoffContract::from_json_str(&body)
             .with_context(|| format!("failed to validate agent handoff {}", path.display()))?;
         handoffs.push(handoff);
     }
     handoffs.sort_by(|left, right| left.loop_id.cmp(&right.loop_id));
+    Ok(handoffs)
+}
+
+pub fn list_agent_handoff_v2_contracts(runs_root: impl AsRef<Path>) -> Result<Vec<AgentHandoffV2>> {
+    let runs_root = runs_root.as_ref();
+    let handoff_root = runs_root.join("agent-handoffs");
+    if !handoff_root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut handoffs = Vec::new();
+    for entry in fs::read_dir(&handoff_root).with_context(|| {
+        format!(
+            "failed to read agent handoff root {}",
+            handoff_root.display()
+        )
+    })? {
+        let entry = entry.context("failed to read agent handoff root entry")?;
+        let path = entry.path().join("handoff.json");
+        if !path.is_file() {
+            continue;
+        }
+        let body = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read agent handoff v2 {}", path.display()))?;
+        let schema_version = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("schemaVersion")
+                    .and_then(|schema| schema.as_str())
+                    .map(str::to_string)
+            });
+        if schema_version.as_deref() != Some(AGENT_HANDOFF_V2_SCHEMA_VERSION) {
+            continue;
+        }
+        let handoff = AgentHandoffV2::from_json_str(&body)
+            .with_context(|| format!("failed to validate agent handoff v2 {}", path.display()))?;
+        handoffs.push(handoff);
+    }
+    handoffs.sort_by(|left, right| left.handoff_id.cmp(&right.handoff_id));
     Ok(handoffs)
 }
 
@@ -41547,14 +41647,35 @@ scenarios:
         );
         assert!(bundle.generated_state.tracked_fixture_only);
 
+        let handoff_v2_body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.blocked.fixture.json",
+        );
+        let handoff_v2 = AgentHandoffV2::from_json_str(&handoff_v2_body)
+            .expect("handoff v2 fixture validates for cockpit projection");
         let cockpit = build_studio_loop_cockpit_read_model(
             std::slice::from_ref(&bundle),
             std::slice::from_ref(&handoff),
+            std::slice::from_ref(&handoff_v2),
         );
-        assert_eq!(cockpit.loops.len(), 1);
-        assert_eq!(cockpit.loops[0].loop_id, "multi-agent-demo-fixture");
-        assert_eq!(cockpit.loops[0].handoff_status.as_deref(), Some("ready"));
-        assert_eq!(cockpit.loops[0].bundle_status.as_deref(), Some("partial"));
+        assert_eq!(cockpit.loops.len(), 2);
+        let v1_loop = cockpit
+            .loops
+            .iter()
+            .find(|loop_row| loop_row.loop_id == "multi-agent-demo-fixture")
+            .expect("v1 handoff loop remains present");
+        assert_eq!(v1_loop.handoff_status.as_deref(), Some("ready"));
+        assert_eq!(v1_loop.bundle_status.as_deref(), Some("partial"));
+        let v2_loop = cockpit
+            .loops
+            .iter()
+            .find(|loop_row| loop_row.handoff_id.as_deref() == Some("handoff-v2-blocked"))
+            .expect("v2 handoff projection remains present");
+        assert_eq!(v2_loop.loop_id, "task-board-schema");
+        assert_eq!(v2_loop.handoff_status.as_deref(), Some("blocked"));
+        assert_eq!(v2_loop.from_role.as_deref(), Some("designer"));
+        assert_eq!(v2_loop.to_role.as_deref(), Some("reviewer"));
+        assert!(!v2_loop.open_risks.is_empty());
+        assert!(!v2_loop.acceptance_checklist.is_empty());
         assert!(cockpit.boundary.contains("does not execute commands"));
 
         let ownership: serde_json::Value = serde_json::from_str(&read_json_fixture(
@@ -41697,7 +41818,7 @@ scenarios:
         assert!(bundle.boundary.contains("spawn agents"));
         assert!(bundle.boundary.contains("claim production readiness"));
 
-        let cockpit = build_studio_loop_cockpit_read_model(std::slice::from_ref(&bundle), &[]);
+        let cockpit = build_studio_loop_cockpit_read_model(std::slice::from_ref(&bundle), &[], &[]);
         assert_eq!(cockpit.loops.len(), 1);
         assert_eq!(cockpit.loops[0].bundle_status.as_deref(), Some("completed"));
         assert!(cockpit.loops[0].bundle_missing_refs.is_empty());
@@ -44023,6 +44144,7 @@ scenarios:
         let cockpit = build_studio_loop_cockpit_read_model(
             std::slice::from_ref(&bundle),
             std::slice::from_ref(&handoff),
+            &[],
         );
         assert_eq!(cockpit.schema_version, STUDIO_LOOP_COCKPIT_SCHEMA_VERSION);
         assert!(cockpit.boundary.contains("does not execute commands"));
@@ -44285,7 +44407,7 @@ scenarios:
             &plan_path,
         )
         .expect("bundle read-model builds");
-        let cockpit = build_studio_loop_cockpit_read_model(&[bundle], &listed);
+        let cockpit = build_studio_loop_cockpit_read_model(&[bundle], &listed, &[]);
         assert_eq!(cockpit.schema_version, STUDIO_LOOP_COCKPIT_SCHEMA_VERSION);
         assert_eq!(cockpit.loops.len(), 1);
         assert_eq!(cockpit.loops[0].loop_id, "temp-loop");

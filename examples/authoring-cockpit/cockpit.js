@@ -2097,6 +2097,8 @@ const OuroforgeCockpit = (() => {
       const allowed = Array.isArray(loop.allowedCommands) ? loop.allowedCommands : [];
       const forbidden = Array.isArray(loop.forbiddenActions) ? loop.forbiddenActions : [];
       const evidence = Array.isArray(loop.evidenceRefs) ? loop.evidenceRefs : [];
+      const risks = Array.isArray(loop.openRisks) ? loop.openRisks : [];
+      const stale = Array.isArray(loop.staleStateIndicators) ? loop.staleStateIndicators : [];
       const missing = Array.isArray(loop.bundleMissingRefs) ? loop.bundleMissingRefs : [];
       const current = loop.currentStep && typeof loop.currentStep === 'object' ? loop.currentStep : null;
       const status = loop.status || loop.bundleStatus || loop.handoffStatus || 'unknown';
@@ -2108,6 +2110,8 @@ const OuroforgeCockpit = (() => {
         ${renderLoopCockpitTimeline(loop)}
         <div class="hint">Next safe action: ${escapeText(loop.nextSafeAction || 'unrecorded')}</div>
         ${blockers.length ? `<div class="hint">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="hint">No blockers reported.</div>'}
+        ${risks.length ? `<div class="hint">Open risks: ${escapeText(risks.map((risk) => `${risk.id || 'risk'}:${risk.severity || 'unknown'}:${risk.description || 'missing'}`).join(' · '))}</div>` : '<div class="hint">No open risks reported.</div>'}
+        ${stale.length ? `<div class="hint">Stale state: ${escapeText(stale.map((item) => `${item.id || 'stale'}:${item.reason || 'missing'}:${item.nextAction || 'inspect'}`).join(' · '))}</div>` : '<div class="hint">No stale state indicators reported.</div>'}
         ${decisions.length ? `<div class="hint">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="hint">No required decisions reported.</div>'}
         <div class="hint">Allowed command text: ${escapeText(commandText || 'none')}</div>
         <div class="hint">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
@@ -2208,23 +2212,35 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderAgentHandoffSurface(run) {
-    const handoffs = normalizeAgentHandoffs(run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
+    const handoffs = [
+      ...normalizeAgentHandoffs(run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null),
+      ...normalizeAgentHandoffs(run?.agent_handoff_v2s || run?.agentHandoffV2s || null),
+    ];
     if (!handoffs.length) {
       return '<section id="agent-handoff" class="panel"><h2>Agent handoff</h2><p class="empty">No agent handoff is attached to dashboard-data.json. Generate one with the Rust CLI and keep it under local generated state.</p></section>';
     }
     const rows = handoffs.map((handoff) => {
+      const isV2 = handoff.schemaVersion === 'agent-handoff-v2';
       const blockers = Array.isArray(handoff.blockers) ? handoff.blockers : [];
-      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : [];
+      const decisions = Array.isArray(handoff.requiredDecisions) ? handoff.requiredDecisions : Array.isArray(handoff.decisions) ? handoff.decisions : [];
       const allowed = Array.isArray(handoff.allowedCommands) ? handoff.allowedCommands : [];
       const forbidden = Array.isArray(handoff.forbiddenActions) ? handoff.forbiddenActions : [];
-      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : [];
+      const evidence = Array.isArray(handoff.evidenceRefs) ? handoff.evidenceRefs : Array.isArray(handoff.evidenceLinks) ? handoff.evidenceLinks : [];
       const guardrails = Array.isArray(handoff.driftGuardrails) ? handoff.driftGuardrails : [];
+      const risks = Array.isArray(handoff.openRisks) ? handoff.openRisks : [];
+      const stale = Array.isArray(handoff.staleStateIndicators) ? handoff.staleStateIndicators : [];
+      const checklist = Array.isArray(handoff.acceptanceChecklist) ? handoff.acceptanceChecklist : [];
       const commandText = allowed.map((command) => command.command || '').filter(Boolean).join(' · ');
-      return `<div class="surface-row"><strong>${escapeText(handoff.loopId || 'unknown-loop')}</strong> ${surfaceState(Boolean(handoff.status), handoff.status || 'unknown')}<br>
-        <small>Step: ${escapeText(handoff.currentStep?.stepId || 'none')} · ${escapeText(handoff.currentStep?.kind || 'unknown')}</small>
-        <div class="hint">Next safe action: ${escapeText(handoff.nextSafeAction || 'unrecorded')}</div>
+      const title = handoff.loopId || handoff.handoffId || handoff.taskId || 'unknown-handoff';
+      const nextAction = handoff.nextSafeAction || handoff.nextRecommendedAction || 'unrecorded';
+      return `<div class="surface-row"><strong>${escapeText(title)}</strong> ${surfaceState(Boolean(handoff.status), handoff.status || 'unknown')}<br>
+        <small>${isV2 ? `Task: ${escapeText(handoff.taskId || 'unknown')} · ${escapeText(handoff.fromRole || 'unknown')} → ${escapeText(handoff.toRole || 'unknown')}` : `Step: ${escapeText(handoff.currentStep?.stepId || 'none')} · ${escapeText(handoff.currentStep?.kind || 'unknown')}`}</small>
+        <div class="hint">Next safe action: ${escapeText(nextAction)}</div>
         ${blockers.length ? `<div class="hint">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="hint">No blockers reported.</div>'}
+        ${risks.length ? `<div class="hint">Open risks: ${escapeText(risks.map((risk) => `${risk.id || 'risk'}:${risk.severity || 'unknown'}:${risk.description || 'missing'}`).join(' · '))}</div>` : '<div class="hint">No open risks reported.</div>'}
+        ${stale.length ? `<div class="hint">Stale state: ${escapeText(stale.map((item) => `${item.id || 'stale'}:${item.reason || 'missing'}:${item.nextAction || 'inspect'}`).join(' · '))}</div>` : '<div class="hint">No stale state indicators reported.</div>'}
         ${decisions.length ? `<div class="hint">Required decisions: ${escapeText(decisions.map((decision) => `${decision.id || 'decision'}:${decision.kind || 'unknown'}`).join(' · '))}</div>` : '<div class="hint">No required decisions reported.</div>'}
+        <div class="hint">Acceptance checklist: ${escapeText(checklist.map((item) => `${item.id || 'item'}:${item.checked ? 'checked' : 'unchecked'}`).join(' · ') || 'none')}</div>
         <div class="hint">Allowed command text: ${escapeText(commandText || 'none')}</div>
         <div class="hint">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
         <div class="hint">Evidence refs: ${escapeText(evidence.map((ref) => `${ref.id || 'ref'}:${ref.path || 'missing'}`).join(' · ') || 'none')}</div>
@@ -2439,7 +2455,10 @@ const OuroforgeCockpit = (() => {
           ...latest,
           regression_matrix: dashboardData.regression_matrix || dashboardData.regressionMatrix,
           loop_evidence_bundles: dashboardData.loop_evidence_bundles || dashboardData.loopEvidenceBundles || [],
-          agent_handoffs: dashboardData.agent_handoffs || dashboardData.agentHandoffs || [],
+          agent_handoffs: [
+            ...normalizeAgentHandoffs(dashboardData.agent_handoffs || dashboardData.agentHandoffs || []),
+            ...normalizeAgentHandoffs(dashboardData.agent_handoff_v2s || dashboardData.agentHandoffV2s || []),
+          ],
           loop_cockpit: dashboardData.loop_cockpit || dashboardData.loopCockpit || null,
         };
       }

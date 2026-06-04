@@ -215,6 +215,8 @@ const run = {
       bundleStatus: 'partial',
       handoffStatus: 'blocked',
       bundleMissingRefs: ['comparison:<missing>'],
+      openRisks: [{ id: '<risk>', severity: 'high', description: 'handoff <risk>', mitigation: 'manual review' }],
+      staleStateIndicators: [{ id: '<stale>', reason: 'artifact <stale>', nextAction: 'refresh evidence' }],
       boundary: 'Display-only cockpit row; does not execute commands.',
     }],
   },
@@ -1179,6 +1181,8 @@ assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Allowed command text:
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Forbidden actions: Do not click &lt;run&gt; controls/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Evidence refs: &lt;bundle&gt;:runs\/&lt;bundle&gt;\/bundle\.json/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Missing\/stale bundle refs: comparison:&lt;missing&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Open risks: &lt;risk&gt;:high:handoff &lt;risk&gt;/);
+assert.match(cockpit.renderStudioLoopCockpitSurface(run), /Stale state: &lt;stale&gt;:artifact &lt;stale&gt;:refresh evidence/);
 assert.match(cockpit.renderStudioLoopCockpitSurface(run), /No browser authority|does not execute commands/);
 assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<cockpit-loop>/);
 assert.doesNotMatch(cockpit.renderStudioLoopCockpitSurface(run), /<button/i);
@@ -1385,6 +1389,15 @@ assert.doesNotMatch(cockpit.renderAgentHandoffSurface(run), /<handoff-loop>/);
 assert.doesNotMatch(cockpit.renderAgentHandoffSurface(run), /<button/i);
 assert.match(cockpit.renderEvidencePane(run), /Agent handoff/);
 assert.match(cockpit.renderAgentHandoffSurface({}), /No agent handoff/);
+
+const handoffV2Fixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-handoff-v2.blocked.fixture.json', 'utf8'));
+const handoffV2Markup = cockpit.renderAgentHandoffSurface({ agent_handoff_v2s: [handoffV2Fixture] });
+assert.match(handoffV2Markup, /handoff-v2-blocked/);
+assert.match(handoffV2Markup, /task-board-schema/);
+assert.match(handoffV2Markup, /Open risks/);
+assert.match(handoffV2Markup, /missing-review-risk/);
+assert.match(handoffV2Markup, /Acceptance checklist/);
+assert.doesNotMatch(handoffV2Markup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /Authoring loop evidence bundle/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /partial/);
 assert.match(cockpit.renderLoopEvidenceBundleSurface(run), /&lt;loop-bundle&gt;/);
