@@ -3505,6 +3505,389 @@ pub fn agent_work_package_read_model_from_json_str(input: &str) -> AgentWorkPack
     }
 }
 
+pub const AGENT_DECISION_LEDGER_SCHEMA_VERSION: &str = "agent-decision-ledger-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentDecisionLedger {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "ledgerId")]
+    pub ledger_id: String,
+    pub milestone: String,
+    pub status: AgentDecisionLedgerStatus,
+    pub decisions: Vec<AgentDecisionRecord>,
+    #[serde(rename = "pipelineRefs")]
+    pub pipeline_refs: AgentDecisionLedgerPipelineRefs,
+    #[serde(rename = "appendOnly")]
+    pub append_only: AgentDecisionLedgerAppendOnly,
+    #[serde(rename = "staleRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_refs: Vec<String>,
+    #[serde(
+        rename = "malformedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub malformed_reasons: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentDecisionLedgerStatus {
+    Active,
+    Stale,
+    Malformed,
+    AppendOnlyViolation,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentDecisionRecord {
+    #[serde(rename = "decisionId")]
+    pub decision_id: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub role: String,
+    #[serde(rename = "actorId")]
+    pub actor_id: String,
+    pub rationale: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "alternativesRejected")]
+    pub alternatives_rejected: Vec<AgentDecisionRejectedAlternative>,
+    pub confidence: AgentDecisionConfidence,
+    #[serde(rename = "scopeRisk")]
+    pub scope_risk: AgentDecisionScopeRisk,
+    pub outcome: AgentDecisionOutcome,
+    pub timestamp: String,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentDecisionRejectedAlternative {
+    pub id: String,
+    pub summary: String,
+    #[serde(rename = "rejectionReason")]
+    pub rejection_reason: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentDecisionConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentDecisionScopeRisk {
+    Narrow,
+    Moderate,
+    Broad,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentDecisionOutcome {
+    Accepted,
+    Rejected,
+    Deferred,
+    Blocked,
+    Superseded,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentDecisionLedgerPipelineRefs {
+    #[serde(rename = "taskBoardRef")]
+    pub task_board_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "workPackageRefs")]
+    pub work_package_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "handoffRefs")]
+    pub handoff_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "reviewGateRefs")]
+    pub review_gate_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "qaResultRefs")]
+    pub qa_result_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "performanceRegressionRefs")]
+    pub performance_regression_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "evidenceBundleRefs")]
+    pub evidence_bundle_refs: Vec<AuthoringLoopArtifactRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentDecisionLedgerAppendOnly {
+    pub sequence: u64,
+    #[serde(rename = "previousLedgerHash", skip_serializing_if = "Option::is_none")]
+    pub previous_ledger_hash: Option<String>,
+    #[serde(rename = "entryOrderHash")]
+    pub entry_order_hash: String,
+    pub note: String,
+}
+
+impl AgentDecisionLedger {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let ledger: AgentDecisionLedger =
+            serde_json::from_str(input).context("failed to parse Agent Decision Ledger JSON")?;
+        ledger.validate_schema()?;
+        Ok(ledger)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_DECISION_LEDGER_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent decision ledger schemaVersion must be {AGENT_DECISION_LEDGER_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent decision ledger ledgerId", &self.ledger_id)?;
+        require_text("agent decision ledger milestone", &self.milestone)?;
+        if self.decisions.is_empty() {
+            return Err(anyhow!("agent decision ledger decisions must not be empty"));
+        }
+        for (index, decision) in self.decisions.iter().enumerate() {
+            decision.validate_schema(index)?;
+        }
+        self.pipeline_refs.validate_schema()?;
+        self.append_only.validate_schema()?;
+        validate_optional_text_list("agent decision ledger staleRefs", &self.stale_refs)?;
+        validate_optional_text_list(
+            "agent decision ledger malformedReasons",
+            &self.malformed_reasons,
+        )?;
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("agent decision ledger guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "agent decision ledger forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("agent decision ledger boundary", &self.boundary)?;
+        self.validate_status_shape()?;
+        self.validate_guardrails()
+    }
+
+    fn validate_status_shape(&self) -> Result<()> {
+        match self.status {
+            AgentDecisionLedgerStatus::Active => {
+                if !self.stale_refs.is_empty() || !self.malformed_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "active agent decision ledger must not include staleRefs or malformedReasons"
+                    ));
+                }
+            }
+            AgentDecisionLedgerStatus::Stale => {
+                if self.stale_refs.is_empty() {
+                    return Err(anyhow!("stale agent decision ledger requires staleRefs"));
+                }
+            }
+            AgentDecisionLedgerStatus::Malformed => {
+                if self.malformed_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "malformed agent decision ledger requires malformedReasons"
+                    ));
+                }
+            }
+            AgentDecisionLedgerStatus::AppendOnlyViolation => {
+                if self
+                    .malformed_reasons
+                    .iter()
+                    .chain(self.stale_refs.iter())
+                    .all(|reason| !reason.to_ascii_lowercase().contains("append"))
+                {
+                    return Err(anyhow!(
+                        "append-only-violation agent decision ledger requires append-only evidence in staleRefs or malformedReasons"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_guardrails(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "browser command bridge",
+            "trusted browser state",
+            "production readiness",
+            "Godot replacement",
+        ] {
+            if !forbidden.contains(&phrase.to_ascii_lowercase()) {
+                return Err(anyhow!(
+                    "agent decision ledger forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        for phrase in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not apply",
+            "does not merge",
+            "does not write trusted browser state",
+        ] {
+            if !self
+                .boundary
+                .to_ascii_lowercase()
+                .contains(&phrase.to_ascii_lowercase())
+            {
+                return Err(anyhow!(
+                    "agent decision ledger boundary must state it {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl AgentDecisionRecord {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent decision ledger decisions[{index}].decisionId"),
+            &self.decision_id,
+        )?;
+        validate_path_component(
+            &format!("agent decision ledger decisions[{index}].taskId"),
+            &self.task_id,
+        )?;
+        validate_path_component(
+            &format!("agent decision ledger decisions[{index}].role"),
+            &self.role,
+        )?;
+        validate_path_component(
+            &format!("agent decision ledger decisions[{index}].actorId"),
+            &self.actor_id,
+        )?;
+        require_text(
+            &format!("agent decision ledger decisions[{index}].rationale"),
+            &self.rationale,
+        )?;
+        validate_nonempty_refs(
+            &format!("agent decision ledger decisions[{index}].evidenceRefs"),
+            &self.evidence_refs,
+        )?;
+        if self.alternatives_rejected.is_empty() {
+            return Err(anyhow!(
+                "agent decision ledger decisions[{index}].alternativesRejected must not be empty"
+            ));
+        }
+        for (alternative_index, alternative) in self.alternatives_rejected.iter().enumerate() {
+            alternative.validate_schema(index, alternative_index)?;
+        }
+        require_text(
+            &format!("agent decision ledger decisions[{index}].timestamp"),
+            &self.timestamp,
+        )?;
+        if !self.timestamp.contains('T') || !self.timestamp.ends_with('Z') {
+            return Err(anyhow!(
+                "agent decision ledger decisions[{index}].timestamp must be UTC RFC3339-like text"
+            ));
+        }
+        validate_optional_text_list(
+            &format!("agent decision ledger decisions[{index}].blockedReasons"),
+            &self.blocked_reasons,
+        )?;
+        if matches!(self.outcome, AgentDecisionOutcome::Blocked) && self.blocked_reasons.is_empty()
+        {
+            return Err(anyhow!(
+                "blocked agent decision ledger decisions[{index}] requires blockedReasons"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl AgentDecisionRejectedAlternative {
+    fn validate_schema(&self, decision_index: usize, alternative_index: usize) -> Result<()> {
+        validate_path_component(
+            &format!(
+                "agent decision ledger decisions[{decision_index}].alternativesRejected[{alternative_index}].id"
+            ),
+            &self.id,
+        )?;
+        require_text(
+            &format!(
+                "agent decision ledger decisions[{decision_index}].alternativesRejected[{alternative_index}].summary"
+            ),
+            &self.summary,
+        )?;
+        require_text(
+            &format!(
+                "agent decision ledger decisions[{decision_index}].alternativesRejected[{alternative_index}].rejectionReason"
+            ),
+            &self.rejection_reason,
+        )
+    }
+}
+
+impl AgentDecisionLedgerPipelineRefs {
+    fn validate_schema(&self) -> Result<()> {
+        self.task_board_ref
+            .validate("agent decision ledger pipelineRefs.taskBoardRef")?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.workPackageRefs",
+            &self.work_package_refs,
+        )?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.handoffRefs",
+            &self.handoff_refs,
+        )?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.reviewGateRefs",
+            &self.review_gate_refs,
+        )?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.qaResultRefs",
+            &self.qa_result_refs,
+        )?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.performanceRegressionRefs",
+            &self.performance_regression_refs,
+        )?;
+        validate_nonempty_refs(
+            "agent decision ledger pipelineRefs.evidenceBundleRefs",
+            &self.evidence_bundle_refs,
+        )
+    }
+}
+
+impl AgentDecisionLedgerAppendOnly {
+    fn validate_schema(&self) -> Result<()> {
+        require_text(
+            "agent decision ledger appendOnly.entryOrderHash",
+            &self.entry_order_hash,
+        )?;
+        if let Some(previous) = &self.previous_ledger_hash {
+            require_text(
+                "agent decision ledger appendOnly.previousLedgerHash",
+                previous,
+            )?;
+        }
+        require_text("agent decision ledger appendOnly.note", &self.note)?;
+        if !self.note.to_ascii_lowercase().contains("append-only") {
+            return Err(anyhow!(
+                "agent decision ledger appendOnly.note must describe append-only semantics"
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub const PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "production-evidence-bundle-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -43225,6 +43608,151 @@ scenarios:
             .iter()
             .any(|reason| reason.contains("acceptanceCriteria")));
         assert!(malformed.boundary.contains("validation errors"));
+    }
+
+    #[test]
+    fn agent_decision_ledger_v1_accepts_fixture_states_and_boundaries() {
+        for (fixture, expected_status) in [
+            (
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+                AgentDecisionLedgerStatus::Active,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.stale.fixture.json",
+                AgentDecisionLedgerStatus::Stale,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.malformed.fixture.json",
+                AgentDecisionLedgerStatus::Malformed,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.append-only-violation.fixture.json",
+                AgentDecisionLedgerStatus::AppendOnlyViolation,
+            ),
+        ] {
+            let ledger = AgentDecisionLedger::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(ledger.schema_version, AGENT_DECISION_LEDGER_SCHEMA_VERSION);
+            assert_eq!(ledger.status, expected_status);
+            assert_eq!(ledger.decisions.len(), 2);
+            assert!(ledger.generated_state.tracked_fixture_only);
+            assert!(ledger
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(ledger
+                .append_only
+                .note
+                .to_ascii_lowercase()
+                .contains("append-only"));
+            assert!(ledger.boundary.contains("does not execute commands"));
+            assert!(ledger.boundary.contains("does not spawn agents"));
+            assert!(ledger.boundary.contains("does not apply"));
+            assert!(ledger.boundary.contains("does not merge"));
+            assert!(ledger
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(ledger
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "hidden background agents"));
+            assert!(ledger
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(ledger
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-merge"));
+            assert!(ledger
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "self-approval"));
+            assert!(ledger.decisions.iter().all(|decision| {
+                !decision.evidence_refs.is_empty()
+                    && !decision.alternatives_rejected.is_empty()
+                    && decision.timestamp.ends_with('Z')
+            }));
+        }
+    }
+
+    #[test]
+    fn agent_decision_ledger_v1_rejects_invalid_and_boundary_drift() {
+        let invalid = AgentDecisionLedger::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.invalid.fixture.json",
+        ))
+        .expect_err("invalid fixture rejects unsupported outcome before unsafe boundary");
+        assert!(format!("{invalid:#}").contains("unknown variant"));
+
+        let mut active_with_stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        active_with_stale["staleRefs"] = json!(["task board drift"]);
+        let active_error = AgentDecisionLedger::from_json_str(&active_with_stale.to_string())
+            .expect_err("active ledger cannot hide stale refs");
+        assert!(format!("{active_error:#}").contains("active agent decision ledger"));
+
+        let mut blocked_without_reason: serde_json::Value =
+            serde_json::from_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+            ))
+            .expect("ledger json");
+        blocked_without_reason["decisions"][1]["blockedReasons"] = json!([]);
+        let blocked_error = AgentDecisionLedger::from_json_str(&blocked_without_reason.to_string())
+            .expect_err("blocked decisions require blocker reasons");
+        assert!(format!("{blocked_error:#}").contains("requires blockedReasons"));
+
+        let mut unsafe_boundary: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        unsafe_boundary["boundary"] = json!("Agent decision ledger can apply browser changes.");
+        let boundary_error = AgentDecisionLedger::from_json_str(&unsafe_boundary.to_string())
+            .expect_err("unsafe boundary rejects");
+        assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn agent_decision_ledger_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/agent-decision-ledger-v1.md");
+        for required in [
+            "schemaVersion: agent-decision-ledger-v1",
+            "append-only local audit evidence",
+            "does not execute commands",
+            "does not spawn agents",
+            "does not apply changes",
+            "does not merge changes",
+            "does not write trusted browser state",
+            "browser command bridges",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "hidden background agents",
+            "production readiness",
+            "Godot replacement",
+            "Generated decision ledgers",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(
+                doc.contains(required),
+                "agent decision ledger doc missing {required}"
+            );
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
     }
 
     #[test]

@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "agent-decision-ledger-v1",
+  "ledgerId": "demo-agent-decision-ledger-invalid",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "status": "active",
+  "decisions": [
+    {
+      "decisionId": "decision-001",
+      "taskId": "task-review-qa-handoff",
+      "role": "reviewer",
+      "actorId": "agent-reviewer-1",
+      "rationale": "Keep QA output untrusted until the review gate records accepted evidence.",
+      "evidenceRefs": [
+        {
+          "id": "demo-work-package",
+          "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+          "description": "fixture-scoped work package"
+        },
+        {
+          "id": "demo-handoff",
+          "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+          "description": "fixture-scoped handoff"
+        }
+      ],
+      "alternativesRejected": [
+        {
+          "id": "auto-promote-qa-output",
+          "summary": "Automatically promote QA output after task completion.",
+          "rejectionReason": "Would bypass review-gated promotion and auto-apply guardrails."
+        }
+      ],
+      "confidence": "high",
+      "scopeRisk": "narrow",
+      "outcome": "auto-applied",
+      "timestamp": "2026-06-03T16:24:29Z"
+    },
+    {
+      "decisionId": "decision-002",
+      "taskId": "task-regression-blocker",
+      "role": "critic",
+      "actorId": "agent-critic-1",
+      "rationale": "Defer final outcome until stale regression evidence is refreshed.",
+      "evidenceRefs": [
+        {
+          "id": "demo-regression-result",
+          "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+          "description": "fixture-scoped regression result"
+        }
+      ],
+      "alternativesRejected": [
+        {
+          "id": "ignore-stale-regression",
+          "summary": "Accept the stale regression lane as sufficient.",
+          "rejectionReason": "Would hide stale evidence from future agents."
+        }
+      ],
+      "confidence": "medium",
+      "scopeRisk": "moderate",
+      "outcome": "blocked",
+      "timestamp": "2026-06-03T16:25:00Z",
+      "blockedReasons": []
+    }
+  ],
+  "pipelineRefs": {
+    "taskBoardRef": {
+      "id": "demo-task-board",
+      "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+      "description": "fixture-scoped task board"
+    },
+    "workPackageRefs": [
+      {
+        "id": "demo-work-package",
+        "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+        "description": "fixture-scoped work package"
+      }
+    ],
+    "handoffRefs": [
+      {
+        "id": "demo-handoff",
+        "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+        "description": "fixture-scoped handoff"
+      }
+    ],
+    "reviewGateRefs": [
+      {
+        "id": "demo-review-decision",
+        "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+        "description": "fixture-scoped review gate"
+      }
+    ],
+    "qaResultRefs": [
+      {
+        "id": "demo-qa-result",
+        "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json",
+        "description": "fixture-scoped QA result"
+      }
+    ],
+    "performanceRegressionRefs": [
+      {
+        "id": "demo-regression-result",
+        "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+        "description": "fixture-scoped regression result"
+      }
+    ],
+    "evidenceBundleRefs": [
+      {
+        "id": "demo-production-evidence-bundle",
+        "path": "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+        "description": "fixture-scoped production evidence bundle"
+      }
+    ]
+  },
+  "appendOnly": {
+    "sequence": 2,
+    "previousLedgerHash": "fnv1a64-ledger-v1:0000000000000000",
+    "entryOrderHash": "fnv1a64-ledger-v1:1111111111111111",
+    "note": "Append-only local audit metadata; new decisions append after existing entries."
+  },
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Agent decisions are audit evidence, not mutation authority.",
+    "Agent outputs remain untrusted until Rust/local validation and review-gated apply or promotion.",
+    "Issues #1 and #23 must remain open."
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser state writes",
+    "production readiness claim",
+    "Godot replacement claim",
+    "release automation"
+  ],
+  "boundary": "Agent decision ledger can apply changes from the browser."
+}
