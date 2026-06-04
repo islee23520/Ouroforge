@@ -72,7 +72,16 @@ A rejected command records a reason and the boundary that no command was run.
 ## Patch preview requiredTests integration
 
 SMP1.5.3 wires patch preview `requiredTests` metadata to this policy. When a
-preview required test declares `allowlistPolicyId`, validation requires `argv`,
-checks that `command` matches normalized `argv`, rejects forbidden command
-classes first, and then matches the inert default allowlist. This is still a
-pre-execution validation hook; it does not create a sandbox or run the command.
+preview required test includes `argv`, validation checks that `command` matches
+normalized `argv`, rejects forbidden command classes first, and then matches the
+inert default allowlist. `allowlistPolicyId` identifies the current preview
+policy (`source-patch-preview-safe-local-checks-v1`) and requires `argv` when it
+is present; it does not grant broader authority than an `argv`-only metadata
+record. This is still a pre-execution validation hook; it does not create a
+sandbox or run the command.
+
+Prefix matches are intentionally review metadata only. They are useful for
+showing that a command is shaped like a known local check, but they are not a
+future execution contract by themselves. Any later sandbox evaluator must add
+its own explicit suffix/flag/path constraints, canonicalization, isolation, and
+audit evidence before a matched command can be run.
