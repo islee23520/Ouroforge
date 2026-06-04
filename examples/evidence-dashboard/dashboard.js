@@ -380,6 +380,35 @@ const OuroforgeDashboard = (() => {
 
 
 
+  function renderQaScenarioCandidates(run = {}) {
+    const model = run.qa_scenario_candidates || run.qaScenarioCandidates || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || 'No QA scenario candidates are available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const candidates = Array.isArray(model.candidates) ? model.candidates : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Candidates', model.candidate_count ?? model.candidateCount ?? 0],
+      ['High priority', model.high_priority_count ?? model.highPriorityCount ?? 0],
+      ['Blocked/deferred', `${model.blocked_count ?? model.blockedCount ?? 0}/${model.deferred_count ?? model.deferredCount ?? 0}`],
+      ['Malformed', model.malformed_count ?? model.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const candidateRows = candidates.slice(0, 12).map((candidate) => {
+      const risk = candidate.sourceRisk || candidate.source_risk || {};
+      const objective = candidate.targetObjective || candidate.target_objective || {};
+      const input = candidate.inputStrategy || candidate.input_strategy || {};
+      const budget = candidate.budget || {};
+      const blocked = Array.isArray(candidate.blockedReasons || candidate.blocked_reasons) ? (candidate.blockedReasons || candidate.blocked_reasons) : [];
+      const expected = Array.isArray(candidate.expectedEvidence || candidate.expected_evidence) ? (candidate.expectedEvidence || candidate.expected_evidence) : [];
+      return `<li><strong>${escapeText(candidate.candidateId || candidate.candidate_id || 'scenario candidate')}</strong>: <span class="${statusClass(candidate.status)}">${escapeText(candidate.status || 'unknown')}</span> · ${escapeText(candidate.priority || 'priority')}<br><small>${escapeText(risk.riskId || risk.risk_id || 'risk')} → ${escapeText(objective.objectiveId || objective.objective_id || 'objective')} · ${escapeText(input.kind || 'input')} · maxRuns ${escapeText(budget.maxRuns ?? budget.max_runs ?? '?')} · expected ${escapeText(expected.length)} · ${escapeText(blocked.join(' · ') || objective.description || 'reviewable untrusted candidate')}</small></li>`;
+    }).join('') || '<li>No parseable QA scenario candidates are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Scenario candidates</h4><ul class="run-meta-list">${candidateRows}</ul>
+      ${renderRefLinks('QA scenario candidate refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only QA scenario candidates; dashboard surfaces do not run candidates, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.')}</p>`;
+  }
+
   function renderFuzzingPlans(run = {}) {
     const model = run.fuzzing_plans || run.fuzzingPlans || {};
     if (!model.present) {
@@ -1431,6 +1460,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
+      <section class="panel"><h3>QA scenario candidates</h3>${renderQaScenarioCandidates(run)}</section>
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
@@ -1513,7 +1543,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

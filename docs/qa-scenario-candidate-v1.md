@@ -23,3 +23,7 @@ Guardrails:
 ## QA14.2.2 validation hardening
 
 QA14.2.2 adds fail-closed validation for duplicate expected output paths, assertion/evidence coverage, unsupported assertion/operator combinations, high-priority manual-review overbreadth, stale Seed/scenario-pack refs, stale source scenario ids, and indexed source-risk evidence refs. Candidate refs remain local validation evidence only; they do not execute scenarios or trust candidate outputs.
+
+## QA14.2.3 linkage/read model
+
+QA14.2.3 exposes scenario candidates through the run dashboard/read model as `qa_scenario_candidates`. The read model reports missing/malformed/proposed/blocked/deferred status, priority counts, evidence refs, parsed candidates, and a conservative read-only boundary. Dashboard/Studio display is inspect-only and must not run candidates, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.

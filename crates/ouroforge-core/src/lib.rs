@@ -32055,6 +32055,7 @@ pub struct RunDashboardReadModel {
     pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
     pub fuzzing_plans: RunDashboardFuzzingPlans,
+    pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -32311,6 +32312,22 @@ pub struct RunDashboardRuntimeInvariants {
     pub evidence_refs: Vec<String>,
     pub summaries: Vec<RuntimeInvariantEvidenceSummary>,
     pub evidence: Vec<RuntimeInvariantEvidence>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardQaScenarioCandidates {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub candidate_count: usize,
+    pub blocked_count: usize,
+    pub deferred_count: usize,
+    pub high_priority_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub candidates: Vec<QaScenarioCandidateArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -32705,6 +32722,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
     let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
+    let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -32763,6 +32781,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         runtime_invariants,
         qa_worker_assignments,
         fuzzing_plans,
+        qa_scenario_candidates,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -33080,6 +33099,109 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_artifact_is_qa_scenario_candidate(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("qa_scenario_candidate")
+        || artifact.id.contains("qa-scenario-candidate")
+        || artifact.id.contains("scenario-candidate")
+        || artifact.path.contains("qa-scenario-candidate")
+        || artifact.path.contains("scenario-candidate")
+}
+
+fn read_dashboard_qa_scenario_candidates(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardQaScenarioCandidates> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_qa_scenario_candidate,
+    )?;
+    let boundary = "Read-only QA scenario candidates; dashboard/Studio surfaces must not run candidates, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardQaScenarioCandidates {
+            present: false,
+            empty_state: "No QA scenario candidates are indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            candidate_count: 0,
+            blocked_count: 0,
+            deferred_count: 0,
+            high_priority_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            candidates: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut candidates = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<QaScenarioCandidateArtifact>(value.clone()) {
+            Ok(candidate) if candidate.validate().is_ok() => candidates.push(candidate),
+            _ => malformed_count += 1,
+        }
+    }
+    candidates.sort_by(|left, right| {
+        (left.run_id.as_str(), left.candidate_id.as_str())
+            .cmp(&(right.run_id.as_str(), right.candidate_id.as_str()))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let candidate_count = candidates.len();
+    let blocked_count = candidates
+        .iter()
+        .filter(|candidate| candidate.status == QaScenarioCandidateStatus::Blocked)
+        .count();
+    let deferred_count = candidates
+        .iter()
+        .filter(|candidate| candidate.status == QaScenarioCandidateStatus::Deferred)
+        .count();
+    let high_priority_count = candidates
+        .iter()
+        .filter(|candidate| candidate.priority == QaScenarioCandidatePriority::High)
+        .count();
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if deferred_count > 0 {
+        "deferred"
+    } else if candidate_count > 0 {
+        "proposed"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardQaScenarioCandidates {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        candidate_count,
+        blocked_count,
+        deferred_count,
+        high_priority_count,
+        malformed_count,
+        evidence_refs,
+        candidates,
+        artifacts,
+        boundary,
+    })
 }
 
 fn dashboard_artifact_is_fuzzing_plan(artifact: &EvidenceArtifact) -> bool {
@@ -40851,6 +40973,78 @@ scenarios:
         assert!(stale_risk.to_string().contains("stale runId"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn qa_scenario_candidate_dashboard_read_model_reports_present_missing_and_malformed() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("qa-scenario-candidate-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.qa_scenario_candidates.present);
+        assert_eq!(missing.qa_scenario_candidates.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("qa-scenario-candidate-dashboard-present");
+        let mut candidate = QaScenarioCandidateArtifact::from_json_str(include_str!(
+            "../../../examples/qa-scenario-candidate-v1/scenario-candidate.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        candidate.run_id = json_string(&run, "id").expect("run id present");
+        let path = "evidence/qa-scenario-candidates/scenario-candidate.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/qa-scenario-candidates"))
+            .expect("candidate evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(candidate)).expect("candidate writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "qa-scenario-candidate-plan",
+            "application/json",
+            path,
+            json!({ "artifact": "qa_scenario_candidate" }),
+        )
+        .expect("candidate indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.qa_scenario_candidates.present);
+        assert_eq!(dashboard.qa_scenario_candidates.status, "proposed");
+        assert_eq!(dashboard.qa_scenario_candidates.candidate_count, 1);
+        assert_eq!(dashboard.qa_scenario_candidates.high_priority_count, 1);
+        assert_eq!(
+            dashboard.qa_scenario_candidates.evidence_refs,
+            vec![path.to_string()]
+        );
+        assert!(dashboard
+            .qa_scenario_candidates
+            .boundary
+            .contains("must not run candidates"));
+        fs::remove_dir_all(root).expect("fixture removed");
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("qa-scenario-candidate-dashboard-malformed");
+        let malformed_path = "evidence/qa-scenario-candidates/scenario-candidate-malformed.json";
+        fs::create_dir_all(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/qa-scenario-candidates"),
+        )
+        .expect("candidate evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed candidate writes");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "qa-scenario-candidate-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "qa_scenario_candidate" }),
+        )
+        .expect("malformed candidate indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.qa_scenario_candidates.present);
+        assert_eq!(malformed.qa_scenario_candidates.status, "malformed");
+        assert_eq!(malformed.qa_scenario_candidates.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
     }
 
     #[test]
