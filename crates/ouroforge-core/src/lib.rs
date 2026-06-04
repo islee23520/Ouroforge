@@ -20136,7 +20136,12 @@ pub fn classify_source_file_path_str(path: &str) -> SourceFileClassReport {
             vec!["absolute, rooted, prefixed, or parent-dir path"],
         );
     }
-    if components.iter().any(|component| component.is_empty()) {
+    // Check the raw separator-split segments rather than the collected
+    // `Path::components()`: `Component::Normal` filtering already drops empty
+    // segments produced by repeated separators (e.g. `examples//scenes/foo`),
+    // so an emptiness check on `components` can never fire. Reject any empty
+    // raw segment so repeated/leading/trailing separators stay unsafe-path.
+    if normalized.split('/').any(|segment| segment.is_empty()) {
         return source_class_report(
             normalized,
             SourceFileClassLabel::UnsafePath,
@@ -31858,6 +31863,27 @@ scenarios:
         let opaque = classify_source_file_path_str("examples/assets/player.png");
         assert_eq!(opaque.class, SourceFileClassLabel::BinaryOpaque);
         assert!(opaque.is_blocked());
+
+        // Repeated separators must stay unsafe-path: `Path::components()` collapses
+        // `//`, so the guard must inspect the raw separator-split segments.
+        let repeated_separator =
+            classify_source_file_path_str("examples//playable-demo-v2/scenes/foo.scene.json");
+        assert_eq!(repeated_separator.class, SourceFileClassLabel::UnsafePath);
+        assert!(repeated_separator.is_blocked());
+        assert!(repeated_separator
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("empty path component")));
+
+        // Backslash-normalized repeated separators are equally unsafe.
+        let backslash_repeated = classify_source_file_path_str("examples\\\\demo\\scene.json");
+        assert_eq!(backslash_repeated.class, SourceFileClassLabel::UnsafePath);
+        assert!(backslash_repeated.is_blocked());
+
+        // Trailing separator leaves an empty final segment and must be rejected.
+        let trailing_separator = classify_source_file_path_str("examples/demo/scene.json/");
+        assert_eq!(trailing_separator.class, SourceFileClassLabel::UnsafePath);
+        assert!(trailing_separator.is_blocked());
     }
 
     #[test]
