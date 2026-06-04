@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "level-intent-v1",
+  "intentId": "intent_partial_dialogue_intro",
+  "levelId": "dialogue_intro",
+  "targetGameMode": "exploration",
+  "levelSize": {
+    "width": 24,
+    "height": 16,
+    "unit": "tiles"
+  },
+  "playerGoals": [
+    {
+      "goalId": "meet_guide",
+      "description": "Player reaches a guide character and observes dialogue intent."
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "approach_guide",
+      "description": "Player approaches the guide without combat.",
+      "requires": ["movement", "dialogue"]
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "needs_asset_review",
+      "description": "Guide sprite references are not final yet."
+    }
+  ],
+  "requiredMechanics": ["movement", "dialogue"],
+  "allowedAssets": [
+    {
+      "refId": "guide_placeholder",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    }
+  ],
+  "allowedEntities": [
+    {
+      "refId": "guide_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "difficultyTarget": "tutorial",
+  "pacingTarget": "calm",
+  "forbiddenPlacements": [
+    {
+      "placementId": "combat_gate",
+      "targetRef": "enemy_gate",
+      "reason": "The partial intro must not require combat."
+    }
+  ],
+  "linkedGoals": {
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "scenarioIds": ["dialogue_intro_smoke"]
+  },
+  "status": "partial",
+  "guardrails": [
+    "Partial intent may feed later plans only after Rust validation."
+  ]
+}

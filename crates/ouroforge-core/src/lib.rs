@@ -13629,6 +13629,485 @@ fn validate_repo_relative_source_ref(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+const LEVEL_INTENT_SCHEMA_VERSION: &str = "level-intent-v1";
+const MAX_LEVEL_INTENT_SIZE_TILES: u32 = 512;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "levelId")]
+    pub level_id: String,
+    #[serde(rename = "targetGameMode")]
+    pub target_game_mode: LevelIntentGameMode,
+    #[serde(rename = "levelSize")]
+    pub level_size: LevelIntentSize,
+    #[serde(rename = "playerGoals")]
+    pub player_goals: Vec<LevelIntentTextItem>,
+    pub objectives: Vec<LevelIntentObjective>,
+    pub constraints: Vec<LevelIntentConstraint>,
+    #[serde(rename = "requiredMechanics")]
+    pub required_mechanics: Vec<LevelIntentMechanic>,
+    #[serde(
+        rename = "forbiddenMechanics",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub forbidden_mechanics: Vec<LevelIntentMechanic>,
+    #[serde(rename = "allowedAssets")]
+    pub allowed_assets: Vec<LevelIntentRef>,
+    #[serde(
+        rename = "forbiddenAssets",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub forbidden_assets: Vec<LevelIntentRef>,
+    #[serde(rename = "allowedEntities")]
+    pub allowed_entities: Vec<LevelIntentRef>,
+    #[serde(
+        rename = "forbiddenEntities",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub forbidden_entities: Vec<LevelIntentRef>,
+    #[serde(rename = "difficultyTarget")]
+    pub difficulty_target: LevelIntentDifficultyTarget,
+    #[serde(rename = "pacingTarget")]
+    pub pacing_target: LevelIntentPacingTarget,
+    #[serde(rename = "forbiddenPlacements")]
+    pub forbidden_placements: Vec<LevelIntentPlacement>,
+    #[serde(rename = "linkedGoals")]
+    pub linked_goals: LevelIntentLinkedGoals,
+    pub status: LevelIntentStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelIntentGameMode {
+    CollectAndExit,
+    Exploration,
+    Puzzle,
+    Platformer,
+    CombatArena,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentSize {
+    pub width: u32,
+    pub height: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentTextItem {
+    #[serde(rename = "goalId")]
+    pub goal_id: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentObjective {
+    #[serde(rename = "objectiveId")]
+    pub objective_id: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<LevelIntentMechanic>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentConstraint {
+    #[serde(rename = "constraintId")]
+    pub constraint_id: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelIntentMechanic {
+    Movement,
+    Collision,
+    Trigger,
+    Collect,
+    Exit,
+    Dialogue,
+    EnemyPatrol,
+    Platforming,
+    PuzzleSwitch,
+    AudioIntent,
+    AnimationState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentRef {
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+    #[serde(rename = "sourceRef")]
+    pub source_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelIntentDifficultyTarget {
+    Tutorial,
+    Easy,
+    Normal,
+    Hard,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelIntentPacingTarget {
+    Calm,
+    Steady,
+    Escalating,
+    Intense,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentPlacement {
+    #[serde(rename = "placementId")]
+    pub placement_id: String,
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LevelIntentLinkedGoals {
+    #[serde(rename = "seedRef")]
+    pub seed_ref: String,
+    #[serde(rename = "scenarioPackRef")]
+    pub scenario_pack_ref: String,
+    #[serde(rename = "scenarioIds")]
+    pub scenario_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelIntentStatus {
+    Draft,
+    Partial,
+    Blocked,
+}
+
+impl LevelIntentArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: LevelIntentArtifact =
+            serde_json::from_str(input).context("failed to parse Level Intent JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != LEVEL_INTENT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "level intent schemaVersion must be {LEVEL_INTENT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("level intent intentId", &self.intent_id)?;
+        validate_path_component("level intent levelId", &self.level_id)?;
+        self.level_size.validate()?;
+        validate_level_intent_items(
+            "level intent playerGoals",
+            "goalId",
+            &self.player_goals,
+            |item| (&item.goal_id, &item.description),
+        )?;
+        validate_level_intent_items(
+            "level intent objectives",
+            "objectiveId",
+            &self.objectives,
+            |item| (&item.objective_id, &item.description),
+        )?;
+        validate_level_intent_items(
+            "level intent constraints",
+            "constraintId",
+            &self.constraints,
+            |item| (&item.constraint_id, &item.description),
+        )?;
+        validate_unique_mechanics(
+            "level intent requiredMechanics",
+            &self.required_mechanics,
+            false,
+        )?;
+        self.validate_objective_mechanics()?;
+        validate_unique_mechanics(
+            "level intent forbiddenMechanics",
+            &self.forbidden_mechanics,
+            true,
+        )?;
+        validate_level_intent_refs("level intent allowedAssets", &self.allowed_assets, false)?;
+        validate_level_intent_refs("level intent forbiddenAssets", &self.forbidden_assets, true)?;
+        validate_level_intent_refs(
+            "level intent allowedEntities",
+            &self.allowed_entities,
+            false,
+        )?;
+        validate_level_intent_refs(
+            "level intent forbiddenEntities",
+            &self.forbidden_entities,
+            true,
+        )?;
+        validate_level_intent_placements(
+            "level intent forbiddenPlacements",
+            &self.forbidden_placements,
+        )?;
+        self.linked_goals.validate()?;
+        self.validate_no_contradictions()?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("level intent blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("level intent guardrails", guardrail)?;
+        }
+        match self.status {
+            LevelIntentStatus::Blocked if self.blocked_reasons.is_empty() => Err(anyhow!(
+                "level intent blocked status requires blockedReasons"
+            )),
+            LevelIntentStatus::Draft | LevelIntentStatus::Partial
+                if !self.blocked_reasons.is_empty() =>
+            {
+                Err(anyhow!(
+                    "level intent non-blocked status must not include blockedReasons"
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_no_contradictions(&self) -> Result<()> {
+        let required_mechanics = self.required_mechanics.iter().collect::<BTreeSet<_>>();
+        for mechanic in &self.forbidden_mechanics {
+            if required_mechanics.contains(mechanic) {
+                return Err(anyhow!(
+                    "level intent mechanic cannot be both required and forbidden: {:?}",
+                    mechanic
+                ));
+            }
+        }
+        validate_no_ref_overlap(
+            "level intent assets",
+            &self.allowed_assets,
+            &self.forbidden_assets,
+        )?;
+        validate_no_ref_overlap(
+            "level intent entities",
+            &self.allowed_entities,
+            &self.forbidden_entities,
+        )?;
+        let allowed_ids = self
+            .allowed_assets
+            .iter()
+            .chain(self.allowed_entities.iter())
+            .map(|reference| reference.ref_id.as_str())
+            .collect::<BTreeSet<_>>();
+        let allowed_sources = self
+            .allowed_assets
+            .iter()
+            .chain(self.allowed_entities.iter())
+            .map(|reference| reference.source_ref.as_str())
+            .collect::<BTreeSet<_>>();
+        for placement in &self.forbidden_placements {
+            if allowed_ids.contains(placement.target_ref.as_str())
+                || allowed_sources.contains(placement.target_ref.as_str())
+            {
+                return Err(anyhow!(
+                    "level intent forbiddenPlacements targetRef contradicts an allowed ref: {}",
+                    placement.target_ref
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_objective_mechanics(&self) -> Result<()> {
+        let required_mechanics = self.required_mechanics.iter().collect::<BTreeSet<_>>();
+        for objective in &self.objectives {
+            let mut objective_mechanics = BTreeSet::new();
+            for mechanic in &objective.requires {
+                if !objective_mechanics.insert(*mechanic) {
+                    return Err(anyhow!(
+                        "level intent objective {} requires must not contain duplicates",
+                        objective.objective_id
+                    ));
+                }
+                if !required_mechanics.contains(mechanic) {
+                    return Err(anyhow!(
+                        "level intent objective {} requires undeclared requiredMechanic {:?}",
+                        objective.objective_id,
+                        mechanic
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl LevelIntentSize {
+    fn validate(&self) -> Result<()> {
+        if self.width == 0
+            || self.height == 0
+            || self.width > MAX_LEVEL_INTENT_SIZE_TILES
+            || self.height > MAX_LEVEL_INTENT_SIZE_TILES
+        {
+            return Err(anyhow!(
+                "level intent levelSize width and height must be between 1 and {MAX_LEVEL_INTENT_SIZE_TILES}"
+            ));
+        }
+        if let Some(unit) = &self.unit {
+            if unit != "tiles" {
+                return Err(anyhow!("level intent levelSize.unit must be tiles"));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl LevelIntentLinkedGoals {
+    fn validate(&self) -> Result<()> {
+        validate_repo_relative_source_ref("level intent linkedGoals.seedRef", &self.seed_ref)?;
+        validate_repo_relative_source_ref(
+            "level intent linkedGoals.scenarioPackRef",
+            &self.scenario_pack_ref,
+        )?;
+        if self.scenario_ids.is_empty() {
+            return Err(anyhow!(
+                "level intent linkedGoals.scenarioIds must not be empty"
+            ));
+        }
+        validate_unique_path_components(
+            "level intent linkedGoals.scenarioIds",
+            "scenarioId",
+            &self.scenario_ids,
+        )
+    }
+}
+
+fn validate_level_intent_items<T>(
+    field: &str,
+    id_label: &str,
+    values: &[T],
+    parts: impl Fn(&T) -> (&String, &String),
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    let mut ids = BTreeSet::new();
+    for value in values {
+        let (id, description) = parts(value);
+        validate_path_component(&format!("{field}.{id_label}"), id)?;
+        require_bounded_display_text(&format!("{field}.description"), description)?;
+        if !ids.insert(id.as_str()) {
+            return Err(anyhow!("duplicate {field}.{id_label}: {id}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_unique_mechanics(
+    field: &str,
+    values: &[LevelIntentMechanic],
+    allow_empty: bool,
+) -> Result<()> {
+    if values.is_empty() && !allow_empty {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    let mut seen = BTreeSet::new();
+    for value in values {
+        if !seen.insert(*value) {
+            return Err(anyhow!("{field} must not contain duplicates"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_level_intent_refs(
+    field: &str,
+    values: &[LevelIntentRef],
+    allow_empty: bool,
+) -> Result<()> {
+    if values.is_empty() && !allow_empty {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    let mut ids = BTreeSet::new();
+    for value in values {
+        validate_path_component(&format!("{field}.refId"), &value.ref_id)?;
+        validate_repo_relative_source_ref(&format!("{field}.sourceRef"), &value.source_ref)?;
+        if !ids.insert(value.ref_id.as_str()) {
+            return Err(anyhow!("duplicate {field}.refId: {}", value.ref_id));
+        }
+    }
+    Ok(())
+}
+
+fn validate_level_intent_placements(field: &str, values: &[LevelIntentPlacement]) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    let mut ids = BTreeSet::new();
+    let mut target_refs = BTreeSet::new();
+    for value in values {
+        validate_path_component(&format!("{field}.placementId"), &value.placement_id)?;
+        validate_path_component(&format!("{field}.targetRef"), &value.target_ref)?;
+        require_bounded_display_text(&format!("{field}.reason"), &value.reason)?;
+        if !ids.insert(value.placement_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate {field}.placementId: {}",
+                value.placement_id
+            ));
+        }
+        if !target_refs.insert(value.target_ref.as_str()) {
+            return Err(anyhow!("duplicate {field}.targetRef: {}", value.target_ref));
+        }
+    }
+    Ok(())
+}
+
+fn validate_no_ref_overlap(
+    field: &str,
+    allowed: &[LevelIntentRef],
+    forbidden: &[LevelIntentRef],
+) -> Result<()> {
+    let allowed_ids = allowed
+        .iter()
+        .map(|reference| reference.ref_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let allowed_sources = allowed
+        .iter()
+        .map(|reference| reference.source_ref.as_str())
+        .collect::<BTreeSet<_>>();
+    for reference in forbidden {
+        if allowed_ids.contains(reference.ref_id.as_str())
+            || allowed_sources.contains(reference.source_ref.as_str())
+        {
+            return Err(anyhow!(
+                "{field} contains contradictory allowed/forbidden refs"
+            ));
+        }
+    }
+    Ok(())
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -55794,6 +56273,136 @@ scenarios:
         assert_eq!(malformed.fuzzing_plans.status, "malformed");
         assert_eq!(malformed.fuzzing_plans.malformed_count, 1);
         fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
+    }
+
+    #[test]
+    fn level_intent_v1_accepts_valid_fixture() {
+        let fixture =
+            include_str!("../../../examples/level-intent-v1/level-intent.valid.fixture.json");
+        let intent =
+            LevelIntentArtifact::from_json_str(fixture).expect("valid level intent fixture parses");
+
+        assert_eq!(intent.schema_version, "level-intent-v1");
+        assert_eq!(intent.level_id, "collect_and_exit_intro");
+        assert_eq!(intent.status, LevelIntentStatus::Draft);
+        assert_eq!(intent.level_size.width, 32);
+        assert_eq!(intent.difficulty_target, LevelIntentDifficultyTarget::Easy);
+        assert!(intent
+            .required_mechanics
+            .contains(&LevelIntentMechanic::Collect));
+        assert!(intent.guardrails.iter().any(|guardrail| {
+            guardrail.contains("Planning input only") || guardrail.contains("No generation")
+        }));
+    }
+
+    #[test]
+    fn level_intent_v1_accepts_partial_and_blocked_fixtures() {
+        let partial =
+            include_str!("../../../examples/level-intent-v1/level-intent.partial.fixture.json");
+        let partial = LevelIntentArtifact::from_json_str(partial)
+            .expect("partial level intent fixture parses");
+        assert_eq!(partial.status, LevelIntentStatus::Partial);
+        assert!(partial.blocked_reasons.is_empty());
+
+        let blocked =
+            include_str!("../../../examples/level-intent-v1/level-intent.blocked.fixture.json");
+        let blocked = LevelIntentArtifact::from_json_str(blocked)
+            .expect("blocked level intent fixture parses");
+        assert_eq!(blocked.status, LevelIntentStatus::Blocked);
+        assert!(!blocked.blocked_reasons.is_empty());
+    }
+
+    #[test]
+    fn level_intent_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/missing-objectives.fixture.json"
+                ),
+                "objectives",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unsupported-mechanic.fixture.json"
+                ),
+                "teleport_anywhere",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unsafe-asset-ref.fixture.json"
+                ),
+                "escape",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unsafe-entity-ref.fixture.json"
+                ),
+                "escape",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unbounded-size.fixture.json"
+                ),
+                "levelSize",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unsupported-difficulty.fixture.json"
+                ),
+                "nightmare",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/unsupported-pacing.fixture.json"
+                ),
+                "chaotic",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/malformed-linked-ref.fixture.json"
+                ),
+                "linkedGoals",
+            ),
+            (
+                include_str!(
+                    "../../../examples/level-intent-v1/invalid/blocked-without-reason.fixture.json"
+                ),
+                "blockedReasons",
+            ),
+        ] {
+            let error = LevelIntentArtifact::from_json_str(fixture)
+                .expect_err("invalid level intent fixture is rejected");
+            assert!(
+                error.to_string().contains(expected)
+                    || error.to_string().contains("failed to parse"),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn level_intent_v1_rejects_contradictory_constraints() {
+        let fixture = include_str!(
+            "../../../examples/level-intent-v1/invalid/contradictory-constraints.fixture.json"
+        );
+        let error = LevelIntentArtifact::from_json_str(fixture)
+            .expect_err("contradictory level intent fixture is rejected");
+        assert!(
+            error.to_string().contains("contradict")
+                || error.to_string().contains("required and forbidden")
+        );
+    }
+
+    #[test]
+    fn level_intent_v1_keeps_planning_input_boundary_documented() {
+        let doc = include_str!("../../../docs/level-intent-v1.md");
+        assert!(doc.contains("planning input"));
+        assert!(doc.contains("does not generate"));
+        assert!(doc.contains("does not write"));
+        assert!(doc.contains("512"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("level-intent-v1.md"));
     }
 
     #[test]
