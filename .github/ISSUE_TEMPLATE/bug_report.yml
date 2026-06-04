@@ -5,7 +5,23 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Ouroforge is a local pre-release MVP. Please include evidence and avoid posting secrets, private paths, or generated files that contain sensitive data.
+        Thanks for reporting a bug. Ouroforge is a local pre-release MVP. Please include evidence and avoid posting secrets, private paths, or generated files that contain sensitive data. Public issue intake categories, labels, and required triage fields are defined in `docs/public-issue-intake-triage-v1.md`.
+  - type: dropdown
+    id: intake_category
+    attributes:
+      label: Public intake category
+      description: Choose the closest category from docs/public-issue-intake-triage-v1.md.
+      options:
+        - Bug
+        - Docs
+        - Demo/onboarding
+        - Security
+        - Feature request
+        - Forbidden scope request
+        - Roadmap/governance
+        - Support question
+    validations:
+      required: true
   - type: textarea
     id: summary
     attributes:

@@ -5,7 +5,23 @@ body:
   - type: markdown
     attributes:
       value: |
-        Public readiness tasks must not change repository visibility or publish announcements. They should improve evidence, docs, governance, or demo reproducibility. For post-launch docs and roadmap communication, use `docs/post-launch-roadmap-triage-v1.md` and `docs/post-launch-roadmap-response-snippets-v1.md`.
+        Public readiness tasks must not change repository visibility or publish announcements. They should improve evidence, docs, governance, or demo reproducibility. Classify public intake with `docs/public-issue-intake-triage-v1.md`. For post-launch docs and roadmap communication, use `docs/post-launch-roadmap-triage-v1.md` and `docs/post-launch-roadmap-response-snippets-v1.md`.
+  - type: dropdown
+    id: intake_category
+    attributes:
+      label: Public intake category
+      description: Choose the closest category from docs/public-issue-intake-triage-v1.md.
+      options:
+        - Demo/onboarding
+        - Docs
+        - Roadmap/governance
+        - Security
+        - Support question
+        - Bug
+        - Feature request
+        - Forbidden scope request
+    validations:
+      required: true
   - type: textarea
     id: blocker
     attributes:
