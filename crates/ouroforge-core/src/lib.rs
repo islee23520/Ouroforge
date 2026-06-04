@@ -3004,6 +3004,7 @@ impl FileArtifactOwnershipPolicy {
             entry.validate_schema(index)?;
         }
         self.generated_state.validate()?;
+        self.validate_conflict_policy()?;
         validate_nonempty_text_list(
             "file/artifact ownership policy guardrails",
             &self.guardrails,
@@ -3034,6 +3035,61 @@ impl FileArtifactOwnershipPolicy {
             return Err(anyhow!(
                 "file/artifact ownership policy boundary must state that the policy does not lock files"
             ));
+        }
+        Ok(())
+    }
+
+    fn validate_conflict_policy(&self) -> Result<()> {
+        let mut entry_ids = BTreeSet::new();
+        let mut work_package_owners = BTreeMap::<&str, &str>::new();
+        for (index, entry) in self.entries.iter().enumerate() {
+            if !entry_ids.insert(entry.id.as_str()) {
+                return Err(anyhow!(
+                    "file/artifact ownership policy duplicate entry id: {}",
+                    entry.id
+                ));
+            }
+            entry.validate_mode_target_pair(index)?;
+            entry.validate_generated_root_scope(index, &self.generated_state.roots)?;
+            for work_package_ref in &entry.work_package_refs {
+                if let Some(existing_owner) = work_package_owners.get(work_package_ref.as_str()) {
+                    if *existing_owner != entry.owner_agent {
+                        return Err(anyhow!(
+                            "file/artifact ownership policy conflicting work package {work_package_ref}: owner {existing_owner} conflicts with owner {}",
+                            entry.owner_agent
+                        ));
+                    }
+                } else {
+                    work_package_owners
+                        .insert(work_package_ref.as_str(), entry.owner_agent.as_str());
+                }
+            }
+        }
+
+        for left_index in 0..self.entries.len() {
+            let left = &self.entries[left_index];
+            if left.releases_ownership() {
+                continue;
+            }
+            for right_index in (left_index + 1)..self.entries.len() {
+                let right = &self.entries[right_index];
+                if right.releases_ownership() || !left.targets_overlap(right) {
+                    continue;
+                }
+                let conflict_kind = ownership_conflict_kind(left, right);
+                if let Some(conflict_kind) = conflict_kind {
+                    if left.conflict_is_resolved() && right.conflict_is_resolved() {
+                        continue;
+                    }
+                    return Err(anyhow!(
+                        "file/artifact ownership policy {conflict_kind} conflict between entries {} owned by {} and {} owned by {}; conflicting entries must be blocked, deferred, or escalated",
+                        left.id,
+                        left.owner_agent,
+                        right.id,
+                        right.owner_agent
+                    ));
+                }
+            }
         }
         Ok(())
     }
@@ -3088,6 +3144,99 @@ impl OwnershipPolicyEntry {
             escalation.validate_schema(index)?;
         }
         Ok(())
+    }
+
+    fn validate_mode_target_pair(&self, index: usize) -> Result<()> {
+        match self.mode {
+            OwnershipMode::SharedReadOnly => {
+                if self.target.kind != OwnershipTargetKind::SharedReadOnlyRef {
+                    return Err(anyhow!(
+                        "ownership policy entries[{index}] shared-read-only mode requires shared-read-only-ref target"
+                    ));
+                }
+            }
+            OwnershipMode::ExclusiveWrite => {
+                if !matches!(
+                    self.target.kind,
+                    OwnershipTargetKind::FilePath | OwnershipTargetKind::Artifact
+                ) {
+                    return Err(anyhow!(
+                        "ownership policy entries[{index}] exclusive-write mode requires file-path or artifact target"
+                    ));
+                }
+            }
+            OwnershipMode::GeneratedWrite => {
+                if self.target.kind != OwnershipTargetKind::GeneratedOutputRoot {
+                    return Err(anyhow!(
+                        "ownership policy entries[{index}] generated-write mode requires generated-output-root target"
+                    ));
+                }
+            }
+            OwnershipMode::EscalationHold => {}
+        }
+        Ok(())
+    }
+
+    fn validate_generated_root_scope(
+        &self,
+        index: usize,
+        generated_roots: &[String],
+    ) -> Result<()> {
+        if self.target.kind == OwnershipTargetKind::GeneratedOutputRoot {
+            let is_declared_root = generated_roots
+                .iter()
+                .any(|root| project_manifest_path_contains(root, &self.target.path));
+            if !is_declared_root {
+                return Err(anyhow!(
+                    "ownership policy entries[{index}].target generated-output-root path {} must be within generatedState.roots",
+                    self.target.path
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn releases_ownership(&self) -> bool {
+        self.state == OwnershipState::Released
+    }
+
+    fn conflict_is_resolved(&self) -> bool {
+        matches!(
+            self.state,
+            OwnershipState::Blocked | OwnershipState::Deferred | OwnershipState::Escalated
+        )
+    }
+
+    fn targets_overlap(&self, other: &OwnershipPolicyEntry) -> bool {
+        self.target.kind == other.target.kind && self.target.id == other.target.id
+            || project_manifest_paths_overlap(&self.target.path, &other.target.path)
+    }
+}
+
+fn ownership_conflict_kind(
+    left: &OwnershipPolicyEntry,
+    right: &OwnershipPolicyEntry,
+) -> Option<&'static str> {
+    let left_writes = left.mode.writes_target();
+    let right_writes = right.mode.writes_target();
+    let left_reads = left.mode == OwnershipMode::SharedReadOnly;
+    let right_reads = right.mode == OwnershipMode::SharedReadOnly;
+
+    if left_writes && right_writes && left.owner_agent != right.owner_agent {
+        Some("write/write")
+    } else if (left_reads && right_writes) || (left_writes && right_reads) {
+        Some("read/write ambiguity")
+    } else {
+        None
+    }
+}
+
+impl OwnershipMode {
+    fn writes_target(self) -> bool {
+        matches!(
+            self,
+            OwnershipMode::ExclusiveWrite | OwnershipMode::GeneratedWrite
+        )
     }
 }
 
@@ -6486,14 +6635,15 @@ fn validate_project_manifest_path(field: &str, value: &str) -> Result<()> {
 }
 
 fn project_manifest_paths_overlap(left: &str, right: &str) -> bool {
-    let left = left.trim_matches('/');
-    let right = right.trim_matches('/');
-    left == right
-        || left
-            .strip_prefix(right)
-            .is_some_and(|rest| rest.starts_with('/'))
-        || right
-            .strip_prefix(left)
+    project_manifest_path_contains(left, right) || project_manifest_path_contains(right, left)
+}
+
+fn project_manifest_path_contains(parent: &str, child: &str) -> bool {
+    let parent = parent.trim_matches('/');
+    let child = child.trim_matches('/');
+    parent == child
+        || child
+            .strip_prefix(parent)
             .is_some_and(|rest| rest.starts_with('/'))
 }
 
@@ -39873,6 +40023,119 @@ scenarios:
         assert!(
             error_text.contains("evidenceRefs"),
             "unexpected malformed ownership policy error: {error_text}"
+        );
+    }
+
+    #[test]
+    fn ownership_policy_v1_rejects_unresolved_write_and_read_ambiguity() {
+        let conflict_body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json",
+        );
+        let mut unresolved: serde_json::Value =
+            serde_json::from_str(&conflict_body).expect("conflict fixture json");
+        unresolved["entries"][0]["state"] = json!("active");
+        unresolved["entries"][1]["state"] = json!("active");
+        unresolved["entries"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("blockedReasons");
+        unresolved["entries"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("blockedReasons");
+        let write_error = FileArtifactOwnershipPolicy::from_json_str(&unresolved.to_string())
+            .expect_err("active write/write ownership conflicts reject policy");
+        assert!(
+            write_error.to_string().contains("write/write conflict"),
+            "unexpected write conflict error: {write_error:#}"
+        );
+
+        let no_conflict_body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+        );
+        let mut read_write: serde_json::Value =
+            serde_json::from_str(&no_conflict_body).expect("no-conflict fixture json");
+        read_write["entries"].as_array_mut().unwrap().push(json!({
+            "id": "reader-over-active-write",
+            "ownerAgent": "reviewer-epsilon",
+            "role": "reviewer",
+            "target": {
+                "kind": "shared-read-only-ref",
+                "id": "scene-doc-read",
+                "path": "docs/multi-agent-production-pipeline-v1.md"
+            },
+            "mode": "shared-read-only",
+            "state": "active",
+            "workPackageRefs": ["work-package-reader-over-active-write"],
+            "evidenceRefs": [{
+                "id": "ownership-evidence",
+                "path": "runs/multi-agent-pipeline/ownership/reader-over-active-write.json",
+                "description": "generated ownership evidence path"
+            }]
+        }));
+        let read_write_error = FileArtifactOwnershipPolicy::from_json_str(&read_write.to_string())
+            .expect_err("active read/write ambiguity rejects policy");
+        assert!(
+            read_write_error
+                .to_string()
+                .contains("read/write ambiguity conflict"),
+            "unexpected read/write ambiguity error: {read_write_error:#}"
+        );
+    }
+
+    #[test]
+    fn ownership_policy_v1_rejects_generated_root_and_path_boundary_drift() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.exclusive-write.fixture.json",
+        );
+        let mut outside_root: serde_json::Value =
+            serde_json::from_str(&body).expect("exclusive-write fixture json");
+        outside_root["entries"][1]["target"]["path"] = json!("docs/generated-report");
+        let root_error = FileArtifactOwnershipPolicy::from_json_str(&outside_root.to_string())
+            .expect_err("generated output root outside generatedState.roots rejects policy");
+        assert!(
+            root_error.to_string().contains("generatedState.roots"),
+            "unexpected generated root error: {root_error:#}"
+        );
+
+        let mut unsafe_path: serde_json::Value =
+            serde_json::from_str(&body).expect("exclusive-write fixture json");
+        unsafe_path["entries"][0]["target"]["path"] = json!("../secret.json");
+        let path_error = FileArtifactOwnershipPolicy::from_json_str(&unsafe_path.to_string())
+            .expect_err("unsafe ownership target path rejects policy");
+        assert!(
+            path_error.to_string().contains("project root"),
+            "unexpected unsafe path error: {path_error:#}"
+        );
+    }
+
+    #[test]
+    fn ownership_policy_v1_rejects_missing_owner_and_conflicting_work_package_refs() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+        );
+        let mut missing_owner: serde_json::Value =
+            serde_json::from_str(&body).expect("no-conflict fixture json");
+        missing_owner["entries"][0]["ownerAgent"] = json!("");
+        let owner_error = FileArtifactOwnershipPolicy::from_json_str(&missing_owner.to_string())
+            .expect_err("missing owner rejects policy");
+        assert!(
+            owner_error.to_string().contains("ownerAgent"),
+            "unexpected owner error: {owner_error:#}"
+        );
+
+        let mut conflicting_work_package: serde_json::Value =
+            serde_json::from_str(&body).expect("no-conflict fixture json");
+        conflicting_work_package["entries"][1]["workPackageRefs"] =
+            conflicting_work_package["entries"][0]["workPackageRefs"].clone();
+        let package_error =
+            FileArtifactOwnershipPolicy::from_json_str(&conflicting_work_package.to_string())
+                .expect_err("same work package under different owners rejects policy");
+        assert!(
+            package_error
+                .to_string()
+                .contains("conflicting work package"),
+            "unexpected work package error: {package_error:#}"
         );
     }
 
