@@ -3394,6 +3394,7 @@ impl OwnershipEscalation {
 }
 
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
+pub const AGENT_HANDOFF_V2_SCHEMA_VERSION: &str = "agent-handoff-v2";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -3454,6 +3455,7 @@ pub struct AgentHandoffStep {
 pub enum AgentHandoffStatus {
     Ready,
     Blocked,
+    Stale,
     Failed,
     Completed,
 }
@@ -3463,10 +3465,96 @@ impl AgentHandoffStatus {
         match self {
             AgentHandoffStatus::Ready => "ready",
             AgentHandoffStatus::Blocked => "blocked",
+            AgentHandoffStatus::Stale => "stale",
             AgentHandoffStatus::Failed => "failed",
             AgentHandoffStatus::Completed => "completed",
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffV2 {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "handoffId")]
+    pub handoff_id: String,
+    #[serde(rename = "fromRole")]
+    pub from_role: String,
+    #[serde(rename = "toRole")]
+    pub to_role: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub status: AgentHandoffStatus,
+    #[serde(rename = "artifactRefs")]
+    pub artifact_refs: Vec<AuthoringLoopArtifactRef>,
+    pub assumptions: Vec<String>,
+    pub decisions: Vec<AuthoringLoopDecisionRef>,
+    #[serde(rename = "evidenceLinks")]
+    pub evidence_links: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "openRisks")]
+    pub open_risks: Vec<AgentHandoffRisk>,
+    #[serde(rename = "acceptanceChecklist")]
+    pub acceptance_checklist: Vec<AgentHandoffChecklistItem>,
+    #[serde(rename = "staleStateIndicators")]
+    pub stale_state_indicators: Vec<AgentHandoffStaleStateIndicator>,
+    #[serde(rename = "nextRecommendedAction")]
+    pub next_recommended_action: String,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    #[serde(
+        rename = "v1Compatibility",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub v1_compatibility: Option<AgentHandoffV1Compatibility>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffRisk {
+    pub id: String,
+    pub severity: String,
+    pub description: String,
+    #[serde(rename = "mitigation")]
+    pub mitigation: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffChecklistItem {
+    pub id: String,
+    pub description: String,
+    pub checked: bool,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffStaleStateIndicator {
+    pub id: String,
+    #[serde(rename = "artifactRef")]
+    pub artifact_ref: AuthoringLoopArtifactRef,
+    pub reason: String,
+    #[serde(rename = "nextAction")]
+    pub next_action: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentHandoffV1Compatibility {
+    #[serde(rename = "originalSchemaVersion")]
+    pub original_schema_version: String,
+    pub compatible: bool,
+    pub notes: Vec<String>,
 }
 
 impl AgentHandoffContract {
@@ -3526,6 +3614,162 @@ impl AgentHandoffContract {
             ));
         }
         Ok(())
+    }
+}
+
+impl AgentHandoffV2 {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let handoff: AgentHandoffV2 =
+            serde_json::from_str(input).context("failed to parse Agent Handoff v2 JSON")?;
+        handoff.validate_schema()?;
+        Ok(handoff)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_HANDOFF_V2_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent handoff v2 schemaVersion must be {AGENT_HANDOFF_V2_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent handoff v2 handoffId", &self.handoff_id)?;
+        validate_path_component("agent handoff v2 fromRole", &self.from_role)?;
+        validate_path_component("agent handoff v2 toRole", &self.to_role)?;
+        if !SUPPORTED_AGENT_ROLES.contains(&self.from_role.as_str()) {
+            return Err(anyhow!(
+                "agent handoff v2 fromRole '{}' is unsupported",
+                self.from_role
+            ));
+        }
+        if !SUPPORTED_AGENT_ROLES.contains(&self.to_role.as_str()) {
+            return Err(anyhow!(
+                "agent handoff v2 toRole '{}' is unsupported",
+                self.to_role
+            ));
+        }
+        validate_path_component("agent handoff v2 taskId", &self.task_id)?;
+        for (index, artifact_ref) in self.artifact_refs.iter().enumerate() {
+            artifact_ref.validate(&format!("agent handoff v2 artifactRefs[{index}]"))?;
+        }
+        if self.artifact_refs.is_empty() {
+            return Err(anyhow!("agent handoff v2 artifactRefs must not be empty"));
+        }
+        validate_nonempty_text_list("agent handoff v2 assumptions", &self.assumptions)?;
+        for (index, decision) in self.decisions.iter().enumerate() {
+            decision.validate(&format!("agent handoff v2 decisions[{index}]"))?;
+        }
+        for (index, evidence_ref) in self.evidence_links.iter().enumerate() {
+            evidence_ref.validate(&format!("agent handoff v2 evidenceLinks[{index}]"))?;
+        }
+        if self.evidence_links.is_empty() {
+            return Err(anyhow!("agent handoff v2 evidenceLinks must not be empty"));
+        }
+        for (index, risk) in self.open_risks.iter().enumerate() {
+            risk.validate(index)?;
+        }
+        for (index, item) in self.acceptance_checklist.iter().enumerate() {
+            item.validate(index)?;
+        }
+        if self.acceptance_checklist.is_empty() {
+            return Err(anyhow!(
+                "agent handoff v2 acceptanceChecklist must not be empty"
+            ));
+        }
+        for (index, indicator) in self.stale_state_indicators.iter().enumerate() {
+            indicator.validate(index)?;
+        }
+        if self.status == AgentHandoffStatus::Stale && self.stale_state_indicators.is_empty() {
+            return Err(anyhow!(
+                "stale agent handoff v2 must list staleStateIndicators"
+            ));
+        }
+        if self.status == AgentHandoffStatus::Blocked && self.open_risks.is_empty() {
+            return Err(anyhow!("blocked agent handoff v2 must list openRisks"));
+        }
+        validate_safe_handoff_text(
+            "agent handoff v2 nextRecommendedAction",
+            &self.next_recommended_action,
+        )?;
+        validate_nonempty_text_list("agent handoff v2 forbiddenActions", &self.forbidden_actions)?;
+        self.generated_state.validate()?;
+        if let Some(compatibility) = &self.v1_compatibility {
+            compatibility.validate()?;
+        }
+        require_text("agent handoff v2 boundary", &self.boundary)?;
+        let boundary = self.boundary.to_ascii_lowercase();
+        if !(boundary.contains("advisory") && boundary.contains("does not execute")) {
+            return Err(anyhow!(
+                "agent handoff v2 boundary must state advisory evidence and does not execute"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl AgentHandoffRisk {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(&format!("agent handoff v2 openRisks[{index}].id"), &self.id)?;
+        validate_path_component(
+            &format!("agent handoff v2 openRisks[{index}].severity"),
+            &self.severity,
+        )?;
+        require_text(
+            &format!("agent handoff v2 openRisks[{index}].description"),
+            &self.description,
+        )?;
+        require_text(
+            &format!("agent handoff v2 openRisks[{index}].mitigation"),
+            &self.mitigation,
+        )
+    }
+}
+
+impl AgentHandoffChecklistItem {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent handoff v2 acceptanceChecklist[{index}].id"),
+            &self.id,
+        )?;
+        require_text(
+            &format!("agent handoff v2 acceptanceChecklist[{index}].description"),
+            &self.description,
+        )?;
+        for (evidence_index, evidence_ref) in self.evidence_refs.iter().enumerate() {
+            evidence_ref.validate(&format!(
+                "agent handoff v2 acceptanceChecklist[{index}].evidenceRefs[{evidence_index}]"
+            ))?;
+        }
+        Ok(())
+    }
+}
+
+impl AgentHandoffStaleStateIndicator {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent handoff v2 staleStateIndicators[{index}].id"),
+            &self.id,
+        )?;
+        self.artifact_ref.validate(&format!(
+            "agent handoff v2 staleStateIndicators[{index}].artifactRef"
+        ))?;
+        require_text(
+            &format!("agent handoff v2 staleStateIndicators[{index}].reason"),
+            &self.reason,
+        )?;
+        validate_safe_handoff_text(
+            &format!("agent handoff v2 staleStateIndicators[{index}].nextAction"),
+            &self.next_action,
+        )
+    }
+}
+
+impl AgentHandoffV1Compatibility {
+    fn validate(&self) -> Result<()> {
+        if self.original_schema_version != AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent handoff v2 v1Compatibility.originalSchemaVersion must be {AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_nonempty_text_list("agent handoff v2 v1Compatibility.notes", &self.notes)
     }
 }
 
@@ -40524,6 +40768,66 @@ scenarios:
             .malformed_reasons
             .iter()
             .any(|reason| reason.contains("evidenceRefs")));
+    }
+
+    #[test]
+    fn agent_handoff_v2_accepts_fixture_states_and_preserves_v1_compatibility() {
+        for fixture in [
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.stale.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.blocked.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.v1-compatible.fixture.json",
+        ] {
+            let body = read_json_fixture(fixture);
+            let handoff = AgentHandoffV2::from_json_str(&body)
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(handoff.schema_version, AGENT_HANDOFF_V2_SCHEMA_VERSION);
+            assert!(SUPPORTED_AGENT_ROLES.contains(&handoff.from_role.as_str()));
+            assert!(SUPPORTED_AGENT_ROLES.contains(&handoff.to_role.as_str()));
+            assert!(!handoff.artifact_refs.is_empty());
+            assert!(!handoff.evidence_links.is_empty());
+            assert!(!handoff.acceptance_checklist.is_empty());
+            assert!(handoff.generated_state.tracked_fixture_only);
+            assert!(handoff.boundary.contains("does not execute commands"));
+            assert!(handoff
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(handoff
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "browser command bridge"));
+        }
+
+        let v1_body =
+            read_json_fixture("examples/multi-agent-pipeline-v1/demo-handoff-v2.fixture.json");
+        let v1 = AgentHandoffContract::from_json_str(&v1_body)
+            .expect("existing v1 handoff contract remains compatible");
+        assert_eq!(v1.schema_version, AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION);
+
+        let compatible_body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.v1-compatible.fixture.json",
+        );
+        let compatible = AgentHandoffV2::from_json_str(&compatible_body)
+            .expect("v1-compatible v2 fixture validates");
+        assert!(compatible
+            .v1_compatibility
+            .as_ref()
+            .is_some_and(|compatibility| compatibility.compatible));
+    }
+
+    #[test]
+    fn agent_handoff_v2_rejects_invalid_missing_evidence_fixture() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-handoff-v2.invalid.fixture.json",
+        );
+        let error =
+            AgentHandoffV2::from_json_str(&body).expect_err("missing evidenceLinks rejects v2");
+        let error_text = format!("{error:#}");
+        assert!(
+            error_text.contains("evidenceLinks"),
+            "unexpected handoff v2 error: {error_text}"
+        );
     }
 
     #[test]
