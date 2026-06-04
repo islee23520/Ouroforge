@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "agent-role-model-v1",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "roles": [
+    {
+      "role": "designer",
+      "purpose": "Transforms GDD goals and scenario evidence into reviewable design notes and acceptance criteria.",
+      "allowedOutputs": ["design-note", "acceptance-criteria", "scenario-intent"],
+      "requiredInputArtifacts": ["gdd", "scenario-pack", "run-evidence"],
+      "requiredEvidence": ["design-rationale", "scenario-link", "review-handoff"],
+      "handoffTargets": ["gameplay-engineer", "level-designer", "reviewer"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent spawning", "trusted source write"]
+    },
+    {
+      "role": "gameplay-engineer",
+      "purpose": "Produces bounded implementation proposals and patch-preview evidence for gameplay behavior.",
+      "allowedOutputs": ["implementation-plan", "patch-preview-request", "test-plan"],
+      "requiredInputArtifacts": ["accepted-design-note", "source-file-class-report", "scenario-evidence"],
+      "requiredEvidence": ["patch-preview", "test-plan", "rollback-note"],
+      "handoffTargets": ["qa-agent", "reviewer", "critic"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent execution", "auto-merge"]
+    },
+    {
+      "role": "level-designer",
+      "purpose": "Creates bounded level/scenario proposals and fixture-scoped draft evidence.",
+      "allowedOutputs": ["level-draft", "scenario-candidate", "tilemap-draft-summary"],
+      "requiredInputArtifacts": ["gdd", "asset-manifest", "scenario-pack"],
+      "requiredEvidence": ["draft-summary", "bounds-check", "review-handoff"],
+      "handoffTargets": ["qa-agent", "reviewer"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent spawning", "trusted scene write"]
+    },
+    {
+      "role": "asset-import-planner",
+      "purpose": "Plans local asset manifest changes and preview evidence without importing remote assets or mutating dependencies.",
+      "allowedOutputs": ["asset-plan", "manifest-draft", "preview-evidence-request"],
+      "requiredInputArtifacts": ["asset-manifest", "asset-preview-evidence", "project-manifest"],
+      "requiredEvidence": ["asset-integrity-warning-review", "preview-link", "review-handoff"],
+      "handoffTargets": ["designer", "reviewer"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent download", "network install"]
+    },
+    {
+      "role": "qa-agent",
+      "purpose": "Runs bounded local QA evidence generation and reports pass/fail/blocker evidence only.",
+      "allowedOutputs": ["qa-report", "scenario-result-summary", "failure-classification-input"],
+      "requiredInputArtifacts": ["scenario-pack", "run-config", "budget-policy"],
+      "requiredEvidence": ["run-verdict", "evidence-refs", "generated-state-audit"],
+      "handoffTargets": ["performance-regression-agent", "reviewer", "critic"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent loop", "auto-fix"]
+    },
+    {
+      "role": "performance-regression-agent",
+      "purpose": "Evaluates explicit performance/regression budgets from generated evidence without quality guarantees.",
+      "allowedOutputs": ["performance-summary", "regression-matrix-input", "budget-blocker"],
+      "requiredInputArtifacts": ["run-verdict", "frame-metrics", "regression-policy"],
+      "requiredEvidence": ["metric-summary", "threshold-link", "blocker-rationale"],
+      "handoffTargets": ["reviewer", "critic"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent rerun", "production-safety-claim"]
+    },
+    {
+      "role": "reviewer",
+      "purpose": "Accepts, rejects, or holds proposed outputs using independent evidence and explicit scope checks.",
+      "allowedOutputs": ["review-decision", "hold-reason", "evidence-gap"],
+      "requiredInputArtifacts": ["proposal", "evidence-bundle", "generated-state-audit"],
+      "requiredEvidence": ["independent-review-note", "scope-check", "risk-check"],
+      "handoffTargets": ["critic", "build-release-candidate-agent"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent approval", "reviewer bypass"]
+    },
+    {
+      "role": "critic",
+      "purpose": "Challenges assumptions, drift, missing evidence, and unsafe authority before trusted promotion.",
+      "allowedOutputs": ["critic-finding", "risk-classification", "missing-evidence-report"],
+      "requiredInputArtifacts": ["proposal", "review-decision", "evidence-bundle"],
+      "requiredEvidence": ["risk-rationale", "drift-check", "no-self-review-check"],
+      "handoffTargets": ["reviewer", "designer", "gameplay-engineer"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent escalation", "trusted mutation"]
+    },
+    {
+      "role": "build-release-candidate-agent",
+      "purpose": "Design-gate-only role for local release-candidate readiness evidence; it does not publish, sign, deploy, or automate CI/CD.",
+      "allowedOutputs": ["release-candidate-checklist", "packaging-risk-note", "blocked-release-gate"],
+      "requiredInputArtifacts": ["accepted-review-decision", "verification-log", "generated-state-audit"],
+      "requiredEvidence": ["checklist-evidence", "non-publish-boundary", "reviewer-signoff-ref"],
+      "handoffTargets": ["reviewer", "critic"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent deploy", "publish or sign release"]
+    }
+  ],
+  "separationRequirements": [
+    {
+      "id": "no-self-review",
+      "description": "The role that creates a proposal or evidence bundle cannot be the only reviewer or critic for trusted apply/promotion.",
+      "appliesTo": ["gameplay-engineer", "level-designer", "asset-import-planner", "reviewer", "critic"],
+      "blockedCondition": "same role identity is proposer and sole reviewer/critic",
+      "requiredEvidence": ["proposer-id", "reviewer-id", "critic-id-or-hold-reason"]
+    },
+    {
+      "id": "design-gate-only-release",
+      "description": "Build/release candidate participation remains advisory and cannot publish, sign, deploy, mutate CI, or change repository visibility.",
+      "appliesTo": ["build-release-candidate-agent"],
+      "blockedCondition": "release role requests publish, sign, deploy, visibility, or CI/CD mutation authority",
+      "requiredEvidence": ["non-publish-boundary", "manual-review-required", "generated-state-audit"]
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline", ".omx/multi-agent-pipeline"],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "role model is accountability metadata, not hidden agent execution",
+    "outputs remain untrusted until Rust/local validation and review-gated apply or promotion",
+    "browser and Studio surfaces stay read-only or draft-only for trusted state"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "remote worker pool",
+    "publish or deploy"
+  ]
+}

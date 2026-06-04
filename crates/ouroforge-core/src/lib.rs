@@ -2132,6 +2132,161 @@ pub struct AuthoringLoopResumePreflight {
     pub boundary: String,
 }
 
+pub const AGENT_ROLE_MODEL_SCHEMA_VERSION: &str = "agent-role-model-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentRoleModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub milestone: String,
+    pub roles: Vec<AgentRoleDefinition>,
+    #[serde(rename = "separationRequirements")]
+    pub separation_requirements: Vec<RoleSeparationRequirement>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentRoleDefinition {
+    pub role: String,
+    pub purpose: String,
+    #[serde(rename = "allowedOutputs")]
+    pub allowed_outputs: Vec<String>,
+    #[serde(rename = "requiredInputArtifacts")]
+    pub required_input_artifacts: Vec<String>,
+    #[serde(rename = "requiredEvidence")]
+    pub required_evidence: Vec<String>,
+    #[serde(rename = "handoffTargets")]
+    pub handoff_targets: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RoleSeparationRequirement {
+    pub id: String,
+    pub description: String,
+    #[serde(rename = "appliesTo")]
+    pub applies_to: Vec<String>,
+    #[serde(rename = "blockedCondition")]
+    pub blocked_condition: String,
+    #[serde(rename = "requiredEvidence")]
+    pub required_evidence: Vec<String>,
+}
+
+impl AgentRoleModel {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let model: AgentRoleModel =
+            serde_json::from_str(input).context("failed to parse Agent Role Model JSON")?;
+        model.validate_schema()?;
+        Ok(model)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_ROLE_MODEL_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent role model schemaVersion must be {AGENT_ROLE_MODEL_SCHEMA_VERSION}"
+            ));
+        }
+        require_text("agent role model milestone", &self.milestone)?;
+        if self.roles.is_empty() {
+            return Err(anyhow!("agent role model roles must not be empty"));
+        }
+        let mut seen_roles = BTreeSet::new();
+        for (index, role) in self.roles.iter().enumerate() {
+            role.validate(index)?;
+            if !seen_roles.insert(role.role.clone()) {
+                return Err(anyhow!(
+                    "agent role model role '{}' is duplicated",
+                    role.role
+                ));
+            }
+        }
+        validate_nonempty_text_list("agent role model guardrails", &self.guardrails)?;
+        validate_nonempty_text_list("agent role model forbiddenActions", &self.forbidden_actions)?;
+        if self.separation_requirements.is_empty() {
+            return Err(anyhow!(
+                "agent role model separationRequirements must not be empty"
+            ));
+        }
+        for (index, requirement) in self.separation_requirements.iter().enumerate() {
+            requirement.validate(index)?;
+        }
+        self.generated_state.validate()?;
+        Ok(())
+    }
+}
+
+impl AgentRoleDefinition {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(&format!("agent role model roles[{index}].role"), &self.role)?;
+        require_text(
+            &format!("agent role model roles[{index}].purpose"),
+            &self.purpose,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model roles[{index}].allowedOutputs"),
+            &self.allowed_outputs,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model roles[{index}].requiredInputArtifacts"),
+            &self.required_input_artifacts,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model roles[{index}].requiredEvidence"),
+            &self.required_evidence,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model roles[{index}].handoffTargets"),
+            &self.handoff_targets,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model roles[{index}].forbiddenActions"),
+            &self.forbidden_actions,
+        )?;
+        let forbidden_text = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for required_forbidden in ["self-approval", "auto-apply", "hidden agent"] {
+            if !forbidden_text.contains(required_forbidden) {
+                return Err(anyhow!(
+                    "agent role model roles[{index}].forbiddenActions must include {required_forbidden} boundary"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl RoleSeparationRequirement {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent role model separationRequirements[{index}].id"),
+            &self.id,
+        )?;
+        require_text(
+            &format!("agent role model separationRequirements[{index}].description"),
+            &self.description,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model separationRequirements[{index}].appliesTo"),
+            &self.applies_to,
+        )?;
+        require_text(
+            &format!("agent role model separationRequirements[{index}].blockedCondition"),
+            &self.blocked_condition,
+        )?;
+        validate_nonempty_text_list(
+            &format!("agent role model separationRequirements[{index}].requiredEvidence"),
+            &self.required_evidence,
+        )
+    }
+}
+
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -33561,6 +33716,60 @@ scenarios:
     fn read_visual_edit_draft_fixture(relative: &str) -> String {
         fs::read_to_string(repo_fixture_path(relative))
             .unwrap_or_else(|error| panic!("{relative} reads: {error:#}"))
+    }
+
+    fn read_json_fixture(relative: &str) -> String {
+        fs::read_to_string(repo_fixture_path(relative))
+            .unwrap_or_else(|error| panic!("{relative} reads: {error:#}"))
+    }
+
+    #[test]
+    fn agent_role_model_v1_accepts_fixture_roles_and_boundaries() {
+        let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
+        let model = AgentRoleModel::from_json_str(&body).expect("agent role fixture validates");
+        assert_eq!(model.schema_version, AGENT_ROLE_MODEL_SCHEMA_VERSION);
+        assert_eq!(model.roles.len(), 9);
+        assert!(model
+            .roles
+            .iter()
+            .any(|role| role.role == "build-release-candidate-agent"
+                && role.purpose.contains("Design-gate-only")));
+        for role in &model.roles {
+            assert!(!role.allowed_outputs.is_empty());
+            assert!(!role.required_input_artifacts.is_empty());
+            assert!(!role.required_evidence.is_empty());
+            assert!(role.forbidden_actions.join(" ").contains("self-approval"));
+            assert!(role.forbidden_actions.join(" ").contains("auto-apply"));
+        }
+        assert!(model
+            .separation_requirements
+            .iter()
+            .any(|requirement| requirement.id == "no-self-review"));
+        assert!(model
+            .guardrails
+            .join(" ")
+            .contains("not hidden agent execution"));
+        assert!(model
+            .forbidden_actions
+            .iter()
+            .any(|action| action == "remote worker pool"));
+        assert!(model.generated_state.tracked_fixture_only);
+    }
+
+    #[test]
+    fn agent_role_model_v1_rejects_duplicate_and_underbounded_roles() {
+        let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
+        let mut value: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
+        let duplicate = value["roles"][0].clone();
+        value["roles"].as_array_mut().unwrap().push(duplicate);
+        let error = AgentRoleModel::from_json_str(&value.to_string()).unwrap_err();
+        assert!(error.to_string().contains("duplicated"));
+
+        let mut unsafe_value: serde_json::Value =
+            serde_json::from_str(&body).expect("fixture json");
+        unsafe_value["roles"][0]["forbiddenActions"] = json!(["trusted source write"]);
+        let error = AgentRoleModel::from_json_str(&unsafe_value.to_string()).unwrap_err();
+        assert!(error.to_string().contains("self-approval"));
     }
 
     #[test]
