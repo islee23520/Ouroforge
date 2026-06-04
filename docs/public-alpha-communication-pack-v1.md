@@ -1,6 +1,6 @@
 # Public Alpha Communication Pack v1
 
-Status: **draft communication artifact for issue #385 PLG1.8.1**.
+Status: **final communication artifact for issue #385 PLG1.8.1 and PLG1.8.2**.
 
 This pack gives maintainers conservative wording they may adapt when preparing a
 future public-alpha review. It is not an announcement, launch approval,
@@ -19,7 +19,8 @@ browser surfaces trusted write authority.
 ## Public alpha summary draft
 
 Use this only after maintainers separately decide that a public-alpha review may
-be discussed:
+be discussed. Reusing this text does not publish an announcement or change the
+repository visibility state:
 
 > Ouroforge is an inspectable pre-release MVP for evidence-driven game-authoring
 > experiments. The current repository demonstrates a local Seed → Run → Evidence
@@ -83,6 +84,25 @@ fresh-clone references instead of copying stale commands into announcements:
 Every demo pointer should say that generated state remains local and ignored
 unless a fixture-scoped issue explicitly authorizes tracking it.
 
+## Safety model summary for communication
+
+When describing the safety model, keep the language factual and narrow:
+
+- Ouroforge is local-first: users run local commands and inspect local evidence.
+- Rust CLI/core code and the local filesystem own trusted persistence.
+- Agents, browser workers, dashboards, cockpits, and Chrome DevTools Protocol
+  observations are evidence inputs or read-only displays.
+- Browser surfaces do not write source files, execute commands, operate a local
+  command server, or apply patches.
+- Source-preview, sandbox, stale-target, rollback, and review artifacts are
+  governance/evidence boundaries. They are not permission to mutate the trusted
+  maintainer worktree.
+- Generated evidence remains local ignored state unless a future fixture-scoped
+  issue explicitly authorizes tracking it.
+
+Do not use this safety summary to imply a sandbox guarantee for arbitrary
+untrusted projects, browser content, dependencies, or user-supplied commands.
+
 ## Issue and security reporting pointers
 
 Use existing contribution and security routing docs rather than promising a new
@@ -100,6 +120,40 @@ support channel:
 - [`security-response-playbook-v1.md`](security-response-playbook-v1.md) for
   alpha security-response governance.
 
+## Maintainer response snippets
+
+These snippets are intentionally conservative and should be adapted with current
+evidence before use. They do not create a support queue or response-time promise.
+
+### General project reply
+
+> Ouroforge is a local-first pre-release MVP for evidence-native authoring-loop
+> experiments. The current repository is useful for inspecting the local demo,
+> evidence artifacts, and governance boundaries. It is not a production editor,
+> compatibility-stable engine, hosted service, native exporter, plugin runtime,
+> secure sandbox, or Godot replacement.
+
+### Demo reply
+
+> Start with the README and the fresh-clone smoke/audit docs. Demo commands write
+> generated local state such as `runs/`, `target/`, dashboard exports,
+> screenshots, and local tool output; those files should remain ignored unless a
+> fixture-scoped issue explicitly says otherwise.
+
+### Issue routing reply
+
+> Please include the smallest reproducible local command, affected commit,
+> expected versus actual evidence, and whether generated artifacts are involved.
+> This issue does not authorize launch/release work, visibility changes, source
+> apply, command bridges, hosted/cloud/auth behavior, or support commitments.
+
+### Security routing reply
+
+> Please avoid posting exploit details, secrets, tokens, private paths, or
+> private screenshots in public. Use a private maintainer channel when available;
+> if only a public issue is available, file a minimal routing issue that says a
+> private security report is needed.
+
 ## Forbidden overclaim checklist
 
 Before reusing any text from this pack, answer **No** to every question:
@@ -115,9 +169,36 @@ Before reusing any text from this pack, answer **No** to every question:
   local tool artifacts should be committed?
 - Does it close, replace, or weaken #1 or #23 as governance anchors?
 
-## PLG1.8.1 verification notes
+## Publication boundary
 
-This initial draft is documentation-only and intentionally conservative. PLG1.8.2
-must finalize the pack against the safety model, reporting pointers, forbidden
-claims, generated-state audit, and broad issue closure verification before #385
-is closed.
+This pack is a source document for maintainers, not a publication event. Before
+copying any text into a public announcement, maintainers should separately record:
+
+1. the exact visibility/publication decision and date under the public visibility
+   decision process;
+2. fresh verification of README/demo commands and public wording scans;
+3. known gaps and non-goals that must accompany the announcement;
+4. whether #1 remains the roadmap anchor and #23 remains the protected memory
+   anchor;
+5. who owns follow-up triage without creating support/security SLA claims.
+
+## PLG1.8.2 finalization audit
+
+PLG1.8.2 finalized this pack as a documentation/governance artifact only:
+
+- short project description and public-alpha summary are conservative and
+  reusable only after a separate maintainer decision;
+- what-works and non-goal sections distinguish current local MVP behavior from
+  unsupported launch/product claims;
+- safety language points to local-first, read-only browser surfaces, no command
+  bridge, no source apply, and generated-state isolation;
+- issue and security reporting pointers reuse existing docs instead of creating
+  a support channel or security guarantee;
+- forbidden-overclaim and publication-boundary checklists require separate
+  manual visibility/publication decisions;
+- no repository visibility, GitHub settings, release, package publication,
+  announcement publication, or product behavior was changed by this pack;
+- generated demo, run, dashboard, screenshot, launch-report, and local tool
+  artifacts remain ignored/untracked unless explicitly fixture-scoped;
+- #1 and #23 remain protected anchors and must stay open unless a separate
+  explicit governance decision authorizes otherwise.
