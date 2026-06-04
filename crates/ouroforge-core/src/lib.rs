@@ -3571,6 +3571,14 @@ impl AgentHandoffContract {
                 "agent handoff schemaVersion must be {AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION}"
             ));
         }
+        // `stale` is an agent-handoff-v2-only status. The AgentHandoffStatus enum
+        // is shared with v2, so reject it here to preserve the v1 accepted set
+        // (ready, blocked, failed, completed) and keep v1 compatibility intact.
+        if self.status == AgentHandoffStatus::Stale {
+            return Err(anyhow!(
+                "agent handoff status 'stale' is not valid for {AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION}; it is an agent-handoff-v2 status"
+            ));
+        }
         validate_path_component("agent handoff loopId", &self.loop_id)?;
         if let Some(step) = &self.current_step {
             step.validate()?;
@@ -43901,6 +43909,14 @@ scenarios:
         .expect("failed handoff validates with blockers");
         assert_eq!(failed.status, AgentHandoffStatus::Failed);
         assert!(failed.boundary.contains("does not execute"));
+
+        // `stale` is an agent-handoff-v2-only status; the shared enum must not
+        // leak it into the v1 contract's accepted set.
+        let stale_error = AgentHandoffContract::from_json_str(
+            &serde_json::to_string_pretty(&agent_handoff_value("stale")).expect("handoff json"),
+        )
+        .expect_err("stale status must be rejected for agent-handoff-contract-v1");
+        assert!(stale_error.to_string().contains("stale"));
     }
 
     #[test]
