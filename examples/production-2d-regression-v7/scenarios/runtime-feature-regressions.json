@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "production-2d-runtime-feature-regressions-v7",
+  "description": "Focused source-like Production 2D regression paths for renderer/camera/collision/input/save/replay behavior. Generated run evidence remains untracked.",
+  "seed": "seeds/runtime-demo.yaml",
+  "scenes": [
+    "../game-runtime/scene.json",
+    "../game-runtime/action-map-v1.json",
+    "../playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "runtime-feature-contracts",
+      "description": "Documentation fixture for P2D8.12.1 Node smoke assertions.",
+      "scenarios": [
+        {
+          "id": "renderer-camera-ordering",
+          "description": "Renderer ordering, camera layer behavior, and render queue validation stay deterministic.",
+          "assertions": [
+            { "world_state": { "path": "renderQueue.validation.status", "equals": "ready" } },
+            { "world_state": { "path": "renderQueue.renderables", "exists": true } },
+            { "world_state": { "path": "camera.activeCameraId", "exists": true } }
+          ]
+        },
+        {
+          "id": "collision-input-save-replay",
+          "description": "Collision triggers, input actions, save/load, snapshot, and replay divergence evidence remain observable.",
+          "assertions": [
+            { "runtime_events": { "path": "events", "containsType": "runtime.trigger.entered" } },
+            { "world_state": { "path": "actionState", "exists": true } },
+            { "world_state": { "path": "componentModel.goalFlags", "exists": true } }
+          ]
+        }
+      ]
+    }
+  ]
+}
