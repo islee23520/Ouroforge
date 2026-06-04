@@ -1605,6 +1605,39 @@ assert.doesNotMatch(cockpit.renderAgentHandoffSurface(run), /<button/i);
 assert.match(cockpit.renderEvidencePane(run), /Agent handoff/);
 assert.match(cockpit.renderAgentHandoffSurface({}), /No agent handoff/);
 
+const reviewCriticGateFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json', 'utf8'));
+run.review_critic_gate = reviewCriticGateFixture;
+const reviewGateMarkup = cockpit.renderReviewCriticGateSurface(run);
+assert.match(reviewGateMarkup, /Review\/critic gate/);
+assert.match(reviewGateMarkup, /demo-review-critic-gate/);
+assert.match(reviewGateMarkup, /agent-reviewer-1/);
+assert.match(reviewGateMarkup, /agent-critic-1/);
+assert.match(reviewGateMarkup, /agent-work-package\.valid\.fixture\.json/);
+assert.match(reviewGateMarkup, /agent-handoff-v2\.valid\.fixture\.json/);
+assert.match(reviewGateMarkup, /agent-shared-state-snapshot\.fresh\.fixture\.json/);
+assert.match(reviewGateMarkup, /qa-worker-assignment\.valid\.fixture\.json/);
+assert.match(reviewGateMarkup, /production-evidence-bundle\.complete\.fixture\.json/);
+assert.match(reviewGateMarkup, /agent-decision-ledger\.valid\.fixture\.json/);
+assert.match(reviewGateMarkup, /does not execute commands/);
+assert.doesNotMatch(reviewGateMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const reviewGateXss = cockpit.renderReviewCriticGateSurface({ review_critic_gate: {
+  schemaVersion: 'review-critic-gate-read-model-v1',
+  gateId: '<script>gate</script>',
+  taskId: '<img>',
+  decision: '<script>blocked</script>',
+  promotionRecommendation: '<script>block</script>',
+  reviewerActorId: '<reviewer>',
+  criticActorId: '<critic>',
+  blockers: ['<script>blocked</script>'],
+  evidenceReviewedRefPaths: ['<script>evidence</script>'],
+  boundary: '<script>boundary</script>',
+} });
+assert.match(reviewGateXss, /&lt;script&gt;gate&lt;\/script&gt;/);
+assert.match(reviewGateXss, /&lt;script&gt;blocked&lt;\/script&gt;/);
+assert.doesNotMatch(reviewGateXss, /<script>gate<\/script>|<script>boundary<\/script>/);
+assert.match(cockpit.renderEvidencePane(run), /Review\/critic gate/);
+assert.match(cockpit.renderReviewCriticGateSurface({}), /No review\/critic gate/);
+
 const handoffV2Fixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-handoff-v2.blocked.fixture.json', 'utf8'));
 const handoffV2Markup = cockpit.renderAgentHandoffSurface({ agent_handoff_v2s: [handoffV2Fixture] });
 assert.match(handoffV2Markup, /handoff-v2-blocked/);

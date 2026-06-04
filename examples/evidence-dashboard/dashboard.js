@@ -1464,6 +1464,58 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+
+  function normalizeReviewCriticGates(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderReviewCriticGates(value = null) {
+    const gates = normalizeReviewCriticGates(value);
+    if (!gates.length) {
+      return '<section class="panel review-critic-gates"><h3>Review/critic gate</h3><p class="empty-state">No review/critic gate is attached to this dashboard data.</p><p class="run-meta">Read-only dashboard surface. The browser cannot promote outputs, execute commands, spawn agents, apply changes, auto-merge, self-approve, or write trusted state.</p></section>';
+    }
+    const cards = gates.map((gate) => {
+      const stateSnapshots = Array.isArray(gate.stateSnapshotRefs) ? gate.stateSnapshotRefs : Array.isArray(gate.stateSnapshotRefPaths) ? gate.stateSnapshotRefPaths : [];
+      const qaRefs = Array.isArray(gate.qaEvidenceRefs) ? gate.qaEvidenceRefs : Array.isArray(gate.qaEvidenceRefPaths) ? gate.qaEvidenceRefPaths : [];
+      const regressionRefs = Array.isArray(gate.regressionEvidenceRefs) ? gate.regressionEvidenceRefs : Array.isArray(gate.regressionEvidenceRefPaths) ? gate.regressionEvidenceRefPaths : [];
+      const reviewed = Array.isArray(gate.evidenceReviewed) ? gate.evidenceReviewed : Array.isArray(gate.evidenceReviewedRefPaths) ? gate.evidenceReviewedRefPaths : [];
+      const blockers = Array.isArray(gate.blockedReasons) ? gate.blockedReasons : Array.isArray(gate.blockers) ? gate.blockers : [];
+      const stale = Array.isArray(gate.staleStateIndicators) ? gate.staleStateIndicators : [];
+      const fixes = Array.isArray(gate.requiredFixes) ? gate.requiredFixes : [];
+      const malformed = Array.isArray(gate.malformedReasons) ? gate.malformedReasons : [];
+      const forbidden = Array.isArray(gate.forbiddenActions) ? gate.forbiddenActions : [];
+      const refText = (refs) => refs.map((ref) => typeof ref === 'string' ? ref : ref.path || ref.id || 'ref').join(' · ') || 'missing';
+      const implementer = gate.implementer?.actorId || gate.implementerActorId || 'unknown-implementer';
+      const reviewer = gate.reviewer?.actorId || gate.reviewerActorId || 'unknown-reviewer';
+      const critic = gate.critic?.actorId || gate.criticActorId || 'unknown-critic';
+      const workPackage = gate.workPackageRef?.path || gate.workPackageRefPath || 'missing';
+      const handoff = gate.handoffRef?.path || gate.handoffRefPath || 'missing';
+      const ledger = gate.decisionLedgerRef?.path || gate.decisionLedgerRefPath || 'missing';
+      return `<article class="artifact review-critic-gate">
+        <h4>${escapeText(gate.gateId || 'unknown-review-critic-gate')}</h4>
+        <p class="run-meta">Read-only review/critic gate. The dashboard displays linkage and blocker evidence only; it does not execute commands, spawn agents, apply changes, promote outputs, write trusted browser state, auto-merge, or self-approve.</p>
+        <div class="run-meta">Schema: ${escapeText(gate.schemaVersion || 'unknown')} · task ${escapeText(gate.taskId || 'unknown')} · decision <span class="${statusClass(gate.decision || 'unknown')}">${escapeText(gate.decision || 'unknown')}</span> · recommendation ${escapeText(gate.promotionRecommendation || 'unknown')}</div>
+        <div class="run-meta">Actors: implementer ${escapeText(implementer)} · reviewer ${escapeText(reviewer)} · critic ${escapeText(critic)}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${stale.length ? `<div class="artifact-warning">Stale state: ${escapeText(stale.join(' · '))}</div>` : '<div class="run-meta">No stale state indicators reported.</div>'}
+        ${fixes.length ? `<div class="artifact-warning">Required fixes: ${escapeText(fixes.join(' · '))}</div>` : ''}
+        ${malformed.length ? `<div class="artifact-warning">Malformed: ${escapeText(malformed.join(' · '))}</div>` : ''}
+        <div class="run-meta">Work package: ${escapeText(workPackage)}</div>
+        <div class="run-meta">Handoff: ${escapeText(handoff)}</div>
+        <div class="run-meta">State snapshots: ${escapeText(refText(stateSnapshots))}</div>
+        <div class="run-meta">QA evidence: ${escapeText(refText(qaRefs))}</div>
+        <div class="run-meta">Regression evidence: ${escapeText(refText(regressionRefs))}</div>
+        <div class="run-meta">Decision ledger: ${escapeText(ledger)}</div>
+        <div class="run-meta">Evidence reviewed: ${escapeText(refText(reviewed))}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'missing')}</div>
+        <p class="run-meta">${escapeText(gate.boundary || 'Review/critic gate display is read-only and command-inert.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel review-critic-gates"><h3>Review/critic gate</h3><div class="artifact-grid">${cards}</div></section>`;
+  }
+
   function normalizeProductionTaskBoards(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1924,6 +1976,7 @@ const OuroforgeDashboard = (() => {
         ...normalizeAgentHandoffs(run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null),
         ...normalizeAgentHandoffs(run.agent_handoff_v2s || run.agentHandoffV2s || null),
       ])}
+      ${renderReviewCriticGates(run.review_critic_gates || run.reviewCriticGates || run.review_critic_gate || run.reviewCriticGate || run.review_gate || run.reviewGate || null)}
       ${renderProductionEvidenceBundles(run.production_evidence_bundles || run.productionEvidenceBundles || run.production_evidence_bundle || run.productionEvidenceBundle || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
       ${renderJournalViewer(run)}
@@ -2002,7 +2055,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -74,7 +74,16 @@ MAP13.8.2 adds deeper independence/evidence validation for self-review,
 reviewer bypass, missing evidence, stale refs, and conflicts. Accepted gates
 with self-review, reviewer-role drift, missing reviewed evidence, or stale-state
 promotion attempts are rejected; blocked gates must keep those blockers visible.
-MAP13.8.3 owns linkage/read-model and dashboard/Studio compatibility.
+MAP13.8.3 adds a read-only `review-critic-gate-read-model-v1` summary that
+links the gate to its work package, handoff, shared state snapshots, QA evidence,
+regression/evidence bundle, and decision ledger paths. The read model exposes
+reviewer/critic/implementer actor IDs, decision and recommendation state,
+blockers, stale indicators, generated roots, and malformed validation reasons for
+Studio/dashboard display. It is display-only: it cannot promote work, apply
+changes, execute commands, spawn agents, write trusted browser state, merge,
+auto-apply, auto-merge, self-approve, or bypass the reviewer/critic gate.
+Dashboard and Studio compatibility tests assert escaped rendering and no command
+bridge/browser trusted write controls.
 
 Issues #1 and #23 must remain open unless a separate explicit governance
 decision says otherwise.

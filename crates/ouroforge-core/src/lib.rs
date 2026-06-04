@@ -4081,6 +4081,61 @@ pub struct ReviewCriticGate {
     pub boundary: String,
 }
 
+pub const REVIEW_CRITIC_GATE_READ_MODEL_SCHEMA_VERSION: &str = "review-critic-gate-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ReviewCriticGateReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "gateId")]
+    pub gate_id: String,
+    pub milestone: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub decision: String,
+    #[serde(rename = "promotionRecommendation")]
+    pub promotion_recommendation: String,
+    #[serde(rename = "implementerActorId")]
+    pub implementer_actor_id: String,
+    #[serde(rename = "reviewerActorId")]
+    pub reviewer_actor_id: String,
+    #[serde(rename = "criticActorId")]
+    pub critic_actor_id: String,
+    #[serde(rename = "workPackageRefPath")]
+    pub work_package_ref_path: String,
+    #[serde(rename = "handoffRefPath")]
+    pub handoff_ref_path: String,
+    #[serde(rename = "stateSnapshotRefPaths")]
+    pub state_snapshot_ref_paths: Vec<String>,
+    #[serde(rename = "qaEvidenceRefPaths")]
+    pub qa_evidence_ref_paths: Vec<String>,
+    #[serde(rename = "regressionEvidenceRefPaths")]
+    pub regression_evidence_ref_paths: Vec<String>,
+    #[serde(rename = "decisionLedgerRefPath")]
+    pub decision_ledger_ref_path: String,
+    #[serde(rename = "evidenceReviewedRefPaths")]
+    pub evidence_reviewed_ref_paths: Vec<String>,
+    #[serde(rename = "riskCount")]
+    pub risk_count: usize,
+    #[serde(rename = "requiredFixCount")]
+    pub required_fix_count: usize,
+    pub blockers: Vec<String>,
+    #[serde(rename = "staleStateIndicators")]
+    pub stale_state_indicators: Vec<String>,
+    #[serde(rename = "generatedRoots")]
+    pub generated_roots: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn review_critic_gate_read_model_from_json_str(input: &str) -> ReviewCriticGateReadModel {
+    match ReviewCriticGate::from_json_str(input) {
+        Ok(gate) => ReviewCriticGateReadModel::from_gate(&gate),
+        Err(error) => ReviewCriticGateReadModel::malformed(format!("{error:#}")),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewCriticGateActor {
@@ -4366,6 +4421,99 @@ impl ReviewCriticGate {
             }
         }
         Ok(())
+    }
+}
+
+impl ReviewCriticGateDecision {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReviewCriticGateDecision::Accepted => "accepted",
+            ReviewCriticGateDecision::Rejected => "rejected",
+            ReviewCriticGateDecision::Deferred => "deferred",
+            ReviewCriticGateDecision::NeedsFix => "needs-fix",
+            ReviewCriticGateDecision::Blocked => "blocked",
+        }
+    }
+}
+
+impl ReviewCriticGatePromotionRecommendation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReviewCriticGatePromotionRecommendation::Promote => "promote",
+            ReviewCriticGatePromotionRecommendation::Reject => "reject",
+            ReviewCriticGatePromotionRecommendation::Defer => "defer",
+            ReviewCriticGatePromotionRecommendation::FixRequired => "fix-required",
+            ReviewCriticGatePromotionRecommendation::Block => "block",
+        }
+    }
+}
+
+impl ReviewCriticGateReadModel {
+    pub fn from_gate(gate: &ReviewCriticGate) -> Self {
+        let mut blockers = gate.blocked_reasons.clone();
+        blockers.extend(
+            gate.required_fixes
+                .iter()
+                .map(|fix| format!("required fix: {fix}")),
+        );
+        blockers.extend(
+            gate.stale_state_indicators
+                .iter()
+                .map(|indicator| format!("stale state: {indicator}")),
+        );
+        Self {
+            schema_version: REVIEW_CRITIC_GATE_READ_MODEL_SCHEMA_VERSION.to_string(),
+            gate_id: gate.gate_id.clone(),
+            milestone: gate.milestone.clone(),
+            task_id: gate.task_id.clone(),
+            decision: gate.decision.as_str().to_string(),
+            promotion_recommendation: gate.promotion_recommendation.as_str().to_string(),
+            implementer_actor_id: gate.implementer.actor_id.clone(),
+            reviewer_actor_id: gate.reviewer.actor_id.clone(),
+            critic_actor_id: gate.critic.actor_id.clone(),
+            work_package_ref_path: gate.work_package_ref.path.clone(),
+            handoff_ref_path: gate.handoff_ref.path.clone(),
+            state_snapshot_ref_paths: artifact_ref_paths(&gate.state_snapshot_refs),
+            qa_evidence_ref_paths: artifact_ref_paths(&gate.qa_evidence_refs),
+            regression_evidence_ref_paths: artifact_ref_paths(&gate.regression_evidence_refs),
+            decision_ledger_ref_path: gate.decision_ledger_ref.path.clone(),
+            evidence_reviewed_ref_paths: artifact_ref_paths(&gate.evidence_reviewed),
+            risk_count: gate.risks.len(),
+            required_fix_count: gate.required_fixes.len(),
+            blockers,
+            stale_state_indicators: gate.stale_state_indicators.clone(),
+            generated_roots: gate.generated_state.roots.clone(),
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only review/critic gate summary; it links work package, handoff, shared state snapshots, QA/regression evidence, and decision ledger refs without executing commands, spawning agents, applying changes, writing trusted browser state, auto-merging, self-approving, or promoting outputs by itself.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: REVIEW_CRITIC_GATE_READ_MODEL_SCHEMA_VERSION.to_string(),
+            gate_id: "malformed-review-critic-gate".to_string(),
+            milestone: "malformed-review-critic-gate".to_string(),
+            task_id: "malformed-review-critic-gate".to_string(),
+            decision: "malformed".to_string(),
+            promotion_recommendation: "block".to_string(),
+            implementer_actor_id: String::new(),
+            reviewer_actor_id: String::new(),
+            critic_actor_id: String::new(),
+            work_package_ref_path: String::new(),
+            handoff_ref_path: String::new(),
+            state_snapshot_ref_paths: Vec::new(),
+            qa_evidence_ref_paths: Vec::new(),
+            regression_evidence_ref_paths: Vec::new(),
+            decision_ledger_ref_path: String::new(),
+            evidence_reviewed_ref_paths: Vec::new(),
+            risk_count: 0,
+            required_fix_count: 0,
+            blockers: Vec::new(),
+            stale_state_indicators: Vec::new(),
+            generated_roots: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed review/critic gate summary; it reports validation errors without executing commands, spawning agents, applying changes, writing trusted state, auto-merging, self-approving, or promoting outputs.".to_string(),
+        }
     }
 }
 
@@ -6226,6 +6374,18 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ],
             &mut malformed_reasons,
         );
+        let review_critic_gates = pipeline_values(
+            value,
+            &[
+                "review_critic_gates",
+                "reviewCriticGates",
+                "review_critic_gate",
+                "reviewCriticGate",
+                "review_gate",
+                "reviewGate",
+            ],
+            &mut malformed_reasons,
+        );
 
         let mut sections = vec![
             pipeline_collection_section(
@@ -6270,6 +6430,7 @@ impl StudioMultiAgentPipelineInspectionReadModel {
                 &task_boards,
                 |task| pipeline_text_contains_any(task, &["review", "critic"]),
             ),
+            pipeline_review_critic_gate_section(&review_critic_gates, &mut malformed_reasons),
             pipeline_lane_section("qa-queue", "QA queue", &task_boards, |task| {
                 pipeline_text_contains_any(task, &["qa", "playtest"])
             }),
@@ -6524,6 +6685,57 @@ fn pipeline_state_snapshot_section(
         }
         .to_string(),
         item_count: snapshots.len(),
+        blockers,
+        malformed_reasons: section_malformed,
+    }
+}
+
+fn pipeline_review_critic_gate_section(
+    gates: &[&serde_json::Value],
+    malformed_reasons: &mut Vec<String>,
+) -> StudioMultiAgentPipelineInspectionSection {
+    if gates.is_empty() {
+        return StudioMultiAgentPipelineInspectionSection {
+            id: "review-critic-gate".to_string(),
+            label: "Review/critic gate".to_string(),
+            status: "missing".to_string(),
+            item_count: 0,
+            blockers: Vec::new(),
+            malformed_reasons: Vec::new(),
+        };
+    }
+
+    let mut blockers = Vec::new();
+    let mut section_malformed = Vec::new();
+    for (index, gate) in gates.iter().enumerate() {
+        let model = review_critic_gate_read_model_from_json_str(&gate.to_string());
+        blockers.extend(model.blockers);
+        if model.decision != "accepted" {
+            blockers.push(format!(
+                "{} decision {} does not promote",
+                model.gate_id, model.decision
+            ));
+        }
+        section_malformed.extend(
+            model
+                .malformed_reasons
+                .into_iter()
+                .map(|reason| format!("review-critic-gate[{index}]: {reason}")),
+        );
+    }
+    malformed_reasons.extend(section_malformed.iter().cloned());
+    StudioMultiAgentPipelineInspectionSection {
+        id: "review-critic-gate".to_string(),
+        label: "Review/critic gate".to_string(),
+        status: if !section_malformed.is_empty() {
+            "malformed"
+        } else if !blockers.is_empty() {
+            "blocked"
+        } else {
+            "present"
+        }
+        .to_string(),
+        item_count: gates.len(),
         blockers,
         malformed_reasons: section_malformed,
     }
@@ -46442,6 +46654,72 @@ scenarios:
     }
 
     #[test]
+    fn review_critic_gate_read_model_links_pipeline_refs_without_promotion_authority() {
+        let accepted = review_critic_gate_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ));
+        assert_eq!(
+            accepted.schema_version,
+            REVIEW_CRITIC_GATE_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(accepted.gate_id, "demo-review-critic-gate");
+        assert_eq!(accepted.decision, "accepted");
+        assert_eq!(accepted.promotion_recommendation, "promote");
+        assert_eq!(accepted.implementer_actor_id, "agent-implementer-1");
+        assert_eq!(accepted.reviewer_actor_id, "agent-reviewer-1");
+        assert_eq!(accepted.critic_actor_id, "agent-critic-1");
+        assert!(accepted
+            .work_package_ref_path
+            .contains("agent-work-package.valid"));
+        assert!(accepted.handoff_ref_path.contains("agent-handoff-v2.valid"));
+        assert!(accepted
+            .state_snapshot_ref_paths
+            .iter()
+            .any(|path| path.contains("agent-shared-state-snapshot.fresh")));
+        assert!(accepted
+            .qa_evidence_ref_paths
+            .iter()
+            .any(|path| path.contains("qa-worker-assignment.valid")));
+        assert!(accepted
+            .regression_evidence_ref_paths
+            .iter()
+            .any(|path| path.contains("production-evidence-bundle.complete")));
+        assert!(accepted
+            .decision_ledger_ref_path
+            .contains("agent-decision-ledger.valid"));
+        assert_eq!(accepted.evidence_reviewed_ref_paths.len(), 6);
+        assert_eq!(accepted.risk_count, 1);
+        assert_eq!(accepted.required_fix_count, 0);
+        assert!(accepted.blockers.is_empty());
+        assert!(accepted
+            .generated_roots
+            .iter()
+            .any(|root| root == "dashboard-data"));
+        assert!(accepted.boundary.contains("Read-only review/critic gate"));
+        assert!(accepted.boundary.contains("without executing commands"));
+        assert!(accepted.boundary.contains("writing trusted browser state"));
+        assert!(accepted.boundary.contains("promoting outputs by itself"));
+
+        let stale = review_critic_gate_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.stale.fixture.json",
+        ));
+        assert_eq!(stale.decision, "blocked");
+        assert!(stale
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("stale")));
+
+        let malformed = review_critic_gate_read_model_from_json_str(
+            r#"{"schemaVersion":"review-critic-gate-v1","gateId":"bad"}"#,
+        );
+        assert_eq!(malformed.decision, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("milestone") || reason.contains("taskId")));
+    }
+
+    #[test]
     fn review_critic_gate_doc_audits_generated_state_and_governance() {
         let doc = read_repo_text("docs/review-critic-gate-v1.md");
         for required in [
@@ -47164,6 +47442,10 @@ scenarios:
             "examples/multi-agent-pipeline-v1/demo-evidence-bundle.fixture.json",
         ))
         .expect("evidence bundle json");
+        let review_critic_gate: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ))
+        .expect("review critic gate json");
         let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
             &json!({
                 "production_task_board": task_board,
@@ -47172,6 +47454,7 @@ scenarios:
                 "agent_work_package": work_package,
                 "agent_handoff_v2s": [handoff],
                 "agentSharedStateSnapshot": state_snapshot,
+                "reviewCriticGate": review_critic_gate,
                 "loop_evidence_bundles": [evidence_bundle]
             })
             .to_string(),
@@ -47194,6 +47477,7 @@ scenarios:
             "handoff",
             "state-snapshot",
             "review-critic",
+            "review-critic-gate",
             "qa-queue",
             "performance-regression",
             "decision-ledger",
@@ -47225,6 +47509,14 @@ scenarios:
             regression.item_count > 0,
             "regression lane should detect tasks"
         );
+        let review_gate = model
+            .sections
+            .iter()
+            .find(|section| section.id == "review-critic-gate")
+            .expect("review gate section");
+        assert_eq!(review_gate.status, "present");
+        assert_eq!(review_gate.item_count, 1);
+
         let decisions = model
             .sections
             .iter()
@@ -47302,7 +47594,8 @@ scenarios:
             &json!({
                 "production_task_boards": ["bad"],
                 "agent_role_model": {"schemaVersion": "agent-role-model-v1", "roles": "bad"},
-                "agentWorkPackage": {"schemaVersion": "agent-work-package-read-model-v1", "workPackageId": "bad", "status": "malformed", "malformedReasons": ["acceptanceCriteria missing"]}
+                "agentWorkPackage": {"schemaVersion": "agent-work-package-read-model-v1", "workPackageId": "bad", "status": "malformed", "malformedReasons": ["acceptanceCriteria missing"]},
+                "reviewCriticGate": {"schemaVersion": "review-critic-gate-v1", "gateId": "bad"}
             })
             .to_string(),
         );
@@ -47323,6 +47616,14 @@ scenarios:
                     .malformed_reasons
                     .iter()
                     .any(|reason| reason.contains("acceptanceCriteria"))));
+        assert!(malformed
+            .sections
+            .iter()
+            .any(|section| section.id == "review-critic-gate"
+                && section
+                    .malformed_reasons
+                    .iter()
+                    .any(|reason| reason.contains("milestone") || reason.contains("taskId"))));
     }
 
     #[test]
