@@ -2,9 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use ouroforge_core::{
     add_evidence_artifact, append_ledger_event,
-    append_mutation_review_decision_for_proposal_from_path, apply_patch_sandbox_from_path,
-    apply_scene_only_mutation_operation, bind_run_command_context, bind_run_project_metadata,
-    bind_run_transaction_provenance, build_authoring_loop_dry_run_summary_from_path,
+    append_mutation_review_decision_for_proposal_from_path, append_visual_edit_draft_application,
+    apply_patch_sandbox_from_path, apply_scene_only_mutation_operation, bind_run_command_context,
+    bind_run_project_metadata, bind_run_transaction_provenance,
+    build_authoring_loop_dry_run_summary_from_path,
     build_authoring_loop_resume_preflight_from_path, build_authoring_loop_status_from_path,
     build_regression_promotion_draft_from_run, build_regression_run_matrix,
     build_studio_loop_cockpit_read_model, create_minimal_2d_project_scaffold,
@@ -17,12 +18,14 @@ use ouroforge_core::{
     read_ledger_events, read_scene, reject_generated_artifact_source_collision,
     reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
     run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, write_agent_handoff_contract_from_path,
-    write_regression_promotion_draft, write_run_comparison_artifact,
-    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
-    MutationProposalInput, MutationReviewReviewerType, MutationReviewState, ProjectAssetManifest,
-    ProjectAssetType, ProjectManifest, ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, VisualEditDraftArtifact, VisualEditDraftTargetType, WorkerId,
+    update_journal, validate_scene_reload, validate_visual_edit_draft_review_preflight,
+    write_agent_handoff_contract_from_path, write_regression_promotion_draft,
+    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
+    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
+    ProjectAssetManifest, ProjectAssetType, ProjectManifest, ProjectSceneMutationContext,
+    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    VisualEditDraftApplyCommandContext, VisualEditDraftArtifact, VisualEditDraftTargetType,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -1280,6 +1283,24 @@ fn apply_visual_edit_draft_cli(
         .with_context(|| format!("failed to read visual edit draft {}", draft_path.display()))?;
     let draft: VisualEditDraftArtifact = serde_json::from_str(&draft_input)
         .with_context(|| format!("failed to parse visual edit draft {}", draft_path.display()))?;
+    let review_gate = draft.review_gate.as_ref().ok_or_else(|| {
+        anyhow!("edit draft-apply requires draft reviewGate linkage from VA1.8.1")
+    })?;
+    if review_gate.proposal_id != proposal_id {
+        return Err(anyhow!(
+            "edit draft-apply --proposal {} does not match draft reviewGate proposalId {}",
+            proposal_id,
+            review_gate.proposal_id
+        ));
+    }
+    if review_gate.review_decision_id != decision_id {
+        return Err(anyhow!(
+            "edit draft-apply --decision {} does not match draft reviewGate reviewDecisionId {}",
+            decision_id,
+            review_gate.review_decision_id
+        ));
+    }
+    let review_preflight = validate_visual_edit_draft_review_preflight(run_dir, &draft)?;
     if draft.target.target_type != VisualEditDraftTargetType::Scene {
         return Err(anyhow!(
             "edit draft-apply supports scene drafts only in #348 VA1.6.3"
@@ -1334,12 +1355,30 @@ fn apply_visual_edit_draft_cli(
         validation_required: true,
     };
     let transaction = apply_scene_only_mutation_operation(run_dir, &operation, transaction_output)?;
+    let command_context = visual_edit_draft_apply_command_context(
+        draft_path,
+        project_root_or_manifest,
+        run_dir,
+        proposal_id,
+        decision_id,
+        transaction_output,
+    );
+    let visual_application = append_visual_edit_draft_application(
+        run_dir,
+        &draft,
+        &transaction,
+        transaction_output,
+        &scene_path,
+        command_context,
+    )?;
     Ok(serde_json::json!({
         "schemaVersion": "visual-edit-draft-apply-cli-v1",
         "draftId": draft.draft_id,
         "projectId": manifest.project.id,
         "proposalId": proposal_id,
+        "patchDraftId": review_preflight.patch_draft_id,
         "reviewDecisionId": decision_id,
+        "visualEditApplicationId": visual_application.id,
         "transactionId": transaction.id,
         "transactionOutput": transaction_output.to_string_lossy(),
         "target": {
@@ -1347,9 +1386,68 @@ fn apply_visual_edit_draft_cli(
             "path": scene_ref.path,
             "id": scene_ref.id,
         },
+        "beforeSceneHash": visual_application.before_scene_hash,
+        "afterSceneHash": visual_application.after_scene_hash,
         "rollback": transaction.rollback,
+        "commandContext": visual_application.command_context,
         "guardrail": "review-gated manual CLI apply only; no browser apply, auto-apply, source mutation, or hidden trusted writes",
     }))
+}
+
+fn shell_quote_cli_arg(arg: &str) -> String {
+    if arg
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | '='))
+    {
+        return arg.to_string();
+    }
+    format!("'{}'", arg.replace('\'', "'\\''"))
+}
+
+fn visual_edit_draft_apply_command_context(
+    draft_path: &Path,
+    project_root_or_manifest: &Path,
+    run_dir: &Path,
+    proposal_id: &str,
+    decision_id: &str,
+    transaction_output: &Path,
+) -> VisualEditDraftApplyCommandContext {
+    let argv = vec![
+        "cargo".to_string(),
+        "run".to_string(),
+        "-p".to_string(),
+        "ouroforge-cli".to_string(),
+        "--".to_string(),
+        "edit".to_string(),
+        "draft-apply".to_string(),
+        draft_path.to_string_lossy().to_string(),
+        "--project".to_string(),
+        project_root_or_manifest.to_string_lossy().to_string(),
+        "--run-dir".to_string(),
+        run_dir.to_string_lossy().to_string(),
+        "--proposal".to_string(),
+        proposal_id.to_string(),
+        "--decision".to_string(),
+        decision_id.to_string(),
+        "--transaction-output".to_string(),
+        transaction_output.to_string_lossy().to_string(),
+    ];
+    let command = argv
+        .iter()
+        .map(|arg| shell_quote_cli_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+    VisualEditDraftApplyCommandContext {
+        schema_version: "visual-edit-draft-apply-command-context-v1".to_string(),
+        command,
+        argv,
+        draft_path: draft_path.to_string_lossy().to_string(),
+        project_path: project_root_or_manifest.to_string_lossy().to_string(),
+        run_dir: run_dir.to_string_lossy().to_string(),
+        transaction_output: transaction_output.to_string_lossy().to_string(),
+        guardrail: "reproducible CLI context only; dashboards may display but must not execute it"
+            .to_string(),
+    }
 }
 
 fn resolve_visual_edit_scene_target<'a>(

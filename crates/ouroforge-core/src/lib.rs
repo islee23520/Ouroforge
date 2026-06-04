@@ -10375,6 +10375,60 @@ pub struct VisualEditDraftReviewPreflight {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct VisualEditDraftApplyCommandContext {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "draftPath")]
+    pub draft_path: String,
+    #[serde(rename = "projectPath")]
+    pub project_path: String,
+    #[serde(rename = "runDir")]
+    pub run_dir: String,
+    #[serde(rename = "transactionOutput")]
+    pub transaction_output: String,
+    pub guardrail: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftApplicationRecord {
+    pub id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "patchDraftId")]
+    pub patch_draft_id: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "transactionArtifactPath")]
+    pub transaction_artifact_path: String,
+    #[serde(rename = "targetScenePath")]
+    pub target_scene_path: String,
+    #[serde(rename = "beforeSceneHash")]
+    pub before_scene_hash: SceneHash,
+    #[serde(rename = "afterSceneHash")]
+    pub after_scene_hash: SceneHash,
+    pub rollback: SceneEditRollbackMetadata,
+    #[serde(rename = "commandContext")]
+    pub command_context: VisualEditDraftApplyCommandContext,
+    pub status: String,
+    #[serde(rename = "createdAtUnixMs")]
+    pub created_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftApplicationIndex {
+    pub applications: Vec<VisualEditDraftApplicationRecord>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct VisualEditDraftTarget {
     #[serde(rename = "type")]
     pub target_type: VisualEditDraftTargetType,
@@ -20239,6 +20293,109 @@ fn write_scene_only_mutation_applications(
         fs::create_dir_all(parent).with_context(|| {
             format!(
                 "failed to create scene application directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json(&path, &json!(index))
+}
+
+pub fn append_visual_edit_draft_application(
+    run_dir: impl AsRef<Path>,
+    draft: &VisualEditDraftArtifact,
+    transaction: &SceneEditTransaction,
+    transaction_output: impl AsRef<Path>,
+    target_scene_path: impl AsRef<Path>,
+    command_context: VisualEditDraftApplyCommandContext,
+) -> Result<VisualEditDraftApplicationRecord> {
+    let run_dir = run_dir.as_ref();
+    let preflight = validate_visual_edit_draft_review_preflight(run_dir, draft)?;
+    let after_scene_hash = transaction
+        .after_scene_hash
+        .clone()
+        .ok_or_else(|| anyhow!("visual edit draft application requires afterSceneHash"))?;
+    let mut index = read_visual_edit_draft_applications(run_dir)?;
+    if index.applications.iter().any(|application| {
+        application.review_decision_id == preflight.review_decision_id
+            && application.status == "applied"
+    }) {
+        return Err(anyhow!(
+            "visual edit draft review decision {} already has an applied visual edit",
+            preflight.review_decision_id
+        ));
+    }
+    let record = VisualEditDraftApplicationRecord {
+        id: format!(
+            "visual-edit-application-{}-{}",
+            unix_millis()?,
+            index.applications.len() + 1
+        ),
+        draft_id: preflight.draft_id,
+        proposal_id: preflight.proposal_id,
+        patch_draft_id: preflight.patch_draft_id,
+        review_decision_id: preflight.review_decision_id,
+        transaction_id: transaction.id.clone(),
+        transaction_artifact_path: transaction_output.as_ref().to_string_lossy().to_string(),
+        target_scene_path: target_scene_path.as_ref().to_string_lossy().to_string(),
+        before_scene_hash: transaction.before_scene_hash.clone(),
+        after_scene_hash,
+        rollback: transaction.rollback.clone(),
+        command_context,
+        status: "applied".to_string(),
+        created_at_unix_ms: unix_millis()?,
+    };
+    index.applications.push(record.clone());
+    write_visual_edit_draft_applications(run_dir, &index)?;
+    append_ledger_event(
+        run_dir,
+        "visual_edit_draft.applied",
+        "mutation-cli",
+        json!({
+            "application_id": record.id,
+            "draft_id": record.draft_id,
+            "proposal_id": record.proposal_id,
+            "patch_draft_id": record.patch_draft_id,
+            "decision_id": record.review_decision_id,
+            "transaction_id": record.transaction_id,
+            "transaction_artifact_path": record.transaction_artifact_path,
+            "target_scene_path": record.target_scene_path,
+            "before_scene_hash": record.before_scene_hash,
+            "after_scene_hash": record.after_scene_hash,
+        }),
+    )?;
+    Ok(record)
+}
+
+pub fn read_visual_edit_draft_applications(
+    run_dir: impl AsRef<Path>,
+) -> Result<VisualEditDraftApplicationIndex> {
+    let path = run_dir
+        .as_ref()
+        .join("mutation/visual-edit-applications.json");
+    if !path.is_file() {
+        return Ok(VisualEditDraftApplicationIndex::default());
+    }
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read visual edit applications {}", path.display()))?;
+    serde_json::from_str(&input).with_context(|| {
+        format!(
+            "failed to parse visual edit applications {}",
+            path.display()
+        )
+    })
+}
+
+fn write_visual_edit_draft_applications(
+    run_dir: impl AsRef<Path>,
+    index: &VisualEditDraftApplicationIndex,
+) -> Result<()> {
+    let path = run_dir
+        .as_ref()
+        .join("mutation/visual-edit-applications.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create visual edit application directory {}",
                 parent.display()
             )
         })?;
@@ -37306,6 +37463,169 @@ scenarios:
     }
 
     #[test]
+    fn visual_edit_draft_application_records_review_gated_apply_lifecycle() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("visual-edit-draft-application");
+        let patch_draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let mut visual_draft = valid_scene_visual_edit_draft_for_scene(&scene);
+        let decision = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &patch_draft,
+            &proposal,
+            Some(current_mutation_review_expected_hashes(&artifacts.run_dir)),
+        );
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: patch_draft.drafts[0].id.clone(),
+            review_decision_id: decision.id.clone(),
+        });
+        let transaction_output = root.join("transactions/visual-edit-apply.json");
+        let operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash,
+            Some(decision.id.clone()),
+        );
+        let transaction = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &operation,
+            &transaction_output,
+        )
+        .expect("review-gated scene apply succeeds");
+        let command_context = VisualEditDraftApplyCommandContext {
+            schema_version: "visual-edit-draft-apply-command-context-v1".to_string(),
+            command: "cargo run -p ouroforge-cli -- edit draft-apply draft.json".to_string(),
+            argv: vec![
+                "cargo".to_string(),
+                "run".to_string(),
+                "-p".to_string(),
+                "ouroforge-cli".to_string(),
+                "--".to_string(),
+                "edit".to_string(),
+                "draft-apply".to_string(),
+                "draft.json".to_string(),
+            ],
+            draft_path: "draft.json".to_string(),
+            project_path: "project".to_string(),
+            run_dir: artifacts.run_dir.to_string_lossy().to_string(),
+            transaction_output: transaction_output.to_string_lossy().to_string(),
+            guardrail:
+                "reproducible CLI context only; dashboards may display but must not execute it"
+                    .to_string(),
+        };
+
+        let application = append_visual_edit_draft_application(
+            &artifacts.run_dir,
+            &visual_draft,
+            &transaction,
+            &transaction_output,
+            &scene_path,
+            command_context.clone(),
+        )
+        .expect("visual edit application records");
+
+        assert_eq!(application.draft_id, visual_draft.draft_id);
+        assert_eq!(application.proposal_id, proposal.id);
+        assert_eq!(application.patch_draft_id, patch_draft.drafts[0].id);
+        assert_eq!(application.review_decision_id, decision.id);
+        assert_eq!(application.transaction_id, transaction.id);
+        assert_eq!(
+            application.transaction_artifact_path,
+            transaction_output.to_string_lossy()
+        );
+        assert_eq!(application.target_scene_path, scene_path.to_string_lossy());
+        assert_eq!(application.before_scene_hash, transaction.before_scene_hash);
+        assert_eq!(
+            application.after_scene_hash,
+            transaction.after_scene_hash.unwrap()
+        );
+        assert_eq!(application.rollback, transaction.rollback);
+        assert_eq!(application.command_context, command_context);
+        assert_eq!(application.status, "applied");
+
+        let index = read_visual_edit_draft_applications(&artifacts.run_dir)
+            .expect("visual edit application index reads");
+        assert_eq!(index.applications, vec![application]);
+        let ledger = read_ledger_events(&artifacts.run_dir).expect("ledger reads");
+        assert!(ledger
+            .iter()
+            .any(|event| { event["event"] == "visual_edit_draft.applied" }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn visual_edit_draft_application_rejects_duplicate_decision_before_recording() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("visual-edit-draft-application-duplicate");
+        let patch_draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let mut visual_draft = valid_scene_visual_edit_draft_for_scene(&scene);
+        let decision = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &patch_draft,
+            &proposal,
+            Some(current_mutation_review_expected_hashes(&artifacts.run_dir)),
+        );
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: patch_draft.drafts[0].id.clone(),
+            review_decision_id: decision.id.clone(),
+        });
+        let transaction_output = root.join("transactions/visual-edit-apply.json");
+        let operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash,
+            Some(decision.id.clone()),
+        );
+        let transaction = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &operation,
+            &transaction_output,
+        )
+        .expect("review-gated scene apply succeeds");
+        let command_context = VisualEditDraftApplyCommandContext {
+            schema_version: "visual-edit-draft-apply-command-context-v1".to_string(),
+            command: "cargo run -p ouroforge-cli -- edit draft-apply draft.json".to_string(),
+            argv: vec!["ouroforge-cli".to_string(), "edit".to_string()],
+            draft_path: "draft.json".to_string(),
+            project_path: "project".to_string(),
+            run_dir: artifacts.run_dir.to_string_lossy().to_string(),
+            transaction_output: transaction_output.to_string_lossy().to_string(),
+            guardrail:
+                "reproducible CLI context only; dashboards may display but must not execute it"
+                    .to_string(),
+        };
+        append_visual_edit_draft_application(
+            &artifacts.run_dir,
+            &visual_draft,
+            &transaction,
+            &transaction_output,
+            &scene_path,
+            command_context.clone(),
+        )
+        .expect("first visual edit application records");
+
+        let duplicate = append_visual_edit_draft_application(
+            &artifacts.run_dir,
+            &visual_draft,
+            &transaction,
+            root.join("transactions/duplicate-visual-edit-apply.json"),
+            &scene_path,
+            command_context,
+        )
+        .expect_err("duplicate review decision rejects");
+        assert!(duplicate
+            .to_string()
+            .contains("already has an applied visual edit"));
+        let index = read_visual_edit_draft_applications(&artifacts.run_dir)
+            .expect("visual edit application index reads");
+        assert_eq!(index.applications.len(), 1);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn scene_edit_model_validates_and_preserves_scene_shape() {
         let root = unique_temp_dir("scene-edit-model");
         fs::create_dir_all(&root).expect("temp root exists");
@@ -42249,6 +42569,20 @@ scenarios:
             },
         )
         .expect("accepted decision appends")
+    }
+
+    fn current_mutation_review_expected_hashes(run_dir: &Path) -> MutationReviewExpectedHashes {
+        MutationReviewExpectedHashes {
+            proposal_index_hash: Some(
+                canonical_json_digest(json!(read_mutation_proposals(run_dir).unwrap())).unwrap(),
+            ),
+            patch_draft_hash: Some(
+                canonical_json_digest(json!(read_patch_draft_artifact(run_dir).unwrap())).unwrap(),
+            ),
+            evidence_index_hash: Some(
+                canonical_json_digest(json!(read_evidence_index(run_dir).unwrap())).unwrap(),
+            ),
+        }
     }
 
     fn create_project_scene_only_mutation_fixture(

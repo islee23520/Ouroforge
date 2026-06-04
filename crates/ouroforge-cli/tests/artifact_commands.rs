@@ -641,10 +641,13 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
     fs::create_dir_all(temp.join("drafts")).expect("draft dir exists");
     fs::write(
         &draft_path,
-        scene_draft_json(
+        scene_draft_json_with_review_gate(
             "cli-scene-draft-apply",
             &before_hash.algorithm,
             &before_hash.value,
+            proposal_id,
+            "patch-draft-cli-draft-apply-1",
+            &rejected_decision_id,
         ),
     )
     .expect("draft writes");
@@ -676,6 +679,20 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
         scene_before_apply.pointer("/entities/0/components/transform/x"),
         Some(&serde_json::json!(32))
     );
+
+    attach_expected_review_hashes(&run_dir, &accepted_decision_id);
+    fs::write(
+        &draft_path,
+        scene_draft_json_with_review_gate(
+            "cli-scene-draft-apply",
+            &before_hash.algorithm,
+            &before_hash.value,
+            proposal_id,
+            "patch-draft-cli-draft-apply-1",
+            &accepted_decision_id,
+        ),
+    )
+    .expect("accepted review-gated draft writes");
 
     let transaction_output = temp.join("runs/draft-apply/accepted.json");
     let applied = run_cli(
@@ -724,6 +741,32 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
         .as_str()
         .unwrap()
         .contains("beforeSceneHash"));
+    let visual_applications: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("mutation/visual-edit-applications.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        visual_applications["applications"][0]["draftId"],
+        "cli-scene-draft-apply"
+    );
+    assert_eq!(
+        visual_applications["applications"][0]["patchDraftId"],
+        "patch-draft-cli-draft-apply-1"
+    );
+    assert_eq!(
+        visual_applications["applications"][0]["reviewDecisionId"],
+        accepted_decision_id
+    );
+    assert_eq!(
+        visual_applications["applications"][0]["commandContext"]["schemaVersion"],
+        "visual-edit-draft-apply-command-context-v1"
+    );
+    assert!(
+        visual_applications["applications"][0]["commandContext"]["guardrail"]
+            .as_str()
+            .unwrap()
+            .contains("must not execute")
+    );
 
     fs::remove_dir_all(temp).ok();
 }
@@ -2966,6 +3009,83 @@ fn scene_draft_json(
   "validationStatus": "unvalidated"
 }}"##
     )
+}
+
+fn scene_draft_json_with_review_gate(
+    draft_id: &str,
+    before_hash_algorithm: &str,
+    before_hash_value: &str,
+    proposal_id: &str,
+    patch_draft_id: &str,
+    review_decision_id: &str,
+) -> String {
+    let mut value: serde_json::Value = serde_json::from_str(&scene_draft_json(
+        draft_id,
+        before_hash_algorithm,
+        before_hash_value,
+    ))
+    .expect("scene draft json parses");
+    value["reviewGate"] = serde_json::json!({
+        "proposalId": proposal_id,
+        "patchDraftId": patch_draft_id,
+        "reviewDecisionId": review_decision_id,
+    });
+    serde_json::to_string_pretty(&value).expect("review gated draft serializes")
+}
+
+fn attach_expected_review_hashes(run_dir: &Path, decision_id: &str) {
+    let proposal_index = read_json(run_dir.join("mutation/proposals.json"));
+    let patch_drafts = read_json(run_dir.join("mutation/patch-drafts.json"));
+    let evidence_index = read_json(run_dir.join("evidence/index.json"));
+    let review_path = run_dir.join("mutation/review-decisions.json");
+    let mut review = read_json(&review_path);
+    let decision = review["decisions"]
+        .as_array_mut()
+        .expect("review decisions array")
+        .iter_mut()
+        .find(|decision| decision["id"] == decision_id)
+        .expect("decision exists");
+    decision["expected_hashes"] = serde_json::json!({
+        "proposal_index_hash": canonical_json_digest(&proposal_index),
+        "patch_draft_hash": canonical_json_digest(&patch_drafts),
+        "evidence_index_hash": canonical_json_digest(&evidence_index),
+    });
+    fs::write(
+        review_path,
+        serde_json::to_string_pretty(&review).expect("review serializes"),
+    )
+    .expect("review hashes written");
+}
+
+fn read_json(path: impl AsRef<Path>) -> serde_json::Value {
+    serde_json::from_str(&fs::read_to_string(path).expect("json reads")).expect("json parses")
+}
+
+fn canonical_json_digest(value: &serde_json::Value) -> String {
+    let canonical = canonical_json_value(value.clone());
+    let bytes = serde_json::to_vec(&canonical).expect("canonical json serializes");
+    fnv1a64_hex(&bytes)
+}
+
+fn canonical_json_value(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Array(values) => serde_json::Value::Array(
+            values
+                .into_iter()
+                .map(canonical_json_value)
+                .collect::<Vec<_>>(),
+        ),
+        serde_json::Value::Object(map) => {
+            let mut sorted = serde_json::Map::new();
+            let mut entries = map.into_iter().collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            for (key, value) in entries {
+                sorted.insert(key, canonical_json_value(value));
+            }
+            serde_json::Value::Object(sorted)
+        }
+        other => other,
+    }
 }
 
 fn fnv1a64_hex(bytes: &[u8]) -> String {
