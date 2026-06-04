@@ -44,6 +44,12 @@ Current checked-in behavior includes:
   evidence only; source patch apply to the trusted maintainer worktree remains
   unimplemented and forbidden until a separate later governance gate authorizes
   it.
+- 3D Capability Gate v1 is complete as bounded local 3D evidence: scene graph,
+  camera/projection, mesh/material refs, render smoke, collision/trigger,
+  animation, probe/evaluator compatibility, deterministic demo/regression
+  fixtures, normalized dashboard read models, and escaped read-only Studio
+  inspection. It is not production 3D readiness, broad 3D compatibility, native
+  export, plugin runtime, hosted/cloud behavior, or a Godot replacement claim.
 
 Generated run, dashboard, screenshot, sandbox, and local tool artifacts are local
 state and stay untracked unless a future issue explicitly scopes a deterministic
@@ -208,9 +214,16 @@ Pipeline v1 is now recorded as complete in `docs/roadmap.md`,
 `docs/multi-agent-production-pipeline-governance-handoff.md` as a local
 evidence-gated collaboration/accountability milestone; it is not hidden-agent
 orchestration, cloud execution, auto-apply/auto-merge authority, release
-automation, public-launch approval, or production readiness. The next
-recommended technical branch is the scoped Autonomous QA / Playtest Swarm v1
-sequence, not unrestricted autonomous project mutation.
+automation, public-launch approval, or production readiness. 3D Capability Gate
+v1 is recorded as complete in `docs/roadmap.md`,
+`docs/3d-capability-gate-v1.md`, and
+`docs/studio-3d-inspection-surface-v1.md` as a bounded local 3D evidence
+milestone; it is not production 3D readiness, broad 3D compatibility,
+advanced-import/rendering parity, native-export, plugin-runtime, hosted/cloud,
+source-apply, public-launch, or Godot replacement scope. The next recommended
+technical branch is the scoped Gameplay Scripting / Logic System v1 sequence
+(#611-#625), not arbitrary third-party scripting or unrestricted autonomous
+project mutation.
 
 ## Contributor guide
 
