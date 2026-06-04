@@ -316,6 +316,7 @@ const OuroforgeCockpit = (() => {
       { id: 'runtime-event-inspection', label: 'Collision/transition/event inspection', present: Boolean(run?.engine_summaries?.collision?.present || run?.engine_summaries?.transition?.present || run?.engine_summaries?.events?.present), detail: run?.engine_summaries?.source_world_state || 'collision/transition/event summary unavailable' },
       { id: 'runtime-asset-loading', label: 'Runtime asset loading', present: Boolean(run?.asset_loading?.present || run?.assetLoading?.present), detail: `${run?.asset_loading?.attempt_count ?? run?.assetLoading?.attemptCount ?? 0} load attempt(s)` },
       { id: 'asset-preview-evidence', label: 'Asset preview evidence', present: Boolean(run?.asset_preview?.present || run?.assetPreview?.present), detail: `${run?.asset_preview?.preview_count ?? run?.assetPreview?.previewCount ?? 0} preview record(s)` },
+      { id: 'source-apply-context', label: 'Source apply context', present: Boolean(run?.source_apply_worktree_context?.present || run?.sourceApplyWorktreeContext?.present), detail: `${run?.source_apply_worktree_context?.target_count ?? run?.sourceApplyWorktreeContext?.targetCount ?? 0} target row(s)` },
       { id: 'studio-draft-authoring', label: 'Studio draft authoring', present: Boolean(studioDraftAuthoringState(run).present), detail: `${studioDraftAuthoringState(run).drafts.length} temporary draft(s)` },
       { id: 'visual-diff-preview', label: 'Visual diff preview', present: Boolean(run?.visual_diff_preview?.present || run?.visualDiffPreview?.present), detail: `${run?.visual_diff_preview?.summary_count ?? run?.visualDiffPreview?.summaryCount ?? (run?.visual_diff_preview?.summaries || run?.visualDiffPreview?.summaries || []).length ?? 0} summary row(s)` },
       { id: 'studio-asset-inspector', label: 'Asset inspector', present: Boolean(run?.asset_inspector?.present || run?.assetInspector?.present), detail: `${run?.asset_inspector?.asset_count ?? run?.assetInspector?.assetCount ?? 0} asset row(s)` },
@@ -656,6 +657,39 @@ const OuroforgeCockpit = (() => {
       <div class="field-grid">${cards}</div>${rows}
       <p class="hint">Warnings: ${escapeText(warningText)}</p>
       <p class="hint">${escapeText(preview.boundary || 'Asset preview evidence is display-only.')}</p>
+    </section>`;
+  }
+
+  function renderSourceApplyWorktreeContextSurface(run) {
+    const context = run?.source_apply_worktree_context || run?.sourceApplyWorktreeContext || {};
+    if (!context.present) {
+      return `<section id="source-apply-context" class="panel"><h2>Source apply context</h2><p class="empty">${escapeText(context.empty_state || 'No source apply worktree context evidence is available for this run.')}</p><p class="hint">Read-only Studio surface. The browser cannot apply source patches, execute commands, write trusted files, merge branches, or bypass review gates.</p></section>`;
+    }
+    const reports = Array.isArray(context.reports) ? context.reports : [];
+    const cards = [
+      ['Status', context.status || 'unknown'],
+      ['Reports', reports.length],
+      ['Targets', context.target_count ?? context.targetCount ?? 0],
+      ['Blocked reasons', context.blocked_count ?? context.blockedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const rows = reports.slice(0, 4).map((report) => {
+      const lock = report.lockStatus || report.lock_status || {};
+      const blocked = Array.isArray(report.blockedReasons || report.blocked_reasons) ? (report.blockedReasons || report.blocked_reasons) : [];
+      const targetRows = (Array.isArray(report.targets) ? report.targets : []).slice(0, 8).map((target) => {
+        const reasons = Array.isArray(target.blockedReasons || target.blocked_reasons) ? (target.blockedReasons || target.blocked_reasons) : [];
+        return `<li><strong>${escapeText(target.path || 'unknown target')}</strong> ${surfaceState(true, reasons.length ? 'blocked' : 'clean')}<br><small>${escapeText(target.gitStatus || target.git_status || 'unknown git')} · ${escapeText(target.rootZone || target.root_zone || 'unknown root')} · ${escapeText(target.fileClassDecision || target.file_class_decision || 'unknown class')} · ${escapeText(reasons.length ? reasons.join(' · ') : 'no blocked target reasons')}</small></li>`;
+      }).join('') || '<li>No target rows recorded.</li>';
+      const blockedText = blocked.length ? blocked.slice(0, 8).join(' · ') : 'No blocked context reasons recorded.';
+      return `<div class="surface-row"><strong>${escapeText(report.policyId || report.policy_id || 'source apply context')}</strong> ${surfaceState(true, report.status || 'unknown')}<br>
+        <small>${escapeText(report.branch || 'unknown branch')} @ ${escapeText(report.headCommit || report.head_commit || 'unknown head')} · lock ${escapeText(lock.active ? 'active' : 'inactive')} ${escapeText(lock.attemptId || lock.attempt_id || '')}</small>
+        <ul>${targetRows}</ul>
+        <small>Blocked: ${escapeText(blockedText)}</small>
+      </div>`;
+    }).join('') || '<div class="surface-row">No parseable context reports recorded.</div>';
+    return `<section id="source-apply-context" class="panel"><h2>Source apply context</h2>
+      <p class="hint">Escaped read-only worktree eligibility evidence from Rust validation. This surface does not apply patches, execute commands, write trusted files, merge branches, or bypass review gates.</p>
+      <div class="field-grid">${cards}</div>${rows}
+      <p class="hint">${escapeText(context.boundary || 'Source apply context evidence is display-only.')}</p>
     </section>`;
   }
 
@@ -1798,7 +1832,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1883,7 +1917,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

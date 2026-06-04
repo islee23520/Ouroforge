@@ -23976,6 +23976,33 @@ pub fn validate_source_apply_worktree_context(
     Ok(report)
 }
 
+pub fn write_source_apply_worktree_context_evidence(
+    run_dir: impl AsRef<Path>,
+    input: &SourceApplyWorktreeContextInput,
+) -> Result<SourceApplyWorktreeContextReport> {
+    let run_dir = run_dir.as_ref();
+    let report = inspect_source_apply_worktree_context(input);
+    let artifact_path = "evidence/source-apply/worktree-context.json";
+    if let Some(parent) = run_dir.join(artifact_path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    write_json(&run_dir.join(artifact_path), &json!(report))?;
+    add_evidence_artifact(
+        run_dir,
+        "source-apply-worktree-context",
+        "application/json",
+        artifact_path,
+        json!({
+            "artifact": "source_apply_worktree_context",
+            "schemaVersion": report.schema_version,
+            "status": report.status,
+            "policyId": report.policy_id,
+            "boundary": "read-only context evidence; no trusted source apply was performed"
+        }),
+    )?;
+    Ok(report)
+}
+
 fn inspect_source_apply_worktree_target(
     target: &SourceApplyWorktreeContextTargetInput,
     worktree_root: &Path,
@@ -26334,6 +26361,7 @@ pub struct RunDashboardReadModel {
     pub asset_loading: RunDashboardAssetLoading,
     pub asset_preview: RunDashboardAssetPreview,
     pub asset_inspector: RunDashboardAssetInspector,
+    pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -26558,6 +26586,19 @@ pub struct RunDashboardAssetInspector {
     pub tilemap_count: usize,
     pub evidence_refs: Vec<String>,
     pub assets: Vec<RunDashboardAssetInspectorAsset>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardSourceApplyWorktreeContext {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub target_count: usize,
+    pub blocked_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub reports: Vec<SourceApplyWorktreeContextReport>,
+    pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
 
@@ -26913,6 +26954,8 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let asset_preview = read_dashboard_asset_preview(run_dir, &evidence)?;
     let asset_inspector =
         dashboard_asset_inspector(&asset_integrity, &asset_loading, &asset_preview);
+    let source_apply_worktree_context =
+        read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -26967,6 +27010,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         asset_loading,
         asset_preview,
         asset_inspector,
+        source_apply_worktree_context,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -27284,6 +27328,100 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_artifact_is_source_apply_worktree_context(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("source_apply_worktree_context")
+        || artifact.id.contains("source-apply-worktree-context")
+        || artifact.path.contains("source-apply-worktree-context")
+}
+
+fn read_dashboard_source_apply_worktree_context(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardSourceApplyWorktreeContext> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_source_apply_worktree_context,
+    )?;
+    let boundary = "Read-only source apply worktree context evidence from Rust validation; browser/dashboard/Studio surfaces must not apply patches, execute commands, write trusted files, merge branches, or bypass review gates.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardSourceApplyWorktreeContext {
+            present: false,
+            empty_state: "No source apply worktree context evidence is indexed for this run."
+                .to_string(),
+            status: "missing".to_string(),
+            target_count: 0,
+            blocked_count: 0,
+            evidence_refs: Vec::new(),
+            reports: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut reports = Vec::new();
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if let Some(value) = &artifact.value {
+            if let Ok(report) =
+                serde_json::from_value::<SourceApplyWorktreeContextReport>(value.clone())
+            {
+                reports.push(report);
+            }
+        }
+    }
+    reports.sort_by(|left, right| {
+        (
+            left.policy_id.as_str(),
+            left.branch.as_str(),
+            left.head_commit.as_str(),
+        )
+            .cmp(&(
+                right.policy_id.as_str(),
+                right.branch.as_str(),
+                right.head_commit.as_str(),
+            ))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let target_count = reports.iter().map(|report| report.targets.len()).sum();
+    let blocked_count = reports
+        .iter()
+        .map(|report| report.blocked_reasons.len())
+        .sum();
+    let status = if artifacts
+        .iter()
+        .any(|artifact| artifact.read_error.is_some())
+    {
+        "malformed"
+    } else if reports
+        .iter()
+        .any(SourceApplyWorktreeContextReport::is_blocked)
+    {
+        "blocked"
+    } else if reports.is_empty() {
+        "malformed"
+    } else {
+        "passed"
+    };
+    Ok(RunDashboardSourceApplyWorktreeContext {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        target_count,
+        blocked_count,
+        evidence_refs,
+        reports,
+        artifacts,
+        boundary,
+    })
 }
 
 fn dashboard_asset_inspector(
@@ -35914,6 +36052,56 @@ scenarios:
         assert!(reasons.contains("branch-head-mismatch"), "{reasons}");
         assert!(reasons.contains("active-apply-lock"), "{reasons}");
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_evidence_exports_dashboard_read_model() {
+        let root = unique_temp_dir("source-apply-context-dashboard");
+        fs::create_dir_all(root.join("seeds")).expect("seed dir");
+        fs::write(root.join("seeds/platformer.yaml"), "id: platformer\n").expect("seed");
+        let (run_root, artifacts) = create_test_run("source-apply-context-dashboard-run");
+        let input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![
+                SourceApplyWorktreeContextTargetInput {
+                    path: "seeds/platformer.yaml".to_string(),
+                    git_status: "modified".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Allowed,
+                    authorized_creation: false,
+                },
+                SourceApplyWorktreeContextTargetInput {
+                    path: "examples/demo/new.scene.json".to_string(),
+                    git_status: "untracked-collision".to_string(),
+                    expected_file_class_decision: SourceFileClassDecision::Allowed,
+                    authorized_creation: true,
+                },
+            ],
+        );
+        let report = write_source_apply_worktree_context_evidence(&artifacts.run_dir, &input)
+            .expect("context evidence written");
+        assert_eq!(report.status, "blocked");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        let context = &model.source_apply_worktree_context;
+        assert!(context.present);
+        assert_eq!(context.status, "blocked");
+        assert_eq!(context.target_count, 2);
+        assert!(context.blocked_count >= 2);
+        assert!(context
+            .evidence_refs
+            .contains(&"evidence/source-apply/worktree-context.json".to_string()));
+        assert_eq!(
+            context.reports[0].schema_version,
+            "source-apply-worktree-context-v1"
+        );
+        assert!(context.reports[0]
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("dirty-target")));
+        assert!(context.boundary.contains("must not apply patches"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+        fs::remove_dir_all(run_root).expect("run fixture removed");
     }
 
     #[test]
