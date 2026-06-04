@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "source-file-class-fixture-v1",
+  "cases": [
+    {
+      "path": "seeds/platformer.yaml",
+      "class": "deterministic-scene-fixture",
+      "decision": "allowed"
+    },
+    {
+      "path": "examples/engine-expressiveness-v2-regression/scenario-pack.json",
+      "class": "scenario-regression-fixture",
+      "decision": "allowed"
+    },
+    {
+      "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "class": "runtime-demo-config",
+      "decision": "allowed"
+    },
+    {
+      "path": "docs/source-mutation-file-classes-v1.md",
+      "class": "documentation-governance",
+      "decision": "needs-approval"
+    },
+    {
+      "path": "crates/ouroforge-core/src/lib.rs",
+      "class": "rust-trust-boundary",
+      "decision": "needs-approval"
+    },
+    {
+      "path": "examples/authoring-cockpit/cockpit.test.cjs",
+      "class": "tests-evidence-reader",
+      "decision": "needs-approval"
+    },
+    {
+      "path": "Cargo.lock",
+      "class": "dependency-manifest",
+      "decision": "blocked"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "class": "ci-workflow-secrets",
+      "decision": "blocked"
+    },
+    {
+      "path": "scripts/install.sh",
+      "class": "build-script-tooling",
+      "decision": "blocked"
+    },
+    {
+      "path": "runs/run-1/run.json",
+      "class": "generated-local-state",
+      "decision": "blocked"
+    },
+    {
+      "path": ".secret/config.json",
+      "class": "unsafe-path",
+      "decision": "blocked"
+    },
+    {
+      "path": "../Cargo.toml",
+      "class": "unsafe-path",
+      "decision": "blocked"
+    }
+  ]
+}
