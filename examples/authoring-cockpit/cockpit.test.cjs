@@ -583,6 +583,25 @@ run.route_attempts = {
   }],
 };
 
+run.visual_comparisons = {
+  present: true,
+  status: 'changed',
+  comparison_count: 1,
+  changed_count: 1,
+  malformed_count: 0,
+  evidence_refs: ['evidence/visual-comparisons/visual-comparison.json'],
+  boundary: 'Read-only visual comparison evidence; Studio must not compute trusted diffs.',
+  summaries: [{
+    comparisonId: 'qa14_7_collect_goal_visual',
+    scenarioId: 'collect-and-exit',
+    checkpointId: 'goal-checkpoint',
+    outcome: 'changed',
+    failureClassification: 'visual_regression_candidate',
+    changedPixels: 64,
+    changedPercentX1000: 2,
+  }],
+};
+
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
   kind: 'application/json',
@@ -627,7 +646,8 @@ assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goal_route/);
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 23);
+assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 24);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -931,6 +951,10 @@ const xssVisualDiff = { visual_diff_preview: { present: true, boundary: '<script
 assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<script>summary</script>'), 'visual diff operation summary must be escaped');
 assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<script>diff-boundary</script>'), 'visual diff boundary must be escaped');
 assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<img src=x onerror=alert(1)>'), 'visual diff summary id must be escaped');
+const xssVisualComparison = { visual_comparisons: { present: true, status: '<script>status</script>', boundary: '<script>comparison-boundary</script>', evidence_refs: ['<script>ref</script>'], summaries: [{ comparisonId: '<img src=x onerror=alert(1)>', scenarioId: '<script>scenario</script>', checkpointId: '<script>checkpoint</script>', outcome: '<script>outcome</script>', failureClassification: '<script>classification</script>', changedPixels: '<script>pixels</script>', changedPercentX1000: '<script>percent</script>' }] } };
+assert.ok(!cockpit.renderVisualComparisonEvidenceSurface(xssVisualComparison).includes('<script>classification</script>'), 'visual comparison classification must be escaped');
+assert.ok(!cockpit.renderVisualComparisonEvidenceSurface(xssVisualComparison).includes('<script>comparison-boundary</script>'), 'visual comparison boundary must be escaped');
+assert.ok(!cockpit.renderVisualComparisonEvidenceSurface(xssVisualComparison).includes('<img src=x onerror=alert(1)>'), 'visual comparison id must be escaped');
 const xssTilemapDraft = { tilemap_draft_preview: { present: true, boundary: '<script>tilemap-boundary</script>', records: [{ operationId: '<img src=x onerror=alert(1)>', kind: '<script>kind</script>', layerId: '<b>layer</b>', summary: '<script>summary</script>', beforeTilemapHash: { algorithm: '<script>before</script>', value: '<b>hash</b>' }, afterTilemapHash: { algorithm: '<script>after</script>', value: '<b>hash</b>' }, collisionCells: ['<script>cell</script>'], triggerCells: [] }] } };
 assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>summary</script>'), 'tilemap draft preview summary must be escaped');
 assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>tilemap-boundary</script>'), 'tilemap draft preview boundary must be escaped');
@@ -1055,6 +1079,12 @@ assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /Asset preview evid
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /player_atlas/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /missing_asset_file/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface({}), /No asset preview evidence/);
+const visualComparisonMarkup = cockpit.renderVisualComparisonEvidenceSurface(run);
+assert.match(visualComparisonMarkup, /Visual comparison evidence/);
+assert.match(visualComparisonMarkup, /qa14_7_collect_goal_visual/);
+assert.match(visualComparisonMarkup, /visual_regression_candidate/);
+assert.match(visualComparisonMarkup, /must not compute trusted diffs/);
+assert.match(cockpit.renderVisualComparisonEvidenceSurface({}), /No visual comparison evidence/);
 const visualDiffPreviewMarkup = cockpit.renderVisualDiffPreviewSurface(run);
 assert.match(visualDiffPreviewMarkup, /Visual diff preview/);
 assert.match(visualDiffPreviewMarkup, /visual-diff-scene-draft/);

@@ -124,6 +124,34 @@ const run = {
       budgetUsed: { maxActions: 8, actionsUsed: 2, maxRouteNodes: 8, routeNodesUsed: 2 },
     }],
   },
+  visual_comparisons: {
+    present: true,
+    status: 'changed',
+    comparison_count: 1,
+    unchanged_count: 0,
+    changed_count: 1,
+    missing_screenshot_count: 0,
+    malformed_screenshot_count: 0,
+    mismatched_dimensions_count: 0,
+    unsupported_count: 0,
+    blocked_count: 0,
+    malformed_count: 0,
+    evidence_refs: ['evidence/visual-comparisons/visual-comparison.json', 'evidence/screenshots/before-goal.png', 'evidence/screenshots/after-goal.png'],
+    boundary: 'Read-only visual comparison evidence; dashboard must not compute trusted diffs.',
+    summaries: [{
+      comparisonId: 'qa14_7_collect_goal_visual',
+      runId: 'run-1',
+      scenarioId: 'collect-and-exit',
+      checkpointId: 'goal-checkpoint',
+      outcome: 'changed',
+      failureClassification: 'visual_regression_candidate',
+      changedPixels: 64,
+      changedPercentX1000: 2,
+      changedRegionCount: 1,
+      beforeScreenshotRef: 'evidence/screenshots/before-goal.png',
+      afterScreenshotRef: 'evidence/screenshots/after-goal.png',
+    }],
+  },
   qa_scenario_candidates: {
     present: true,
     status: 'proposed',
@@ -828,6 +856,7 @@ assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
 assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
 assert.match(dashboard.renderRunDetail(run), /Route attempt evidence/);
+assert.match(dashboard.renderRunDetail(run), /Visual comparison evidence/);
 assert.match(dashboard.renderRunDetail(run), /QA scenario candidates/);
 assert.match(dashboard.renderRunDetail(run), /Adversarial input fuzzing plans/);
 assert.match(dashboard.renderRunDetail(run), /QA worker assignments/);
@@ -838,6 +867,10 @@ assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, emp
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
 assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
 assert.match(dashboard.renderRouteAttempts({ route_attempts: { present: false, empty_state: 'No route attempt evidence' } }), /No route attempt evidence/);
+assert.match(dashboard.renderVisualComparisons({ visual_comparisons: { present: false, empty_state: 'No visual comparison evidence' } }), /No visual comparison evidence/);
+assert.match(dashboard.renderVisualComparisons(run), /visual_regression_candidate/);
+assert.match(dashboard.renderVisualComparisons(run), /collect-and-exit/);
+assert.match(dashboard.renderVisualComparisons(run), /must not compute trusted diffs/);
 assert.match(dashboard.renderQaScenarioCandidates({ qa_scenario_candidates: { present: false, empty_state: 'No candidate evidence' } }), /No candidate evidence/);
 assert.match(dashboard.renderFuzzingPlans({ fuzzing_plans: { present: false, empty_state: 'No fuzzing plan evidence' } }), /No fuzzing plan evidence/);
 assert.match(dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: false, empty_state: 'No worker assignment evidence' } }), /No worker assignment evidence/);
@@ -951,6 +984,11 @@ assert.ok(!routeAttemptXss.includes('<script>actions</script>'), 'route attempt 
 assert.ok(!routeAttemptXss.includes('<script>blocked</script>'), 'route attempt blocker reason must be escaped');
 assert.ok(!routeAttemptXss.includes('<script>boundary</script>'), 'route attempt boundary must be escaped');
 assert.match(routeAttemptXss, /&lt;script&gt;attempt&lt;\/script&gt;/);
+const visualComparisonXss = dashboard.renderVisualComparisons({ visual_comparisons: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], summaries: [{ comparisonId: '<script>comparison</script>', scenarioId: '<script>scenario</script>', checkpointId: '<script>checkpoint</script>', outcome: '<script>outcome</script>', failureClassification: '<script>classification</script>', beforeScreenshotRef: '<script>before</script>', afterScreenshotRef: '<script>after</script>', changedPixels: '<script>pixels</script>', changedPercentX1000: '<script>percent</script>', changedRegionCount: '<script>regions</script>' }] } });
+assert.ok(!visualComparisonXss.includes('<script>comparison</script>'), 'visual comparison ids must be escaped');
+assert.ok(!visualComparisonXss.includes('<script>classification</script>'), 'visual comparison classification must be escaped');
+assert.ok(!visualComparisonXss.includes('<script>boundary</script>'), 'visual comparison boundary must be escaped');
+assert.match(visualComparisonXss, /&lt;script&gt;comparison&lt;\/script&gt;/);
 const candidateXss = dashboard.renderQaScenarioCandidates({ qa_scenario_candidates: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], candidates: [{ candidateId: '<script>candidate</script>', priority: '<script>priority</script>', status: '<script>status</script>', sourceRisk: { riskId: '<script>risk</script>' }, targetObjective: { objectiveId: '<script>objective</script>', description: '<script>description</script>' }, inputStrategy: { kind: '<script>input</script>' }, budget: { maxRuns: '<script>runs</script>' }, blockedReasons: ['<script>blocked</script>'], expectedEvidence: [{ evidenceId: '<script>evidence</script>' }] }] } });
 assert.ok(!candidateXss.includes('<script>candidate</script>'), 'scenario candidate ids must be escaped');
 assert.ok(!candidateXss.includes('<script>boundary</script>'), 'scenario candidate boundary must be escaped');

@@ -407,6 +407,34 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(model.boundary || 'Read-only route attempt evidence; dashboard surfaces do not run solvers, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.')}</p>`;
   }
 
+  function renderVisualComparisons(run = {}) {
+    const model = run.visual_comparisons || run.visualComparisons || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || 'No visual comparison evidence is available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const summaries = Array.isArray(model.summaries) ? model.summaries : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Comparisons', model.comparison_count ?? model.comparisonCount ?? summaries.length],
+      ['Changed/unchanged', `${model.changed_count ?? model.changedCount ?? 0}/${model.unchanged_count ?? model.unchangedCount ?? 0}`],
+      ['Missing/malformed screenshots', `${model.missing_screenshot_count ?? model.missingScreenshotCount ?? 0}/${model.malformed_screenshot_count ?? model.malformedScreenshotCount ?? 0}`],
+      ['Mismatched/unsupported', `${model.mismatched_dimensions_count ?? model.mismatchedDimensionsCount ?? 0}/${model.unsupported_count ?? model.unsupportedCount ?? 0}`],
+      ['Blocked/malformed artifacts', `${model.blocked_count ?? model.blockedCount ?? 0}/${model.malformed_count ?? model.malformedCount ?? 0}`],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const summaryRows = summaries.slice(0, 12).map((summary) => {
+      const classification = summary.failureClassification || summary.failure_classification || 'visual_unclassified';
+      const changedPixels = summary.changedPixels ?? summary.changed_pixels ?? 0;
+      const changedPercent = summary.changedPercentX1000 ?? summary.changed_percent_x1000 ?? 0;
+      const regionCount = summary.changedRegionCount ?? summary.changed_region_count ?? 0;
+      return `<li><strong>${escapeText(summary.comparisonId || summary.comparison_id || 'visual comparison')}</strong>: <span class="${statusClass(summary.outcome)}">${escapeText(summary.outcome || 'unknown')}</span> · ${escapeText(classification)}<br><small>${escapeText(summary.scenarioId || summary.scenario_id || 'scenario')} · ${escapeText(summary.checkpointId || summary.checkpoint_id || 'checkpoint')} · changed ${escapeText(changedPixels)} px (${escapeText(changedPercent)} x1000) · regions ${escapeText(regionCount)} · ${escapeText(summary.beforeScreenshotRef || summary.before_screenshot_ref || 'before missing')} → ${escapeText(summary.afterScreenshotRef || summary.after_screenshot_ref || 'after missing')}</small></li>`;
+    }).join('') || '<li>No parseable visual comparisons are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Visual comparisons</h4><ul class="run-meta-list">${summaryRows}</ul>
+      ${renderRefLinks('Visual comparison evidence refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only visual comparison evidence; dashboard surfaces do not compute trusted diffs, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim aesthetic quality.')}</p>`;
+  }
+
   function renderQaScenarioCandidates(run = {}) {
     const model = run.qa_scenario_candidates || run.qaScenarioCandidates || {};
     if (!model.present) {
@@ -1488,6 +1516,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
       <section class="panel"><h3>Route attempt evidence</h3>${renderRouteAttempts(run)}</section>
+      <section class="panel"><h3>Visual comparison evidence</h3>${renderVisualComparisons(run)}</section>
       <section class="panel"><h3>QA scenario candidates</h3>${renderQaScenarioCandidates(run)}</section>
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
@@ -1571,7 +1600,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

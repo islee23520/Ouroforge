@@ -33019,6 +33019,7 @@ pub struct RunDashboardReadModel {
     pub fuzzing_plans: RunDashboardFuzzingPlans,
     pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
     pub route_attempts: RunDashboardRouteAttempts,
+    pub visual_comparisons: RunDashboardVisualComparisons,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -33344,6 +33345,43 @@ pub struct RunDashboardRouteAttempts {
     pub attempts: Vec<RouteAttemptEvidenceArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardVisualComparisons {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub comparison_count: usize,
+    pub unchanged_count: usize,
+    pub changed_count: usize,
+    pub missing_screenshot_count: usize,
+    pub malformed_screenshot_count: usize,
+    pub mismatched_dimensions_count: usize,
+    pub unsupported_count: usize,
+    pub blocked_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub summaries: Vec<RunDashboardVisualComparisonSummary>,
+    pub comparisons: Vec<VisualComparisonEvidenceArtifact>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardVisualComparisonSummary {
+    pub comparison_id: String,
+    pub run_id: String,
+    pub scenario_id: String,
+    pub checkpoint_id: String,
+    pub outcome: VisualComparisonOutcome,
+    pub failure_classification: String,
+    pub changed_pixels: Option<u64>,
+    pub changed_percent_x1000: Option<u32>,
+    pub changed_region_count: usize,
+    pub before_screenshot_ref: Option<String>,
+    pub after_screenshot_ref: Option<String>,
+    pub evidence_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -33705,6 +33743,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
     let route_attempts = read_dashboard_route_attempts(run_dir, &evidence)?;
+    let visual_comparisons = read_dashboard_visual_comparisons(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -33765,6 +33804,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         fuzzing_plans,
         qa_scenario_candidates,
         route_attempts,
+        visual_comparisons,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -34305,6 +34345,18 @@ fn dashboard_artifact_is_route_attempt(artifact: &EvidenceArtifact) -> bool {
         || artifact.path.contains("route_attempt")
 }
 
+fn dashboard_artifact_is_visual_comparison(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("visual_comparison_evidence")
+        || artifact.id.contains("visual-comparison")
+        || artifact.id.contains("visual_comparison")
+        || artifact.path.contains("visual-comparison")
+        || artifact.path.contains("visual_comparison")
+}
+
 fn read_dashboard_route_attempts(
     run_dir: &Path,
     evidence: &[EvidenceArtifact],
@@ -34425,6 +34477,195 @@ fn read_dashboard_route_attempts(
         artifacts,
         boundary,
     })
+}
+
+fn read_dashboard_visual_comparisons(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardVisualComparisons> {
+    let artifacts =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_visual_comparison)?;
+    let boundary = "Read-only visual comparison evidence; dashboard/Studio surfaces must not compute trusted diffs, run browser-side visual judgment, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim aesthetic quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardVisualComparisons {
+            present: false,
+            empty_state: "No visual comparison evidence is indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            comparison_count: 0,
+            unchanged_count: 0,
+            changed_count: 0,
+            missing_screenshot_count: 0,
+            malformed_screenshot_count: 0,
+            mismatched_dimensions_count: 0,
+            unsupported_count: 0,
+            blocked_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            summaries: Vec::new(),
+            comparisons: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut comparisons = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<VisualComparisonEvidenceArtifact>(value.clone()) {
+            Ok(comparison)
+                if validate_visual_comparison_evidence_refs(run_dir, &comparison).is_ok() =>
+            {
+                evidence_refs.extend(visual_comparison_evidence_refs(&comparison));
+                comparisons.push(comparison);
+            }
+            _ => malformed_count += 1,
+        }
+    }
+    comparisons.sort_by(|left, right| {
+        (
+            left.run_id.as_str(),
+            left.scenario_id.as_str(),
+            left.checkpoint_id.as_str(),
+            left.comparison_id.as_str(),
+        )
+            .cmp(&(
+                right.run_id.as_str(),
+                right.scenario_id.as_str(),
+                right.checkpoint_id.as_str(),
+                right.comparison_id.as_str(),
+            ))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let summaries = comparisons
+        .iter()
+        .map(dashboard_visual_comparison_summary)
+        .collect::<Vec<_>>();
+    let comparison_count = comparisons.len();
+    let unchanged_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::Unchanged)
+        .count();
+    let changed_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::Changed)
+        .count();
+    let missing_screenshot_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::MissingScreenshot)
+        .count();
+    let malformed_screenshot_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::MalformedScreenshot)
+        .count();
+    let mismatched_dimensions_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::MismatchedDimensions)
+        .count();
+    let unsupported_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::Unsupported)
+        .count();
+    let blocked_count = comparisons
+        .iter()
+        .filter(|comparison| comparison.outcome == VisualComparisonOutcome::Blocked)
+        .count();
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if unsupported_count > 0 {
+        "unsupported"
+    } else if malformed_screenshot_count > 0 {
+        "malformed_screenshot"
+    } else if missing_screenshot_count > 0 {
+        "missing_screenshot"
+    } else if mismatched_dimensions_count > 0 {
+        "mismatched_dimensions"
+    } else if changed_count > 0 {
+        "changed"
+    } else if comparison_count > 0 && unchanged_count == comparison_count {
+        "unchanged"
+    } else if comparison_count > 0 {
+        "mixed"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardVisualComparisons {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        comparison_count,
+        unchanged_count,
+        changed_count,
+        missing_screenshot_count,
+        malformed_screenshot_count,
+        mismatched_dimensions_count,
+        unsupported_count,
+        blocked_count,
+        malformed_count,
+        evidence_refs,
+        summaries,
+        comparisons,
+        artifacts,
+        boundary,
+    })
+}
+
+fn visual_comparison_evidence_refs(comparison: &VisualComparisonEvidenceArtifact) -> Vec<String> {
+    let mut refs = Vec::new();
+    refs.extend(comparison.evidence_refs.clone());
+    refs.extend(comparison.metadata_refs.clone());
+    refs.extend(comparison.before.screenshot_ref.clone());
+    refs.extend(comparison.after.screenshot_ref.clone());
+    refs.extend(comparison.before.metadata_ref.clone());
+    refs.extend(comparison.after.metadata_ref.clone());
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn dashboard_visual_comparison_summary(
+    comparison: &VisualComparisonEvidenceArtifact,
+) -> RunDashboardVisualComparisonSummary {
+    let summary = comparison.pixel_diff_summary.as_ref();
+    RunDashboardVisualComparisonSummary {
+        comparison_id: comparison.comparison_id.clone(),
+        run_id: comparison.run_id.clone(),
+        scenario_id: comparison.scenario_id.clone(),
+        checkpoint_id: comparison.checkpoint_id.clone(),
+        outcome: comparison.outcome,
+        failure_classification: visual_comparison_failure_classification(comparison.outcome)
+            .to_string(),
+        changed_pixels: summary.map(|summary| summary.changed_pixels),
+        changed_percent_x1000: summary.map(|summary| summary.changed_percent_x1000),
+        changed_region_count: comparison.changed_regions.len(),
+        before_screenshot_ref: comparison.before.screenshot_ref.clone(),
+        after_screenshot_ref: comparison.after.screenshot_ref.clone(),
+        evidence_refs: visual_comparison_evidence_refs(comparison),
+    }
+}
+
+fn visual_comparison_failure_classification(outcome: VisualComparisonOutcome) -> &'static str {
+    match outcome {
+        VisualComparisonOutcome::Unchanged => "visual_unchanged",
+        VisualComparisonOutcome::Changed => "visual_regression_candidate",
+        VisualComparisonOutcome::MissingScreenshot => "visual_missing_screenshot",
+        VisualComparisonOutcome::MalformedScreenshot => "visual_malformed_screenshot",
+        VisualComparisonOutcome::MismatchedDimensions => "visual_mismatched_dimensions",
+        VisualComparisonOutcome::Unsupported => "visual_unsupported",
+        VisualComparisonOutcome::Blocked => "visual_blocked",
+    }
 }
 
 fn read_dashboard_qa_worker_assignments(
@@ -42271,6 +42512,94 @@ scenarios:
                 .expect_err("changed outcome within thresholds is rejected");
         assert!(error.to_string().contains("must exceed"));
         fs::remove_dir_all(threshold_root).expect("threshold fixture removed");
+    }
+
+    #[test]
+    fn visual_comparison_dashboard_read_model_links_scenarios_failures_and_refs() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("visual-comparison-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.visual_comparisons.present);
+        assert_eq!(missing.visual_comparisons.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("visual-comparison-dashboard-present");
+        let mut comparison = write_indexed_visual_comparison_fixture(&artifacts.run_dir);
+        comparison.outcome = VisualComparisonOutcome::Changed;
+        comparison.pixel_diff_summary = Some(VisualComparisonPixelDiffSummary {
+            total_pixels: 57_600,
+            changed_pixels: 64,
+            changed_percent_x1000: 2,
+        });
+        comparison.changed_regions = vec![VisualComparisonChangedRegion {
+            region_id: "changed-region".to_string(),
+            x: 8,
+            y: 8,
+            width: 16,
+            height: 4,
+            changed_pixels: 64,
+        }];
+
+        let comparison_path = "evidence/visual-comparisons/visual-comparison.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/visual-comparisons"))
+            .expect("visual comparison evidence dir exists");
+        write_json(&artifacts.run_dir.join(comparison_path), &json!(comparison))
+            .expect("visual comparison writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "visual-comparison-evidence",
+            "application/json",
+            comparison_path,
+            json!({ "artifact": "visual_comparison_evidence" }),
+        )
+        .expect("visual comparison indexed");
+
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.visual_comparisons.present);
+        assert_eq!(dashboard.visual_comparisons.status, "changed");
+        assert_eq!(dashboard.visual_comparisons.comparison_count, 1);
+        assert_eq!(dashboard.visual_comparisons.changed_count, 1);
+        assert_eq!(
+            dashboard.visual_comparisons.summaries[0].scenario_id,
+            "collect-and-exit"
+        );
+        assert_eq!(
+            dashboard.visual_comparisons.summaries[0].checkpoint_id,
+            "goal-checkpoint"
+        );
+        assert_eq!(
+            dashboard.visual_comparisons.summaries[0].failure_classification,
+            "visual_regression_candidate"
+        );
+        assert_eq!(
+            dashboard.visual_comparisons.summaries[0].changed_pixels,
+            Some(64)
+        );
+        assert!(dashboard
+            .visual_comparisons
+            .evidence_refs
+            .contains(&comparison_path.to_string()));
+        assert!(dashboard
+            .visual_comparisons
+            .evidence_refs
+            .contains(&"evidence/screenshots/before-goal.png".to_string()));
+        assert!(dashboard.visual_comparisons.boundary.contains("Read-only"));
+        assert!(dashboard
+            .visual_comparisons
+            .boundary
+            .contains("must not compute trusted diffs"));
+
+        write_json(
+            &artifacts.run_dir.join(comparison_path),
+            &json!({ "schemaVersion": "bad" }),
+        )
+        .expect("malformed visual comparison writes");
+        let malformed = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads malformed");
+        assert!(malformed.visual_comparisons.present);
+        assert_eq!(malformed.visual_comparisons.status, "malformed");
+        assert_eq!(malformed.visual_comparisons.malformed_count, 1);
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     fn write_indexed_visual_comparison_fixture(run_dir: &Path) -> VisualComparisonEvidenceArtifact {
