@@ -28775,6 +28775,8 @@ pub struct SceneCollider {
     pub sensor: bool,
     #[serde(default)]
     pub trigger: bool,
+    #[serde(default)]
+    pub disabled: bool,
     #[serde(
         default,
         rename = "collisionGroup",
@@ -32474,9 +32476,9 @@ fn validate_scene_collider(
             "scene entity {entity_id} collider shape must be aabb"
         ));
     }
-    if !matches!(collider.body.as_str(), "static" | "dynamic" | "kinematic") {
+    if scene_collider_body_kind(&collider.body).is_none() {
         return Err(anyhow!(
-            "scene entity {entity_id} collider body must be static, dynamic, or kinematic"
+            "scene entity {entity_id} collider body must be static, dynamic, trigger, sensor, or legacy kinematic"
         ));
     }
     if collider.size.width <= 0 || collider.size.height <= 0 {
@@ -32517,6 +32519,29 @@ fn validate_scene_collider(
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SceneColliderBodyKind {
+    Static,
+    Dynamic,
+    Trigger,
+    Sensor,
+    KinematicLegacy,
+}
+
+fn scene_collider_body_kind(body: &str) -> Option<SceneColliderBodyKind> {
+    match body {
+        "static" => Some(SceneColliderBodyKind::Static),
+        "dynamic" => Some(SceneColliderBodyKind::Dynamic),
+        "trigger" => Some(SceneColliderBodyKind::Trigger),
+        "sensor" => Some(SceneColliderBodyKind::Sensor),
+        // Backward-compatible with existing expressive physics fixtures. The
+        // bounded production solver keeps this accepted but treats it as a
+        // legacy explicit movement body rather than broad physics-engine scope.
+        "kinematic" => Some(SceneColliderBodyKind::KinematicLegacy),
+        _ => None,
+    }
 }
 
 fn validate_scene_trigger(
@@ -55270,9 +55295,9 @@ scenarios:
             .expect("collider")
             .body = "rigid".to_string();
         let rejected = validate_scene(&invalid_body).expect_err("invalid body rejected");
-        assert!(rejected
-            .to_string()
-            .contains("collider body must be static, dynamic, or kinematic"));
+        assert!(rejected.to_string().contains(
+            "collider body must be static, dynamic, trigger, sensor, or legacy kinematic"
+        ));
 
         let mut duplicate_mask = scene.clone();
         duplicate_mask.entities[0]
@@ -55346,6 +55371,162 @@ scenarios:
             .expect("collider")
             .collision_group = Some("legacy-freeform".to_string());
         validate_scene(&legacy_without_rules).expect("legacy freeform collision group accepted");
+    }
+
+    #[test]
+    fn scene_physics_body_model_accepts_contact_only_and_disabled_states() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "physics-body-model-v1",
+            "bounds": { "width": 320, "height": 180 },
+            "collisionRules": {
+                "version": "2",
+                "defaultLayer": "world",
+                "layers": [
+                    { "id": "world", "solid": true, "collidesWith": ["actors"] },
+                    { "id": "actors", "solid": true, "collidesWith": ["world", "triggers", "sensors"] },
+                    { "id": "triggers", "solid": false, "triggerOnly": true, "collidesWith": ["actors"] },
+                    { "id": "sensors", "solid": false, "triggerOnly": true, "collidesWith": ["actors"] }
+                ]
+            },
+            "entities": [
+                {
+                    "id": "floor",
+                    "sprite": { "color": "#64748b" },
+                    "components": {
+                        "transform": { "x": 0, "y": 96 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 128, "height": 16 },
+                        "controllable": false,
+                        "collider": {
+                            "body": "static",
+                            "size": { "width": 128, "height": 16 },
+                            "collisionGroup": "world",
+                            "collisionMask": ["actors"]
+                        }
+                    }
+                },
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 4, "y": 64 },
+                        "velocity": { "x": 1, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "collider": {
+                            "body": "dynamic",
+                            "size": { "width": 16, "height": 16 },
+                            "collisionGroup": "actors",
+                            "collisionMask": ["world", "triggers", "sensors"]
+                        }
+                    }
+                },
+                {
+                    "id": "checkpoint-trigger",
+                    "sprite": { "color": "#facc15" },
+                    "components": {
+                        "transform": { "x": 32, "y": 64 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false,
+                        "collider": {
+                            "body": "trigger",
+                            "size": { "width": 16, "height": 16 },
+                            "trigger": true,
+                            "collisionGroup": "triggers",
+                            "collisionMask": ["actors"]
+                        }
+                    }
+                },
+                {
+                    "id": "camera-sensor",
+                    "sprite": { "color": "#38bdf8" },
+                    "components": {
+                        "transform": { "x": 64, "y": 64 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 24, "height": 24 },
+                        "controllable": false,
+                        "collider": {
+                            "body": "sensor",
+                            "size": { "width": 24, "height": 24 },
+                            "sensor": true,
+                            "collisionGroup": "sensors",
+                            "collisionMask": ["actors"]
+                        }
+                    }
+                },
+                {
+                    "id": "disabled-debug-body",
+                    "sprite": { "color": "#94a3b8" },
+                    "components": {
+                        "transform": { "x": 96, "y": 64 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": false,
+                        "collider": {
+                            "body": "static",
+                            "size": { "width": 16, "height": 16 },
+                            "disabled": true,
+                            "collisionGroup": "world",
+                            "collisionMask": ["actors"]
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("physics body model scene parses");
+
+        validate_scene(&scene).expect("physics body model validates");
+        let bodies = scene
+            .entities
+            .iter()
+            .filter_map(|entity| {
+                entity
+                    .components
+                    .collider
+                    .as_ref()
+                    .map(|collider| collider.body.as_str())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            bodies,
+            vec!["static", "dynamic", "trigger", "sensor", "static"]
+        );
+        assert!(
+            scene.entities[4]
+                .components
+                .collider
+                .as_ref()
+                .expect("disabled collider")
+                .disabled
+        );
+
+        let mut unsupported_body = scene.clone();
+        unsupported_body.entities[1]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .body = "rigid".to_string();
+        let rejected = validate_scene(&unsupported_body).expect_err("unsupported body rejected");
+        assert!(rejected.to_string().contains(
+            "collider body must be static, dynamic, trigger, sensor, or legacy kinematic"
+        ));
+
+        let mut malformed_disabled = scene.clone();
+        malformed_disabled.entities[4]
+            .components
+            .collider
+            .as_mut()
+            .expect("collider")
+            .size
+            .width = 0;
+        let rejected =
+            validate_scene(&malformed_disabled).expect_err("malformed disabled body rejected");
+        assert!(rejected
+            .to_string()
+            .contains("collider size must be positive"));
     }
 
     #[test]
