@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "probe-animation-regression",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "activeCameraId": "probe-camera",
+    "meshes": [
+      { "id": "animated-cube-mesh", "kind": "primitive", "primitive": "cube", "materialRef": "animated-blue" },
+      { "id": "animation-goal-mesh", "kind": "primitive", "primitive": "cube", "materialRef": "goal-orange" }
+    ],
+    "materials": [
+      { "id": "animated-blue", "kind": "unlit", "baseColor": "#3b82f6" },
+      { "id": "goal-orange", "kind": "unlit", "baseColor": "#f97316" }
+    ],
+    "colliders": [
+      { "id": "animated-box", "shape": "box", "body": "dynamic", "size": { "x": 2, "y": 2, "z": 2 }, "collisionGroup": "actors", "collisionMask": ["triggers"] },
+      { "id": "animation-goal-trigger", "shape": "box", "body": "trigger", "trigger": true, "size": { "x": 2, "y": 2, "z": 2 }, "collisionGroup": "triggers" }
+    ],
+    "nodes": [
+      {
+        "id": "animated-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "animated-cube-mesh",
+        "materialRef": "animated-blue",
+        "colliderRef": "animated-box",
+        "metadata": { "fixtureScope": "animated transform target for probe/evaluator regression" }
+      },
+      {
+        "id": "animation-goal",
+        "localTransform": {
+          "translation": { "x": 3, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "animation-goal-mesh",
+        "materialRef": "goal-orange",
+        "colliderRef": "animation-goal-trigger",
+        "metadata": { "fixtureScope": "trigger target for animation/evaluator regression" }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "probe-camera",
+        "active": true,
+        "transform": { "translation": { "x": 0, "y": 0, "z": 10 }, "rotation": { "x": 0, "y": 0, "z": 0 }, "scale": { "x": 1, "y": 1, "z": 1 } },
+        "projection": { "kind": "perspective", "fovDegrees": 60, "near": 1, "far": 1000, "aspectMode": "viewport" },
+        "viewport": { "x": 0, "y": 0, "width": 320, "height": 180 }
+      }
+    ],
+    "animationClips": [
+      {
+        "id": "animated-cube-to-trigger",
+        "targetNodeId": "animated-cube",
+        "channel": "translation",
+        "durationFrames": 3,
+        "looped": false,
+        "keyframes": [
+          { "frame": 0, "value": { "x": 0, "y": 0, "z": 0 } },
+          { "frame": 3, "value": { "x": 3, "y": 0, "z": 0 } }
+        ],
+        "metadata": { "capabilityGate": "bounded transform animation only; no skeletal animation, IK, or graph editor claim" }
+      }
+    ],
+    "animationStates": [
+      { "clipId": "animated-cube-to-trigger", "targetNodeId": "animated-cube", "channel": "translation", "currentFrame": 0, "currentTimeMs": 0, "playing": true, "looped": false }
+    ],
+    "metadata": { "generatedStateBoundary": "tracked source-like probe/animation regression fixture only; generated evidence stays untracked" }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D probe and animation regression fixture, not production 3D readiness or Godot replacement evidence",
+    "issue": "#606"
+  }
+}

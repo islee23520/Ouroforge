@@ -38,3 +38,27 @@ scenarios:
       - scene3d_collision:
           path: events.0.type
           equals: runtime.scene3d.collision.trigger
+  - id: probe-animation-evaluator-regression
+    description: Assert runtime probe and bounded animation evidence reach a passing scenario verdict while a deliberate negative assertion fails.
+    steps:
+      - wait:
+          frames: 3
+    assertions:
+      - scene3d_probe:
+          path: status
+          equals: present
+      - scene3d_probe:
+          path: animationStateCount
+          equals: 1
+      - scene3d_animation:
+          path: states.0.clipId
+          equals: animated-cube-to-trigger
+      - scene3d_animation:
+          path: states.0.currentFrame
+          equals: 3
+      - scene3d_animation:
+          path: states.0.playing
+          equals: false
+      - scene3d_collision:
+          path: triggerCount
+          equals: 1

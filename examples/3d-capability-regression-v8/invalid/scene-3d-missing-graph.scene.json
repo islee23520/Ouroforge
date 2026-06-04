@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "invalid-3d-missing-graph",
+  "bounds": { "width": 64, "height": 64 },
+  "entities": [],
+  "metadata": { "expectedValidationError": "sceneKind 3d requires scene3d graph" }
+}
