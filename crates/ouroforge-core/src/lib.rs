@@ -40824,6 +40824,70 @@ scenarios:
     }
 
     #[test]
+    fn scenario_coverage_v12_read_model_compatibility_documents_generated_state_boundaries() {
+        let root = unique_temp_dir("scenario-coverage-v12-read-model-compatibility");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "loop_project");
+        let plan = read_loop_plan_from_path(&plan_path);
+        let bundle = build_authoring_loop_evidence_bundle(&plan, &root, &plan_path)
+            .expect("partial bundle read model builds without writing generated bundle state");
+        let handoff_path = root.join("runs/agent-handoffs/temp-loop/handoff.json");
+        let handoff = write_agent_handoff_contract_from_path(&plan_path, &handoff_path)
+            .expect("handoff contract writes advisory generated state");
+
+        assert_eq!(
+            bundle.schema_version,
+            AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            handoff.schema_version,
+            AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION
+        );
+        assert!(bundle.generated_state.tracked_fixture_only);
+        assert!(handoff.generated_state.tracked_fixture_only);
+        assert!(bundle
+            .generated_state
+            .roots
+            .iter()
+            .any(|root| root == "runs"));
+        assert!(
+            !bundle.missing_refs.is_empty(),
+            "compatibility read model preserves missing generated refs instead of fixing them"
+        );
+
+        let cockpit = build_studio_loop_cockpit_read_model(
+            std::slice::from_ref(&bundle),
+            std::slice::from_ref(&handoff),
+        );
+        assert_eq!(cockpit.schema_version, STUDIO_LOOP_COCKPIT_SCHEMA_VERSION);
+        assert!(cockpit.boundary.contains("does not execute commands"));
+        assert!(cockpit.boundary.contains("write files"));
+        assert_eq!(cockpit.loops.len(), 1);
+        assert_eq!(cockpit.loops[0].loop_id, "temp-loop");
+        assert_eq!(cockpit.loops[0].bundle_missing_refs, bundle.missing_refs);
+        assert!(cockpit.loops[0]
+            .allowed_commands
+            .iter()
+            .all(|command| command.boundary.contains("inert")
+                || command.boundary.contains("does not execute")));
+        assert!(cockpit.loops[0]
+            .forbidden_actions
+            .iter()
+            .any(|action| action.contains("trusted state") || action.contains("browser")));
+        assert!(cockpit.loops[0]
+            .boundary
+            .contains("does not move artifacts, mutate source state"));
+        assert!(
+            !root
+                .join("runs/authoring-loop-bundles/temp-loop/bundle.json")
+                .exists(),
+            "Studio compatibility read model must not persist generated dashboard exports"
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn scenario_coverage_v12_decision_ledger_appends_review_and_critic_events() {
         let root = unique_temp_dir("scenario-coverage-v12-decision-ledger");
         fs::create_dir_all(&root).expect("ledger root");

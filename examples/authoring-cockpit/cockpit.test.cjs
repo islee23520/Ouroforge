@@ -1023,6 +1023,32 @@ assert.match(sourcePatchCoverageMatrix, /No source patch apply to the trusted ma
 assert.match(sourcePatchCoverageMatrix, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
 assert.match(sourcePatchCoverageMatrix, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
 
+const multiAgentCoverageMatrix = fs.readFileSync(require.resolve('../../docs/multi-agent-pipeline-coverage-matrix-v1.md'), 'utf8');
+assert.match(multiAgentCoverageMatrix, /Scenario Coverage v12 \/ MAP13\.16\.3 coverage matrix/);
+assert.match(multiAgentCoverageMatrix, /Role validation/);
+assert.match(multiAgentCoverageMatrix, /Task board\/status transitions/);
+assert.match(multiAgentCoverageMatrix, /Ownership conflicts/);
+assert.match(multiAgentCoverageMatrix, /Handoff v2 \/ handoff contract/);
+assert.match(multiAgentCoverageMatrix, /State snapshot\/staleness/);
+assert.match(multiAgentCoverageMatrix, /Review\/critic independence/);
+assert.match(multiAgentCoverageMatrix, /QA queue \/ QA worker assignment/);
+assert.match(multiAgentCoverageMatrix, /Performance\/regression lane/);
+assert.match(multiAgentCoverageMatrix, /Build\/release design gate/);
+assert.match(multiAgentCoverageMatrix, /Decision ledger append-only/);
+assert.match(multiAgentCoverageMatrix, /Production\/authoring loop evidence bundle/);
+assert.match(multiAgentCoverageMatrix, /Dashboard display/);
+assert.match(multiAgentCoverageMatrix, /Studio\/cockpit display/);
+assert.match(multiAgentCoverageMatrix, /Malformed\/missing\/stale\/unresolved conflict evidence/);
+assert.match(multiAgentCoverageMatrix, /no hidden background agents/);
+assert.match(multiAgentCoverageMatrix, /no unbounded spawning/);
+assert.match(multiAgentCoverageMatrix, /no auto-apply, auto-merge, or self-approval/);
+assert.match(multiAgentCoverageMatrix, /no browser trusted writes or command bridge/);
+assert.match(multiAgentCoverageMatrix, /no remote worker pool, hosted worker pool, cloud worker pool, or remote\/cloud swarm/);
+assert.match(multiAgentCoverageMatrix, /no dependency mutation, CI mutation, or workflow mutation/);
+assert.match(multiAgentCoverageMatrix, /no production-ready claim and no Godot replacement claim/);
+assert.match(multiAgentCoverageMatrix, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
+assert.match(multiAgentCoverageMatrix, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
+
 const cockpitReadme = fs.readFileSync(require.resolve('./README.md'), 'utf8');
 assert.match(cockpitReadme, /Studio Draft Authoring Surface v1/);
 assert.match(cockpitReadme, /scene, tilemap, and\s+asset-reference draft rows/);
