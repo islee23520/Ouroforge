@@ -82,7 +82,7 @@ Per-milestone evidence steps live in the matching `docs/*.md`; contribution expe
 | Evidence fidelity & trust boundary | [`docs/evidence-fidelity-trust-boundary-v1.md`](docs/evidence-fidelity-trust-boundary-v1.md) |
 | Artifact write policy | [`docs/artifact-write-policy-v1.md`](docs/artifact-write-policy-v1.md) |
 | Public-readiness gates | [`docs/public-readiness-audit.md`](docs/public-readiness-audit.md), [`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), [`docs/public-alpha-readiness-governance-handoff-v1.md`](docs/public-alpha-readiness-governance-handoff-v1.md) |
-| Versioning and changelog policy | [`docs/release-versioning-policy-v1.md`](docs/release-versioning-policy-v1.md) |
+| Versioning, changelog, and release artifact policy | [`docs/release-versioning-policy-v1.md`](docs/release-versioning-policy-v1.md), [`docs/release-artifact-policy-v1.md`](docs/release-artifact-policy-v1.md) |
 
 The full set of 90+ milestone contracts and demo-evidence notes lives under [`docs/`](docs/).
 

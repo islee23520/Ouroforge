@@ -116,7 +116,8 @@ confirm:
 ## Relationship to later governance
 
 This policy supports Public Alpha Readiness and Launch Governance by defining
-conservative versioning and changelog language. Later issues may add a no-publish
-release artifact checklist, readiness gate report, or manual visibility decision
-record, but those later artifacts must not reinterpret this policy as publication
-authority.
+conservative versioning and changelog language.
+`docs/release-artifact-policy-v1.md` adds the no-publish release artifact
+checklist for current public-alpha readiness work. Later issues may add a
+readiness gate report or manual visibility decision record, but those later
+artifacts must not reinterpret this policy as publication authority.
