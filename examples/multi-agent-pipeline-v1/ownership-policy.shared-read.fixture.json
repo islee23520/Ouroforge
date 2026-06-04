@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "file-artifact-ownership-policy-v1",
+  "policyId": "ownership-policy-shared-read",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data/multi-agent-pipeline",
+      "target"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Ownership policy is evidence metadata only, not hidden file locking",
+    "Agent outputs remain untrusted until Rust/local validation and review-gated apply or promotion",
+    "Conflicts block or escalate instead of silently overwriting files",
+    "#1 and #23 remain open governance anchors"
+  ],
+  "forbiddenActions": [
+    "silent overwrite",
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser file writes",
+    "remote worker pool",
+    "release automation"
+  ],
+  "boundary": "Fixture-scoped ownership policy only; it does not lock files, spawn agents, execute commands, apply changes, merge PRs, write trusted browser state, or mutate source files.",
+  "entries": [
+    {
+      "id": "designer-read-scope",
+      "ownerAgent": "designer-alpha",
+      "role": "designer",
+      "target": {
+        "kind": "shared-read-only-ref",
+        "id": "scope-doc",
+        "path": "docs/multi-agent-production-pipeline-v1.md"
+      },
+      "mode": "shared-read-only",
+      "state": "active",
+      "workPackageRefs": [
+        "work-package-designer-read-scope"
+      ],
+      "evidenceRefs": [
+        {
+          "id": "ownership-evidence",
+          "path": "runs/multi-agent-pipeline/ownership/designer-read-scope.json",
+          "description": "generated ownership evidence path"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-read-scope",
+      "ownerAgent": "reviewer-epsilon",
+      "role": "reviewer",
+      "target": {
+        "kind": "shared-read-only-ref",
+        "id": "scope-doc",
+        "path": "docs/multi-agent-production-pipeline-v1.md"
+      },
+      "mode": "shared-read-only",
+      "state": "active",
+      "workPackageRefs": [
+        "work-package-reviewer-read-scope"
+      ],
+      "evidenceRefs": [
+        {
+          "id": "ownership-evidence",
+          "path": "runs/multi-agent-pipeline/ownership/reviewer-read-scope.json",
+          "description": "generated ownership evidence path"
+        }
+      ]
+    }
+  ]
+}

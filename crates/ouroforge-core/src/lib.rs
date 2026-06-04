@@ -2883,6 +2883,244 @@ impl ProductionTaskStatus {
     }
 }
 
+pub const FILE_ARTIFACT_OWNERSHIP_POLICY_SCHEMA_VERSION: &str = "file-artifact-ownership-policy-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FileArtifactOwnershipPolicy {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    pub milestone: String,
+    pub entries: Vec<OwnershipPolicyEntry>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OwnershipPolicyEntry {
+    pub id: String,
+    #[serde(rename = "ownerAgent")]
+    pub owner_agent: String,
+    pub role: String,
+    pub target: OwnershipTargetRef,
+    pub mode: OwnershipMode,
+    pub state: OwnershipState,
+    #[serde(
+        rename = "workPackageRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub work_package_refs: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escalation: Option<OwnershipEscalation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OwnershipTargetRef {
+    pub kind: OwnershipTargetKind,
+    pub id: String,
+    pub path: String,
+    #[serde(rename = "generatedRoot", default)]
+    pub generated_root: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum OwnershipTargetKind {
+    FilePath,
+    Artifact,
+    GeneratedOutputRoot,
+    SharedReadOnlyRef,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum OwnershipMode {
+    SharedReadOnly,
+    ExclusiveWrite,
+    GeneratedWrite,
+    EscalationHold,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum OwnershipState {
+    Proposed,
+    Active,
+    Blocked,
+    Deferred,
+    Escalated,
+    Released,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OwnershipEscalation {
+    pub reason: String,
+    #[serde(rename = "requiredDecision")]
+    pub required_decision: String,
+    #[serde(rename = "safeNextAction")]
+    pub safe_next_action: String,
+}
+
+impl FileArtifactOwnershipPolicy {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let policy: FileArtifactOwnershipPolicy = serde_json::from_str(input)
+            .context("failed to parse File/Artifact Ownership Policy JSON")?;
+        policy.validate_schema()?;
+        Ok(policy)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != FILE_ARTIFACT_OWNERSHIP_POLICY_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "file/artifact ownership policy schemaVersion must be {FILE_ARTIFACT_OWNERSHIP_POLICY_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("file/artifact ownership policy policyId", &self.policy_id)?;
+        require_text("file/artifact ownership policy milestone", &self.milestone)?;
+        if self.entries.is_empty() {
+            return Err(anyhow!(
+                "file/artifact ownership policy entries must not be empty"
+            ));
+        }
+        for (index, entry) in self.entries.iter().enumerate() {
+            entry.validate_schema(index)?;
+        }
+        self.generated_state.validate()?;
+        validate_nonempty_text_list(
+            "file/artifact ownership policy guardrails",
+            &self.guardrails,
+        )?;
+        validate_nonempty_text_list(
+            "file/artifact ownership policy forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("file/artifact ownership policy boundary", &self.boundary)?;
+        let forbidden_text = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for required_forbidden in [
+            "silent overwrite",
+            "auto-apply",
+            "hidden background agents",
+            "browser command bridge",
+        ] {
+            if !forbidden_text.contains(required_forbidden) {
+                return Err(anyhow!(
+                    "file/artifact ownership policy forbiddenActions must include {required_forbidden} boundary"
+                ));
+            }
+        }
+        if !self
+            .boundary
+            .to_ascii_lowercase()
+            .contains("does not lock files")
+        {
+            return Err(anyhow!(
+                "file/artifact ownership policy boundary must state that the policy does not lock files"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl OwnershipPolicyEntry {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        validate_path_component(&format!("ownership policy entries[{index}].id"), &self.id)?;
+        validate_path_component(
+            &format!("ownership policy entries[{index}].ownerAgent"),
+            &self.owner_agent,
+        )?;
+        validate_path_component(
+            &format!("ownership policy entries[{index}].role"),
+            &self.role,
+        )?;
+        if !SUPPORTED_AGENT_ROLES.contains(&self.role.as_str()) {
+            return Err(anyhow!(
+                "ownership policy entries[{index}].role '{}' is unsupported",
+                self.role
+            ));
+        }
+        self.target
+            .validate_schema(&format!("ownership policy entries[{index}].target"))?;
+        validate_nonempty_text_list(
+            &format!("ownership policy entries[{index}].workPackageRefs"),
+            &self.work_package_refs,
+        )?;
+        for evidence in &self.evidence_refs {
+            evidence.validate(&format!("ownership policy entries[{index}].evidenceRefs"))?;
+        }
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "ownership policy entries[{index}].evidenceRefs must not be empty"
+            ));
+        }
+        if matches!(
+            self.state,
+            OwnershipState::Blocked | OwnershipState::Escalated
+        ) && self.blocked_reasons.is_empty()
+        {
+            return Err(anyhow!(
+                "ownership policy entries[{index}] blocked or escalated state requires blockedReasons"
+            ));
+        }
+        if self.mode == OwnershipMode::EscalationHold && self.escalation.is_none() {
+            return Err(anyhow!(
+                "ownership policy entries[{index}] escalation-hold mode requires escalation"
+            ));
+        }
+        if let Some(escalation) = &self.escalation {
+            escalation.validate_schema(index)?;
+        }
+        Ok(())
+    }
+}
+
+impl OwnershipTargetRef {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.id"), &self.id)?;
+        validate_project_manifest_path(&format!("{field}.path"), &self.path)?;
+        if self.kind == OwnershipTargetKind::GeneratedOutputRoot && !self.generated_root {
+            return Err(anyhow!(
+                "{field}.generatedRoot must be true for generated-output-root targets"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl OwnershipEscalation {
+    fn validate_schema(&self, index: usize) -> Result<()> {
+        require_text(
+            &format!("ownership policy entries[{index}].escalation.reason"),
+            &self.reason,
+        )?;
+        require_text(
+            &format!("ownership policy entries[{index}].escalation.requiredDecision"),
+            &self.required_decision,
+        )?;
+        require_text(
+            &format!("ownership policy entries[{index}].escalation.safeNextAction"),
+            &self.safe_next_action,
+        )
+    }
+}
+
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -39313,6 +39551,58 @@ scenarios:
             .iter()
             .any(|action| action == "remote worker pool"));
         assert!(model.generated_state.tracked_fixture_only);
+    }
+
+    #[test]
+    fn ownership_policy_v1_accepts_fixture_scoped_policy_states() {
+        for fixture in [
+            "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+            "examples/multi-agent-pipeline-v1/ownership-policy.shared-read.fixture.json",
+            "examples/multi-agent-pipeline-v1/ownership-policy.exclusive-write.fixture.json",
+            "examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json",
+            "examples/multi-agent-pipeline-v1/ownership-policy.escalation.fixture.json",
+        ] {
+            let body = read_json_fixture(fixture);
+            let policy = FileArtifactOwnershipPolicy::from_json_str(&body)
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(
+                policy.schema_version,
+                FILE_ARTIFACT_OWNERSHIP_POLICY_SCHEMA_VERSION
+            );
+            assert!(policy.generated_state.tracked_fixture_only);
+            assert!(policy
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(policy.boundary.contains("does not lock files"));
+            assert!(policy
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "silent overwrite"));
+            assert!(policy
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(policy
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "browser command bridge"));
+        }
+    }
+
+    #[test]
+    fn ownership_policy_v1_rejects_malformed_fixture() {
+        let malformed = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.malformed.fixture.json",
+        );
+        let error = FileArtifactOwnershipPolicy::from_json_str(&malformed)
+            .expect_err("missing evidence refs reject malformed ownership policy");
+        let error_text = format!("{error:#}");
+        assert!(
+            error_text.contains("evidenceRefs"),
+            "unexpected malformed ownership policy error: {error_text}"
+        );
     }
 
     #[test]

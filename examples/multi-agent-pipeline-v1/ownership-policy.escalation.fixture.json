@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "file-artifact-ownership-policy-v1",
+  "policyId": "ownership-policy-escalation",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data/multi-agent-pipeline",
+      "target"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Ownership policy is evidence metadata only, not hidden file locking",
+    "Agent outputs remain untrusted until Rust/local validation and review-gated apply or promotion",
+    "Conflicts block or escalate instead of silently overwriting files",
+    "#1 and #23 remain open governance anchors"
+  ],
+  "forbiddenActions": [
+    "silent overwrite",
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser file writes",
+    "remote worker pool",
+    "release automation"
+  ],
+  "boundary": "Fixture-scoped ownership policy only; it does not lock files, spawn agents, execute commands, apply changes, merge PRs, write trusted browser state, or mutate source files.",
+  "entries": [
+    {
+      "id": "source-like-escalation",
+      "ownerAgent": "critic-delta",
+      "role": "critic",
+      "target": {
+        "kind": "file-path",
+        "id": "source-like-target",
+        "path": "crates/ouroforge-core/src/lib.rs"
+      },
+      "mode": "escalation-hold",
+      "state": "escalated",
+      "workPackageRefs": [
+        "work-package-source-like-escalation"
+      ],
+      "evidenceRefs": [
+        {
+          "id": "ownership-evidence",
+          "path": "runs/multi-agent-pipeline/ownership/source-like-escalation.json",
+          "description": "generated ownership evidence path"
+        }
+      ],
+      "blockedReasons": [
+        "Source-like target requires explicit review escalation before any future ownership acceptance"
+      ],
+      "escalation": {
+        "reason": "Source-like Rust target requires trusted review before ownership can be accepted",
+        "requiredDecision": "independent reviewer and critic approval",
+        "safeNextAction": "defer work package until #668 conflict detection and review gates validate the target"
+      }
+    }
+  ]
+}
