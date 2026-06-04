@@ -57013,7 +57013,8 @@ scenarios:
         assert_eq!(summary["layers"][0]["id"], json!("sky"));
 
         // Top-level layers are also surfaced when neither renderer nor camera carry them.
-        let top_level = json!({ "layers": [{ "id": "ground", "order": 0, "parallaxFactor": 100 }] });
+        let top_level =
+            json!({ "layers": [{ "id": "ground", "order": 0, "parallaxFactor": 100 }] });
         assert_eq!(dashboard_camera_summary(&top_level)["layerCount"], json!(1));
 
         // renderer.layers still takes precedence (no regression).
