@@ -1141,6 +1141,7 @@
   }
 
   function runtimeState(slotId = 'slot-1') {
+    const stateLabel = safeEvidenceStem(slotId, 'runtime state id');
     const scopedEntities = world.entities.map((entity) => ({
       entityId: entity.id,
       transform: clone(entity.components && entity.components.transform ? entity.components.transform : {}),
@@ -1149,7 +1150,7 @@
     }));
     const state = {
       schemaVersion: 'runtime-state-v1',
-      stateId: `${String(slotId)}-tick-${world.tick}`,
+      stateId: `${stateLabel}-tick-${world.tick}`,
       runId: world.runId || 'browser-runtime-local',
       sceneId: world.sceneId,
       tick: world.tick,
@@ -1179,16 +1180,16 @@
     return state;
   }
 
-  function safeSaveSlotId(slotId = 'slot-1') {
-    const safeSlotId = String(slotId || 'slot-1');
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(safeSlotId) || safeSlotId.includes('..')) {
-      throw new Error('runtime save slotId must be a path-safe generated evidence file stem');
+  function safeEvidenceStem(value = 'slot-1', label = 'runtime evidence id') {
+    const stem = String(value || 'slot-1');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(stem) || stem.includes('..')) {
+      throw new Error(`${label} must be a path-safe generated evidence file stem`);
     }
-    return safeSlotId;
+    return stem;
   }
 
   function createSave(slotId = 'slot-1') {
-    const safeSlotId = safeSaveSlotId(slotId);
+    const safeSlotId = safeEvidenceStem(slotId, 'runtime save slotId');
     const state = runtimeState(safeSlotId);
     const save = {
       schemaVersion: 'runtime-save-artifact-v1',
@@ -1237,7 +1238,7 @@
   }
 
   function loadSave(saveOrSlotId) {
-    const save = typeof saveOrSlotId === 'string' ? saveSlots.get(safeSaveSlotId(saveOrSlotId)) : saveOrSlotId;
+    const save = typeof saveOrSlotId === 'string' ? saveSlots.get(safeEvidenceStem(saveOrSlotId, 'runtime save slotId')) : saveOrSlotId;
     if (!save || typeof save !== 'object' || save.schemaVersion !== 'runtime-save-artifact-v1') {
       throw new Error('runtime save artifact schemaVersion must be runtime-save-artifact-v1');
     }
@@ -1245,6 +1246,55 @@
     record('runtime.save.loaded', { saveId: save.saveId, slotId: save.slotId, stateDigest: save.state && save.state.digest });
     renderDebug();
     return api.getWorldState();
+  }
+
+
+  function replayStateDigest(frameId = `tick-${world.tick}`) {
+    const safeFrameId = safeEvidenceStem(frameId, 'runtime replay frameId');
+    const state = runtimeState(safeFrameId);
+    return {
+      schemaVersion: 'runtime-replay-digest-v1',
+      frameId: safeFrameId,
+      sceneId: state.sceneId,
+      tick: state.tick,
+      stateId: state.stateId,
+      digest: clone(state.digest),
+      policy: {
+        artifactPath: `evidence/runtime-state/replay/${safeFrameId}.digest.json`,
+        rootKind: 'generated_evidence',
+        trustedWriter: 'rust-local-scenario-runner-v1',
+        browserWriteAccess: 'none',
+        retention: 'generated replay evidence; untracked unless fixture-scoped',
+      },
+    };
+  }
+
+  function compareReplayDigest(expectedDigest, frameId = `tick-${world.tick}`) {
+    const expected = expectedDigest && expectedDigest.digest ? expectedDigest.digest : expectedDigest;
+    if (!expected || typeof expected !== 'object' || expected.algorithm !== 'fnv1a64-canonical-json-v1' || !/^[0-9a-f]{16}$/.test(String(expected.value || ''))) {
+      throw new Error('runtime replay expected digest must use fnv1a64-canonical-json-v1 with a 16 character hex value');
+    }
+    const actual = replayStateDigest(frameId);
+    const diverged = actual.digest.value !== expected.value;
+    const evidence = {
+      schemaVersion: 'runtime-replay-divergence-v1',
+      status: diverged ? 'diverged' : 'matched',
+      frameId: actual.frameId,
+      sceneId: actual.sceneId,
+      tick: actual.tick,
+      expected: clone(expected),
+      actual: clone(actual.digest),
+      firstDivergence: diverged ? { frameId: actual.frameId, tick: actual.tick, reason: 'state digest mismatch' } : null,
+      policy: {
+        artifactPath: `evidence/runtime-state/replay/${actual.frameId}.divergence.json`,
+        rootKind: 'generated_evidence',
+        trustedWriter: 'rust-local-scenario-runner-v1',
+        browserWriteAccess: 'none',
+        retention: 'generated replay evidence; untracked unless fixture-scoped',
+      },
+    };
+    record('runtime.replay.digest_compared', { frameId: actual.frameId, status: evidence.status, expected, actual: actual.digest });
+    return evidence;
   }
 
 
@@ -1369,6 +1419,8 @@
     runtimeState,
     createSave,
     loadSave,
+    replayStateDigest,
+    compareReplayDigest,
     loadScene,
     reload,
     transition,

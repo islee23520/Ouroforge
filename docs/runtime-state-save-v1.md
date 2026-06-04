@@ -1,6 +1,6 @@
 # Runtime State and Save Artifact v1
 
-This is the approved v1 contract for issue #587 P2D8.7.1. It defines the schema boundary only; runtime save/load behavior is intentionally deferred to later PR units.
+This is the approved v1 contract for issue #587. It defines the runtime state, save artifact, and deterministic replay evidence boundaries for the P2D8.7 PR units.
 
 ## Boundary
 
@@ -28,7 +28,17 @@ This is the approved v1 contract for issue #587 P2D8.7.1. It defines the schema 
 - Trusted writer: `rust-local-runtime-save-v1`.
 - Browser write access: `none`.
 
-## Deferred work
+## Replay digest and divergence evidence
 
-- P2D8.7.2 implements runtime snapshot/save/load behavior and hardens snapshot semantics.
-- P2D8.7.3 implements replay state digests, divergence evidence, scenario assertions, and read-model compatibility.
+Replay evidence compares deterministic runtime state digests at key frames without granting browser write authority:
+
+- `runtime-replay-digest-v1` captures `frameId`, `sceneId`, `tick`, `stateId`, and a `fnv1a64-canonical-json-v1` runtime state digest.
+- `runtime-replay-divergence-v1` records `matched` or `diverged` comparisons between expected and actual digests.
+- Diverged evidence must include `firstDivergence` with the frame/tick and reason.
+- Generated evidence paths:
+  - `evidence/runtime-state/replay/<frame>.digest.json`
+  - `evidence/runtime-state/replay/<frame>.divergence.json`
+- Trusted writer: `rust-local-scenario-runner-v1`.
+- Browser write access: `none`.
+
+Runtime helpers may expose digest/comparison payloads for scenario probes, but Rust/local validation owns trusted replay evidence acceptance and generated artifact writing.

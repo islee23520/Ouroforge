@@ -10031,6 +10031,8 @@ const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1
 const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
 const RUNTIME_STATE_SCHEMA_VERSION: &str = "runtime-state-v1";
 const RUNTIME_SAVE_ARTIFACT_SCHEMA_VERSION: &str = "runtime-save-artifact-v1";
+const RUNTIME_REPLAY_DIGEST_SCHEMA_VERSION: &str = "runtime-replay-digest-v1";
+const RUNTIME_REPLAY_DIVERGENCE_SCHEMA_VERSION: &str = "runtime-replay-divergence-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -10127,6 +10129,71 @@ pub enum RuntimeSaveRootKind {
 pub enum RuntimeSaveBrowserWriteAccess {
     None,
     DraftOnly,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeReplayDigestEvidenceV1 {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub tick: u64,
+    #[serde(rename = "stateId")]
+    pub state_id: String,
+    pub digest: RuntimeStateDigest,
+    pub policy: RuntimeReplayGeneratedStatePolicy,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeReplayDivergenceEvidenceV1 {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: RuntimeReplayDivergenceStatus,
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub tick: u64,
+    pub expected: RuntimeStateDigest,
+    pub actual: RuntimeStateDigest,
+    #[serde(rename = "firstDivergence", skip_serializing_if = "Option::is_none")]
+    pub first_divergence: Option<RuntimeReplayFirstDivergence>,
+    pub policy: RuntimeReplayGeneratedStatePolicy,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeReplayDivergenceStatus {
+    Matched,
+    Diverged,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeReplayFirstDivergence {
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    pub tick: u64,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeReplayGeneratedStatePolicy {
+    #[serde(rename = "artifactPath")]
+    pub artifact_path: String,
+    #[serde(rename = "rootKind")]
+    pub root_kind: RuntimeSaveRootKind,
+    #[serde(rename = "trustedWriter")]
+    pub trusted_writer: String,
+    #[serde(rename = "browserWriteAccess")]
+    pub browser_write_access: RuntimeSaveBrowserWriteAccess,
+    #[serde(rename = "retention")]
+    pub retention: String,
 }
 
 impl RuntimeStateV1 {
@@ -10265,6 +10332,128 @@ impl RuntimeSaveGeneratedStatePolicy {
     }
 }
 
+impl RuntimeReplayDigestEvidenceV1 {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: RuntimeReplayDigestEvidenceV1 =
+            serde_json::from_str(input).context("failed to parse Runtime Replay Digest JSON")?;
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_REPLAY_DIGEST_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "runtime replay digest schemaVersion must be {RUNTIME_REPLAY_DIGEST_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("runtime replay digest frameId", &self.frame_id)?;
+        validate_path_component("runtime replay digest sceneId", &self.scene_id)?;
+        validate_path_component("runtime replay digest stateId", &self.state_id)?;
+        self.digest.validate("runtime replay digest")?;
+        self.policy.validate("digest")?;
+        Ok(())
+    }
+}
+
+impl RuntimeReplayDivergenceEvidenceV1 {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: RuntimeReplayDivergenceEvidenceV1 = serde_json::from_str(input)
+            .context("failed to parse Runtime Replay Divergence JSON")?;
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_REPLAY_DIVERGENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "runtime replay divergence schemaVersion must be {RUNTIME_REPLAY_DIVERGENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("runtime replay divergence frameId", &self.frame_id)?;
+        validate_path_component("runtime replay divergence sceneId", &self.scene_id)?;
+        self.expected.validate("runtime replay expected digest")?;
+        self.actual.validate("runtime replay actual digest")?;
+        match self.status {
+            RuntimeReplayDivergenceStatus::Matched => {
+                if self.first_divergence.is_some() {
+                    return Err(anyhow!(
+                        "runtime replay matched evidence must not include firstDivergence"
+                    ));
+                }
+                if self.expected != self.actual {
+                    return Err(anyhow!(
+                        "runtime replay matched evidence requires expected and actual digests to match"
+                    ));
+                }
+            }
+            RuntimeReplayDivergenceStatus::Diverged => {
+                if self.first_divergence.is_none() {
+                    return Err(anyhow!(
+                        "runtime replay diverged evidence requires firstDivergence"
+                    ));
+                }
+                if self.expected == self.actual {
+                    return Err(anyhow!(
+                        "runtime replay diverged evidence requires expected and actual digests to differ"
+                    ));
+                }
+            }
+        }
+        if let Some(first_divergence) = &self.first_divergence {
+            first_divergence.validate()?;
+        }
+        self.policy.validate("divergence")?;
+        Ok(())
+    }
+}
+
+impl RuntimeReplayFirstDivergence {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("runtime replay firstDivergence frameId", &self.frame_id)?;
+        require_text("runtime replay firstDivergence reason", &self.reason)?;
+        Ok(())
+    }
+}
+
+impl RuntimeReplayGeneratedStatePolicy {
+    fn validate(&self, artifact_kind: &str) -> Result<()> {
+        match self.root_kind {
+            RuntimeSaveRootKind::GeneratedEvidence => {
+                validate_evidence_artifact_path(&self.artifact_path)?;
+                let expected_suffix = match artifact_kind {
+                    "digest" => ".digest.json",
+                    "divergence" => ".divergence.json",
+                    _ => ".json",
+                };
+                if !self
+                    .artifact_path
+                    .starts_with("evidence/runtime-state/replay/")
+                    || !self.artifact_path.ends_with(expected_suffix)
+                {
+                    return Err(anyhow!(
+                        "runtime replay policy artifactPath must be evidence/runtime-state/replay/<frame>{expected_suffix} for generated evidence"
+                    ));
+                }
+            }
+            RuntimeSaveRootKind::LocalGeneratedState => {
+                validate_runtime_replay_local_generated_path(&self.artifact_path)?;
+            }
+        }
+        if self.trusted_writer != "rust-local-scenario-runner-v1" {
+            return Err(anyhow!(
+                "runtime replay policy trustedWriter must be rust-local-scenario-runner-v1"
+            ));
+        }
+        if self.browser_write_access != RuntimeSaveBrowserWriteAccess::None {
+            return Err(anyhow!(
+                "runtime replay policy browserWriteAccess must be none for trusted replay artifacts"
+            ));
+        }
+        require_text("runtime replay policy retention", &self.retention)?;
+        Ok(())
+    }
+}
+
 fn validate_runtime_save_local_generated_path(path: &str) -> Result<()> {
     require_text("runtime save policy artifactPath", path)?;
     if !(path.starts_with("runs/") || path.starts_with(".omx/")) {
@@ -10296,6 +10485,42 @@ fn validate_runtime_save_local_generated_path(path: &str) -> Result<()> {
     if !path.ends_with(".save.json") {
         return Err(anyhow!(
             "runtime save policy local generated artifactPath must end with .save.json"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_runtime_replay_local_generated_path(path: &str) -> Result<()> {
+    require_text("runtime replay policy artifactPath", path)?;
+    if !(path.starts_with("runs/") || path.starts_with(".omx/")) {
+        return Err(anyhow!(
+            "runtime replay policy local generated artifactPath must start with runs/ or .omx/"
+        ));
+    }
+    if path.contains('\\') {
+        return Err(anyhow!(
+            "runtime replay policy local generated artifactPath must not contain backslash separators"
+        ));
+    }
+    let candidate = Path::new(path);
+    if candidate.is_absolute() {
+        return Err(anyhow!(
+            "runtime replay policy local generated artifactPath must be relative"
+        ));
+    }
+    for component in candidate.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "runtime replay policy local generated artifactPath must stay inside its generated root"
+                ));
+            }
+        }
+    }
+    if !(path.ends_with(".digest.json") || path.ends_with(".divergence.json")) {
+        return Err(anyhow!(
+            "runtime replay policy local generated artifactPath must end with .digest.json or .divergence.json"
         ));
     }
     Ok(())
@@ -46552,6 +46777,129 @@ scenarios:
         )
         .expect_err("unsupported digest algorithm rejected");
         assert!(bad_digest.to_string().contains("digest algorithm"));
+    }
+
+    #[test]
+    fn runtime_replay_digest_and_divergence_evidence_validate_policy_boundaries() {
+        let digest = RuntimeReplayDigestEvidenceV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-replay-digest-v1",
+                "frameId": "frame-2",
+                "sceneId": "action-map-v1-fixture",
+                "tick": 2,
+                "stateId": "frame-2-tick-2",
+                "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "policy": {
+                    "artifactPath": "evidence/runtime-state/replay/frame-2.digest.json",
+                    "rootKind": "generated_evidence",
+                    "trustedWriter": "rust-local-scenario-runner-v1",
+                    "browserWriteAccess": "none",
+                    "retention": "generated replay evidence; untracked unless fixture-scoped"
+                }
+            })
+            .to_string(),
+        )
+        .expect("runtime replay digest validates");
+        assert_eq!(digest.frame_id, "frame-2");
+
+        let matched = RuntimeReplayDivergenceEvidenceV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-replay-divergence-v1",
+                "status": "matched",
+                "frameId": "frame-2",
+                "sceneId": "action-map-v1-fixture",
+                "tick": 2,
+                "expected": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "actual": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "policy": {
+                    "artifactPath": "evidence/runtime-state/replay/frame-2.divergence.json",
+                    "rootKind": "generated_evidence",
+                    "trustedWriter": "rust-local-scenario-runner-v1",
+                    "browserWriteAccess": "none",
+                    "retention": "generated replay evidence; untracked unless fixture-scoped"
+                }
+            })
+            .to_string(),
+        )
+        .expect("matched replay divergence evidence validates");
+        assert_eq!(matched.status, RuntimeReplayDivergenceStatus::Matched);
+
+        let diverged = RuntimeReplayDivergenceEvidenceV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-replay-divergence-v1",
+                "status": "diverged",
+                "frameId": "frame-3",
+                "sceneId": "action-map-v1-fixture",
+                "tick": 3,
+                "expected": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "actual": { "algorithm": "fnv1a64-canonical-json-v1", "value": "fedcba9876543210" },
+                "firstDivergence": { "frameId": "frame-3", "tick": 3, "reason": "state digest mismatch" },
+                "policy": {
+                    "artifactPath": "evidence/runtime-state/replay/frame-3.divergence.json",
+                    "rootKind": "generated_evidence",
+                    "trustedWriter": "rust-local-scenario-runner-v1",
+                    "browserWriteAccess": "none",
+                    "retention": "generated replay evidence; untracked unless fixture-scoped"
+                }
+            })
+            .to_string(),
+        )
+        .expect("diverged replay evidence validates");
+        assert_eq!(diverged.status, RuntimeReplayDivergenceStatus::Diverged);
+    }
+
+    #[test]
+    fn runtime_replay_evidence_rejects_silent_or_unsafe_divergence() {
+        let missing_first_divergence = RuntimeReplayDivergenceEvidenceV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-replay-divergence-v1",
+                "status": "diverged",
+                "frameId": "frame-3",
+                "sceneId": "action-map-v1-fixture",
+                "tick": 3,
+                "expected": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "actual": { "algorithm": "fnv1a64-canonical-json-v1", "value": "fedcba9876543210" },
+                "policy": {
+                    "artifactPath": "evidence/runtime-state/replay/frame-3.divergence.json",
+                    "rootKind": "generated_evidence",
+                    "trustedWriter": "rust-local-scenario-runner-v1",
+                    "browserWriteAccess": "none",
+                    "retention": "generated replay evidence; untracked unless fixture-scoped"
+                }
+            })
+            .to_string(),
+        )
+        .expect_err("diverged replay evidence requires firstDivergence");
+        assert!(missing_first_divergence
+            .to_string()
+            .contains("firstDivergence"));
+
+        let unsafe_policy = RuntimeReplayDigestEvidenceV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-replay-digest-v1",
+                "frameId": "frame-2",
+                "sceneId": "action-map-v1-fixture",
+                "tick": 2,
+                "stateId": "frame-2-tick-2",
+                "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" },
+                "policy": {
+                    "artifactPath": "examples/runtime-state-save-v1/generated/frame-2.digest.json",
+                    "rootKind": "generated_evidence",
+                    "trustedWriter": "browser-runtime-v1",
+                    "browserWriteAccess": "draft_only",
+                    "retention": "generated replay evidence"
+                }
+            })
+            .to_string(),
+        )
+        .expect_err("source-like replay path and browser writer rejected");
+        assert!(
+            unsafe_policy.to_string().contains("artifactPath")
+                || unsafe_policy.to_string().contains("evidence artifact path")
+                || unsafe_policy.to_string().contains("trustedWriter")
+                || unsafe_policy.to_string().contains("browserWriteAccess"),
+            "unexpected error: {unsafe_policy:#}"
+        );
     }
 
     #[test]
