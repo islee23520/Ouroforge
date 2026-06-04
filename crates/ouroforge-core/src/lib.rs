@@ -40544,6 +40544,150 @@ scenarios:
         assert!(unsupported_field.to_string().contains("failed to parse"));
     }
 
+    #[test]
+    fn scenario_coverage_v12_task_board_status_transitions_are_state_machine_only() {
+        let input = fs::read_to_string(repo_fixture_path(
+            "examples/authoring-loop-plan-fixtures/valid/pending.json",
+        ))
+        .expect("pending task board fixture reads");
+        let plan = AuthoringLoopPlan::from_json_str(&input).expect("pending task board validates");
+
+        let (running, update) = plan
+            .update_step_status("run-baseline", AuthoringLoopStepStatus::Running)
+            .expect("pending task can move to running");
+
+        assert_eq!(update.loop_id, "fixture-loop-pending");
+        assert_eq!(update.step_id, "run-baseline");
+        assert_eq!(update.from, "pending");
+        assert_eq!(update.to, "running");
+        assert!(update.boundary.contains("does not execute commands"));
+        assert!(update.boundary.contains("write plan files"));
+        assert_eq!(running.steps[0].status, AuthoringLoopStepStatus::Running);
+        assert_eq!(
+            running.steps[0]
+                .status_transition
+                .as_ref()
+                .expect("transition recorded")
+                .from,
+            AuthoringLoopStepStatus::Pending
+        );
+
+        let invalid_transition = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/invalid-status-transition.json"
+        ))
+        .expect_err("pending cannot jump straight to completed");
+        assert!(invalid_transition
+            .to_string()
+            .contains("invalid status transition"));
+
+        let illegal_retry = running
+            .update_step_status("run-baseline", AuthoringLoopStepStatus::Pending)
+            .expect_err("running cannot silently return to pending without blocked/failed state");
+        assert!(illegal_retry.to_string().contains("cannot transition"));
+    }
+
+    #[test]
+    fn scenario_coverage_v12_work_packages_and_ownership_block_conflicts() {
+        let input = fs::read_to_string(repo_fixture_path(
+            "examples/authoring-loop-plan-fixtures/valid/completed.json",
+        ))
+        .expect("completed work package fixture reads");
+        let plan =
+            AuthoringLoopPlan::from_json_str(&input).expect("completed work packages validate");
+
+        assert_eq!(plan.steps.len(), 8);
+        assert!(plan
+            .steps
+            .iter()
+            .all(|step| !step.expected_artifacts.is_empty()
+                || step.kind == AuthoringLoopStepKind::RecordReviewDecision));
+        let apply = plan
+            .steps
+            .iter()
+            .find(|step| step.kind == AuthoringLoopStepKind::ApplyAcceptedSceneMutation)
+            .expect("apply work package exists");
+        assert!(
+            !apply.rollback_refs.is_empty(),
+            "trusted mutation work packages keep rollback ownership evidence"
+        );
+        assert!(
+            !apply.required_decisions.is_empty(),
+            "apply work packages require accepted review evidence"
+        );
+
+        let mut duplicate_artifact =
+            serde_json::from_str::<serde_json::Value>(&input).expect("fixture parses as value");
+        duplicate_artifact["steps"][1]["expectedArtifacts"][0]["id"] = json!("baseline-run");
+        let duplicate_error = AuthoringLoopPlan::from_json_str(&duplicate_artifact.to_string())
+            .expect_err("two work packages cannot own the same artifact id");
+        assert!(duplicate_error
+            .to_string()
+            .contains("duplicate authoring loop plan artifact id"));
+
+        let duplicate_step = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/duplicate-step-id.json"
+        ))
+        .expect_err("task board rejects duplicate ownership by step id");
+        assert!(duplicate_step
+            .to_string()
+            .contains("duplicate authoring loop plan step id"));
+
+        let incomplete_producer = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/invalid/incomplete-input-producer.json"
+        ))
+        .expect_err("completed consumer cannot depend on failed producer output");
+        assert!(incomplete_producer
+            .to_string()
+            .contains("input baseline-run is not produced by a completed step"));
+    }
+
+    #[test]
+    fn scenario_coverage_v12_snapshots_and_staleness_are_read_only_status_evidence() {
+        let root = unique_temp_dir("scenario-coverage-v12-stale-snapshot");
+        write_loop_dry_run_project(&root);
+        let plan_path = write_loop_dry_run_plan(&root, "stale_project_id");
+        let plan = read_loop_plan_from_path(&plan_path);
+
+        let status = build_authoring_loop_status(&plan, &root).expect("status read model builds");
+        assert_eq!(status.schema_version, AUTHORING_LOOP_STATUS_SCHEMA_VERSION);
+        assert_eq!(status.status, "in-progress");
+        assert!(status.boundary.contains("read-only inspection"));
+        assert!(status.boundary.contains("does not execute"));
+        assert!(status.steps.iter().any(|step| {
+            step.missing_prerequisites
+                .iter()
+                .any(|missing| missing.contains("stale project context"))
+        }));
+        assert!(status
+            .next_safe_action
+            .contains("Resolve missing prerequisites"));
+
+        let dry_run =
+            build_authoring_loop_dry_run_summary_with_base(&plan, &root).expect("dry-run builds");
+        assert_eq!(dry_run.status, "blocked");
+        assert!(dry_run.boundary.contains("does not execute"));
+        assert!(dry_run
+            .missing_prerequisites
+            .iter()
+            .any(|missing| missing.contains("stale project context")));
+
+        let bundle = build_authoring_loop_evidence_bundle(&plan, &root, &plan_path)
+            .expect("bundle snapshot read model builds despite stale prereq");
+        assert_eq!(
+            bundle.schema_version,
+            AUTHORING_LOOP_EVIDENCE_BUNDLE_SCHEMA_VERSION
+        );
+        assert!(bundle
+            .boundary
+            .contains("does not move artifacts, mutate source state"));
+        assert!(
+            bundle.generated_state.tracked_fixture_only,
+            "generated task-board snapshots stay fixture-scoped"
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
+
     fn loop_evidence_bundle_value(status: &str, missing_refs: Vec<&str>) -> serde_json::Value {
         json!({
             "schemaVersion": "authoring-loop-evidence-bundle-v1",
