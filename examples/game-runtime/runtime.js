@@ -116,6 +116,7 @@
     sceneTransitions: [],
     transitionEvents: [],
     audioEvents: [],
+    vfxEvents: [],
     reloads: [],
     tilemaps: [],
     cameras: [],
@@ -300,6 +301,24 @@
     };
   }
 
+  function vfxComponent(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    const emitters = Array.isArray(source.emitters) ? source.emitters : [];
+    return {
+      emitters: emitters.slice(0, 16).map((emitter, index) => ({
+        id: typeof emitter.id === 'string' && emitter.id ? emitter.id : `emitter-${index}`,
+        kind: ['burst', 'trail', 'spark'].includes(emitter.kind) ? emitter.kind : 'burst',
+        trigger: ['tick', 'animation_state', 'manual'].includes(emitter.trigger) ? emitter.trigger : 'tick',
+        disabled: emitter.disabled === true,
+        particleCount: Number.isFinite(emitter.particleCount) ? Math.max(1, Math.min(64, Math.floor(emitter.particleCount))) : 1,
+        lifetimeFrames: Number.isFinite(emitter.lifetimeFrames) ? Math.max(1, Math.min(120, Math.floor(emitter.lifetimeFrames))) : 1,
+        color: typeof emitter.color === 'string' ? emitter.color : '#f8fafc',
+        asset: typeof emitter.asset === 'string' ? emitter.asset : null,
+        layer: typeof emitter.layer === 'string' ? emitter.layer : null,
+      })),
+    };
+  }
+
   function normalizeEntity(entity = {}, index = 0, componentDefaults = {}) {
     const components = entity.components || {};
     const sprite = entity.sprite || {};
@@ -335,6 +354,7 @@
     if (components.cameraTarget) normalized.components.cameraTarget = cameraTargetComponent(components.cameraTarget);
     if (components.uiText) normalized.components.uiText = uiTextComponent(components.uiText);
     if (components.hudValue) normalized.components.hudValue = hudValueComponent(components.hudValue);
+    if (components.vfx && Array.isArray(components.vfx.emitters)) normalized.components.vfx = vfxComponent(components.vfx);
     if (components.audio && Array.isArray(components.audio.events)) {
       normalized.components.audio = {
         events: components.audio.events
@@ -814,6 +834,38 @@
     }
   }
 
+
+  function emitVfxEvents(trigger = 'tick') {
+    for (const entity of world.entities) {
+      const vfx = entity.components && entity.components.vfx;
+      if (!vfx || !Array.isArray(vfx.emitters)) continue;
+      for (const emitter of vfx.emitters) {
+        if (emitter.disabled || emitter.trigger !== trigger) continue;
+        const transform = entity.components && entity.components.transform ? entity.components.transform : { x: 0, y: 0 };
+        const event = {
+          schemaVersion: 'runtime-vfx-event-v1',
+          sceneId: world.sceneId,
+          entityId: entity.id,
+          emitterId: emitter.id,
+          kind: emitter.kind,
+          trigger: emitter.trigger,
+          tick: world.tick,
+          particleCount: emitter.particleCount,
+          lifetimeFrames: emitter.lifetimeFrames,
+          expiresAtTick: world.tick + emitter.lifetimeFrames,
+          color: emitter.color,
+          asset: emitter.asset,
+          layer: emitter.layer || (entity.sprite && entity.sprite.layer) || 'default',
+          origin: { x: transform.x, y: transform.y },
+          readOnlyEvidence: true,
+        };
+        world.vfxEvents.push(event);
+        if (world.vfxEvents.length > 64) world.vfxEvents.shift();
+        record('runtime.vfx.emitted', event);
+      }
+    }
+  }
+
   function animationState(entity) {
     const animationComponent = entity && entity.components && entity.components.animation;
     const state = animationComponent && animationComponent.state;
@@ -888,6 +940,7 @@
     }
     refreshGroundedState(world.collisions);
     processTriggerEvents(world.collisions);
+    emitVfxEvents('tick');
     updateCameraState();
   }
 
@@ -953,6 +1006,7 @@
     world.collisions = [];
     world.collisionEvents = [];
     world.audioEvents = [];
+    world.vfxEvents = [];
     world.tick = 0;
     const assetMetadata = assets.load(world, world.assetManifest);
     record('runtime.scene.loaded', {
@@ -1314,7 +1368,7 @@
   }
 
   function componentModelDebugState(entities) {
-    const names = ['status', 'input', 'trigger', 'goalFlag', 'cameraTarget', 'uiText', 'hudValue'];
+    const names = ['status', 'input', 'trigger', 'goalFlag', 'cameraTarget', 'uiText', 'hudValue', 'vfx'];
     const counts = Object.fromEntries(names.map((name) => [name, 0]));
     const hudValues = [];
     const entityComponents = entities.map((entity) => {
