@@ -32292,6 +32292,12 @@ pub struct SceneDocument {
     #[serde(rename = "schemaVersion")]
     #[serde(default = "scene_schema_v1")]
     pub schema_version: String,
+    #[serde(
+        default = "scene_kind_2d",
+        rename = "sceneKind",
+        skip_serializing_if = "is_scene_kind_2d"
+    )]
+    pub scene_kind: String,
     pub id: String,
     pub bounds: SceneBounds,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -32336,7 +32342,10 @@ pub struct SceneDocument {
         skip_serializing_if = "Option::is_none"
     )]
     pub component_defaults: Option<SceneComponentDefaults>,
+    #[serde(default)]
     pub entities: Vec<SceneEntity>,
+    #[serde(default, rename = "scene3d", skip_serializing_if = "Option::is_none")]
+    pub scene_3d: Option<Scene3dGraph>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -32373,6 +32382,58 @@ pub struct SceneReloadAssetManifestReport {
 pub struct SceneBounds {
     pub width: i64,
     pub height: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dGraph {
+    #[serde(default = "scene_3d_graph_v1")]
+    pub version: String,
+    pub nodes: Vec<Scene3dNode>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dNode {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(rename = "localTransform")]
+    pub local_transform: Scene3dTransform,
+    #[serde(
+        default,
+        rename = "worldTransform",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub world_transform: Option<Scene3dTransform>,
+    #[serde(default, rename = "meshRef", skip_serializing_if = "Option::is_none")]
+    pub mesh_ref: Option<String>,
+    #[serde(
+        default,
+        rename = "colliderRef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub collider_ref: Option<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dTransform {
+    pub translation: Scene3dVector,
+    pub rotation: Scene3dVector,
+    pub scale: Scene3dVector,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dVector {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -32788,6 +32849,7 @@ pub struct SceneComponents {
     pub transform: ScenePoint,
     pub velocity: ScenePoint,
     pub size: SceneSize,
+    #[serde(default)]
     pub controllable: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collider: Option<SceneCollider>,
@@ -35410,6 +35472,18 @@ fn scene_schema_v1() -> String {
     "1".to_string()
 }
 
+fn scene_kind_2d() -> String {
+    "2d".to_string()
+}
+
+fn is_scene_kind_2d(value: &str) -> bool {
+    value == scene_kind_2d()
+}
+
+fn scene_3d_graph_v1() -> String {
+    "1".to_string()
+}
+
 fn scene_renderer_v1() -> String {
     "1".to_string()
 }
@@ -35566,6 +35640,10 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     if scene.schema_version != "1" {
         return Err(anyhow!("scene schemaVersion must be 1 for scene schema v1"));
     }
+    match scene.scene_kind.as_str() {
+        "2d" | "3d" => {}
+        other => return Err(anyhow!("scene sceneKind must be 2d or 3d, got {other}")),
+    }
     validate_path_component("scene id", &scene.id)?;
     if scene.bounds.width <= 0 || scene.bounds.height <= 0 {
         return Err(anyhow!("scene bounds must be positive"));
@@ -35583,9 +35661,13 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
     validate_scene_transitions(&scene.scene_transitions)?;
     validate_scene_tilemaps(&scene.tilemaps, scene.asset_manifest.as_ref())?;
     validate_scene_metadata("scene metadata", &scene.metadata)?;
-    if scene.entities.is_empty() {
-        return Err(anyhow!("scene entities must not be empty"));
+    if scene.scene_kind == "2d" && scene.entities.is_empty() {
+        return Err(anyhow!("scene entities must not be empty for 2d scenes"));
     }
+    if scene.scene_kind == "3d" && scene.scene_3d.is_none() {
+        return Err(anyhow!("sceneKind 3d requires scene3d graph"));
+    }
+    validate_scene_3d(scene)?;
     if let Some(defaults) = &scene.component_defaults {
         validate_scene_component_defaults(defaults, gameplay_flags.as_ref())?;
     }
@@ -35671,6 +35753,72 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         )?;
     }
     validate_scene_cameras(scene)?;
+    Ok(())
+}
+
+fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
+    let Some(graph) = &scene.scene_3d else {
+        return Ok(());
+    };
+    if graph.version != "1" {
+        return Err(anyhow!("scene3d version must be 1"));
+    }
+    if scene.scene_kind != "3d" {
+        return Err(anyhow!("scene3d graph requires sceneKind 3d"));
+    }
+    if graph.nodes.is_empty() {
+        return Err(anyhow!("scene3d nodes must not be empty"));
+    }
+    validate_scene_metadata("scene3d metadata", &graph.metadata)?;
+    for node in &graph.nodes {
+        validate_path_component("scene3d node id", &node.id)?;
+        if let Some(parent) = &node.parent {
+            validate_path_component(&format!("scene3d node {} parent", node.id), parent)?;
+        }
+        validate_scene_3d_transform(
+            &format!("scene3d node {} localTransform", node.id),
+            &node.local_transform,
+        )?;
+        if let Some(world_transform) = &node.world_transform {
+            validate_scene_3d_transform(
+                &format!("scene3d node {} worldTransform", node.id),
+                world_transform,
+            )?;
+        }
+        if let Some(mesh_ref) = &node.mesh_ref {
+            validate_path_component(&format!("scene3d node {} meshRef", node.id), mesh_ref)?;
+        }
+        if let Some(collider_ref) = &node.collider_ref {
+            validate_path_component(
+                &format!("scene3d node {} colliderRef", node.id),
+                collider_ref,
+            )?;
+        }
+        validate_scene_metadata(
+            &format!("scene3d node {} metadata", node.id),
+            &node.metadata,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_transform(field: &str, transform: &Scene3dTransform) -> Result<()> {
+    validate_scene_3d_vector(&format!("{field} translation"), &transform.translation)?;
+    validate_scene_3d_vector(&format!("{field} rotation"), &transform.rotation)?;
+    validate_scene_3d_vector(&format!("{field} scale"), &transform.scale)?;
+    if transform.scale.x == 0 || transform.scale.y == 0 || transform.scale.z == 0 {
+        return Err(anyhow!("{field} scale axes must be non-zero"));
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_vector(field: &str, vector: &Scene3dVector) -> Result<()> {
+    const MAX_3D_COMPONENT_ABS: i64 = 1_000_000_000;
+    for (axis, value) in [("x", vector.x), ("y", vector.y), ("z", vector.z)] {
+        if value.abs() > MAX_3D_COMPONENT_ABS {
+            return Err(anyhow!("{field}.{axis} exceeds bounded 3d range"));
+        }
+    }
     Ok(())
 }
 
@@ -62001,6 +62149,89 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("componentDefaults size must be positive"));
+    }
+
+    #[test]
+    fn scene_3d_schema_v1_accepts_explicit_graph_fixture() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-valid.scene.json",
+        ))
+        .expect("3D scene fixture parses");
+
+        validate_scene(&scene).expect("3D scene fixture validates");
+        assert_eq!(scene.scene_kind, "3d");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.version, "1");
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.nodes[1].parent.as_deref(), Some("root-cube"));
+        assert_eq!(graph.nodes[0].mesh_ref.as_deref(), Some("cube-mesh"));
+        assert_eq!(
+            graph.nodes[0].collider_ref.as_deref(),
+            Some("cube-collider")
+        );
+    }
+
+    #[test]
+    fn scene_3d_schema_v1_preserves_existing_2d_fixture_compatibility() {
+        for fixture in [
+            "examples/game-runtime/scene.json",
+            "examples/game-runtime/scene-components-v2.json",
+            "examples/game-runtime/physics-rules-v2.json",
+        ] {
+            let scene: SceneDocument =
+                serde_json::from_str(&read_json_fixture(fixture)).expect("2D scene fixture parses");
+            assert_eq!(scene.scene_kind, "2d");
+            assert!(scene.scene_3d.is_none());
+            validate_scene(&scene)
+                .unwrap_or_else(|error| panic!("{fixture} remains 2D-compatible: {error:#}"));
+        }
+
+        let source_like_regression_fixture: SceneDocument =
+            serde_json::from_str(&read_json_fixture(
+                "examples/engine-expressiveness-v2-regression/scenes/expressiveness-v2.scene.json",
+            ))
+            .expect("source-like 2D regression fixture parses with default sceneKind");
+        assert_eq!(source_like_regression_fixture.scene_kind, "2d");
+        assert!(source_like_regression_fixture.scene_3d.is_none());
+    }
+
+    #[test]
+    fn scene_3d_schema_v1_accepts_explicit_3d_with_legacy_2d_entities() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-mixed-2d-compatibility.scene.json",
+        ))
+        .expect("mixed 2D/3D compatibility fixture parses");
+
+        validate_scene(&scene).expect("mixed 2D/3D compatibility fixture validates");
+        assert_eq!(scene.scene_kind, "3d");
+        assert_eq!(scene.entities.len(), 1);
+        assert_eq!(
+            scene
+                .scene_3d
+                .as_ref()
+                .expect("3D graph present")
+                .nodes
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn scene_3d_schema_v1_rejects_invalid_or_malformed_fixtures() {
+        let missing_graph: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-invalid-missing-graph.scene.json",
+        ))
+        .expect("invalid 3D fixture still parses before semantic validation");
+        let error = validate_scene(&missing_graph).expect_err("3D scene without graph is rejected");
+        assert!(error
+            .to_string()
+            .contains("sceneKind 3d requires scene3d graph"));
+
+        let malformed = serde_json::from_str::<SceneDocument>(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-malformed-transform.scene.json",
+        ))
+        .expect_err("malformed 3D transform is rejected by schema parsing");
+        assert!(malformed.to_string().contains("missing field `z`"));
     }
 
     #[test]

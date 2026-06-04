@@ -84,6 +84,12 @@ scenes, project manifests, run artifacts, dashboard exports, Studio read models,
 or source-like fixtures unless an explicit migration note and compatibility test
 is included in the specific follow-up issue.
 
+Issue #597 begins the scene representation work with an explicit
+`sceneKind: "3d"` opt-in and a bounded `scene3d` graph. Existing scene schema v1
+documents without `sceneKind` continue to default to `2d`. The source-like 3D
+fixture policy and graph shape are documented in
+[`3d-scene-graph-v1.md`](./3d-scene-graph-v1.md).
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-mixed-2d-compatibility",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [
+    {
+      "id": "legacy-2d-proxy",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 12, "y": 24 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": false
+      },
+      "metadata": {
+        "compatibilityRole": "legacy 2D read model remains parseable beside explicit 3D scene data"
+      }
+    }
+  ],
+  "scene3d": {
+    "version": "1",
+    "nodes": [
+      {
+        "id": "root-3d",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-valid",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "nodes": [
+      {
+        "id": "root-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "cube-mesh",
+        "colliderRef": "cube-collider",
+        "metadata": {
+          "fixtureScope": "source-like 3D validation fixture"
+        }
+      },
+      {
+        "id": "child-marker",
+        "parent": "root-cube",
+        "localTransform": {
+          "translation": { "x": 4, "y": 2, "z": -3 },
+          "rotation": { "x": 0, "y": 45, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "metadata": {
+          "fixtureScope": "hierarchy shape only; world-transform resolution follows later"
+        }
+      }
+    ],
+    "metadata": {
+      "generatedStateBoundary": "tracked fixture only; screenshots/runs/previews stay untracked"
+    }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D scene graph fixture, not renderer evidence"
+  }
+}

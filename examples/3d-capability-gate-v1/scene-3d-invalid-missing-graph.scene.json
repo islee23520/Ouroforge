@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-invalid-missing-graph",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "metadata": {
+    "expectedValidationError": "sceneKind 3d requires scene3d graph"
+  }
+}
