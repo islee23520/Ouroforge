@@ -4221,6 +4221,29 @@ fn compare_snapshot_ownership(
     conflicting_refs: &mut Vec<String>,
 ) {
     let observed_by_path = snapshot_ownership_by_path(observed);
+
+    // Detect current-state internal ownership collisions (the same artifact path
+    // assigned to multiple distinct owners) before collapsing to one owner per
+    // path. snapshot_ownership_by_path keeps only the last owner, so without this
+    // a genuine collision is silently overwritten and never reported.
+    let mut current_owners_by_path: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for entry in current {
+        for reference in &entry.artifact_refs {
+            current_owners_by_path
+                .entry(reference.path.as_str())
+                .or_default()
+                .insert(entry.owner.as_str());
+        }
+    }
+    for (path, owners) in &current_owners_by_path {
+        if owners.len() > 1 {
+            let owners_list = owners.iter().copied().collect::<Vec<_>>().join(", ");
+            conflicting_refs.push(format!(
+                "ownershipMap.{path} conflicting: current state assigns multiple owners {owners_list}"
+            ));
+        }
+    }
+
     let current_by_path = snapshot_ownership_by_path(current);
 
     for (path, observed_owner) in &observed_by_path {
@@ -45562,6 +45585,39 @@ scenarios:
         let boundary_error = AgentSharedStateSnapshot::from_json_str(&unsafe_boundary.to_string())
             .expect_err("unsafe snapshot boundary rejects");
         assert!(format!("{boundary_error:#}").contains("read-only"));
+    }
+
+    #[test]
+    fn compare_snapshot_ownership_reports_current_duplicate_owner_collision() {
+        let owner_ref = |owner: &str, id: &str, path: &str| AgentSharedStateSnapshotOwnership {
+            owner: owner.to_string(),
+            artifact_refs: vec![AuthoringLoopArtifactRef {
+                id: id.to_string(),
+                path: path.to_string(),
+                description: None,
+            }],
+        };
+        // Current state assigns the same artifact path to two distinct owners.
+        let observed = vec![owner_ref("agent-a", "doc", "docs/shared.md")];
+        let current = vec![
+            owner_ref("agent-a", "doc", "docs/shared.md"),
+            owner_ref("agent-b", "doc-dup", "docs/shared.md"),
+        ];
+        let mut stale_refs = Vec::new();
+        let mut missing_refs = Vec::new();
+        let mut conflicting_refs = Vec::new();
+        compare_snapshot_ownership(
+            &observed,
+            &current,
+            &mut stale_refs,
+            &mut missing_refs,
+            &mut conflicting_refs,
+        );
+        assert!(
+            conflicting_refs.iter().any(|reference| reference
+                .contains("docs/shared.md conflicting: current state assigns multiple owners")),
+            "duplicate current owner path must be reported as conflicting: {conflicting_refs:?}"
+        );
     }
 
     #[test]
