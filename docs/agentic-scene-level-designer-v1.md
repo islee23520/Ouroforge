@@ -89,7 +89,8 @@ proves a safer dependency order:
     ([Agent-Generated Level Draft v1](agent-generated-level-draft-v1.md)).
 11. #638 - Review-Gated Level Apply v1
     ([Review-Gated Level Apply v1](review-gated-level-apply-v1.md)).
-12. #639 - Studio Level Design Inspection Surface v1.
+12. #639 - Studio Level Design Inspection Surface v1
+    ([Studio Level Design Inspection Surface v1](studio-level-design-inspection-surface-v1.md)).
 13. #640 - Agentic Level Design Demo v1.
 14. #641 - Scenario Coverage v10: Agentic Level Design Regression Suite.
 15. #642 - Roadmap and #1 Governance Refresh after Agentic Scene and Level

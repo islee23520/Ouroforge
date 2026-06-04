@@ -180,6 +180,24 @@ local server.
 See `../../docs/studio-2d-engine-inspection-surface-v1.md` for the #593 boundary
 audit and verification checklist.
 
+## Studio Level Design Inspection Surface v1
+
+When `dashboard-data.json` includes `level_design_inspection`, the cockpit shows
+read-only panels for level intent, generation plan, tile/entity drafts,
+reachability/pathing, objective proof, difficulty/pacing heuristic evidence,
+visual/semantic diff evidence, and review/apply status. All exported values are
+escaped, malformed or missing models render visible empty states, and command
+text remains copyable inert text only.
+
+The browser does not write trusted files, execute commands, bridge to a local
+server, auto-apply, auto-merge, self-approve, become a production editor, add
+visual scripting, or claim autonomous full game generation. Rust/local
+validation remains the trusted boundary for persistence, draft/apply validation,
+and generated evidence writing.
+
+See `../../docs/studio-level-design-inspection-surface-v1.md` for the #639
+boundary audit and verification checklist.
+
 ## QA and evidence loop
 
 The cockpit includes Run QA and project workspace panels with local display-only commands:

@@ -812,6 +812,71 @@ run.visual_comparisons = {
   }],
 };
 
+run.level_design_inspection = {
+  present: true,
+  schemaVersion: 'studio-level-design-inspection-v1',
+  status: 'ready',
+  boundary: 'Read-only Studio level design inspection; no browser trusted writes, no command bridge, no auto-apply, no auto-merge, no self-approval, no production editor, no autonomous full game generation, and no visual scripting.',
+  panels: [{
+    id: 'intent',
+    label: 'Intent and constraints',
+    kind: 'level-intent',
+    status: 'ready',
+    items: [{ label: 'Intent', value: 'Collect key then exit without softlock.' }],
+    refs: [{ id: 'intent', path: 'examples/level-intent/collect-exit.intent.json' }],
+  }, {
+    id: 'generation-plan',
+    label: 'Generation plan',
+    kind: 'scene-generation-plan',
+    status: 'ready',
+    items: [{ label: 'Steps', value: 'tilemap draft, placement draft, objective proof' }],
+    refs: [{ id: 'plan', path: 'examples/scene-generation-plan/collect-exit.plan.json' }],
+  }, {
+    id: 'tile-entity-draft',
+    label: 'Tile and entity drafts',
+    kind: 'draft-summary',
+    status: 'needs-review',
+    items: [{ label: 'Drafts', value: 'terrain corridor plus key and exit placement' }],
+    refs: [{ id: 'tilemap-draft', path: 'runs/level-drafts/collect/tilemap-draft.json' }],
+  }, {
+    id: 'reachability-pathing',
+    label: 'Reachability and pathing',
+    kind: 'evidence',
+    status: 'passed',
+    items: [{ label: 'Route', value: 'spawn -> key -> exit reachable in 8 actions' }],
+    refs: [{ id: 'route', path: 'runs/level-drafts/collect/reachability.json' }],
+  }, {
+    id: 'objective-proof',
+    label: 'Objective proof',
+    kind: 'evidence',
+    status: 'passed',
+    items: [{ label: 'Proof', value: 'win condition can be satisfied after key pickup' }],
+    refs: [{ id: 'proof', path: 'runs/level-drafts/collect/objective-proof.json' }],
+  }, {
+    id: 'difficulty-pacing',
+    label: 'Difficulty and pacing heuristic',
+    kind: 'heuristic',
+    status: 'advisory',
+    items: [{ label: 'Pacing', value: 'advisory only; not subjective game quality proof' }],
+    refs: [{ id: 'heuristic', path: 'runs/level-drafts/collect/difficulty.json' }],
+  }, {
+    id: 'visual-semantic-diff',
+    label: 'Visual and semantic diff',
+    kind: 'diff-evidence',
+    status: 'changed',
+    items: [{ label: 'Diff', value: '64 changed pixels and one objective semantic delta' }],
+    refs: [{ id: 'diff', path: 'runs/level-drafts/collect/visual-semantic-diff.json' }],
+  }, {
+    id: 'review-apply-status',
+    label: 'Review and apply status',
+    kind: 'review-gate',
+    status: 'blocked',
+    items: [{ label: 'Apply', value: 'blocked until accepted non-self review' }],
+    refs: [{ id: 'apply', path: 'runs/level-drafts/collect/review-gated-apply.json' }],
+    commands: [{ command: 'cargo run -p ouroforge-cli -- level apply-preview <script>alert(1)</script>' }],
+  }],
+};
+
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
   kind: 'application/json',
@@ -857,7 +922,8 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goa
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 28);
+assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 29);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -1381,6 +1447,31 @@ assert.match(cockpitReadme, /do not write source, scene, tilemap, asset, save, p
 assert.match(cockpitReadme, /do not\s+execute commands; do not bridge to a local server/);
 assert.match(cockpitReadme, /do not claim production editor, hosted Studio, native export,\s+plugin runtime, visual scripting, public launch, production-ready engine, or\s+Godot replacement behavior/);
 assert.match(cockpitReadme, /Generated run\/dashboard\/\s*screenshot\/temp\/local tool outputs stay untracked/);
+assert.match(cockpitReadme, /Studio Level Design Inspection Surface v1/);
+assert.match(cockpitReadme, /level intent, generation plan, tile\/entity drafts/);
+assert.match(cockpitReadme, /command\s+text remains copyable inert text only/);
+assert.match(cockpitReadme, /does not write trusted files, execute commands, bridge to a local\s+server, auto-apply, auto-merge, self-approve/);
+assert.match(cockpitReadme, /docs\/studio-level-design-inspection-surface-v1\.md/);
+const studioLevelDesignInspectionDoc = fs.readFileSync(require.resolve('../../docs/studio-level-design-inspection-surface-v1.md'), 'utf8');
+assert.match(studioLevelDesignInspectionDoc, /Issue: #639/);
+assert.match(studioLevelDesignInspectionDoc, /level intent and design constraints/);
+assert.match(studioLevelDesignInspectionDoc, /scene generation plan/);
+assert.match(studioLevelDesignInspectionDoc, /tilemap and entity\/objective\/encounter drafts/);
+assert.match(studioLevelDesignInspectionDoc, /reachability and pathing evidence/);
+assert.match(studioLevelDesignInspectionDoc, /objective completion and win\/loss proof/);
+assert.match(studioLevelDesignInspectionDoc, /difficulty, pacing, and balance heuristic evidence/);
+assert.match(studioLevelDesignInspectionDoc, /visual and semantic diff evidence/);
+assert.match(studioLevelDesignInspectionDoc, /review and apply status/);
+assert.match(studioLevelDesignInspectionDoc, /escape every exported label, value, ref, status, schema, boundary/);
+assert.match(studioLevelDesignInspectionDoc, /keep command strings inside inert copyable text/);
+assert.match(studioLevelDesignInspectionDoc, /browser trusted writes/);
+assert.match(studioLevelDesignInspectionDoc, /command bridge or local server bridge/);
+assert.match(studioLevelDesignInspectionDoc, /auto-apply or auto-merge/);
+assert.match(studioLevelDesignInspectionDoc, /self-approval or reviewer bypass/);
+assert.match(studioLevelDesignInspectionDoc, /autonomous full game generation/);
+assert.match(studioLevelDesignInspectionDoc, /production editor, full visual level editor/);
+assert.match(studioLevelDesignInspectionDoc, /#1 and #23 remain open/);
+assert.doesNotMatch(studioLevelDesignInspectionDoc, /trusted browser write enabled|command bridge enabled|auto-apply enabled|auto-merge enabled|production-ready claim enabled/);
 const production2dStudioInspectionDoc = fs.readFileSync(require.resolve('../../docs/production-2d-studio-inspection-v1.md'), 'utf8');
 assert.match(production2dStudioInspectionDoc, /Issue: #593/);
 assert.match(production2dStudioInspectionDoc, /Display contract/);
@@ -1625,6 +1716,34 @@ assert.match(visualComparisonMarkup, /qa14_7_collect_goal_visual/);
 assert.match(visualComparisonMarkup, /visual_regression_candidate/);
 assert.match(visualComparisonMarkup, /must not compute trusted diffs/);
 assert.match(cockpit.renderVisualComparisonEvidenceSurface({}), /No visual comparison evidence/);
+const levelDesignInspectionMarkup = cockpit.renderStudioLevelDesignInspectionSurface(run);
+assert.match(levelDesignInspectionMarkup, /Level design inspection/);
+assert.match(levelDesignInspectionMarkup, /studio-level-design-inspection-v1/);
+assert.match(levelDesignInspectionMarkup, /Intent and constraints/);
+assert.match(levelDesignInspectionMarkup, /Generation plan/);
+assert.match(levelDesignInspectionMarkup, /Tile and entity drafts/);
+assert.match(levelDesignInspectionMarkup, /Reachability and pathing/);
+assert.match(levelDesignInspectionMarkup, /Objective proof/);
+assert.match(levelDesignInspectionMarkup, /Difficulty and pacing heuristic/);
+assert.match(levelDesignInspectionMarkup, /Visual and semantic diff/);
+assert.match(levelDesignInspectionMarkup, /Review and apply status/);
+assert.match(levelDesignInspectionMarkup, /Copyable command text only/);
+assert.match(levelDesignInspectionMarkup, /no browser trusted writes/);
+assert.match(levelDesignInspectionMarkup, /no command bridge/);
+assert.match(levelDesignInspectionMarkup, /no auto-apply/);
+assert.match(levelDesignInspectionMarkup, /no auto-merge/);
+assert.match(levelDesignInspectionMarkup, /no self-approval/);
+assert.match(levelDesignInspectionMarkup, /no production editor/);
+assert.match(levelDesignInspectionMarkup, /no autonomous full game generation/);
+assert.match(levelDesignInspectionMarkup, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+assert.doesNotMatch(levelDesignInspectionMarkup, /<script>alert\(1\)<\/script>/);
+assert.doesNotMatch(levelDesignInspectionMarkup, /<button|onclick|localStorage|fetch\(/i);
+assert.match(cockpit.renderStudioLevelDesignInspectionSurface({}), /No level design inspection read model/);
+assert.match(cockpit.renderStudioLevelDesignInspectionSurface({ level_design_inspection: { present: true, panels: '<bad>', malformedReasons: ['<script>bad</script>'] } }), /Malformed level design inspection/);
+assert.match(cockpit.renderStudioLevelDesignInspectionSurface({ level_design_inspection: { present: true, panels: '<bad>', malformedReasons: ['<script>bad</script>'] } }), /&lt;script&gt;bad&lt;\/script&gt;/);
+assert.equal(cockpit.normalizeStudioLevelDesignInspection({ level_design_inspection: { present: true, panels: '<bad>' } }).status, 'malformed');
+assert.ok(cockpit.studioSurfaceSummary(run).some((surface) => surface.id === 'studio-level-design-inspection' && surface.present), 'Studio surface summary should include level design inspection');
+assert.match(cockpit.renderEvidencePane(run), /id="studio-level-design-inspection"/);
 const visualDiffPreviewMarkup = cockpit.renderVisualDiffPreviewSurface(run);
 assert.match(visualDiffPreviewMarkup, /Visual diff preview/);
 assert.match(visualDiffPreviewMarkup, /visual-diff-scene-draft/);
