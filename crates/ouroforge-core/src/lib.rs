@@ -7014,6 +7014,473 @@ fn validate_runtime_invariant_evidence_ref(reference: &str) -> Result<()> {
     ))
 }
 
+pub fn evaluate_runtime_invariants(
+    model: &RuntimeInvariantModel,
+    world_state: &serde_json::Value,
+    scenario_result: Option<&serde_json::Value>,
+    recorded_at_unix_ms: u128,
+) -> Result<RuntimeInvariantEvidence> {
+    model.validate()?;
+    let mut checks = Vec::new();
+    for invariant in &model.invariants {
+        checks.push(evaluate_runtime_invariant(
+            model,
+            invariant,
+            world_state,
+            scenario_result,
+        ));
+    }
+    let evidence = RuntimeInvariantEvidence {
+        schema_version: RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION.to_string(),
+        model_id: model.model_id.clone(),
+        run_id: model.run_id.clone(),
+        scenario_id: model.scenario_id.clone(),
+        world_state_path: model.world_state_path.clone(),
+        scenario_result_path: model.scenario_result_path.clone(),
+        recorded_at_unix_ms,
+        checks,
+    };
+    evidence.validate()?;
+    Ok(evidence)
+}
+
+fn evaluate_runtime_invariant(
+    model: &RuntimeInvariantModel,
+    invariant: &RuntimeInvariantSpec,
+    world_state: &serde_json::Value,
+    scenario_result: Option<&serde_json::Value>,
+) -> RuntimeInvariantCheck {
+    let Some(source) = runtime_invariant_source(model, invariant, world_state, scenario_result)
+    else {
+        return runtime_invariant_check(
+            invariant,
+            RuntimeInvariantStatus::Unsupported,
+            None,
+            Some("invariant evidencePath is not a supported world-state or scenario-result source"),
+        );
+    };
+
+    let target = runtime_invariant_path_value(source, &invariant.target_path);
+    if target.is_none() {
+        return runtime_invariant_check(
+            invariant,
+            RuntimeInvariantStatus::Missing,
+            None,
+            Some("targetPath was not present in referenced runtime evidence"),
+        );
+    }
+    let target = target.unwrap_or(&serde_json::Value::Null);
+    let (status, observed, message) = match invariant.invariant_type {
+        RuntimeInvariantType::PlayerInBounds | RuntimeInvariantType::EntityInBounds => {
+            evaluate_in_bounds(source, target, invariant.bounds_path.as_deref())
+        }
+        RuntimeInvariantType::FiniteTransform => evaluate_finite_transform(target),
+        RuntimeInvariantType::HealthNonNegative => evaluate_health_non_negative(target),
+        RuntimeInvariantType::ObjectiveFlagsConsistent => {
+            evaluate_objective_flags_consistent(target)
+        }
+        RuntimeInvariantType::SceneTransitionValid => evaluate_scene_transition_valid(
+            source,
+            target,
+            invariant.transition_target_path.as_deref(),
+        ),
+        RuntimeInvariantType::NoImpossibleState => evaluate_no_impossible_state(target),
+        RuntimeInvariantType::RequiredEntityPresent => {
+            evaluate_required_entity_present(target, invariant.required_entity_id.as_deref())
+        }
+        RuntimeInvariantType::BehaviorStateConsistent => evaluate_behavior_state_consistent(
+            source,
+            invariant.behavior_state_path.as_deref(),
+            &invariant.allowed_states,
+        ),
+    };
+    runtime_invariant_check(invariant, status, observed, message.as_deref())
+}
+
+fn runtime_invariant_source<'a>(
+    model: &RuntimeInvariantModel,
+    invariant: &RuntimeInvariantSpec,
+    world_state: &'a serde_json::Value,
+    scenario_result: Option<&'a serde_json::Value>,
+) -> Option<&'a serde_json::Value> {
+    if invariant.evidence_path == model.world_state_path {
+        return Some(world_state);
+    }
+    if invariant.evidence_path == model.scenario_result_path.as_deref().unwrap_or_default() {
+        return scenario_result;
+    }
+    None
+}
+
+fn runtime_invariant_check(
+    invariant: &RuntimeInvariantSpec,
+    status: RuntimeInvariantStatus,
+    observed: Option<serde_json::Value>,
+    message: Option<&str>,
+) -> RuntimeInvariantCheck {
+    RuntimeInvariantCheck {
+        invariant_id: invariant.invariant_id.clone(),
+        invariant_type: invariant.invariant_type,
+        status,
+        target_path: invariant.target_path.clone(),
+        evidence_refs: vec![invariant.evidence_path.clone()],
+        observed,
+        message: message.map(ToString::to_string),
+    }
+}
+
+fn runtime_invariant_path_value<'a>(
+    source: &'a serde_json::Value,
+    path: &str,
+) -> Option<&'a serde_json::Value> {
+    let mut current = source;
+    for segment in path.split('.') {
+        current = match current {
+            serde_json::Value::Object(map) => map.get(segment)?,
+            serde_json::Value::Array(items) => {
+                let index = segment.parse::<usize>().ok()?;
+                items.get(index)?
+            }
+            _ => return None,
+        };
+    }
+    Some(current)
+}
+
+fn evaluate_in_bounds(
+    source: &serde_json::Value,
+    target: &serde_json::Value,
+    bounds_path: Option<&str>,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(bounds_path) = bounds_path else {
+        return (
+            RuntimeInvariantStatus::Unsupported,
+            Some(target.clone()),
+            Some("in-bounds invariant is missing boundsPath".to_string()),
+        );
+    };
+    let Some(bounds) = runtime_invariant_path_value(source, bounds_path) else {
+        return (
+            RuntimeInvariantStatus::Missing,
+            Some(target.clone()),
+            Some("boundsPath was not present in referenced runtime evidence".to_string()),
+        );
+    };
+    let Some((x, y)) = runtime_invariant_xy(target) else {
+        return (
+            RuntimeInvariantStatus::Malformed,
+            Some(target.clone()),
+            Some("targetPath did not contain finite numeric x/y values".to_string()),
+        );
+    };
+    let Some((min_x, max_x, min_y, max_y)) = runtime_invariant_bounds(bounds) else {
+        return (
+            RuntimeInvariantStatus::Malformed,
+            Some(bounds.clone()),
+            Some(
+                "boundsPath did not contain finite min/max or x/y/width/height bounds".to_string(),
+            ),
+        );
+    };
+    if x >= min_x && x <= max_x && y >= min_y && y <= max_y {
+        (
+            RuntimeInvariantStatus::Passed,
+            Some(json!({ "x": x, "y": y })),
+            None,
+        )
+    } else {
+        (
+            RuntimeInvariantStatus::Failed,
+            Some(
+                json!({ "x": x, "y": y, "bounds": { "minX": min_x, "maxX": max_x, "minY": min_y, "maxY": max_y } }),
+            ),
+            Some("entity transform was outside configured bounds".to_string()),
+        )
+    }
+}
+
+fn evaluate_finite_transform(
+    target: &serde_json::Value,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(object) = target.as_object() else {
+        return (
+            RuntimeInvariantStatus::Malformed,
+            Some(target.clone()),
+            Some("transform target must be an object".to_string()),
+        );
+    };
+    let numeric_keys = ["x", "y", "z", "rotation", "scale", "scaleX", "scaleY"];
+    let mut found = false;
+    for key in numeric_keys {
+        if let Some(value) = object.get(key) {
+            found = true;
+            if runtime_invariant_f64(value).is_none() {
+                return (
+                    RuntimeInvariantStatus::Malformed,
+                    Some(target.clone()),
+                    Some(format!("transform field {key} was not a finite number")),
+                );
+            }
+        }
+    }
+    if found {
+        (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
+    } else {
+        (
+            RuntimeInvariantStatus::Missing,
+            Some(target.clone()),
+            Some("transform target had no recognized numeric fields".to_string()),
+        )
+    }
+}
+
+fn evaluate_health_non_negative(
+    target: &serde_json::Value,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(value) = runtime_invariant_f64(target) else {
+        return (
+            RuntimeInvariantStatus::Malformed,
+            Some(target.clone()),
+            Some("health target was not numeric".to_string()),
+        );
+    };
+    if value >= 0.0 {
+        (RuntimeInvariantStatus::Passed, Some(json!(value)), None)
+    } else {
+        (
+            RuntimeInvariantStatus::Failed,
+            Some(json!(value)),
+            Some("health target was below zero".to_string()),
+        )
+    }
+}
+
+fn evaluate_objective_flags_consistent(
+    target: &serde_json::Value,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    match target {
+        serde_json::Value::Bool(_) => (RuntimeInvariantStatus::Passed, Some(target.clone()), None),
+        serde_json::Value::Object(map) => {
+            let contradiction = map.get("completed").and_then(|v| v.as_bool()) == Some(true)
+                && map.get("failed").and_then(|v| v.as_bool()) == Some(true);
+            if contradiction {
+                (
+                    RuntimeInvariantStatus::Failed,
+                    Some(target.clone()),
+                    Some("objective flags were both completed and failed".to_string()),
+                )
+            } else {
+                (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
+            }
+        }
+        _ => (
+            RuntimeInvariantStatus::Malformed,
+            Some(target.clone()),
+            Some("objective flag target must be boolean or object".to_string()),
+        ),
+    }
+}
+
+fn evaluate_scene_transition_valid(
+    source: &serde_json::Value,
+    target: &serde_json::Value,
+    transition_target_path: Option<&str>,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(path) = transition_target_path else {
+        return (
+            RuntimeInvariantStatus::Unsupported,
+            Some(target.clone()),
+            Some("scene transition invariant is missing transitionTargetPath".to_string()),
+        );
+    };
+    let Some(transition_target) = runtime_invariant_path_value(source, path) else {
+        return (
+            RuntimeInvariantStatus::Missing,
+            Some(target.clone()),
+            Some("transitionTargetPath was not present in referenced runtime evidence".to_string()),
+        );
+    };
+    let current = target.as_str();
+    let valid = match transition_target {
+        serde_json::Value::String(next) => current.is_some_and(|current| current == next),
+        serde_json::Value::Array(items) => {
+            current.is_some_and(|current| items.iter().any(|item| item.as_str() == Some(current)))
+        }
+        serde_json::Value::Object(map) => current.is_some_and(|current| map.contains_key(current)),
+        _ => false,
+    };
+    if valid {
+        (
+            RuntimeInvariantStatus::Passed,
+            Some(json!({ "current": target, "declared": transition_target })),
+            None,
+        )
+    } else {
+        (
+            RuntimeInvariantStatus::Failed,
+            Some(json!({ "current": target, "declared": transition_target })),
+            Some("scene transition target was not declared".to_string()),
+        )
+    }
+}
+
+fn evaluate_no_impossible_state(
+    target: &serde_json::Value,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    match target.as_bool() {
+        Some(false) => (RuntimeInvariantStatus::Passed, Some(target.clone()), None),
+        Some(true) => (
+            RuntimeInvariantStatus::Failed,
+            Some(target.clone()),
+            Some("impossible-state marker was true".to_string()),
+        ),
+        None => (
+            RuntimeInvariantStatus::Malformed,
+            Some(target.clone()),
+            Some("impossible-state marker must be boolean".to_string()),
+        ),
+    }
+}
+
+fn evaluate_required_entity_present(
+    target: &serde_json::Value,
+    required_entity_id: Option<&str>,
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(required) = required_entity_id else {
+        return (
+            RuntimeInvariantStatus::Unsupported,
+            Some(target.clone()),
+            Some("required entity invariant is missing requiredEntityId".to_string()),
+        );
+    };
+    let present = match target {
+        serde_json::Value::Object(map) => {
+            map.contains_key(required) || map.get("id").and_then(|v| v.as_str()) == Some(required)
+        }
+        serde_json::Value::Array(items) => items.iter().any(|item| {
+            item.as_str() == Some(required)
+                || item.get("id").and_then(|v| v.as_str()) == Some(required)
+        }),
+        serde_json::Value::String(value) => value == required,
+        _ => false,
+    };
+    if present {
+        (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
+    } else {
+        (
+            RuntimeInvariantStatus::Failed,
+            Some(target.clone()),
+            Some(format!("required entity {required} was not present")),
+        )
+    }
+}
+
+fn evaluate_behavior_state_consistent(
+    source: &serde_json::Value,
+    behavior_state_path: Option<&str>,
+    allowed_states: &[String],
+) -> (
+    RuntimeInvariantStatus,
+    Option<serde_json::Value>,
+    Option<String>,
+) {
+    let Some(path) = behavior_state_path else {
+        return (
+            RuntimeInvariantStatus::Unsupported,
+            None,
+            Some("behavior invariant is missing behaviorStatePath".to_string()),
+        );
+    };
+    if allowed_states.is_empty() {
+        return (
+            RuntimeInvariantStatus::Unsupported,
+            None,
+            Some("behavior invariant has no allowedStates".to_string()),
+        );
+    }
+    let Some(state) = runtime_invariant_path_value(source, path) else {
+        return (
+            RuntimeInvariantStatus::Missing,
+            None,
+            Some("behaviorStatePath was not present in referenced runtime evidence".to_string()),
+        );
+    };
+    let Some(state) = state.as_str() else {
+        return (
+            RuntimeInvariantStatus::Malformed,
+            Some(state.clone()),
+            Some("behavior state was not a string".to_string()),
+        );
+    };
+    if allowed_states.iter().any(|allowed| allowed == state) {
+        (RuntimeInvariantStatus::Passed, Some(json!(state)), None)
+    } else {
+        (
+            RuntimeInvariantStatus::Failed,
+            Some(json!(state)),
+            Some("behavior state was outside allowedStates".to_string()),
+        )
+    }
+}
+
+fn runtime_invariant_xy(value: &serde_json::Value) -> Option<(f64, f64)> {
+    let object = value.as_object()?;
+    Some((
+        runtime_invariant_f64(object.get("x")?)?,
+        runtime_invariant_f64(object.get("y")?)?,
+    ))
+}
+
+fn runtime_invariant_bounds(value: &serde_json::Value) -> Option<(f64, f64, f64, f64)> {
+    let object = value.as_object()?;
+    if let (Some(min_x), Some(max_x), Some(min_y), Some(max_y)) = (
+        object.get("minX").and_then(runtime_invariant_f64),
+        object.get("maxX").and_then(runtime_invariant_f64),
+        object.get("minY").and_then(runtime_invariant_f64),
+        object.get("maxY").and_then(runtime_invariant_f64),
+    ) {
+        return Some((min_x, max_x, min_y, max_y));
+    }
+    let x = object.get("x").and_then(runtime_invariant_f64)?;
+    let y = object.get("y").and_then(runtime_invariant_f64)?;
+    let width = object.get("width").and_then(runtime_invariant_f64)?;
+    let height = object.get("height").and_then(runtime_invariant_f64)?;
+    Some((x, x + width, y, y + height))
+}
+
+fn runtime_invariant_f64(value: &serde_json::Value) -> Option<f64> {
+    let number = value.as_f64()?;
+    number.is_finite().then_some(number)
+}
+
 const RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION: &str = "runtime-asset-load-evidence-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -38244,6 +38711,146 @@ scenarios:
             unsafe_ref.to_string().contains("escape")
                 || unsafe_ref.to_string().contains("evidence/")
         );
+    }
+
+    #[test]
+    fn runtime_invariant_evaluator_reports_pass_fail_and_unsupported_checks() {
+        let model = RuntimeInvariantModel::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-invariant-model-v1",
+                "modelId": "qa14_5_runtime_invariants_eval",
+                "runId": "run_qa_invariant_eval",
+                "scenarioId": "collect-and-exit",
+                "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+                "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+                "evidenceIndexPath": "evidence/index.json",
+                "invariants": [
+                    {
+                        "invariantId": "player-in-bounds",
+                        "invariantType": "player_in_bounds",
+                        "targetPath": "player.transform",
+                        "boundsPath": "level.bounds",
+                        "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+                    },
+                    {
+                        "invariantId": "health-non-negative",
+                        "invariantType": "health_non_negative",
+                        "targetPath": "player.health",
+                        "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+                    },
+                    {
+                        "invariantId": "manual-placeholder",
+                        "invariantType": "no_impossible_state",
+                        "targetPath": "world.impossible",
+                        "evidencePath": "invariants/manual-placeholder.json"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("model parses");
+
+        let evidence = evaluate_runtime_invariants(
+            &model,
+            &json!({
+                "player": { "transform": { "x": 4, "y": 5 }, "health": -1 },
+                "level": { "bounds": { "minX": 0, "maxX": 10, "minY": 0, "maxY": 10 } }
+            }),
+            Some(&json!({ "scenario_id": "collect-and-exit", "status": "failed" })),
+            1700000000000,
+        )
+        .expect("evaluation emits valid evidence");
+
+        assert_eq!(evidence.checks.len(), 3);
+        assert_eq!(evidence.checks[0].status, RuntimeInvariantStatus::Passed);
+        assert_eq!(evidence.checks[1].status, RuntimeInvariantStatus::Failed);
+        assert_eq!(
+            evidence.checks[2].status,
+            RuntimeInvariantStatus::Unsupported
+        );
+        let summary = evidence.summary();
+        assert_eq!(summary.passed_count, 1);
+        assert_eq!(summary.failed_count, 1);
+        assert_eq!(summary.unsupported_count, 1);
+    }
+
+    #[test]
+    fn runtime_invariant_evaluator_covers_supported_runtime_shapes() {
+        let model = RuntimeInvariantModel::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-invariant-model-v1",
+                "modelId": "qa14_5_runtime_shapes",
+                "runId": "run_qa_invariant_shapes",
+                "scenarioId": "collect-and-exit",
+                "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+                "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+                "evidenceIndexPath": "evidence/index.json",
+                "invariants": [
+                    { "invariantId": "entity-in-bounds", "invariantType": "entity_in_bounds", "targetPath": "entities.enemy.transform", "boundsPath": "level.bounds", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "finite-transform", "invariantType": "finite_transform", "targetPath": "player.transform", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "objective-flags", "invariantType": "objective_flags_consistent", "targetPath": "objectives.exit", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "transition-valid", "invariantType": "scene_transition_valid", "targetPath": "scene.current", "transitionTargetPath": "scene.declaredTransitions", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "no-impossible-state", "invariantType": "no_impossible_state", "targetPath": "world.impossible", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "required-entity", "invariantType": "required_entity_present", "targetPath": "entities", "requiredEntityId": "player", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "behavior-state", "invariantType": "behavior_state_consistent", "targetPath": "entities.enemy.behavior", "behaviorStatePath": "entities.enemy.state", "allowedStates": ["idle", "patrol"], "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("model parses");
+
+        let evidence = evaluate_runtime_invariants(
+            &model,
+            &json!({
+                "player": { "transform": { "x": 2, "y": 3, "rotation": 0 } },
+                "entities": {
+                    "player": { "id": "player" },
+                    "enemy": { "transform": { "x": 9, "y": 9 }, "behavior": "patrol", "state": "patrol" }
+                },
+                "level": { "bounds": { "x": 0, "y": 0, "width": 10, "height": 10 } },
+                "objectives": { "exit": { "completed": true, "failed": false } },
+                "scene": { "current": "exit", "declaredTransitions": ["intro", "exit"] },
+                "world": { "impossible": false }
+            }),
+            Some(&json!({ "scenario_id": "collect-and-exit", "status": "passed" })),
+            1700000000001,
+        )
+        .expect("evaluation emits valid evidence");
+
+        assert!(evidence
+            .checks
+            .iter()
+            .all(|check| check.status == RuntimeInvariantStatus::Passed));
+    }
+
+    #[test]
+    fn runtime_invariant_evaluator_reports_missing_and_malformed_targets() {
+        let model = RuntimeInvariantModel::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-invariant-model-v1",
+                "modelId": "qa14_5_runtime_missing_malformed",
+                "runId": "run_qa_invariant_missing",
+                "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+                "evidenceIndexPath": "evidence/index.json",
+                "invariants": [
+                    { "invariantId": "missing-health", "invariantType": "health_non_negative", "targetPath": "player.health", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" },
+                    { "invariantId": "bad-transform", "invariantType": "finite_transform", "targetPath": "player.transform", "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("model parses");
+
+        let evidence = evaluate_runtime_invariants(
+            &model,
+            &json!({ "player": { "transform": { "x": "not-a-number", "y": 1 } } }),
+            None,
+            1700000000002,
+        )
+        .expect("evaluation emits valid evidence");
+
+        assert_eq!(evidence.checks[0].status, RuntimeInvariantStatus::Missing);
+        assert_eq!(evidence.checks[1].status, RuntimeInvariantStatus::Malformed);
     }
 
     #[test]

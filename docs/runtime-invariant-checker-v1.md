@@ -1,19 +1,24 @@
 # Runtime State Invariant Checker v1
 
-Status: **QA14.5.1 invariant model** for issue #686.
+Status: **QA14.5.1/QA14.5.2 invariant model and evaluator** for issue #686.
 
-This document defines the bounded model for runtime invariant checks used by
-QA/playtest evidence. It does not evaluate invariants yet, create background
+This document defines the bounded model and in-process evaluator for runtime
+invariant checks used by QA/playtest evidence. It does not create background
 workers, run hidden agents, mutate trusted state, or authorize auto-fix/apply/
 merge behavior.
 
 ## Scope
 
-The v1 model is structured data only: `runtime-invariant-model-v1` lists
-supported invariant specs, and `runtime-invariant-evidence-v1` records pass,
-fail, unsupported, missing, malformed, or stale outcomes. Paths point to
-run-relative evidence such as `evidence/scenarios/<scenario-id>/world-state.json`,
-scenario results, or invariant artifacts under `invariants/`.
+The v1 model is structured data: `runtime-invariant-model-v1` lists supported
+invariant specs, and `runtime-invariant-evidence-v1` records pass, fail,
+unsupported, missing, malformed, or stale outcomes. Paths point to run-relative
+evidence such as `evidence/scenarios/<scenario-id>/world-state.json`, scenario
+results, or invariant artifacts under `invariants/`.
+
+QA14.5.2 adds `evaluate_runtime_invariants`, a deterministic Rust evaluator that
+checks supported invariants against supplied world-state/scenario-result JSON and
+emits validated `runtime-invariant-evidence-v1` records. Unsupported evidence
+sources remain explicit `unsupported` outcomes rather than hidden execution.
 
 Arbitrary expressions, scripts, dynamic code, browser command bridges, and
 trusted mutations are forbidden.
@@ -60,3 +65,17 @@ schema validation instead of interpreted.
   subjective quality, market readiness, production safety, accessibility
   compliance, Godot replacement status, or production-ready status.
 - #1 and #23 remain open.
+
+
+## QA14.5.2 evaluator boundary
+
+The evaluator accepts already-captured JSON evidence and returns structured
+invariant evidence. It does not launch browsers, spawn workers, write run files,
+open network connections, execute scripts, apply mutations, or infer subjective
+quality. Missing target state is reported as `missing`; malformed target state is
+reported as `malformed`; unsupported evidence refs are reported as `unsupported`.
+
+Focused tests cover pass, fail, unsupported, missing, and malformed outcomes for
+the supported invariant types. Stale evidence/run integration remains deferred to
+QA14.5.3, where invariant evidence is linked into scenario/evaluator read-model
+fields.
