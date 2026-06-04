@@ -10866,6 +10866,92 @@ impl SourcePatchPreviewValidation {
     }
 }
 
+pub const SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION: &str =
+    "source-patch-sandbox-evaluator-plan-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxEvaluationInputs {
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "fileClassValidationRef")]
+    pub file_class_validation_ref: String,
+    #[serde(rename = "diffIntegrityValidationRef")]
+    pub diff_integrity_validation_ref: String,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxLayoutPolicy {
+    #[serde(rename = "sandboxId")]
+    pub sandbox_id: String,
+    #[serde(rename = "sandboxRoot")]
+    pub sandbox_root: String,
+    #[serde(rename = "worktreePath")]
+    pub worktree_path: String,
+    #[serde(rename = "evidencePath")]
+    pub evidence_path: String,
+    #[serde(rename = "reportPath")]
+    pub report_path: String,
+    #[serde(rename = "cleanupPath")]
+    pub cleanup_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxCleanupPolicy {
+    #[serde(rename = "cleanupRequired")]
+    pub cleanup_required: bool,
+    #[serde(rename = "preserveEvidence")]
+    pub preserve_evidence: bool,
+    #[serde(rename = "onSuccess")]
+    pub on_success: String,
+    #[serde(rename = "onFailure")]
+    pub on_failure: String,
+    #[serde(rename = "generatedOutputRoots")]
+    pub generated_output_roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxEvaluatorPlan {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "evaluationId")]
+    pub evaluation_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "sourceMutationApplyStatus")]
+    pub source_mutation_apply_status: SourcePatchPreviewApplyStatus,
+    pub inputs: SourcePatchSandboxEvaluationInputs,
+    pub layout: SourcePatchSandboxLayoutPolicy,
+    pub cleanup: SourcePatchSandboxCleanupPolicy,
+    #[serde(rename = "requiredTests")]
+    pub required_tests: Vec<SourcePatchPreviewRequiredTest>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxEvaluatorPlanValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "evaluationId")]
+    pub evaluation_id: String,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchSandboxEvaluatorPlanValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
 pub fn inspect_source_patch_test_command_allowlist(
     artifact: &SourcePatchTestCommandAllowlistArtifact,
 ) -> SourcePatchTestCommandAllowlistValidation {
@@ -10983,6 +11069,253 @@ pub fn validate_source_patch_test_command_allowlist(
     if validation.is_blocked() {
         return Err(anyhow!(
             "source patch test command allowlist blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+pub fn inspect_source_patch_sandbox_evaluator_plan(
+    plan: &SourcePatchSandboxEvaluatorPlan,
+) -> SourcePatchSandboxEvaluatorPlanValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if plan.schema_version != SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION}"
+        ));
+    }
+    if plan.evaluation_id.trim().is_empty() {
+        blocked_reasons.push("evaluationId must not be empty".to_string());
+    } else if let Err(error) = validate_sandbox_id(&plan.evaluation_id) {
+        blocked_reasons.push(format!("evaluationId invalid: {error}"));
+    }
+    if plan.created_at.trim().is_empty() {
+        blocked_reasons.push("createdAt must not be empty".to_string());
+    }
+    if plan.source_mutation_apply_status != SourcePatchPreviewApplyStatus::Blocked {
+        blocked_reasons.push(
+            "sourceMutationApplyStatus must remain blocked for trusted worktree apply".to_string(),
+        );
+    }
+    if plan.inputs.patch_preview_id.trim().is_empty() {
+        blocked_reasons.push("inputs.patchPreviewId must not be empty".to_string());
+    }
+    if plan.inputs.patch_preview_id != plan.layout.sandbox_id {
+        blocked_reasons.push(
+            "inputs.patchPreviewId must match layout.sandboxId for deterministic isolation"
+                .to_string(),
+        );
+    }
+    if plan.inputs.file_class_validation_ref.trim().is_empty() {
+        blocked_reasons.push("inputs.fileClassValidationRef must not be empty".to_string());
+    } else if let Err(error) = validate_relative_artifact_path(
+        "inputs.fileClassValidationRef",
+        &plan.inputs.file_class_validation_ref,
+    ) {
+        blocked_reasons.push(error.to_string());
+    }
+    if plan.inputs.diff_integrity_validation_ref.trim().is_empty() {
+        blocked_reasons.push("inputs.diffIntegrityValidationRef must not be empty".to_string());
+    } else if let Err(error) = validate_relative_artifact_path(
+        "inputs.diffIntegrityValidationRef",
+        &plan.inputs.diff_integrity_validation_ref,
+    ) {
+        blocked_reasons.push(error.to_string());
+    }
+    if plan.inputs.allowlist_policy_id != "source-patch-preview-safe-local-checks-v1" {
+        blocked_reasons.push(
+            "inputs.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+                .to_string(),
+        );
+    }
+
+    inspect_source_patch_sandbox_layout_policy(
+        &plan.layout,
+        &plan.evaluation_id,
+        &mut blocked_reasons,
+    );
+    inspect_source_patch_sandbox_cleanup_policy(
+        &plan.cleanup,
+        &plan.layout.sandbox_root,
+        &mut blocked_reasons,
+    );
+
+    if plan.required_tests.is_empty() {
+        blocked_reasons.push("requiredTests must not be empty".to_string());
+    }
+    for (index, required_test) in plan.required_tests.iter().enumerate() {
+        let field = format!("requiredTests[{index}]");
+        if required_test.command.trim().is_empty() {
+            blocked_reasons.push(format!("{field}.command must not be empty"));
+        }
+        if !required_test.execution_authority.contains("copyable")
+            || !required_test.execution_authority.contains("not_executed")
+        {
+            blocked_reasons.push(format!(
+                "{field}.executionAuthority must remain copyable/not_executed metadata"
+            ));
+        }
+        if required_test.allowlist_policy_id.as_deref()
+            != Some("source-patch-preview-safe-local-checks-v1")
+        {
+            blocked_reasons.push(format!(
+                "{field}.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+            ));
+        }
+        if required_test.argv.is_empty() {
+            blocked_reasons.push(format!("{field}.argv must not be empty"));
+            continue;
+        }
+        let normalized = normalize_source_patch_test_command(&required_test.argv);
+        if required_test.command != normalized {
+            blocked_reasons.push(format!(
+                "{field}.command must match normalized argv `{normalized}`"
+            ));
+        }
+        let command = SourcePatchTestCommand {
+            command: required_test.command.clone(),
+            argv: required_test.argv.clone(),
+        };
+        if let Some(forbidden) = classify_source_patch_forbidden_test_command(&command) {
+            blocked_reasons.push(format!("{field}.argv forbidden: {}", forbidden.reason));
+        } else if default_source_patch_test_command_allowlist()
+            .match_command(&command)
+            .is_none()
+        {
+            blocked_reasons.push(format!(
+                "{field}.argv is not in the source patch test command allowlist"
+            ));
+        }
+    }
+
+    if !plan
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("does not execute"))
+    {
+        blocked_reasons
+            .push("guardrails must state the plan does not execute commands".to_string());
+    }
+    if !plan
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("trusted main worktree"))
+    {
+        blocked_reasons
+            .push("guardrails must state the trusted main worktree is not modified".to_string());
+    }
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchSandboxEvaluatorPlanValidation {
+        schema_version: "source-patch-sandbox-evaluator-plan-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        evaluation_id: plan.evaluation_id.clone(),
+        blocked_reasons,
+        guardrails: vec![
+            "sandbox evaluator plan is inert metadata; it does not execute commands".to_string(),
+            "patch application is future-scoped and must stay sandbox-only".to_string(),
+            "trusted main worktree source patch apply remains blocked".to_string(),
+            "sandbox/generated outputs remain under sandbox/<id>/ until fixture-scoped".to_string(),
+        ],
+    }
+}
+
+fn inspect_source_patch_sandbox_layout_policy(
+    layout: &SourcePatchSandboxLayoutPolicy,
+    evaluation_id: &str,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if layout.sandbox_id.trim().is_empty() {
+        blocked_reasons.push("layout.sandboxId must not be empty".to_string());
+    } else if let Err(error) = validate_sandbox_id(&layout.sandbox_id) {
+        blocked_reasons.push(format!("layout.sandboxId invalid: {error}"));
+    }
+    if layout.sandbox_id != evaluation_id {
+        blocked_reasons.push("layout.sandboxId must match evaluationId".to_string());
+    }
+    let expected_root = format!("sandbox/{evaluation_id}");
+    if layout.sandbox_root != expected_root {
+        blocked_reasons.push(format!("layout.sandboxRoot must be {expected_root}"));
+    }
+    let layout_paths = [
+        ("layout.sandboxRoot", layout.sandbox_root.as_str()),
+        ("layout.worktreePath", layout.worktree_path.as_str()),
+        ("layout.evidencePath", layout.evidence_path.as_str()),
+        ("layout.reportPath", layout.report_path.as_str()),
+        ("layout.cleanupPath", layout.cleanup_path.as_str()),
+    ];
+    for (field, value) in layout_paths {
+        if let Err(error) = validate_run_relative_sandbox_path(value) {
+            blocked_reasons.push(format!("{field}: {error}"));
+        }
+        if !value_stays_under_sandbox_root(value, &layout.sandbox_root) {
+            blocked_reasons.push(format!("{field} must stay under layout.sandboxRoot"));
+        }
+    }
+    if !layout.worktree_path.ends_with("/worktree") {
+        blocked_reasons.push("layout.worktreePath must end with /worktree".to_string());
+    }
+    if !layout.evidence_path.ends_with("/evidence") {
+        blocked_reasons.push("layout.evidencePath must end with /evidence".to_string());
+    }
+    if !layout.report_path.ends_with("/evidence/report.json") {
+        blocked_reasons.push("layout.reportPath must end with /evidence/report.json".to_string());
+    }
+    if !layout.cleanup_path.ends_with("/cleanup.json") {
+        blocked_reasons.push("layout.cleanupPath must end with /cleanup.json".to_string());
+    }
+}
+
+fn inspect_source_patch_sandbox_cleanup_policy(
+    cleanup: &SourcePatchSandboxCleanupPolicy,
+    sandbox_root: &str,
+    blocked_reasons: &mut Vec<String>,
+) {
+    if !cleanup.cleanup_required {
+        blocked_reasons.push("cleanup.cleanupRequired must be true".to_string());
+    }
+    if !cleanup.preserve_evidence {
+        blocked_reasons.push("cleanup.preserveEvidence must be true".to_string());
+    }
+    if cleanup.on_success.trim().is_empty() || !cleanup.on_success.contains("remove") {
+        blocked_reasons.push("cleanup.onSuccess must describe sandbox cleanup/removal".to_string());
+    }
+    if cleanup.on_failure.trim().is_empty() || !cleanup.on_failure.contains("preserve") {
+        blocked_reasons
+            .push("cleanup.onFailure must describe preserved failure evidence".to_string());
+    }
+    if cleanup.generated_output_roots.is_empty() {
+        blocked_reasons.push("cleanup.generatedOutputRoots must not be empty".to_string());
+    }
+    for (index, root) in cleanup.generated_output_roots.iter().enumerate() {
+        let field = format!("cleanup.generatedOutputRoots[{index}]");
+        if let Err(error) = validate_run_relative_sandbox_path(root) {
+            blocked_reasons.push(format!("{field}: {error}"));
+        }
+        if !value_stays_under_sandbox_root(root, sandbox_root) {
+            blocked_reasons.push(format!("{field} must stay under layout.sandboxRoot"));
+        }
+    }
+}
+
+fn value_stays_under_sandbox_root(value: &str, sandbox_root: &str) -> bool {
+    value == sandbox_root || value.starts_with(&format!("{sandbox_root}/"))
+}
+
+pub fn validate_source_patch_sandbox_evaluator_plan(
+    plan: &SourcePatchSandboxEvaluatorPlan,
+) -> Result<SourcePatchSandboxEvaluatorPlanValidation> {
+    let validation = inspect_source_patch_sandbox_evaluator_plan(plan);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch sandbox evaluator plan blocked: {}",
             validation.blocked_reasons.join("; ")
         ));
     }
