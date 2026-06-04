@@ -6,6 +6,15 @@ preview-only milestone. It does not implement source patch application, merge
 automation, branch mutation, dependency mutation, arbitrary command execution,
 browser command bridges, hosted services, or production editor behavior.
 
+Status after #366: complete as inert preview/review/sandbox evidence, still
+preview-only. Completion means the preview artifact, file-class, diff-integrity,
+stale-target, command-allowlist, sandbox dry-run, review-decision, evidence
+bundle, dashboard/Studio display, Scenario Coverage v6, and generated-state
+audit slices were implemented and verified. It does **not** authorize trusted
+source apply, merge/rebase automation, dependency/CI mutation, browser command
+bridges, native export, plugin runtime, public launch automation, or Godot
+replacement claims.
+
 The trusted boundary remains local-first and Rust-owned. Browser, dashboard, and
 Studio surfaces may display exported preview evidence as escaped read-only data
 and inert command text only. They must not write trusted files, execute commands,
@@ -385,7 +394,7 @@ The coverage matrix intentionally does **not** claim:
 - committed generated preview, sandbox, report, dashboard, run, smoke output,
   screenshot, log, or package artifacts outside explicit source-like fixtures.
 
-Remaining gaps after #365 are roadmap scope, not regressions in this suite:
+Remaining gaps after #366 are roadmap scope, not regressions in this suite:
 trusted source apply, production-grade sandboxing, richer Studio affordances,
 release/export packaging, plugin execution, and public launch readiness all
 require later issue contracts and fresh guardrail reviews.

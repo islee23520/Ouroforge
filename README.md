@@ -40,6 +40,10 @@ Current checked-in behavior includes:
 - Read-only static dashboard and authoring cockpit surfaces over exported JSON.
 - Fixture-backed contracts for scene, asset, tilemap, source-preview, sandbox,
   review, and public-readiness documentation boundaries.
+- Source Mutation Preview v1 is complete as inert preview/review/sandbox
+  evidence only; source patch apply to the trusted maintainer worktree remains
+  unimplemented and forbidden until a separate later governance gate authorizes
+  it.
 
 Generated run, dashboard, screenshot, sandbox, and local tool artifacts are local
 state and stay untracked unless a future issue explicitly scopes a deterministic
@@ -185,7 +189,11 @@ a separate manual visibility decision.
 The roadmap and completed milestone references live in
 [`docs/roadmap.md`](docs/roadmap.md). Public-alpha readiness, launch governance,
 release artifact policy, and post-launch roadmap responses are documented as
-separate references rather than launch approval.
+separate references rather than launch approval. Source Mutation Preview v1 is
+recorded there as complete but preview-only; it does not authorize trusted source
+apply, branch merge/rebase automation, browser command bridges, dependency/CI
+mutation, native export, plugin runtime, public launch automation, or Godot
+replacement claims.
 
 ## Contributor guide
 

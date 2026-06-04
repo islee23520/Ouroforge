@@ -134,10 +134,18 @@ outcome keeps source mutation apply blocked: the gate produced threat model,
 file-class, preview-artifact, review-gate, rollback/audit, sandbox/worktree, and
 read-only Studio review designs, but it did not implement source patch
 application, arbitrary patch apply, browser command bridges, or source-mutation
-readiness. Source Mutation Preview v1 remains scoped as a later preview-only
-implementation contract in `docs/source-mutation-preview-v1.md`; it may only
-produce inert preview/evidence surfaces unless a separate later governance issue
-authorizes more.
+readiness.
+
+Source Mutation Preview v1 is complete as an inert preview/evidence milestone
+after #365/#366. Its implementation slices added file-class validation, bounded
+diff integrity checks, preview artifacts, stale-target guards, allowlisted
+sandbox dry-run evidence, review-decision/evidence bundles, read-only
+dashboard/Studio display, and generated-state cleanup/audit coverage. This is
+not source apply authorization: source patch application to the trusted
+maintainer worktree, merge/rebase automation, dependency/CI mutation, arbitrary
+shell/network/install commands, browser command bridges, public launch
+automation, native export, plugin runtime, and Godot replacement claims remain
+out of scope unless a separate later governance issue authorizes them.
 
 ## Near-term governance and public-readiness work
 
@@ -156,14 +164,23 @@ and leaving #1/#23 open. Visual Authoring v1 (#343-#354) is now complete as a
 local-first draft/preview/review evidence milestone; it is not a public-readiness
 or production-editor claim.
 
-After #354, the next recommended milestone is Source Mutation Preview v1
-implementation slices (#356-#366) as inert preview/evidence work only. Public
-Alpha Readiness (#367-#377) and Public Alpha Launch Governance (#378-#387) remain
-later governance tracks, only when backed by fixed PR units, regression coverage,
-generated-state audits, and explicit non-goals. Native Export Design Gate, Plugin
-Design Gate, and Visual Authoring v2 remain possible later governance topics, but
-none is authorized as implementation scope by the Visual Authoring v1 completion
-handoff.
+After #366, Source Mutation Preview v1 is recorded as complete and still
+preview-only. The next conservative milestone candidates are:
+
+1. keep source patch apply blocked and open a later Source Mutation Apply Design
+   Gate only if maintainers explicitly want trusted apply semantics;
+2. continue with Public Alpha Readiness (#367-#377) as governance/readiness
+   evidence only, with no visibility change or launch automation; or
+3. defer public-readiness work in favor of another design gate such as Native
+   Export or Plugin capability, again only through fixed scoped issues.
+
+Until maintainers make a separate explicit decision, Public Alpha Readiness
+(#367-#377) and Public Alpha Launch Governance (#378-#387) remain governance
+tracks, only when backed by fixed PR units, regression coverage,
+generated-state audits, and explicit non-goals. Native Export Design Gate,
+Plugin Design Gate, and Visual Authoring v2 remain possible later governance
+topics, but none is authorized as implementation scope by this Source Mutation
+Preview completion handoff.
 
 The public-readiness and post-launch triage docs remain governance inputs, not
 automated launch or roadmap-acceptance paths:
@@ -199,12 +216,12 @@ remain governance actions, not automated code paths.
   warnings instead of inferred passes.
 - Keep source mutation apply blocked until a separately scoped later milestone
   has an explicit implementation decision, sandbox/evidence enforcement, and
-  review approval; the completed design gate and completed Asset Pipeline v1 are
-  not that authorization.
-- Treat Source Mutation Preview v1 as the preferred next milestone after Visual
-  Authoring v1, but only as inert preview/evidence work. It must not authorize
-  source mutation apply, browser trusted writes, command bridges, dependency/CI
-  mutation, marketplace/plugin scope, native export, or public launch automation.
+  review approval; the completed design gate, completed Source Mutation Preview
+  v1 milestone, and completed Asset Pipeline v1 are not that authorization.
+- Treat Source Mutation Preview v1 as complete but preview-only. Its artifacts
+  are evidence inputs for review/governance, not authority to apply patches,
+  merge branches, execute browser-originated commands, mutate dependencies/CI,
+  publish, package native exports, enable plugins, or launch publicly.
 
 ## Active anchors
 

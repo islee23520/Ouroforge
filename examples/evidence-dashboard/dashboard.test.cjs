@@ -1135,3 +1135,10 @@ assert.ok(demoDisplayAudit.forbiddenControls.includes('browser_command_bridge'))
 assert.match(demoDisplayAuditDoc, /read-only display/i);
 assert.match(demoDisplayAuditDoc, /Generated reports remain untracked/);
 assert.doesNotMatch(demoDisplayAuditDoc, /can apply patches|can merge branches|trusted file write control|executes commands from the browser/i);
+
+const sourceMutationRoadmap = fs.readFileSync('docs/roadmap.md', 'utf8');
+const sourceMutationPreviewDoc = fs.readFileSync('docs/source-mutation-preview-v1.md', 'utf8');
+assert.match(sourceMutationRoadmap, /Source Mutation Preview v1 is complete as an inert preview\/evidence milestone/);
+assert.match(sourceMutationRoadmap, /source patch application to the trusted\s+maintainer worktree[\s\S]*remain\s+out of scope/);
+assert.match(sourceMutationPreviewDoc, /Status after #366: complete as inert preview\/review\/sandbox evidence/);
+assert.match(sourceMutationPreviewDoc, /does \*\*not\*\* authorize trusted\s+source apply/);
