@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "runtime-save-artifact-v1",
+  "saveId": "save-slot-1-tick-42",
+  "runId": "run-runtime-state-v1",
+  "slotId": "slot-1",
+  "createdAtUnixMs": 1780592000000,
+  "state": {
+    "schemaVersion": "runtime-state-v1",
+    "stateId": "state-slot-1-tick-42",
+    "runId": "run-runtime-state-v1",
+    "scenarioId": "save-load-smoke",
+    "sceneId": "foundation-scene",
+    "tick": 42,
+    "recordedAtUnixMs": 1780592000000,
+    "flags": { "coin_collected": true, "door_open": false },
+    "inventory": ["coin"],
+    "progress": { "coins": 1, "checkpoint": 2 },
+    "entities": [
+      {
+        "entityId": "player",
+        "transform": { "x": 40, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "status": { "hitPoints": 3, "states": ["grounded"] }
+      }
+    ],
+    "camera": { "activeCameraId": "follow-player", "position": { "x": 16, "y": 0 } },
+    "input": { "actionState": { "move_right": false, "jump": false } },
+    "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" }
+  },
+  "policy": {
+    "artifactPath": "evidence/runtime-state/saves/slot-1.save.json",
+    "rootKind": "generated_evidence",
+    "trustedWriter": "rust-local-runtime-save-v1",
+    "browserWriteAccess": "none",
+    "retention": "generated run evidence; untracked unless fixture-scoped"
+  }
+}

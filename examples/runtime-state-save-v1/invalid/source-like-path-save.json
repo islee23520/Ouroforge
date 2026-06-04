@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "runtime-save-artifact-v1",
+  "saveId": "save-slot-1-tick-42",
+  "runId": "run-runtime-state-v1",
+  "slotId": "slot-1",
+  "createdAtUnixMs": 1780592000000,
+  "state": {
+    "schemaVersion": "runtime-state-v1",
+    "stateId": "state-slot-1-tick-42",
+    "runId": "run-runtime-state-v1",
+    "sceneId": "foundation-scene",
+    "tick": 42,
+    "recordedAtUnixMs": 1780592000000,
+    "entities": [{ "entityId": "player" }],
+    "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" }
+  },
+  "policy": {
+    "artifactPath": "examples/runtime-state-save-v1/generated/slot-1.save.json",
+    "rootKind": "generated_evidence",
+    "trustedWriter": "rust-local-runtime-save-v1",
+    "browserWriteAccess": "none",
+    "retention": "invalid source-like generated output"
+  }
+}
