@@ -12,7 +12,7 @@ A lane uses `schemaVersion: performance-regression-lane-v1` and includes:
 
 - `laneId`, `milestone`, risk area, assigned role/agent, and classification;
 - `baselineRuns` and `comparisonRuns` evidence refs;
-- `metrics` with baseline, comparison, delta, unit, and notes;
+- `metrics` with metric source, baseline, comparison, delta, unit, and notes;
 - `thresholds` with metric refs, comparison operators, threshold values,
   `classificationIfExceeded`, and rationale;
 - `evidenceLinks` to run comparison, frame budget, scenario matrix, QA queue,
@@ -45,15 +45,17 @@ The lane is inert local evidence:
   completion, or Godot replacement capability.
 
 Browser metrics are advisory evidence inputs only. Rust/local validation owns the
-trusted artifact contract and later regression classification checks. Dashboard,
+trusted artifact contract and regression classification checks. Browser-advisory
+metric sources require warnings that state advisory status and trusted
+Rust/local ownership. Dashboard,
 Studio, and cockpit surfaces may display escaped read-only summaries only.
 
 ## MAP13.10.1 scope
 
 MAP13.10.1 defines the lane artifact, classification enum, docs, and fixture
-examples. Later MAP13.10 PRs own deeper validation for missing baselines, stale
-run refs, malformed metrics, unsupported thresholds, missing evidence, browser
-metric trust warnings, and dashboard/Studio linkage.
+examples. MAP13.10.2 adds validation for missing baselines, stale run refs, malformed
+metrics, unsupported thresholds, missing evidence, and browser metric trust
+warnings. MAP13.10.3 owns dashboard/Studio linkage.
 
 ## Generated-state policy
 

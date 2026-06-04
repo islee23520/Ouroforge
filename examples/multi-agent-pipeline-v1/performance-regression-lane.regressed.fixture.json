@@ -32,7 +32,8 @@
       "baselineValue": 13.2,
       "comparisonValue": 13.4,
       "deltaValue": 0.2,
-      "notes": "Local fixture values for regression-lane schema coverage only."
+      "notes": "Local fixture values for regression-lane schema coverage only.",
+      "metricSource": "browser-advisory"
     },
     {
       "id": "p95-frame-ms",
@@ -40,7 +41,8 @@
       "unit": "milliseconds",
       "baselineValue": 15.9,
       "comparisonValue": 16.0,
-      "deltaValue": 0.1
+      "deltaValue": 0.1,
+      "metricSource": "local-rust"
     }
   ],
   "thresholds": [
@@ -132,5 +134,6 @@
   "boundary": "Performance/regression lane is inert local evidence; it does not execute commands, does not spawn agents, does not mutate trusted files, does not write trusted browser state, does not auto-apply, does not auto-merge, does not self-approve, does not claim production readiness, and does not claim Godot replacement capability.",
   "blockedReasons": [
     "Candidate p95 frame time exceeded the local frame-budget threshold."
-  ]
+  ],
+  "staleRunRefs": []
 }

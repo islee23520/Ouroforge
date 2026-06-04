@@ -29,10 +29,11 @@
       "id": "average-frame-ms",
       "name": "average-frame-ms",
       "unit": "milliseconds",
-      "baselineValue": 13.2,
-      "comparisonValue": 13.4,
-      "deltaValue": 0.2,
-      "notes": "Local fixture values for regression-lane schema coverage only."
+      "baselineValue": "unsupported-browser-longtask",
+      "comparisonValue": "unsupported-browser-longtask",
+      "deltaValue": "unsupported-browser-longtask",
+      "notes": "Local fixture values for regression-lane schema coverage only.",
+      "metricSource": "unsupported"
     },
     {
       "id": "p95-frame-ms",
@@ -40,7 +41,8 @@
       "unit": "milliseconds",
       "baselineValue": 15.9,
       "comparisonValue": 16.0,
-      "deltaValue": 0.1
+      "deltaValue": 0.1,
+      "metricSource": "local-rust"
     }
   ],
   "thresholds": [
@@ -48,8 +50,8 @@
       "id": "avg-frame-budget",
       "metricId": "average-frame-ms",
       "operator": "delta-less-than-or-equal",
-      "value": 1.0,
-      "classificationIfExceeded": "regressed",
+      "value": "unsupported-threshold",
+      "classificationIfExceeded": "unsupported",
       "rationale": "Average frame delta over one millisecond requires regression review before promotion."
     },
     {
@@ -132,5 +134,6 @@
   "boundary": "Performance/regression lane is inert local evidence; it does not execute commands, does not spawn agents, does not mutate trusted files, does not write trusted browser state, does not auto-apply, does not auto-merge, does not self-approve, does not claim production readiness, and does not claim Godot replacement capability.",
   "blockedReasons": [
     "Unsupported threshold operator or metric source for trusted classification."
-  ]
+  ],
+  "staleRunRefs": []
 }

@@ -77,7 +77,23 @@
     ],
     "metadata": {
       "generatedStateBoundary": "tracked fixture only; screenshots/runs/previews stay untracked"
-    }
+    },
+    "colliders": [
+      {
+        "id": "cube-collider",
+        "shape": "box",
+        "body": "static",
+        "size": {
+          "x": 2,
+          "y": 2,
+          "z": 2
+        },
+        "collisionGroup": "world",
+        "collisionMask": [
+          "actors"
+        ]
+      }
+    ]
   },
   "metadata": {
     "capabilityGate": "bounded local 3D scene graph fixture, not renderer evidence"

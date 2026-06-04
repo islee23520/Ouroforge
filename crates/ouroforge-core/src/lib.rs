@@ -14794,6 +14794,12 @@ pub struct PerformanceRegressionLaneArtifact {
     pub baseline_runs: Vec<AuthoringLoopArtifactRef>,
     #[serde(rename = "comparisonRuns")]
     pub comparison_runs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "staleRunRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub stale_run_refs: Vec<String>,
     pub metrics: Vec<PerformanceRegressionMetric>,
     pub thresholds: Vec<PerformanceRegressionThreshold>,
     #[serde(rename = "evidenceLinks")]
@@ -14817,6 +14823,8 @@ pub struct PerformanceRegressionLaneArtifact {
 pub struct PerformanceRegressionMetric {
     pub id: String,
     pub name: String,
+    #[serde(rename = "metricSource", default)]
+    pub metric_source: PerformanceRegressionMetricSource,
     pub unit: String,
     #[serde(rename = "baselineValue")]
     pub baseline_value: serde_json::Value,
@@ -14883,6 +14891,16 @@ pub enum PerformanceRegressionThresholdOperator {
     DeltaGreaterThanOrEqual,
 }
 
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum PerformanceRegressionMetricSource {
+    #[default]
+    LocalRust,
+    ScenarioEvaluator,
+    BrowserAdvisory,
+    Unsupported,
+}
+
 impl PerformanceRegressionLaneArtifact {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let artifact: PerformanceRegressionLaneArtifact = serde_json::from_str(input)
@@ -14909,14 +14927,22 @@ impl PerformanceRegressionLaneArtifact {
             "performance regression lane assignedAgent",
             &self.assigned_agent,
         )?;
-        validate_nonempty_refs(
-            "performance regression lane baselineRuns",
-            &self.baseline_runs,
-        )?;
+        if self.classification == PerformanceRegressionClassification::MissingBaseline {
+            validate_optional_refs(
+                "performance regression lane baselineRuns",
+                &self.baseline_runs,
+            )?;
+        } else {
+            validate_nonempty_refs(
+                "performance regression lane baselineRuns",
+                &self.baseline_runs,
+            )?;
+        }
         validate_nonempty_refs(
             "performance regression lane comparisonRuns",
             &self.comparison_runs,
         )?;
+        self.validate_stale_run_refs()?;
         if self.metrics.is_empty() {
             return Err(anyhow!(
                 "performance regression lane metrics must not be empty"
@@ -14941,6 +14967,7 @@ impl PerformanceRegressionLaneArtifact {
             threshold.validate(index, &metric_ids)?;
         }
         self.evidence_links.validate()?;
+        self.validate_browser_metric_warnings()?;
         validate_optional_text_list(
             "performance regression lane blockedReasons",
             &self.blocked_reasons,
@@ -14972,6 +14999,110 @@ impl PerformanceRegressionLaneArtifact {
             }
             PerformanceRegressionClassification::Improved
             | PerformanceRegressionClassification::Unchanged => {}
+        }
+        if self.classification == PerformanceRegressionClassification::MissingBaseline
+            && !self.baseline_runs.is_empty()
+        {
+            return Err(anyhow!(
+                "performance regression lane missing-baseline classification must not include trusted baselineRuns"
+            ));
+        }
+        if self.classification == PerformanceRegressionClassification::Stale
+            && self.stale_run_refs.is_empty()
+        {
+            return Err(anyhow!(
+                "performance regression lane stale classification requires staleRunRefs"
+            ));
+        }
+        if self.classification != PerformanceRegressionClassification::Stale
+            && !self.stale_run_refs.is_empty()
+        {
+            return Err(anyhow!(
+                "performance regression lane staleRunRefs require stale classification"
+            ));
+        }
+        if self.classification != PerformanceRegressionClassification::Unsupported
+            && self.metrics.iter().any(|metric| {
+                metric.metric_source == PerformanceRegressionMetricSource::Unsupported
+            })
+        {
+            return Err(anyhow!(
+                "performance regression lane unsupported metric sources require unsupported classification"
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_stale_run_refs(&self) -> Result<()> {
+        validate_optional_text_list(
+            "performance regression lane staleRunRefs",
+            &self.stale_run_refs,
+        )?;
+        let live_run_paths = self
+            .baseline_runs
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .chain(
+                self.comparison_runs
+                    .iter()
+                    .map(|reference| reference.path.as_str()),
+            )
+            .chain(
+                self.evidence_links
+                    .run_comparison_refs
+                    .iter()
+                    .map(|reference| reference.path.as_str()),
+            )
+            .collect::<BTreeSet<_>>();
+        let mut stale_paths = BTreeSet::new();
+        for (index, stale_ref) in self.stale_run_refs.iter().enumerate() {
+            validate_project_manifest_path(
+                &format!("performance regression lane staleRunRefs[{index}]"),
+                stale_ref,
+            )?;
+            if !self
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| stale_ref == root || stale_ref.starts_with(&format!("{root}/")))
+            {
+                return Err(anyhow!(
+                    "performance regression lane staleRunRefs[{index}] must stay under generated performance roots"
+                ));
+            }
+            if !stale_paths.insert(stale_ref.as_str()) {
+                return Err(anyhow!(
+                    "duplicate performance regression lane staleRunRefs path: {stale_ref}"
+                ));
+            }
+            if live_run_paths.contains(stale_ref.as_str()) {
+                return Err(anyhow!(
+                    "performance regression lane staleRunRefs[{index}] must not duplicate current run or comparison evidence refs"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_browser_metric_warnings(&self) -> Result<()> {
+        let has_browser_metrics = self.metrics.iter().any(|metric| {
+            metric.metric_source == PerformanceRegressionMetricSource::BrowserAdvisory
+        });
+        if !has_browser_metrics {
+            return Ok(());
+        }
+        let warning_text = self
+            .evidence_links
+            .browser_metric_warnings
+            .join(" ")
+            .to_ascii_lowercase();
+        if !(warning_text.contains("advisory")
+            && warning_text.contains("rust/local validation")
+            && warning_text.contains("trusted"))
+        {
+            return Err(anyhow!(
+                "performance regression lane browser metric warnings must state browser metrics are advisory and Rust/local validation owns trusted classification"
+            ));
         }
         Ok(())
     }
@@ -15043,6 +15174,13 @@ impl PerformanceRegressionMetric {
                     "performance regression lane metrics[{index}].{field} must be a number or explicit textual value"
                 ));
             }
+            if self.metric_source != PerformanceRegressionMetricSource::Unsupported
+                && !value.is_number()
+            {
+                return Err(anyhow!(
+                    "performance regression lane metrics[{index}].{field} must be numeric unless metricSource is unsupported"
+                ));
+            }
         }
         if let Some(notes) = &self.notes {
             require_bounded_display_text(
@@ -15072,6 +15210,23 @@ impl PerformanceRegressionThreshold {
         if !(self.value.is_number() || self.value.is_string()) {
             return Err(anyhow!(
                 "performance regression lane thresholds[{index}].value must be a number or explicit textual value"
+            ));
+        }
+        if !self.value.is_number()
+            && self.classification_if_exceeded != PerformanceRegressionClassification::Unsupported
+        {
+            return Err(anyhow!(
+                "performance regression lane thresholds[{index}].value must be numeric unless classificationIfExceeded is unsupported"
+            ));
+        }
+        if matches!(
+            self.classification_if_exceeded,
+            PerformanceRegressionClassification::Improved
+                | PerformanceRegressionClassification::Unchanged
+                | PerformanceRegressionClassification::MissingBaseline
+        ) {
+            return Err(anyhow!(
+                "performance regression lane thresholds[{index}].classificationIfExceeded must be a blocking classification"
             ));
         }
         require_bounded_display_text(
@@ -56276,7 +56431,11 @@ scenarios:
             assert_eq!(lane.schema_version, PERFORMANCE_REGRESSION_LANE_SCHEMA_VERSION);
             assert_eq!(lane.classification, expected_classification);
             assert_eq!(lane.assigned_role, "performance-regression-agent");
-            assert!(!lane.baseline_runs.is_empty());
+            if expected_classification == PerformanceRegressionClassification::MissingBaseline {
+                assert!(lane.baseline_runs.is_empty());
+            } else {
+                assert!(!lane.baseline_runs.is_empty());
+            }
             assert!(!lane.comparison_runs.is_empty());
             assert!(lane
                 .evidence_links
@@ -56308,6 +56467,11 @@ scenarios:
                 .browser_metric_warnings
                 .iter()
                 .any(|warning| warning.contains("advisory evidence inputs")));
+            if expected_classification == PerformanceRegressionClassification::Stale {
+                assert!(!lane.stale_run_refs.is_empty());
+            } else {
+                assert!(lane.stale_run_refs.is_empty());
+            }
             assert!(lane.generated_state.tracked_fixture_only);
             assert!(lane
                 .generated_state
@@ -56367,6 +56531,79 @@ scenarios:
     }
 
     #[test]
+    fn performance_regression_lane_v1_rejects_baseline_metric_threshold_and_warning_drift() {
+        let valid = || -> serde_json::Value {
+            serde_json::from_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+            ))
+            .expect("lane json")
+        };
+
+        let mut missing_baseline = valid();
+        missing_baseline["baselineRuns"] = json!([]);
+        let baseline_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&missing_baseline.to_string())
+                .expect_err("non-missing-baseline classification requires baseline runs");
+        assert!(format!("{baseline_error:#}").contains("baselineRuns"));
+
+        let mut stale_without_refs: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json",
+        ))
+        .expect("stale lane json");
+        stale_without_refs["staleRunRefs"] = json!([]);
+        let stale_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&stale_without_refs.to_string())
+                .expect_err("stale classification requires staleRunRefs");
+        assert!(format!("{stale_error:#}").contains("staleRunRefs"));
+
+        let mut stale_duplicate = serde_json::from_str::<serde_json::Value>(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json",
+        ))
+        .expect("stale lane json");
+        stale_duplicate["staleRunRefs"] =
+            json!(["runs/multi-agent-pipeline/demo/performance/comparison-run.json"]);
+        let stale_duplicate_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&stale_duplicate.to_string())
+                .expect_err("stale refs cannot duplicate current comparison refs");
+        assert!(format!("{stale_duplicate_error:#}").contains("must not duplicate"));
+
+        let mut malformed_metric = valid();
+        malformed_metric["metrics"][0]["comparisonValue"] = json!({"not": "a metric"});
+        let metric_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&malformed_metric.to_string())
+                .expect_err("object metric value rejects");
+        assert!(format!("{metric_error:#}").contains("comparisonValue"));
+
+        let mut non_numeric_metric = valid();
+        non_numeric_metric["metrics"][0]["comparisonValue"] = json!("not-numeric");
+        let non_numeric_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&non_numeric_metric.to_string())
+                .expect_err("supported metric values must be numeric");
+        assert!(format!("{non_numeric_error:#}").contains("must be numeric"));
+
+        let mut unsupported_threshold = valid();
+        unsupported_threshold["thresholds"][0]["classificationIfExceeded"] = json!("unchanged");
+        let unsupported_threshold_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&unsupported_threshold.to_string())
+                .expect_err("threshold exceeded classifications must block");
+        assert!(format!("{unsupported_threshold_error:#}").contains("classificationIfExceeded"));
+
+        let mut missing_evidence = valid();
+        missing_evidence["evidenceLinks"]["runComparisonRefs"] = json!([]);
+        let evidence_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&missing_evidence.to_string())
+                .expect_err("missing run comparison evidence rejects");
+        assert!(format!("{evidence_error:#}").contains("runComparisonRefs"));
+
+        let mut missing_browser_warning = valid();
+        missing_browser_warning["evidenceLinks"]["browserMetricWarnings"] = json!([]);
+        let warning_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&missing_browser_warning.to_string())
+                .expect_err("browser metrics require trust warning");
+        assert!(format!("{warning_error:#}").contains("browser metric warnings"));
+    }
+
+    #[test]
     fn performance_regression_lane_doc_audits_generated_state_and_governance() {
         let doc = read_repo_text("docs/performance-regression-lane-v1.md");
         for required in [
@@ -56384,6 +56621,7 @@ scenarios:
             "QA queue",
             "review/critic gate",
             "Browser metrics are advisory evidence inputs only",
+            "MAP13.10.2",
             "does not execute commands",
             "does not spawn agents",
             "does not mutate trusted files",
