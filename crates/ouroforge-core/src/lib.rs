@@ -7078,6 +7078,14 @@ fn validate_repo_relative_source_ref(field: &str, value: &str) -> Result<()> {
     if path.is_absolute() {
         return Err(anyhow!("{field} must be relative"));
     }
+    // Reject raw backslash separators before the component check. On Unix
+    // `Path::components()` treats a backslash as an ordinary character, so a
+    // value like `seeds\..\secret.yaml` parses as a single normal component and
+    // would otherwise escape the repo-relative space in a consumer that
+    // normalizes `\` to `/`. Fail closed on that shape.
+    if value.contains('\\') {
+        return Err(anyhow!("{field} must not contain backslash separators"));
+    }
     for component in path.components() {
         match component {
             Component::Normal(_) | Component::CurDir => {}
@@ -40481,6 +40489,28 @@ scenarios:
         let error = QaScenarioCandidateArtifact::from_json_str(blocked)
             .expect_err("blocked candidate without reasons rejected");
         assert!(error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn repo_relative_source_ref_rejects_backslash_traversal() {
+        // A plain repo-relative ref is accepted.
+        validate_repo_relative_source_ref("seedRef", "seeds/platformer.yaml")
+            .expect("plain repo-relative ref is accepted");
+
+        // Backslash-shaped traversal must fail closed even though Unix
+        // Path::components() treats it as a single normal component.
+        let backslash = validate_repo_relative_source_ref("seedRef", "seeds\\..\\secret.yaml")
+            .expect_err("backslash traversal ref rejected");
+        assert!(backslash.to_string().contains("backslash"));
+
+        let nested_backslash =
+            validate_repo_relative_source_ref("scenarioPackRef", "examples\\pack.json")
+                .expect_err("any backslash separator rejected");
+        assert!(nested_backslash.to_string().contains("backslash"));
+
+        // Existing forward-slash traversal guards remain intact.
+        validate_repo_relative_source_ref("replayRef", "../secret.yaml")
+            .expect_err("parent traversal still rejected");
     }
 
     #[test]
