@@ -41,5 +41,14 @@ Studio/cockpit surfaces may display this summary when exported as `camera3d` or
 read-only displays and do not persist viewport edits, operate camera tooling, or
 control the runtime.
 
-Scenario/evaluator camera checks are a separate #598 PR unit. Existing 2D
-camera config remains unchanged.
+## Scenario/evaluator compatibility
+
+Scenario assertions may target `scene3d_camera` to check active camera
+existence, active camera id, projection kind, FOV/near/far fields, viewport
+shape, and camera counts from bounded camera evidence. Runtime scenario capture
+writes a read-only `ouroforge.scene3d-camera-scenario-evidence.v1` artifact from
+world-state `scene3dCamera`/`camera3d` evidence. The evaluator treats missing
+referenced `scene3d_camera` evidence as a consistency failure, so passed camera
+assertions must remain backed by an existing artifact.
+
+Existing 2D camera config remains unchanged.
