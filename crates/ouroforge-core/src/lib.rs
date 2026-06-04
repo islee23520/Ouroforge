@@ -19694,6 +19694,30 @@ pub struct GameplayEventSignalSystemArtifact {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+pub struct GameplayEventSignalQueueSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "eventLogId")]
+    pub event_log_id: String,
+    #[serde(rename = "eventCount")]
+    pub event_count: usize,
+    #[serde(rename = "consumedCount")]
+    pub consumed_count: usize,
+    #[serde(rename = "unconsumedCount")]
+    pub unconsumed_count: usize,
+    #[serde(rename = "earliestTick", skip_serializing_if = "Option::is_none")]
+    pub earliest_tick: Option<u64>,
+    #[serde(rename = "latestTick", skip_serializing_if = "Option::is_none")]
+    pub latest_tick: Option<u64>,
+    #[serde(rename = "orderedEventIds")]
+    pub ordered_event_ids: Vec<String>,
+    #[serde(rename = "queueRules")]
+    pub queue_rules: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct GameplayEventSignalDefinition {
     pub id: String,
     #[serde(rename = "eventType")]
@@ -19751,6 +19775,46 @@ impl GameplayEventSignalSystemArtifact {
             .context("failed to parse Gameplay Event Signal System JSON")?;
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    pub fn queue_summary_from_json_str(input: &str) -> Result<GameplayEventSignalQueueSummary> {
+        let artifact = Self::from_json_str(input)?;
+        Ok(artifact.queue_summary())
+    }
+
+    pub fn ordered_events(&self) -> Vec<&GameplayEventSignalDefinition> {
+        let mut events: Vec<_> = self.events.iter().collect();
+        events.sort_by(|left, right| {
+            left.tick
+                .cmp(&right.tick)
+                .then(left.ordering_index.cmp(&right.ordering_index))
+                .then(left.id.cmp(&right.id))
+        });
+        events
+    }
+
+    pub fn queue_summary(&self) -> GameplayEventSignalQueueSummary {
+        let ordered_events = self.ordered_events();
+        GameplayEventSignalQueueSummary {
+            schema_version: "gameplay-event-signal-queue-summary.v1".to_string(),
+            event_log_id: self.event_log_id.clone(),
+            event_count: self.events.len(),
+            consumed_count: self.events.iter().filter(|event| event.consumed).count(),
+            unconsumed_count: self.events.iter().filter(|event| !event.consumed).count(),
+            earliest_tick: ordered_events.first().map(|event| event.tick),
+            latest_tick: ordered_events.last().map(|event| event.tick),
+            ordered_event_ids: ordered_events
+                .iter()
+                .map(|event| event.id.clone())
+                .collect(),
+            queue_rules: vec![
+                "Validate event artifacts before ordering.".to_string(),
+                "Order events deterministically by tick, then orderingIndex, then id.".to_string(),
+                "Keep consumed and unconsumed state visible; do not drop unconsumed events.".to_string(),
+                format!("Bound queues to at most {MAX_GAMEPLAY_EVENTS} events for v1 fixtures."),
+            ],
+            boundary: "Read-only deterministic Gameplay Event Signal queue summary; no runtime execution, no script execution, no eval, no dynamic import, no plugin loader, no command bridge, no browser trusted writes, no source apply, and no production-stable scripting API claim.".to_string(),
+        }
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -66458,6 +66522,31 @@ scenarios:
             .events
             .iter()
             .any(|event| event.consumed && !event.consumed_by.is_empty()));
+
+        let queue_summary = ready.queue_summary();
+        assert_eq!(
+            queue_summary.schema_version,
+            "gameplay-event-signal-queue-summary.v1"
+        );
+        assert_eq!(queue_summary.event_count, 6);
+        assert_eq!(queue_summary.consumed_count, 5);
+        assert_eq!(queue_summary.unconsumed_count, 1);
+        assert_eq!(queue_summary.earliest_tick, Some(42));
+        assert_eq!(queue_summary.latest_tick, Some(47));
+        assert_eq!(
+            queue_summary.ordered_event_ids,
+            vec![
+                "player-spike-contact".to_string(),
+                "keycard-collected".to_string(),
+                "blue-door-flag-changed".to_string(),
+                "hazard-pulse-timer".to_string(),
+                "dash-input-action".to_string(),
+                "guard-state-changed".to_string(),
+            ]
+        );
+        assert!(queue_summary.boundary.contains("Read-only"));
+        assert!(queue_summary.boundary.contains("no runtime execution"));
+        assert!(queue_summary.boundary.contains("no command bridge"));
 
         let partial = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
             "../../../examples/gameplay-event-signal-system-v1/event-signal.partial.fixture.json"
