@@ -1044,6 +1044,48 @@ const OuroforgeDashboard = (() => {
     return [];
   }
 
+
+  function normalizeAgentRoleModels(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderAgentRoleModels(value = null) {
+    const models = normalizeAgentRoleModels(value);
+    if (!models.length) {
+      return '<section class="panel agent-role-models"><h3>Agent role model</h3><p class="empty-state">No agent role model is attached to this dashboard data.</p></section>';
+    }
+    const cards = models.map((model) => {
+      const roles = Array.isArray(model.roles) ? model.roles : [];
+      const separation = Array.isArray(model.separationRequirements) ? model.separationRequirements : [];
+      const forbidden = Array.isArray(model.forbiddenActions) ? model.forbiddenActions : [];
+      const guardrails = Array.isArray(model.guardrails) ? model.guardrails : [];
+      const roleRows = roles.length
+        ? roles.map((role) => {
+          const outputs = Array.isArray(role.allowedOutputs) ? role.allowedOutputs : [];
+          const evidence = Array.isArray(role.requiredEvidence) ? role.requiredEvidence : [];
+          const targets = Array.isArray(role.handoffTargets) ? role.handoffTargets : [];
+          const roleForbidden = Array.isArray(role.forbiddenActions) ? role.forbiddenActions : [];
+          return `<li><strong>${escapeText(role.role || 'unknown-role')}</strong>: ${escapeText(role.purpose || 'missing purpose')}<br><span class="run-meta">Outputs: ${escapeText(outputs.join(' · ') || 'missing')} · Evidence: ${escapeText(evidence.join(' · ') || 'missing')} · Handoffs: ${escapeText(targets.join(' · ') || 'missing')}</span><br><span class="run-meta">Forbidden: ${escapeText(roleForbidden.join(' · ') || 'missing')}</span></li>`;
+        }).join('')
+        : '<li class="artifact-warning">Missing or malformed roles list.</li>';
+      const separationRows = separation.length
+        ? separation.map((requirement) => `<li><strong>${escapeText(requirement.id || 'separation-requirement')}</strong>: ${escapeText(requirement.description || 'missing description')}<br><span class="run-meta">Blocked: ${escapeText(requirement.blockedCondition || 'missing blocked condition')}</span></li>`).join('')
+        : '<li class="artifact-warning">Missing role separation requirements.</li>';
+      return `<article class="artifact agent-role-model">
+        <h4>${escapeText(model.milestone || 'unknown milestone')}</h4>
+        <p class="run-meta">Read-only role accountability metadata. The dashboard does not spawn agents, execute commands, grant authority, apply mutations, approve reviews, or merge changes.</p>
+        <div class="run-meta">Schema: ${escapeText(model.schemaVersion || 'unknown')} · roles ${escapeText(roles.length)}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'missing')}</div>
+        <div class="run-meta">Guardrails: ${escapeText(guardrails.join(' · ') || 'missing')}</div>
+        <h5>Roles</h5><ul>${roleRows}</ul>
+        <h5>Separation requirements</h5><ul>${separationRows}</ul>
+      </article>`;
+    }).join('');
+    return `<section class="panel agent-role-models"><h3>Agent role model</h3><div class="artifact-grid">${cards}</div></section>`;
+  }
+
   function normalizeAgentHandoffs(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1308,6 +1350,7 @@ const OuroforgeDashboard = (() => {
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
+      ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
       ${renderAgentHandoffs(agentHandoffs || run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
       ${renderJournalViewer(run)}
@@ -1379,7 +1422,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

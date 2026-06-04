@@ -783,6 +783,21 @@ assert.doesNotMatch(dashboard.renderLoopRecoveryStatus(run.loop_recovery), /<mis
 assert.match(dashboard.renderRunDetail(run), /Authoring loop recovery/);
 assert.match(dashboard.renderLoopRecoveryStatus(null), /No recovery status/);
 
+const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
+run.agent_role_model = agentRoleModelFixture;
+const roleModelMarkup = dashboard.renderAgentRoleModels(agentRoleModelFixture);
+assert.match(roleModelMarkup, /Agent role model/);
+assert.match(roleModelMarkup, /designer/);
+assert.match(roleModelMarkup, /build-release-candidate-agent/);
+assert.match(roleModelMarkup, /no-self-review/);
+assert.match(roleModelMarkup, /self-approval/);
+assert.match(roleModelMarkup, /Read-only role accountability metadata/);
+assert.doesNotMatch(roleModelMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(dashboard.renderAgentRoleModels({ schemaVersion: 'agent-role-model-v1', milestone: '<bad>', roles: '<bad>', separationRequirements: [] }), /Missing or malformed roles list/);
+assert.doesNotMatch(dashboard.renderAgentRoleModels({ schemaVersion: 'agent-role-model-v1', milestone: '<script>bad</script>', roles: [], separationRequirements: [] }), /<script>bad<\/script>/);
+assert.match(dashboard.renderRunDetail(run), /Agent role model/);
+assert.match(dashboard.renderAgentRoleModels(null), /No agent role model/);
+
 assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /Agent handoff/);
 assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /blocked/);
 assert.match(dashboard.renderAgentHandoffs(run.agent_handoffs), /&lt;handoff-loop&gt;/);
