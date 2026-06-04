@@ -2133,6 +2133,17 @@ pub struct AuthoringLoopResumePreflight {
 }
 
 pub const AGENT_ROLE_MODEL_SCHEMA_VERSION: &str = "agent-role-model-v1";
+const SUPPORTED_AGENT_ROLES: &[&str] = &[
+    "designer",
+    "gameplay-engineer",
+    "level-designer",
+    "asset-import-planner",
+    "qa-agent",
+    "performance-regression-agent",
+    "reviewer",
+    "critic",
+    "build-release-candidate-agent",
+];
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -2226,6 +2237,12 @@ impl AgentRoleModel {
 impl AgentRoleDefinition {
     fn validate(&self, index: usize) -> Result<()> {
         validate_path_component(&format!("agent role model roles[{index}].role"), &self.role)?;
+        if !SUPPORTED_AGENT_ROLES.contains(&self.role.as_str()) {
+            return Err(anyhow!(
+                "agent role model roles[{index}].role '{}' is unsupported",
+                self.role
+            ));
+        }
         require_text(
             &format!("agent role model roles[{index}].purpose"),
             &self.purpose,
@@ -2234,6 +2251,7 @@ impl AgentRoleDefinition {
             &format!("agent role model roles[{index}].allowedOutputs"),
             &self.allowed_outputs,
         )?;
+        validate_agent_role_allowed_outputs(index, &self.allowed_outputs)?;
         validate_nonempty_text_list(
             &format!("agent role model roles[{index}].requiredInputArtifacts"),
             &self.required_input_artifacts,
@@ -2260,6 +2278,34 @@ impl AgentRoleDefinition {
         }
         Ok(())
     }
+}
+
+fn validate_agent_role_allowed_outputs(index: usize, outputs: &[String]) -> Result<()> {
+    for (output_index, output) in outputs.iter().enumerate() {
+        let normalized = output.trim().to_ascii_lowercase();
+        for forbidden in [
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "trusted-source-write",
+            "trusted source write",
+            "browser-command",
+            "browser command",
+            "hidden-agent",
+            "hidden agent",
+            "publish",
+            "deploy",
+            "sign-release",
+            "sign release",
+        ] {
+            if normalized.contains(forbidden) {
+                return Err(anyhow!(
+                    "agent role model roles[{index}].allowedOutputs[{output_index}] contains forbidden output authority: {forbidden}"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 impl RoleSeparationRequirement {
@@ -33770,6 +33816,26 @@ scenarios:
         unsafe_value["roles"][0]["forbiddenActions"] = json!(["trusted source write"]);
         let error = AgentRoleModel::from_json_str(&unsafe_value.to_string()).unwrap_err();
         assert!(error.to_string().contains("self-approval"));
+    }
+
+    #[test]
+    fn agent_role_model_v1_rejects_unsupported_roles_and_forbidden_outputs() {
+        let invalid =
+            read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.invalid.fixture.json");
+        let error = AgentRoleModel::from_json_str(&invalid).unwrap_err();
+        assert!(error.to_string().contains("unsupported"));
+
+        let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
+        let mut value: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
+        value["roles"][0]["allowedOutputs"] = json!(["auto-apply"]);
+        let error = AgentRoleModel::from_json_str(&value.to_string()).unwrap_err();
+        assert!(error.to_string().contains("forbidden output authority"));
+
+        let mut missing_evidence: serde_json::Value =
+            serde_json::from_str(&body).expect("fixture json");
+        missing_evidence["roles"][0]["requiredEvidence"] = json!([]);
+        let error = AgentRoleModel::from_json_str(&missing_evidence.to_string()).unwrap_err();
+        assert!(error.to_string().contains("requiredEvidence"));
     }
 
     #[test]
