@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "source-patch-test-command-allowlist-v1",
+  "policyId": "source-patch-preview-safe-local-checks-v1",
+  "commands": [
+    {
+      "id": "cargo-fmt-check",
+      "command": "cargo fmt --check",
+      "argv": ["cargo", "fmt", "--check"],
+      "category": "rust-format-check",
+      "matchPolicy": "exact",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 300,
+      "rationale": "Check formatting without rewriting source files."
+    },
+    {
+      "id": "core-patch-preview-tests",
+      "command": "cargo test -p ouroforge-core --test patch_preview_artifact -- --nocapture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-core",
+        "--test",
+        "patch_preview_artifact",
+        "--",
+        "--nocapture"
+      ],
+      "category": "rust-focused-test",
+      "matchPolicy": "prefix",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 600,
+      "rationale": "Focused source patch preview schema and validation regression tests."
+    },
+    {
+      "id": "cli-patch-preview-tests",
+      "command": "cargo test -p ouroforge-cli --test artifact_commands patch_preview -- --nocapture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-cli",
+        "--test",
+        "artifact_commands",
+        "patch_preview",
+        "--",
+        "--nocapture"
+      ],
+      "category": "rust-focused-test",
+      "matchPolicy": "prefix",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 600,
+      "rationale": "Focused CLI read-only patch preview inspection regression tests."
+    },
+    {
+      "id": "cargo-clippy-strict",
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "category": "rust-clippy",
+      "matchPolicy": "exact",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 1200,
+      "rationale": "Static Rust analysis using already-present local project dependencies."
+    },
+    {
+      "id": "dashboard-syntax",
+      "command": "node --check examples/evidence-dashboard/dashboard.js",
+      "argv": ["node", "--check", "examples/evidence-dashboard/dashboard.js"],
+      "category": "node-syntax-check",
+      "matchPolicy": "exact",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 120,
+      "rationale": "Node syntax check for read-only evidence dashboard code."
+    },
+    {
+      "id": "dashboard-smoke-test",
+      "command": "node examples/evidence-dashboard/dashboard.test.cjs",
+      "argv": ["node", "examples/evidence-dashboard/dashboard.test.cjs"],
+      "category": "node-fixture-test",
+      "matchPolicy": "exact",
+      "workingDirectory": ".",
+      "mayWriteGeneratedArtifacts": false,
+      "generatedOutputRoots": [],
+      "timeoutSeconds": 120,
+      "rationale": "Local dashboard fixture smoke test without network or install steps."
+    }
+  ],
+  "guardrails": [
+    "This allowlist is inert policy data and does not execute commands.",
+    "Source patch apply to the trusted main worktree remains unimplemented and forbidden.",
+    "Browser/dashboard/Studio surfaces may display commands read-only only.",
+    "Sandbox dry-run execution is future-scoped and must stay allowlist-only."
+  ]
+}
