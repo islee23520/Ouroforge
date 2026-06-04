@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "reachability-pathing-evidence-v1",
+  "evidenceId": "reach_result_drift",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "tilemapDraftId": "draft_collect_and_exit_tilemap_intro",
+  "placementDraftId": "draft_collect_and_exit_entities_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 5, "height": 3 },
+  "cells": [
+    { "point": { "x": 0, "y": 1 }, "kind": "walkable" },
+    { "point": { "x": 2, "y": 0 }, "kind": "blocked" },
+    { "point": { "x": 2, "y": 1 }, "kind": "blocked" },
+    { "point": { "x": 2, "y": 2 }, "kind": "blocked" },
+    { "point": { "x": 4, "y": 1 }, "kind": "objective" }
+  ],
+  "queries": [
+    { "queryId": "start_to_goal", "kind": "start_to_goal", "from": { "x": 0, "y": 1 }, "to": { "x": 4, "y": 1 }, "movement": { "kind": "walking" } }
+  ],
+  "results": [
+    { "queryId": "start_to_goal", "status": "reachable", "path": [{ "x": 0, "y": 1 }, { "x": 4, "y": 1 }] }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "report", "kind": "path_report", "pathHint": "evidence/reachability-pathing/reach_result_drift/report.json" }
+  ],
+  "status": "validated"
+}

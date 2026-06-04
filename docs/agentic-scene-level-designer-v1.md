@@ -77,7 +77,8 @@ proves a safer dependency order:
    ([Tilemap Terrain Generation Draft v1](tilemap-terrain-generation-draft-v1.md)).
 5. #632 - Entity, Objective, and Encounter Placement Draft v1
    ([Entity Objective Encounter Placement Draft v1](entity-objective-encounter-placement-draft-v1.md)).
-6. #633 - Reachability and Pathing Evidence v1.
+6. #633 - Reachability and Pathing Evidence v1
+   ([Reachability Pathing Evidence v1](reachability-pathing-evidence-v1.md)).
 7. #634 - Objective Completion and Win Loss Proof v1.
 8. #635 - Difficulty, Pacing, and Balance Heuristic Evidence v1.
 9. #636 - Level Visual Diff and Semantic Comparison v1.

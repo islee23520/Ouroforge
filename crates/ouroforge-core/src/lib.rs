@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
@@ -16788,6 +16788,695 @@ fn entity_objective_status_label(status: EntityObjectivePlacementDraftStatus) ->
         EntityObjectivePlacementDraftStatus::Stale => "stale",
         EntityObjectivePlacementDraftStatus::Unsupported => "unsupported",
         EntityObjectivePlacementDraftStatus::Blocked => "blocked",
+    }
+}
+
+const REACHABILITY_PATHING_EVIDENCE_SCHEMA_VERSION: &str = "reachability-pathing-evidence-v1";
+const REACHABILITY_PATHING_READ_MODEL_SCHEMA_VERSION: &str =
+    "reachability-pathing-evidence-read-model-v1";
+const MAX_REACHABILITY_GRID_TILES: u32 = 256;
+const MAX_REACHABILITY_CELLS: usize = 4096;
+const MAX_REACHABILITY_QUERIES: usize = 64;
+const MAX_REACHABILITY_PATH_NODES: usize = 1024;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityPathingEvidenceArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "tilemapDraftId")]
+    pub tilemap_draft_id: String,
+    #[serde(rename = "placementDraftId")]
+    pub placement_draft_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    pub grid: ReachabilityGrid,
+    pub cells: Vec<ReachabilityCell>,
+    pub queries: Vec<ReachabilityQuery>,
+    pub results: Vec<ReachabilityQueryResult>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<ReachabilityExpectedEvidence>,
+    pub status: ReachabilityEvidenceStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityGrid {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityPoint {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityCell {
+    pub point: ReachabilityPoint,
+    pub kind: ReachabilityCellKind,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityCellKind {
+    Walkable,
+    Blocked,
+    Hazard,
+    Door,
+    Key,
+    Checkpoint,
+    Objective,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityQuery {
+    #[serde(rename = "queryId")]
+    pub query_id: String,
+    pub kind: ReachabilityQueryKind,
+    pub from: ReachabilityPoint,
+    pub to: ReachabilityPoint,
+    pub movement: ReachabilityMovement,
+    #[serde(
+        rename = "requiredPickupRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub required_pickup_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityQueryKind {
+    StartToGoal,
+    RequiredPickupPath,
+    KeyToDoor,
+    CheckpointToObjective,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityMovement {
+    pub kind: ReachabilityMovementKind,
+    #[serde(
+        rename = "unsupportedReason",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unsupported_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityMovementKind {
+    Walking,
+    Jump,
+    Action,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityQueryResult {
+    #[serde(rename = "queryId")]
+    pub query_id: String,
+    pub status: ReachabilityQueryStatus,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub path: Vec<ReachabilityPoint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocker: Option<ReachabilityBlocker>,
+    #[serde(
+        rename = "unsupportedReason",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unsupported_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityQueryStatus {
+    Reachable,
+    Unreachable,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityBlocker {
+    pub kind: ReachabilityBlockerKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub point: Option<ReachabilityPoint>,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityBlockerKind {
+    BlockedCell,
+    HazardCell,
+    MissingEdge,
+    MissingObjective,
+    UnknownState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: ReachabilityExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityExpectedEvidenceKind {
+    PathReport,
+    UnreachableReport,
+    UnsupportedReport,
+    ScenarioAssertion,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReachabilityEvidenceStatus {
+    Validated,
+    Failed,
+    Stale,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReachabilityPathingEvidenceReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub status: String,
+    #[serde(rename = "queryCount")]
+    pub query_count: usize,
+    #[serde(rename = "reachableCount")]
+    pub reachable_count: usize,
+    #[serde(rename = "unreachableCount")]
+    pub unreachable_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: usize,
+    #[serde(rename = "expectedEvidenceRefs")]
+    pub expected_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl ReachabilityPathingEvidenceArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: ReachabilityPathingEvidenceArtifact = serde_json::from_str(input)
+            .context("failed to parse Reachability Pathing Evidence JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != REACHABILITY_PATHING_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "reachability pathing evidence schemaVersion must be {REACHABILITY_PATHING_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("reachability evidence evidenceId", &self.evidence_id)?;
+        validate_path_component("reachability evidence intentId", &self.intent_id)?;
+        validate_path_component("reachability evidence planId", &self.plan_id)?;
+        validate_path_component(
+            "reachability evidence tilemapDraftId",
+            &self.tilemap_draft_id,
+        )?;
+        validate_path_component(
+            "reachability evidence placementDraftId",
+            &self.placement_draft_id,
+        )?;
+        validate_repo_relative_source_ref(
+            "reachability evidence targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "reachability evidence targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        self.grid.validate()?;
+        let cell_map = validate_reachability_cells(&self.grid, &self.cells)?;
+        validate_reachability_queries(&self.grid, &self.queries)?;
+        validate_reachability_expected_evidence(&self.evidence_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("reachability evidence blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("reachability evidence guardrails", guardrail)?;
+        }
+        let expected = evaluate_reachability_queries(&self.grid, &cell_map, &self.queries)?;
+        validate_reachability_results(&self.results, &expected)?;
+        validate_reachability_status(self.status, &self.results, &self.blocked_reasons)
+    }
+}
+
+impl ReachabilityGrid {
+    fn validate(&self) -> Result<()> {
+        if self.width == 0
+            || self.height == 0
+            || self.width > MAX_REACHABILITY_GRID_TILES
+            || self.height > MAX_REACHABILITY_GRID_TILES
+        {
+            return Err(anyhow!(
+                "reachability grid width and height must be between 1 and {MAX_REACHABILITY_GRID_TILES}"
+            ));
+        }
+        Ok(())
+    }
+
+    fn contains(self, point: ReachabilityPoint) -> bool {
+        point.x < self.width && point.y < self.height
+    }
+}
+
+pub fn reachability_pathing_evidence_read_model_from_json_str(
+    input: &str,
+) -> Result<ReachabilityPathingEvidenceReadModel> {
+    let artifact = ReachabilityPathingEvidenceArtifact::from_json_str(input)?;
+    Ok(reachability_pathing_evidence_read_model(&artifact))
+}
+
+pub fn reachability_pathing_evidence_read_model(
+    artifact: &ReachabilityPathingEvidenceArtifact,
+) -> ReachabilityPathingEvidenceReadModel {
+    let count_status = |status| {
+        artifact
+            .results
+            .iter()
+            .filter(|result| result.status == status)
+            .count()
+    };
+    ReachabilityPathingEvidenceReadModel {
+        schema_version: REACHABILITY_PATHING_READ_MODEL_SCHEMA_VERSION.to_string(),
+        evidence_id: artifact.evidence_id.clone(),
+        status: reachability_evidence_status_label(artifact.status).to_string(),
+        query_count: artifact.queries.len(),
+        reachable_count: count_status(ReachabilityQueryStatus::Reachable),
+        unreachable_count: count_status(ReachabilityQueryStatus::Unreachable),
+        unsupported_count: count_status(ReachabilityQueryStatus::Unsupported),
+        blocked_count: count_status(ReachabilityQueryStatus::Blocked),
+        expected_evidence_refs: artifact
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.path_hint.clone())
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only reachability/pathing evidence; bounded local graph analysis only, unsupported movement is explicit, no gameplay quality guarantee, no scene writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_reachability_cells(
+    grid: &ReachabilityGrid,
+    cells: &[ReachabilityCell],
+) -> Result<BTreeMap<ReachabilityPoint, ReachabilityCellKind>> {
+    if cells.is_empty() || cells.len() > MAX_REACHABILITY_CELLS {
+        return Err(anyhow!(
+            "reachability cells must contain between 1 and {MAX_REACHABILITY_CELLS} entries"
+        ));
+    }
+    let mut by_point = BTreeMap::new();
+    for cell in cells {
+        if !grid.contains(cell.point) {
+            return Err(anyhow!(
+                "reachability cell is outside grid bounds: {},{}",
+                cell.point.x,
+                cell.point.y
+            ));
+        }
+        if by_point.insert(cell.point, cell.kind).is_some() {
+            return Err(anyhow!(
+                "duplicate reachability cell point: {},{}",
+                cell.point.x,
+                cell.point.y
+            ));
+        }
+    }
+    Ok(by_point)
+}
+
+fn validate_reachability_queries(
+    grid: &ReachabilityGrid,
+    queries: &[ReachabilityQuery],
+) -> Result<()> {
+    if queries.is_empty() || queries.len() > MAX_REACHABILITY_QUERIES {
+        return Err(anyhow!(
+            "reachability queries must contain between 1 and {MAX_REACHABILITY_QUERIES} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for query in queries {
+        validate_path_component("reachability queries.queryId", &query.query_id)?;
+        if !grid.contains(query.from) || !grid.contains(query.to) {
+            return Err(anyhow!(
+                "reachability query endpoints must be inside grid: {}",
+                query.query_id
+            ));
+        }
+        if matches!(query.movement.kind, ReachabilityMovementKind::Unsupported)
+            && query.movement.unsupported_reason.is_none()
+        {
+            return Err(anyhow!(
+                "reachability unsupported movement requires unsupportedReason"
+            ));
+        }
+        if let Some(reason) = &query.movement.unsupported_reason {
+            require_bounded_display_text("reachability movement unsupportedReason", reason)?;
+        }
+        validate_unique_path_components(
+            "reachability queries.requiredPickupRefs",
+            "pickupRef",
+            &query.required_pickup_refs,
+        )?;
+        if !ids.insert(query.query_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate reachability queries.queryId: {}",
+                query.query_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_reachability_expected_evidence(
+    evidence_id: &str,
+    values: &[ReachabilityExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("reachability expectedEvidence must not be empty"));
+    }
+    let expected_prefix = format!("evidence/reachability-pathing/{evidence_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "reachability expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "reachability expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate reachability expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate reachability expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_reachability_queries(
+    grid: &ReachabilityGrid,
+    cells: &BTreeMap<ReachabilityPoint, ReachabilityCellKind>,
+    queries: &[ReachabilityQuery],
+) -> Result<Vec<ReachabilityQueryResult>> {
+    queries
+        .iter()
+        .map(|query| evaluate_reachability_query(grid, cells, query))
+        .collect()
+}
+
+fn evaluate_reachability_query(
+    grid: &ReachabilityGrid,
+    cells: &BTreeMap<ReachabilityPoint, ReachabilityCellKind>,
+    query: &ReachabilityQuery,
+) -> Result<ReachabilityQueryResult> {
+    if query.movement.kind != ReachabilityMovementKind::Walking {
+        return Ok(ReachabilityQueryResult {
+            query_id: query.query_id.clone(),
+            status: ReachabilityQueryStatus::Unsupported,
+            path: Vec::new(),
+            blocker: None,
+            unsupported_reason: Some(query.movement.unsupported_reason.clone().unwrap_or_else(
+                || "movement mechanic is not supported by reachability v1".to_string(),
+            )),
+        });
+    }
+    if !is_reachability_walkable(cells, query.from) {
+        return Ok(unreachable_reachability_result(
+            query,
+            ReachabilityBlockerKind::BlockedCell,
+            Some(query.from),
+            "start cell is blocked or hazardous",
+        ));
+    }
+    if !is_reachability_walkable(cells, query.to) {
+        return Ok(unreachable_reachability_result(
+            query,
+            ReachabilityBlockerKind::MissingObjective,
+            Some(query.to),
+            "target objective cell is blocked or hazardous",
+        ));
+    }
+    match find_reachability_path(grid, cells, query.from, query.to) {
+        Some(path) => Ok(ReachabilityQueryResult {
+            query_id: query.query_id.clone(),
+            status: ReachabilityQueryStatus::Reachable,
+            path,
+            blocker: None,
+            unsupported_reason: None,
+        }),
+        None => Ok(unreachable_reachability_result(
+            query,
+            ReachabilityBlockerKind::MissingEdge,
+            None,
+            "no walking path connects the requested endpoints",
+        )),
+    }
+}
+
+fn unreachable_reachability_result(
+    query: &ReachabilityQuery,
+    kind: ReachabilityBlockerKind,
+    point: Option<ReachabilityPoint>,
+    summary: &str,
+) -> ReachabilityQueryResult {
+    ReachabilityQueryResult {
+        query_id: query.query_id.clone(),
+        status: ReachabilityQueryStatus::Unreachable,
+        path: Vec::new(),
+        blocker: Some(ReachabilityBlocker {
+            kind,
+            point,
+            summary: summary.to_string(),
+        }),
+        unsupported_reason: None,
+    }
+}
+
+fn find_reachability_path(
+    grid: &ReachabilityGrid,
+    cells: &BTreeMap<ReachabilityPoint, ReachabilityCellKind>,
+    from: ReachabilityPoint,
+    to: ReachabilityPoint,
+) -> Option<Vec<ReachabilityPoint>> {
+    let mut queue = VecDeque::from([from]);
+    let mut visited = BTreeSet::from([from]);
+    let mut parents = BTreeMap::new();
+    while let Some(point) = queue.pop_front() {
+        if point == to {
+            return reconstruct_reachability_path(from, to, &parents);
+        }
+        for next in reachability_neighbors(*grid, point) {
+            if !visited.contains(&next) && is_reachability_walkable(cells, next) {
+                visited.insert(next);
+                parents.insert(next, point);
+                queue.push_back(next);
+            }
+        }
+    }
+    None
+}
+
+fn reconstruct_reachability_path(
+    from: ReachabilityPoint,
+    to: ReachabilityPoint,
+    parents: &BTreeMap<ReachabilityPoint, ReachabilityPoint>,
+) -> Option<Vec<ReachabilityPoint>> {
+    let mut path = vec![to];
+    let mut current = to;
+    while current != from {
+        current = *parents.get(&current)?;
+        path.push(current);
+        if path.len() > MAX_REACHABILITY_PATH_NODES {
+            return None;
+        }
+    }
+    path.reverse();
+    Some(path)
+}
+
+fn reachability_neighbors(
+    grid: ReachabilityGrid,
+    point: ReachabilityPoint,
+) -> Vec<ReachabilityPoint> {
+    let mut neighbors = Vec::with_capacity(4);
+    if point.x > 0 {
+        neighbors.push(ReachabilityPoint {
+            x: point.x - 1,
+            y: point.y,
+        });
+    }
+    if point.y > 0 {
+        neighbors.push(ReachabilityPoint {
+            x: point.x,
+            y: point.y - 1,
+        });
+    }
+    if point.x + 1 < grid.width {
+        neighbors.push(ReachabilityPoint {
+            x: point.x + 1,
+            y: point.y,
+        });
+    }
+    if point.y + 1 < grid.height {
+        neighbors.push(ReachabilityPoint {
+            x: point.x,
+            y: point.y + 1,
+        });
+    }
+    neighbors
+}
+
+fn is_reachability_walkable(
+    cells: &BTreeMap<ReachabilityPoint, ReachabilityCellKind>,
+    point: ReachabilityPoint,
+) -> bool {
+    !matches!(
+        cells
+            .get(&point)
+            .copied()
+            .unwrap_or(ReachabilityCellKind::Walkable),
+        ReachabilityCellKind::Blocked | ReachabilityCellKind::Hazard
+    )
+}
+
+fn validate_reachability_results(
+    actual: &[ReachabilityQueryResult],
+    expected: &[ReachabilityQueryResult],
+) -> Result<()> {
+    if actual.len() != expected.len() {
+        return Err(anyhow!("reachability results must match query count"));
+    }
+    let actual_by_id = actual
+        .iter()
+        .map(|result| (result.query_id.as_str(), result))
+        .collect::<BTreeMap<_, _>>();
+    for expected_result in expected {
+        let Some(actual_result) = actual_by_id.get(expected_result.query_id.as_str()) else {
+            return Err(anyhow!(
+                "reachability results missing queryId: {}",
+                expected_result.query_id
+            ));
+        };
+        if *actual_result != expected_result {
+            return Err(anyhow!(
+                "reachability result drift for queryId: {}",
+                expected_result.query_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_reachability_status(
+    status: ReachabilityEvidenceStatus,
+    results: &[ReachabilityQueryResult],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_unreachable = results
+        .iter()
+        .any(|result| result.status == ReachabilityQueryStatus::Unreachable);
+    let has_unsupported = results
+        .iter()
+        .any(|result| result.status == ReachabilityQueryStatus::Unsupported);
+    let has_blocked = results
+        .iter()
+        .any(|result| result.status == ReachabilityQueryStatus::Blocked);
+    match status {
+        ReachabilityEvidenceStatus::Validated
+            if blocked_reasons.is_empty() && !has_unreachable && !has_unsupported && !has_blocked =>
+        {
+            Ok(())
+        }
+        ReachabilityEvidenceStatus::Failed if blocked_reasons.is_empty() && has_unreachable => Ok(()),
+        ReachabilityEvidenceStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        ReachabilityEvidenceStatus::Unsupported if blocked_reasons.is_empty() && has_unsupported => Ok(()),
+        ReachabilityEvidenceStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        ReachabilityEvidenceStatus::Validated => Err(anyhow!(
+            "reachability validated status cannot include failed, unsupported, blocked, or blockedReasons"
+        )),
+        ReachabilityEvidenceStatus::Failed => Err(anyhow!(
+            "reachability failed status requires at least one unreachable result and no blockedReasons"
+        )),
+        ReachabilityEvidenceStatus::Stale => Err(anyhow!(
+            "reachability stale status requires blockedReasons describing stale linked drafts"
+        )),
+        ReachabilityEvidenceStatus::Unsupported => Err(anyhow!(
+            "reachability unsupported status requires at least one unsupported result and no blockedReasons"
+        )),
+        ReachabilityEvidenceStatus::Blocked => Err(anyhow!(
+            "reachability blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn reachability_evidence_status_label(status: ReachabilityEvidenceStatus) -> &'static str {
+    match status {
+        ReachabilityEvidenceStatus::Validated => "validated",
+        ReachabilityEvidenceStatus::Failed => "failed",
+        ReachabilityEvidenceStatus::Stale => "stale",
+        ReachabilityEvidenceStatus::Unsupported => "unsupported",
+        ReachabilityEvidenceStatus::Blocked => "blocked",
     }
 }
 
@@ -60990,6 +61679,129 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("entity-objective-encounter-placement-draft-v1.md"));
+    }
+
+    #[test]
+    fn reachability_pathing_evidence_v1_accepts_valid_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/reachability-pathing-evidence-v1/reachability.valid.fixture.json"
+        );
+        let artifact = ReachabilityPathingEvidenceArtifact::from_json_str(fixture)
+            .expect("valid reachability fixture parses");
+        assert_eq!(artifact.schema_version, "reachability-pathing-evidence-v1");
+        assert_eq!(artifact.evidence_id, "reach_collect_and_exit_intro");
+        assert_eq!(artifact.status, ReachabilityEvidenceStatus::Validated);
+        assert_eq!(
+            artifact.results[0].status,
+            ReachabilityQueryStatus::Reachable
+        );
+        assert_eq!(artifact.results[0].path.len(), 5);
+
+        let read_model = reachability_pathing_evidence_read_model_from_json_str(fixture)
+            .expect("reachability read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "reachability-pathing-evidence-read-model-v1"
+        );
+        assert_eq!(read_model.status, "validated");
+        assert_eq!(read_model.query_count, 1);
+        assert_eq!(read_model.reachable_count, 1);
+        assert_eq!(read_model.unreachable_count, 0);
+        assert!(read_model.boundary.contains("bounded local graph analysis"));
+        assert!(read_model
+            .boundary
+            .contains("no gameplay quality guarantee"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+    }
+
+    #[test]
+    fn reachability_pathing_evidence_v1_accepts_unreachable_unsupported_stale_and_blocked() {
+        for (fixture, expected_status, expected_result) in [
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/reachability.unreachable.fixture.json"
+                ),
+                ReachabilityEvidenceStatus::Failed,
+                ReachabilityQueryStatus::Unreachable,
+            ),
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/reachability.unsupported.fixture.json"
+                ),
+                ReachabilityEvidenceStatus::Unsupported,
+                ReachabilityQueryStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/reachability.stale.fixture.json"
+                ),
+                ReachabilityEvidenceStatus::Stale,
+                ReachabilityQueryStatus::Reachable,
+            ),
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/reachability.blocked.fixture.json"
+                ),
+                ReachabilityEvidenceStatus::Blocked,
+                ReachabilityQueryStatus::Reachable,
+            ),
+        ] {
+            let artifact = ReachabilityPathingEvidenceArtifact::from_json_str(fixture)
+                .expect("non-validated reachability fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            assert_eq!(artifact.results[0].status, expected_result);
+            if matches!(
+                expected_status,
+                ReachabilityEvidenceStatus::Stale | ReachabilityEvidenceStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn reachability_pathing_evidence_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/invalid/duplicate-cell.fixture.json"
+                ),
+                "duplicate",
+            ),
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/reachability-pathing-evidence-v1/invalid/result-drift.fixture.json"
+                ),
+                "result drift",
+            ),
+        ] {
+            let error = ReachabilityPathingEvidenceArtifact::from_json_str(fixture)
+                .expect_err("invalid reachability fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn reachability_pathing_evidence_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/reachability-pathing-evidence-v1.md");
+        assert!(doc.contains("bounded local path"));
+        assert!(doc.contains("does not infer unsupported movement"));
+        assert!(doc.contains("does not prove subjective level quality"));
+        assert!(doc.contains("no scene write"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("reachability-pathing-evidence-v1.md"));
     }
 
     #[test]
