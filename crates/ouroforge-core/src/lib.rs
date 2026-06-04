@@ -65394,6 +65394,67 @@ scenarios:
     }
 
     #[test]
+    fn audits_3d_demo_scene_v1_docs_generated_state_and_wording() {
+        let readme = read_repo_text("examples/3d-demo-scene-v1/README.md");
+        assert!(readme.contains("3D Demo Scene v1 capability gate"));
+        assert!(readme.contains("cargo run -p ouroforge-cli -- seed validate examples/3d-demo-scene-v1/seeds/3d-demo-scene-v1.yaml"));
+        assert!(readme
+            .contains("cargo run -p ouroforge-cli -- project validate examples/3d-demo-scene-v1"));
+        assert!(readme.contains("node examples/3d-demo-scene-v1/evidence-smoke.test.cjs"));
+        assert!(readme.contains("3d demo scene v1 evidence smoke passed"));
+        assert!(readme.contains("production 3D engine"));
+        assert!(readme.contains("Godot"));
+        assert!(readme.contains("browser-runtime evidence is read-only inspection input"));
+        assert!(readme.contains("Rust/local"));
+        assert!(readme.contains("trusted source-like fixture"));
+        for generated_root in ["runs/", "dashboard-data/", "target/", "tmp/"] {
+            assert!(
+                readme.contains(generated_root),
+                "README documents generated root {generated_root}"
+            );
+        }
+        for forbidden_positive_claim in [
+            "is a production 3D engine",
+            "is a Godot replacement",
+            "replaces Godot",
+            "secure sandbox",
+            "native export ready",
+            "plugin runtime ready",
+            "hosted service",
+            "adds auto-apply",
+            "adds auto-merge",
+        ] {
+            assert!(
+                !readme.contains(forbidden_positive_claim),
+                "README must not include positive overclaim: {forbidden_positive_claim}"
+            );
+        }
+
+        let manifest_path = repo_fixture_path("examples/3d-demo-scene-v1/ouroforge.project.json");
+        let manifest =
+            ProjectManifest::from_path(&manifest_path).expect("3D demo project manifest validates");
+        let generated_roots: Vec<_> = manifest
+            .generated
+            .roots
+            .iter()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            generated_roots,
+            vec!["runs", "target", "dashboard-data", "tmp"]
+        );
+
+        let smoke = read_repo_text("examples/3d-demo-scene-v1/evidence-smoke.test.cjs");
+        assert!(
+            smoke.contains("fs.mkdtempSync(path.join(os.tmpdir(), 'ouroforge-3d-demo-scene-v1-'))")
+        );
+        assert!(smoke.contains("fs.rmSync(tempDir, { recursive: true, force: true })"));
+        assert!(smoke.contains("not trusted persistence"));
+        assert!(smoke.contains("Godot replacement evidence"));
+        assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));
+    }
+
+    #[test]
     fn validates_engine_expressiveness_v2_regression_seed_and_pack() {
         let seed = Seed::from_yaml_str(include_str!(
             "../../../examples/engine-expressiveness-v2-regression/seeds/engine-expressiveness-v2-regression.yaml"
