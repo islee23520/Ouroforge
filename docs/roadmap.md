@@ -264,7 +264,8 @@ Recommended next milestone candidates after this governance refresh are:
 3. **Agentic Scene and Level Designer v1 (#627-#642)** or **GDD-to-Playable
    Prototype v1 (#644-#661)** — later agentic authoring candidates that require
    their own scoped contracts, review gates, generated-state audits, and
-   conservative wording.
+   conservative wording. The Agentic Scene and Level Designer contract starts in
+   [`docs/agentic-scene-level-designer-v1.md`](agentic-scene-level-designer-v1.md).
 4. **Manual public visibility review** — only if maintainers separately choose
    it, using the launch checklist, visibility decision records, communication
    pack, hold/rollback criteria, issue/PR intake policy, security-response
