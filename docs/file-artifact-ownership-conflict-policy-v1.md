@@ -75,6 +75,20 @@ Rust/local validation rejects unresolved conflicts before a policy can be accept
 
 The conflict check treats policy entries as evidence metadata only. A blocked, deferred, or escalated conflict is accepted as explicit evidence that work must stop or be escalated; it is not a hidden lock, write permission, auto-apply path, or automatic resolution.
 
+## Conflict evidence and read-only display
+
+The Rust read model `file-artifact-ownership-policy-read-model-v1` summarizes accepted policies into:
+
+- `status` (`active`, `blocked`, `deferred`, `escalated`, or `malformed`);
+- `conflictCount`;
+- `blockers`;
+- `deferredEntries`;
+- `escalations`;
+- `generatedRoots`;
+- `malformedReasons`.
+
+Dashboard and Studio/cockpit surfaces may render ownership policies as read-only compatibility views. They display owner, role, mode, target, work-package refs, evidence refs, blockers, and escalation requirements only. They do not write trusted state, lock files, execute commands, spawn agents, auto-apply, auto-merge, self-approve, or resolve conflicts.
+
 ## Fixture set
 
 Tracked fixtures live under `examples/multi-agent-pipeline-v1/`:

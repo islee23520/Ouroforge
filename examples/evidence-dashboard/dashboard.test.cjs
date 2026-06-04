@@ -1109,6 +1109,21 @@ assert.match(blockedTaskBoardMarkup, /Waiting for #668/);
 assert.match(dashboard.renderRunDetail(run), /Production task board/);
 assert.match(dashboard.renderProductionTaskBoards(null), /No production task board/);
 
+const ownershipPolicyConflictFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json', 'utf8'));
+const ownershipPolicyEscalationFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/ownership-policy.escalation.fixture.json', 'utf8'));
+run.ownership_policy = ownershipPolicyConflictFixture;
+const ownershipPolicyMarkup = dashboard.renderOwnershipPolicies(ownershipPolicyConflictFixture);
+assert.match(ownershipPolicyMarkup, /Ownership policy/);
+assert.match(ownershipPolicyMarkup, /ownership-policy-conflict/);
+assert.match(ownershipPolicyMarkup, /scene-write-a/);
+assert.match(ownershipPolicyMarkup, /Conflicts with reviewer write hold/);
+assert.match(ownershipPolicyMarkup, /Read-only ownership policy/);
+assert.doesNotMatch(ownershipPolicyMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const escalationPolicyMarkup = dashboard.renderOwnershipPolicies(ownershipPolicyEscalationFixture);
+assert.match(escalationPolicyMarkup, /independent reviewer and critic approval/);
+assert.match(dashboard.renderRunDetail(run), /Ownership policy/);
+assert.match(dashboard.renderOwnershipPolicies(null), /No file\/artifact ownership policy/);
+
 const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
 run.agent_role_model = agentRoleModelFixture;
 const roleModelMarkup = dashboard.renderAgentRoleModels(agentRoleModelFixture);

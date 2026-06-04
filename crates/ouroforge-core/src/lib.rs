@@ -3240,6 +3240,129 @@ impl OwnershipMode {
     }
 }
 
+pub const FILE_ARTIFACT_OWNERSHIP_POLICY_READ_MODEL_SCHEMA_VERSION: &str =
+    "file-artifact-ownership-policy-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct FileArtifactOwnershipPolicyReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "policyId")]
+    pub policy_id: String,
+    pub status: String,
+    #[serde(rename = "entryCount")]
+    pub entry_count: usize,
+    #[serde(rename = "conflictCount")]
+    pub conflict_count: usize,
+    pub blockers: Vec<String>,
+    #[serde(rename = "deferredEntries")]
+    pub deferred_entries: Vec<String>,
+    pub escalations: Vec<String>,
+    #[serde(rename = "generatedRoots")]
+    pub generated_roots: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn file_artifact_ownership_policy_read_model_from_json_str(
+    input: &str,
+) -> FileArtifactOwnershipPolicyReadModel {
+    match FileArtifactOwnershipPolicy::from_json_str(input) {
+        Ok(policy) => FileArtifactOwnershipPolicyReadModel::from_policy(&policy),
+        Err(error) => FileArtifactOwnershipPolicyReadModel::malformed(format!("{error:#}")),
+    }
+}
+
+impl FileArtifactOwnershipPolicyReadModel {
+    pub fn from_policy(policy: &FileArtifactOwnershipPolicy) -> Self {
+        let mut blockers = Vec::new();
+        let mut deferred_entries = Vec::new();
+        let mut escalations = Vec::new();
+        for entry in &policy.entries {
+            for reason in &entry.blocked_reasons {
+                blockers.push(format!("{}: {reason}", entry.id));
+            }
+            if entry.state == OwnershipState::Deferred {
+                deferred_entries.push(entry.id.clone());
+            }
+            if entry.state == OwnershipState::Escalated {
+                let decision = entry
+                    .escalation
+                    .as_ref()
+                    .map(|escalation| escalation.required_decision.as_str())
+                    .unwrap_or("decision required");
+                escalations.push(format!("{}: {decision}", entry.id));
+            }
+        }
+
+        let conflict_count = ownership_policy_conflict_count(&policy.entries);
+        let status = if !escalations.is_empty() {
+            "escalated"
+        } else if conflict_count > 0
+            || policy
+                .entries
+                .iter()
+                .any(|entry| entry.state == OwnershipState::Blocked)
+        {
+            "blocked"
+        } else if !deferred_entries.is_empty() {
+            "deferred"
+        } else {
+            "active"
+        };
+
+        Self {
+            schema_version: FILE_ARTIFACT_OWNERSHIP_POLICY_READ_MODEL_SCHEMA_VERSION.to_string(),
+            policy_id: policy.policy_id.clone(),
+            status: status.to_string(),
+            entry_count: policy.entries.len(),
+            conflict_count,
+            blockers,
+            deferred_entries,
+            escalations,
+            generated_roots: policy.generated_state.roots.clone(),
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only ownership policy summary; it reports conflicts, blockers, deferred entries, and escalation requirements without locking files, spawning agents, executing commands, applying changes, writing trusted browser state, or merging PRs.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: FILE_ARTIFACT_OWNERSHIP_POLICY_READ_MODEL_SCHEMA_VERSION.to_string(),
+            policy_id: "malformed-ownership-policy".to_string(),
+            status: "malformed".to_string(),
+            entry_count: 0,
+            conflict_count: 0,
+            blockers: Vec::new(),
+            deferred_entries: Vec::new(),
+            escalations: Vec::new(),
+            generated_roots: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed ownership policy summary; it reports validation errors without locking files, spawning agents, executing commands, applying changes, writing trusted state, or merging PRs.".to_string(),
+        }
+    }
+}
+
+fn ownership_policy_conflict_count(entries: &[OwnershipPolicyEntry]) -> usize {
+    let mut count = 0;
+    for left_index in 0..entries.len() {
+        let left = &entries[left_index];
+        if left.releases_ownership() {
+            continue;
+        }
+        for right in entries.iter().skip(left_index + 1) {
+            if right.releases_ownership() || !left.targets_overlap(right) {
+                continue;
+            }
+            if ownership_conflict_kind(left, right).is_some() {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 impl OwnershipTargetRef {
     fn validate_schema(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field}.id"), &self.id)?;
@@ -40137,6 +40260,45 @@ scenarios:
                 .contains("conflicting work package"),
             "unexpected work package error: {package_error:#}"
         );
+    }
+
+    #[test]
+    fn ownership_policy_read_model_reports_conflicts_escalations_and_malformed_state() {
+        let conflict = file_artifact_ownership_policy_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json",
+        ));
+        assert_eq!(
+            conflict.schema_version,
+            FILE_ARTIFACT_OWNERSHIP_POLICY_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(conflict.policy_id, "ownership-policy-conflict");
+        assert_eq!(conflict.status, "blocked");
+        assert_eq!(conflict.conflict_count, 1);
+        assert!(conflict
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("scene-write-a")));
+        assert!(conflict.boundary.contains("without locking files"));
+
+        let escalation =
+            file_artifact_ownership_policy_read_model_from_json_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/ownership-policy.escalation.fixture.json",
+            ));
+        assert_eq!(escalation.status, "escalated");
+        assert!(escalation
+            .escalations
+            .iter()
+            .any(|item| item.contains("independent reviewer and critic approval")));
+
+        let malformed =
+            file_artifact_ownership_policy_read_model_from_json_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/ownership-policy.malformed.fixture.json",
+            ));
+        assert_eq!(malformed.status, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("evidenceRefs")));
     }
 
     #[test]
