@@ -101,6 +101,27 @@ const run = {
       { invariantId: '<script>bad</script>', invariantType: 'finite_transform', status: 'passed', targetPath: 'player.transform', evidenceRefs: ['evidence/scenarios/scaffold-smoke/world-state.json'] },
     ] }],
   },
+  qa_worker_assignments: {
+    present: true,
+    status: 'blocked',
+    assignment_count: 2,
+    passed_count: 0,
+    failed_count: 0,
+    deferred_count: 0,
+    blocked_count: 1,
+    exhausted_count: 1,
+    malformed_count: 0,
+    evidence_refs: ['evidence/qa-worker-assignment/worker-assignment.json'],
+    boundary: 'Read-only QA worker assignment evidence; dashboard must not spawn workers.',
+    plans: [{
+      planId: 'qa14_4_worker_assignment_smoke',
+      runId: 'run-1',
+      assignments: [
+        { assignmentId: 'scenario-worker', workerId: 'qa-worker-1', assignedLane: 'scenario-playtest', status: 'blocked', target: { targetType: 'scenario_candidate', targetId: 'collect-and-exit' }, budget: { maxRuns: 3 }, timeoutMs: 10000, outputRoot: 'evidence/qa-workers/qa-worker-1/run/', cleanupPolicy: { mode: 'retain_on_failure' }, blockedReasons: ['budget gate pending'] },
+        { assignmentId: '<script>worker</script>', workerId: 'qa-worker-2', assignedLane: 'fuzz-smoke', status: 'exhausted', target: { targetType: 'fuzz_target', targetId: 'movement-fuzz' }, budget: { maxRuns: 2 }, timeoutMs: 8000, outputRoot: 'evidence/qa-workers/qa-worker-2/run/', cleanupPolicy: { mode: 'retain_for_review' } },
+      ],
+    }],
+  },
   source_apply_worktree_context: {
     present: true,
     status: 'blocked',
@@ -719,6 +740,10 @@ assert.match(dashboard.renderSourceApplyWorktreeContext(run), /browser\/dashboar
 assert.match(dashboard.renderRuntimeInvariants(run), /Runtime invariant evidence refs/);
 assert.match(dashboard.renderRuntimeInvariants(run), /health was negative/);
 assert.match(dashboard.renderRuntimeInvariants(run), /qa14_5_runtime_dashboard/);
+assert.match(dashboard.renderQaWorkerAssignments(run), /QA worker assignment refs/);
+assert.match(dashboard.renderQaWorkerAssignments(run), /budget gate pending/);
+assert.match(dashboard.renderQaWorkerAssignments(run), /qa-worker-1/);
+assert.doesNotMatch(dashboard.renderQaWorkerAssignments(run), /<script>worker<\/script>/);
 assert.doesNotMatch(dashboard.renderRuntimeInvariants(run), /<script>bad<\/script>/);
 assert.doesNotMatch(dashboard.renderSourceApplyWorktreeContext(run), /<script>bad<\/script>/);
 assert.doesNotMatch(dashboard.renderSourceApplyWorktreeContext(run), /<button|onclick|fetch\(/i);
@@ -727,12 +752,14 @@ assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
 assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
+assert.match(dashboard.renderRunDetail(run), /QA worker assignments/);
 assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
 assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, empty_state: 'No loading evidence' } }), /No loading evidence/);
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
 assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
+assert.match(dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: false, empty_state: 'No worker assignment evidence' } }), /No worker assignment evidence/);
 
 const visualAuthoringDoc = fs.readFileSync(require.resolve('../../docs/visual-authoring-v1.md'), 'utf8');
 assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
@@ -779,6 +806,9 @@ assert.ok(!sourceApplyXss.includes('<img src=x onerror=alert(1)>'), 'source appl
 const invariantXss = dashboard.renderRuntimeInvariants({ runtime_invariants: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], summaries: [{ modelId: '<script>model</script>', runId: '<script>run</script>' }], evidence: [{ checks: [{ invariantId: '<script>check</script>', invariantType: '<script>type</script>', status: '<script>status</script>', targetPath: '<script>target</script>', message: '<script>message</script>' }] }] } });
 assert.ok(!invariantXss.includes('<script>check</script>'), 'runtime invariant check ids must be escaped');
 assert.ok(!invariantXss.includes('<script>boundary</script>'), 'runtime invariant boundary must be escaped');
+const qaWorkerXss = dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], plans: [{ planId: '<script>plan</script>', assignments: [{ assignmentId: '<script>assignment</script>', workerId: '<script>worker</script>', assignedLane: '<script>lane</script>', status: '<script>status</script>', target: { targetType: '<script>target</script>', targetId: '<script>target-id</script>' }, budget: { maxRuns: '<script>runs</script>' }, timeoutMs: '<script>timeout</script>', outputRoot: '<script>output</script>', cleanupPolicy: { mode: '<script>cleanup</script>' }, blockedReasons: ['<script>blocked</script>'] }] }] } });
+assert.ok(!qaWorkerXss.includes('<script>assignment</script>'), 'qa worker assignment ids must be escaped');
+assert.ok(!qaWorkerXss.includes('<script>boundary</script>'), 'qa worker assignment boundary must be escaped');
 assert.match(sourceApplyXss, /&lt;script&gt;blocked&lt;\/script&gt;/);
 
 const rawMalformedCommandContextRun = {

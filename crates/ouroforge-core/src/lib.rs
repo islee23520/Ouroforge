@@ -30924,6 +30924,7 @@ pub struct RunDashboardReadModel {
     pub asset_inspector: RunDashboardAssetInspector,
     pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
     pub runtime_invariants: RunDashboardRuntimeInvariants,
+    pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -31180,6 +31181,24 @@ pub struct RunDashboardRuntimeInvariants {
     pub evidence_refs: Vec<String>,
     pub summaries: Vec<RuntimeInvariantEvidenceSummary>,
     pub evidence: Vec<RuntimeInvariantEvidence>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardQaWorkerAssignments {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub assignment_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub deferred_count: usize,
+    pub blocked_count: usize,
+    pub exhausted_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub plans: Vec<QaWorkerAssignmentArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -31539,6 +31558,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let source_apply_worktree_context =
         read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
+    let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -31595,6 +31615,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         asset_inspector,
         source_apply_worktree_context,
         runtime_invariants,
+        qa_worker_assignments,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -31912,6 +31933,125 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_artifact_is_qa_worker_assignment(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("qa_worker_assignment")
+        || artifact.id.contains("qa-worker-assignment")
+        || artifact.id.contains("worker-assignment")
+        || artifact.path.contains("qa-worker-assignment")
+        || artifact.path.contains("worker-assignment")
+}
+
+fn read_dashboard_qa_worker_assignments(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardQaWorkerAssignments> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_qa_worker_assignment,
+    )?;
+    let boundary = "Read-only QA worker assignment evidence; dashboard/Studio surfaces must not spawn workers, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardQaWorkerAssignments {
+            present: false,
+            empty_state: "No QA worker assignment evidence is indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            assignment_count: 0,
+            passed_count: 0,
+            failed_count: 0,
+            deferred_count: 0,
+            blocked_count: 0,
+            exhausted_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            plans: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut plans = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<QaWorkerAssignmentArtifact>(value.clone()) {
+            Ok(plan) if plan.validate().is_ok() => plans.push(plan),
+            _ => malformed_count += 1,
+        }
+    }
+    plans.sort_by(|left, right| {
+        (left.run_id.as_str(), left.plan_id.as_str())
+            .cmp(&(right.run_id.as_str(), right.plan_id.as_str()))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let mut assignment_count = 0usize;
+    let mut passed_count = 0usize;
+    let mut failed_count = 0usize;
+    let mut deferred_count = 0usize;
+    let mut blocked_count = 0usize;
+    let mut exhausted_count = 0usize;
+    for plan in &plans {
+        assignment_count += plan.assignments.len();
+        for assignment in &plan.assignments {
+            match assignment.status {
+                QaWorkerAssignmentStatus::Passed => passed_count += 1,
+                QaWorkerAssignmentStatus::Failed => failed_count += 1,
+                QaWorkerAssignmentStatus::Deferred => deferred_count += 1,
+                QaWorkerAssignmentStatus::Blocked => blocked_count += 1,
+                QaWorkerAssignmentStatus::Exhausted => exhausted_count += 1,
+                QaWorkerAssignmentStatus::Assigned => {}
+            }
+        }
+    }
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if exhausted_count > 0 {
+        "exhausted"
+    } else if failed_count > 0 {
+        "failed"
+    } else if deferred_count > 0 {
+        "deferred"
+    } else if assignment_count > 0 && passed_count == assignment_count {
+        "passed"
+    } else if assignment_count > 0 {
+        "assigned"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardQaWorkerAssignments {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        assignment_count,
+        passed_count,
+        failed_count,
+        deferred_count,
+        blocked_count,
+        exhausted_count,
+        malformed_count,
+        evidence_refs,
+        plans,
+        artifacts,
+        boundary,
+    })
 }
 
 fn dashboard_artifact_is_runtime_invariant_evidence(artifact: &EvidenceArtifact) -> bool {
@@ -39437,6 +39577,78 @@ scenarios:
             .contains("missing a target identity field"));
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn qa_worker_assignment_dashboard_read_model_reports_present_missing_and_malformed() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("qa-worker-assignment-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.qa_worker_assignments.present);
+        assert_eq!(missing.qa_worker_assignments.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("qa-worker-assignment-dashboard-present");
+        let mut plan = QaWorkerAssignmentArtifact::from_json_str(include_str!(
+            "../../../examples/qa-worker-assignment-v1/worker-assignment.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        plan.run_id = json_string(&run, "id").expect("run id present");
+        let path = "evidence/qa-worker-assignment/worker-assignment.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/qa-worker-assignment"))
+            .expect("assignment evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(plan)).expect("assignment writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "qa-worker-assignment-plan",
+            "application/json",
+            path,
+            json!({ "artifact": "qa_worker_assignment" }),
+        )
+        .expect("assignment indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.qa_worker_assignments.present);
+        assert_eq!(dashboard.qa_worker_assignments.status, "exhausted");
+        assert_eq!(dashboard.qa_worker_assignments.assignment_count, 2);
+        assert_eq!(dashboard.qa_worker_assignments.exhausted_count, 1);
+        assert_eq!(
+            dashboard.qa_worker_assignments.evidence_refs,
+            vec![path.to_string()]
+        );
+        assert!(dashboard
+            .qa_worker_assignments
+            .boundary
+            .contains("must not spawn workers"));
+        fs::remove_dir_all(root).expect("fixture removed");
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("qa-worker-assignment-dashboard-malformed");
+        let malformed_path = "evidence/qa-worker-assignment/worker-assignment-malformed.json";
+        fs::create_dir_all(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/qa-worker-assignment"),
+        )
+        .expect("assignment evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed assignment writes");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "qa-worker-assignment-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "qa_worker_assignment" }),
+        )
+        .expect("malformed assignment indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.qa_worker_assignments.present);
+        assert_eq!(malformed.qa_worker_assignments.status, "malformed");
+        assert_eq!(malformed.qa_worker_assignments.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # QA Worker Assignment and Budget Policy v1
 
-Status: **QA14.4.1/QA14.4.2 worker assignment artifact plus budget/output/ref validation** for issue #685.
+Status: **QA14.4.1/QA14.4.2/QA14.4.3 worker assignment artifact, validation, and read-model display** for issue #685.
 
 This document defines a local, bounded QA/playtest worker assignment artifact. It is a planning/evidence contract only: it does not spawn workers, run browsers, execute commands, mutate trusted state, or authorize auto-fix/apply/merge behavior.
 
@@ -51,4 +51,8 @@ QA14.4.1 adds the artifact model, validation, statuses, fixtures, and documentat
 
 ## QA14.4.2 validation boundary
 
-QA14.4.2 hardens local validation for worker ids, bounded budgets, non-zero timeouts, generated output roots, explicit cleanup policy, duplicate assignments, overlapping output roots, missing indexed target refs, and stale run/target refs. These checks still do not execute workers; they only reject unsafe or stale assignment evidence before it can be treated as usable QA planning input. Read-model compatibility remains a separate fixed PR unit under #685.
+QA14.4.2 hardens local validation for worker ids, bounded budgets, non-zero timeouts, generated output roots, explicit cleanup policy, duplicate assignments, overlapping output roots, missing indexed target refs, and stale run/target refs. These checks still do not execute workers; they only reject unsafe or stale assignment evidence before it can be treated as usable QA planning input. Read-model compatibility is provided by QA14.4.3.
+
+## QA14.4.3 read-model boundary
+
+QA14.4.3 exposes QA worker assignment artifacts through the run dashboard/read model and static dashboard as read-only display data. Missing evidence reports an empty state; malformed artifacts report `malformed`; blocked/exhausted states are counted separately. The dashboard does not spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.

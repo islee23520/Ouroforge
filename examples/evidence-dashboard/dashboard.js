@@ -379,6 +379,35 @@ const OuroforgeDashboard = (() => {
   }
 
 
+
+  function renderQaWorkerAssignments(run = {}) {
+    const model = run.qa_worker_assignments || run.qaWorkerAssignments || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || 'No QA worker assignment evidence is available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const plans = Array.isArray(model.plans) ? model.plans : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Assignments', model.assignment_count ?? model.assignmentCount ?? 0],
+      ['Passed/failed', `${model.passed_count ?? model.passedCount ?? 0}/${model.failed_count ?? model.failedCount ?? 0}`],
+      ['Deferred/blocked', `${model.deferred_count ?? model.deferredCount ?? 0}/${model.blocked_count ?? model.blockedCount ?? 0}`],
+      ['Exhausted', model.exhausted_count ?? model.exhaustedCount ?? 0],
+      ['Malformed', model.malformed_count ?? model.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const assignmentRows = plans.flatMap((plan) => Array.isArray(plan.assignments) ? plan.assignments.map((assignment) => ({ plan, assignment })) : []).slice(0, 12).map(({ plan, assignment }) => {
+      const budget = assignment.budget || {};
+      const target = assignment.target || {};
+      const cleanup = assignment.cleanupPolicy || assignment.cleanup_policy || {};
+      const blocked = Array.isArray(assignment.blockedReasons || assignment.blocked_reasons) ? (assignment.blockedReasons || assignment.blocked_reasons) : [];
+      return `<li><strong>${escapeText(assignment.assignmentId || assignment.assignment_id || 'assignment')}</strong>: <span class="${statusClass(assignment.status)}">${escapeText(assignment.status || 'unknown')}</span> · ${escapeText(assignment.workerId || assignment.worker_id || 'worker')} · ${escapeText(assignment.assignedLane || assignment.assigned_lane || 'lane')}<br><small>${escapeText(target.targetType || target.target_type || 'target')} ${escapeText(target.targetId || target.target_id || '')} · maxRuns ${escapeText(budget.maxRuns ?? budget.max_runs ?? '?')} · timeout ${escapeText(assignment.timeoutMs ?? assignment.timeout_ms ?? '?')}ms · cleanup ${escapeText(cleanup.mode || 'unknown')} · ${escapeText(assignment.outputRoot || assignment.output_root || 'no output root')} · ${escapeText(blocked.join(' · ') || plan.planId || plan.plan_id || 'bounded local assignment')}</small></li>`;
+    }).join('') || '<li>No parseable QA worker assignments are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Assignments</h4><ul class="run-meta-list">${assignmentRows}</ul>
+      ${renderRefLinks('QA worker assignment refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only QA worker assignment evidence; dashboard surfaces do not spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.')}</p>`;
+  }
+
   function renderRuntimeInvariants(run = {}) {
     const invariants = run.runtime_invariants || run.runtimeInvariants || {};
     if (!invariants.present) {
@@ -1374,6 +1403,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
+      <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
@@ -1454,7 +1484,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
