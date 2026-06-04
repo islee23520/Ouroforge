@@ -20,5 +20,19 @@ Run:
 node examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs
 ```
 
+## P2D8.12.2 media and performance scenarios
+
+`media-performance-regressions.test.cjs` covers animation state changes, VFX
+intent events, audio intent evidence, and runtime frame-budget/profiler evidence
+using existing runtime fixtures. `scenarios/media-performance-regressions.json`
+documents the bounded media/performance scenario paths as source-like metadata for
+the smoke.
+
+Run:
+
+```bash
+node examples/production-2d-regression-v7/media-performance-regressions.test.cjs
+```
+
 This is not a shipped-game, production-ready engine, Godot replacement, native
 export, hosted service, plugin runtime, or browser-trusted mutation workflow.

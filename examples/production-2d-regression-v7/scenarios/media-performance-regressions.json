@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "production-2d-media-performance-regressions-v7",
+  "description": "Focused source-like Production 2D regression paths for animation/VFX/audio/frame-budget behavior. Generated run evidence remains untracked.",
+  "seed": "seeds/runtime-demo.yaml",
+  "scenes": [
+    "../game-runtime/scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "media-performance-contracts",
+      "description": "Documentation fixture for P2D8.12.2 Node smoke assertions.",
+      "scenarios": [
+        {
+          "id": "animation-vfx-audio-intent",
+          "description": "Animation state transitions, VFX intent events, and browser audio intent evidence remain observable without trusted browser writes.",
+          "assertions": [
+            { "runtime_events": { "path": "events", "containsType": "runtime.animation.state" } },
+            { "runtime_events": { "path": "events", "containsType": "runtime.vfx.emitted" } },
+            { "runtime_events": { "path": "events", "containsType": "runtime.audio.emitted" } }
+          ]
+        },
+        {
+          "id": "frame-budget-profiler-evidence",
+          "description": "Runtime frame-budget evidence reports timings, violations, counts, and read-only authority boundaries.",
+          "assertions": [
+            { "world_state": { "path": "runtimeFrameBudget.status", "equals": "violated" } },
+            { "world_state": { "path": "runtimeFrameBudget.violations", "exists": true } },
+            { "world_state": { "path": "runtimeFrameBudget.readOnlyInspection.disallowedActions", "exists": true } }
+          ]
+        }
+      ]
+    }
+  ]
+}
