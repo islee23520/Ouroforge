@@ -48249,8 +48249,13 @@ pub struct RunDashboardEngineSummaries {
     pub camera: serde_json::Value,
     pub render_breakdown: serde_json::Value,
     pub render_queue: serde_json::Value,
+    pub scene3d_hierarchy: serde_json::Value,
+    pub scene3d_camera: serde_json::Value,
+    pub scene3d_animation: serde_json::Value,
+    pub scene3d_probe: serde_json::Value,
     pub scene3d_render: serde_json::Value,
     pub scene3d_collision: serde_json::Value,
+    pub scene3d_scenario_verdicts: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
@@ -51649,8 +51654,13 @@ fn read_dashboard_engine_summaries(
             camera: json!({ "present": false, "emptyState": "No camera/layer read model is available." }),
             render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
             render_queue: json!({ "present": false, "emptyState": "No scene render queue evidence is available." }),
+            scene3d_hierarchy: json!({ "present": false, "emptyState": "No 3D hierarchy evidence is available." }),
+            scene3d_camera: json!({ "present": false, "emptyState": "No 3D camera evidence is available." }),
+            scene3d_animation: json!({ "present": false, "emptyState": "No 3D animation evidence is available." }),
+            scene3d_probe: json!({ "present": false, "emptyState": "No 3D runtime probe evidence is available." }),
             scene3d_render: json!({ "present": false, "emptyState": "No 3D render smoke evidence is available." }),
             scene3d_collision: json!({ "present": false, "emptyState": "No 3D collision evidence is available." }),
+            scene3d_scenario_verdicts: json!({ "present": false, "emptyState": "No 3D scenario verdict evidence is available." }),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
@@ -51693,8 +51703,13 @@ fn read_dashboard_engine_summaries(
         camera: dashboard_camera_summary(world_state),
         render_breakdown: dashboard_render_breakdown_summary(world_state),
         render_queue: dashboard_render_queue_summary(world_state),
+        scene3d_hierarchy: dashboard_scene3d_hierarchy_summary(world_state),
+        scene3d_camera: dashboard_scene3d_camera_summary(world_state),
+        scene3d_animation: dashboard_scene3d_animation_summary(world_state),
+        scene3d_probe: dashboard_scene3d_probe_summary(world_state),
         scene3d_render: dashboard_scene3d_render_summary(world_state),
         scene3d_collision: dashboard_scene3d_collision_summary(world_state),
+        scene3d_scenario_verdicts: dashboard_scene3d_scenario_verdicts_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
@@ -51885,6 +51900,234 @@ fn dashboard_render_queue_summary(world_state: &serde_json::Value) -> serde_json
         "renderables": renderables,
         "tilemapStats": queue.get("tilemapStats").or_else(|| queue.get("tilemap_stats")).cloned().unwrap_or(json!({})),
         "readOnlyInspection": read_only
+    })
+}
+
+fn dashboard_scene3d_hierarchy_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dTransforms")
+        .or_else(|| world_state.get("scene3d_transforms"))
+        .or_else(|| world_state.get("scene3dHierarchy"))
+        .or_else(|| world_state.get("scene3d_hierarchy"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D hierarchy evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D hierarchy evidence is malformed."
+        });
+    }
+    let transforms = summary
+        .get("transforms")
+        .or_else(|| summary.get("nodes"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let parented_count = transforms
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("parentId")
+                .or_else(|| entry.get("parent_id"))
+                .is_some_and(|value| !value.is_null())
+        })
+        .count();
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "sceneId": summary.get("sceneId").or_else(|| summary.get("scene_id")).cloned().unwrap_or(json!(null)),
+        "nodeCount": summary.get("nodeCount").or_else(|| summary.get("node_count")).cloned().unwrap_or_else(|| json!(transforms.len())),
+        "rootCount": summary.get("rootCount").or_else(|| summary.get("root_count")).cloned().unwrap_or_else(|| json!(transforms.len().saturating_sub(parented_count))),
+        "parentedNodeCount": summary.get("parentedNodeCount").or_else(|| summary.get("parented_node_count")).cloned().unwrap_or_else(|| json!(parented_count)),
+        "transforms": transforms,
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only bounded 3D hierarchy evidence; no 3D editor or viewport persistence claim.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-transform",
+            "browserStudioMode": "read-only 3D hierarchy evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "viewport persistence", "scene mutation"]
+        }))
+    })
+}
+
+fn dashboard_scene3d_camera_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let candidate = world_state
+        .get("scene3dCamera")
+        .or_else(|| world_state.get("scene3d_camera"))
+        .or_else(|| world_state.get("camera3d"))
+        .or_else(|| world_state.pointer("/camera/scene3dCamera"))
+        .or_else(|| world_state.pointer("/camera/camera3d"));
+    let Some(summary) = candidate else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D camera evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D camera evidence is malformed."
+        });
+    }
+    let cameras = summary
+        .get("cameras")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "activeCameraId": summary.get("activeCameraId").or_else(|| summary.get("active_camera_id")).cloned().unwrap_or(json!(null)),
+        "cameraCount": summary.get("cameraCount").or_else(|| summary.get("camera_count")).cloned().unwrap_or_else(|| json!(cameras.len())),
+        "cameras": cameras,
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only 3D camera evidence; no viewport persistence or camera editor tooling.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-camera",
+            "browserStudioMode": "read-only 3D camera evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "viewport persistence", "scene mutation"]
+        }))
+    })
+}
+
+fn dashboard_scene3d_animation_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dAnimation")
+        .or_else(|| world_state.get("scene3d_animation"))
+        .or_else(|| world_state.get("scene3dAnimationSummary"))
+        .or_else(|| world_state.get("scene3d_animation_summary"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D animation evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D animation evidence is malformed."
+        });
+    }
+    let states = summary
+        .get("states")
+        .or_else(|| summary.get("animationStates"))
+        .or_else(|| summary.get("animation_states"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let playing_count = states
+        .iter()
+        .filter(|state| state.get("playing").and_then(|value| value.as_bool()) == Some(true))
+        .count();
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "stateCount": summary.get("stateCount").or_else(|| summary.get("state_count")).cloned().unwrap_or_else(|| json!(states.len())),
+        "playingStateCount": summary.get("playingStateCount").or_else(|| summary.get("playing_state_count")).cloned().unwrap_or_else(|| json!(playing_count)),
+        "states": states,
+        "events": summary.get("events").cloned().unwrap_or_else(|| json!([])),
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only bounded 3D animation evidence; no skeletal authoring, IK, or graph editor claim.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-animation",
+            "browserStudioMode": "read-only 3D animation evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "timeline persistence", "scene mutation"]
+        }))
+    })
+}
+
+fn dashboard_scene3d_probe_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dProbe")
+        .or_else(|| world_state.get("scene3d_probe"))
+        .or_else(|| world_state.get("scene3dProbeSummary"))
+        .or_else(|| world_state.get("scene3d_probe_summary"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D runtime probe evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D runtime probe evidence is malformed."
+        });
+    }
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "status": summary.get("status").cloned().unwrap_or(json!("unknown")),
+        "sceneKind": summary.get("sceneKind").or_else(|| summary.get("scene_kind")).cloned().unwrap_or(json!(null)),
+        "nodeCount": summary.get("nodeCount").or_else(|| summary.get("node_count")).cloned().unwrap_or(json!(0)),
+        "cameraCount": summary.get("cameraCount").or_else(|| summary.get("camera_count")).cloned().unwrap_or(json!(0)),
+        "animationStateCount": summary.get("animationStateCount").or_else(|| summary.get("animation_state_count")).cloned().unwrap_or(json!(0)),
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only 3D runtime probe evidence; browser probe output is not trusted persistence.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-probe",
+            "browserStudioMode": "read-only 3D runtime probe evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "browser runtime control"]
+        }))
+    })
+}
+
+fn dashboard_scene3d_scenario_verdicts_summary(
+    world_state: &serde_json::Value,
+) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dScenarioVerdicts")
+        .or_else(|| world_state.get("scene3d_scenario_verdicts"))
+        .or_else(|| world_state.get("scenarioVerdicts"))
+        .or_else(|| world_state.get("scenario_verdicts"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D scenario verdict evidence is available."
+        });
+    };
+    if !summary.is_object() && !summary.is_array() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D scenario verdict evidence is malformed."
+        });
+    }
+    let verdicts = if let Some(values) = summary.as_array() {
+        values.clone()
+    } else {
+        summary
+            .get("verdicts")
+            .or_else(|| summary.get("results"))
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default()
+    };
+    let failed_count = verdicts
+        .iter()
+        .filter(|verdict| {
+            verdict
+                .get("status")
+                .and_then(|value| value.as_str())
+                .is_some_and(|status| matches!(status, "failed" | "error"))
+        })
+        .count();
+    json!({
+        "present": true,
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "verdictCount": verdicts.len(),
+        "failedVerdictCount": failed_count,
+        "verdicts": verdicts,
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only 3D scenario verdict evidence; Studio cannot promote, mutate, or execute scenarios.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "local-scenario-evaluator",
+            "browserStudioMode": "read-only 3D scenario verdict inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "scenario execution", "promotion"]
+        }))
     })
 }
 
@@ -80784,6 +81027,207 @@ scenarios:
             json!("missing: missing mesh missing-mesh")
         );
 
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_extract_scene3d_read_model_fields() {
+        let (root, artifacts) = create_test_run("dashboard-scene3d-read-model-fields");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"passed\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "sceneId": "studio-3d-read-model",
+                "tick": 7,
+                "entities": [],
+                "scene3dTransforms": {
+                    "schemaVersion": "scene3d-transforms-v1",
+                    "sceneId": "studio-3d-read-model",
+                    "transforms": [
+                        { "nodeId": "root", "parentId": null, "worldTransform": { "translation": { "x": 0, "y": 0, "z": 0 } } },
+                        { "nodeId": "child", "parentId": "root", "worldTransform": { "translation": { "x": 2, "y": 0, "z": 0 } } }
+                    ],
+                    "boundary": "Read-only 3D hierarchy evidence; no 3D editor."
+                },
+                "scene3dCamera": {
+                    "schemaVersion": "scene3d-camera-v1",
+                    "activeCameraId": "main-camera",
+                    "cameras": [
+                        { "id": "main-camera", "active": true, "projection": { "kind": "perspective", "fovDegrees": 60, "near": 1, "far": 1000 } }
+                    ]
+                },
+                "scene3dAnimation": {
+                    "schemaVersion": "scene3d-animation-v1",
+                    "states": [
+                        { "clipId": "clip-a", "targetNodeId": "child", "channel": "translation", "currentFrame": 3, "playing": false }
+                    ],
+                    "boundary": "Read-only bounded 3D animation evidence; no skeletal authoring."
+                },
+                "scene3dProbe": {
+                    "schemaVersion": "scene3d-probe-v1",
+                    "status": "present",
+                    "sceneKind": "3d",
+                    "nodeCount": 2,
+                    "cameraCount": 1,
+                    "animationStateCount": 1
+                },
+                "scene3dScenarioVerdicts": {
+                    "schemaVersion": "scene3d-scenario-verdicts-v1",
+                    "verdicts": [
+                        { "scenarioId": "studio-3d-read-model", "status": "passed", "assertionCount": 3 }
+                    ],
+                    "boundary": "Read-only 3D scenario verdict evidence; Studio cannot execute scenarios."
+                }
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(
+            model.engine_summaries.scene3d_hierarchy["present"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_hierarchy["nodeCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_hierarchy["parentedNodeCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_camera["activeCameraId"],
+            json!("main-camera")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_camera["cameraCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_animation["stateCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_animation["playingStateCount"],
+            json!(0)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_probe["status"],
+            json!("present")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_probe["sceneKind"],
+            json!("3d")
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_scenario_verdicts["verdictCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_scenario_verdicts["failedVerdictCount"],
+            json!(0)
+        );
+        assert!(
+            model.engine_summaries.scene3d_hierarchy["readOnlyInspection"]["disallowedActions"]
+                .as_array()
+                .expect("hierarchy disallowed actions")
+                .iter()
+                .any(|value| value == "command bridge")
+        );
+        assert!(model.engine_summaries.scene3d_scenario_verdicts["boundary"]
+            .as_str()
+            .is_some_and(|value| value.contains("Studio cannot execute scenarios")));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_report_missing_and_malformed_scene3d_read_models() {
+        let missing = read_dashboard_engine_summaries(&[]);
+        assert_eq!(missing.scene3d_hierarchy["present"], json!(false));
+        assert_eq!(missing.scene3d_camera["present"], json!(false));
+        assert_eq!(missing.scene3d_animation["present"], json!(false));
+        assert_eq!(missing.scene3d_probe["present"], json!(false));
+        assert_eq!(missing.scene3d_scenario_verdicts["present"], json!(false));
+
+        let (root, artifacts) = create_test_run("dashboard-scene3d-read-model-malformed");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"pending\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "1",
+                "sceneId": "studio-3d-malformed",
+                "tick": 1,
+                "entities": [],
+                "scene3dTransforms": "bad",
+                "scene3dCamera": "bad",
+                "scene3dAnimation": "bad",
+                "scene3dProbe": "bad",
+                "scene3dScenarioVerdicts": "bad"
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert_eq!(
+            model.engine_summaries.scene3d_hierarchy["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_camera["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_animation["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_probe["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_scenario_verdicts["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.scene3d_probe["emptyState"],
+            json!("3D runtime probe evidence is malformed.")
+        );
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
