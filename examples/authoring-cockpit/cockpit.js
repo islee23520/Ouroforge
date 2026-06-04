@@ -196,6 +196,57 @@ const OuroforgeCockpit = (() => {
     return timelineMutationLinks(run).filter((artifact) => /source-patch|source-apply/.test(`${artifact.id} ${artifact.path}`));
   }
 
+
+  function summarizeTimelineEvidenceArtifact(artifact) {
+    const value = artifact?.value;
+    const valuePreview = value === undefined
+      ? ''
+      : JSON.stringify(value).slice(0, 160);
+    return {
+      id: artifact?.id || artifact?.path || 'unknown-artifact',
+      path: artifact?.path || '',
+      exists: artifact?.exists !== false,
+      readError: artifact?.read_error || artifact?.readError || '',
+      valuePreview,
+    };
+  }
+
+  function timelineArtifactSummaries(run, keys) {
+    return evidenceArtifacts(run, ...keys).map(summarizeTimelineEvidenceArtifact);
+  }
+
+  function buildTimelineComparisonView(sortedRuns, entries, comparisonCandidates) {
+    const runsById = new Map(sortedRuns.map((run) => [run?.summary?.id || 'unknown-run', run]));
+    return comparisonCandidates.map((candidate) => {
+      const beforeRun = runsById.get(candidate.beforeRunId) || {};
+      const afterRun = runsById.get(candidate.afterRunId) || {};
+      const beforeScreenshots = timelineArtifactSummaries(beforeRun, ['screenshots']);
+      const afterScreenshots = timelineArtifactSummaries(afterRun, ['screenshots']);
+      const beforeWorldStates = timelineArtifactSummaries(beforeRun, ['world_states', 'worldStates']);
+      const afterWorldStates = timelineArtifactSummaries(afterRun, ['world_states', 'worldStates']);
+      const comparisonArtifacts = evidenceArtifacts(afterRun, 'comparison_artifacts', 'comparisonArtifacts')
+        .concat(Array.isArray(afterRun?.comparison?.artifacts) ? afterRun.comparison.artifacts : []);
+      return {
+        beforeRunId: candidate.beforeRunId,
+        afterRunId: candidate.afterRunId,
+        comparisonRefs: candidate.comparisonRefs,
+        classifications: comparisonArtifacts.map((artifact) => artifact?.classification || 'unknown'),
+        screenshots: {
+          before: beforeScreenshots,
+          after: afterScreenshots,
+          missing: beforeScreenshots.concat(afterScreenshots).filter((artifact) => !artifact.exists || artifact.readError).map((artifact) => artifact.id),
+        },
+        worldState: {
+          before: beforeWorldStates,
+          after: afterWorldStates,
+          changed: JSON.stringify(beforeWorldStates.map((artifact) => artifact.valuePreview)) !== JSON.stringify(afterWorldStates.map((artifact) => artifact.valuePreview)),
+        },
+        guardrail: 'display-only before/after comparison; no evidence mutation, rerun, source apply, command execution, publish, deploy, or trusted write authority',
+        diagnostics: entries.find((entry) => entry.runId === candidate.beforeRunId)?.diagnostics.concat(entries.find((entry) => entry.runId === candidate.afterRunId)?.diagnostics || []) || [],
+      };
+    });
+  }
+
   function buildEvidenceTimelineModel(runs = []) {
     const sortedRuns = [...(Array.isArray(runs) ? runs : [])].sort((left, right) => Number(left?.summary?.created_at_unix_ms || left?.summary?.createdAtUnixMs || 0) - Number(right?.summary?.created_at_unix_ms || right?.summary?.createdAtUnixMs || 0));
     const entries = sortedRuns.map((run) => {
@@ -234,6 +285,7 @@ const OuroforgeCockpit = (() => {
       status: diagnostics.length ? 'diagnostics' : 'ready',
       entries,
       comparisonCandidates,
+      comparisonView: buildTimelineComparisonView(sortedRuns, entries, comparisonCandidates),
       diagnostics,
       guardrails: [
         'timeline model is read-only exported evidence',
@@ -2054,6 +2106,29 @@ const OuroforgeCockpit = (() => {
     </ul></section>`;
   }
 
+
+  function renderEvidenceComparisonView(model) {
+    const comparisons = Array.isArray(model?.comparisonView) ? model.comparisonView : [];
+    if (!comparisons.length) {
+      return '<section id="evidence-comparison-view" class="panel"><h2>Before/after evidence comparison</h2><p class="empty">No fixture before/after comparison is available.</p><p class="hint">Display-only Studio surface; no evidence mutation, rerun, source apply, command execution, publish, deploy, merge, or trusted write controls are rendered.</p></section>';
+    }
+    const rows = comparisons.map((comparison) => {
+      const screenshotSummary = ['before', 'after'].map((side) => {
+        const artifacts = comparison.screenshots?.[side] || [];
+        return `<div><strong>${escapeText(side)} screenshots</strong><ul>${artifacts.length ? artifacts.map((artifact) => `<li>${escapeText(artifact.id)} ${surfaceState(artifact.exists && !artifact.readError, artifact.exists ? (artifact.readError ? 'broken' : 'available') : 'missing')}<br><small>${escapeText(artifact.path || 'no path')}</small></li>`).join('') : '<li>No screenshot evidence.</li>'}</ul></div>`;
+      }).join('');
+      const worldSummary = ['before', 'after'].map((side) => {
+        const artifacts = comparison.worldState?.[side] || [];
+        return `<div><strong>${escapeText(side)} world-state</strong><ul>${artifacts.length ? artifacts.map((artifact) => `<li>${escapeText(artifact.id)}<br><small>${escapeText(artifact.valuePreview || artifact.path || 'no summary')}</small></li>`).join('') : '<li>No world-state evidence.</li>'}</ul></div>`;
+      }).join('');
+      const refs = comparison.comparisonRefs?.length ? comparison.comparisonRefs.join(' · ') : 'no comparison artifact exported yet';
+      const classifications = comparison.classifications?.length ? comparison.classifications.join(' · ') : 'unknown';
+      const diagnostics = comparison.diagnostics?.length ? `<ul class="warning-list">${comparison.diagnostics.map((diagnostic) => `<li>${escapeText(diagnostic.kind)}: ${escapeText(diagnostic.artifactId)}</li>`).join('')}</ul>` : '<p class="hint compact">No comparison diagnostics for this pair.</p>';
+      return `<li class="surface-row"><strong>${escapeText(comparison.beforeRunId)}</strong> → <strong>${escapeText(comparison.afterRunId)}</strong> ${surfaceState(true, classifications)}<br><small>${escapeText(refs)}</small><div class="field-grid compact">${screenshotSummary}${worldSummary}</div><p class="hint compact">World-state changed: ${escapeText(comparison.worldState?.changed ? 'true' : 'false')}</p>${diagnostics}</li>`;
+    }).join('');
+    return `<section id="evidence-comparison-view" class="panel"><h2>Before/after evidence comparison</h2><p class="hint">Read-only fixture comparison view. The browser cannot mutate evidence, rerun tests, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p><ol>${rows}</ol></section>`;
+  }
+
   function renderEvidenceTimelineSurface(input) {
     const model = input?.schemaVersion === 'studio-evidence-timeline-model-v1'
       ? input
@@ -2077,7 +2152,7 @@ const OuroforgeCockpit = (() => {
     const diagnostics = model.diagnostics.length
       ? `<p class="artifact-warning">${escapeText(model.diagnostics.length)} timeline diagnostic(s) require reviewer attention.</p>`
       : '<p class="hint">All indexed timeline evidence is readable.</p>';
-    return `<section id="evidence-timeline" class="panel"><h2>Evidence timeline</h2><p class="hint">Read-only Studio timeline. The browser cannot mutate evidence, rerun tests, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p>${diagnostics}<ol class="timeline">${rows}</ol>${comparisons}</section>`;
+    return `<section id="evidence-timeline" class="panel"><h2>Evidence timeline</h2><p class="hint">Read-only Studio timeline. The browser cannot mutate evidence, rerun tests, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p>${diagnostics}<ol class="timeline">${rows}</ol>${comparisons}${renderEvidenceComparisonView(model)}</section>`;
   }
 
   function renderEvidencePane(run) {
@@ -2166,7 +2241,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
