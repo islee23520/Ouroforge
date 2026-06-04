@@ -1,5 +1,7 @@
 use ouroforge_core::{
-    parse_unified_patch_diff_integrity, PatchDiffFileStatus, PatchDiffIntegrityWarningKind,
+    inspect_unified_patch_diff_for_preview, parse_unified_patch_diff_integrity,
+    validate_unified_patch_diff_for_preview, PatchDiffFileStatus, PatchDiffIntegrityLimits,
+    PatchDiffIntegrityWarningKind,
 };
 
 fn warning_kinds(
@@ -98,4 +100,114 @@ fn patch_diff_integrity_reports_malformed_parser_failures_from_fixtures() {
             "{name} expected {expected_warning:?}, got {kinds:?}"
         );
     }
+}
+
+fn assert_blocked_fixture(name: &str, diff_text: &str, expected: &str) {
+    let validation =
+        inspect_unified_patch_diff_for_preview(diff_text, PatchDiffIntegrityLimits::default())
+            .unwrap_or_else(|error| {
+                panic!("{name} should inspect without hard parser failure: {error}")
+            });
+    assert_eq!(validation.status, "blocked", "{name} should be blocked");
+    assert!(
+        validation
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains(expected)),
+        "{name} expected blocker containing {expected:?}, got {:?}",
+        validation.blocked_reasons
+    );
+    let error =
+        validate_unified_patch_diff_for_preview(diff_text, PatchDiffIntegrityLimits::default())
+            .expect_err("blocked integrity validation should reject before preview");
+    assert!(error
+        .to_string()
+        .contains("patch diff integrity validation blocked"));
+}
+
+#[test]
+fn patch_diff_integrity_blocks_unsafe_targets_before_preview() {
+    let cases = [
+        (
+            "generated_target",
+            include_str!("../../../examples/patch-diff-integrity-v1/unsafe/generated-target.diff"),
+            "generated",
+        ),
+        (
+            "traversal_target",
+            include_str!("../../../examples/patch-diff-integrity-v1/unsafe/traversal-target.diff"),
+            "absolute, rooted, prefixed, or parent-dir path",
+        ),
+        (
+            "binary_target",
+            include_str!("../../../examples/patch-diff-integrity-v1/unsafe/binary-target.diff"),
+            "binary",
+        ),
+        (
+            "mode_change",
+            include_str!("../../../examples/patch-diff-integrity-v1/unsafe/mode-change.diff"),
+            "mode",
+        ),
+        (
+            "critical_delete",
+            include_str!("../../../examples/patch-diff-integrity-v1/unsafe/critical-delete.diff"),
+            "critical file deletion",
+        ),
+    ];
+
+    for (name, fixture, expected) in cases {
+        assert_blocked_fixture(name, fixture, expected);
+    }
+}
+
+#[test]
+fn patch_diff_integrity_blocks_file_and_line_limit_overflows() {
+    let mut many_files = String::new();
+    for index in 0..3 {
+        many_files.push_str(&format!(
+            "diff --git a/docs/file-{index}.md b/docs/file-{index}.md\n--- a/docs/file-{index}.md\n+++ b/docs/file-{index}.md\n@@ -1 +1 @@\n-old\n+new\n"
+        ));
+    }
+    let file_limit = inspect_unified_patch_diff_for_preview(
+        &many_files,
+        PatchDiffIntegrityLimits {
+            max_files: 2,
+            max_changed_lines: 100,
+        },
+    )
+    .expect("file-limit diff inspects");
+    assert_eq!(file_limit.status, "blocked");
+    assert!(file_limit
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("exceeding limit 2")));
+
+    let line_limit = inspect_unified_patch_diff_for_preview(
+        include_str!("../../../examples/patch-diff-integrity-v1/valid/two-file-basic.diff"),
+        PatchDiffIntegrityLimits {
+            max_files: 10,
+            max_changed_lines: 1,
+        },
+    )
+    .expect("line-limit diff inspects");
+    assert_eq!(line_limit.status, "blocked");
+    assert!(line_limit
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("exceeding limit 1")));
+}
+
+#[test]
+fn patch_diff_integrity_allows_valid_fixture_for_later_preview_checks() {
+    let validation = validate_unified_patch_diff_for_preview(
+        include_str!("../../../examples/patch-diff-integrity-v1/valid/two-file-basic.diff"),
+        PatchDiffIntegrityLimits::default(),
+    )
+    .expect("valid docs/examples diff should pass integrity preflight");
+    assert_eq!(validation.status, "passed");
+    assert!(validation.blocked_reasons.is_empty());
+    assert!(validation
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("no source patch apply")));
 }
