@@ -748,6 +748,67 @@ const OuroforgeCockpit = (() => {
     return `cargo run -p ouroforge-cli -- edit draft-preview ${draftPath} --project ${manifest}`;
   }
 
+  function studioDraftControlModel(draft) {
+    const targetType = draft?.target?.type || draft?.target?.target_type || 'unknown';
+    const operations = Array.isArray(draft?.proposedOperations) ? draft.proposedOperations : [];
+    const blockedReasons = Array.isArray(draft?.blockedReasons) ? draft.blockedReasons : [];
+    const validationStatus = draft?.validationStatus || 'unvalidated';
+    const common = {
+      targetType,
+      validationStatus,
+      disabled: true,
+      blockedReasons,
+      boundary: 'Display-only bounded controls; Studio does not persist drafts, write trusted files, execute commands, or apply edits.',
+      controls: [],
+    };
+    if (targetType === 'scene') {
+      return {
+        ...common,
+        kind: 'scene-draft-controls',
+        label: 'Scene draft controls',
+        controls: operations.slice(0, 4).map((operation, index) => ({
+          id: operation.id || `scene-operation-${index + 1}`,
+          label: operation.summary || operation.kind || 'Scene operation preview',
+          field: operation.path || 'scene field',
+          value: operation.value ?? operation.afterValue ?? operation.after_value ?? 'pending trusted preview',
+          hint: 'Scene edits remain preview-only until copied to the Rust CLI transaction flow.',
+        })),
+      };
+    }
+    if (targetType === 'tilemap') {
+      return {
+        ...common,
+        kind: 'tilemap-draft-controls',
+        label: 'Tilemap draft controls',
+        controls: operations.slice(0, 4).map((operation, index) => ({
+          id: operation.id || `tilemap-operation-${index + 1}`,
+          label: operation.summary || operation.kind || 'Tilemap operation preview',
+          field: operation.path || operation.cell || 'tilemap cell/layer',
+          value: operation.tileId || operation.tile_id || operation.value || 'pending trusted preview',
+          hint: 'Tilemap edits remain preview-only until copied to the Rust CLI bounds/hash preflight.',
+        })),
+      };
+    }
+    return {
+      ...common,
+      kind: 'unsupported-draft-controls',
+      label: 'Draft controls unavailable',
+      blockedReasons: blockedReasons.length ? blockedReasons : [`${targetType} controls are outside this PR unit`],
+    };
+  }
+
+  function renderStudioDraftControls(draft) {
+    const model = studioDraftControlModel(draft);
+    if (!['scene-draft-controls', 'tilemap-draft-controls'].includes(model.kind)) {
+      return `<p class="hint">${escapeText(model.label)}: ${escapeText(model.blockedReasons.join('; '))}</p>`;
+    }
+    const controlRows = model.controls.map((control) => `<label>${escapeText(control.label)}<br><input type="text" value="${escapeText(control.value)}" disabled readonly data-draft-field="${escapeText(control.field)}"><small>${escapeText(control.field)} · ${escapeText(control.hint)}</small></label>`).join('') || '<p class="empty">No bounded controls are available for this draft.</p>';
+    const blocked = model.blockedReasons.length
+      ? `<p class="warn">Blocked state: ${escapeText(model.blockedReasons.join('; '))}</p>`
+      : `<p class="hint">Validation status: ${escapeText(model.validationStatus)}; controls remain disabled and copy-only.</p>`;
+    return `<fieldset class="draft-controls" disabled data-draft-control="${escapeText(model.targetType)}"><legend>${escapeText(model.label)}</legend>${controlRows}${blocked}<p class="hint">${escapeText(model.boundary)}</p></fieldset>`;
+  }
+
   function renderStudioDraftAuthoringSurface(run) {
     const state = studioDraftAuthoringState(run);
     if (!state.present && !state.drafts.length) {
@@ -782,6 +843,7 @@ const OuroforgeCockpit = (() => {
         ${blocked}
         ${reviewGate}
         <h4>Proposed operations</h4><ul>${operationRows}</ul>
+        <h4>Bounded draft controls</h4>${renderStudioDraftControls(draft)}
         <h4>Copyable draft JSON</h4><pre>${escapeText(draftJson)}</pre>
         <h4>Copyable CLI preview command</h4><code>${escapeText(studioDraftPreviewCommand(draft, run))}</code>
       </article>`;
@@ -1693,7 +1755,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
