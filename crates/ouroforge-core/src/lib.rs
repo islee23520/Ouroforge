@@ -19718,6 +19718,39 @@ pub struct GameplayEventSignalQueueSummary {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+pub struct GameplayEventSignalReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "eventLogId")]
+    pub event_log_id: String,
+    pub status: String,
+    #[serde(rename = "eventCount")]
+    pub event_count: usize,
+    #[serde(rename = "consumedCount")]
+    pub consumed_count: usize,
+    #[serde(rename = "unconsumedCount")]
+    pub unconsumed_count: usize,
+    #[serde(rename = "eventTypeCounts")]
+    pub event_type_counts: BTreeMap<String, usize>,
+    #[serde(rename = "orderedEventIds")]
+    pub ordered_event_ids: Vec<String>,
+    #[serde(rename = "signalNames")]
+    pub signal_names: Vec<String>,
+    #[serde(rename = "sourceRefs")]
+    pub source_refs: Vec<String>,
+    #[serde(rename = "targetRefs")]
+    pub target_refs: Vec<String>,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "queueSummary")]
+    pub queue_summary: GameplayEventSignalQueueSummary,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct GameplayEventSignalDefinition {
     pub id: String,
     #[serde(rename = "eventType")]
@@ -19780,6 +19813,69 @@ impl GameplayEventSignalSystemArtifact {
     pub fn queue_summary_from_json_str(input: &str) -> Result<GameplayEventSignalQueueSummary> {
         let artifact = Self::from_json_str(input)?;
         Ok(artifact.queue_summary())
+    }
+
+    pub fn read_model_from_json_str(input: &str) -> Result<GameplayEventSignalReadModel> {
+        let artifact = Self::from_json_str(input)?;
+        Ok(artifact.read_model())
+    }
+
+    pub fn read_model(&self) -> GameplayEventSignalReadModel {
+        let mut event_type_counts = BTreeMap::new();
+        let mut signal_names = BTreeSet::new();
+        let mut source_refs = BTreeSet::new();
+        let mut target_refs = BTreeSet::new();
+        let mut linked_evidence_refs = BTreeSet::new();
+        let mut blocked_reasons = Vec::new();
+
+        for reference in &self.evidence_refs {
+            linked_evidence_refs.insert(reference.clone());
+        }
+        for reason in &self.blocked_reasons {
+            blocked_reasons.push(reason.clone());
+        }
+        for event in &self.events {
+            *event_type_counts
+                .entry(gameplay_event_signal_type_label(event.event_type).to_string())
+                .or_insert(0) += 1;
+            if let Some(signal_name) = &event.signal_name {
+                signal_names.insert(signal_name.clone());
+            }
+            for value in event.source.values() {
+                source_refs.insert(value.clone());
+            }
+            for value in event.target.values() {
+                target_refs.insert(value.clone());
+            }
+            for reference in &event.evidence_refs {
+                linked_evidence_refs.insert(reference.clone());
+            }
+            if let Some(reason) = &event.blocked_reason {
+                blocked_reasons.push(format!("{}: {reason}", event.id));
+            }
+        }
+
+        GameplayEventSignalReadModel {
+            schema_version: "gameplay-event-signal-read-model.v1".to_string(),
+            event_log_id: self.event_log_id.clone(),
+            status: gameplay_event_signal_status_label(self.status).to_string(),
+            event_count: self.events.len(),
+            consumed_count: self.events.iter().filter(|event| event.consumed).count(),
+            unconsumed_count: self.events.iter().filter(|event| !event.consumed).count(),
+            event_type_counts,
+            ordered_event_ids: self
+                .ordered_events()
+                .iter()
+                .map(|event| event.id.clone())
+                .collect(),
+            signal_names: signal_names.into_iter().collect(),
+            source_refs: source_refs.into_iter().collect(),
+            target_refs: target_refs.into_iter().collect(),
+            linked_evidence_refs: linked_evidence_refs.into_iter().collect(),
+            blocked_reasons,
+            queue_summary: self.queue_summary(),
+            boundary: "Read-only Gameplay Event Signal evidence/read-model summary; no runtime execution, no script execution, no eval, no dynamic import, no plugin loader, no command bridge, no browser trusted writes, no source apply, and no production-stable scripting API claim.".to_string(),
+        }
     }
 
     pub fn ordered_events(&self) -> Vec<&GameplayEventSignalDefinition> {
@@ -19911,6 +20007,30 @@ impl GameplayEventSignalDefinition {
             require_bounded_display_text("gameplay event signal blockedReason", reason)?;
         }
         validate_gameplay_behavior_refs("gameplay event signal evidenceRefs", &self.evidence_refs)
+    }
+}
+
+fn gameplay_event_signal_status_label(status: GameplayEventSignalStatus) -> &'static str {
+    match status {
+        GameplayEventSignalStatus::Ready => "ready",
+        GameplayEventSignalStatus::Partial => "partial",
+        GameplayEventSignalStatus::Blocked => "blocked",
+        GameplayEventSignalStatus::Unsupported => "unsupported",
+    }
+}
+
+fn gameplay_event_signal_type_label(event_type: GameplayEventSignalType) -> &'static str {
+    match event_type {
+        GameplayEventSignalType::CollisionContact => "collision_contact",
+        GameplayEventSignalType::TriggerEntered => "trigger_entered",
+        GameplayEventSignalType::TriggerExited => "trigger_exited",
+        GameplayEventSignalType::ItemCollected => "item_collected",
+        GameplayEventSignalType::FlagChanged => "flag_changed",
+        GameplayEventSignalType::TimerElapsed => "timer_elapsed",
+        GameplayEventSignalType::InputAction => "input_action",
+        GameplayEventSignalType::SceneLoaded => "scene_loaded",
+        GameplayEventSignalType::StateChanged => "state_changed",
+        GameplayEventSignalType::BehaviorExecuted => "behavior_executed",
     }
 }
 
@@ -66547,6 +66667,42 @@ scenarios:
         assert!(queue_summary.boundary.contains("Read-only"));
         assert!(queue_summary.boundary.contains("no runtime execution"));
         assert!(queue_summary.boundary.contains("no command bridge"));
+
+        let read_model = GameplayEventSignalSystemArtifact::read_model_from_json_str(include_str!(
+            "../../../examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json"
+        ))
+        .expect("ready gameplay event signal read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "gameplay-event-signal-read-model.v1"
+        );
+        assert_eq!(read_model.event_log_id, ready.event_log_id);
+        assert_eq!(read_model.status, "ready");
+        assert_eq!(read_model.event_count, 6);
+        assert_eq!(read_model.consumed_count, 5);
+        assert_eq!(read_model.unconsumed_count, 1);
+        assert_eq!(
+            read_model.event_type_counts.get("collision_contact"),
+            Some(&1)
+        );
+        assert!(read_model
+            .signal_names
+            .contains(&"flag_changed".to_string()));
+        assert!(read_model.source_refs.contains(&"flag-store".to_string()));
+        assert!(read_model.target_refs.contains(&"player".to_string()));
+        assert!(read_model
+            .linked_evidence_refs
+            .contains(&"docs/gameplay-event-signal-system-v1.md".to_string()));
+        assert_eq!(
+            read_model.queue_summary.schema_version,
+            "gameplay-event-signal-queue-summary.v1"
+        );
+        assert!(read_model.boundary.contains("Read-only"));
+        assert!(read_model.boundary.contains("no runtime execution"));
+        assert!(read_model.boundary.contains("no script execution"));
+        assert!(read_model.boundary.contains("no command bridge"));
+        assert!(read_model.boundary.contains("no browser trusted writes"));
+        assert!(read_model.boundary.contains("no source apply"));
 
         let partial = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
             "../../../examples/gameplay-event-signal-system-v1/event-signal.partial.fixture.json"

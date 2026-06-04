@@ -95,6 +95,26 @@ The queue summary shape is display/test data only:
   no script execution, no command bridge, no browser trusted writes, no source
   apply, and no production-stable scripting API claim.
 
+## Evidence/read-model export compatibility
+
+GL10.3.3 exposes a read-only event/signal read model for dashboard, Studio, and
+local evidence export compatibility. The read model summarizes already-validated
+event artifacts; it does not emit runtime events, dispatch signals, apply
+behavior, mutate source files, or create browser write authority.
+
+The read-model shape is display/export data only:
+
+- `schemaVersion: "gameplay-event-signal-read-model.v1"`;
+- `eventLogId`, aggregate `status`, `eventCount`, `consumedCount`, and
+  `unconsumedCount`;
+- `eventTypeCounts`, `orderedEventIds`, `signalNames`, `sourceRefs`, and
+  `targetRefs` for dashboard/Studio indexing;
+- `linkedEvidenceRefs` and `blockedReasons` for audit display;
+- nested `queueSummary` for deterministic ordering compatibility;
+- a boundary string that explicitly says read-only, no runtime execution, no
+  script execution, no command bridge, no browser trusted writes, no source
+  apply, and no production-stable scripting API claim.
+
 ## Validation expectations
 
 Rust/local validation rejects duplicate event ids, unknown event types, missing
