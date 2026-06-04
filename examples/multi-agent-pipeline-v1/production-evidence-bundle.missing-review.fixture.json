@@ -1,0 +1,245 @@
+{
+  "schemaVersion": "production-evidence-bundle-v1",
+  "bundleId": "demo-production-evidence-bundle-missing-review",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "status": "missing-review",
+  "taskBoardRef": {
+    "id": "demo-task-board",
+    "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+    "description": "fixture-scoped task board"
+  },
+  "roleModelRef": {
+    "id": "demo-role-model",
+    "path": "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+    "description": "fixture-scoped role model"
+  },
+  "ownershipPolicyRef": {
+    "id": "demo-ownership-policy",
+    "path": "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+    "description": "fixture-scoped ownership policy"
+  },
+  "workPackageRefs": [
+    {
+      "id": "demo-work-package",
+      "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+      "description": "fixture-scoped work package"
+    }
+  ],
+  "handoffRefs": [
+    {
+      "id": "demo-handoff",
+      "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+      "description": "fixture-scoped handoff"
+    }
+  ],
+  "stateSnapshotRefs": [
+    {
+      "id": "demo-state-snapshot",
+      "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
+      "description": "fixture-scoped state snapshot"
+    }
+  ],
+  "reviewDecisionRefs": [
+    {
+      "id": "demo-review-decision",
+      "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+      "description": "fixture-scoped review decision ledger"
+    }
+  ],
+  "qaResultRefs": [
+    {
+      "id": "demo-qa-result",
+      "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json",
+      "description": "fixture-scoped QA result"
+    }
+  ],
+  "performanceRegressionRefs": [
+    {
+      "id": "demo-regression-result",
+      "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+      "description": "fixture-scoped regression result"
+    }
+  ],
+  "decisionLedgerRefs": [
+    {
+      "id": "demo-decision-ledger",
+      "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+      "description": "fixture-scoped decisions"
+    }
+  ],
+  "outcomeRefs": [
+    {
+      "id": "demo-outcome",
+      "path": "runs/multi-agent-pipeline/demo/outcomes/final-status.json",
+      "description": "fixture-scoped final status"
+    }
+  ],
+  "laneOutputs": [
+    {
+      "id": "task-board",
+      "lane": "task-board",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-task-board",
+          "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+          "description": "fixture-scoped task board"
+        }
+      ]
+    },
+    {
+      "id": "role-model",
+      "lane": "role-model",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-role-model",
+          "path": "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+          "description": "fixture-scoped role model"
+        }
+      ]
+    },
+    {
+      "id": "ownership",
+      "lane": "ownership",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-ownership-policy",
+          "path": "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+          "description": "fixture-scoped ownership policy"
+        }
+      ]
+    },
+    {
+      "id": "work-package",
+      "lane": "work-package",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-work-package",
+          "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+          "description": "fixture-scoped work package"
+        }
+      ]
+    },
+    {
+      "id": "handoff",
+      "lane": "handoff",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-handoff",
+          "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+          "description": "fixture-scoped handoff"
+        }
+      ]
+    },
+    {
+      "id": "state-snapshot",
+      "lane": "state-snapshot",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-state-snapshot",
+          "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
+          "description": "fixture-scoped state snapshot"
+        }
+      ]
+    },
+    {
+      "id": "review-critic",
+      "lane": "review-critic",
+      "status": "missing",
+      "evidenceRefs": [
+        {
+          "id": "demo-review-decision",
+          "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+          "description": "fixture-scoped review decision ledger"
+        }
+      ]
+    },
+    {
+      "id": "qa",
+      "lane": "qa",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-qa-result",
+          "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json",
+          "description": "fixture-scoped QA result"
+        }
+      ]
+    },
+    {
+      "id": "performance-regression",
+      "lane": "performance-regression",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-regression-result",
+          "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+          "description": "fixture-scoped regression result"
+        }
+      ]
+    },
+    {
+      "id": "decision-ledger",
+      "lane": "decision-ledger",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-decision-ledger",
+          "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+          "description": "fixture-scoped decisions"
+        }
+      ]
+    },
+    {
+      "id": "outcome",
+      "lane": "outcome",
+      "status": "present",
+      "evidenceRefs": [
+        {
+          "id": "demo-outcome",
+          "path": "runs/multi-agent-pipeline/demo/outcomes/final-status.json",
+          "description": "fixture-scoped final status"
+        }
+      ]
+    }
+  ],
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Agent outputs remain untrusted until Rust/local validation and review-gated apply or promotion.",
+    "Generated task boards, handoffs, work packages, snapshots, evidence bundles, runs, dashboard exports, and local tool state remain ignored unless fixture-scoped.",
+    "Browser and Studio surfaces inspect this bundle read-only."
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "cloud orchestration",
+    "trusted browser writes",
+    "release automation",
+    "dependency or CI mutation"
+  ],
+  "boundary": "Production evidence bundle is an inert local audit artifact; it does not execute commands, does not spawn agents, does not write trusted browser state, does not claim production readiness, and does not claim Godot replacement capability.",
+  "missingReviews": [
+    {
+      "id": "missing-review-demo",
+      "workPackageRef": {
+        "id": "demo-work-package",
+        "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+        "description": "fixture-scoped work package"
+      },
+      "requiredReviewerRole": "reviewer"
+    }
+  ]
+}
