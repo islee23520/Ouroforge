@@ -1159,10 +1159,18 @@ const OuroforgeDashboard = (() => {
       const fileClassSummary = value.fileClassSummary || {};
       const riskIds = Array.isArray(value.riskIds) ? value.riskIds : [];
       const blockedReasons = Array.isArray(value.blockedReasons) ? value.blockedReasons : [];
+      const dryRunSummary = value.dryRunSummary || {};
+      const requiredTestSummary = value.requiredTestSummary || {};
+      const reviewSummary = value.reviewSummary || {};
+      const linkedEvidence = Array.isArray(value.linkedEvidence) ? value.linkedEvidence : [];
       const refs = [value.previewRef, value.fileClassReportRef, value.diffIntegrityReportRef, value.sandboxReportRef, value.testSummaryRef, value.reviewDecisionRef]
         .filter(Boolean)
         .map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      const linkedEvidenceText = linkedEvidence.map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`).join(' · ');
       const fileClassText = `allowed:${fileClassSummary.allowed ?? 0} review-held:${fileClassSummary.reviewHeld ?? 0} blocked:${fileClassSummary.blocked ?? 0} highest-risk:${fileClassSummary.highestRisk || 'unknown'}`;
+      const requiredCommands = Array.isArray(requiredTestSummary.commands) ? requiredTestSummary.commands : [];
+      const dryRunRef = dryRunSummary.reportRef ? `${dryRunSummary.reportRef.kind || 'artifact'}:${dryRunSummary.reportRef.path || 'missing'}` : 'none';
+      const reviewRef = reviewSummary.decisionRef ? `${reviewSummary.decisionRef.kind || 'artifact'}:${reviewSummary.decisionRef.path || 'missing'}` : 'none';
       return `<article class="artifact source-patch-evidence-bundle">
         <h4>${escapeText(value.bundleId || artifact.id || 'source patch bundle')}</h4>
         <div class="run-meta"><span class="${statusClass(value.status || 'unknown')}">${escapeText(value.status || 'unknown')}</span> · preview ${escapeText(value.patchPreviewId || 'unknown')}</div>
@@ -1170,6 +1178,10 @@ const OuroforgeDashboard = (() => {
         <div class="run-meta">Expected behavior: ${escapeText(patchSummary.expectedBehaviorChange || 'not recorded')}</div>
         <div class="run-meta">File classes: ${escapeText(fileClassText)}</div>
         <div class="run-meta">Risk: ${escapeText(riskIds.join(' · ') || 'none')}</div>
+        <div class="run-meta">Dry-run: ${escapeText(dryRunSummary.status || 'unknown')} · policy ${escapeText(dryRunSummary.allowlistPolicyId || 'unknown')} · report ${escapeText(dryRunRef)}</div>
+        <div class="run-meta">Required tests: ${escapeText(requiredCommands.join(' · ') || 'none')} · policy ${escapeText(requiredTestSummary.allowlistPolicyId || 'unknown')}</div>
+        <div class="run-meta">Review: ${escapeText(reviewSummary.status || 'unknown')} · decision ${escapeText(reviewRef)}</div>
+        <div class="run-meta">Linked evidence: ${escapeText(linkedEvidenceText || 'none')}</div>
         ${blockedReasons.length ? `<div class="artifact-warning">Blocked: ${escapeText(blockedReasons.join(' · '))}</div>` : ''}
         <div class="run-meta">Refs: ${escapeText(refs.join(' · ') || artifact.path || 'none')}</div>
         <div class="run-meta">Forbidden actions: ${escapeText(notices.map((notice) => notice.action || 'unknown').join(' · ') || 'none')}</div>

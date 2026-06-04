@@ -686,16 +686,28 @@ const OuroforgeCockpit = (() => {
       const fileClassSummary = value.fileClassSummary || {};
       const riskIds = Array.isArray(value.riskIds) ? value.riskIds : [];
       const blockedReasons = Array.isArray(value.blockedReasons) ? value.blockedReasons : [];
+      const dryRunSummary = value.dryRunSummary || {};
+      const requiredTestSummary = value.requiredTestSummary || {};
+      const reviewSummary = value.reviewSummary || {};
+      const linkedEvidence = Array.isArray(value.linkedEvidence) ? value.linkedEvidence : [];
       const refs = [value.previewRef, value.fileClassReportRef, value.diffIntegrityReportRef, value.sandboxReportRef, value.testSummaryRef, value.reviewDecisionRef]
         .filter(Boolean)
         .map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      const linkedEvidenceText = linkedEvidence.map((ref) => `${ref.kind || 'artifact'}:${ref.path || 'missing'}`).join(' · ');
       const fileClassText = `allowed:${fileClassSummary.allowed ?? 0} review-held:${fileClassSummary.reviewHeld ?? 0} blocked:${fileClassSummary.blocked ?? 0} highest-risk:${fileClassSummary.highestRisk || 'unknown'}`;
+      const requiredCommands = Array.isArray(requiredTestSummary.commands) ? requiredTestSummary.commands : [];
+      const dryRunRef = dryRunSummary.reportRef ? `${dryRunSummary.reportRef.kind || 'artifact'}:${dryRunSummary.reportRef.path || 'missing'}` : 'none';
+      const reviewRef = reviewSummary.decisionRef ? `${reviewSummary.decisionRef.kind || 'artifact'}:${reviewSummary.decisionRef.path || 'missing'}` : 'none';
       return `<div class="surface-row"><strong>${escapeText(value.bundleId || artifact.id || 'source patch bundle')}</strong> ${surfaceState(true, value.status || 'unknown')}<br>
         <small>Preview ${escapeText(value.patchPreviewId || 'unknown')} · ${escapeText(artifact.path || 'mutation/source-patch-evidence-bundle.json')}</small><br>
         <small>Patch summary: ${escapeText(patchSummary.title || 'not recorded')} · targets ${escapeText(patchSummary.targetCount ?? 'unknown')} · changed lines ${escapeText(patchSummary.changedLines ?? 'unknown')}</small><br>
         <small>Expected behavior: ${escapeText(patchSummary.expectedBehaviorChange || 'not recorded')}</small><br>
         <small>File classes: ${escapeText(fileClassText)}</small><br>
         <small>Risk: ${escapeText(riskIds.join(' · ') || 'none')}</small><br>
+        <small>Dry-run: ${escapeText(dryRunSummary.status || 'unknown')} · policy ${escapeText(dryRunSummary.allowlistPolicyId || 'unknown')} · report ${escapeText(dryRunRef)}</small><br>
+        <small>Required tests: ${escapeText(requiredCommands.join(' · ') || 'none')} · policy ${escapeText(requiredTestSummary.allowlistPolicyId || 'unknown')}</small><br>
+        <small>Review: ${escapeText(reviewSummary.status || 'unknown')} · decision ${escapeText(reviewRef)}</small><br>
+        <small>Linked evidence: ${escapeText(linkedEvidenceText || 'none')}</small><br>
         ${blockedReasons.length ? `<small>Blocked: ${escapeText(blockedReasons.join(' · '))}</small><br>` : ''}
         <small>Refs: ${escapeText(refs.join(' · ') || 'none')}</small><br>
         <small>Forbidden: ${escapeText(notices.map((notice) => notice.action || 'unknown').join(' · ') || 'none')}</small>

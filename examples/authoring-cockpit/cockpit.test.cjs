@@ -146,6 +146,14 @@ const run = {
       patchSummary: { title: 'Review docs patch preview', expectedBehaviorChange: 'Docs preview only; no trusted worktree apply.', targetCount: 2, changedLines: 18 },
       fileClassSummary: { allowed: 1, reviewHeld: 1, blocked: 0, highestRisk: 'review_held' },
       riskIds: ['source_patch_preview', 'review_held_target'],
+      linkedEvidence: [
+        { kind: 'source-patch-preview', path: 'mutation/preview.json' },
+        { kind: 'sandbox-dry-run-report', path: 'sandbox/preview-1/evidence/report.json' },
+        { kind: 'review-decision', path: 'mutation/review-decisions.json' },
+      ],
+      dryRunSummary: { status: 'passed', allowlistPolicyId: 'source-patch-preview-safe-local-checks-v1', reportRef: { kind: 'sandbox-dry-run-report', path: 'sandbox/preview-1/evidence/report.json' } },
+      requiredTestSummary: { total: 2, commands: ['cargo fmt --check', 'cargo test -p ouroforge-core'], allowlistPolicyId: 'source-patch-preview-safe-local-checks-v1' },
+      reviewSummary: { status: 'reviewed', decisionRef: { kind: 'review-decision', path: 'mutation/review-decisions.json' } },
       blockedReasons: ['manual review required before any future apply design'],
       previewRef: { kind: 'source-patch-preview', path: 'mutation/preview.json' },
       fileClassReportRef: { kind: 'file-class-report', path: 'evidence/file-class.json' },
@@ -1172,6 +1180,10 @@ assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Review docs p
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review-held:1/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review_held_target/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /manual review required/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Dry-run: passed/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /cargo fmt --check/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Review: reviewed/);
+assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Linked evidence: source-patch-preview:mutation\/preview.json/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /apply_patch/);
 assert.doesNotMatch(cockpit.renderSourcePatchEvidenceBundleSurface(run), /<button|applyCommand|mergeCommand/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /Source patch apply transaction/);
