@@ -47828,6 +47828,57 @@ scenarios:
     }
 
     #[test]
+    fn build_release_candidate_agent_lane_design_gate_audits_release_boundaries() {
+        let doc = read_repo_text("docs/build-release-candidate-agent-lane-design-gate-v1.md");
+        for required in [
+            "design gate only",
+            "does not implement build",
+            "release automation",
+            "CI/CD automation",
+            "native export",
+            "public visibility",
+            "credentialed commands",
+            "network/install commands",
+            "dependency mutation",
+            "browser command bridges",
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "reviewer bypass",
+            "generated-state audit",
+            "conservative public wording audit",
+            "issues #1 and #23 remain open",
+            "hold",
+            "needs-review",
+            "ready-for-human-release-review",
+            "does not execute commands",
+            "does not supersede",
+        ] {
+            assert!(
+                doc.contains(required),
+                "build/release lane design doc missing {required}"
+            );
+        }
+        for forbidden in [
+            "this lane publishes",
+            "automatically releases",
+            "agents may sign",
+            "native export is authorized",
+            "is production-ready",
+            "replace Godot",
+            "browser command bridge is allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "design doc must not contain forbidden claim: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
     fn scenario_coverage_v12_review_critic_qa_and_build_lanes_stay_separated() {
         let input = fs::read_to_string(repo_fixture_path(
             "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
