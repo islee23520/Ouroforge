@@ -315,6 +315,7 @@ const OuroforgeCockpit = (() => {
       { id: 'runtime-event-inspection', label: 'Collision/transition/event inspection', present: Boolean(run?.engine_summaries?.collision?.present || run?.engine_summaries?.transition?.present || run?.engine_summaries?.events?.present), detail: run?.engine_summaries?.source_world_state || 'collision/transition/event summary unavailable' },
       { id: 'runtime-asset-loading', label: 'Runtime asset loading', present: Boolean(run?.asset_loading?.present || run?.assetLoading?.present), detail: `${run?.asset_loading?.attempt_count ?? run?.assetLoading?.attemptCount ?? 0} load attempt(s)` },
       { id: 'asset-preview-evidence', label: 'Asset preview evidence', present: Boolean(run?.asset_preview?.present || run?.assetPreview?.present), detail: `${run?.asset_preview?.preview_count ?? run?.assetPreview?.previewCount ?? 0} preview record(s)` },
+      { id: 'visual-diff-preview', label: 'Visual diff preview', present: Boolean(run?.visual_diff_preview?.present || run?.visualDiffPreview?.present), detail: `${run?.visual_diff_preview?.summary_count ?? run?.visualDiffPreview?.summaryCount ?? (run?.visual_diff_preview?.summaries || run?.visualDiffPreview?.summaries || []).length ?? 0} summary row(s)` },
       { id: 'studio-asset-inspector', label: 'Asset inspector', present: Boolean(run?.asset_inspector?.present || run?.assetInspector?.present), detail: `${run?.asset_inspector?.asset_count ?? run?.assetInspector?.assetCount ?? 0} asset row(s)` },
       { id: 'loop-cockpit', label: 'Loop cockpit', present: Boolean(normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length), detail: `${normalizeStudioLoopCockpit(run?.loop_cockpit || run?.loopCockpit || null).loops.length} loop(s)` },
       { id: 'run-comparison', label: 'Run comparison', present: Boolean(run?.comparison?.present), detail: `${(run?.comparison?.artifacts || []).length} comparison artifact(s)` },
@@ -601,6 +602,83 @@ const OuroforgeCockpit = (() => {
       <div class="field-grid">${cards}</div>${rows}
       <p class="hint">Warnings: ${escapeText(warningText)}</p>
       <p class="hint">${escapeText(preview.boundary || 'Asset preview evidence is display-only.')}</p>
+    </section>`;
+  }
+
+
+  function visualDiffList(value, fallback = []) {
+    return Array.isArray(value) ? value : fallback;
+  }
+
+  function visualDiffSummaryCount(summary, key, camelKey) {
+    const collection = summary?.[key] || summary?.[camelKey] || [];
+    return Array.isArray(collection) ? collection.length : 0;
+  }
+
+  function visualDiffCollisionTriggerCount(summary, key, camelKey) {
+    const value = summary?.collisionTriggerSummary || summary?.collision_trigger_summary || {};
+    return value?.[key] ?? value?.[camelKey] ?? 0;
+  }
+
+  function renderVisualDiffPreviewSurface(run) {
+    const preview = run?.visual_diff_preview || run?.visualDiffPreview || {};
+    const summaries = visualDiffList(preview.summaries || preview.records || preview.visualDiffSummaries || preview.visual_diff_summaries);
+    if (!preview.present && summaries.length === 0) {
+      return `<section id="visual-diff-preview" class="panel"><h2>Visual diff preview</h2><p class="empty">${escapeText(preview.empty_state || 'No visual diff summary read model is available for this run.')}</p><p class="hint">Read-only Studio surface. The browser does not apply visual edits, write files, execute commands, or persist draft state.</p></section>`;
+    }
+    const operationCount = summaries.reduce((total, summary) => total + visualDiffSummaryCount(summary, 'operationSummaries', 'operation_summaries'), 0);
+    const entityCount = summaries.reduce((total, summary) => total + visualDiffSummaryCount(summary?.after, 'entitySummaries', 'entity_summaries'), 0);
+    const tileCount = summaries.reduce((total, summary) => total + visualDiffSummaryCount(summary?.after, 'tileSummaries', 'tile_summaries'), 0);
+    const assetCount = summaries.reduce((total, summary) => total + visualDiffSummaryCount(summary?.after, 'assetSummaries', 'asset_summaries'), 0);
+    const collisionCount = summaries.reduce((total, summary) => total + Number(visualDiffCollisionTriggerCount(summary?.after, 'collisionCellsAffected', 'collision_cells_affected') || 0), 0);
+    const triggerCount = summaries.reduce((total, summary) => total + Number(visualDiffCollisionTriggerCount(summary?.after, 'triggerCellsAffected', 'trigger_cells_affected') || 0), 0);
+    const cards = [
+      ['Summaries', preview.summary_count ?? preview.summaryCount ?? summaries.length],
+      ['Operations', preview.operation_count ?? preview.operationCount ?? operationCount],
+      ['Entity rows', preview.entity_count ?? preview.entityCount ?? entityCount],
+      ['Tile rows', preview.tile_count ?? preview.tileCount ?? tileCount],
+      ['Asset rows', preview.asset_count ?? preview.assetCount ?? assetCount],
+      ['Collision / trigger', `${collisionCount} / ${triggerCount}`],
+      ['Status', preview.status || 'preview-only'],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const rows = summaries.slice(0, 8).map((summary) => {
+      const target = summary.target || {};
+      const sourceRefs = summary.sourceRefs || summary.source_refs || {};
+      const before = summary.before || {};
+      const after = summary.after || {};
+      const operations = visualDiffList(summary.operationSummaries || summary.operation_summaries);
+      const opRows = operations.slice(0, 6).map((operation) => {
+        const collision = operation.collisionTriggerSummary || operation.collision_trigger_summary || {};
+        const links = [
+          operation.transactionId || operation.transaction_id ? `tx ${operation.transactionId || operation.transaction_id}` : null,
+          operation.path ? `path ${operation.path}` : null,
+          (operation.affectedEntityIds || operation.affected_entity_ids || []).length ? `entities ${(operation.affectedEntityIds || operation.affected_entity_ids).join(', ')}` : null,
+          (operation.affectedTilemapIds || operation.affected_tilemap_ids || []).length ? `tilemaps ${(operation.affectedTilemapIds || operation.affected_tilemap_ids).join(', ')}` : null,
+          (operation.affectedAssetIds || operation.affected_asset_ids || []).length ? `assets ${(operation.affectedAssetIds || operation.affected_asset_ids).join(', ')}` : null,
+          collision.collisionCellsAffected || collision.collision_cells_affected ? `collision ${collision.collisionCellsAffected || collision.collision_cells_affected}` : null,
+          collision.triggerCellsAffected || collision.trigger_cells_affected ? `trigger ${collision.triggerCellsAffected || collision.trigger_cells_affected}` : null,
+        ].filter(Boolean).join(' · ');
+        return `<li><strong>${escapeText(operation.operationId || operation.operation_id || 'operation')}</strong> ${surfaceState(true, operation.change || 'preview')}<br><small>${escapeText(operation.summary || 'No operation summary recorded.')}${links ? `<br>${escapeText(links)}` : ''}</small></li>`;
+      }).join('') || '<li>No operation summaries exported.</li>';
+      const refs = [
+        sourceRefs.draftId || sourceRefs.draft_id ? `draft ${sourceRefs.draftId || sourceRefs.draft_id}` : null,
+        sourceRefs.transactionId || sourceRefs.transaction_id ? `transaction ${sourceRefs.transactionId || sourceRefs.transaction_id}` : null,
+        sourceRefs.proposalId || sourceRefs.proposal_id ? `proposal ${sourceRefs.proposalId || sourceRefs.proposal_id}` : null,
+        sourceRefs.journalRef || sourceRefs.journal_ref ? `journal ${sourceRefs.journalRef || sourceRefs.journal_ref}` : null,
+        sourceRefs.dashboardRef || sourceRefs.dashboard_ref ? `dashboard ${sourceRefs.dashboardRef || sourceRefs.dashboard_ref}` : null,
+      ].filter(Boolean).join(' · ') || 'No source refs recorded.';
+      const targetText = `${target.type || target.target_type || 'target'} ${target.id || ''} ${target.path || ''}`.trim();
+      const impact = summary.expectedScenarioImpact || summary.expected_scenario_impact || {};
+      const impactText = impact.status ? `${impact.status}: ${impact.summary || ''}` : 'Scenario impact requires separate evidence.';
+      return `<div class="surface-row"><strong>${escapeText(summary.summaryId || summary.summary_id || 'visual diff summary')}</strong> ${surfaceState(true, target.type || target.target_type || 'preview')}<br>
+        <small>${escapeText(targetText)}<br>Before: ${escapeText(before.summaryText || before.summary_text || 'No before summary.')}<br>After: ${escapeText(after.summaryText || after.summary_text || 'No after summary.')}<br>Refs: ${escapeText(refs)}<br>Scenario impact: ${escapeText(impactText)}</small>
+        <ul>${opRows}</ul>
+      </div>`;
+    }).join('') || '<div class="surface-row">No visual diff summary records exported.</div>';
+    return `<section id="visual-diff-preview" class="panel"><h2>Visual diff preview</h2>
+      <p class="hint">Escaped read-only visual diff summaries from Rust-generated draft/transaction evidence. This panel has no apply buttons, trusted writes, command execution, local server bridge, or browser persistence.</p>
+      <div class="field-grid">${cards}</div>${rows}
+      <p class="hint">${escapeText(preview.boundary || 'Visual diff previews are display-only; trusted writes remain Rust CLI review-gated.')}</p>
     </section>`;
   }
 
@@ -1411,7 +1489,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -1496,7 +1574,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
