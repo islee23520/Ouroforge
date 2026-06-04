@@ -386,6 +386,9 @@ pub enum ScenarioAssertion {
     AnimationEvidence {
         animation_evidence: JsonPathAssertion,
     },
+    VfxEvidence {
+        vfx_evidence: JsonPathAssertion,
+    },
     TransitionEvidence {
         transition_evidence: JsonPathAssertion,
     },
@@ -1262,6 +1265,9 @@ fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<Sce
         }),
         "animation_evidence" => Ok(ScenarioAssertion::AnimationEvidence {
             animation_evidence: json_path_assertion,
+        }),
+        "vfx_evidence" => Ok(ScenarioAssertion::VfxEvidence {
+            vfx_evidence: json_path_assertion,
         }),
         "transition_evidence" => Ok(ScenarioAssertion::TransitionEvidence {
             transition_evidence: json_path_assertion,
@@ -13428,6 +13434,7 @@ impl ScenarioAssertion {
             ScenarioAssertion::CollisionEvidence { collision_evidence } => collision_evidence,
             ScenarioAssertion::AudioEvidence { audio_evidence } => audio_evidence,
             ScenarioAssertion::AnimationEvidence { animation_evidence } => animation_evidence,
+            ScenarioAssertion::VfxEvidence { vfx_evidence } => vfx_evidence,
             ScenarioAssertion::TransitionEvidence {
                 transition_evidence,
             } => transition_evidence,
@@ -28922,6 +28929,23 @@ fn run_scenario<T: CdpTransport>(
         .get("entities")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let vfx_source = world_state
+        .get("vfxEvents")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let vfx_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "vfx-evidence",
+        "vfx_evidence",
+        unix_millis()?,
+        &json!({
+            "bounded": true,
+            "vfxEvents": vfx_source.clone(),
+            "vfxEventCount": vfx_source.as_array().map_or(0, Vec::len)
+        }),
+    )?;
     let transition_source = world_state
         .get("transitionEvents")
         .cloned()
@@ -28987,6 +29011,10 @@ fn run_scenario<T: CdpTransport>(
             value: &animation_source,
             evidence_ref: &world_state_path,
         },
+        vfx_evidence: AssertionSource {
+            value: &vfx_source,
+            evidence_ref: &vfx_path,
+        },
         transition_evidence: AssertionSource {
             value: &transition_source,
             evidence_ref: &transition_path,
@@ -29040,6 +29068,7 @@ fn run_scenario<T: CdpTransport>(
                 "visual_checkpoints": visual_checkpoint_paths.clone(),
                 "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
                 "transition_evidence": transition_path.clone(),
+                "vfx_evidence": vfx_path.clone(),
                 "asset_load_evidence": asset_load_paths.clone(),
                 "console_logs": console_paths.clone(),
                 "performance_metrics": performance_paths.clone(),
@@ -29071,6 +29100,7 @@ fn run_scenario<T: CdpTransport>(
             "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
             "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
             "transition_evidence_path": transition_path.clone(),
+            "vfx_evidence_path": vfx_path.clone(),
             "asset_load_evidence_paths": asset_load_paths.clone(),
             "console_log_paths": console_paths.clone(),
             "performance_metric_paths": performance_paths.clone(),
@@ -29084,6 +29114,7 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(visual_checkpoint_screenshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(transition_path);
+    evidence_paths.push(vfx_path);
     evidence_paths.extend(asset_load_paths);
     evidence_paths.push(frame_stats_path);
     evidence_paths.extend(console_paths);
@@ -29547,6 +29578,7 @@ struct ScenarioAssertionSources<'a> {
     collision_evidence: AssertionSource<'a>,
     audio_evidence: AssertionSource<'a>,
     animation_evidence: AssertionSource<'a>,
+    vfx_evidence: AssertionSource<'a>,
     transition_evidence: AssertionSource<'a>,
 }
 
@@ -29723,6 +29755,9 @@ fn evaluate_scenario_assertions(
                     animation_evidence,
                     sources.animation_evidence,
                 ),
+                ScenarioAssertion::VfxEvidence { vfx_evidence } => {
+                    ("vfx_evidence", vfx_evidence, sources.vfx_evidence)
+                }
                 ScenarioAssertion::TransitionEvidence {
                     transition_evidence,
                 } => (
@@ -35674,6 +35709,7 @@ pub struct RunDashboardEngineSummaries {
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
+    pub vfx: serde_json::Value,
     pub audio: serde_json::Value,
     pub physics: serde_json::Value,
     pub input: serde_json::Value,
@@ -38477,6 +38513,7 @@ fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_jso
         .get("collisionEvents")
         .cloned()
         .unwrap_or(json!([]));
+    let vfx_events = world_state.get("vfxEvents").cloned().unwrap_or(json!([]));
     let animation_entities = world_state
         .get("entities")
         .and_then(|entities| entities.as_array())
@@ -38493,6 +38530,11 @@ fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_jso
                             .cloned()
                             .or_else(|| animation.pointer("/state/currentClip").cloned())
                             .unwrap_or(json!(null)),
+                        "activeState": animation
+                            .get("activeState")
+                            .cloned()
+                            .or_else(|| animation.pointer("/state/activeState").cloned())
+                            .unwrap_or(json!(null)),
                         "frameIndex": animation.pointer("/state/frameIndex").cloned().unwrap_or(json!(null)),
                     }))
                 })
@@ -38502,13 +38544,59 @@ fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_jso
     json!({
         "present": !animation_entities.is_empty()
             || audio_events.as_array().is_some_and(|events| !events.is_empty())
-            || collision_events.as_array().is_some_and(|events| !events.is_empty()),
+            || collision_events.as_array().is_some_and(|events| !events.is_empty())
+            || vfx_events.as_array().is_some_and(|events| !events.is_empty()),
         "animationEntityCount": animation_entities.len(),
         "audioEventCount": audio_events.as_array().map_or(0, Vec::len),
         "collisionEventCount": collision_events.as_array().map_or(0, Vec::len),
+        "vfxEventCount": vfx_events.as_array().map_or(0, Vec::len),
         "animationEntities": animation_entities,
         "audioEvents": audio_events,
-        "collisionEvents": collision_events
+        "collisionEvents": collision_events,
+        "vfxEvents": vfx_events
+    })
+}
+
+fn dashboard_vfx_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let vfx_events = world_state.get("vfxEvents").cloned().unwrap_or(json!([]));
+    let emitters = world_state
+        .get("entities")
+        .and_then(|entities| entities.as_array())
+        .map(|entities| {
+            entities
+                .iter()
+                .filter_map(|entity| {
+                    let vfx = entity.pointer("/components/vfx")?;
+                    let emitters = vfx
+                        .get("emitters")
+                        .and_then(|emitters| emitters.as_array())
+                        .cloned()
+                        .unwrap_or_default();
+                    Some(json!({
+                        "entityId": entity.get("id").cloned().unwrap_or(json!(null)),
+                        "emitterCount": emitters.len(),
+                        "emitters": emitters
+                    }))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    json!({
+        "present": !emitters.is_empty()
+            || vfx_events.as_array().is_some_and(|events| !events.is_empty()),
+        "vfxEntityCount": emitters.len(),
+        "vfxEmitterCount": emitters
+            .iter()
+            .map(|entry| entry.get("emitterCount").and_then(|count| count.as_u64()).unwrap_or(0))
+            .sum::<u64>(),
+        "vfxEventCount": vfx_events.as_array().map_or(0, Vec::len),
+        "entities": emitters,
+        "events": vfx_events,
+        "readOnlyInspection": {
+            "trustedEmitter": "browser-runtime-evidence-helper",
+            "browserStudioMode": "read-only evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "browser runtime control"]
+        }
     })
 }
 
@@ -38554,6 +38642,7 @@ fn read_dashboard_engine_summaries(
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
+            vfx: json!({ "present": false, "emptyState": "No VFX read model is available." }),
             audio: json!({}),
             physics: json!({}),
             input: json!({ "present": false, "emptyState": "No input action read model is available." }),
@@ -38598,8 +38687,18 @@ fn read_dashboard_engine_summaries(
             "manifestAssetCount": world_state.pointer("/assetManifest/assetCount").cloned().unwrap_or(json!(null))
         }),
         animation: json!({
-            "animatedEntityCount": dashboard_entities_with_component(world_state, "animation")
+            "animatedEntityCount": dashboard_entities_with_component(world_state, "animation"),
+            "activeStateCount": world_state
+                .get("entities")
+                .and_then(|entities| entities.as_array())
+                .map(|entities| entities.iter().filter(|entity| {
+                    entity.pointer("/components/animation/state/activeState")
+                        .or_else(|| entity.pointer("/components/animation/activeState"))
+                        .is_some_and(|value| !value.is_null())
+                }).count())
+                .unwrap_or(0)
         }),
+        vfx: dashboard_vfx_summary(world_state),
         audio: json!({
             "audioEventCount": dashboard_array_len(world_state.get("audioEvents")),
             "audioEntityCount": dashboard_entities_with_component(world_state, "audio")
@@ -54394,6 +54493,9 @@ scenarios:
                         json!("tilemap.collision.authoring-map.terrain.2.0.wall"),
                     ),
                 },
+                ScenarioAssertion::VfxEvidence {
+                    vfx_evidence: json_path_equals("0.emitterId", json!("run-dust")),
+                },
             ],
         };
         let world_state = json!({
@@ -54411,6 +54513,7 @@ scenarios:
             json!({ "stepCount": 0, "events": [{ "type": "runtime.physics.jump" }] });
         let performance_metrics = json!({ "ScriptDuration": 2.5 });
         let console_errors = json!({ "logs": [], "count": 0 });
+        let vfx_events = json!([{ "emitterId": "run-dust" }]);
         let none = serde_json::Value::Null;
         let sources = assertion_sources_for_test(
             &world_state,
@@ -54423,11 +54526,12 @@ scenarios:
             &world_state["collisions"],
             &none,
             &none,
+            &vfx_events,
         );
 
         let assertions = evaluate_scenario_assertions(&scenario, &sources);
 
-        assert_eq!(assertions.len(), 11);
+        assert_eq!(assertions.len(), 12);
         assert_eq!(assertions[0]["passed"], true);
         assert_eq!(assertions[1]["passed"], true);
         assert_eq!(assertions[2]["passed"], false);
@@ -54444,6 +54548,8 @@ scenarios:
         assert_eq!(assertions[9]["passed"], true);
         assert_eq!(assertions[10]["passed"], true);
         assert_eq!(assertions[10]["target"], "collision_evidence");
+        assert_eq!(assertions[11]["passed"], true);
+        assert_eq!(assertions[11]["target"], "vfx_evidence");
     }
 
     #[test]
@@ -60965,7 +61071,8 @@ scenarios:
                     "components": {
                         "transform": { "x": 40, "y": 72 },
                         "collider": { "body": "dynamic" },
-                        "animation": { "currentClip": "idle" },
+                        "animation": { "currentClip": "idle", "state": { "currentClip": "run", "activeState": "run", "frameIndex": 1 } },
+                        "vfx": { "emitters": [{ "id": "run-dust", "kind": "trail", "trigger": "tick", "particleCount": 8, "lifetimeFrames": 24, "enabled": true }] },
                         "audio": { "events": [] }
                     }
                 }],
@@ -61045,6 +61152,7 @@ scenarios:
                 "assetManifest": { "id": "runtime-v1-assets", "assetCount": 3 },
                 "assets": [{ "id": "player-sprite", "status": "loaded" }],
                 "audioEvents": [{ "name": "player_spawn" }],
+                "vfxEvents": [{ "schemaVersion": "runtime-vfx-event-v1", "entityId": "player", "emitterId": "run-dust", "kind": "trail", "particleCount": 8, "lifetimeFrames": 24, "tick": 4 }],
                 "collisionRules": { "defaultLayer": "default" },
                 "collisions": [{ "pairId": "goal:player" }],
                 "collisionEvents": [{ "type": "runtime.collision.trigger" }],
@@ -61219,6 +61327,17 @@ scenarios:
             model.engine_summaries.animation["animatedEntityCount"],
             json!(1)
         );
+        assert_eq!(
+            model.engine_summaries.animation["activeStateCount"],
+            json!(1)
+        );
+        assert_eq!(model.engine_summaries.vfx["vfxEntityCount"], json!(1));
+        assert_eq!(model.engine_summaries.vfx["vfxEmitterCount"], json!(1));
+        assert_eq!(model.engine_summaries.vfx["vfxEventCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.vfx["events"][0]["emitterId"],
+            json!("run-dust")
+        );
         assert_eq!(model.engine_summaries.audio["audioEventCount"], json!(1));
         assert_eq!(
             model.engine_summaries.physics["collisionEventCount"],
@@ -61300,7 +61419,16 @@ scenarios:
             model.engine_summaries.events["animationEntityCount"],
             json!(1)
         );
+        assert_eq!(
+            model.engine_summaries.events["animationEntities"][0]["activeState"],
+            json!("run")
+        );
         assert_eq!(model.engine_summaries.events["audioEventCount"], json!(1));
+        assert_eq!(model.engine_summaries.events["vfxEventCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.events["vfxEvents"][0]["emitterId"],
+            json!("run-dust")
+        );
         assert_eq!(
             model.engine_summaries.reload["lastStatus"],
             json!("succeeded")
@@ -62492,6 +62620,7 @@ scenarios:
         collision_evidence: &'a serde_json::Value,
         audio_evidence: &'a serde_json::Value,
         animation_evidence: &'a serde_json::Value,
+        vfx_evidence: &'a serde_json::Value,
     ) -> ScenarioAssertionSources<'a> {
         ScenarioAssertionSources {
             world_state: AssertionSource {
@@ -62532,6 +62661,10 @@ scenarios:
             },
             animation_evidence: AssertionSource {
                 value: animation_evidence,
+                evidence_ref: "evidence/world-state.json",
+            },
+            vfx_evidence: AssertionSource {
+                value: vfx_evidence,
                 evidence_ref: "evidence/world-state.json",
             },
             transition_evidence: AssertionSource {

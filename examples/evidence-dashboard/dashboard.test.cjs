@@ -340,6 +340,15 @@ const run = {
       triggerCollisionEventCount: 1,
       trueFlags: ['coin_collected', 'door_open'],
     },
+    animation: { animatedEntityCount: 1, activeStateCount: 1 },
+    vfx: { present: true, vfxEntityCount: 1, vfxEmitterCount: 1, vfxEventCount: 1 },
+    events: {
+      present: true,
+      animationEntityCount: 1,
+      vfxEventCount: 1,
+      animationEntities: [{ entityId: '<player>', activeState: '<run>', currentClip: '<run-clip>', frameIndex: 2 }],
+      vfxEvents: [{ emitterId: '<run-dust>', kind: '<trail>', particleCount: 8 }],
+    },
   },
 
   loop_dry_run: {
@@ -833,6 +842,12 @@ assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /HUD value components/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Goal: Collect coin/);
 assert.match(dashboard.renderGameplaySummary({}), /No trigger\/flag world-state summary/);
+assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /Animated entities/);
+assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /VFX events/);
+assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /&lt;run-dust&gt;/);
+assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /state &lt;run&gt;/);
+assert.doesNotMatch(dashboard.renderAnimationVfxSummary(run.engine_summaries), /<run-dust>|<run>/);
+assert.match(dashboard.renderAnimationVfxSummary({}), /No animation\/VFX read model/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /input action evidence/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /3/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /&lt;dash&gt;/);

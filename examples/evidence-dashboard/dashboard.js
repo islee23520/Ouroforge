@@ -269,6 +269,29 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>`;
   }
 
+  function renderAnimationVfxSummary(summary = {}) {
+    const animation = summary?.animation || {};
+    const vfx = summary?.vfx || {};
+    const events = summary?.events || {};
+    if (!summary?.present || (!animation.animatedEntityCount && !vfx.present && !events.present)) {
+      return '<p class="empty-state">No animation/VFX read model is available.</p>';
+    }
+    const animationRows = Array.isArray(events.animationEntities) && events.animationEntities.length
+      ? events.animationEntities.map((entity) => `<li><strong>${escapeText(entity?.entityId || 'entity')}</strong>: state ${escapeText(entity?.activeState || 'none')} · clip ${escapeText(entity?.currentClip || 'none')} · frame ${escapeText(entity?.frameIndex ?? 'unknown')}</li>`).join('')
+      : '<li>No animation entity rows exported.</li>';
+    const vfxRows = Array.isArray(events.vfxEvents) && events.vfxEvents.length
+      ? events.vfxEvents.map((event) => `<li><strong>${escapeText(event?.emitterId || 'vfx emitter')}</strong>: ${escapeText(event?.kind || 'vfx')} · particles ${escapeText(event?.particleCount ?? 'unknown')}</li>`).join('')
+      : '<li>No VFX event rows exported.</li>';
+    const rows = [
+      ['Animated entities', animation.animatedEntityCount ?? events.animationEntityCount ?? 0],
+      ['Active animation states', animation.activeStateCount ?? 0],
+      ['VFX entities', vfx.vfxEntityCount ?? 0],
+      ['VFX emitters', vfx.vfxEmitterCount ?? 0],
+      ['VFX events', vfx.vfxEventCount ?? events.vfxEventCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    return `<div class="field-grid">${rows}</div><h4>Animation entities</h4><ul class="run-meta-list">${animationRows}</ul><h4>VFX events</h4><ul class="run-meta-list">${vfxRows}</ul><p class="run-meta">Read-only animation/VFX evidence only; the dashboard cannot write scene state, execute commands, or control the browser runtime.</p>`;
+  }
+
   function renderInputActionSummary(summary = {}) {
     const input = summary?.input || {};
     if (!summary?.present || !input.present) {
@@ -1651,6 +1674,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Camera/layer read model</h3>${renderCameraLayerSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Scene render breakdown</h3>${renderRenderBreakdownSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Animation and VFX evidence</h3>${renderAnimationVfxSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Input action mapping</h3>${renderInputActionSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
@@ -1744,7 +1768,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

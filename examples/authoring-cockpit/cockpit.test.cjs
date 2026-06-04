@@ -535,7 +535,8 @@ const run = {
     },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
-    animation: { animatedEntityCount: 0 },
+    animation: { animatedEntityCount: 1, activeStateCount: 1 },
+    vfx: { present: true, vfxEntityCount: 1, vfxEmitterCount: 1, vfxEventCount: 1, entities: [{ entityId: 'player', emitterCount: 1, emitters: [{ id: 'run-dust', kind: 'trail' }] }] },
     audio: { audioEntityCount: 0, audioEventCount: 0 },
     physics: {
       colliderEntityCount: 2,
@@ -610,9 +611,11 @@ const run = {
       animationEntityCount: 1,
       audioEventCount: 1,
       collisionEventCount: 1,
-      animationEntities: [{ entityId: 'player', mode: 'playing', currentClip: 'run', frameIndex: 3 }],
+      vfxEventCount: 1,
+      animationEntities: [{ entityId: 'player', mode: 'playing', activeState: 'run', currentClip: 'run', frameIndex: 3 }],
       audioEvents: [{ type: 'runtime.audio.play', clipId: 'coin' }],
       collisionEvents: [{ type: 'runtime.collision.trigger', triggerId: 'collect_key' }],
+      vfxEvents: [{ schemaVersion: 'runtime-vfx-event-v1', entityId: 'player', emitterId: 'run-dust', kind: 'trail', particleCount: 8 }],
     },
     reload: { reloadCount: 0, lastStatus: null },
     composition: { entityCount: 3, parentedEntityCount: 0 },
@@ -891,15 +894,20 @@ assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Declared scene t
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /to_boss/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /runtime\.scene\.transition/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /runtime\.audio\.play/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /VFX events/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /run-dust/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /state run/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: '<bad>', transition: null, events: [] } }), /collision summary missing or malformed/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: false, empty_state: '<script>events</script>' } }), /&lt;script&gt;events&lt;\/script&gt;/);
-const xssRuntimeEvents = cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: { present: true, rules: { '<script>': { bad: '<img>' } }, colliderEntityCount: 1, collisionEventCount: 1, events: [{ type: '<script>', payload: '<img>' }] }, transition: { present: true, currentSceneId: '<svg>', declaredTransitionCount: 1, declaredTransitions: [{ id: '<b>', toScene: '<img>' }], transitionEventCount: 1, transitions: [{ type: '<b>', to: '<img>' }], lastReloadStatus: '<i>' }, events: { present: true, animationEntityCount: 1, audioEventCount: 1, collisionEventCount: 1, animationEntities: [{ entityId: '<img>', mode: '<svg>', currentClip: '<script>', frameIndex: 1 }], audioEvents: [{ type: '<b>', clipId: '<i>' }] } } });
+const xssRuntimeEvents = cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: { present: true, rules: { '<script>': { bad: '<img>' } }, colliderEntityCount: 1, collisionEventCount: 1, events: [{ type: '<script>', payload: '<img>' }] }, transition: { present: true, currentSceneId: '<svg>', declaredTransitionCount: 1, declaredTransitions: [{ id: '<b>', toScene: '<img>' }], transitionEventCount: 1, transitions: [{ type: '<b>', to: '<img>' }], lastReloadStatus: '<i>' }, events: { present: true, animationEntityCount: 1, audioEventCount: 1, collisionEventCount: 1, vfxEventCount: 1, animationEntities: [{ entityId: '<img>', mode: '<svg>', activeState: '<b>', currentClip: '<script>', frameIndex: 1 }], audioEvents: [{ type: '<b>', clipId: '<i>' }], vfxEvents: [{ emitterId: '<script>', kind: '<img>' }] } } });
 assert.doesNotMatch(xssRuntimeEvents, /<script>|<img>|<svg>|<b>|<i>/);
 assert.match(xssRuntimeEvents, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Input actions/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /VFX/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /1 VFX entit\(ies\), 1 event\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Render breakdown/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /1 element\(s\), 1 absence diagnostic\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);

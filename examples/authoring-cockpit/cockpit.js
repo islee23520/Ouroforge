@@ -517,6 +517,7 @@ const OuroforgeCockpit = (() => {
       ['Tilemaps', `${summaryValue(summary, 'tilemaps', 'tilemapCount', 0)} tilemap(s), ${summaryValue(summary, 'tilemaps', 'layerCount', 0)} layer(s)`],
       ['Assets', `${summaryValue(summary, 'assets', 'manifestId')} · ${summaryValue(summary, 'assets', 'assetCount', 0)} loaded/ref(s)`],
       ['Animation', `${summaryValue(summary, 'animation', 'animatedEntityCount', 0)} animated entit(ies)`],
+      ['VFX', `${summaryValue(summary, 'vfx', 'vfxEntityCount', 0)} VFX entit(ies), ${summaryValue(summary, 'vfx', 'vfxEventCount', 0)} event(s)`],
       ['Audio', `${summaryValue(summary, 'audio', 'audioEntityCount', 0)} audio entit(ies), ${summaryValue(summary, 'audio', 'audioEventCount', 0)} event(s)`],
       ['Physics/contact', `${summaryValue(summary, 'physics', 'colliderEntityCount', 0)} collider entit(ies), ${summaryValue(summary, 'physics', 'collisionEventCount', 0)} event(s)`],
       ['Input actions', `${summaryValue(summary, 'input', 'mappedActionCount', 0)} mapped, ${summaryValue(summary, 'input', 'activeActionCount', 0)} active, ${summaryValue(summary, 'input', 'warningCount', 0)} warning(s)`],
@@ -767,8 +768,11 @@ const OuroforgeCockpit = (() => {
       ? transition.declaredTransitions.map((entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || 'declared transition')}</strong><br><small>${escapeText(compactJson(entry))}</small></div>`).join('')
       : '<p class="empty compact">No manifest-validated declared transitions exported.</p>';
     const animationRows = Array.isArray(events?.animationEntities) && events.animationEntities.length
-      ? events.animationEntities.map((entity) => `<li><strong>${escapeText(entity?.entityId || 'entity')}</strong> · ${escapeText(entity?.mode || 'mode unknown')} · clip ${escapeText(entity?.currentClip || 'none')} · frame ${escapeText(entity?.frameIndex ?? 'unknown')}</li>`).join('')
+      ? events.animationEntities.map((entity) => `<li><strong>${escapeText(entity?.entityId || 'entity')}</strong> · ${escapeText(entity?.mode || 'mode unknown')} · state ${escapeText(entity?.activeState || 'none')} · clip ${escapeText(entity?.currentClip || 'none')} · frame ${escapeText(entity?.frameIndex ?? 'unknown')}</li>`).join('')
       : '<li>No animation event entity rows exported.</li>';
+    const vfxRows = Array.isArray(events?.vfxEvents) && events.vfxEvents.length
+      ? events.vfxEvents.map((event) => `<div class="surface-row"><strong>${escapeText(event?.emitterId || event?.type || 'vfx event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
+      : '<p class="empty compact">No VFX event rows exported.</p>';
     const audioRows = Array.isArray(events?.audioEvents) && events.audioEvents.length
       ? events.audioEvents.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'audio event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
       : '<p class="empty compact">No audio event rows exported.</p>';
@@ -779,13 +783,14 @@ const OuroforgeCockpit = (() => {
         <div><strong>Collision</strong><br>${escapeText(collision?.colliderEntityCount ?? 0)} collider(s), ${escapeText(collision?.collisionEventCount ?? 0)} event(s)</div>
         <div><strong>Physics contacts</strong><br>${escapeText(physics?.contactPairCount ?? 0)} pair(s), pairs ${escapeText(compactJson(physics?.contactPairs || []))}, blocked ${escapeText(compactJson(physics?.blockedMovement || {}))}</div>
         <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.declaredTransitionCount ?? 0)} declared · ${escapeText(transition?.transitionEventCount ?? 0)} event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
-        <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s)</div>
+        <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s), ${escapeText(events?.vfxEventCount ?? 0)} VFX event(s)</div>
       </div>
       <h3>Collision rules</h3><div class="field-grid">${collisionRules}</div>
       <h3>Collision events</h3>${collisionRows}
       <h3>Declared scene transitions</h3>${declaredTransitionRows}
       <h3>Scene transition events</h3>${transitionRows}
       <h3>Animation entities</h3><ul>${animationRows}</ul>
+      <h3>VFX events</h3>${vfxRows}
       <h3>Audio events</h3>${audioRows}
     </section>`;
   }
