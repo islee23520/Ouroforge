@@ -106,6 +106,13 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    `docs/edit-draft-transaction-cli-v1.md`.
 6. **Visual Diff Preview v1** — produce bounded visual/read-model diff evidence
    for accepted draft previews, malformed drafts, and no-op/stale states.
+   Rust owns `visual-diff-summary-v1` validation/generation, and Studio may render
+   exported `visual_diff_preview` / `visualDiffPreview` data as escaped
+   before/after, operation, source-ref, collision/trigger, asset/entity/tile,
+   and scenario-impact diagnostics only. The rendering surface has no browser
+   apply controls, trusted writes, local command bridge, source mutation, review
+   decision controls, or browser persistence. Generated diff summaries are
+   review evidence only; scenario impact still requires separate run evidence.
 7. **Review-Gated Visual Edit Apply v1** — apply only reviewed/accepted visual
    edit transactions through the trusted CLI boundary with rollback/audit
    evidence; no auto-apply or browser apply.

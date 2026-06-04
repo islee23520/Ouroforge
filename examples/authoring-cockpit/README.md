@@ -48,6 +48,15 @@ read model as escaped diagnostics only. It does not write tilemaps, persist draf
 state, execute preview/apply commands, or treat preview metadata as review
 approval.
 
+Visual Diff Preview v1 may display Rust-generated `visual-diff-summary-v1`
+records from `dashboard-data.json` under `visual_diff_preview` or
+`visualDiffPreview`. The panel renders before/after summary text, operation
+rows, source refs, collision/trigger counts, asset/entity/tile references, and
+scenario-impact notes as escaped read-only diagnostics. It intentionally has no
+apply buttons, browser persistence, trusted writes, command execution, local
+server bridge, or review-decision controls; any trusted write remains routed
+through Rust CLI transactions and review-gated apply.
+
 ## Studio v3 demo surfaces
 
 The cockpit composes completed local surfaces only:
@@ -65,6 +74,8 @@ The cockpit composes completed local surfaces only:
 - regression run matrix status from generated dashboard data when project-bound runs exist;
 - replay evidence surface when replay artifacts exist;
 - live preview controls through the existing runtime probe;
+- visual diff preview summaries with escaped before/after, operation, source-ref,
+  collision/trigger, and scenario-impact notes from Rust-exported read models;
 - tilemap draft preview summaries, affected-cell counts, hashes, and
   collision/trigger metadata from Rust-exported read models;
 - scene edit command generation for Rust-validated fields;

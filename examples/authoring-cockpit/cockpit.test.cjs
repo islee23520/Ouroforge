@@ -193,6 +193,37 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  visual_diff_preview: {
+    present: true,
+    summary_count: 2,
+    operation_count: 2,
+    status: 'preview-only',
+    boundary: 'Visual diff previews are read-only; browser cannot apply edits, write files, execute commands, or persist drafts.',
+    summaries: [
+      {
+        schemaVersion: 'visual-diff-summary-v1',
+        summaryId: 'visual-diff-scene-draft',
+        target: { type: 'scene', id: 'main', path: 'examples/game-runtime/scene.json' },
+        sourceRefs: { draftId: 'draft-scene-1', transactionId: 'tx-scene-1', proposalId: 'proposal-1', journalRef: 'journal.md#visual-diff', dashboardRef: 'dashboard-data.json#run-1' },
+        before: { summaryText: 'Player before scene edit.', entitySummaries: [{ entityId: 'player', change: 'updated', summary: 'player before' }], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 0 } },
+        after: { summaryText: 'Player after scene edit.', entitySummaries: [{ entityId: 'player', change: 'updated', summary: 'player x changed' }], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 0 } },
+        operationSummaries: [{ operationId: 'op-player-x', transactionId: 'tx-scene-1', target: 'scene', change: 'updated', path: 'components.transform.x', summary: 'Move player x from 32 to 48.', affectedEntityIds: ['player'], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 0 } }],
+        expectedScenarioImpact: { status: 'unknown', summary: 'Scenario impact requires separate evidence.' },
+        guardrail: 'read-only visual diff summary; no apply',
+      },
+      {
+        schemaVersion: 'visual-diff-summary-v1',
+        summaryId: 'visual-diff-tilemap-draft',
+        target: { type: 'tilemap', id: 'level', path: 'assets/tilemaps/level.json' },
+        sourceRefs: { draftId: 'draft-tile-1', dashboardRef: 'dashboard-data.json#tilemap' },
+        before: { summaryText: 'Tilemap before draft.', tileSummaries: [{ tilemapId: 'level', layerId: 'terrain', change: 'unchanged', summary: 'before tile', affectedCells: 1, tileIds: ['solid_ground'] }], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 0 } },
+        after: { summaryText: 'Tilemap after draft.', tileSummaries: [{ tilemapId: 'level', layerId: 'terrain', change: 'updated', summary: 'trigger tile added', affectedCells: 1, tileIds: ['coin_trigger'] }], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 1, triggerIds: ['coin_collected'] } },
+        operationSummaries: [{ operationId: 'op-trigger-preview', target: 'tilemap', change: 'updated', path: 'layers.terrain[4]', summary: 'Preview trigger tile.', affectedTilemapIds: ['level'], collisionTriggerSummary: { collisionCellsAffected: 0, triggerCellsAffected: 1, triggerIds: ['coin_collected'] } }],
+        expectedScenarioImpact: { status: 'unknown', summary: 'Requires scenario rerun.' },
+        guardrail: 'read-only visual diff summary; no apply',
+      },
+    ],
+  },
   tilemap_draft_preview: {
     present: true,
     preview_count: 2,
@@ -406,7 +437,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 18);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 19);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -684,6 +715,10 @@ assert.ok(!cockpit.renderRuntimeAssetLoadingSurface(xssAssetLoading).includes('<
 const xssAssetPreview = { asset_preview: { present: true, boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>' }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>' }] } };
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview reason</script>'), 'asset preview rows must be escaped');
 assert.ok(!cockpit.renderAssetPreviewEvidenceSurface(xssAssetPreview).includes('<script>preview-boundary</script>'), 'asset preview boundary must be escaped');
+const xssVisualDiff = { visual_diff_preview: { present: true, boundary: '<script>diff-boundary</script>', summaries: [{ summaryId: '<img src=x onerror=alert(1)>', target: { type: '<script>target</script>', path: '<b>path</b>' }, sourceRefs: { draftId: '<script>draft</script>' }, before: { summaryText: '<script>before</script>', collisionTriggerSummary: {} }, after: { summaryText: '<script>after</script>', collisionTriggerSummary: {} }, operationSummaries: [{ operationId: '<script>op</script>', change: '<script>change</script>', path: '<b>path</b>', summary: '<script>summary</script>', affectedEntityIds: ['<script>entity</script>'], collisionTriggerSummary: {} }], expectedScenarioImpact: { status: '<script>impact</script>', summary: '<script>impact summary</script>' } }] } };
+assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<script>summary</script>'), 'visual diff operation summary must be escaped');
+assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<script>diff-boundary</script>'), 'visual diff boundary must be escaped');
+assert.ok(!cockpit.renderVisualDiffPreviewSurface(xssVisualDiff).includes('<img src=x onerror=alert(1)>'), 'visual diff summary id must be escaped');
 const xssTilemapDraft = { tilemap_draft_preview: { present: true, boundary: '<script>tilemap-boundary</script>', records: [{ operationId: '<img src=x onerror=alert(1)>', kind: '<script>kind</script>', layerId: '<b>layer</b>', summary: '<script>summary</script>', beforeTilemapHash: { algorithm: '<script>before</script>', value: '<b>hash</b>' }, afterTilemapHash: { algorithm: '<script>after</script>', value: '<b>hash</b>' }, collisionCells: ['<script>cell</script>'], triggerCells: [] }] } };
 assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>summary</script>'), 'tilemap draft preview summary must be escaped');
 assert.ok(!cockpit.renderTilemapDraftPreviewSurface(xssTilemapDraft).includes('<script>tilemap-boundary</script>'), 'tilemap draft preview boundary must be escaped');
@@ -772,6 +807,17 @@ assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /Asset preview evid
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /player_atlas/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface(run), /missing_asset_file/);
 assert.match(cockpit.renderAssetPreviewEvidenceSurface({}), /No asset preview evidence/);
+const visualDiffPreviewMarkup = cockpit.renderVisualDiffPreviewSurface(run);
+assert.match(visualDiffPreviewMarkup, /Visual diff preview/);
+assert.match(visualDiffPreviewMarkup, /visual-diff-scene-draft/);
+assert.match(visualDiffPreviewMarkup, /op-player-x/);
+assert.match(visualDiffPreviewMarkup, /draft draft-scene-1/);
+assert.match(visualDiffPreviewMarkup, /dashboard dashboard-data\.json#run-1/);
+assert.match(visualDiffPreviewMarkup, /Scenario impact: unknown/);
+assert.match(visualDiffPreviewMarkup, /collision 0 \/ trigger 1|0 \/ 1/);
+assert.match(visualDiffPreviewMarkup, /browser cannot apply edits, write files, execute commands, or persist drafts/);
+assert.doesNotMatch(visualDiffPreviewMarkup, /<button/i);
+assert.match(cockpit.renderVisualDiffPreviewSurface({}), /No visual diff summary read model/);
 const tilemapDraftPreviewMarkup = cockpit.renderTilemapDraftPreviewSurface(run);
 assert.match(tilemapDraftPreviewMarkup, /Tilemap draft previews/);
 assert.match(tilemapDraftPreviewMarkup, /op-collision-preview/);
@@ -805,6 +851,7 @@ assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifest
 assert.match(cockpit.renderStudioAssetInspectorSurface({}), /No asset inspector data/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
+assert.match(cockpit.renderEvidencePane(run), /Visual diff preview/);
 assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
