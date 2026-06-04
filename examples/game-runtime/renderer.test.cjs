@@ -130,6 +130,8 @@ const queue = renderQueue({
 });
 assert.equal(queue.schemaVersion, 'ouroforge.scene-render-queue.v1');
 assert.equal(queue.validation.status, 'ready');
+assert.deepEqual(queue.tilemapStats, { layerCount: 1, cellCount: 1, drawnTileCount: 1, missingTileRefCount: 0, assetTileCount: 0 });
+assert.deepEqual(queue.renderables.find((renderable) => renderable.id === 'tilemap-level-ground').tileCount, 1);
 assert.deepEqual(queue.renderables.map((renderable) => [renderable.id, renderable.drawOrder, renderable.primitiveKind, renderable.visible]), [
   ['entity-sky', 0, 'rect', true],
   ['tilemap-level-ground', 1, 'tilemap', true],
@@ -150,6 +152,24 @@ assert.deepEqual(queue.renderables.map((renderable) => [renderable.id, renderabl
   ['debug-label-zebra', 16, 'debug_label', true],
 ]);
 assert.deepEqual(queue.readOnlyInspection.disallowedActions, ['trusted writes', 'command bridge', 'live mutation']);
+
+const missingTileQueue = renderQueue({
+  world: {
+    sceneId: 'missing-tile-queue-test',
+    tick: 1,
+    bounds: { width: 64, height: 64 },
+    entities: [],
+    tilemaps: tilemap.normalizeTilemaps([{ id: 'broken', tileSize: { width: 16, height: 16 }, grid: { width: 2, height: 1 }, tiles: [{ id: 'known', asset: 'known-tile' }], layers: [{ id: 'ground', order: 0, data: ['known', 'missing'] }] }]),
+  },
+  renderer: normalizeRenderer({ layers: [{ id: 'ground', order: 0 }] }),
+  tilemap,
+  frameId: 'frame-missing-tile',
+});
+assert.equal(missingTileQueue.validation.status, 'warning');
+assert.deepEqual(missingTileQueue.tilemapStats, { layerCount: 1, cellCount: 2, drawnTileCount: 1, missingTileRefCount: 1, assetTileCount: 1 });
+assert.match(missingTileQueue.validation.warnings[0], /references missing tile missing/);
+assert.equal(missingTileQueue.renderables.find((renderable) => renderable.id === 'tilemap-broken-ground').missingTileRefCount, 1);
+
 
 const queueContext = createContext();
 drawRuntime({

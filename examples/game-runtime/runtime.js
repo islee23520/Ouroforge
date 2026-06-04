@@ -1030,6 +1030,10 @@
         renderQueueSkippedCount: renderQueue.renderables.filter((renderable) => renderable.visible === false).length,
         renderQueueBlockedReasonCount: Array.isArray(renderQueue.validation.blockedReasons) ? renderQueue.validation.blockedReasons.length : 0,
         renderQueueWarningCount: Array.isArray(renderQueue.validation.warnings) ? renderQueue.validation.warnings.length : 0,
+        tilemapRenderLayerCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.layerCount : 0,
+        tilemapRenderCellCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.cellCount : 0,
+        tilemapRenderDrawnTileCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.drawnTileCount : 0,
+        tilemapRenderMissingTileRefCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.missingTileRefCount : 0,
       });
     },
     getEvents() {

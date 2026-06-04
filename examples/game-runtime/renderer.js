@@ -126,8 +126,31 @@
         layers.push({ id: item.layerId, order: item.order, visible: item.layer && item.layer.visible !== false, kind: 'tilemap' });
       }
     }
+    const tilemapStats = { layerCount: tilemapLayers.length, cellCount: 0, drawnTileCount: 0, missingTileRefCount: 0, assetTileCount: 0 };
+    const tilemapWarnings = [];
     const renderables = [];
     for (const item of tilemapLayers) {
+      const layerData = Array.isArray(item.layer && item.layer.data) ? item.layer.data : [];
+      let tileCount = 0;
+      let missingTileRefCount = 0;
+      let assetTileCount = 0;
+      for (const tileId of layerData) {
+        if (!tileId) continue;
+        tilemapStats.cellCount += 1;
+        const tile = item.tilemap && item.tilemap.tileIndex && item.tilemap.tileIndex[tileId];
+        if (!tile) {
+          missingTileRefCount += 1;
+          tilemapStats.missingTileRefCount += 1;
+          tilemapWarnings.push(`tilemap ${item.tilemapId} layer ${item.layerId} references missing tile ${tileId}`);
+          continue;
+        }
+        tileCount += 1;
+        tilemapStats.drawnTileCount += 1;
+        if (tile.asset) {
+          assetTileCount += 1;
+          tilemapStats.assetTileCount += 1;
+        }
+      }
       renderables.push({
         id: `tilemap-${item.tilemapId}-${item.layerId}`,
         sourceKind: 'tilemap-layer',
@@ -138,8 +161,11 @@
         stableKey: `${item.tilemapId}:${item.layerId}`,
         drawOrder: 0,
         primitiveKind: 'tilemap',
-        visible: !(item.layer && item.layer.visible === false),
-        fallbackReason: item.layer && item.layer.visible === false ? 'tilemap layer hidden' : null,
+        tileCount,
+        missingTileRefCount,
+        assetTileCount,
+        visible: !(item.layer && item.layer.visible === false) && tileCount > 0,
+        fallbackReason: item.layer && item.layer.visible === false ? 'tilemap layer hidden' : (tileCount === 0 ? (missingTileRefCount > 0 ? 'tilemap layer has missing tile refs' : 'tilemap layer empty') : null),
       });
     }
     const queueEntities = Array.isArray(world.entities) ? world.entities : [];
@@ -195,13 +221,15 @@
     renderables.forEach((renderable, drawOrder) => { renderable.drawOrder = drawOrder; });
     const warnings = renderables
       .filter((renderable) => renderable.visible === false && !renderable.fallbackReason)
-      .map((renderable) => `hidden renderable ${renderable.id} should include fallbackReason`);
+      .map((renderable) => `hidden renderable ${renderable.id} should include fallbackReason`)
+      .concat(tilemapWarnings);
     return {
       schemaVersion: 'ouroforge.scene-render-queue.v1',
       frameId: String(frameId),
       sceneId: String(world.sceneId || 'unknown-scene'),
       layers,
       renderables,
+      tilemapStats,
       validation: { status: warnings.length ? 'warning' : 'ready', blockedReasons: [], warnings },
       readOnlyInspection: { trustedEmitter: 'browser-runtime-renderer', browserStudioMode: 'read-only evidence inspection', disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
     };
