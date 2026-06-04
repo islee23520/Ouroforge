@@ -7275,6 +7275,28 @@ impl VisualComparisonEvidenceArtifact {
         self.validate_outcome_consistency()
     }
 
+    fn validate_threshold_result(&self) -> Result<()> {
+        let Some(summary) = &self.pixel_diff_summary else {
+            return Ok(());
+        };
+        if self.thresholds.is_empty() {
+            return Ok(());
+        }
+        let threshold_passed = self.thresholds.iter().all(|threshold| {
+            summary.changed_pixels <= threshold.max_changed_pixels
+                && summary.changed_percent_x1000 <= threshold.max_changed_percent_x1000
+        });
+        match self.outcome {
+            VisualComparisonOutcome::Unchanged if !threshold_passed => Err(anyhow!(
+                "visual comparison unchanged outcome exceeds configured thresholds"
+            )),
+            VisualComparisonOutcome::Changed if threshold_passed => Err(anyhow!(
+                "visual comparison changed outcome must exceed at least one configured threshold"
+            )),
+            _ => Ok(()),
+        }
+    }
+
     fn validate_outcome_consistency(&self) -> Result<()> {
         match self.outcome {
             VisualComparisonOutcome::Unchanged => {
@@ -7331,6 +7353,103 @@ impl VisualComparisonEvidenceArtifact {
     }
 }
 
+pub fn validate_visual_comparison_evidence_refs(
+    run_dir: impl AsRef<Path>,
+    comparison: &VisualComparisonEvidenceArtifact,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    comparison.validate()?;
+    comparison.validate_threshold_result()?;
+    let index = read_evidence_index(run_dir)?;
+    let indexed_paths = index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut references = Vec::new();
+    references.extend(comparison.evidence_refs.iter().map(String::as_str));
+    references.extend(comparison.metadata_refs.iter().map(String::as_str));
+    references.extend(comparison.before.screenshot_ref.as_deref());
+    references.extend(comparison.after.screenshot_ref.as_deref());
+    references.extend(comparison.before.metadata_ref.as_deref());
+    references.extend(comparison.after.metadata_ref.as_deref());
+    references.sort();
+    references.dedup();
+    for reference in references {
+        if !indexed_paths.contains(reference) {
+            return Err(anyhow!(
+                "visual comparison reference is missing from evidence index: {reference}"
+            ));
+        }
+        validate_visual_comparison_indexed_reference(run_dir, comparison, reference)?;
+    }
+    Ok(())
+}
+
+fn validate_visual_comparison_indexed_reference(
+    run_dir: &Path,
+    comparison: &VisualComparisonEvidenceArtifact,
+    reference: &str,
+) -> Result<()> {
+    if reference.ends_with(".json") {
+        let value = read_json_value(run_dir.join(reference)).with_context(|| {
+            format!("visual comparison metadata reference is unreadable: {reference}")
+        })?;
+        validate_visual_comparison_reference_freshness(comparison, reference, &value)?;
+        if Some(reference) == comparison.before.metadata_ref.as_deref() {
+            comparison.before.validate_metadata_dimensions(
+                "visual comparison before",
+                reference,
+                &value,
+            )?;
+        }
+        if Some(reference) == comparison.after.metadata_ref.as_deref() {
+            comparison.after.validate_metadata_dimensions(
+                "visual comparison after",
+                reference,
+                &value,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_visual_comparison_reference_freshness(
+    comparison: &VisualComparisonEvidenceArtifact,
+    reference: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    if let Some(run_id) = json_string(value, "runId").or_else(|| json_string(value, "run_id")) {
+        if run_id != comparison.run_id {
+            return Err(anyhow!(
+                "visual comparison reference is stale for runId {run_id}; expected {} at {reference}",
+                comparison.run_id
+            ));
+        }
+    }
+    if let Some(scenario_id) =
+        json_string(value, "scenarioId").or_else(|| json_string(value, "scenario_id"))
+    {
+        if scenario_id != comparison.scenario_id {
+            return Err(anyhow!(
+                "visual comparison reference scenarioId drift at {reference}: {scenario_id} != {}",
+                comparison.scenario_id
+            ));
+        }
+    }
+    if let Some(checkpoint_id) =
+        json_string(value, "checkpointId").or_else(|| json_string(value, "checkpoint_id"))
+    {
+        if checkpoint_id != comparison.checkpoint_id {
+            return Err(anyhow!(
+                "visual comparison reference checkpointId drift at {reference}: {checkpoint_id} != {}",
+                comparison.checkpoint_id
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl VisualComparisonScreenshotRef {
     fn validate(&self, field: &str) -> Result<()> {
         match (&self.screenshot_ref, &self.missing_reason) {
@@ -7376,6 +7495,52 @@ impl VisualComparisonScreenshotRef {
             validate_evidence_artifact_path(reference)?;
             if !reference.ends_with(".json") {
                 return Err(anyhow!("{field}.metadataRef must be JSON evidence"));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_metadata_dimensions(
+        &self,
+        field: &str,
+        reference: &str,
+        value: &serde_json::Value,
+    ) -> Result<()> {
+        let width = value
+            .get("width")
+            .or_else(|| value.get("imageWidth"))
+            .or_else(|| value.get("image_width"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        let height = value
+            .get("height")
+            .or_else(|| value.get("imageHeight"))
+            .or_else(|| value.get("image_height"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        if let Some((expected_width, expected_height)) = self.dimensions() {
+            if width != Some(expected_width) || height != Some(expected_height) {
+                return Err(anyhow!(
+                    "{field}.metadataRef dimensions are stale at {reference}"
+                ));
+            }
+        }
+        if let Some(format) = value
+            .get("format")
+            .or_else(|| value.get("imageFormat"))
+            .or_else(|| value.get("image_format"))
+            .and_then(|value| value.as_str())
+        {
+            let expected = match self.format {
+                Some(VisualComparisonImageFormat::Png) => "png",
+                Some(VisualComparisonImageFormat::Jpeg) => "jpeg",
+                None => format,
+            };
+            let normalized = format.trim().to_ascii_lowercase();
+            if normalized != expected && !(expected == "jpeg" && normalized == "jpg") {
+                return Err(anyhow!(
+                    "{field}.metadataRef format is stale at {reference}: {format} != {expected}"
+                ));
             }
         }
         Ok(())
@@ -42001,6 +42166,178 @@ scenarios:
             .validate()
             .expect_err("missing screenshot state cannot also include screenshotRef");
         assert!(error.to_string().contains("missingReason"));
+    }
+
+    #[test]
+    fn visual_comparison_evidence_refs_accept_fresh_indexed_metadata() {
+        let (root, artifacts) = create_test_run("visual-comparison-indexed-refs");
+        let comparison = write_indexed_visual_comparison_fixture(&artifacts.run_dir);
+
+        validate_visual_comparison_evidence_refs(&artifacts.run_dir, &comparison)
+            .expect("fresh indexed visual comparison refs validate");
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn visual_comparison_evidence_refs_reject_stale_metadata_identity() {
+        for (field, value) in [
+            ("runId", json!("stale-run")),
+            ("scenarioId", json!("stale-scenario")),
+            ("checkpointId", json!("stale-checkpoint")),
+        ] {
+            let (root, artifacts) =
+                create_test_run(&format!("visual-comparison-stale-{}", field.to_lowercase()));
+            let comparison = write_indexed_visual_comparison_fixture(&artifacts.run_dir);
+            let metadata_ref = comparison
+                .before
+                .metadata_ref
+                .as_deref()
+                .expect("before metadata ref exists");
+            let mut metadata =
+                read_json_value(artifacts.run_dir.join(metadata_ref)).expect("metadata reads");
+            metadata[field] = value.clone();
+            write_json(&artifacts.run_dir.join(metadata_ref), &metadata).expect("metadata writes");
+
+            let error = validate_visual_comparison_evidence_refs(&artifacts.run_dir, &comparison)
+                .expect_err("stale visual comparison metadata is rejected");
+            assert!(
+                error.to_string().contains(field),
+                "expected {field} drift error, got {error}"
+            );
+
+            fs::remove_dir_all(root).expect("fixture removed");
+        }
+    }
+
+    #[test]
+    fn visual_comparison_evidence_refs_reject_metadata_dimension_and_format_drift() {
+        for (field, value, expected) in [
+            ("width", json!(321), "dimensions"),
+            ("height", json!(181), "dimensions"),
+            ("format", json!("jpeg"), "format"),
+        ] {
+            let (root, artifacts) = create_test_run(&format!("visual-comparison-drift-{field}"));
+            let comparison = write_indexed_visual_comparison_fixture(&artifacts.run_dir);
+            let metadata_ref = comparison
+                .after
+                .metadata_ref
+                .as_deref()
+                .expect("after metadata ref exists");
+            let mut metadata =
+                read_json_value(artifacts.run_dir.join(metadata_ref)).expect("metadata reads");
+            metadata[field] = value.clone();
+            write_json(&artifacts.run_dir.join(metadata_ref), &metadata).expect("metadata writes");
+
+            let error = validate_visual_comparison_evidence_refs(&artifacts.run_dir, &comparison)
+                .expect_err("stale visual comparison dimensions or format are rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected {expected} drift error, got {error}"
+            );
+
+            fs::remove_dir_all(root).expect("fixture removed");
+        }
+    }
+
+    #[test]
+    fn visual_comparison_evidence_refs_reject_missing_index_and_threshold_mismatch() {
+        let (missing_root, missing_artifacts) = create_test_run("visual-comparison-missing-index");
+        let mut missing = write_indexed_visual_comparison_fixture(&missing_artifacts.run_dir);
+        missing
+            .evidence_refs
+            .push("evidence/screenshots/not-indexed.png".to_string());
+        let error = validate_visual_comparison_evidence_refs(&missing_artifacts.run_dir, &missing)
+            .expect_err("unindexed visual comparison ref is rejected");
+        assert!(error.to_string().contains("missing from evidence index"));
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (threshold_root, threshold_artifacts) =
+            create_test_run("visual-comparison-threshold-mismatch");
+        let mut changed = VisualComparisonEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/visual-comparison-evidence-v1/visual-comparison-changed.sample.json"
+        ))
+        .expect("changed fixture parses");
+        write_indexed_visual_comparison_artifact(&threshold_artifacts.run_dir, &changed);
+        let summary = changed
+            .pixel_diff_summary
+            .as_mut()
+            .expect("changed comparison has summary");
+        summary.changed_pixels = 1;
+        summary.changed_percent_x1000 = 1;
+
+        let error =
+            validate_visual_comparison_evidence_refs(&threshold_artifacts.run_dir, &changed)
+                .expect_err("changed outcome within thresholds is rejected");
+        assert!(error.to_string().contains("must exceed"));
+        fs::remove_dir_all(threshold_root).expect("threshold fixture removed");
+    }
+
+    fn write_indexed_visual_comparison_fixture(run_dir: &Path) -> VisualComparisonEvidenceArtifact {
+        let comparison = VisualComparisonEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json"
+        ))
+        .expect("unchanged fixture parses");
+        write_indexed_visual_comparison_artifact(run_dir, &comparison);
+        comparison
+    }
+
+    fn write_indexed_visual_comparison_artifact(
+        run_dir: &Path,
+        comparison: &VisualComparisonEvidenceArtifact,
+    ) {
+        let mut refs = Vec::new();
+        refs.extend(comparison.evidence_refs.iter().map(String::as_str));
+        refs.extend(comparison.metadata_refs.iter().map(String::as_str));
+        refs.extend(comparison.before.screenshot_ref.as_deref());
+        refs.extend(comparison.after.screenshot_ref.as_deref());
+        refs.extend(comparison.before.metadata_ref.as_deref());
+        refs.extend(comparison.after.metadata_ref.as_deref());
+        refs.sort();
+        refs.dedup();
+        for reference in refs {
+            fs::create_dir_all(
+                run_dir.join(Path::new(reference).parent().expect("reference has parent")),
+            )
+            .expect("reference parent exists");
+            if reference.ends_with(".json") {
+                let screenshot = if Some(reference) == comparison.before.metadata_ref.as_deref() {
+                    &comparison.before
+                } else if Some(reference) == comparison.after.metadata_ref.as_deref() {
+                    &comparison.after
+                } else {
+                    &comparison.before
+                };
+                let (width, height) = screenshot.dimensions().unwrap_or((320, 180));
+                write_json(
+                    &run_dir.join(reference),
+                    &json!({
+                        "runId": comparison.run_id,
+                        "scenarioId": comparison.scenario_id,
+                        "checkpointId": comparison.checkpoint_id,
+                        "width": width,
+                        "height": height,
+                        "format": screenshot.format.unwrap_or(VisualComparisonImageFormat::Png)
+                    }),
+                )
+                .expect("metadata writes");
+            } else {
+                fs::write(run_dir.join(reference), test_png_bytes(320, 180))
+                    .expect("screenshot writes");
+            }
+            add_evidence_artifact(
+                run_dir,
+                &format!("visual-link-{}", reference.replace('/', "-")),
+                if reference.ends_with(".json") {
+                    "application/json"
+                } else {
+                    "image/png"
+                },
+                reference,
+                json!({ "artifact": "visual_comparison_link_fixture" }),
+            )
+            .expect("visual comparison reference indexed");
+        }
     }
 
     #[test]
