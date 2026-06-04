@@ -28709,6 +28709,47 @@ pub struct SceneInputController {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub allowed_actions: Vec<String>,
+    #[serde(default, rename = "actionMap", skip_serializing_if = "Option::is_none")]
+    pub action_map: Option<SceneActionMap>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneActionMap {
+    pub actions: Vec<SceneActionBinding>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneActionBinding {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keyboard: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gamepad: Option<SceneGamepadActionBinding>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGamepadActionBinding {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buttons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub axes: Vec<SceneGamepadAxisBinding>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGamepadAxisBinding {
+    pub axis: String,
+    pub direction: SceneGamepadAxisDirection,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneGamepadAxisDirection {
+    Positive,
+    Negative,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -32668,6 +32709,131 @@ fn validate_scene_input_controller(field: &str, input: &SceneInputController) ->
         }
     }
     validate_unique_path_components(field, "allowedActions", &input.allowed_actions)?;
+    for action in &input.allowed_actions {
+        validate_path_component(&format!("{field} allowedActions action"), action)?;
+    }
+    if let Some(action_map) = &input.action_map {
+        validate_scene_action_map(field, &input.allowed_actions, action_map)?;
+    }
+    Ok(())
+}
+
+fn validate_scene_action_map(
+    field: &str,
+    allowed_actions: &[String],
+    action_map: &SceneActionMap,
+) -> Result<()> {
+    if action_map.actions.is_empty() {
+        return Err(anyhow!("{field} actionMap actions must not be empty"));
+    }
+    let mut action_ids = BTreeSet::new();
+    let mut keyboard_bindings = BTreeMap::<String, String>::new();
+    let mut gamepad_button_bindings = BTreeMap::<String, String>::new();
+    let mut gamepad_axis_bindings = BTreeMap::<String, String>::new();
+
+    for action in &action_map.actions {
+        validate_path_component(&format!("{field} actionMap action id"), &action.id)?;
+        if !action_ids.insert(action.id.clone()) {
+            return Err(anyhow!(
+                "{field} actionMap contains duplicate action id: {}",
+                action.id
+            ));
+        }
+        if action.keyboard.is_empty()
+            && action
+                .gamepad
+                .as_ref()
+                .is_none_or(|gamepad| gamepad.buttons.is_empty() && gamepad.axes.is_empty())
+        {
+            return Err(anyhow!(
+                "{field} actionMap action {} must declare at least one keyboard or gamepad binding",
+                action.id
+            ));
+        }
+        let mut per_action_keyboard = BTreeSet::new();
+        for key in &action.keyboard {
+            validate_path_component(&format!("{field} actionMap keyboard key"), key)?;
+            let normalized = key.to_ascii_lowercase();
+            if !per_action_keyboard.insert(normalized.clone()) {
+                return Err(anyhow!(
+                    "{field} actionMap action {} declares duplicate keyboard binding: {key}",
+                    action.id
+                ));
+            }
+            if let Some(existing_action) =
+                keyboard_bindings.insert(normalized.clone(), action.id.clone())
+            {
+                return Err(anyhow!(
+                    "{field} actionMap keyboard binding {key} conflicts between actions {existing_action} and {}",
+                    action.id
+                ));
+            }
+        }
+        if let Some(gamepad) = &action.gamepad {
+            validate_scene_gamepad_action_binding(
+                field,
+                &action.id,
+                gamepad,
+                &mut gamepad_button_bindings,
+                &mut gamepad_axis_bindings,
+            )?;
+        }
+    }
+
+    for action in allowed_actions {
+        if !action_ids.contains(action) {
+            return Err(anyhow!(
+                "{field} allowedActions action {action} is missing from actionMap"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_gamepad_action_binding(
+    field: &str,
+    action_id: &str,
+    gamepad: &SceneGamepadActionBinding,
+    gamepad_button_bindings: &mut BTreeMap<String, String>,
+    gamepad_axis_bindings: &mut BTreeMap<String, String>,
+) -> Result<()> {
+    let mut per_action_buttons = BTreeSet::new();
+    for button in &gamepad.buttons {
+        validate_path_component(&format!("{field} actionMap gamepad button"), button)?;
+        let normalized = button.to_ascii_lowercase();
+        if !per_action_buttons.insert(normalized.clone()) {
+            return Err(anyhow!(
+                "{field} actionMap action {action_id} declares duplicate gamepad button binding: {button}"
+            ));
+        }
+        if let Some(existing_action) =
+            gamepad_button_bindings.insert(normalized.clone(), action_id.to_string())
+        {
+            return Err(anyhow!(
+                "{field} actionMap gamepad button {button} conflicts between actions {existing_action} and {action_id}"
+            ));
+        }
+    }
+
+    let mut per_action_axes = BTreeSet::new();
+    for axis in &gamepad.axes {
+        validate_path_component(&format!("{field} actionMap gamepad axis"), &axis.axis)?;
+        let normalized = format!("{}:{:?}", axis.axis.to_ascii_lowercase(), axis.direction);
+        if !per_action_axes.insert(normalized.clone()) {
+            return Err(anyhow!(
+                "{field} actionMap action {action_id} declares duplicate gamepad axis binding: {}",
+                axis.axis
+            ));
+        }
+        if let Some(existing_action) =
+            gamepad_axis_bindings.insert(normalized.clone(), action_id.to_string())
+        {
+            return Err(anyhow!(
+                "{field} actionMap gamepad axis {} conflicts between actions {existing_action} and {action_id}",
+                axis.axis
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -53932,6 +54098,115 @@ scenarios:
         assert_eq!(
             serialized["entities"][2]["components"]["uiText"]["text"],
             "Coin: 0/1"
+        );
+    }
+
+    fn scene_with_input_action_map(input: serde_json::Value) -> SceneDocument {
+        serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "action-map-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [
+                {
+                    "id": "player",
+                    "sprite": { "color": "#5eead4" },
+                    "components": {
+                        "transform": { "x": 32, "y": 72 },
+                        "velocity": { "x": 0, "y": 0 },
+                        "size": { "width": 16, "height": 16 },
+                        "controllable": true,
+                        "input": input
+                    }
+                }
+            ]
+        }))
+        .expect("action-map scene parses")
+    }
+
+    #[test]
+    fn scene_input_action_map_schema_accepts_keyboard_and_gamepad_shape() {
+        let scene: SceneDocument = serde_json::from_str(include_str!(
+            "../../../examples/game-runtime/action-map-v1.json"
+        ))
+        .expect("action map fixture parses");
+
+        validate_scene(&scene).expect("action map schema validates");
+        let input = scene.entities[0].components.input.as_ref().expect("input");
+        let action_map = input.action_map.as_ref().expect("action map");
+        assert_eq!(action_map.actions.len(), 4);
+        assert_eq!(action_map.actions[0].id, "move_left");
+        assert_eq!(
+            action_map.actions[0]
+                .gamepad
+                .as_ref()
+                .expect("gamepad")
+                .axes[0]
+                .direction,
+            SceneGamepadAxisDirection::Negative
+        );
+    }
+
+    #[test]
+    fn scene_input_action_map_rejects_conflicting_keyboard_bindings() {
+        let scene = scene_with_input_action_map(json!({
+            "scheme": "keyboard",
+            "allowedActions": ["move_left", "interact"],
+            "actionMap": {
+                "actions": [
+                    { "id": "move_left", "keyboard": ["a"] },
+                    { "id": "interact", "keyboard": ["A"] }
+                ]
+            }
+        }));
+
+        let error = validate_scene(&scene).expect_err("conflicting keyboard binding rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("keyboard binding A conflicts between actions move_left and interact"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn scene_input_action_map_rejects_malformed_actions_without_bindings() {
+        let scene = scene_with_input_action_map(json!({
+            "scheme": "keyboard",
+            "allowedActions": ["jump"],
+            "actionMap": {
+                "actions": [
+                    { "id": "jump" }
+                ]
+            }
+        }));
+
+        let error = validate_scene(&scene).expect_err("unbound action rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("action jump must declare at least one keyboard or gamepad binding"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn scene_input_action_map_rejects_allowed_actions_missing_from_map() {
+        let scene = scene_with_input_action_map(json!({
+            "scheme": "keyboard",
+            "allowedActions": ["move_left", "jump"],
+            "actionMap": {
+                "actions": [
+                    { "id": "move_left", "keyboard": ["left"] }
+                ]
+            }
+        }));
+
+        let error = validate_scene(&scene).expect_err("missing allowed action rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("allowedActions action jump is missing from actionMap"),
+            "unexpected error: {error:#}"
         );
     }
 
