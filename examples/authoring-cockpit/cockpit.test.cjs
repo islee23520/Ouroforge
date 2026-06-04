@@ -554,6 +554,26 @@ const run = {
       readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'browser runtime control', 'remote telemetry'] },
       authority: 'browser_runtime_evidence_input_not_profiler_truth',
     },
+    runtime_state: {
+      present: true,
+      stateId: '<tick-12-state>',
+      sceneId: 'trigger-flags-v1-fixture',
+      tick: 12,
+      digest: { algorithm: 'fnv1a64-canonical-json-v1', value: '<digest-value>' },
+      snapshotCount: 1,
+      saveEventCount: 2,
+      saveCreatedCount: 1,
+      saveLoadedCount: 1,
+      replayDigestComparedCount: 1,
+      saveEvents: [
+        { type: 'runtime.save.created', payload: { saveId: '<slot-1-tick-12>', slotId: '<slot-1>', stateDigest: { value: '<digest-value>' } } },
+        { type: 'runtime.save.loaded', payload: { saveId: '<slot-1-tick-12>', slotId: '<slot-1>', stateDigest: { value: '<digest-value>' } } },
+      ],
+      replayEvents: [{ type: 'runtime.replay.digest_compared', payload: { frameId: '<frame-12>', status: 'matched', expected: { value: '<digest-value>' }, actual: { value: '<digest-value>' } } }],
+      snapshots: [{ snapshotId: '<snapshot-12>', tick: 12 }],
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'save mutation', 'browser runtime control'] },
+      authority: 'browser_runtime_evidence_input_not_trusted_persistence',
+    },
     physics: {
       colliderEntityCount: 2,
       collisionEventCount: 1,
@@ -721,7 +741,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goa
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 26);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 27);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -954,6 +974,18 @@ assert.match(cockpit.renderRuntimeProfilerInspectionSurface({ engine_summaries: 
 const xssRuntimeProfiler = cockpit.renderRuntimeProfilerInspectionSurface({ engine_summaries: { present: true, runtime_frame_budget: { frameId: '<script>frame</script>', sceneId: '<img>', scenarioId: '<svg>', timings: { renderMs: '<b>' }, budget: { renderMs: '<i>' }, counts: { entityCount: '<p>' }, status: '<script>bad</script>', violations: [{ field: '<script>render</script>', actualMs: '<img>', budgetMs: '<svg>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, authority: '<b>authority</b>' } } });
 assert.doesNotMatch(xssRuntimeProfiler, /<script>|<img>|<svg>|<b>|<i>|<p>/);
 assert.match(xssRuntimeProfiler, /&lt;script&gt;render&lt;\/script&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /Runtime save\/state inspection/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /Runtime save\/state inspection/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /&lt;tick-12-state&gt;/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /Save\/load events/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /Replay digest comparisons/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /trusted persistence remains Rust\/local generated evidence/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface(run), /browser runtime control/);
+assert.doesNotMatch(cockpit.renderRuntimeStateInspectionSurface(run), /<tick-12-state>|<digest-value>/);
+assert.match(cockpit.renderRuntimeStateInspectionSurface({ engine_summaries: { present: true, runtime_state: '<bad>' } }), /No runtime save\/load\/replay state read model/);
+const xssRuntimeState = cockpit.renderRuntimeStateInspectionSurface({ engine_summaries: { present: true, runtime_state: { present: true, stateId: '<script>state</script>', sceneId: '<img>', digest: { algorithm: '<svg>', value: '<b>' }, saveEvents: [{ type: '<script>save</script>', payload: { saveId: '<img>', slotId: '<svg>', stateDigest: { value: '<b>' } } }], replayEvents: [{ payload: { frameId: '<i>', status: '<p>', expected: { value: '<em>' }, actual: { value: '<strong>' } } }], snapshots: [{ snapshotId: '<script>snap</script>', tick: '<img>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] } } } });
+assert.doesNotMatch(xssRuntimeState, /<script>|<img|<svg>|<b>|<i>|<p>|<em>/);
+assert.match(xssRuntimeState, /&lt;script&gt;state&lt;\/script&gt;/);
 assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);
@@ -1000,6 +1032,7 @@ assert.match(cockpit.renderIntegration(run), /Run comparison/);
 assert.match(cockpit.renderIntegration(run), /Engine Expansion state/);
 assert.match(cockpit.renderIntegration(run), /Render breakdown inspection/);
 assert.match(cockpit.renderIntegration(run), /Runtime profiler inspection/);
+assert.match(cockpit.renderIntegration(run), /Runtime save\/state inspection/);
 assert.match(cockpit.renderIntegration(run), /Expressive scene inspection/);
 assert.match(cockpit.renderIntegration(run), /Collision\/transition\/event inspection/);
 assert.match(cockpit.renderIntegration(run), /Component counts/);
