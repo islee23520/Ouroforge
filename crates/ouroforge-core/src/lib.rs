@@ -11448,6 +11448,33 @@ pub fn write_source_patch_evidence_bundle(
     Ok(path)
 }
 
+pub fn write_source_patch_apply_transaction_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &SourcePatchApplyTransactionArtifact,
+) -> Result<PathBuf> {
+    validate_source_patch_apply_transaction_artifact(artifact)?;
+    let path = run_dir
+        .as_ref()
+        .join("mutation/source-patch-apply-transaction.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create source patch apply transaction directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    let mut value = serde_json::to_value(artifact)?;
+    if let serde_json::Value::Object(map) = &mut value {
+        map.insert(
+            "readModel".to_string(),
+            serde_json::to_value(source_patch_apply_transaction_read_model(artifact))?,
+        );
+    }
+    write_json_atomic(&path, &value)?;
+    Ok(path)
+}
+
 pub fn validate_source_patch_evidence_bundle(
     bundle: &SourcePatchEvidenceBundleArtifact,
 ) -> Result<SourcePatchEvidenceBundleValidation> {
@@ -11908,7 +11935,7 @@ pub fn inspect_source_patch_apply_transaction_artifact(
     SourcePatchApplyTransactionValidation {
         schema_version: "source-patch-apply-transaction-validation-v1".to_string(),
         status: if blocked_reasons.is_empty() {
-            "passed".to_string()
+            "shape_valid_pending_linked_evidence".to_string()
         } else {
             "blocked".to_string()
         },
@@ -11917,7 +11944,9 @@ pub fn inspect_source_patch_apply_transaction_artifact(
         verification_command_count: artifact.verification_commands.len(),
         blocked_reasons,
         guardrails: vec![
-            "apply transaction validation is readiness metadata only; it does not apply patches"
+            "shape validation checks transaction metadata only; it does not apply patches"
+                .to_string(),
+            "linked evidence readiness requires inspect_source_patch_apply_transaction_artifact_with_evidence_root before any future trusted apply"
                 .to_string(),
             "validated transactions still require a separate trusted apply implementation before writes"
                 .to_string(),
@@ -11939,6 +11968,27 @@ pub fn validate_source_patch_apply_transaction_artifact(
         ));
     }
     Ok(validation)
+}
+
+pub fn inspect_source_patch_apply_transaction_artifact_with_evidence_root(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    evidence_root: impl AsRef<Path>,
+) -> SourcePatchApplyTransactionValidation {
+    let mut validation = inspect_source_patch_apply_transaction_artifact(artifact);
+    let root = evidence_root.as_ref();
+    inspect_source_patch_apply_transaction_linked_evidence(
+        artifact,
+        root,
+        &mut validation.blocked_reasons,
+    );
+    validation.blocked_reasons.sort();
+    validation.blocked_reasons.dedup();
+    validation.status = if validation.blocked_reasons.is_empty() {
+        "linked_evidence_ready_no_apply_authority".to_string()
+    } else {
+        "blocked".to_string()
+    };
+    validation
 }
 
 pub fn source_patch_apply_transaction_read_model(
@@ -11969,7 +12019,7 @@ pub fn source_patch_apply_transaction_read_model(
         readiness_label: if validation.is_blocked() {
             "blocked_before_trusted_apply".to_string()
         } else {
-            "ready_metadata_only_no_apply_authority".to_string()
+            "shape_valid_pending_linked_evidence_no_apply_authority".to_string()
         },
         target_count: artifact.targets.len(),
         verification_command_count: artifact.verification_commands.len(),
@@ -12004,6 +12054,118 @@ pub fn source_patch_apply_transaction_read_model(
             "dashboard and Studio surfaces may not write trusted files".to_string(),
             "trusted apply remains separately scoped from transaction readiness".to_string(),
         ],
+    }
+}
+
+fn inspect_source_patch_apply_transaction_linked_evidence(
+    artifact: &SourcePatchApplyTransactionArtifact,
+    evidence_root: &Path,
+    blocked_reasons: &mut Vec<String>,
+) {
+    for (field, path, expected_id, required_statuses) in [
+        (
+            "evidence.patchPreviewRef",
+            artifact.evidence.patch_preview_ref.as_str(),
+            artifact.evidence.patch_preview_id.as_str(),
+            &["passed", "ready", "complete", "valid"][..],
+        ),
+        (
+            "evidence.sandboxReportRef",
+            artifact.evidence.sandbox_report_ref.as_str(),
+            artifact.evidence.sandbox_report_id.as_str(),
+            &["passed", "success", "succeeded", "complete"][..],
+        ),
+        (
+            "evidence.reviewDecisionRef",
+            artifact.evidence.review_decision_ref.as_str(),
+            artifact.evidence.review_decision_id.as_str(),
+            &["accepted", "approved", "passed"][..],
+        ),
+        (
+            "evidence.fileClassReportRef",
+            artifact.evidence.file_class_report_ref.as_str(),
+            artifact.evidence.file_class_report_id.as_str(),
+            &["passed", "valid", "complete"][..],
+        ),
+        (
+            "evidence.diffIntegrityReportRef",
+            artifact.evidence.diff_integrity_report_ref.as_str(),
+            artifact.evidence.diff_integrity_report_id.as_str(),
+            &["passed", "valid", "complete"][..],
+        ),
+    ] {
+        inspect_source_patch_apply_transaction_linked_json(
+            evidence_root,
+            field,
+            path,
+            expected_id,
+            required_statuses,
+            blocked_reasons,
+        );
+    }
+}
+
+fn inspect_source_patch_apply_transaction_linked_json(
+    evidence_root: &Path,
+    field: &str,
+    path: &str,
+    expected_id: &str,
+    required_statuses: &[&str],
+    blocked_reasons: &mut Vec<String>,
+) {
+    if let Err(error) = validate_relative_artifact_path(field, path) {
+        blocked_reasons.push(error.to_string());
+        return;
+    }
+    let evidence_path = evidence_root.join(path);
+    let value = match read_json_value(&evidence_path) {
+        Ok(value) => value,
+        Err(error) => {
+            blocked_reasons.push(format!(
+                "{field} linked evidence {} must exist and be readable JSON: {error}",
+                evidence_path.display()
+            ));
+            return;
+        }
+    };
+    if !json_contains_string(&value, expected_id) {
+        blocked_reasons.push(format!(
+            "{field} linked evidence must contain expected id {expected_id}"
+        ));
+    }
+    if !json_contains_any_string_ci(&value, required_statuses) {
+        blocked_reasons.push(format!(
+            "{field} linked evidence must record one of statuses: {}",
+            required_statuses.join(", ")
+        ));
+    }
+}
+
+fn json_contains_string(value: &serde_json::Value, expected: &str) -> bool {
+    match value {
+        serde_json::Value::String(actual) => actual == expected,
+        serde_json::Value::Array(values) => values
+            .iter()
+            .any(|value| json_contains_string(value, expected)),
+        serde_json::Value::Object(map) => map
+            .values()
+            .any(|value| json_contains_string(value, expected)),
+        _ => false,
+    }
+}
+
+fn json_contains_any_string_ci(value: &serde_json::Value, expected: &[&str]) -> bool {
+    match value {
+        serde_json::Value::String(actual) => expected
+            .iter()
+            .any(|expected| actual.eq_ignore_ascii_case(expected)),
+        serde_json::Value::Array(values) => values
+            .iter()
+            .any(|value| json_contains_any_string_ci(value, expected)),
+        serde_json::Value::Object(map) => map
+            .values()
+            .any(|value| json_contains_any_string_ci(value, expected)),
+        _ => false,
     }
 }
 
@@ -13899,8 +14061,18 @@ fn push_if_blank(blocked_reasons: &mut Vec<String>, field: &str, value: &str) {
 
 fn require_sha256_like(blocked_reasons: &mut Vec<String>, field: &str, value: &str) {
     push_if_blank(blocked_reasons, field, value);
-    if !value.trim().is_empty() && !value.starts_with("sha256:") {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let Some(hex) = trimmed.strip_prefix("sha256:") else {
         blocked_reasons.push(format!("{field} must use sha256: prefix"));
+        return;
+    };
+    if hex.len() != 64 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        blocked_reasons.push(format!(
+            "{field} must be sha256: followed by exactly 64 hex characters"
+        ));
     }
 }
 
@@ -30552,6 +30724,10 @@ fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboar
         (
             "source-patch-evidence-bundle",
             "mutation/source-patch-evidence-bundle.json",
+        ),
+        (
+            "source-patch-apply-transaction",
+            "mutation/source-patch-apply-transaction.json",
         ),
         (
             "mutation-evolve-v1-demo-summary",

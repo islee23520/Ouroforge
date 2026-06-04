@@ -19,8 +19,8 @@
   "targets": [
     {
       "path": "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
-      "beforeHash": "sha256:fixture-before-hash",
-      "afterHash": "sha256:fixture-after-hash-if-later-authorized",
+      "beforeHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "afterHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "fileClass": "runtime_demo_config",
       "reviewLevel": "elevated_source_like_data_review",
       "classificationStatus": "potentially_allowed_later",

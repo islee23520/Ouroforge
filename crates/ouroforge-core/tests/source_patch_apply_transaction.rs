@@ -1,6 +1,8 @@
 use ouroforge_core::{
-    inspect_source_patch_apply_transaction_artifact, source_patch_apply_transaction_read_model,
-    validate_source_patch_apply_transaction_artifact, SourcePatchApplyTransactionArtifact,
+    inspect_source_patch_apply_transaction_artifact,
+    inspect_source_patch_apply_transaction_artifact_with_evidence_root,
+    source_patch_apply_transaction_read_model, validate_source_patch_apply_transaction_artifact,
+    write_source_patch_apply_transaction_artifact, SourcePatchApplyTransactionArtifact,
     SourcePatchApplyTransactionStatus, SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION,
 };
 use serde_json::json;
@@ -10,6 +12,80 @@ fn fixture() -> SourcePatchApplyTransactionArtifact {
         "../../../examples/source-patch-apply-transaction-v1/apply-transaction.sample.json"
     ))
     .expect("fixture deserializes")
+}
+
+fn unique_run_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "ouroforge-{name}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(dir.join("evidence")).expect("create evidence dir");
+    dir
+}
+
+fn write_json_at(root: &std::path::Path, relative: &str, value: serde_json::Value) {
+    let path = root.join(relative);
+    std::fs::create_dir_all(path.parent().expect("fixture path parent")).expect("create parent");
+    std::fs::write(
+        path,
+        serde_json::to_string_pretty(&value).expect("serialize fixture"),
+    )
+    .expect("write fixture json");
+}
+
+fn write_linked_evidence_fixtures(
+    root: &std::path::Path,
+    artifact: &SourcePatchApplyTransactionArtifact,
+) {
+    write_json_at(
+        root,
+        &artifact.evidence.patch_preview_ref,
+        json!({"patchPreviewId": artifact.evidence.patch_preview_id, "status": "passed"}),
+    );
+    write_json_at(
+        root,
+        &artifact.evidence.sandbox_report_ref,
+        json!({"sandboxReportId": artifact.evidence.sandbox_report_id, "status": "passed"}),
+    );
+    write_json_at(
+        root,
+        &artifact.evidence.review_decision_ref,
+        json!({"reviewDecisionId": artifact.evidence.review_decision_id, "status": "accepted"}),
+    );
+    write_json_at(
+        root,
+        &artifact.evidence.file_class_report_ref,
+        json!({"fileClassReportId": artifact.evidence.file_class_report_id, "status": "passed"}),
+    );
+    write_json_at(
+        root,
+        &artifact.evidence.diff_integrity_report_ref,
+        json!({"diffIntegrityReportId": artifact.evidence.diff_integrity_report_id, "status": "passed"}),
+    );
+}
+
+fn write_minimal_dashboard_run(run_dir: &std::path::Path) {
+    std::fs::write(
+        run_dir.join("run.json"),
+        serde_json::json!({"id":"run-source-patch-apply-transaction","created_at_unix_ms":1})
+            .to_string(),
+    )
+    .expect("write run");
+    std::fs::write(
+        run_dir.join("verdict.json"),
+        serde_json::json!({"status":"passed"}).to_string(),
+    )
+    .expect("write verdict");
+    std::fs::create_dir_all(run_dir.join("evidence")).expect("evidence dir");
+    std::fs::write(
+        run_dir.join("evidence/index.json"),
+        serde_json::json!({"artifacts":[]}).to_string(),
+    )
+    .expect("write evidence index");
 }
 
 #[test]
@@ -85,7 +161,7 @@ fn source_patch_apply_transaction_validation_passes_ready_fixture() {
     let validation = validate_source_patch_apply_transaction_artifact(&artifact)
         .expect("complete ready transaction validates");
 
-    assert_eq!(validation.status, "passed");
+    assert_eq!(validation.status, "shape_valid_pending_linked_evidence");
     assert_eq!(validation.target_count, 1);
     assert_eq!(validation.verification_command_count, 1);
     assert!(validation.blocked_reasons.is_empty());
@@ -218,10 +294,10 @@ fn source_patch_apply_transaction_read_model_is_display_only() {
         model.schema_version,
         "source-patch-apply-transaction-read-model-v1"
     );
-    assert_eq!(model.status, "passed");
+    assert_eq!(model.status, "shape_valid_pending_linked_evidence");
     assert_eq!(
         model.readiness_label,
-        "ready_metadata_only_no_apply_authority"
+        "shape_valid_pending_linked_evidence_no_apply_authority"
     );
     assert!(model
         .evidence_summary
@@ -247,4 +323,79 @@ fn source_patch_apply_transaction_read_model_is_display_only() {
             .iter()
             .any(|action| action == forbidden));
     }
+}
+
+#[test]
+fn source_patch_apply_transaction_strictly_rejects_malformed_hashes() {
+    let mut artifact = fixture();
+    artifact.targets[0].before_hash = "sha256:not-a-hash".to_string();
+    artifact.targets[0].expected_after_hash = "sha256:1234".to_string();
+    artifact.rollback_ref.target_before_hashes[0].before_hash = "sha256:not-a-hash".to_string();
+
+    let validation = inspect_source_patch_apply_transaction_artifact(&artifact);
+
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("64 hex characters")));
+}
+
+#[test]
+fn source_patch_apply_transaction_linked_evidence_validation_requires_existing_matching_evidence() {
+    let artifact = fixture();
+    let missing_root = unique_run_dir("source-patch-apply-missing-linked-evidence");
+
+    let missing = inspect_source_patch_apply_transaction_artifact_with_evidence_root(
+        &artifact,
+        &missing_root,
+    );
+    assert_eq!(missing.status, "blocked");
+    assert!(missing
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("must exist and be readable JSON")));
+
+    let ready_root = unique_run_dir("source-patch-apply-linked-evidence");
+    write_linked_evidence_fixtures(&ready_root, &artifact);
+    let ready =
+        inspect_source_patch_apply_transaction_artifact_with_evidence_root(&artifact, &ready_root);
+
+    assert_eq!(ready.status, "linked_evidence_ready_no_apply_authority");
+    assert!(ready.blocked_reasons.is_empty());
+}
+
+#[test]
+fn source_patch_apply_transaction_exports_generated_dashboard_artifact_read_only() {
+    use ouroforge_core::read_dashboard_run;
+
+    let run_dir = unique_run_dir("source-patch-apply-transaction-dashboard");
+    write_minimal_dashboard_run(&run_dir);
+    let artifact = fixture();
+    let path = write_source_patch_apply_transaction_artifact(&run_dir, &artifact)
+        .expect("transaction writes under mutation generated state");
+    assert!(path.ends_with("mutation/source-patch-apply-transaction.json"));
+
+    let dashboard = read_dashboard_run(&run_dir).expect("dashboard reads generated transaction");
+    let exported = dashboard
+        .mutation_artifacts
+        .iter()
+        .find(|artifact| artifact.id == "source-patch-apply-transaction")
+        .expect("transaction exported as mutation artifact");
+    assert_eq!(
+        exported.path,
+        "mutation/source-patch-apply-transaction.json"
+    );
+    assert_eq!(exported.metadata["read_only"], true);
+    let value = exported
+        .value
+        .as_ref()
+        .expect("transaction value is readable");
+    assert_eq!(value["transactionId"], artifact.transaction_id);
+    assert_eq!(
+        value["readModel"]["readinessLabel"],
+        "shape_valid_pending_linked_evidence_no_apply_authority"
+    );
+    assert!(value.get("applyCommand").is_none());
+    assert!(value.get("mergeCommand").is_none());
 }

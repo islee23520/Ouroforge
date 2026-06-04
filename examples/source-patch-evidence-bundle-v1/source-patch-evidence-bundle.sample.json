@@ -6,7 +6,7 @@
   "previewRef": {
     "kind": "source-patch-preview",
     "path": "mutation/source-patch-previews/patch-preview-demo-001.json",
-    "hash": "sha256:previewfixturehash"
+    "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "fileClassReportRef": {
     "kind": "file-class-report",

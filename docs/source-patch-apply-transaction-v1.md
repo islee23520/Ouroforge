@@ -2,10 +2,10 @@
 
 Source Patch Apply Transaction v1 is an inert contract artifact for issue #702.
 It records the evidence a future trusted source-apply path must consume before
-any source write could be considered. This PR unit adds the artifact shape,
-fixture, and documentation only; it does not implement trusted apply, validation
-readiness, rollback execution, command execution, browser writes, or merge
-automation.
+any source write could be considered. The merged v1 scope adds the artifact
+shape, shape validation, linked-evidence inspection, generated dashboard export,
+and read-only display compatibility; it does not implement trusted apply,
+rollback execution, command execution, browser writes, or merge automation.
 
 ## Artifact purpose
 
@@ -38,8 +38,10 @@ The transaction artifact is metadata only. It does not authorize or perform:
 - dependency, CI/workflow, build-script, credential, network/cloud, release,
   export, or generated/local-state mutation.
 
-Validation and readiness enforcement are intentionally left to the next PR unit
-(SA15.4.2). Read-model/export compatibility is intentionally left to SA15.4.3.
+Shape validation, linked-evidence inspection, generated dashboard export, and
+read-model compatibility are included in v1. These checks remain metadata-only:
+they do not execute commands, apply patches, merge branches, or write trusted
+files.
 
 ## Governance anchors
 
@@ -49,8 +51,11 @@ or narrow either issue.
 
 ## Validation readiness (SA15.4.2)
 
-`validate_source_patch_apply_transaction_artifact` checks transaction readiness
-without applying, writing, merging, or running commands. A transaction is blocked
+`validate_source_patch_apply_transaction_artifact` checks transaction shape
+without applying, writing, merging, or running commands.
+`inspect_source_patch_apply_transaction_artifact_with_evidence_root` additionally
+checks that linked evidence files exist, are readable JSON, contain the expected
+ids, and carry accepted/passed-style status metadata. A transaction is blocked
 when required preview/review/sandbox/file-class/diff-integrity refs are missing,
 refs escape artifact roots, target hashes are malformed or inconsistent,
 rollback before-hash coverage is incomplete, target paths are duplicated or not
@@ -58,15 +63,16 @@ classified as explicitly allowed source-like file classes, verification commands
 are not allowlisted copyable metadata, post-apply evidence refs are absent, or
 non-apply/read-only guardrails are missing.
 
-A passed validation means only that the transaction metadata is complete enough
-for a future separately scoped trusted apply implementation to consider. It does
-not itself authorize source writes.
+A `shape_valid_pending_linked_evidence` result means only that transaction
+metadata is internally complete. A `linked_evidence_ready_no_apply_authority`
+result means linked evidence also passed read-only presence/id/status inspection.
+Neither result authorizes source writes.
 
 ## Read-model compatibility (SA15.4.3)
 
 `source_patch_apply_transaction_read_model` summarizes transaction readiness,
 targets, evidence refs, blockers, allowed inspection actions, and forbidden apply
 or command actions for dashboard/Studio display. Dashboard and cockpit surfaces
-may render `source-patch-apply-transaction` mutation artifacts read-only; they do
+export and may render `source-patch-apply-transaction` mutation artifacts read-only; they do
 not expose apply, merge, command execution, browser command bridge, or trusted
 write controls.
