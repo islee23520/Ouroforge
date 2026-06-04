@@ -66267,6 +66267,74 @@ scenarios:
     }
 
     #[test]
+    fn validates_scenario_coverage_v8_core_3d_regression_pack() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-regression-v8/scenes/core-3d-regression.scene.json",
+        ))
+        .expect("Scenario Coverage v8 core 3D scene parses");
+        validate_scene(&scene).expect("Scenario Coverage v8 core 3D scene validates");
+        assert_eq!(scene.scene_kind, "3d");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.active_camera_id.as_deref(), Some("regression-camera"));
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(graph.meshes.len(), 2);
+        assert_eq!(graph.materials.len(), 2);
+        assert_eq!(graph.colliders.len(), 2);
+        assert_eq!(graph.nodes[1].parent.as_deref(), Some("regression-root"));
+        assert_eq!(graph.nodes[1].mesh_ref.as_deref(), Some("actor-cube-mesh"));
+        assert_eq!(graph.nodes[1].material_ref.as_deref(), Some("actor-green"));
+        assert_eq!(graph.nodes[1].collider_ref.as_deref(), Some("actor-box"));
+        assert_eq!(graph.nodes[2].collider_ref.as_deref(), Some("goal-trigger"));
+        assert!(graph.cameras[0].active);
+        assert_eq!(graph.cameras[0].projection.kind, "perspective");
+
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../examples/3d-capability-regression-v8/seeds/3d-core-regression-v8.yaml"
+        ))
+        .expect("Scenario Coverage v8 core 3D seed validates");
+        assert_eq!(seed.id, "scenario-coverage-v8.core-3d-regression");
+        assert_eq!(seed.scenarios.len(), 1);
+        assert_eq!(seed.scenarios[0].id, "core-3d-transform-render-collision");
+        assert_eq!(seed.scenarios[0].assertions.len(), 8);
+        assert!(seed
+            .acceptance
+            .iter()
+            .any(|item| item.contains("not production 3D readiness")));
+
+        let pack = ScenarioPack::from_path(repo_fixture_path(
+            "examples/3d-capability-regression-v8/scenarios/3d-core-regression-v8.json",
+        ))
+        .expect("Scenario Coverage v8 core 3D scenario pack validates");
+        assert_eq!(pack.id, "3d-core-regression-v8");
+        assert_eq!(pack.scenario_groups.len(), 1);
+        assert_eq!(pack.scenario_groups[0].scenarios.len(), 1);
+
+        let manifest_path =
+            repo_fixture_path("examples/3d-capability-regression-v8/ouroforge.project.json");
+        let manifest = ProjectManifest::from_path(&manifest_path)
+            .expect("Scenario Coverage v8 project manifest validates");
+        assert_eq!(manifest.project.id, "scenario_coverage_v8_3d_core");
+        let report = manifest
+            .validate_references(manifest_path.parent().expect("manifest parent"))
+            .expect("Scenario Coverage v8 project references validate");
+        assert_eq!(report.source_refs, 3);
+        assert_eq!(
+            report.generated_roots,
+            vec!["runs", "target", "dashboard-data", "tmp"]
+        );
+
+        let smoke = read_repo_text("examples/3d-capability-regression-v8/core-3d-smoke.test.cjs");
+        assert!(smoke.contains("scenario coverage v8 core 3d smoke passed"));
+        assert!(smoke.contains(
+            "fs.mkdtempSync(path.join(os.tmpdir(), 'ouroforge-3d-core-regression-v8-'))"
+        ));
+        assert!(smoke.contains("fs.rmSync(tempDir, { recursive: true, force: true })"));
+        assert!(smoke.contains("production 3D readiness"));
+        assert!(smoke.contains("Godot replacement evidence"));
+        assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));
+    }
+
+    #[test]
     fn validates_engine_expressiveness_v2_regression_seed_and_pack() {
         let seed = Seed::from_yaml_str(include_str!(
             "../../../examples/engine-expressiveness-v2-regression/seeds/engine-expressiveness-v2-regression.yaml"

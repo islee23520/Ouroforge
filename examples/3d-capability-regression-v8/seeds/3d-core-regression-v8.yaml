@@ -1,0 +1,40 @@
+id: scenario-coverage-v8.core-3d-regression
+title: Scenario Coverage v8 Core 3D Regression
+goal: Prove focused transform hierarchy, active camera, primitive mesh/material render smoke, and trigger collision evidence for bounded local 3D scenes.
+constraints:
+  target: game-runtime
+acceptance:
+  - The regression remains a bounded local 3D capability gate, not production 3D readiness or a Godot replacement claim.
+  - Browser/runtime evidence is read-only inspection input; Rust/local validation owns source-like fixture checks and CLI contracts.
+  - Generated runs, screenshots, dashboard data, and temp outputs remain untracked.
+scenarios:
+  - id: core-3d-transform-render-collision
+    description: Assert core 3D transform, camera, render, mesh/material, and collision evidence surfaces remain deterministic.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - scene3d_transform:
+          path: transforms.1.parentId
+          equals: regression-root
+      - scene3d_transform:
+          path: transforms.1.worldTransform.translation.x
+          equals: 7
+      - scene3d_camera:
+          path: activeCameraId
+          equals: regression-camera
+      - scene3d_camera:
+          path: cameras.0.projection.kind
+          equals: perspective
+      - scene3d_render:
+          path: visibleObjectCount
+          equals: 2
+      - scene3d_render:
+          path: renderables.0.materialRef
+          exists: true
+      - scene3d_collision:
+          path: triggerCount
+          equals: 1
+      - scene3d_collision:
+          path: events.0.type
+          equals: runtime.scene3d.collision.trigger

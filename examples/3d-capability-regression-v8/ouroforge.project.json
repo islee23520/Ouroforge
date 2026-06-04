@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "scenario_coverage_v8_3d_core",
+    "name": "Scenario Coverage v8 Core 3D Regression"
+  },
+  "scenes": [
+    { "id": "core-3d-regression", "path": "scenes/core-3d-regression.scene.json" }
+  ],
+  "seeds": [
+    { "id": "3d-core-regression-v8", "path": "seeds/3d-core-regression-v8.yaml" }
+  ],
+  "scenarioPacks": [
+    { "id": "3d-core-regression-v8", "path": "scenarios/3d-core-regression-v8.json" }
+  ],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": ["runs", "target", "dashboard-data", "tmp"]
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "core-3d-regression",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "activeCameraId": "regression-camera",
+    "meshes": [
+      {
+        "id": "actor-cube-mesh",
+        "kind": "primitive",
+        "primitive": "cube",
+        "materialRef": "actor-green",
+        "metadata": { "fixtureScope": "bounded primitive mesh regression only; no importer or production renderer claim" }
+      },
+      {
+        "id": "trigger-cube-mesh",
+        "kind": "primitive",
+        "primitive": "cube",
+        "materialRef": "trigger-purple",
+        "metadata": { "fixtureScope": "trigger marker primitive regression only" }
+      }
+    ],
+    "materials": [
+      { "id": "actor-green", "kind": "unlit", "baseColor": "#22c55e" },
+      { "id": "trigger-purple", "kind": "unlit", "baseColor": "#a855f7" }
+    ],
+    "colliders": [
+      {
+        "id": "actor-box",
+        "shape": "box",
+        "body": "dynamic",
+        "size": { "x": 2, "y": 2, "z": 2 },
+        "collisionGroup": "actors",
+        "collisionMask": ["triggers"]
+      },
+      {
+        "id": "goal-trigger",
+        "shape": "box",
+        "body": "trigger",
+        "trigger": true,
+        "size": { "x": 2, "y": 2, "z": 2 },
+        "collisionGroup": "triggers"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "regression-root",
+        "localTransform": {
+          "translation": { "x": 5, "y": 1, "z": 0 },
+          "rotation": { "x": 0, "y": 15, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "metadata": { "fixtureScope": "parent transform for hierarchy regression" }
+      },
+      {
+        "id": "actor-cube",
+        "parent": "regression-root",
+        "localTransform": {
+          "translation": { "x": 2, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "actor-cube-mesh",
+        "materialRef": "actor-green",
+        "colliderRef": "actor-box",
+        "components": [
+          { "kind": "mesh", "reference": "actor-cube-mesh" },
+          { "kind": "material", "reference": "actor-green" },
+          { "kind": "collider", "reference": "actor-box" }
+        ],
+        "metadata": { "fixtureScope": "child renderable with dynamic box collider" }
+      },
+      {
+        "id": "trigger-cube",
+        "localTransform": {
+          "translation": { "x": 2, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "trigger-cube-mesh",
+        "materialRef": "trigger-purple",
+        "colliderRef": "goal-trigger",
+        "components": [
+          { "kind": "mesh", "reference": "trigger-cube-mesh" },
+          { "kind": "material", "reference": "trigger-purple" },
+          { "kind": "collider", "reference": "goal-trigger" }
+        ],
+        "metadata": { "fixtureScope": "trigger volume renderable for collision regression" }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "regression-camera",
+        "active": true,
+        "transform": {
+          "translation": { "x": 0, "y": 0, "z": 10 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "projection": { "kind": "perspective", "fovDegrees": 60, "near": 1, "far": 1000, "aspectMode": "viewport" },
+        "viewport": { "x": 0, "y": 0, "width": 320, "height": 180 },
+        "metadata": { "fixtureScope": "active perspective camera regression" }
+      }
+    ],
+    "metadata": {
+      "generatedStateBoundary": "tracked source-like regression fixture only; generated runs, screenshots, dashboard data, and temp projects stay untracked"
+    }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D regression fixture, not production 3D readiness or Godot replacement evidence",
+    "issue": "#606"
+  }
+}
