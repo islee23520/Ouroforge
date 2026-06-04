@@ -3575,6 +3575,453 @@ impl AgentWorkPackageStatus {
     }
 }
 
+pub const STUDIO_MULTI_AGENT_PIPELINE_INSPECTION_READ_MODEL_SCHEMA_VERSION: &str =
+    "studio-multi-agent-pipeline-inspection-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct StudioMultiAgentPipelineInspectionReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    pub sections: Vec<StudioMultiAgentPipelineInspectionSection>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct StudioMultiAgentPipelineInspectionSection {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+    #[serde(rename = "itemCount")]
+    pub item_count: usize,
+    pub blockers: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+}
+
+pub fn studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+    input: &str,
+) -> StudioMultiAgentPipelineInspectionReadModel {
+    match serde_json::from_str::<serde_json::Value>(input) {
+        Ok(value) => StudioMultiAgentPipelineInspectionReadModel::from_value(&value),
+        Err(error) => StudioMultiAgentPipelineInspectionReadModel::malformed(format!(
+            "pipeline inspection input must be JSON: {error:#}"
+        )),
+    }
+}
+
+impl StudioMultiAgentPipelineInspectionReadModel {
+    pub fn from_value(value: &serde_json::Value) -> Self {
+        let mut malformed_reasons = Vec::new();
+        if !value.is_object() {
+            return Self::malformed("pipeline inspection input must be a JSON object".to_string());
+        }
+
+        let task_boards = pipeline_values(
+            value,
+            &[
+                "production_task_boards",
+                "productionTaskBoards",
+                "production_task_board",
+                "productionTaskBoard",
+            ],
+            &mut malformed_reasons,
+        );
+        let role_models = pipeline_values(
+            value,
+            &[
+                "agent_role_models",
+                "agentRoleModels",
+                "agent_role_model",
+                "agentRoleModel",
+            ],
+            &mut malformed_reasons,
+        );
+        let ownership_policies = pipeline_values(
+            value,
+            &[
+                "ownership_policies",
+                "ownershipPolicies",
+                "ownership_policy",
+                "ownershipPolicy",
+            ],
+            &mut malformed_reasons,
+        );
+        let work_packages = pipeline_values(
+            value,
+            &[
+                "agent_work_packages",
+                "agentWorkPackages",
+                "agent_work_package",
+                "agentWorkPackage",
+            ],
+            &mut malformed_reasons,
+        );
+        let handoffs = pipeline_values(
+            value,
+            &[
+                "agent_handoffs",
+                "agentHandoffs",
+                "agent_handoff",
+                "agentHandoff",
+                "agent_handoff_v2s",
+                "agentHandoffV2s",
+            ],
+            &mut malformed_reasons,
+        );
+        let evidence_bundles = pipeline_values(
+            value,
+            &[
+                "loop_evidence_bundles",
+                "loopEvidenceBundles",
+                "loop_evidence_bundle",
+                "loopEvidenceBundle",
+                "production_evidence_bundles",
+                "productionEvidenceBundles",
+                "production_evidence_bundle",
+                "productionEvidenceBundle",
+            ],
+            &mut malformed_reasons,
+        );
+
+        let mut sections = vec![
+            pipeline_collection_section(
+                "task-board",
+                "Task board",
+                &task_boards,
+                "tasks",
+                &mut malformed_reasons,
+            ),
+            pipeline_collection_section(
+                "role-model",
+                "Role model",
+                &role_models,
+                "roles",
+                &mut malformed_reasons,
+            ),
+            pipeline_collection_section(
+                "ownership-policy",
+                "Ownership policy",
+                &ownership_policies,
+                "entries",
+                &mut malformed_reasons,
+            ),
+            pipeline_collection_section(
+                "work-package",
+                "Work package",
+                &work_packages,
+                "workPackageId",
+                &mut malformed_reasons,
+            ),
+            pipeline_collection_section(
+                "handoff",
+                "Handoff",
+                &handoffs,
+                "handoffId",
+                &mut malformed_reasons,
+            ),
+            pipeline_lane_section(
+                "review-critic",
+                "Review and critic lane",
+                &task_boards,
+                |task| pipeline_text_contains_any(task, &["review", "critic"]),
+            ),
+            pipeline_lane_section("qa-queue", "QA queue", &task_boards, |task| {
+                pipeline_text_contains_any(task, &["qa", "playtest"])
+            }),
+            pipeline_lane_section(
+                "performance-regression",
+                "Performance and regression lane",
+                &task_boards,
+                |task| pipeline_text_contains_any(task, &["performance", "regression"]),
+            ),
+            pipeline_decision_section(&task_boards, &evidence_bundles),
+            pipeline_collection_section(
+                "production-evidence-bundle",
+                "Production evidence bundle",
+                &evidence_bundles,
+                "bundleId",
+                &mut malformed_reasons,
+            ),
+        ];
+
+        for section in &mut sections {
+            if section.item_count == 0 && section.status == "present" {
+                section.status = "empty".to_string();
+            }
+        }
+        let status = if sections.iter().any(|section| section.status == "malformed")
+            || !malformed_reasons.is_empty()
+        {
+            "malformed"
+        } else if sections.iter().any(|section| section.status == "blocked") {
+            "blocked"
+        } else if sections.iter().any(|section| section.status == "missing") {
+            "partial"
+        } else {
+            "ready"
+        };
+        Self {
+            schema_version:
+                STUDIO_MULTI_AGENT_PIPELINE_INSPECTION_READ_MODEL_SCHEMA_VERSION.to_string(),
+            status: status.to_string(),
+            sections,
+            malformed_reasons,
+            boundary: "Read-only Studio multi-agent pipeline inspection model; it normalizes display fields without executing commands, spawning agents, writing trusted browser state, bridging to local commands, cloud orchestration, auto-apply, auto-merge, or self-approval.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version:
+                STUDIO_MULTI_AGENT_PIPELINE_INSPECTION_READ_MODEL_SCHEMA_VERSION.to_string(),
+            status: "malformed".to_string(),
+            sections: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed Studio multi-agent pipeline inspection model; it reports validation errors without executing commands, spawning agents, writing trusted state, cloud orchestration, auto-apply, auto-merge, or self-approval.".to_string(),
+        }
+    }
+}
+
+fn pipeline_values<'a>(
+    value: &'a serde_json::Value,
+    keys: &[&str],
+    malformed_reasons: &mut Vec<String>,
+) -> Vec<&'a serde_json::Value> {
+    let Some((key, raw)) = keys
+        .iter()
+        .find_map(|key| value.get(*key).map(|raw| (*key, raw)))
+    else {
+        return Vec::new();
+    };
+    if let Some(items) = raw.as_array() {
+        let mut values = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            if item.is_object() {
+                values.push(item);
+            } else {
+                malformed_reasons.push(format!("{key}[{index}] must be an object"));
+            }
+        }
+        values
+    } else if raw.is_object() {
+        vec![raw]
+    } else {
+        malformed_reasons.push(format!("{key} must be an object or array of objects"));
+        Vec::new()
+    }
+}
+
+fn pipeline_collection_section(
+    id: &str,
+    label: &str,
+    values: &[&serde_json::Value],
+    item_field: &str,
+    malformed_reasons: &mut Vec<String>,
+) -> StudioMultiAgentPipelineInspectionSection {
+    if values.is_empty() {
+        return StudioMultiAgentPipelineInspectionSection {
+            id: id.to_string(),
+            label: label.to_string(),
+            status: "missing".to_string(),
+            item_count: 0,
+            blockers: Vec::new(),
+            malformed_reasons: Vec::new(),
+        };
+    }
+    let mut item_count = 0;
+    let mut blockers = Vec::new();
+    let mut section_malformed = Vec::new();
+    for (index, value) in values.iter().enumerate() {
+        blockers.extend(pipeline_blockers(value));
+        if let Some(reasons) = value.get("malformedReasons").and_then(|raw| raw.as_array()) {
+            section_malformed.extend(
+                reasons
+                    .iter()
+                    .filter_map(|reason| reason.as_str().map(str::to_string)),
+            );
+        }
+        let collection_items = value
+            .get(item_field)
+            .and_then(|raw| raw.as_array())
+            .or_else(|| {
+                if item_field == "tasks" {
+                    value.get("steps").and_then(|raw| raw.as_array())
+                } else {
+                    None
+                }
+            });
+        if let Some(items) = collection_items {
+            item_count += items.len();
+            for item in items {
+                blockers.extend(pipeline_blockers(item));
+            }
+        } else if item_field.ends_with("Id")
+            || item_field == "workPackageId"
+            || item_field == "handoffId"
+        {
+            item_count += 1;
+        } else if value.get(item_field).is_some() {
+            section_malformed.push(format!(
+                "{id}[{index}].{item_field} must be an array or string id"
+            ));
+        } else {
+            section_malformed.push(format!("{id}[{index}].{item_field} is missing"));
+        }
+    }
+    malformed_reasons.extend(section_malformed.iter().cloned());
+    let status = if !section_malformed.is_empty() {
+        "malformed"
+    } else if !blockers.is_empty() {
+        "blocked"
+    } else {
+        "present"
+    };
+    StudioMultiAgentPipelineInspectionSection {
+        id: id.to_string(),
+        label: label.to_string(),
+        status: status.to_string(),
+        item_count,
+        blockers,
+        malformed_reasons: section_malformed,
+    }
+}
+
+fn pipeline_lane_section(
+    id: &str,
+    label: &str,
+    task_boards: &[&serde_json::Value],
+    matches: impl Fn(&serde_json::Value) -> bool,
+) -> StudioMultiAgentPipelineInspectionSection {
+    if task_boards.is_empty() {
+        return StudioMultiAgentPipelineInspectionSection {
+            id: id.to_string(),
+            label: label.to_string(),
+            status: "missing".to_string(),
+            item_count: 0,
+            blockers: Vec::new(),
+            malformed_reasons: Vec::new(),
+        };
+    }
+    let mut count = 0;
+    let mut blockers = Vec::new();
+    for board in task_boards {
+        if let Some(tasks) = board
+            .get("tasks")
+            .and_then(|raw| raw.as_array())
+            .or_else(|| board.get("steps").and_then(|raw| raw.as_array()))
+        {
+            for task in tasks.iter().filter(|task| matches(task)) {
+                count += 1;
+                blockers.extend(pipeline_blockers(task));
+            }
+        }
+    }
+    StudioMultiAgentPipelineInspectionSection {
+        id: id.to_string(),
+        label: label.to_string(),
+        status: if !blockers.is_empty() {
+            "blocked"
+        } else if count == 0 {
+            "empty"
+        } else {
+            "present"
+        }
+        .to_string(),
+        item_count: count,
+        blockers,
+        malformed_reasons: Vec::new(),
+    }
+}
+
+fn pipeline_decision_section(
+    task_boards: &[&serde_json::Value],
+    evidence_bundles: &[&serde_json::Value],
+) -> StudioMultiAgentPipelineInspectionSection {
+    let mut count = 0;
+    let mut blockers = Vec::new();
+    for board in task_boards {
+        if let Some(tasks) = board
+            .get("tasks")
+            .and_then(|raw| raw.as_array())
+            .or_else(|| board.get("steps").and_then(|raw| raw.as_array()))
+        {
+            for task in tasks {
+                let decision_refs = task
+                    .get("requiredDecisions")
+                    .and_then(|raw| raw.as_array())
+                    .map_or(0, Vec::len);
+                let expected_decisions = task
+                    .get("expectedArtifacts")
+                    .and_then(|raw| raw.as_array())
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter(|item| {
+                                pipeline_text_contains_any(item, &["decision", "review"])
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+                count += decision_refs + expected_decisions;
+                if decision_refs + expected_decisions > 0 {
+                    blockers.extend(pipeline_blockers(task));
+                }
+            }
+        }
+    }
+    for bundle in evidence_bundles {
+        count += bundle
+            .get("reviewDecisions")
+            .and_then(|raw| raw.as_array())
+            .map_or(0, Vec::len);
+    }
+    StudioMultiAgentPipelineInspectionSection {
+        id: "decision-ledger".to_string(),
+        label: "Decision ledger".to_string(),
+        status: if !blockers.is_empty() {
+            "blocked"
+        } else if count == 0 && task_boards.is_empty() && evidence_bundles.is_empty() {
+            "missing"
+        } else if count == 0 {
+            "empty"
+        } else {
+            "present"
+        }
+        .to_string(),
+        item_count: count,
+        blockers,
+        malformed_reasons: Vec::new(),
+    }
+}
+
+fn pipeline_blockers(value: &serde_json::Value) -> Vec<String> {
+    let mut blockers = Vec::new();
+    for key in ["blockedReasons", "blockers", "missingRefs", "openRisks"] {
+        if let Some(items) = value.get(key).and_then(|raw| raw.as_array()) {
+            for item in items {
+                if let Some(text) = item.as_str() {
+                    blockers.push(text.to_string());
+                } else if let Some(description) =
+                    item.get("description").and_then(|raw| raw.as_str())
+                {
+                    blockers.push(description.to_string());
+                } else if let Some(id) = item.get("id").and_then(|raw| raw.as_str()) {
+                    blockers.push(id.to_string());
+                }
+            }
+        }
+    }
+    blockers
+}
+
+fn pipeline_text_contains_any(value: &serde_json::Value, needles: &[&str]) -> bool {
+    let text = value.to_string().to_ascii_lowercase();
+    needles.iter().any(|needle| text.contains(needle))
+}
+
 impl AgentWorkPackage {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let package: AgentWorkPackage = serde_json::from_str(input)?;
@@ -41975,6 +42422,144 @@ scenarios:
             .iter()
             .any(|reason| reason.contains("acceptanceCriteria")));
         assert!(malformed.boundary.contains("validation errors"));
+    }
+
+    #[test]
+    fn studio_multi_agent_pipeline_inspection_read_model_normalizes_sections_and_lanes() {
+        let task_board: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+        ))
+        .expect("demo task board json");
+        let role_model: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+        ))
+        .expect("role model json");
+        let ownership_policy: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json",
+        ))
+        .expect("ownership policy json");
+        let work_package: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.blocked.fixture.json",
+        ))
+        .expect("work package json");
+        let handoff: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-handoff-v2.fixture.json",
+        ))
+        .expect("handoff json");
+        let evidence_bundle: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-evidence-bundle.fixture.json",
+        ))
+        .expect("evidence bundle json");
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({
+                "production_task_board": task_board,
+                "agent_role_model": role_model,
+                "ownership_policy": ownership_policy,
+                "agent_work_package": work_package,
+                "agent_handoff_v2s": [handoff],
+                "loop_evidence_bundles": [evidence_bundle]
+            })
+            .to_string(),
+        );
+        assert_eq!(
+            model.schema_version,
+            STUDIO_MULTI_AGENT_PIPELINE_INSPECTION_READ_MODEL_SCHEMA_VERSION
+        );
+        assert!(model
+            .boundary
+            .contains("Read-only Studio multi-agent pipeline"));
+        assert!(model.boundary.contains("without executing commands"));
+        assert!(model.boundary.contains("cloud orchestration"));
+        assert_eq!(model.status, "blocked");
+        for section_id in [
+            "task-board",
+            "role-model",
+            "ownership-policy",
+            "work-package",
+            "handoff",
+            "review-critic",
+            "qa-queue",
+            "performance-regression",
+            "decision-ledger",
+            "production-evidence-bundle",
+        ] {
+            assert!(
+                model
+                    .sections
+                    .iter()
+                    .any(|section| section.id == section_id),
+                "missing section {section_id}"
+            );
+        }
+        let qa = model
+            .sections
+            .iter()
+            .find(|section| section.id == "qa-queue")
+            .expect("qa section");
+        assert!(
+            qa.item_count > 0,
+            "qa lane should detect task-board QA tasks"
+        );
+        let regression = model
+            .sections
+            .iter()
+            .find(|section| section.id == "performance-regression")
+            .expect("regression section");
+        assert!(
+            regression.item_count > 0,
+            "regression lane should detect tasks"
+        );
+        let decisions = model
+            .sections
+            .iter()
+            .find(|section| section.id == "decision-ledger")
+            .expect("decision section");
+        assert!(decisions.item_count > 0, "decision refs should be counted");
+        let work_package = model
+            .sections
+            .iter()
+            .find(|section| section.id == "work-package")
+            .expect("work package section");
+        assert!(work_package
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("ownership evidence")));
+    }
+
+    #[test]
+    fn studio_multi_agent_pipeline_inspection_read_model_reports_missing_and_malformed_inputs() {
+        let missing = studio_multi_agent_pipeline_inspection_read_model_from_json_str("{}");
+        assert_eq!(missing.status, "partial");
+        assert!(missing
+            .sections
+            .iter()
+            .all(|section| section.status == "missing"));
+
+        let malformed = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({
+                "production_task_boards": ["bad"],
+                "agent_role_model": {"schemaVersion": "agent-role-model-v1", "roles": "bad"},
+                "agentWorkPackage": {"schemaVersion": "agent-work-package-read-model-v1", "workPackageId": "bad", "status": "malformed", "malformedReasons": ["acceptanceCriteria missing"]}
+            })
+            .to_string(),
+        );
+        assert_eq!(malformed.status, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("production_task_boards[0]")));
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("role-model") || reason.contains("roles")));
+        assert!(malformed
+            .sections
+            .iter()
+            .any(|section| section.id == "work-package"
+                && section
+                    .malformed_reasons
+                    .iter()
+                    .any(|reason| reason.contains("acceptanceCriteria"))));
     }
 
     #[test]
