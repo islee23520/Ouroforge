@@ -1,9 +1,10 @@
 use ouroforge_core::{
     apply_source_patch_preview_in_sandbox, inspect_source_patch_sandbox_evaluator_plan,
-    validate_source_patch_sandbox_evaluator_plan, SourcePatchPreviewApplyStatus,
-    SourcePatchPreviewArtifact, SourcePatchPreviewRequiredTest, SourcePatchSandboxCleanupPolicy,
-    SourcePatchSandboxEvaluationInputs, SourcePatchSandboxEvaluatorPlan,
-    SourcePatchSandboxLayoutPolicy, SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION,
+    run_source_patch_sandbox_allowlisted_tests, validate_source_patch_sandbox_evaluator_plan,
+    SourcePatchPreviewApplyStatus, SourcePatchPreviewArtifact, SourcePatchPreviewRequiredTest,
+    SourcePatchSandboxCleanupPolicy, SourcePatchSandboxEvaluationInputs,
+    SourcePatchSandboxEvaluatorPlan, SourcePatchSandboxLayoutPolicy,
+    SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION,
 };
 use serde_json::json;
 use std::fs;
@@ -229,6 +230,93 @@ fn source_patch_sandbox_apply_rejects_stale_target_without_trusted_write() {
         .join("sandbox/patch-preview-1/worktree")
         .join(target_rel)
         .exists());
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
+fn source_patch_sandbox_allowlisted_tests_run_in_sandbox_and_capture_report() {
+    let temp = sandbox_test_dir("allowlisted-tests-capture-report");
+    let run_dir = temp.join("run");
+    let worktree_file =
+        run_dir.join("sandbox/patch-preview-1/worktree/examples/evidence-dashboard/dashboard.js");
+    fs::create_dir_all(worktree_file.parent().expect("worktree parent")).expect("create worktree");
+    fs::write(&worktree_file, "const dashboard = 'sandbox-only';\n").expect("write sandbox js");
+
+    let required_tests = vec![SourcePatchPreviewRequiredTest {
+        command: "node --check examples/evidence-dashboard/dashboard.js".to_string(),
+        argv: vec![
+            "node".to_string(),
+            "--check".to_string(),
+            "examples/evidence-dashboard/dashboard.js".to_string(),
+        ],
+        allowlist_policy_id: Some("source-patch-preview-safe-local-checks-v1".to_string()),
+        execution_authority: "sandbox_allowlisted_execution".to_string(),
+    }];
+
+    let report =
+        run_source_patch_sandbox_allowlisted_tests(&fixture_plan(), &required_tests, &run_dir)
+            .expect("allowlisted sandbox test passes");
+
+    assert_eq!(report.status, "passed");
+    assert_eq!(
+        report.commands_run,
+        vec!["node --check examples/evidence-dashboard/dashboard.js"]
+    );
+    assert_eq!(
+        report.tests[0].allowlist_policy_id,
+        "node-check-known-examples"
+    );
+    assert_eq!(report.tests[0].status, "passed");
+    assert!(report
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("current_dir")));
+    let report_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            run_dir.join("sandbox/patch-preview-1/evidence/test-execution-report.json"),
+        )
+        .expect("test execution report written"),
+    )
+    .expect("test execution report parses");
+    assert_eq!(
+        report_json["commandsRun"][0],
+        "node --check examples/evidence-dashboard/dashboard.js"
+    );
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
+fn source_patch_sandbox_allowlisted_tests_reject_forbidden_commands_before_execution() {
+    let temp = sandbox_test_dir("allowlisted-tests-reject-forbidden");
+    let run_dir = temp.join("run");
+    fs::create_dir_all(run_dir.join("sandbox/patch-preview-1/worktree")).expect("create worktree");
+
+    let required_tests = vec![SourcePatchPreviewRequiredTest {
+        command: "curl https://example.invalid".to_string(),
+        argv: vec!["curl".to_string(), "https://example.invalid".to_string()],
+        allowlist_policy_id: Some("source-patch-preview-safe-local-checks-v1".to_string()),
+        execution_authority: "sandbox_allowlisted_execution".to_string(),
+    }];
+
+    let error =
+        run_source_patch_sandbox_allowlisted_tests(&fixture_plan(), &required_tests, &run_dir)
+            .expect_err("forbidden command is blocked");
+
+    assert!(error.to_string().contains("network"));
+    let report_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            run_dir.join("sandbox/patch-preview-1/evidence/test-execution-report.json"),
+        )
+        .expect("blocked report written"),
+    )
+    .expect("blocked report parses");
+    assert_eq!(report_json["commandsRun"], json!([]));
+    assert!(report_json["blockedReasons"][0]
+        .as_str()
+        .expect("blocked reason")
+        .contains("network"));
 
     fs::remove_dir_all(temp).expect("cleanup temp");
 }

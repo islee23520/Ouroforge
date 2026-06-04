@@ -10989,6 +10989,42 @@ pub struct SourcePatchSandboxApplyResult {
     pub blocked_reasons: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxTestExecutionOutput {
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+    #[serde(rename = "exitCode")]
+    pub exit_code: Option<i32>,
+    pub status: String,
+    #[serde(rename = "stdoutPreview")]
+    pub stdout_preview: String,
+    #[serde(rename = "stderrPreview")]
+    pub stderr_preview: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxTestExecutionReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "sandboxRoot")]
+    pub sandbox_root: String,
+    #[serde(rename = "worktreePath")]
+    pub worktree_path: String,
+    #[serde(rename = "reportPath")]
+    pub report_path: String,
+    #[serde(rename = "commandsRun")]
+    pub commands_run: Vec<String>,
+    pub tests: Vec<SourcePatchSandboxTestExecutionOutput>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 pub fn inspect_source_patch_test_command_allowlist(
     artifact: &SourcePatchTestCommandAllowlistArtifact,
 ) -> SourcePatchTestCommandAllowlistValidation {
@@ -11706,6 +11742,160 @@ fn apply_source_patch_sandbox_hunks(
         patched.push('\n');
     }
     Ok(patched)
+}
+
+pub fn run_source_patch_sandbox_allowlisted_tests(
+    plan: &SourcePatchSandboxEvaluatorPlan,
+    required_tests: &[SourcePatchPreviewRequiredTest],
+    run_dir: impl AsRef<Path>,
+) -> Result<SourcePatchSandboxTestExecutionReport> {
+    validate_source_patch_sandbox_evaluator_plan(plan)?;
+    if required_tests.is_empty() {
+        return Err(anyhow!(
+            "source patch sandbox test execution requires at least one required test"
+        ));
+    }
+    let run_dir = run_dir.as_ref();
+    let sandbox_root = run_dir.join(&plan.layout.sandbox_root);
+    let worktree_root = run_dir.join(&plan.layout.worktree_path);
+    let evidence_root = run_dir.join(&plan.layout.evidence_path);
+    let report_path = evidence_root.join("test-execution-report.json");
+    if !worktree_root.exists() {
+        return Err(anyhow!(
+            "source patch sandbox worktree does not exist for test execution: {}",
+            worktree_root.display()
+        ));
+    }
+    fs::create_dir_all(&evidence_root).with_context(|| {
+        format!(
+            "failed to create source patch sandbox test evidence {}",
+            evidence_root.display()
+        )
+    })?;
+    ensure_path_inside(&sandbox_root, &worktree_root)?;
+    ensure_path_inside(&sandbox_root, &evidence_root)?;
+    ensure_path_inside(&sandbox_root, &report_path)?;
+
+    let allowlist = default_source_patch_test_command_allowlist();
+    let mut outputs = Vec::new();
+    let mut blocked_reasons = Vec::<String>::new();
+    for (index, required_test) in required_tests.iter().enumerate() {
+        let field = format!("requiredTests[{index}]");
+        if required_test.argv.is_empty() {
+            blocked_reasons.push(format!("{field}.argv must not be empty"));
+            continue;
+        }
+        let normalized = normalize_source_patch_test_command(&required_test.argv);
+        if required_test.command != normalized {
+            blocked_reasons.push(format!(
+                "{field}.command must match normalized argv `{normalized}`"
+            ));
+            continue;
+        }
+        if required_test.allowlist_policy_id.as_deref()
+            != Some("source-patch-preview-safe-local-checks-v1")
+        {
+            blocked_reasons.push(format!(
+                "{field}.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+            ));
+            continue;
+        }
+        let command = SourcePatchTestCommand {
+            command: required_test.command.clone(),
+            argv: required_test.argv.clone(),
+        };
+        if let Some(forbidden) = classify_source_patch_forbidden_test_command(&command) {
+            blocked_reasons.push(format!("{field}.argv forbidden: {}", forbidden.reason));
+            continue;
+        }
+        let Some(match_result) = allowlist.match_command(&command) else {
+            blocked_reasons.push(format!(
+                "{field}.argv is not in the source patch test command allowlist"
+            ));
+            continue;
+        };
+        let output = Command::new(&required_test.argv[0])
+            .args(&required_test.argv[1..])
+            .current_dir(&worktree_root)
+            .output()
+            .with_context(|| {
+                format!(
+                    "failed to run allowlisted sandbox test `{}` in {}",
+                    required_test.command,
+                    worktree_root.display()
+                )
+            })?;
+        let exit_code = output.status.code();
+        let status = if output.status.success() {
+            "passed"
+        } else {
+            "failed"
+        }
+        .to_string();
+        if !output.status.success() {
+            blocked_reasons.push(format!(
+                "{field}.command exited with status {}",
+                exit_code
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "terminated-by-signal".to_string())
+            ));
+        }
+        outputs.push(SourcePatchSandboxTestExecutionOutput {
+            command: required_test.command.clone(),
+            argv: required_test.argv.clone(),
+            allowlist_policy_id: match_result.policy_id,
+            exit_code,
+            status,
+            stdout_preview: bounded_utf8_preview(&output.stdout, 4096),
+            stderr_preview: bounded_utf8_preview(&output.stderr, 4096),
+        });
+    }
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+    let commands_run = outputs
+        .iter()
+        .map(|output| output.command.clone())
+        .collect::<Vec<_>>();
+    let report = SourcePatchSandboxTestExecutionReport {
+        schema_version: "source-patch-sandbox-test-execution-report-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        sandbox_root: plan.layout.sandbox_root.clone(),
+        worktree_path: plan.layout.worktree_path.clone(),
+        report_path: report_path
+            .strip_prefix(run_dir)
+            .ok()
+            .and_then(|path| path.to_str())
+            .unwrap_or("sandbox/test-execution-report.json")
+            .to_string(),
+        commands_run,
+        tests: outputs,
+        blocked_reasons,
+        guardrails: vec![
+            "sandbox tests execute only argv vectors matched by the source patch test command allowlist".to_string(),
+            "sandbox tests run with current_dir set to the sandbox worktree".to_string(),
+            "no shell, network, install, credential, dependency, merge, or trusted apply commands are allowed".to_string(),
+            "test evidence is written under sandbox evidence only".to_string(),
+        ],
+    };
+    write_json_atomic(&report_path, &json!(report))?;
+    if report.status == "blocked" {
+        return Err(anyhow!(
+            "source patch sandbox test execution blocked: {}",
+            report.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(report)
+}
+
+fn bounded_utf8_preview(bytes: &[u8], max_chars: usize) -> String {
+    String::from_utf8_lossy(bytes)
+        .chars()
+        .take(max_chars)
+        .collect()
 }
 
 fn source_patch_sandbox_file_hash_for_expected(path: &Path, expected: &str) -> Result<String> {
