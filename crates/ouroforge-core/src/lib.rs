@@ -10414,10 +10414,243 @@ pub struct SourcePatchPreviewArtifact {
     pub read_model_prototype: Option<SourcePatchPreviewReadModelPrototype>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "fileClassValidation")]
+    pub file_class_validation: SourcePatchTargetClassValidation,
+    #[serde(
+        rename = "diffIntegrityValidation",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub diff_integrity_validation: Option<PatchDiffIntegrityValidation>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchPreviewValidation {
+    pub fn is_blocked(&self) -> bool {
+        self.status == "blocked"
+    }
+}
+
 impl SourcePatchPreviewArtifact {
     pub fn apply_is_blocked(&self) -> bool {
         self.source_mutation_apply_status == SourcePatchPreviewApplyStatus::Blocked
     }
+}
+
+pub fn inspect_source_patch_preview_artifact(
+    artifact: &SourcePatchPreviewArtifact,
+    limits: PatchDiffIntegrityLimits,
+) -> SourcePatchPreviewValidation {
+    let mut blocked_reasons = Vec::<String>::new();
+
+    if artifact.schema_version != SOURCE_PATCH_PREVIEW_SCHEMA_VERSION {
+        blocked_reasons.push(format!(
+            "schemaVersion must be {SOURCE_PATCH_PREVIEW_SCHEMA_VERSION}"
+        ));
+    }
+    if artifact.patch_preview_id.trim().is_empty() {
+        blocked_reasons.push("patchPreviewId must not be empty".to_string());
+    }
+    if artifact.proposal_id.trim().is_empty() {
+        blocked_reasons.push("proposalId must not be empty".to_string());
+    }
+    if artifact.created_at.trim().is_empty() {
+        blocked_reasons.push("createdAt must not be empty".to_string());
+    }
+    if artifact.stale_target_policy.trim().is_empty() {
+        blocked_reasons.push("staleTargetPolicy must not be empty".to_string());
+    }
+    if artifact.artifact_hash.trim().is_empty() {
+        blocked_reasons.push("artifactHash must not be empty".to_string());
+    }
+    if artifact.targets.is_empty() {
+        blocked_reasons.push("targets must not be empty".to_string());
+    }
+    if artifact.linked_evidence.is_empty() {
+        blocked_reasons.push("linkedEvidence must not be empty".to_string());
+    }
+    if artifact.required_tests.is_empty() {
+        blocked_reasons.push("requiredTests must not be empty".to_string());
+    }
+    if artifact.risk_ids.is_empty() {
+        blocked_reasons.push("riskIds must not be empty".to_string());
+    }
+    if artifact.expected_behavior_change.trim().is_empty() {
+        blocked_reasons.push("expectedBehaviorChange must not be empty".to_string());
+    }
+    if artifact.reviewer_checklist.is_empty() {
+        blocked_reasons.push("reviewerChecklist must not be empty".to_string());
+    }
+    if !artifact.rollback_expectations.required_before_apply {
+        blocked_reasons
+            .push("rollbackExpectations.requiredBeforeApply must remain true".to_string());
+    }
+
+    let mut seen_targets = BTreeSet::<String>::new();
+    for target in &artifact.targets {
+        if target.path.trim().is_empty() {
+            blocked_reasons.push("target path must not be empty".to_string());
+        } else if !seen_targets.insert(target.path.clone()) {
+            blocked_reasons.push(format!("duplicate target file {}", target.path));
+        }
+        if target.before_hash.trim().is_empty() {
+            blocked_reasons.push(format!("{} beforeHash must not be empty", target.path));
+        }
+        if target.file_class.trim().is_empty() {
+            blocked_reasons.push(format!("{} fileClass must not be empty", target.path));
+        }
+        if target.review_level.trim().is_empty() {
+            blocked_reasons.push(format!("{} reviewLevel must not be empty", target.path));
+        }
+        if target.classification_rationale.trim().is_empty() {
+            blocked_reasons.push(format!(
+                "{} classificationRationale must not be empty",
+                target.path
+            ));
+        }
+        if matches!(
+            target.classification_status.as_str(),
+            "restricted_separate_approval" | "blocked_by_design"
+        ) && target.blocked_reasons.is_empty()
+        {
+            blocked_reasons.push(format!(
+                "{} blockedReasons must explain restricted or blocked classification",
+                target.path
+            ));
+        }
+    }
+
+    for evidence in &artifact.linked_evidence {
+        if evidence.kind.trim().is_empty() || evidence.path.trim().is_empty() {
+            blocked_reasons.push("linkedEvidence entries require kind and path".to_string());
+        }
+    }
+    for required_test in &artifact.required_tests {
+        if required_test.command.trim().is_empty() {
+            blocked_reasons.push("requiredTests command must not be empty".to_string());
+        }
+        if !required_test.execution_authority.contains("copyable")
+            || !required_test.execution_authority.contains("not_executed")
+        {
+            blocked_reasons.push(format!(
+                "required test command '{}' must remain copyable/not_executed metadata",
+                required_test.command
+            ));
+        }
+    }
+
+    let target_paths: Vec<PathBuf> = artifact
+        .targets
+        .iter()
+        .map(|target| PathBuf::from(&target.path))
+        .collect();
+    let file_class_validation = classify_source_patch_preview_targets(target_paths.iter());
+    blocked_reasons.extend(
+        file_class_validation
+            .blocked_reasons
+            .iter()
+            .map(|reason| format!("file class blocked: {reason}")),
+    );
+
+    let diff_integrity_validation = match artifact.diff_summary.diff_text.as_deref() {
+        Some(diff_text) if !diff_text.trim().is_empty() => {
+            match inspect_unified_patch_diff_for_preview(diff_text, limits) {
+                Ok(validation) => {
+                    blocked_reasons.extend(
+                        validation
+                            .blocked_reasons
+                            .iter()
+                            .map(|reason| format!("diff integrity blocked: {reason}")),
+                    );
+                    let changed_lines =
+                        validation.report.counts.added + validation.report.counts.removed;
+                    if validation.report.file_count
+                        != artifact.diff_summary.diff_stats.files_changed
+                    {
+                        blocked_reasons.push(format!(
+                            "diffStats.filesChanged {} does not match parsed fileCount {}",
+                            artifact.diff_summary.diff_stats.files_changed,
+                            validation.report.file_count
+                        ));
+                    }
+                    if validation.report.counts.added != artifact.diff_summary.diff_stats.additions
+                    {
+                        blocked_reasons.push(format!(
+                            "diffStats.additions {} does not match parsed additions {}",
+                            artifact.diff_summary.diff_stats.additions,
+                            validation.report.counts.added
+                        ));
+                    }
+                    if validation.report.counts.removed
+                        != artifact.diff_summary.diff_stats.deletions
+                    {
+                        blocked_reasons.push(format!(
+                            "diffStats.deletions {} does not match parsed deletions {}",
+                            artifact.diff_summary.diff_stats.deletions,
+                            validation.report.counts.removed
+                        ));
+                    }
+                    if changed_lines == 0 {
+                        blocked_reasons.push("diffText must include changed lines".to_string());
+                    }
+                    Some(validation)
+                }
+                Err(error) => {
+                    blocked_reasons.push(format!("diffText parse failed: {error}"));
+                    None
+                }
+            }
+        }
+        _ => {
+            blocked_reasons.push("diffSummary.diffText must not be empty".to_string());
+            None
+        }
+    };
+
+    blocked_reasons.sort();
+    blocked_reasons.dedup();
+
+    SourcePatchPreviewValidation {
+        schema_version: "source-patch-preview-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        patch_preview_id: artifact.patch_preview_id.clone(),
+        file_class_validation,
+        diff_integrity_validation,
+        blocked_reasons,
+        guardrails: vec![
+            "source patch preview validation only; no source patch apply".to_string(),
+            "diff integrity and file class checks run before any sandbox evaluation".to_string(),
+            "required tests remain inert copyable metadata, not command execution".to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+        ],
+    }
+}
+
+pub fn validate_source_patch_preview_artifact(
+    artifact: &SourcePatchPreviewArtifact,
+    limits: PatchDiffIntegrityLimits,
+) -> Result<SourcePatchPreviewValidation> {
+    let validation = inspect_source_patch_preview_artifact(artifact, limits);
+    if validation.is_blocked() {
+        return Err(anyhow!(
+            "source patch preview validation blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
 }
 
 pub const PATCH_DIFF_INTEGRITY_SCHEMA_VERSION: &str = "patch-diff-integrity-v1";
