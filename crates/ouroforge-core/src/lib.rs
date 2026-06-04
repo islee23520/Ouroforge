@@ -40688,6 +40688,185 @@ scenarios:
         fs::remove_dir_all(root).ok();
     }
 
+    #[test]
+    fn scenario_coverage_v12_review_critic_qa_and_build_lanes_stay_separated() {
+        let input = fs::read_to_string(repo_fixture_path(
+            "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+        ))
+        .expect("agent role fixture reads");
+        let model = AgentRoleModel::from_json_str(&input).expect("role model validates");
+        let roles = model
+            .roles
+            .iter()
+            .map(|role| (role.role.as_str(), role))
+            .collect::<BTreeMap<_, _>>();
+
+        let reviewer = roles.get("reviewer").expect("reviewer role");
+        assert!(reviewer
+            .handoff_targets
+            .iter()
+            .any(|target| target == "critic"));
+        assert!(reviewer
+            .required_evidence
+            .iter()
+            .any(|evidence| evidence.contains("independent-review")));
+
+        let critic = roles.get("critic").expect("critic role");
+        assert!(critic
+            .required_evidence
+            .iter()
+            .any(|evidence| evidence.contains("no-self-review")));
+
+        let qa = roles.get("qa-agent").expect("qa role");
+        assert!(qa
+            .allowed_outputs
+            .iter()
+            .any(|output| output == "qa-report"));
+        assert!(qa
+            .required_evidence
+            .iter()
+            .any(|evidence| evidence.contains("generated-state-audit")));
+
+        let performance = roles
+            .get("performance-regression-agent")
+            .expect("performance lane role");
+        assert!(performance
+            .allowed_outputs
+            .iter()
+            .any(|output| output == "performance-summary"));
+        assert!(performance
+            .forbidden_actions
+            .iter()
+            .any(|action| action.contains("production-safety-claim")));
+
+        let build = roles
+            .get("build-release-candidate-agent")
+            .expect("build/release design-gate role");
+        assert!(build.purpose.contains("does not publish"));
+        assert!(build
+            .forbidden_actions
+            .iter()
+            .any(|action| action.contains("publish")));
+
+        let mut unsafe_model =
+            serde_json::from_str::<serde_json::Value>(&input).expect("role fixture as value");
+        unsafe_model["roles"][6]["allowedOutputs"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("self-approval"));
+        let error = AgentRoleModel::from_json_str(&unsafe_model.to_string())
+            .expect_err("reviewer cannot advertise self-approval output");
+        assert!(error
+            .to_string()
+            .contains("contains forbidden output authority"));
+    }
+
+    #[test]
+    fn scenario_coverage_v12_gate_lane_bundle_categorizes_review_regression_and_matrix() {
+        let root = unique_temp_dir("scenario-coverage-v12-bundle-lanes");
+        write_loop_dry_run_project(&root);
+        let mut plan = AuthoringLoopPlan::from_json_str(include_str!(
+            "../../../examples/authoring-loop-plan-fixtures/valid/completed.json"
+        ))
+        .expect("completed plan validates");
+        let summarize = plan
+            .steps
+            .iter_mut()
+            .find(|step| step.kind == AuthoringLoopStepKind::Summarize)
+            .expect("summarize step");
+        summarize.expected_artifacts.push(AuthoringLoopArtifactRef {
+            id: "matrix-snapshot".to_string(),
+            path: "runs/after/regression-matrix.json".to_string(),
+            description: Some("regression lane matrix snapshot".to_string()),
+        });
+
+        let plan_path = root.join("loop-plan.json");
+        fs::write(
+            &plan_path,
+            serde_json::to_string_pretty(&plan).expect("plan json"),
+        )
+        .expect("plan written");
+        for step in &plan.steps {
+            for artifact in &step.expected_artifacts {
+                let path = root.join(&artifact.path);
+                fs::create_dir_all(path.parent().expect("artifact parent")).expect("artifact dir");
+                fs::write(path, "{}\n").expect("artifact file");
+            }
+        }
+
+        let bundle =
+            write_authoring_loop_evidence_bundle(&plan, &root, &plan_path).expect("bundle writes");
+
+        assert_eq!(bundle.status, AuthoringLoopEvidenceBundleStatus::Completed);
+        assert_eq!(bundle.runs.len(), 2);
+        assert_eq!(bundle.comparisons.len(), 1);
+        assert_eq!(bundle.proposals.len(), 1);
+        assert_eq!(bundle.review_decisions.len(), 1);
+        assert_eq!(bundle.transactions.len(), 1);
+        assert_eq!(bundle.regression_promotions.len(), 1);
+        assert_eq!(bundle.matrix_snapshots.len(), 1);
+        assert_eq!(bundle.journal_summaries.len(), 1);
+        assert!(bundle.missing_refs.is_empty());
+        assert!(root
+            .join("runs/authoring-loop-bundles/fixture-loop-completed/bundle.json")
+            .is_file());
+
+        let listed = list_authoring_loop_evidence_bundles(root.join("runs"))
+            .expect("generated bundles list and validate refs");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].loop_id, "fixture-loop-completed");
+        assert!(listed[0]
+            .boundary
+            .contains("does not move artifacts, mutate source state"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn scenario_coverage_v12_decision_ledger_appends_review_and_critic_events() {
+        let root = unique_temp_dir("scenario-coverage-v12-decision-ledger");
+        fs::create_dir_all(&root).expect("ledger root");
+        fs::write(root.join("ledger.jsonl"), "").expect("ledger file");
+
+        let review = append_ledger_event(
+            &root,
+            "multi_agent.review_decision",
+            "reviewer",
+            json!({
+                "decisionId": "review-001",
+                "status": "accepted",
+                "evidenceRefs": ["runs/review/evidence.json"],
+                "boundary": "review metadata only; does not apply or merge"
+            }),
+        )
+        .expect("review event appends");
+        let critic = append_ledger_event(
+            &root,
+            "multi_agent.critic_finding",
+            "critic",
+            json!({
+                "findingId": "critic-001",
+                "status": "cleared",
+                "evidenceRefs": ["runs/critic/evidence.json"],
+                "boundary": "critic metadata only; does not apply or merge"
+            }),
+        )
+        .expect("critic event appends");
+
+        let events = read_ledger_events(&root).expect("ledger reads");
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0], review);
+        assert_eq!(events[1], critic);
+        assert_eq!(events[0]["actor"], json!("reviewer"));
+        assert_eq!(events[1]["actor"], json!("critic"));
+        assert!(fs::read_to_string(root.join("ledger.jsonl"))
+            .expect("ledger text")
+            .lines()
+            .all(|line| line.contains("does not apply or merge")));
+
+        fs::remove_dir_all(root).ok();
+    }
+
     fn loop_evidence_bundle_value(status: &str, missing_refs: Vec<&str>) -> serde_json::Value {
         json!({
             "schemaVersion": "authoring-loop-evidence-bundle-v1",
