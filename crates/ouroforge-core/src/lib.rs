@@ -4163,6 +4163,9 @@ impl ReviewCriticGate {
         )?;
         require_text("review/critic gate boundary", &self.boundary)?;
         self.validate_status_shape()?;
+        self.validate_role_independence()?;
+        self.validate_evidence_reviewed_coverage()?;
+        self.validate_stale_state_gate()?;
         self.validate_guardrails()
     }
 
@@ -4225,6 +4228,104 @@ impl ReviewCriticGate {
                     ));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn validate_role_independence(&self) -> Result<()> {
+        if self.reviewer.role != "reviewer" {
+            return Err(anyhow!("review/critic gate reviewer.role must be reviewer"));
+        }
+        if self.critic.role != "critic" {
+            return Err(anyhow!("review/critic gate critic.role must be critic"));
+        }
+
+        let mut conflicts = Vec::new();
+        if self.implementer.actor_id == self.reviewer.actor_id {
+            conflicts.push("self-review: implementer and reviewer actor match");
+        }
+        if self.implementer.actor_id == self.critic.actor_id {
+            conflicts.push("self-critique: implementer and critic actor match");
+        }
+        if self.reviewer.actor_id == self.critic.actor_id {
+            conflicts.push("reviewer/critic conflict: reviewer and critic actor match");
+        }
+        if conflicts.is_empty() {
+            return Ok(());
+        }
+        if self.decision != ReviewCriticGateDecision::Blocked {
+            return Err(anyhow!(
+                "review/critic gate independent reviewer and critic required: {}",
+                conflicts.join("; ")
+            ));
+        }
+        let blocked = self.blocked_reasons.join(" ").to_ascii_lowercase();
+        if !conflicts
+            .iter()
+            .all(|conflict| blocked.contains(conflict.split(':').next().unwrap_or(conflict)))
+        {
+            return Err(anyhow!(
+                "blocked review/critic gate independence conflicts must be visible in blockedReasons"
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_evidence_reviewed_coverage(&self) -> Result<()> {
+        let mut required_refs = vec![
+            &self.work_package_ref,
+            &self.handoff_ref,
+            &self.decision_ledger_ref,
+        ];
+        required_refs.extend(self.state_snapshot_refs.iter());
+        required_refs.extend(self.qa_evidence_refs.iter());
+        required_refs.extend(self.regression_evidence_refs.iter());
+
+        let missing = required_refs
+            .into_iter()
+            .filter(|required| {
+                !self
+                    .evidence_reviewed
+                    .iter()
+                    .any(|reviewed| artifact_refs_match(required, reviewed))
+            })
+            .map(|reference| reference.id.clone())
+            .collect::<Vec<_>>();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        if self.decision != ReviewCriticGateDecision::Blocked {
+            return Err(anyhow!(
+                "review/critic gate evidenceReviewed missing required refs: {}",
+                missing.join(", ")
+            ));
+        }
+        let blocked = self.blocked_reasons.join(" ").to_ascii_lowercase();
+        if !missing
+            .iter()
+            .all(|reference_id| blocked.contains(reference_id) || blocked.contains("evidence"))
+        {
+            return Err(anyhow!(
+                "blocked review/critic gate missing evidence must be visible in blockedReasons"
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_stale_state_gate(&self) -> Result<()> {
+        if self.stale_state_indicators.is_empty() {
+            return Ok(());
+        }
+        if self.decision != ReviewCriticGateDecision::Blocked {
+            return Err(anyhow!(
+                "review/critic gate with staleStateIndicators must be blocked before promotion"
+            ));
+        }
+        let blocked = self.blocked_reasons.join(" ").to_ascii_lowercase();
+        if !blocked.contains("stale") && !blocked.contains("refresh") {
+            return Err(anyhow!(
+                "blocked review/critic gate with staleStateIndicators must describe stale or refresh action"
+            ));
         }
         Ok(())
     }
@@ -46293,6 +46394,54 @@ scenarios:
     }
 
     #[test]
+    fn review_critic_gate_v1_blocks_independence_and_evidence_drift() {
+        let valid: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ))
+        .expect("review gate json");
+
+        let mut accepted_self_review = valid.clone();
+        accepted_self_review["reviewer"]["actorId"] =
+            accepted_self_review["implementer"]["actorId"].clone();
+        let self_review_error = ReviewCriticGate::from_json_str(&accepted_self_review.to_string())
+            .expect_err("accepted self-review rejects");
+        assert!(format!("{self_review_error:#}").contains("self-review"));
+
+        let mut reviewer_bypass = valid.clone();
+        reviewer_bypass["reviewer"]["role"] = json!("gameplay-engineer");
+        let bypass_error = ReviewCriticGate::from_json_str(&reviewer_bypass.to_string())
+            .expect_err("reviewer bypass rejects");
+        assert!(format!("{bypass_error:#}").contains("reviewer.role"));
+
+        let mut missing_evidence = valid.clone();
+        missing_evidence["evidenceReviewed"]
+            .as_array_mut()
+            .expect("evidence array")
+            .retain(|reference| reference["id"] != "decision-ledger");
+        let missing_error = ReviewCriticGate::from_json_str(&missing_evidence.to_string())
+            .expect_err("missing reviewed evidence rejects");
+        assert!(format!("{missing_error:#}").contains("evidenceReviewed"));
+
+        let mut stale_promoted = valid.clone();
+        stale_promoted["staleStateIndicators"] = json!(["state snapshot is stale"]);
+        let stale_error = ReviewCriticGate::from_json_str(&stale_promoted.to_string())
+            .expect_err("stale promoted gate rejects");
+        assert!(format!("{stale_error:#}").contains("staleStateIndicators"));
+
+        let mut blocked_without_visible_conflict: serde_json::Value = serde_json::from_str(
+            &read_json_fixture(
+                "examples/multi-agent-pipeline-v1/review-critic-gate.self-review-blocked.fixture.json",
+            ),
+        )
+        .expect("blocked review gate json");
+        blocked_without_visible_conflict["blockedReasons"] = json!(["review is blocked"]);
+        let hidden_conflict_error =
+            ReviewCriticGate::from_json_str(&blocked_without_visible_conflict.to_string())
+                .expect_err("blocked independence conflict must be visible");
+        assert!(format!("{hidden_conflict_error:#}").contains("independence conflicts"));
+    }
+
+    #[test]
     fn review_critic_gate_doc_audits_generated_state_and_governance() {
         let doc = read_repo_text("docs/review-critic-gate-v1.md");
         for required in [
@@ -46314,6 +46463,9 @@ scenarios:
             "hidden/background workers",
             "Generated",
             "MAP13.8.2",
+            "self-review",
+            "missing evidence",
+            "stale refs",
             "MAP13.8.3",
             "Issues #1 and #23 must remain open",
         ] {

@@ -50,17 +50,27 @@
     {
       "id": "work-package",
       "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
-      "description": "reviewed work package"
+      "description": "fixture work package"
     },
     {
       "id": "handoff",
       "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
-      "description": "reviewed handoff"
+      "description": "fixture handoff"
     },
     {
       "id": "state-snapshot",
       "path": "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
-      "description": "reviewed state snapshot"
+      "description": "fresh shared state snapshot"
+    },
+    {
+      "id": "regression-matrix",
+      "path": "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+      "description": "fixture regression/evidence bundle"
+    },
+    {
+      "id": "decision-ledger",
+      "path": "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+      "description": "fixture decision ledger"
     }
   ],
   "risks": [

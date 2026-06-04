@@ -70,9 +70,11 @@ are schema and regression examples only.
   promotion.
 
 Issue #671 MAP13.8.1 defines the gate artifact, states, docs, and fixtures.
-MAP13.8.2 owns deeper independence/evidence validation for self-review,
-reviewer bypass, missing evidence, stale refs, and conflicts. MAP13.8.3 owns
-linkage/read-model and dashboard/Studio compatibility.
+MAP13.8.2 adds deeper independence/evidence validation for self-review,
+reviewer bypass, missing evidence, stale refs, and conflicts. Accepted gates
+with self-review, reviewer-role drift, missing reviewed evidence, or stale-state
+promotion attempts are rejected; blocked gates must keep those blockers visible.
+MAP13.8.3 owns linkage/read-model and dashboard/Studio compatibility.
 
 Issues #1 and #23 must remain open unless a separate explicit governance
 decision says otherwise.
