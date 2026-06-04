@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "runtime-invariant-model-v1",
+  "modelId": "qa14_5_runtime_invariants",
+  "runId": "run_qa_invariant_smoke",
+  "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+  "evidenceIndexPath": "evidence/index.json",
+  "invariants": [{"invariantId":"unsafe-expression","invariantType":"health_non_negative","targetPath":"player.health","evidencePath":"evidence/scenarios/collect-and-exit/world-state.json","expression":"player.health >= 0"}]
+}

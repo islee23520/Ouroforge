@@ -6632,6 +6632,388 @@ fn validate_asset_preview_path(
     }
 }
 
+const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1";
+const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeInvariantModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "modelId")]
+    pub model_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "worldStatePath")]
+    pub world_state_path: String,
+    #[serde(rename = "scenarioResultPath", skip_serializing_if = "Option::is_none")]
+    pub scenario_result_path: Option<String>,
+    #[serde(rename = "evidenceIndexPath")]
+    pub evidence_index_path: String,
+    pub invariants: Vec<RuntimeInvariantSpec>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeInvariantSpec {
+    #[serde(rename = "invariantId")]
+    pub invariant_id: String,
+    #[serde(rename = "invariantType")]
+    pub invariant_type: RuntimeInvariantType,
+    #[serde(rename = "targetPath")]
+    pub target_path: String,
+    #[serde(rename = "evidencePath")]
+    pub evidence_path: String,
+    #[serde(rename = "requiredEntityId", skip_serializing_if = "Option::is_none")]
+    pub required_entity_id: Option<String>,
+    #[serde(rename = "boundsPath", skip_serializing_if = "Option::is_none")]
+    pub bounds_path: Option<String>,
+    #[serde(
+        rename = "transitionTargetPath",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub transition_target_path: Option<String>,
+    #[serde(rename = "behaviorStatePath", skip_serializing_if = "Option::is_none")]
+    pub behavior_state_path: Option<String>,
+    #[serde(
+        rename = "allowedStates",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub allowed_states: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeInvariantType {
+    PlayerInBounds,
+    EntityInBounds,
+    FiniteTransform,
+    HealthNonNegative,
+    ObjectiveFlagsConsistent,
+    SceneTransitionValid,
+    NoImpossibleState,
+    RequiredEntityPresent,
+    BehaviorStateConsistent,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeInvariantEvidence {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "modelId")]
+    pub model_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "worldStatePath")]
+    pub world_state_path: String,
+    #[serde(rename = "scenarioResultPath", skip_serializing_if = "Option::is_none")]
+    pub scenario_result_path: Option<String>,
+    #[serde(rename = "recordedAtUnixMs")]
+    pub recorded_at_unix_ms: u128,
+    pub checks: Vec<RuntimeInvariantCheck>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeInvariantCheck {
+    #[serde(rename = "invariantId")]
+    pub invariant_id: String,
+    #[serde(rename = "invariantType")]
+    pub invariant_type: RuntimeInvariantType,
+    pub status: RuntimeInvariantStatus,
+    #[serde(rename = "targetPath")]
+    pub target_path: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeInvariantStatus {
+    Passed,
+    Failed,
+    Unsupported,
+    Missing,
+    Malformed,
+    Stale,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeInvariantEvidenceSummary {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "modelId")]
+    pub model_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "checkCount")]
+    pub check_count: usize,
+    #[serde(rename = "passedCount")]
+    pub passed_count: usize,
+    #[serde(rename = "failedCount")]
+    pub failed_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "missingCount")]
+    pub missing_count: usize,
+    #[serde(rename = "malformedCount")]
+    pub malformed_count: usize,
+    #[serde(rename = "staleCount")]
+    pub stale_count: usize,
+}
+
+impl RuntimeInvariantModel {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let model: RuntimeInvariantModel =
+            serde_json::from_str(input).context("failed to parse Runtime Invariant Model JSON")?;
+        model.validate()?;
+        Ok(model)
+    }
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION {
+            return Err(anyhow!("runtime invariant model schemaVersion must be {RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION}"));
+        }
+        validate_path_component("runtime invariant model modelId", &self.model_id)?;
+        validate_path_component("runtime invariant model runId", &self.run_id)?;
+        if let Some(scenario_id) = &self.scenario_id {
+            validate_path_component("runtime invariant model scenarioId", scenario_id)?;
+        }
+        validate_runtime_invariant_world_state_ref(&self.world_state_path)?;
+        if let Some(path) = &self.scenario_result_path {
+            validate_scenario_result_ref(path)?;
+        }
+        validate_runtime_invariant_evidence_index_ref(&self.evidence_index_path)?;
+        if self.invariants.is_empty() {
+            return Err(anyhow!(
+                "runtime invariant model invariants must not be empty"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        for (index, invariant) in self.invariants.iter().enumerate() {
+            invariant.validate(index)?;
+            if !ids.insert(invariant.invariant_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate runtime invariant model invariantId: {}",
+                    invariant.invariant_id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl RuntimeInvariantSpec {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("runtime invariant model invariants[{index}].invariantId"),
+            &self.invariant_id,
+        )?;
+        validate_scenario_path(&self.target_path).with_context(|| {
+            format!("runtime invariant model invariants[{index}].targetPath is invalid")
+        })?;
+        validate_runtime_invariant_evidence_ref(&self.evidence_path)?;
+        if let Some(entity_id) = &self.required_entity_id {
+            validate_path_component(
+                &format!("runtime invariant model invariants[{index}].requiredEntityId"),
+                entity_id,
+            )?;
+        }
+        if let Some(path) = &self.bounds_path {
+            validate_scenario_path(path).with_context(|| {
+                format!("runtime invariant model invariants[{index}].boundsPath is invalid")
+            })?;
+        }
+        if let Some(path) = &self.transition_target_path {
+            validate_scenario_path(path).with_context(|| {
+                format!(
+                    "runtime invariant model invariants[{index}].transitionTargetPath is invalid"
+                )
+            })?;
+        }
+        if let Some(path) = &self.behavior_state_path {
+            validate_scenario_path(path).with_context(|| {
+                format!("runtime invariant model invariants[{index}].behaviorStatePath is invalid")
+            })?;
+        }
+        for state in &self.allowed_states {
+            validate_path_component(
+                &format!("runtime invariant model invariants[{index}].allowedStates"),
+                state,
+            )?;
+        }
+        match self.invariant_type {
+            RuntimeInvariantType::PlayerInBounds | RuntimeInvariantType::EntityInBounds if self.bounds_path.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] in-bounds invariants require boundsPath")),
+            RuntimeInvariantType::SceneTransitionValid if self.transition_target_path.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] scene transition invariants require transitionTargetPath")),
+            RuntimeInvariantType::BehaviorStateConsistent if self.behavior_state_path.is_none() || self.allowed_states.is_empty() => Err(anyhow!("runtime invariant model invariants[{index}] behavior state invariants require behaviorStatePath and allowedStates")),
+            RuntimeInvariantType::RequiredEntityPresent if self.required_entity_id.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] required entity invariants require requiredEntityId")),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl RuntimeInvariantEvidence {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: RuntimeInvariantEvidence = serde_json::from_str(input)
+            .context("failed to parse Runtime Invariant Evidence JSON")?;
+        evidence.validate()?;
+        Ok(evidence)
+    }
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!("runtime invariant evidence schemaVersion must be {RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION}"));
+        }
+        validate_path_component("runtime invariant evidence modelId", &self.model_id)?;
+        validate_path_component("runtime invariant evidence runId", &self.run_id)?;
+        if let Some(scenario_id) = &self.scenario_id {
+            validate_path_component("runtime invariant evidence scenarioId", scenario_id)?;
+        }
+        validate_runtime_invariant_world_state_ref(&self.world_state_path)?;
+        if let Some(path) = &self.scenario_result_path {
+            validate_scenario_result_ref(path)?;
+        }
+        if self.checks.is_empty() {
+            return Err(anyhow!(
+                "runtime invariant evidence checks must not be empty"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        for (index, check) in self.checks.iter().enumerate() {
+            check.validate(index)?;
+            if !ids.insert(check.invariant_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate runtime invariant evidence invariantId: {}",
+                    check.invariant_id
+                ));
+            }
+        }
+        Ok(())
+    }
+    pub fn summary(&self) -> RuntimeInvariantEvidenceSummary {
+        let count = |status: RuntimeInvariantStatus| -> usize {
+            self.checks
+                .iter()
+                .filter(|check| check.status == status)
+                .count()
+        };
+        RuntimeInvariantEvidenceSummary {
+            schema_version: "runtime-invariant-evidence-summary-v1".to_string(),
+            model_id: self.model_id.clone(),
+            run_id: self.run_id.clone(),
+            scenario_id: self.scenario_id.clone(),
+            check_count: self.checks.len(),
+            passed_count: count(RuntimeInvariantStatus::Passed),
+            failed_count: count(RuntimeInvariantStatus::Failed),
+            unsupported_count: count(RuntimeInvariantStatus::Unsupported),
+            missing_count: count(RuntimeInvariantStatus::Missing),
+            malformed_count: count(RuntimeInvariantStatus::Malformed),
+            stale_count: count(RuntimeInvariantStatus::Stale),
+        }
+    }
+}
+
+impl RuntimeInvariantCheck {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("runtime invariant evidence checks[{index}].invariantId"),
+            &self.invariant_id,
+        )?;
+        validate_scenario_path(&self.target_path).with_context(|| {
+            format!("runtime invariant evidence checks[{index}].targetPath is invalid")
+        })?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "runtime invariant evidence checks[{index}].evidenceRefs must not be empty"
+            ));
+        }
+        for evidence_ref in &self.evidence_refs {
+            validate_runtime_invariant_evidence_ref(evidence_ref)?;
+        }
+        match self.status {
+            RuntimeInvariantStatus::Passed if self.message.is_some() => Err(anyhow!(
+                "runtime invariant evidence checks[{index}] passed status must not include message"
+            )),
+            RuntimeInvariantStatus::Failed
+            | RuntimeInvariantStatus::Unsupported
+            | RuntimeInvariantStatus::Missing
+            | RuntimeInvariantStatus::Malformed
+            | RuntimeInvariantStatus::Stale => {
+                let Some(message) = &self.message else {
+                    return Err(anyhow!(
+                        "runtime invariant evidence checks[{index}] {:?} status requires message",
+                        self.status
+                    ));
+                };
+                require_bounded_display_text(
+                    &format!("runtime invariant evidence checks[{index}].message"),
+                    message,
+                )?;
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+fn validate_runtime_invariant_world_state_ref(reference: &str) -> Result<()> {
+    validate_evidence_artifact_path(reference)?;
+    if !reference.starts_with("evidence/scenarios/") || !reference.ends_with("/world-state.json") {
+        return Err(anyhow!("runtime invariant worldStatePath must reference evidence/scenarios/<scenario-id>/world-state.json"));
+    }
+    Ok(())
+}
+fn validate_runtime_invariant_evidence_index_ref(reference: &str) -> Result<()> {
+    validate_evidence_artifact_path(reference)?;
+    if reference != "evidence/index.json" {
+        return Err(anyhow!(
+            "runtime invariant evidenceIndexPath must reference evidence/index.json"
+        ));
+    }
+    Ok(())
+}
+fn validate_runtime_invariant_evidence_ref(reference: &str) -> Result<()> {
+    require_text("runtime invariant evidence ref", reference)?;
+    if reference.starts_with("evidence/") {
+        return validate_evidence_artifact_path(reference);
+    }
+    if reference.starts_with("invariants/") {
+        let path = Path::new(reference);
+        if path.is_absolute()
+            || path.components().any(|component| {
+                matches!(
+                    component,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
+            return Err(anyhow!(
+                "runtime invariant evidence ref must be run-relative and must not escape the run"
+            ));
+        }
+        if !reference.ends_with(".json") {
+            return Err(anyhow!(
+                "runtime invariant evidence ref under invariants/ must point to a JSON artifact"
+            ));
+        }
+        return Ok(());
+    }
+    Err(anyhow!(
+        "runtime invariant evidence refs must point to evidence/ or invariants/"
+    ))
+}
+
 const RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION: &str = "runtime-asset-load-evidence-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -37759,6 +38141,109 @@ scenarios:
         assert_eq!(evidence.warnings[0].kind, "missing_asset_file");
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn runtime_invariant_model_accepts_supported_fixture_types() {
+        let fixture = include_str!(
+            "../../../examples/runtime-invariant-checker-v1/invariant-model.sample.json"
+        );
+        let model = RuntimeInvariantModel::from_json_str(fixture)
+            .expect("runtime invariant model fixture parses");
+
+        assert_eq!(model.schema_version, "runtime-invariant-model-v1");
+        assert_eq!(model.model_id, "qa14_5_runtime_invariants");
+        assert_eq!(model.invariants.len(), 7);
+        assert!(model
+            .invariants
+            .iter()
+            .any(|invariant| invariant.invariant_type == RuntimeInvariantType::PlayerInBounds));
+        assert!(model
+            .invariants
+            .iter()
+            .any(|invariant| invariant.invariant_type
+                == RuntimeInvariantType::BehaviorStateConsistent));
+    }
+
+    #[test]
+    fn runtime_invariant_evidence_summarizes_statuses() {
+        let fixture = include_str!(
+            "../../../examples/runtime-invariant-checker-v1/invariant-evidence.sample.json"
+        );
+        let evidence = RuntimeInvariantEvidence::from_json_str(fixture)
+            .expect("runtime invariant evidence fixture parses");
+
+        let summary = evidence.summary();
+        assert_eq!(
+            summary.schema_version,
+            "runtime-invariant-evidence-summary-v1"
+        );
+        assert_eq!(summary.check_count, 3);
+        assert_eq!(summary.passed_count, 1);
+        assert_eq!(summary.failed_count, 1);
+        assert_eq!(summary.unsupported_count, 1);
+    }
+
+    #[test]
+    fn runtime_invariant_model_rejects_unsupported_missing_and_unsafe_shapes() {
+        let unsafe_expression = include_str!("../../../examples/runtime-invariant-checker-v1/invalid/unsafe-expression.runtime-invariant.json");
+        let expression_error = RuntimeInvariantModel::from_json_str(unsafe_expression)
+            .expect_err("unknown expression field is rejected");
+        assert!(!expression_error.to_string().is_empty());
+
+        let missing_bounds = RuntimeInvariantModel::from_json_str(&json!({
+            "schemaVersion":"runtime-invariant-model-v1",
+            "modelId":"qa14_5_runtime_invariants",
+            "runId":"run_qa_invariant_smoke",
+            "worldStatePath":"evidence/scenarios/collect-and-exit/world-state.json",
+            "evidenceIndexPath":"evidence/index.json",
+            "invariants":[{"invariantId":"player-in-bounds","invariantType":"player_in_bounds","targetPath":"player.transform","evidencePath":"evidence/scenarios/collect-and-exit/world-state.json"}]
+        }).to_string()).expect_err("in-bounds invariants require boundsPath");
+        assert!(missing_bounds.to_string().contains("boundsPath"));
+
+        let unsupported_type = RuntimeInvariantModel::from_json_str(&json!({
+            "schemaVersion":"runtime-invariant-model-v1",
+            "modelId":"qa14_5_runtime_invariants",
+            "runId":"run_qa_invariant_smoke",
+            "worldStatePath":"evidence/scenarios/collect-and-exit/world-state.json",
+            "evidenceIndexPath":"evidence/index.json",
+            "invariants":[{"invariantId":"unsafe-script","invariantType":"script_expression","targetPath":"player.health","evidencePath":"evidence/scenarios/collect-and-exit/world-state.json"}]
+        }).to_string()).expect_err("unsupported invariant type rejected");
+        assert!(!unsupported_type.to_string().is_empty());
+    }
+
+    #[test]
+    fn runtime_invariant_evidence_rejects_silent_or_unsafe_results() {
+        let base = |check: serde_json::Value| {
+            json!({
+                "schemaVersion":"runtime-invariant-evidence-v1",
+                "modelId":"qa14_5_runtime_invariants",
+                "runId":"run_qa_invariant_smoke",
+                "worldStatePath":"evidence/scenarios/collect-and-exit/world-state.json",
+                "recordedAtUnixMs":1700000000000_u64,
+                "checks":[check]
+            })
+        };
+
+        let missing_message = RuntimeInvariantEvidence::from_json_str(&base(json!({
+            "invariantId":"health-non-negative","invariantType":"health_non_negative","status":"failed","targetPath":"player.health","evidenceRefs":["evidence/scenarios/collect-and-exit/world-state.json"],"observed":-1
+        })).to_string()).expect_err("failed checks require message");
+        assert!(missing_message.to_string().contains("requires message"));
+
+        let passing_with_message = RuntimeInvariantEvidence::from_json_str(&base(json!({
+            "invariantId":"player-in-bounds","invariantType":"player_in_bounds","status":"passed","targetPath":"player.transform","evidenceRefs":["evidence/scenarios/collect-and-exit/world-state.json"],"message":"passed but maybe stale"
+        })).to_string()).expect_err("passing checks cannot hide caveats in message");
+        assert!(passing_with_message
+            .to_string()
+            .contains("must not include message"));
+
+        let unsafe_ref = RuntimeInvariantEvidence::from_json_str(&base(json!({
+            "invariantId":"player-in-bounds","invariantType":"player_in_bounds","status":"passed","targetPath":"player.transform","evidenceRefs":["../world-state.json"]
+        })).to_string()).expect_err("escaping evidence ref rejected");
+        assert!(
+            unsafe_ref.to_string().contains("escape")
+                || unsafe_ref.to_string().contains("evidence/")
+        );
     }
 
     #[test]

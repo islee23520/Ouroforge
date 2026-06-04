@@ -1,0 +1,62 @@
+# Runtime State Invariant Checker v1
+
+Status: **QA14.5.1 invariant model** for issue #686.
+
+This document defines the bounded model for runtime invariant checks used by
+QA/playtest evidence. It does not evaluate invariants yet, create background
+workers, run hidden agents, mutate trusted state, or authorize auto-fix/apply/
+merge behavior.
+
+## Scope
+
+The v1 model is structured data only: `runtime-invariant-model-v1` lists
+supported invariant specs, and `runtime-invariant-evidence-v1` records pass,
+fail, unsupported, missing, malformed, or stale outcomes. Paths point to
+run-relative evidence such as `evidence/scenarios/<scenario-id>/world-state.json`,
+scenario results, or invariant artifacts under `invariants/`.
+
+Arbitrary expressions, scripts, dynamic code, browser command bridges, and
+trusted mutations are forbidden.
+
+## Supported invariant types
+
+| Type | Required fields |
+| --- | --- |
+| `player_in_bounds` | `targetPath`, `boundsPath` |
+| `entity_in_bounds` | `targetPath`, `boundsPath` |
+| `finite_transform` | `targetPath` |
+| `health_non_negative` | `targetPath` |
+| `objective_flags_consistent` | `targetPath` |
+| `scene_transition_valid` | `targetPath`, `transitionTargetPath` |
+| `no_impossible_state` | `targetPath` |
+| `required_entity_present` | `targetPath`, `requiredEntityId` |
+| `behavior_state_consistent` | `targetPath`, `behaviorStatePath`, `allowedStates` |
+
+Non-passing statuses require a bounded `message`. Passing checks must not include
+a message so success does not hide caveats.
+
+## Fixtures
+
+- `examples/runtime-invariant-checker-v1/invariant-model.sample.json`
+- `examples/runtime-invariant-checker-v1/invariant-evidence.sample.json`
+- `examples/runtime-invariant-checker-v1/invalid/unsafe-expression.runtime-invariant.json`
+
+The invalid fixture demonstrates that arbitrary expression fields are rejected by
+schema validation instead of interpreted.
+
+## Guardrails
+
+- No hidden background workers, unbounded spawning, remote/cloud swarm, or
+  unsupervised loop.
+- No auto-fix, auto-apply, auto-merge, self-approval, reviewer bypass, or trusted
+  mutation.
+- No browser trusted write, command bridge, local server bridge, hidden command
+  execution, credentialed command, network/install command, dependency mutation,
+  dynamic code loading, plugin loading, or visual scripting behavior.
+- QA/playtest outputs are evidence and backlog inputs only until reviewed.
+- Generated runs, fuzz inputs, screenshots, videos, traces, dashboard exports,
+  and local tool state remain ignored unless explicitly fixture-scoped.
+- Public wording remains conservative: invariant checks do not prove fun,
+  subjective quality, market readiness, production safety, accessibility
+  compliance, Godot replacement status, or production-ready status.
+- #1 and #23 remain open.

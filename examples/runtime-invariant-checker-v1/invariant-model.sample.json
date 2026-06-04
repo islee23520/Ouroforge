@@ -1,0 +1,62 @@
+{
+    "schemaVersion": "runtime-invariant-model-v1",
+    "modelId": "qa14_5_runtime_invariants",
+    "runId": "run_qa_invariant_smoke",
+    "scenarioId": "collect-and-exit",
+    "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+    "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+    "evidenceIndexPath": "evidence/index.json",
+    "invariants": [
+        {
+            "invariantId": "player-in-bounds",
+            "invariantType": "player_in_bounds",
+            "targetPath": "player.transform",
+            "boundsPath": "level.bounds",
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        },
+        {
+            "invariantId": "finite-player-transform",
+            "invariantType": "finite_transform",
+            "targetPath": "player.transform",
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        },
+        {
+            "invariantId": "health-non-negative",
+            "invariantType": "health_non_negative",
+            "targetPath": "player.health",
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        },
+        {
+            "invariantId": "goal-flag-consistent",
+            "invariantType": "objective_flags_consistent",
+            "targetPath": "objectives.collectible",
+            "evidencePath": "evidence/scenarios/collect-and-exit/scenario-result.json"
+        },
+        {
+            "invariantId": "exit-transition-valid",
+            "invariantType": "scene_transition_valid",
+            "targetPath": "scene.current",
+            "transitionTargetPath": "scene.transitions.exit",
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        },
+        {
+            "invariantId": "required-player-present",
+            "invariantType": "required_entity_present",
+            "targetPath": "entities.player",
+            "requiredEntityId": "player",
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        },
+        {
+            "invariantId": "enemy-behavior-consistent",
+            "invariantType": "behavior_state_consistent",
+            "targetPath": "entities.enemy.behavior",
+            "behaviorStatePath": "entities.enemy.state",
+            "allowedStates": [
+                "idle",
+                "patrol",
+                "alert"
+            ],
+            "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+        }
+    ]
+}

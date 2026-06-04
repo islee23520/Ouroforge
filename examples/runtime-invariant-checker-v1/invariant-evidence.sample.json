@@ -1,0 +1,45 @@
+{
+    "schemaVersion": "runtime-invariant-evidence-v1",
+    "modelId": "qa14_5_runtime_invariants",
+    "runId": "run_qa_invariant_smoke",
+    "scenarioId": "collect-and-exit",
+    "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+    "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+    "recordedAtUnixMs": 1700000000000,
+    "checks": [
+        {
+            "invariantId": "player-in-bounds",
+            "invariantType": "player_in_bounds",
+            "status": "passed",
+            "targetPath": "player.transform",
+            "evidenceRefs": [
+                "evidence/scenarios/collect-and-exit/world-state.json"
+            ],
+            "observed": {
+                "x": 12,
+                "y": 4
+            }
+        },
+        {
+            "invariantId": "health-non-negative",
+            "invariantType": "health_non_negative",
+            "status": "failed",
+            "targetPath": "player.health",
+            "evidenceRefs": [
+                "evidence/scenarios/collect-and-exit/world-state.json"
+            ],
+            "observed": -1,
+            "message": "player health was below zero in captured world state"
+        },
+        {
+            "invariantId": "future-invariant-placeholder",
+            "invariantType": "no_impossible_state",
+            "status": "unsupported",
+            "targetPath": "world.flags",
+            "evidenceRefs": [
+                "invariants/qa14_5_runtime_invariants.json"
+            ],
+            "message": "placeholder recorded explicitly until evaluator support lands"
+        }
+    ]
+}
