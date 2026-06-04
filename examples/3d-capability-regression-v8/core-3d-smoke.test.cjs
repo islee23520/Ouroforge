@@ -79,10 +79,15 @@ const evidence = {
 };
 
 const actorTransform = evidence.scene3d_transform.transforms.find((entry) => entry.nodeId === 'actor-cube');
+const triggerTransform = evidence.scene3d_transform.transforms.find((entry) => entry.nodeId === 'trigger-cube');
 assert.equal(state.sceneId, 'core-3d-regression');
 assert.equal(state.sceneKind, '3d');
 assert.equal(actorTransform.parentId, 'regression-root');
 assert.equal(JSON.stringify(actorTransform.worldTransform.translation), JSON.stringify({ x: 7, y: 1, z: 0 }));
+// The trigger must share the actor's world position so the trigger collision is
+// coherent with the parent-applied transform hierarchy (not just local space).
+assert.equal(triggerTransform.parentId, 'regression-root');
+assert.equal(JSON.stringify(triggerTransform.worldTransform.translation), JSON.stringify({ x: 7, y: 1, z: 0 }), 'trigger world position must overlap the actor for a coherent trigger collision');
 assert.equal(evidence.scene3d_camera.activeCameraId, 'regression-camera');
 assert.equal(evidence.scene3d_camera.cameras[0].projection.kind, 'perspective');
 assert.equal(evidence.scene3d_render.visibleObjectCount, 2);

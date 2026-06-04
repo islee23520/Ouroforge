@@ -75,6 +75,7 @@
       },
       {
         "id": "trigger-cube",
+        "parent": "regression-root",
         "localTransform": {
           "translation": { "x": 2, "y": 0, "z": 0 },
           "rotation": { "x": 0, "y": 0, "z": 0 },
