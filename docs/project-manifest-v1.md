@@ -30,7 +30,7 @@ The manifest file is named exactly `ouroforge.project.json`.
   "assetRoots": ["assets"],
   "runsRoot": "runs",
   "generated": {
-    "roots": ["runs", "target", "dashboard-data"]
+    "roots": ["runs", "sandbox", "target", "dashboard-data"]
   }
 }
 ```
@@ -68,7 +68,7 @@ Manifest: examples/project-workspace-fixtures/valid/ouroforge.project.json
 Source refs: 3
 Asset roots: 1
 Runs root: runs
-Generated roots: runs,target,dashboard-data
+Generated roots: runs,sandbox,target,dashboard-data
 ```
 
 Invalid manifests exit non-zero and include the failing field/path, for example a
@@ -144,6 +144,7 @@ No manifest is required for these existing commands.
 Do not commit generated or local runtime/tool state:
 
 - `runs/`
+- `sandbox/`
 - `target/`
 - `examples/evidence-dashboard/dashboard-data.json`
 - `.openchrome/`

@@ -38,7 +38,7 @@ execution.
 | Auth, network, hosted/cloud/server code | Server/auth/cloud integrations, network service code | Blocked by design | Hosted/server/auth scope is outside the current local-first roadmap boundary. |
 | Plugin loaders or dynamic extension code | Plugin runtime, marketplace, dynamic loading hooks | Blocked by design | Plugin runtime scope is explicitly out of scope and would expand execution authority. |
 | Native export or packaged editor code | Native export/build packaging/editor distribution code | Blocked by design | Native export and production editor claims are out of scope for this roadmap segment. |
-| Ignored local/generated state | `runs/`, `target/`, `.omx/`, `.omc/`, `.claude/`, `.openchrome/` | Blocked by design | Generated/local artifacts are not source and must not be committed or treated as reviewed source changes. |
+| Ignored local/generated state | `runs/`, `target/`, `sandbox/`, `.omx/`, `.omc/`, `.claude/`, `.openchrome/` | Blocked by design | Generated/local artifacts are not source and must not be committed or treated as reviewed source changes. |
 | Binary or opaque generated assets | Binary blobs, minified/generated output without deterministic source | Blocked by design | Opaque content prevents reviewer-visible diff, rollback, and rationale checks. |
 
 ## Matrix boundary

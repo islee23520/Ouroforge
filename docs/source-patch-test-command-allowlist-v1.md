@@ -1,9 +1,10 @@
 # Source Patch Test Command Allowlist v1
 
-Source Patch Test Command Allowlist v1 is an inert policy artifact for Source
-Mutation Preview. It records repository-local verification commands that may be
-considered by a future sandbox dry-run evaluator. The artifact itself does not
-execute commands.
+Source Patch Test Command Allowlist v1 is a policy artifact for Source Mutation
+Preview. It records repository-local verification commands as normalized argv
+vectors. The artifact itself is data, but the sandbox dry-run evaluator may
+execute matching argv vectors inside `sandbox/<id>/worktree` after sandbox plan
+validation and forbidden-command rejection.
 
 ## Schema
 
@@ -43,8 +44,8 @@ with single spaces. The stored `command` must match that normalized value.
 
 ## Guardrails
 
-- This policy is review metadata until a later issue explicitly scopes sandbox
-  execution.
+- This policy is data; execution is allowed only through the sandbox dry-run
+  evaluator after sandbox layout validation and forbidden-command rejection.
 - Source patch apply to the trusted worktree remains unimplemented and
   forbidden.
 - Browser/dashboard/Studio surfaces may display command text read-only only.
@@ -55,7 +56,7 @@ with single spaces. The stored `command` must match that normalized value.
 ## Forbidden command rejection
 
 SMP1.5.2 adds a fail-closed classifier that rejects forbidden command classes
-before allowlist prefix matching and before any future sandbox execution. The
+before allowlist prefix matching and before sandbox execution. The
 classifier blocks:
 
 - shell execution and shell metacharacter composition;
@@ -77,11 +78,32 @@ normalized `argv`, rejects forbidden command classes first, and then matches the
 inert default allowlist. `allowlistPolicyId` identifies the current preview
 policy (`source-patch-preview-safe-local-checks-v1`) and requires `argv` when it
 is present; it does not grant broader authority than an `argv`-only metadata
-record. This is still a pre-execution validation hook; it does not create a
-sandbox or run the command.
+record. Preview validation itself remains pre-execution metadata; sandbox
+execution requires a separate validated sandbox plan and worktree.
 
 Prefix matches are intentionally review metadata only. They are useful for
-showing that a command is shaped like a known local check, but they are not a
-future execution contract by themselves. Any later sandbox evaluator must add
-its own explicit suffix/flag/path constraints, canonicalization, isolation, and
-audit evidence before a matched command can be run.
+showing that a command is shaped like a known local check, but they are not an
+execution contract by themselves. The sandbox evaluator adds explicit policy-id
+checks, forbidden-command rejection, worktree isolation, and audit evidence
+before a matched command can be run.
+
+## Sandbox required-test execution integration
+
+SMP1.6.3 uses this policy as an execution gate inside the sandbox evaluator. A
+required test may run only when all of the following are true:
+
+1. `argv` is present and non-empty;
+2. `command` equals the normalized `argv` text;
+3. `allowlistPolicyId` is `source-patch-preview-safe-local-checks-v1`;
+4. the forbidden-command classifier does not detect shell, network, install,
+   credential, dependency mutation, destructive filesystem, source apply, merge,
+   rebase, push, or auto-apply behavior; and
+5. the normalized command matches the default source-patch test command
+   allowlist.
+
+Execution uses the sandbox worktree as `current_dir` and writes bounded stdout,
+stderr, exit-code, command, `argv`, matched policy id, blocked reasons, and
+guardrails to `sandbox/<id>/evidence/test-execution-report.json`. Failed or
+blocked commands are evidence for reviewers; they do not authorize broadening the
+allowlist, retrying through a shell, applying patches to the trusted worktree, or
+triggering browser/Studio command execution.
