@@ -1,8 +1,9 @@
 # Source Patch Stale Target Guard v1
 
 Source Patch Stale Target Guard v1 is an inert contract artifact for issue #703.
-It records the stale-target and freshness evidence a future trusted source-apply
-path must inspect before any source write could be considered.
+It records and validates stale-target and freshness evidence that a future
+trusted source-apply path must inspect before any source write could be
+considered.
 
 ## Artifact purpose
 
@@ -38,9 +39,19 @@ Issue #1 remains the broad roadmap/vision anchor and issue #23 remains the
 repo-memory/design context anchor. This guard model does not close, modify, or
 narrow either issue.
 
-## Future validation scope
+## Implemented validation scope
 
-This PR unit defines the artifact shape, fixture, and documentation. Later #703
-PR units should validate expected before hashes, missing/changed targets,
-branch/head mismatch, file mode mismatch, and freshness of preview, file-class,
-diff-integrity, sandbox, review, transaction, and worktree-context evidence.
+The v1 validator fails closed when recorded or current target state is unsafe:
+
+- expected before hash and observed/current hash mismatch;
+- missing or changed target files;
+- target paths that escape or resolve through symlinks before hashing;
+- stale branch/head observations;
+- file status or file mode mismatch evidence;
+- missing, stale, unrelated, or mismatched linked preview, file-class,
+  diff-integrity, sandbox, review, transaction, or worktree-context evidence.
+
+The dashboard and Studio read models display this evidence read-only. They do not
+turn the guard into a trusted apply implementation, and future trusted apply code
+must explicitly call the current-target and linked-evidence checks immediately
+before any separately authorized write.

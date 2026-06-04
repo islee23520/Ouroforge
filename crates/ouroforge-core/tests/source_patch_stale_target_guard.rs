@@ -9,6 +9,9 @@ use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
+use std::os::unix::fs as unix_fs;
+
 fn fixture() -> SourcePatchStaleTargetGuardArtifact {
     serde_json::from_str(include_str!(
         "../../../examples/source-patch-stale-target-guard-v1/stale-target-guard.sample.json"
@@ -56,6 +59,9 @@ fn write_empty_target(root: &Path, artifact: &SourcePatchStaleTargetGuardArtifac
 
 fn evidence_root_for(artifact: &SourcePatchStaleTargetGuardArtifact) -> PathBuf {
     let root = unique_temp_dir("stale-guard-evidence");
+    let target_path = artifact.targets[0].path.clone();
+    let expected_head = artifact.base_ref.expected_head.clone();
+    let transaction_id = artifact.transaction_id.clone();
     for rel in [
         artifact.evidence_freshness.patch_preview_ref.as_str(),
         artifact.evidence_freshness.file_class_report_ref.as_str(),
@@ -68,17 +74,35 @@ fn evidence_root_for(artifact: &SourcePatchStaleTargetGuardArtifact) -> PathBuf 
         artifact.evidence_freshness.apply_transaction_ref.as_str(),
         artifact.worktree_context_ref.as_str(),
     ] {
-        write_json(&root, rel, json!({ "status": "passed" }));
+        write_json(
+            &root,
+            rel,
+            json!({
+                "status": "passed",
+                "transactionId": transaction_id.clone(),
+                "expectedHead": expected_head.clone(),
+                "targets": [{ "path": target_path.clone() }],
+                "targetPaths": [target_path.clone()]
+            }),
+        );
     }
     write_json(
         &root,
         &artifact.evidence_freshness.review_decision_ref,
-        json!({ "decision": "accepted" }),
+        json!({
+            "decision": "accepted",
+            "transactionId": artifact.transaction_id.clone(),
+        }),
     );
     write_json(
         &root,
         &artifact.evidence_freshness.apply_transaction_ref,
-        json!({ "status": "ready_for_trusted_apply" }),
+        json!({
+            "status": "ready_for_trusted_apply",
+            "transactionId": artifact.transaction_id.clone(),
+            "expectedHead": artifact.base_ref.expected_head.clone(),
+            "targets": [{ "path": artifact.targets[0].path.clone() }],
+        }),
     );
     root
 }
@@ -305,6 +329,46 @@ fn source_patch_stale_target_guard_blocks_missing_and_changed_current_targets() 
         .any(|reason| reason.contains("current hash") && reason.contains("does not match")));
 }
 
+#[cfg(unix)]
+#[test]
+fn source_patch_stale_target_guard_blocks_leaf_and_parent_symlink_targets_before_hashing() {
+    let artifact = fresh_validation_fixture();
+    let evidence_root = evidence_root_for(&artifact);
+
+    let leaf_worktree_root = unique_temp_dir("stale-guard-leaf-symlink-worktree");
+    let outside_leaf = unique_temp_dir("stale-guard-leaf-symlink-outside").join("outside.json");
+    fs::write(&outside_leaf, "").expect("outside target written");
+    let leaf_path = leaf_worktree_root.join(&artifact.targets[0].path);
+    fs::create_dir_all(leaf_path.parent().unwrap()).expect("leaf target parent created");
+    unix_fs::symlink(&outside_leaf, &leaf_path).expect("leaf symlink created");
+
+    let leaf_validation = inspect_source_patch_stale_target_guard_artifact_with_roots(
+        &artifact,
+        &evidence_root,
+        &leaf_worktree_root,
+    );
+    assert!(leaf_validation.blocked_reasons.iter().any(|reason| reason
+        .contains("must stay inside trusted worktree")
+        || reason.contains("must not resolve through a symlink")));
+
+    let parent_worktree_root = unique_temp_dir("stale-guard-parent-symlink-worktree");
+    let outside_parent = unique_temp_dir("stale-guard-parent-symlink-outside");
+    let symlinked_parent = parent_worktree_root.join("examples/source-patch-apply-transaction-v1");
+    fs::create_dir_all(parent_worktree_root.join("examples")).expect("examples dir created");
+    fs::create_dir_all(&outside_parent).expect("outside parent created");
+    fs::write(outside_parent.join("scenario-regression.json"), "").expect("outside file written");
+    unix_fs::symlink(&outside_parent, &symlinked_parent).expect("parent symlink created");
+
+    let parent_validation = inspect_source_patch_stale_target_guard_artifact_with_roots(
+        &artifact,
+        &evidence_root,
+        &parent_worktree_root,
+    );
+    assert!(parent_validation.blocked_reasons.iter().any(|reason| reason
+        .contains("must stay inside trusted worktree")
+        || reason.contains("must not resolve through a symlink")));
+}
+
 #[test]
 fn source_patch_stale_target_guard_blocks_stale_linked_reports_and_target_statuses() {
     let mut artifact = fresh_validation_fixture();
@@ -355,4 +419,38 @@ fn source_patch_stale_target_guard_blocks_stale_linked_reports_and_target_status
         .blocked_reasons
         .iter()
         .any(|reason| reason.contains("fileClassReportRef linked evidence must record")));
+}
+
+#[test]
+fn source_patch_stale_target_guard_rejects_unrelated_status_only_linked_evidence() {
+    let artifact = fresh_validation_fixture();
+    let evidence_root = evidence_root_for(&artifact);
+    write_json(
+        &evidence_root,
+        &artifact.evidence_freshness.patch_preview_ref,
+        json!({ "status": "passed", "summary": "unrelated successful artifact" }),
+    );
+    write_json(
+        &evidence_root,
+        &artifact.evidence_freshness.apply_transaction_ref,
+        json!({ "status": "ready_for_trusted_apply", "transactionId": "other-transaction" }),
+    );
+    let worktree_root = unique_temp_dir("stale-guard-unrelated-linked-worktree");
+    write_empty_target(&worktree_root, &artifact);
+
+    let validation = inspect_source_patch_stale_target_guard_artifact_with_roots(
+        &artifact,
+        &evidence_root,
+        &worktree_root,
+    );
+
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("patchPreviewRef linked evidence must contain target path")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason
+            .contains("applyTransactionRef linked evidence must contain transactionId")));
 }
