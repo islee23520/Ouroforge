@@ -18,6 +18,27 @@ ask for the smallest issue-backed slice instead of inferring intent.
 This policy is a checklist, not automation. Maintainers still make manual review
 and merge decisions through normal GitHub review.
 
+
+## Canonical governance anchors and verification paths
+
+For public-alpha PR intake, #1 and #23 are the canonical open governance
+anchors. Public PRs should record their observed #1/#23 state, and maintainers
+should hold review if a PR closes, replaces, relabels, or weakens either anchor
+without a separate explicit governance decision. Other docs and templates should
+refer back to this section instead of redefining the anchor-state rule.
+
+Verification should be proportional to the changed files:
+
+- **Docs/template-only governance PRs** should run live issue checks, focused
+  markdown/template/link checks, wording and generated-state audits,
+  `git diff --check`, and `git status --short --ignored`.
+- **Code, dependency, CI/workflow, build-script, security-sensitive, or
+  generated-state-affecting PRs** should also run the relevant broad Rust, Node,
+  security, dependency, or smoke checks listed by the linked issue or milestone.
+- Maintainers may still require broader verification for docs/template changes
+  when the policy surface is high risk or when latest-main closure gates require
+  full evidence.
+
 ## Initial PR intake checklist
 
 Use this checklist before a public-alpha PR is treated as review-ready:
@@ -25,10 +46,10 @@ Use this checklist before a public-alpha PR is treated as review-ready:
 | Check | Required evidence | Pass condition | Hold / reject when |
 | --- | --- | --- | --- |
 | Linked scope | PR body names a linked issue, PR unit, roadmap bucket, or maintenance reason. | Scope is concrete and matches changed files. | No issue/scope, broad roadmap claim, or work crosses issue boundaries without explanation. |
-| Drift lock | PR body lists current issue/slice, expected files, authorized behavior, explicit non-goals, generated artifacts, and #1/#23 state. | The PR body makes review boundaries auditable. | Missing or contradictory drift lock, or #1/#23 state is omitted for governance/public-alpha work. |
+| Drift lock | PR body lists current issue/slice, expected files, authorized behavior, explicit non-goals, generated artifacts, and observed #1/#23 state per the canonical governance anchors section. | The PR body makes review boundaries auditable. | Missing or contradictory drift lock, or governance/public-alpha anchor-state evidence is omitted. |
 | Generated-state audit | PR body and/or reviewer evidence includes `git status --short --ignored` when generated roots may be present. | Generated roots remain ignored/untracked unless fixture-scoped. | Tracked `runs/`, `target/`, `.openchrome/`, `.omc/`, `.omx/`, `.claude/`, dashboard exports, screenshots, launch reports, or local tool state appear without explicit fixture authorization. |
 | Guardrail audit | PR states whether it changes launch, release, visibility, source apply, browser command, dependency, security, or public wording boundaries. | It remains docs/templates/checklists or a separately authorized bounded implementation. | It adds forbidden behavior, weakens boundaries, or omits guardrail impact. |
-| Verification evidence | PR lists focused checks and broad checks appropriate to the files changed. | Required commands are run or a narrow docs-only rationale is recorded. | No verification is supplied for changed behavior/docs/templates. |
+| Verification evidence | PR lists checks selected from the canonical verification paths above. | Required checks are run or a narrow docs/template-only rationale is recorded. | No verification is supplied for changed behavior/docs/templates. |
 | Wording audit | Public-facing text is scanned for forbidden overclaims. | Hits are conservative negations, examples, or non-goals. | Positive claims imply production readiness, compatibility stability, secure sandboxing, Godot replacement status, native export readiness, plugin runtime readiness, source apply readiness, support SLA, public visibility changed, or launch approval. |
 | Security/public data audit | PR avoids secrets, tokens, exploit details, private screenshots, private paths, and sensitive generated artifacts. | Public text is sanitized and security details are routed through `SECURITY.md`. | The PR exposes sensitive material or asks reviewers to discuss exploit details publicly. |
 
@@ -47,7 +68,7 @@ authorizes the bounded work and required verification:
 | Hosted/cloud/auth/support | Hosted services, cloud runtime, multi-user auth, accounts, public support process, support SLA, or security guarantee. | Reject or redirect to a later governance issue; current public alpha is local-first and no-SLA. |
 | Public wording overclaim | Wording claims production-ready, compatibility-stable, secure-sandbox, Godot replacement, native-export-ready, plugin-runtime-ready, source-apply-ready, support-SLA, launch-approved, or public-visibility-changed status. | Request conservative wording aligned with `docs/public-wording-guardrail-v1.md`. |
 | Generated/private artifact | Generated run output, screenshots, dashboard exports, local tool state, private bytes, private paths, secrets, or sensitive security details are committed without fixture-scoped authorization. | Request removal/redaction and rerun generated-state/security audit. |
-| #1/#23 governance drift | PR closes, replaces, weakens, or relabels #1 or #23 without a separate explicit governance decision. | Hold until maintainers record the separate governance decision or restore the anchor state. |
+| #1/#23 governance drift | PR closes, replaces, weakens, or relabels #1 or #23 without a separate explicit governance decision. | Hold until maintainers record the separate governance decision or restore the canonical anchor state. |
 
 ## Intake disposition vocabulary
 
@@ -72,8 +93,7 @@ Public-alpha PR intake: <intake-ready | intake-hold | intake-reject | intake-def
 - Wording audit:
 - Security/public-data audit:
 - Required verification:
-- #1 open:
-- #23 open:
+- #1/#23 anchor-state evidence:
 
 Decision rationale:
 ```
@@ -134,14 +154,12 @@ A public-alpha PR is review-ready when:
    security-sensitive changes are absent or explicitly authorized by the linked
    issue;
 5. focused verification matches the changed files;
-6. broad verification is run for code, templates, security, dependency, or
-   public-alpha governance changes unless a documented docs-only rationale is
-   sufficient;
+6. verification follows the canonical docs/template-only or broad path for
+   the changed files;
 7. public-facing wording scan results are reviewed as conservative boundaries,
    not blind failures;
 8. generated/local artifact audit is recorded;
-9. #1 and #23 remain open unless a separate explicit governance decision says
-   otherwise.
+9. #1 and #23 are checked against the canonical governance anchors section.
 
 A public-alpha PR is merge-ready only after:
 
@@ -149,7 +167,7 @@ A public-alpha PR is merge-ready only after:
 - required checks are green or the maintainer records an explicit non-blocking
   explanation for unavailable external checks;
 - the final commit message or squash body can satisfy the Lore protocol;
-- the PR does not close #1 or #23 unless separately authorized;
+- the PR does not violate the canonical #1/#23 anchor-state rule;
 - issue closure, if any, is left to that issue's final evidence gate rather than
   inferred from merge alone.
 
@@ -165,8 +183,7 @@ Public-alpha merge readiness: <ready | hold | reject | defer>
 - Broad verification:
 - Wording/generated-state/security audits:
 - Required reviews/checks:
-- #1 open:
-- #23 open:
+- #1/#23 anchor-state evidence:
 
 Merge rationale or blocker:
 ```

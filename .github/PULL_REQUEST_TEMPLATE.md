@@ -17,7 +17,7 @@
   - no production-ready, compatibility-stable, secure sandbox, Godot replacement, native export ready, plugin runtime ready, source apply ready, or support SLA claims.
 - [ ] Generated artifacts remain untracked unless a separate fixture-scoped issue authorizes them: `runs/`, `target/`, `.openchrome/`, `.omc/`, `.omx/`, `.claude/`, dashboard exports, screenshots, launch reports, and local tool output.
 - [ ] This PR explains why it remains inside the named roadmap bucket or design gate from `docs/post-launch-roadmap-triage-v1.md` or the linked issue.
-- [ ] #1 and #23 remain open unless a separate explicit governance decision says otherwise.
+- [ ] #1/#23 anchor-state evidence is recorded according to `docs/public-pr-intake-policy-v1.md`.
 
 ## Public-alpha contributor guardrails
 
@@ -31,8 +31,8 @@
 
 ## Verification
 
-- [ ] Focused checks:
-- [ ] Broad checks, when applicable:
+- [ ] Focused checks from `docs/public-pr-intake-policy-v1.md`:
+- [ ] Broad checks, when applicable under the policy:
 - [ ] Wording/generated-state audit, when applicable:
 - [ ] `git status --short --ignored` reviewed for generated/local artifacts when applicable.
 

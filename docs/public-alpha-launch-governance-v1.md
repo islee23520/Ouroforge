@@ -70,7 +70,7 @@ merging changed work.
 
 ## Verification policy
 
-Every PR under this milestone should at minimum verify:
+Every PR under this milestone should select verification from the canonical public PR intake policy. Docs/template-only governance PRs may use the focused docs/template path in [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md); code, dependency, CI/workflow, build-script, security-sensitive, generated-state-affecting, or issue-closure gates should use the broad path below as applicable:
 
 ```bash
 gh issue view <current-issue-number> --repo shaun0927/Ouroforge
@@ -91,7 +91,7 @@ Issue-specific documentation checks should also confirm:
   automated;
 - no generated local state is tracked unless explicitly fixture-scoped;
 - public wording stays conservative;
-- #1 and #23 remain open.
+- #1 and #23 are checked using the canonical anchor-state rule in [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md).
 
 ## Closure gates
 
@@ -104,7 +104,7 @@ A Public Alpha Launch Governance v1 issue is ready to close only when:
    launch-governance boundary, and #1/#23 state are checked;
 5. a final issue comment records merged PRs, verification evidence, known gaps,
    and closure rationale;
-6. #1 and #23 remain open unless a separate explicit governance decision exists.
+6. #1 and #23 satisfy the canonical anchor-state rule in [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md).
 
 ## Over-engineering and drift checks
 
@@ -125,11 +125,7 @@ All answers must remain **No** for this scope issue and its governance follow-up
 
 ## Relationship to #1 and #23
 
-- #1 remains the open evidence-native implementation roadmap anchor.
-- #23 remains the open memory/governance anchor.
-- Public Alpha Launch Governance v1 may reference those issues, but it must not
-  close, replace, relabel, or modify them unless a separate explicit governance
-  decision authorizes that action.
+[`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md) owns the canonical public-alpha PR anchor-state rule for #1 and #23. This milestone follows that rule: Public Alpha Launch Governance v1 may reference those issues, but it must not close, replace, relabel, or modify them unless a separate explicit governance decision authorizes that action.
 
 ## Definition of done for #378
 
@@ -139,4 +135,4 @@ All answers must remain **No** for this scope issue and its governance follow-up
 - Verification policy and closure gates are defined.
 - No product implementation, release automation, publishing, or visibility change
   was added.
-- #1 and #23 remain open.
+- #1 and #23 are checked using the canonical anchor-state rule in [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md).
