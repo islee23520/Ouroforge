@@ -704,6 +704,9 @@ const OuroforgeCockpit = (() => {
     const events = summary.events && typeof summary.events === 'object' && !Array.isArray(summary.events)
       ? summary.events
       : null;
+    const physics = summary.physics && typeof summary.physics === 'object' && !Array.isArray(summary.physics)
+      ? summary.physics
+      : {};
     const warnings = [];
     if (!collision) warnings.push('collision summary missing or malformed');
     if (!transition) warnings.push('transition summary missing or malformed');
@@ -732,6 +735,7 @@ const OuroforgeCockpit = (() => {
       ${warnings.length ? `<div class="error">${escapeText(warnings.join(' · '))}</div>` : '<div class="hint">Collision/transition/event summaries loaded.</div>'}
       <div class="field-grid">
         <div><strong>Collision</strong><br>${escapeText(collision?.colliderEntityCount ?? 0)} collider(s), ${escapeText(collision?.collisionEventCount ?? 0)} event(s)</div>
+        <div><strong>Physics contacts</strong><br>${escapeText(physics?.contactPairCount ?? 0)} pair(s), pairs ${escapeText(compactJson(physics?.contactPairs || []))}, blocked ${escapeText(compactJson(physics?.blockedMovement || {}))}</div>
         <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.declaredTransitionCount ?? 0)} declared · ${escapeText(transition?.transitionEventCount ?? 0)} event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
         <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s)</div>
       </div>
