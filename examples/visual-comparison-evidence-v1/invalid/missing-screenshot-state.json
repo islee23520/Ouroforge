@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "visual-comparison-evidence-v1",
+  "comparisonId": "qa14_7_missing_screenshot_state",
+  "runId": "run_visual_comparison_smoke",
+  "scenarioId": "collect-and-exit",
+  "checkpointId": "goal-checkpoint",
+  "before": { "screenshotRef": "evidence/screenshots/before-goal.png", "format": "png", "width": 320, "height": 180 },
+  "after": { "missingReason": "after screenshot was not captured within the bounded run" },
+  "outcome": "missing_screenshot",
+  "thresholds": [],
+  "evidenceRefs": ["evidence/screenshots/before-goal.png"]
+}
