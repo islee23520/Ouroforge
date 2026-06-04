@@ -1366,6 +1366,29 @@ assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
+const studioPipelineInspection = {
+  schemaVersion: 'studio-multi-agent-pipeline-inspection-read-model-v1',
+  status: 'blocked',
+  sections: [
+    { id: 'task-board', label: 'Task board', status: 'present', itemCount: 8, blockers: [], malformedReasons: [] },
+    { id: 'work-package', label: 'Work package', status: 'blocked', itemCount: 1, blockers: ['ownership <review> required'], malformedReasons: [] },
+    { id: 'decision-ledger', label: '<script>Decision</script>', status: 'malformed', itemCount: 0, blockers: [], malformedReasons: ['reviewDecisions missing'] },
+  ],
+  malformedReasons: ['production_task_boards[0] must be object'],
+  boundary: 'Read-only Studio multi-agent pipeline inspection model; it does not execute commands, spawn agents, write trusted browser state, bridge to local commands, use cloud orchestration, auto-apply, auto-merge, or self-approve.',
+};
+run.studio_multi_agent_pipeline_inspection = studioPipelineInspection;
+const pipelineInspectionMarkup = cockpit.renderStudioMultiAgentPipelineInspectionSurface(run);
+assert.match(pipelineInspectionMarkup, /Studio multi-agent pipeline inspection/);
+assert.match(pipelineInspectionMarkup, /ownership &lt;review&gt; required/);
+assert.match(pipelineInspectionMarkup, /reviewDecisions missing/);
+assert.match(pipelineInspectionMarkup, /production_task_boards\[0\] must be object/);
+assert.match(pipelineInspectionMarkup, /cloud orchestration/);
+assert.doesNotMatch(pipelineInspectionMarkup, /<script>Decision<\/script>/);
+assert.doesNotMatch(pipelineInspectionMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(cockpit.renderEvidencePane(run), /Studio multi-agent pipeline inspection/);
+assert.match(cockpit.renderStudioMultiAgentPipelineInspectionSurface({}), /No Studio multi-agent pipeline inspection/);
+
 const productionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.fixture.json', 'utf8'));
 const blockedProductionTaskBoardFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-task-board.blocked.fixture.json', 'utf8'));
 run.production_task_board = productionTaskBoardFixture;

@@ -1366,6 +1366,31 @@ const OuroforgeDashboard = (() => {
   }
 
 
+  function pipelineInspectionModel(run = {}) {
+    return run?.studio_multi_agent_pipeline_inspection || run?.studioMultiAgentPipelineInspection || run?.multi_agent_pipeline_inspection || run?.multiAgentPipelineInspection || null;
+  }
+
+  function renderStudioMultiAgentPipelineInspection(value = null) {
+    const model = value && typeof value === 'object' ? value : null;
+    if (!model) {
+      return '<section class="panel studio-multi-agent-pipeline"><h3>Studio multi-agent pipeline inspection</h3><p class="empty-state">No Studio multi-agent pipeline inspection read model is attached to this dashboard data.</p></section>';
+    }
+    const sections = Array.isArray(model.sections) ? model.sections : [];
+    const malformed = Array.isArray(model.malformedReasons) ? model.malformedReasons : [];
+    const sectionRows = sections.length ? sections.map((section) => {
+      const blockers = Array.isArray(section.blockers) ? section.blockers : [];
+      const reasons = Array.isArray(section.malformedReasons) ? section.malformedReasons : [];
+      return `<li><strong>${escapeText(section.label || section.id || 'pipeline section')}</strong> · <span class="${statusClass(section.status || 'unknown')}">${escapeText(section.status || 'unknown')}</span> · items ${escapeText(section.itemCount ?? 0)}<br><span class="run-meta">ID: ${escapeText(section.id || 'unknown')}</span>${blockers.length ? `<br><span class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</span>` : ''}${reasons.length ? `<br><span class="artifact-warning">Malformed: ${escapeText(reasons.join(' · '))}</span>` : ''}</li>`;
+    }).join('') : '<li class="artifact-warning">Missing or malformed pipeline inspection sections.</li>';
+    return `<section class="panel studio-multi-agent-pipeline"><h3>Studio multi-agent pipeline inspection</h3>
+      <p class="run-meta">Read-only pipeline inspection. The dashboard displays section status, blockers, and malformed reasons only; it does not execute commands, spawn agents, write trusted browser state, bridge to local commands, use cloud orchestration, auto-apply, auto-merge, or self-approve.</p>
+      <div class="run-meta">Schema: ${escapeText(model.schemaVersion || 'unknown')} · status <span class="${statusClass(model.status || 'unknown')}">${escapeText(model.status || 'unknown')}</span> · sections ${escapeText(sections.length)}</div>
+      ${malformed.length ? `<div class="artifact-warning">Malformed input: ${escapeText(malformed.join(' · '))}</div>` : '<div class="run-meta">No malformed input reported.</div>'}
+      <ul>${sectionRows}</ul>
+      <p class="run-meta">${escapeText(model.boundary || 'Pipeline inspection display is read-only and command-inert.')}</p>
+    </section>`;
+  }
+
   function normalizeProductionTaskBoards(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1817,6 +1842,7 @@ const OuroforgeDashboard = (() => {
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
+      ${renderStudioMultiAgentPipelineInspection(pipelineInspectionModel(run))}
       ${renderProductionTaskBoards(run.production_task_boards || run.productionTaskBoards || run.production_task_board || run.productionTaskBoard || null)}
       ${renderOwnershipPolicies(run.ownership_policies || run.ownershipPolicies || run.ownership_policy || run.ownershipPolicy || null)}
       ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
@@ -1898,7 +1924,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
