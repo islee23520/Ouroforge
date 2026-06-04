@@ -19,3 +19,7 @@ Guardrails:
 - Unsupported assertions, unsafe refs, missing targets/objectives/evidence, duplicate ids, overbroad budgets, and blocked candidates without reasons fail closed.
 - Generated runs, fuzz inputs, screenshots, videos, traces, dashboard exports, and local tool state remain ignored unless explicitly fixture-scoped.
 - Public wording remains conservative: no fun, subjective quality, market readiness, production safety, accessibility compliance, Godot replacement, or production-ready claim.
+
+## QA14.2.2 validation hardening
+
+QA14.2.2 adds fail-closed validation for duplicate expected output paths, assertion/evidence coverage, unsupported assertion/operator combinations, high-priority manual-review overbreadth, stale Seed/scenario-pack refs, stale source scenario ids, and indexed source-risk evidence refs. Candidate refs remain local validation evidence only; they do not execute scenarios or trust candidate outputs.

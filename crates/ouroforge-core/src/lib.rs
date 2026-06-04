@@ -6865,6 +6865,7 @@ impl QaScenarioCandidateArtifact {
             ));
         }
         let mut evidence_ids = BTreeSet::new();
+        let mut evidence_paths = BTreeSet::new();
         for evidence in &self.expected_evidence {
             evidence.validate(&self.candidate_id)?;
             if !evidence_ids.insert(evidence.evidence_id.as_str()) {
@@ -6873,8 +6874,23 @@ impl QaScenarioCandidateArtifact {
                     evidence.evidence_id
                 ));
             }
+            if !evidence_paths.insert(evidence.path_hint.as_str()) {
+                return Err(anyhow!(
+                    "duplicate qa scenario candidate expectedEvidence.pathHint: {}",
+                    evidence.path_hint
+                ));
+            }
         }
+        self.validate_assertion_evidence_coverage()?;
         self.budget.validate()?;
+        if self.priority == QaScenarioCandidatePriority::High
+            && self.budget.max_runs == 1
+            && self.input_strategy.kind == QaScenarioInputStrategyKind::ManualReview
+        {
+            return Err(anyhow!(
+                "qa scenario candidate high priority manual-review candidates require more than one bounded run or a non-manual strategy"
+            ));
+        }
         for reason in &self.blocked_reasons {
             require_bounded_display_text("qa scenario candidate blockedReasons", reason)?;
         }
@@ -6893,6 +6909,110 @@ impl QaScenarioCandidateArtifact {
             }
         }
     }
+
+    fn validate_assertion_evidence_coverage(&self) -> Result<()> {
+        let evidence_kinds = self
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.artifact_kind)
+            .collect::<BTreeSet<_>>();
+        for assertion in &self.assertions {
+            let required = match assertion.kind {
+                QaScenarioAssertionKind::WorldState => QaScenarioExpectedEvidenceKind::WorldState,
+                QaScenarioAssertionKind::FrameStats => QaScenarioExpectedEvidenceKind::FrameStats,
+                QaScenarioAssertionKind::RuntimeEvents => {
+                    QaScenarioExpectedEvidenceKind::RuntimeProbe
+                }
+                QaScenarioAssertionKind::ConsoleErrors => {
+                    QaScenarioExpectedEvidenceKind::ConsoleLog
+                }
+                QaScenarioAssertionKind::PerformanceMetrics => {
+                    QaScenarioExpectedEvidenceKind::FrameStats
+                }
+                QaScenarioAssertionKind::CollisionEvidence => {
+                    QaScenarioExpectedEvidenceKind::WorldState
+                }
+                QaScenarioAssertionKind::VisualCheckpoint => {
+                    QaScenarioExpectedEvidenceKind::CandidateSummary
+                }
+            };
+            if !evidence_kinds.contains(&required) {
+                return Err(anyhow!(
+                    "qa scenario candidate assertion {} requires expectedEvidence artifactKind {:?}",
+                    assertion.assertion_id,
+                    required
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_qa_scenario_candidate_refs(
+    repo_root: impl AsRef<Path>,
+    run_dir: impl AsRef<Path>,
+    candidate: &QaScenarioCandidateArtifact,
+) -> Result<()> {
+    let repo_root = repo_root.as_ref();
+    let run_dir = run_dir.as_ref();
+    candidate.validate()?;
+    let seed_path = repo_root.join(&candidate.source_refs.seed_ref);
+    if !seed_path.is_file() {
+        return Err(anyhow!(
+            "qa scenario candidate sourceRefs.seedRef is missing: {}",
+            candidate.source_refs.seed_ref
+        ));
+    }
+    let pack_path = repo_root.join(&candidate.source_refs.scenario_pack_ref);
+    let pack = ScenarioPack::from_path(&pack_path)?;
+    if pack.seed != candidate.source_refs.seed_ref {
+        return Err(anyhow!(
+            "qa scenario candidate sourceRefs.seedRef is stale for scenarioPackRef: {} != {}",
+            candidate.source_refs.seed_ref,
+            pack.seed
+        ));
+    }
+    let scenario_ids = pack
+        .ordered_scenario_ids()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    for scenario_id in &candidate.source_refs.source_scenario_ids {
+        if !scenario_ids.contains(scenario_id) {
+            return Err(anyhow!(
+                "qa scenario candidate sourceScenarioIds contains stale scenario ref: {scenario_id}"
+            ));
+        }
+    }
+    let evidence_index = read_evidence_index(run_dir)?;
+    let indexed_paths = evidence_index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    for reference in &candidate.source_risk.evidence_refs {
+        if !indexed_paths.contains(reference.as_str()) {
+            return Err(anyhow!(
+                "qa scenario candidate sourceRisk.evidenceRefs is missing from evidence index: {reference}"
+            ));
+        }
+        let value = read_json_value(run_dir.join(reference)).with_context(|| {
+            format!("qa scenario candidate sourceRisk.evidenceRef is unreadable: {reference}")
+        })?;
+        if let Some(run_id) = json_string(&value, "runId").or_else(|| json_string(&value, "run_id"))
+        {
+            if run_id != candidate.run_id {
+                return Err(anyhow!(
+                    "qa scenario candidate sourceRisk.evidenceRefs has stale runId {run_id}; expected {}",
+                    candidate.run_id
+                ));
+            }
+        } else {
+            return Err(anyhow!(
+                "qa scenario candidate sourceRisk.evidenceRefs is missing a runId/run_id: {reference}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl QaScenarioSourceRisk {
@@ -6997,6 +7117,27 @@ impl QaScenarioCandidateAssertion {
             &self.assertion_id,
         )?;
         validate_qa_scenario_assertion_path(&self.path)?;
+        match (self.kind, self.operator) {
+            (
+                QaScenarioAssertionKind::ConsoleErrors
+                | QaScenarioAssertionKind::RuntimeEvents
+                | QaScenarioAssertionKind::CollisionEvidence,
+                QaScenarioAssertionOperator::GreaterThan | QaScenarioAssertionOperator::LessThan,
+            ) => {
+                return Err(anyhow!(
+                    "qa scenario candidate assertion operator is unsupported for event/list assertions"
+                ));
+            }
+            (
+                QaScenarioAssertionKind::FrameStats | QaScenarioAssertionKind::PerformanceMetrics,
+                QaScenarioAssertionOperator::Contains,
+            ) => {
+                return Err(anyhow!(
+                    "qa scenario candidate contains operator is unsupported for numeric metric assertions"
+                ));
+            }
+            _ => {}
+        }
         match self.operator {
             QaScenarioAssertionOperator::Exists if self.value.is_some() => Err(anyhow!(
                 "qa scenario candidate exists assertions must not include value"
@@ -7030,6 +7171,25 @@ impl QaScenarioExpectedEvidence {
         if !self.path_hint.starts_with(&expected_prefix) {
             return Err(anyhow!(
                 "qa scenario candidate expectedEvidence.pathHint must stay under {expected_prefix}"
+            ));
+        }
+        if !self.path_hint.ends_with(".json") {
+            return Err(anyhow!(
+                "qa scenario candidate expectedEvidence.pathHint must be JSON evidence"
+            ));
+        }
+        let expected_fragment = match self.artifact_kind {
+            QaScenarioExpectedEvidenceKind::ScenarioResult => "scenario-result",
+            QaScenarioExpectedEvidenceKind::ScenarioInputReplay => "input-replay",
+            QaScenarioExpectedEvidenceKind::WorldState => "world-state",
+            QaScenarioExpectedEvidenceKind::FrameStats => "frame-stats",
+            QaScenarioExpectedEvidenceKind::RuntimeProbe => "runtime-probe",
+            QaScenarioExpectedEvidenceKind::ConsoleLog => "console-log",
+            QaScenarioExpectedEvidenceKind::CandidateSummary => "candidate-summary",
+        };
+        if !self.path_hint.contains(expected_fragment) {
+            return Err(anyhow!(
+                "qa scenario candidate expectedEvidence.pathHint must match artifactKind {expected_fragment}"
             ));
         }
         Ok(())
@@ -40554,6 +40714,142 @@ scenarios:
         )
         .expect_err("missing expected evidence rejected");
         assert!(missing_evidence.to_string().contains("expectedEvidence"));
+    }
+
+    #[test]
+    fn qa_scenario_candidate_rejects_duplicate_outputs_and_missing_assertion_evidence() {
+        let duplicate_output = QaScenarioCandidateArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-scenario-candidate-v1",
+                "candidateId": "qa14_2_duplicate_output",
+                "runId": "run_scenario_candidate_smoke",
+                "sourceRisk": { "riskId": "risk", "description": "Risk is bounded." },
+                "targetObjective": { "objectiveId": "objective", "description": "Objective is bounded." },
+                "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+                "inputStrategy": { "strategyId": "bounded", "kind": "direct_input", "description": "Bounded inputs.", "maxInputEvents": 4 },
+                "assertions": [{ "assertionId": "exists", "kind": "world_state", "path": "flags.goal_collected", "operator": "exists" }],
+                "expectedEvidence": [
+                    { "evidenceId": "world", "artifactKind": "world_state", "pathHint": "evidence/scenarios/qa14_2_duplicate_output/world-state.json" },
+                    { "evidenceId": "world-copy", "artifactKind": "world_state", "pathHint": "evidence/scenarios/qa14_2_duplicate_output/world-state.json" }
+                ],
+                "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+                "priority": "medium",
+                "status": "proposed"
+            })
+            .to_string(),
+        )
+        .expect_err("duplicate expected output paths rejected");
+        assert!(duplicate_output.to_string().contains("pathHint"));
+
+        let missing_console_evidence = QaScenarioCandidateArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-scenario-candidate-v1",
+                "candidateId": "qa14_2_missing_console_evidence",
+                "runId": "run_scenario_candidate_smoke",
+                "sourceRisk": { "riskId": "risk", "description": "Risk is bounded." },
+                "targetObjective": { "objectiveId": "objective", "description": "Objective is bounded." },
+                "sourceRefs": { "seedRef": "seeds/engine-feature-physics-reload-composition.yaml", "scenarioPackRef": "examples/engine-expressiveness-v2-regression/scenarios/engine-expressiveness-v2.scenario-pack.json", "sourceScenarioIds": ["collect-and-exit"] },
+                "inputStrategy": { "strategyId": "bounded", "kind": "direct_input", "description": "Bounded inputs.", "maxInputEvents": 4 },
+                "assertions": [{ "assertionId": "no-console", "kind": "console_errors", "path": "logs", "operator": "count_equals", "value": 0 }],
+                "expectedEvidence": [{ "evidenceId": "result", "artifactKind": "scenario_result", "pathHint": "evidence/scenarios/qa14_2_missing_console_evidence/scenario-result.json" }],
+                "budget": { "maxSteps": 4, "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 2 },
+                "priority": "medium",
+                "status": "proposed"
+            })
+            .to_string(),
+        )
+        .expect_err("assertion evidence coverage is required");
+        assert!(missing_console_evidence
+            .to_string()
+            .contains("expectedEvidence artifactKind"));
+    }
+
+    #[test]
+    fn qa_scenario_candidate_ref_validation_accepts_fresh_pack_and_blocks_stale_refs() {
+        let (root, artifacts) = create_test_run("qa-scenario-candidate-refs");
+        let repo_root = root.join("repo");
+        fs::create_dir_all(repo_root.join("seeds")).expect("seed dir exists");
+        fs::create_dir_all(repo_root.join("scenarios")).expect("scenario dir exists");
+        fs::write(repo_root.join("seeds/smoke.yaml"), VALID_SEED).expect("seed writes");
+        write_json(
+            &repo_root.join("scenarios/regression.json"),
+            &json!({
+                "schemaVersion": "scenario-pack-v1",
+                "id": "qa14_2_pack",
+                "description": "QA candidate source pack.",
+                "seed": "seeds/smoke.yaml",
+                "scenes": ["scenes/main.scene.json"],
+                "scenarioGroups": [{
+                    "id": "smoke",
+                    "description": "Smoke group.",
+                    "scenarios": [{
+                        "id": "collect-and-exit",
+                        "description": "Collect and exit.",
+                        "steps": [{ "wait": { "frames": 1 } }]
+                    }]
+                }]
+            }),
+        )
+        .expect("scenario pack writes");
+
+        let mut candidate = QaScenarioCandidateArtifact::from_json_str(include_str!(
+            "../../../examples/qa-scenario-candidate-v1/scenario-candidate.sample.json"
+        ))
+        .expect("candidate fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        candidate.run_id = json_string(&run, "id").expect("run id present");
+        candidate.source_refs.seed_ref = "seeds/smoke.yaml".to_string();
+        candidate.source_refs.scenario_pack_ref = "scenarios/regression.json".to_string();
+        candidate.source_refs.source_scenario_ids = vec!["collect-and-exit".to_string()];
+        let risk_ref = candidate.source_risk.evidence_refs[0].clone();
+        fs::create_dir_all(
+            artifacts
+                .run_dir
+                .join(Path::new(&risk_ref).parent().unwrap()),
+        )
+        .expect("risk evidence dir exists");
+        write_json(
+            &artifacts.run_dir.join(&risk_ref),
+            &json!({
+                "runId": candidate.run_id,
+                "scenarioId": "collect-and-exit",
+                "artifact": "qa_scenario_risk_fixture"
+            }),
+        )
+        .expect("risk evidence writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "qa-scenario-risk",
+            "application/json",
+            &risk_ref,
+            json!({ "artifact": "qa_scenario_risk_fixture" }),
+        )
+        .expect("risk evidence indexed");
+
+        validate_qa_scenario_candidate_refs(&repo_root, &artifacts.run_dir, &candidate)
+            .expect("fresh source refs validate");
+
+        candidate.source_refs.source_scenario_ids = vec!["stale-scenario".to_string()];
+        let stale = validate_qa_scenario_candidate_refs(&repo_root, &artifacts.run_dir, &candidate)
+            .expect_err("stale source scenario refs are rejected");
+        assert!(stale.to_string().contains("stale scenario"));
+
+        candidate.source_refs.source_scenario_ids = vec!["collect-and-exit".to_string()];
+        write_json(
+            &artifacts.run_dir.join(&risk_ref),
+            &json!({
+                "runId": "stale-run",
+                "scenarioId": "collect-and-exit",
+                "artifact": "qa_scenario_risk_fixture"
+            }),
+        )
+        .expect("stale risk evidence writes");
+        let stale_risk =
+            validate_qa_scenario_candidate_refs(&repo_root, &artifacts.run_dir, &candidate)
+                .expect_err("stale source risk evidence rejected");
+        assert!(stale_risk.to_string().contains("stale runId"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]

@@ -50,6 +50,16 @@
       "evidenceId": "input-replay",
       "artifactKind": "scenario_input_replay",
       "pathHint": "evidence/scenarios/qa14_2_collect_and_exit_gap/input-replay.json"
+    },
+    {
+      "evidenceId": "world-state",
+      "artifactKind": "world_state",
+      "pathHint": "evidence/scenarios/qa14_2_collect_and_exit_gap/world-state.json"
+    },
+    {
+      "evidenceId": "console-log",
+      "artifactKind": "console_log",
+      "pathHint": "evidence/scenarios/qa14_2_collect_and_exit_gap/console-log.json"
     }
   ],
   "budget": {
