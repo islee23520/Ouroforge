@@ -151,6 +151,20 @@ or hostile data, and they must not execute commands, write files, persist browse
 state, own source scene truth, or replace Rust validation. Refresh exported
 `dashboard-data.json` after running `dashboard export` to inspect newer evidence.
 
+
+## Studio 3D Inspection Surface v1
+
+When `dashboard-data.json` includes 3D capability read models, the cockpit
+displays a dedicated read-only 3D inspection panel for scene hierarchy, active
+camera/projection, mesh/material refs, render summaries, collision/trigger
+evidence, animation state, runtime-probe status, and scenario verdicts. The
+panel escapes rendered values and shows missing or malformed state visibly. It
+does not write files, execute commands, persist viewport manipulation, become a
+3D editor, add visual scripting, or claim production 3D readiness, broad engine
+parity, native export, plugin runtime, hosted/cloud behavior, or Godot
+replacement status. Rust/local validation and generated evidence export remain
+the trusted authority. See `../../docs/studio-3d-inspection-surface-v1.md`.
+
 ## Studio 2D Engine Inspection Surface v1
 
 When `dashboard-data.json` includes Production 2D read models, the cockpit also
