@@ -67125,10 +67125,10 @@ scenarios:
             "is a production 3D engine",
             "is a Godot replacement",
             "replaces Godot",
-            "secure sandbox",
+            "is a secure sandbox",
             "native export ready",
             "plugin runtime ready",
-            "hosted service",
+            "is a hosted service",
             "adds auto-apply",
             "adds auto-merge",
         ] {
@@ -67293,6 +67293,116 @@ scenarios:
         assert!(smoke.contains("not trusted persistence"));
         assert!(smoke.contains("production 3D readiness"));
         assert!(smoke.contains("Godot replacement evidence"));
+        assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));
+    }
+
+    #[test]
+    fn audits_scenario_coverage_v8_matrix_docs_and_read_model_compatibility() {
+        let matrix: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-regression-v8/coverage-matrix.json",
+        ))
+        .expect("Scenario Coverage v8 coverage matrix parses");
+        assert_eq!(matrix["issue"].as_u64(), Some(606));
+        assert!(matrix["scope"]
+            .as_str()
+            .is_some_and(|value| value.contains("bounded local 3D capability")));
+        let guardrails = matrix["guardrails"]
+            .as_array()
+            .expect("matrix guardrails are listed");
+        assert!(guardrails.iter().any(|value| value
+            .as_str()
+            .is_some_and(|text| text.contains("#1 and #23 remain open"))));
+        assert!(guardrails.iter().any(|value| value.as_str().is_some_and(
+            |text| text.contains("not production 3D readiness or a Godot replacement")
+        )));
+
+        let features = matrix["features"]
+            .as_array()
+            .expect("matrix features are listed");
+        let feature_ids: std::collections::BTreeSet<_> = features
+            .iter()
+            .filter_map(|feature| feature["id"].as_str())
+            .collect();
+        for required in [
+            "transform-hierarchy",
+            "camera-projection",
+            "mesh-material-refs",
+            "render-smoke",
+            "collision-trigger",
+            "animation-playback",
+            "runtime-probe-contract",
+            "evaluator-pass-fail",
+            "dashboard-read-model-compatibility",
+            "studio-read-model-compatibility",
+            "2d-compatibility-audit",
+        ] {
+            assert!(
+                feature_ids.contains(required),
+                "coverage matrix includes {required}"
+            );
+        }
+        for feature in features {
+            assert_eq!(feature["status"].as_str(), Some("covered"));
+            let evidence_refs = feature["evidenceRefs"]
+                .as_array()
+                .expect("feature evidence refs are listed");
+            assert!(
+                !evidence_refs.is_empty(),
+                "feature has at least one evidence ref: {feature:?}"
+            );
+            for evidence_ref in evidence_refs {
+                let evidence_ref = evidence_ref.as_str().expect("evidence ref is text");
+                assert!(
+                    repo_fixture_path(evidence_ref).exists(),
+                    "evidence ref exists: {evidence_ref}"
+                );
+            }
+        }
+        assert!(matrix["knownGaps"]
+            .as_array()
+            .expect("known gaps are listed")
+            .iter()
+            .any(|gap| gap["id"].as_str() == Some("trusted-browser-writes")
+                && gap["status"].as_str() == Some("out-of-scope")));
+
+        let readme = read_repo_text("examples/3d-capability-regression-v8/README.md");
+        assert!(readme.contains("Scenario Coverage v8: 3D Capability Regression Suite"));
+        assert!(readme.contains("3D9.11.3 coverage matrix and read-model compatibility"));
+        assert!(readme.contains("not production 3D readiness"));
+        assert!(readme.contains("Godot replacement"));
+        assert!(
+            readme.contains("Browser/dashboard/Studio surfaces may inspect exported evidence only")
+        );
+        for generated_root in ["runs/", "dashboard-data/", "target/", "tmp/"] {
+            assert!(
+                readme.contains(generated_root),
+                "README documents generated root {generated_root}"
+            );
+        }
+        for forbidden_positive_claim in [
+            "is a production 3D engine",
+            "is a Godot replacement",
+            "replaces Godot",
+            "is a secure sandbox",
+            "native export ready",
+            "plugin runtime ready",
+            "is a hosted service",
+            "adds auto-apply",
+            "adds auto-merge",
+        ] {
+            assert!(
+                !readme.contains(forbidden_positive_claim),
+                "README must not include positive overclaim: {forbidden_positive_claim}"
+            );
+        }
+
+        let smoke = read_repo_text(
+            "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs",
+        );
+        assert!(smoke.contains("scenario coverage v8 3d coverage/read-model compatibility passed"));
+        assert!(smoke.contains("assertNoGeneratedFixtureState"));
+        assert!(smoke.contains("assert2DCompatibility"));
+        assert!(smoke.contains("trusted browser write|command bridge enabled|auto-merge enabled"));
         assert!(!smoke.contains("writeFileSync(path.join(fixtureDir"));
     }
 
