@@ -342,11 +342,23 @@ const run = {
     },
     animation: { animatedEntityCount: 1, activeStateCount: 1 },
     vfx: { present: true, vfxEntityCount: 1, vfxEmitterCount: 1, vfxEventCount: 1 },
+    audio: {
+      audioEntityCount: 1,
+      audioEventCount: 1,
+      audioWarningCount: 1,
+      browserAudioAuthority: 'intent_evidence_only',
+      audioEvents: [{ name: '<coin>', intentKind: '<sound>', busId: '<sfx>', volume: 80 }],
+      audioWarnings: [{ warning: '<audible_output_not_verified>', requestId: '<audio-1-1>' }],
+    },
     events: {
       present: true,
       animationEntityCount: 1,
+      audioEventCount: 1,
+      audioWarningCount: 1,
       vfxEventCount: 1,
       animationEntities: [{ entityId: '<player>', activeState: '<run>', currentClip: '<run-clip>', frameIndex: 2 }],
+      audioEvents: [{ name: '<coin>', intentKind: '<sound>', busId: '<sfx>', volume: 80 }],
+      audioWarnings: [{ warning: '<audible_output_not_verified>', requestId: '<audio-1-1>' }],
       vfxEvents: [{ emitterId: '<run-dust>', kind: '<trail>', particleCount: 8 }],
     },
   },
@@ -848,6 +860,12 @@ assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /&lt;run
 assert.match(dashboard.renderAnimationVfxSummary(run.engine_summaries), /state &lt;run&gt;/);
 assert.doesNotMatch(dashboard.renderAnimationVfxSummary(run.engine_summaries), /<run-dust>|<run>/);
 assert.match(dashboard.renderAnimationVfxSummary({}), /No animation\/VFX read model/);
+assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /Audio intent events/);
+assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /Browser limitation warnings/);
+assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /&lt;sfx&gt;/);
+assert.match(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /&lt;audible_output_not_verified&gt;/);
+assert.doesNotMatch(dashboard.renderAudioEvidenceSummary(run.engine_summaries), /<sfx>|<audible/);
+assert.match(dashboard.renderAudioEvidenceSummary({}), /No audio intent evidence/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /input action evidence/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /3/);
 assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /&lt;dash&gt;/);

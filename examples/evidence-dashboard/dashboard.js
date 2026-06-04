@@ -292,6 +292,33 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><h4>Animation entities</h4><ul class="run-meta-list">${animationRows}</ul><h4>VFX events</h4><ul class="run-meta-list">${vfxRows}</ul><p class="run-meta">Read-only animation/VFX evidence only; the dashboard cannot write scene state, execute commands, or control the browser runtime.</p>`;
   }
 
+  function renderAudioEvidenceSummary(summary = {}) {
+    const audio = summary?.audio || {};
+    const events = summary?.events || {};
+    if (!summary?.present || (!audio.audioEventCount && !events.audioEventCount)) {
+      return '<p class="empty-state">No audio intent evidence is available.</p>';
+    }
+    const audioEvents = Array.isArray(audio.audioEvents) && audio.audioEvents.length
+      ? audio.audioEvents
+      : (Array.isArray(events.audioEvents) ? events.audioEvents : []);
+    const audioWarnings = Array.isArray(audio.audioWarnings) && audio.audioWarnings.length
+      ? audio.audioWarnings
+      : (Array.isArray(events.audioWarnings) ? events.audioWarnings : []);
+    const eventRows = audioEvents.length
+      ? audioEvents.map((event) => `<li><strong>${escapeText(event?.name || event?.type || event?.kind || 'audio event')}</strong>: ${escapeText(event?.intentKind || event?.kind || 'sound')} · bus ${escapeText(event?.busId || 'default')} · volume ${escapeText(event?.volume ?? 'unknown')}</li>`).join('')
+      : '<li>No audio intent event rows exported.</li>';
+    const warningRows = audioWarnings.length
+      ? audioWarnings.map((warning) => `<li><strong>${escapeText(warning?.warning || 'audio warning')}</strong>: request ${escapeText(warning?.requestId || 'unknown')}</li>`).join('')
+      : '<li>No browser audio limitation warnings exported.</li>';
+    const rows = [
+      ['Audio entities', audio.audioEntityCount ?? 0],
+      ['Audio intent events', audio.audioEventCount ?? events.audioEventCount ?? audioEvents.length],
+      ['Audio warnings', audio.audioWarningCount ?? events.audioWarningCount ?? audioWarnings.length],
+      ['Authority', audio.browserAudioAuthority || 'intent_evidence_only'],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    return `<div class="field-grid">${rows}</div><h4>Audio intent events</h4><ul class="run-meta-list">${eventRows}</ul><h4>Browser limitation warnings</h4><ul class="run-meta-list">${warningRows}</ul><p class="run-meta">Read-only audio intent evidence only; the dashboard cannot verify audible output, write scene state, execute commands, or control the browser audio device.</p>`;
+  }
+
   function renderInputActionSummary(summary = {}) {
     const input = summary?.input || {};
     if (!summary?.present || !input.present) {
@@ -1685,6 +1712,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Scene render breakdown</h3>${renderRenderBreakdownSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Animation and VFX evidence</h3>${renderAnimationVfxSummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Audio intent evidence</h3>${renderAudioEvidenceSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Input action mapping</h3>${renderInputActionSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
@@ -1784,7 +1812,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

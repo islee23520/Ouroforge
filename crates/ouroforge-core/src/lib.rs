@@ -29232,6 +29232,26 @@ fn run_scenario<T: CdpTransport>(
         .get("audioEvents")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
+    let audio_warnings_source = world_state
+        .get("audioWarnings")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let audio_path = write_scenario_json_artifact(
+        config,
+        scenario,
+        &scenario_dir,
+        "audio-evidence",
+        "audio_evidence",
+        unix_millis()?,
+        &json!({
+            "bounded": true,
+            "audioEvents": audio_source.clone(),
+            "audioEventCount": audio_source.as_array().map_or(0, Vec::len),
+            "audioWarnings": audio_warnings_source.clone(),
+            "audioWarningCount": audio_warnings_source.as_array().map_or(0, Vec::len),
+            "browserAudioAuthority": "intent_evidence_only"
+        }),
+    )?;
     let animation_source = world_state
         .get("entities")
         .cloned()
@@ -29312,7 +29332,7 @@ fn run_scenario<T: CdpTransport>(
         },
         audio_evidence: AssertionSource {
             value: &audio_source,
-            evidence_ref: &world_state_path,
+            evidence_ref: &audio_path,
         },
         animation_evidence: AssertionSource {
             value: &animation_source,
@@ -29375,6 +29395,7 @@ fn run_scenario<T: CdpTransport>(
                 "visual_checkpoints": visual_checkpoint_paths.clone(),
                 "visual_checkpoint_screenshots": visual_checkpoint_screenshot_paths.clone(),
                 "transition_evidence": transition_path.clone(),
+                "audio_evidence": audio_path.clone(),
                 "vfx_evidence": vfx_path.clone(),
                 "asset_load_evidence": asset_load_paths.clone(),
                 "console_logs": console_paths.clone(),
@@ -29407,6 +29428,7 @@ fn run_scenario<T: CdpTransport>(
             "visual_checkpoint_paths": visual_checkpoint_paths.clone(),
             "visual_checkpoint_screenshot_paths": visual_checkpoint_screenshot_paths.clone(),
             "transition_evidence_path": transition_path.clone(),
+            "audio_evidence_path": audio_path.clone(),
             "vfx_evidence_path": vfx_path.clone(),
             "asset_load_evidence_paths": asset_load_paths.clone(),
             "console_log_paths": console_paths.clone(),
@@ -29421,6 +29443,7 @@ fn run_scenario<T: CdpTransport>(
     evidence_paths.extend(visual_checkpoint_screenshot_paths);
     evidence_paths.push(world_state_path);
     evidence_paths.push(transition_path);
+    evidence_paths.push(audio_path);
     evidence_paths.push(vfx_path);
     evidence_paths.extend(asset_load_paths);
     evidence_paths.push(frame_stats_path);
@@ -38901,6 +38924,10 @@ fn dashboard_transition_summary(world_state: &serde_json::Value) -> serde_json::
 
 fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let audio_events = world_state.get("audioEvents").cloned().unwrap_or(json!([]));
+    let audio_warnings = world_state
+        .get("audioWarnings")
+        .cloned()
+        .unwrap_or(json!([]));
     let collision_events = world_state
         .get("collisionEvents")
         .cloned()
@@ -38940,10 +38967,12 @@ fn dashboard_runtime_event_summary(world_state: &serde_json::Value) -> serde_jso
             || vfx_events.as_array().is_some_and(|events| !events.is_empty()),
         "animationEntityCount": animation_entities.len(),
         "audioEventCount": audio_events.as_array().map_or(0, Vec::len),
+        "audioWarningCount": audio_warnings.as_array().map_or(0, Vec::len),
         "collisionEventCount": collision_events.as_array().map_or(0, Vec::len),
         "vfxEventCount": vfx_events.as_array().map_or(0, Vec::len),
         "animationEntities": animation_entities,
         "audioEvents": audio_events,
+        "audioWarnings": audio_warnings,
         "collisionEvents": collision_events,
         "vfxEvents": vfx_events
     })
@@ -39093,7 +39122,11 @@ fn read_dashboard_engine_summaries(
         vfx: dashboard_vfx_summary(world_state),
         audio: json!({
             "audioEventCount": dashboard_array_len(world_state.get("audioEvents")),
-            "audioEntityCount": dashboard_entities_with_component(world_state, "audio")
+            "audioWarningCount": dashboard_array_len(world_state.get("audioWarnings")),
+            "audioEntityCount": dashboard_entities_with_component(world_state, "audio"),
+            "audioEvents": world_state.get("audioEvents").cloned().unwrap_or_else(|| json!([])),
+            "audioWarnings": world_state.get("audioWarnings").cloned().unwrap_or_else(|| json!([])),
+            "browserAudioAuthority": "intent_evidence_only"
         }),
         physics: json!({
             "collisionCount": dashboard_array_len(world_state.get("collisions")),
@@ -61999,6 +62032,70 @@ scenarios:
             "Trigger components: `1`; goalFlag components: `1`; HUD value components: `2`; trigger collision events: `1`"
         ));
 
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_engine_summaries_extract_audio_warning_evidence() {
+        let (root, artifacts) = create_test_run("dashboard-audio-warning-summaries");
+        fs::write(
+            artifacts.run_dir.join("verdict.json"),
+            "{\"status\":\"passed\"}\n",
+        )
+        .expect("verdict written");
+        fs::create_dir_all(artifacts.run_dir.join("evidence/workers/worker-1"))
+            .expect("worker evidence dir");
+        fs::write(
+            artifacts
+                .run_dir
+                .join("evidence/workers/worker-1/world-state.json"),
+            serde_json::to_string_pretty(&json!({
+                "sceneId": "audio-warning-scene",
+                "entities": [{
+                    "id": "player",
+                    "components": {
+                        "audio": {
+                            "buses": [{ "id": "sfx", "kind": "sound", "volume": 80, "muted": false }],
+                            "events": [{ "name": "coin", "trigger": "collect", "kind": "sound", "bus": "sfx", "asset": "coin-audio" }]
+                        }
+                    }
+                }],
+                "audioEvents": [{
+                    "kind": "audio_request",
+                    "requestId": "audio-4-1",
+                    "name": "coin",
+                    "intentKind": "sound",
+                    "busId": "sfx",
+                    "volume": 80,
+                    "limitationWarnings": ["browser_audio_intent_only", "audible_output_not_verified"]
+                }],
+                "audioWarnings": [{ "warning": "browser_audio_intent_only", "requestId": "audio-4-1" }]
+            }))
+            .expect("world-state serializes"),
+        )
+        .expect("world-state written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-audio-world-state",
+            "application/json",
+            "evidence/workers/worker-1/world-state.json",
+            json!({ "probe_call": "getWorldState", "worker_id": "worker-1" }),
+        )
+        .expect("world-state indexed");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+
+        assert_eq!(model.engine_summaries.audio["audioEventCount"], json!(1));
+        assert_eq!(model.engine_summaries.audio["audioWarningCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.audio["audioEvents"][0]["busId"],
+            json!("sfx")
+        );
+        assert_eq!(
+            model.engine_summaries.audio["browserAudioAuthority"],
+            json!("intent_evidence_only")
+        );
+        assert_eq!(model.engine_summaries.events["audioWarningCount"], json!(1));
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
