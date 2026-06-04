@@ -3399,6 +3399,213 @@ impl OwnershipEscalation {
     }
 }
 
+pub const AGENT_WORK_PACKAGE_SCHEMA_VERSION: &str = "agent-work-package-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkPackage {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "workPackageId")]
+    pub work_package_id: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub role: String,
+    pub status: AgentWorkPackageStatus,
+    pub objective: String,
+    pub scope: AgentWorkPackageScope,
+    #[serde(rename = "allowedArtifacts")]
+    pub allowed_artifacts: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    #[serde(rename = "acceptanceCriteria")]
+    pub acceptance_criteria: Vec<AgentWorkPackageAcceptanceCriterion>,
+    #[serde(rename = "verificationCommands")]
+    pub verification_commands: Vec<AuthoringLoopResumeCommandContext>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "ownershipRefs")]
+    pub ownership_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "handoffTarget")]
+    pub handoff_target: AuthoringLoopArtifactRef,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "stateSnapshotRef", skip_serializing_if = "Option::is_none")]
+    pub state_snapshot_ref: Option<AuthoringLoopArtifactRef>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentWorkPackageStatus {
+    Assigned,
+    Blocked,
+    Stale,
+    ReadyForReview,
+    Completed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkPackageScope {
+    pub summary: String,
+    #[serde(rename = "inScope")]
+    pub in_scope: Vec<String>,
+    #[serde(rename = "outOfScope")]
+    pub out_of_scope: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentWorkPackageAcceptanceCriterion {
+    pub id: String,
+    pub description: String,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
+}
+
+impl AgentWorkPackage {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let package: AgentWorkPackage = serde_json::from_str(input)?;
+        package.validate_schema()?;
+        Ok(package)
+    }
+
+    fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_WORK_PACKAGE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent work package schemaVersion must be {AGENT_WORK_PACKAGE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent work package workPackageId", &self.work_package_id)?;
+        validate_path_component("agent work package taskId", &self.task_id)?;
+        validate_path_component("agent work package role", &self.role)?;
+        if !SUPPORTED_AGENT_ROLES.contains(&self.role.as_str()) {
+            return Err(anyhow!(
+                "agent work package role '{}' is unsupported",
+                self.role
+            ));
+        }
+        require_text("agent work package objective", &self.objective)?;
+        self.scope.validate("agent work package scope")?;
+        if self.allowed_artifacts.is_empty() {
+            return Err(anyhow!(
+                "agent work package allowedArtifacts must not be empty"
+            ));
+        }
+        for (index, artifact) in self.allowed_artifacts.iter().enumerate() {
+            artifact.validate(&format!("agent work package allowedArtifacts[{index}]"))?;
+        }
+        validate_nonempty_text_list(
+            "agent work package forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        if self.acceptance_criteria.is_empty() {
+            return Err(anyhow!(
+                "agent work package acceptanceCriteria must not be empty"
+            ));
+        }
+        for (index, criterion) in self.acceptance_criteria.iter().enumerate() {
+            criterion.validate(index)?;
+        }
+        if self.verification_commands.is_empty() {
+            return Err(anyhow!(
+                "agent work package verificationCommands must not be empty"
+            ));
+        }
+        for (index, command) in self.verification_commands.iter().enumerate() {
+            command.validate(&format!("agent work package verificationCommands[{index}]"))?;
+            if !(command.boundary.contains("inert")
+                || command.boundary.contains("does not execute"))
+            {
+                return Err(anyhow!(
+                    "agent work package verificationCommands[{index}].boundary must state commands are inert or do not execute"
+                ));
+            }
+        }
+        if self.expected_evidence.is_empty() {
+            return Err(anyhow!(
+                "agent work package expectedEvidence must not be empty"
+            ));
+        }
+        for (index, evidence) in self.expected_evidence.iter().enumerate() {
+            evidence.validate(&format!("agent work package expectedEvidence[{index}]"))?;
+        }
+        if self.ownership_refs.is_empty() {
+            return Err(anyhow!(
+                "agent work package ownershipRefs must not be empty"
+            ));
+        }
+        for (index, ownership_ref) in self.ownership_refs.iter().enumerate() {
+            ownership_ref.validate(&format!("agent work package ownershipRefs[{index}]"))?;
+        }
+        self.handoff_target
+            .validate("agent work package handoffTarget")?;
+        if matches!(
+            self.status,
+            AgentWorkPackageStatus::Blocked | AgentWorkPackageStatus::Stale
+        ) && self.blocked_reasons.is_empty()
+        {
+            return Err(anyhow!(
+                "blocked or stale agent work package must list blockedReasons"
+            ));
+        }
+        for (index, reason) in self.blocked_reasons.iter().enumerate() {
+            require_text(
+                &format!("agent work package blockedReasons[{index}]"),
+                reason,
+            )?;
+        }
+        if let Some(snapshot) = &self.state_snapshot_ref {
+            snapshot.validate("agent work package stateSnapshotRef")?;
+        }
+        self.generated_state.validate()?;
+        require_text("agent work package boundary", &self.boundary)?;
+        if !(self.boundary.contains("does not execute")
+            && self.boundary.contains("untrusted assignment"))
+        {
+            return Err(anyhow!(
+                "agent work package boundary must state this is an untrusted assignment and does not execute"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl AgentWorkPackageScope {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.summary"), &self.summary)?;
+        validate_nonempty_text_list(&format!("{field}.inScope"), &self.in_scope)?;
+        validate_nonempty_text_list(&format!("{field}.outOfScope"), &self.out_of_scope)
+    }
+}
+
+impl AgentWorkPackageAcceptanceCriterion {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent work package acceptanceCriteria[{index}].id"),
+            &self.id,
+        )?;
+        require_text(
+            &format!("agent work package acceptanceCriteria[{index}].description"),
+            &self.description,
+        )?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "agent work package acceptanceCriteria[{index}].evidenceRefs must not be empty"
+            ));
+        }
+        for (evidence_index, evidence) in self.evidence_refs.iter().enumerate() {
+            evidence.validate(&format!(
+                "agent work package acceptanceCriteria[{index}].evidenceRefs[{evidence_index}]"
+            ))?;
+        }
+        Ok(())
+    }
+}
+
 pub const AGENT_HANDOFF_CONTRACT_SCHEMA_VERSION: &str = "agent-handoff-contract-v1";
 pub const AGENT_HANDOFF_V2_SCHEMA_VERSION: &str = "agent-handoff-v2";
 
@@ -41289,6 +41496,62 @@ scenarios:
             .malformed_reasons
             .iter()
             .any(|reason| reason.contains("evidenceRefs")));
+    }
+
+    #[test]
+    fn agent_work_package_v1_accepts_fixture_states() {
+        for path in [
+            "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-work-package.blocked.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-work-package.stale.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-work-package.ready-for-review.fixture.json",
+        ] {
+            let body = read_json_fixture(path);
+            let package = AgentWorkPackage::from_json_str(&body)
+                .unwrap_or_else(|error| panic!("{path} must validate: {error:#}"));
+            assert_eq!(package.schema_version, AGENT_WORK_PACKAGE_SCHEMA_VERSION);
+            assert!(SUPPORTED_AGENT_ROLES.contains(&package.role.as_str()));
+            assert!(!package.allowed_artifacts.is_empty());
+            assert!(!package.acceptance_criteria.is_empty());
+            assert!(!package.expected_evidence.is_empty());
+            assert!(package.generated_state.tracked_fixture_only);
+            assert!(package.boundary.contains("untrusted assignment"));
+            assert!(package.boundary.contains("does not execute"));
+        }
+    }
+
+    #[test]
+    fn agent_work_package_v1_fixture_matrix_preserves_guardrail_examples() {
+        let invalid: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.invalid.fixture.json",
+        ))
+        .expect("invalid work package fixture remains parseable json");
+        assert!(invalid["acceptanceCriteria"]
+            .as_array()
+            .is_some_and(|items| items.is_empty()));
+
+        let overbroad: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.overbroad.fixture.json",
+        ))
+        .expect("overbroad work package fixture remains parseable json");
+        assert!(overbroad["scope"]["outOfScope"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item
+                .as_str()
+                .is_some_and(|text| text.contains("arbitrary game completion")))));
+
+        let unsafe_package: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.unsafe.fixture.json",
+        ))
+        .expect("unsafe work package fixture remains parseable json");
+        assert!(unsafe_package["forbiddenActions"]
+            .as_array()
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item.as_str()
+                        .is_some_and(|text| text.contains("browser command bridge"))
+                })
+            }));
     }
 
     #[test]

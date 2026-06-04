@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "agent-work-package-v1",
+  "workPackageId": "work-package-scene-design-blocked",
+  "taskId": "scene-design-doc",
+  "role": "designer",
+  "status": "blocked",
+  "objective": "Produce a fixture-scoped scene design note with evidence links for reviewer handoff.",
+  "scope": {
+    "summary": "Bounded design documentation and fixture evidence only.",
+    "inScope": [
+      "Edit fixture-scoped design note metadata",
+      "Reference task board and ownership policy evidence",
+      "Prepare reviewer handoff target"
+    ],
+    "outOfScope": [
+      "No source mutation outside listed fixture artifacts",
+      "No command execution from the work package",
+      "No hidden background agents, auto-apply, auto-merge, or self-approval"
+    ]
+  },
+  "allowedArtifacts": [
+    {
+      "id": "design-note",
+      "path": "examples/multi-agent-pipeline-v1/work-packages/scene-design-note.fixture.md",
+      "description": "fixture-scoped design note target"
+    },
+    {
+      "id": "task-board",
+      "path": "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+      "description": "fixture-scoped production task board"
+    }
+  ],
+  "forbiddenActions": [
+    "Do not execute commands from the package",
+    "Do not spawn hidden background agents",
+    "Do not auto-apply, auto-merge, self-approve, or bypass reviewer gates",
+    "Do not use browser command bridge, trusted browser writes, or credentialed commands"
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "evidence-linked",
+      "description": "Work output links task board and ownership evidence for reviewer inspection",
+      "evidenceRefs": [
+        {
+          "id": "task-board",
+          "path": "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+          "description": "task board evidence"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-handoff-ready",
+      "description": "Package names a reviewer handoff target and expected evidence",
+      "evidenceRefs": [
+        {
+          "id": "handoff-target",
+          "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+          "description": "handoff target evidence"
+        }
+      ]
+    }
+  ],
+  "verificationCommands": [
+    {
+      "command": "cargo test -p ouroforge-core agent_work_package_v1",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-core",
+        "agent_work_package_v1"
+      ],
+      "boundary": "inert display text only; work package does not execute commands"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "id": "work-output",
+      "path": "runs/multi-agent-pipeline/work-packages/scene-design-doc/evidence.json",
+      "description": "generated work package evidence path"
+    }
+  ],
+  "ownershipRefs": [
+    {
+      "id": "ownership-policy",
+      "path": "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+      "description": "fixture-scoped ownership policy"
+    }
+  ],
+  "handoffTarget": {
+    "id": "reviewer-handoff",
+    "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+    "description": "reviewer handoff artifact"
+  },
+  "blockedReasons": [
+    "ownership evidence must be reviewed before writing fixture output"
+  ],
+  "stateSnapshotRef": {
+    "id": "state-snapshot",
+    "path": "examples/multi-agent-pipeline-v1/demo-state-snapshot.fixture.json",
+    "description": "fixture-scoped state snapshot"
+  },
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data/multi-agent-pipeline",
+      "target"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "boundary": "Fixture-scoped untrusted assignment only; it does not execute commands, spawn agents, write trusted browser state, apply changes, merge PRs, or grant authority."
+}
