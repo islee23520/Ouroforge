@@ -34,6 +34,10 @@ Ouroforge now has the documentation, governance, demo evidence, fresh-clone smok
 | Example reproducibility | Remediated by #49 | `docs/public-demo-evidence.md` records Chrome/`OUROFORGE_CHROME`, generated artifacts, and fresh-clone smoke commands. | Re-run fresh-clone smoke before public visibility changes. |
 | Secrets/private paths | Pass with caveat | No tracked `.openchrome/`, `.omc/`, or generated `runs/`; verification found only untracked local tool state. | Keep `.openchrome/`, `.omc/`, `runs/`, and generated dashboard data out of commits. |
 
+## Public Alpha Readiness Gate v1
+
+Issue #376 defines the current gate checklist and final report format in [`docs/public-alpha-readiness-gate-v1.md`](public-alpha-readiness-gate-v1.md). The gate records whether the repository is prepared for a separate manual public-visibility review; it does not change visibility, publish packages, automate launch, or make production/compatibility claims.
+
 ## Fresh-clone MVP smoke expectation
 
 A fresh clone of the stacked branch should be able to run:
