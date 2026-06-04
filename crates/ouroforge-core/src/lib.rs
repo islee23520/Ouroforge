@@ -36070,6 +36070,16 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 collider_ref,
             )?;
         }
+        // The 3d-scene-graph-v1 contract documents node components as bounded
+        // declarations for small deterministic local scenes, so reject oversized
+        // component arrays before iterating them.
+        const MAX_3D_NODE_COMPONENTS: usize = 16;
+        if node.components.len() > MAX_3D_NODE_COMPONENTS {
+            return Err(anyhow!(
+                "scene3d node {} components must not exceed {MAX_3D_NODE_COMPONENTS}",
+                node.id
+            ));
+        }
         for component in &node.components {
             validate_scene_3d_component(&node.id, component)?;
         }
@@ -62951,6 +62961,24 @@ scenarios:
                 "{fixture} error {error:#} contains {expected}"
             );
         }
+
+        // A node whose component array exceeds the bounded count is rejected even
+        // though each individual component is valid.
+        let mut oversized: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-valid.scene.json",
+        ))
+        .expect("valid 3D fixture json");
+        let components = (0..17)
+            .map(|_| json!({ "kind": "marker" }))
+            .collect::<Vec<_>>();
+        oversized["scene3d"]["nodes"][0]["components"] = json!(components);
+        let oversized_scene: SceneDocument =
+            serde_json::from_str(&oversized.to_string()).expect("oversized 3D scene parses");
+        let oversized_error = validate_scene(&oversized_scene)
+            .expect_err("oversized 3D node components are rejected");
+        assert!(oversized_error
+            .to_string()
+            .contains("components must not exceed"));
     }
 
     #[test]
