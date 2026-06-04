@@ -69,7 +69,8 @@ proves a safer dependency order:
 
 1. #628 - Level Intent and Design Constraint Model v1
    ([Level Intent v1](level-intent-v1.md)).
-2. #629 - Scene Generation Plan Artifact v1.
+2. #629 - Scene Generation Plan Artifact v1
+   ([Scene Generation Plan v1](scene-generation-plan-v1.md)).
 3. #630 - Spatial Layout and Placement Constraint Solver v1.
 4. #631 - Tilemap and Terrain Generation Draft v1.
 5. #632 - Entity, Objective, and Encounter Placement Draft v1.

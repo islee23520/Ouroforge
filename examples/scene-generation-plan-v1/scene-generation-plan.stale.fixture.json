@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "scene-generation-plan-v1",
+  "planId": "plan_stale_collect_and_exit_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "previewSummary": "Stale advisory plan is visible but must be refreshed before draft planning.",
+  "proposedZones": [
+    {
+      "zoneId": "start_zone",
+      "kind": "start",
+      "purpose": "Introduce movement.",
+      "objectiveRefs": ["collect_key"]
+    }
+  ],
+  "placementStrategy": {
+    "strategyId": "stale_template",
+    "description": "Template predates current target hash.",
+    "mode": "manual_draft",
+    "requiredZoneRefs": ["start_zone"],
+    "forbiddenZoneRefs": []
+  },
+  "requiredAssets": [
+    {
+      "refId": "player_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    }
+  ],
+  "requiredEntities": [
+    {
+      "refId": "player_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "scenarioChecksToGenerate": [
+    {
+      "checkId": "refresh_check",
+      "scenarioId": "collect_and_exit_smoke",
+      "description": "Refresh check after target hash update."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "plan_preview",
+      "kind": "generation_plan",
+      "pathHint": "evidence/scene-generation-plans/plan_stale_collect_and_exit_intro/plan-preview.json"
+    }
+  ],
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "status": "stale",
+  "blockedReasons": [
+    "Target hash must be refreshed before this plan can guide drafts."
+  ]
+}

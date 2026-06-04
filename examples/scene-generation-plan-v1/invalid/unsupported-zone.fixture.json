@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "scene-generation-plan-v1",
+  "planId": "plan_unsupported_zone",
+  "intentId": "intent_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "previewSummary": "Unsupported zone kind.",
+  "proposedZones": [{ "zoneId": "boss_zone", "kind": "boss_room", "purpose": "Unsupported.", "objectiveRefs": ["collect_key"] }],
+  "placementStrategy": { "strategyId": "strategy", "description": "Strategy.", "mode": "manual_draft", "requiredZoneRefs": ["boss_zone"], "forbiddenZoneRefs": [] },
+  "requiredAssets": [{ "refId": "player_asset", "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json" }],
+  "requiredEntities": [{ "refId": "player_entity", "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json" }],
+  "scenarioChecksToGenerate": [{ "checkId": "check", "scenarioId": "smoke", "description": "Check." }],
+  "expectedEvidence": [{ "evidenceId": "preview", "kind": "generation_plan", "pathHint": "evidence/scene-generation-plans/plan_unsupported_zone/preview.json" }],
+  "targetHashes": [{ "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json", "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }],
+  "status": "planned"
+}

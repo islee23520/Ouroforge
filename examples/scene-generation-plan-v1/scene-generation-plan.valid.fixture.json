@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "scene-generation-plan-v1",
+  "planId": "plan_collect_and_exit_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "targetTilemapRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+  "previewSummary": "Advisory plan links the intro intent to zones, checks, and evidence before any draft exists.",
+  "proposedZones": [
+    {
+      "zoneId": "start_zone",
+      "kind": "start",
+      "purpose": "Introduce movement before the key.",
+      "objectiveRefs": ["collect_key"]
+    },
+    {
+      "zoneId": "key_zone",
+      "kind": "objective",
+      "purpose": "Place key collection before exit access.",
+      "objectiveRefs": ["collect_key"]
+    },
+    {
+      "zoneId": "exit_zone",
+      "kind": "exit",
+      "purpose": "Require the exit after key collection.",
+      "objectiveRefs": ["reach_exit"]
+    }
+  ],
+  "placementStrategy": {
+    "strategyId": "left_to_right_intro",
+    "description": "Keep spawn, key, and exit in a readable left-to-right sequence.",
+    "mode": "deterministic_template",
+    "requiredZoneRefs": ["start_zone", "key_zone", "exit_zone"],
+    "forbiddenZoneRefs": []
+  },
+  "requiredAssets": [
+    {
+      "refId": "player_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    },
+    {
+      "refId": "key_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/key.json"
+    }
+  ],
+  "requiredEntities": [
+    {
+      "refId": "player_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    },
+    {
+      "refId": "exit_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "scenarioChecksToGenerate": [
+    {
+      "checkId": "collect_key_check",
+      "scenarioId": "collect_and_exit_smoke",
+      "description": "Future scenario should verify key collection before exit."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "plan_preview",
+      "kind": "generation_plan",
+      "pathHint": "evidence/scene-generation-plans/plan_collect_and_exit_intro/plan-preview.json"
+    },
+    {
+      "evidenceId": "scenario_expectation",
+      "kind": "scenario_check",
+      "pathHint": "evidence/scene-generation-plans/plan_collect_and_exit_intro/scenario-check.json"
+    }
+  ],
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "status": "planned",
+  "guardrails": [
+    "Advisory plan only; no draft generation or trusted write is authorized.",
+    "Browser and Studio surfaces may display this plan as read-only data only."
+  ]
+}

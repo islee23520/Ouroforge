@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "scene-generation-plan-v1",
+  "planId": "plan_blocked_patrol_arena",
+  "intentId": "intent_blocked_patrol_arena",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "previewSummary": "Blocked advisory plan cannot proceed until patrol assets and checks exist.",
+  "proposedZones": [
+    {
+      "zoneId": "patrol_zone",
+      "kind": "hazard",
+      "purpose": "Hold enemy patrol until supporting evidence exists.",
+      "objectiveRefs": ["avoid_patrol"]
+    }
+  ],
+  "placementStrategy": {
+    "strategyId": "blocked_patrol",
+    "description": "Patrol placement waits for approved patrol fixtures.",
+    "mode": "constraint_guided",
+    "requiredZoneRefs": ["patrol_zone"],
+    "forbiddenZoneRefs": []
+  },
+  "requiredAssets": [
+    {
+      "refId": "player_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    }
+  ],
+  "requiredEntities": [
+    {
+      "refId": "player_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "scenarioChecksToGenerate": [
+    {
+      "checkId": "blocked_patrol_check",
+      "scenarioId": "patrol_arena_smoke",
+      "description": "Check is blocked until patrol evidence is approved."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "blocked_plan_preview",
+      "kind": "generation_plan",
+      "pathHint": "evidence/scene-generation-plans/plan_blocked_patrol_arena/plan-preview.json"
+    }
+  ],
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": [
+    "Required patrol asset and scenario evidence are not approved."
+  ]
+}

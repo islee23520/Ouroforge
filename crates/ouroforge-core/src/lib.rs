@@ -14187,6 +14187,559 @@ fn validate_no_ref_overlap(
     Ok(())
 }
 
+const SCENE_GENERATION_PLAN_SCHEMA_VERSION: &str = "scene-generation-plan-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationPlanArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "targetTilemapRef", skip_serializing_if = "Option::is_none")]
+    pub target_tilemap_ref: Option<String>,
+    #[serde(rename = "previewSummary")]
+    pub preview_summary: String,
+    #[serde(rename = "proposedZones")]
+    pub proposed_zones: Vec<SceneGenerationPlanZone>,
+    #[serde(rename = "placementStrategy")]
+    pub placement_strategy: SceneGenerationPlacementStrategy,
+    #[serde(rename = "requiredAssets")]
+    pub required_assets: Vec<LevelIntentRef>,
+    #[serde(rename = "requiredEntities")]
+    pub required_entities: Vec<LevelIntentRef>,
+    #[serde(rename = "scenarioChecksToGenerate")]
+    pub scenario_checks_to_generate: Vec<SceneGenerationScenarioCheck>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<SceneGenerationExpectedEvidence>,
+    #[serde(rename = "targetHashes")]
+    pub target_hashes: Vec<SceneGenerationTargetHash>,
+    pub status: SceneGenerationPlanStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationPlanZone {
+    #[serde(rename = "zoneId")]
+    pub zone_id: String,
+    pub kind: SceneGenerationZoneKind,
+    pub purpose: String,
+    #[serde(
+        rename = "objectiveRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub objective_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneGenerationZoneKind {
+    Start,
+    Objective,
+    Transition,
+    Hazard,
+    Reward,
+    Exit,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationPlacementStrategy {
+    #[serde(rename = "strategyId")]
+    pub strategy_id: String,
+    pub description: String,
+    pub mode: SceneGenerationPlacementMode,
+    #[serde(
+        rename = "forbiddenZoneRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub forbidden_zone_refs: Vec<String>,
+    #[serde(
+        rename = "requiredZoneRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub required_zone_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneGenerationPlacementMode {
+    ManualDraft,
+    DeterministicTemplate,
+    ConstraintGuided,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationScenarioCheck {
+    #[serde(rename = "checkId")]
+    pub check_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: SceneGenerationEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneGenerationEvidenceKind {
+    GenerationPlan,
+    ScenarioCheck,
+    ReachabilityExpectation,
+    ObjectiveExpectation,
+    DraftPreview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationTargetHash {
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    #[serde(rename = "expectedHash")]
+    pub expected_hash: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneGenerationPlanStatus {
+    Planned,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneGenerationPlanReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(
+        rename = "targetTilemapRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub target_tilemap_ref: Option<String>,
+    pub status: String,
+    #[serde(rename = "zoneCount")]
+    pub zone_count: usize,
+    #[serde(rename = "scenarioCheckCount")]
+    pub scenario_check_count: usize,
+    #[serde(rename = "expectedEvidenceRefs")]
+    pub expected_evidence_refs: Vec<String>,
+    #[serde(rename = "targetHashRefs")]
+    pub target_hash_refs: Vec<String>,
+    #[serde(rename = "targetHashCount")]
+    pub target_hash_count: usize,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "previewSummary")]
+    pub preview_summary: String,
+    pub boundary: String,
+}
+
+impl SceneGenerationPlanArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: SceneGenerationPlanArtifact =
+            serde_json::from_str(input).context("failed to parse Scene Generation Plan JSON")?;
+        artifact.validate_shape()?;
+        Ok(artifact)
+    }
+
+    pub fn validate_against_intent(&self, intent: &LevelIntentArtifact) -> Result<()> {
+        self.validate_shape()?;
+        intent.validate()?;
+        if self.intent_id != intent.intent_id {
+            return Err(anyhow!(
+                "scene generation plan intentId does not match level intent: {} != {}",
+                self.intent_id,
+                intent.intent_id
+            ));
+        }
+        validate_scene_generation_refs_against_intent(
+            "scene generation plan requiredAssets",
+            &self.required_assets,
+            &intent.allowed_assets,
+        )?;
+        validate_scene_generation_refs_against_intent(
+            "scene generation plan requiredEntities",
+            &self.required_entities,
+            &intent.allowed_entities,
+        )?;
+        let objective_ids = intent
+            .objectives
+            .iter()
+            .map(|objective| objective.objective_id.as_str())
+            .collect::<BTreeSet<_>>();
+        for zone in &self.proposed_zones {
+            for objective_ref in &zone.objective_refs {
+                if !objective_ids.contains(objective_ref.as_str()) {
+                    return Err(anyhow!(
+                        "scene generation plan zone {} references missing intent objective: {}",
+                        zone.zone_id,
+                        objective_ref
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_shape(&self) -> Result<()> {
+        if self.schema_version != SCENE_GENERATION_PLAN_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "scene generation plan schemaVersion must be {SCENE_GENERATION_PLAN_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("scene generation plan planId", &self.plan_id)?;
+        validate_path_component("scene generation plan intentId", &self.intent_id)?;
+        validate_repo_relative_source_ref(
+            "scene generation plan targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "scene generation plan targetSceneRef must point to a .scene.json source fixture"
+            ));
+        }
+        if let Some(tilemap_ref) = &self.target_tilemap_ref {
+            validate_repo_relative_source_ref(
+                "scene generation plan targetTilemapRef",
+                tilemap_ref,
+            )?;
+        }
+        require_bounded_display_text(
+            "scene generation plan previewSummary",
+            &self.preview_summary,
+        )?;
+        validate_scene_generation_zones(&self.proposed_zones)?;
+        self.placement_strategy.validate(&self.proposed_zones)?;
+        validate_level_intent_refs(
+            "scene generation plan requiredAssets",
+            &self.required_assets,
+            false,
+        )?;
+        validate_level_intent_refs(
+            "scene generation plan requiredEntities",
+            &self.required_entities,
+            false,
+        )?;
+        validate_scene_generation_checks(&self.scenario_checks_to_generate)?;
+        validate_scene_generation_expected_evidence(&self.plan_id, &self.expected_evidence)?;
+        validate_scene_generation_target_hashes(
+            &self.target_scene_ref,
+            self.target_tilemap_ref.as_deref(),
+            &self.target_hashes,
+        )?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("scene generation plan blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("scene generation plan guardrails", guardrail)?;
+        }
+        match self.status {
+            SceneGenerationPlanStatus::Blocked | SceneGenerationPlanStatus::Stale
+                if self.blocked_reasons.is_empty() =>
+            {
+                Err(anyhow!(
+                    "scene generation plan blocked or stale status requires blockedReasons"
+                ))
+            }
+            SceneGenerationPlanStatus::Planned if !self.blocked_reasons.is_empty() => Err(anyhow!(
+                "scene generation plan planned status must not include blockedReasons"
+            )),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl SceneGenerationPlacementStrategy {
+    fn validate(&self, zones: &[SceneGenerationPlanZone]) -> Result<()> {
+        validate_path_component(
+            "scene generation plan placementStrategy.strategyId",
+            &self.strategy_id,
+        )?;
+        require_bounded_display_text(
+            "scene generation plan placementStrategy.description",
+            &self.description,
+        )?;
+        let zone_ids = zones
+            .iter()
+            .map(|zone| zone.zone_id.as_str())
+            .collect::<BTreeSet<_>>();
+        validate_unique_path_components(
+            "scene generation plan placementStrategy.requiredZoneRefs",
+            "zoneRef",
+            &self.required_zone_refs,
+        )?;
+        validate_unique_path_components(
+            "scene generation plan placementStrategy.forbiddenZoneRefs",
+            "zoneRef",
+            &self.forbidden_zone_refs,
+        )?;
+        for reference in self
+            .required_zone_refs
+            .iter()
+            .chain(self.forbidden_zone_refs.iter())
+        {
+            if !zone_ids.contains(reference.as_str()) {
+                return Err(anyhow!(
+                    "scene generation plan placementStrategy references unsupported zone: {reference}"
+                ));
+            }
+        }
+        let required = self.required_zone_refs.iter().collect::<BTreeSet<_>>();
+        for forbidden in &self.forbidden_zone_refs {
+            if required.contains(forbidden) {
+                return Err(anyhow!(
+                    "scene generation plan placementStrategy cannot require and forbid the same zone: {forbidden}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn scene_generation_plan_read_model_from_json_str(
+    input: &str,
+) -> Result<SceneGenerationPlanReadModel> {
+    let plan = SceneGenerationPlanArtifact::from_json_str(input)?;
+    Ok(scene_generation_plan_read_model(&plan))
+}
+
+pub fn scene_generation_plan_read_model(
+    plan: &SceneGenerationPlanArtifact,
+) -> SceneGenerationPlanReadModel {
+    SceneGenerationPlanReadModel {
+        schema_version: "scene-generation-plan-read-model-v1".to_string(),
+        plan_id: plan.plan_id.clone(),
+        intent_id: plan.intent_id.clone(),
+        target_scene_ref: plan.target_scene_ref.clone(),
+        target_tilemap_ref: plan.target_tilemap_ref.clone(),
+        status: match plan.status {
+            SceneGenerationPlanStatus::Planned => "planned",
+            SceneGenerationPlanStatus::Stale => "stale",
+            SceneGenerationPlanStatus::Blocked => "blocked",
+        }
+        .to_string(),
+        zone_count: plan.proposed_zones.len(),
+        scenario_check_count: plan.scenario_checks_to_generate.len(),
+        expected_evidence_refs: plan
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.path_hint.clone())
+            .collect(),
+        target_hash_refs: plan
+            .target_hashes
+            .iter()
+            .map(|target| target.target_ref.clone())
+            .collect(),
+        target_hash_count: plan.target_hashes.len(),
+        blocked_reasons: plan.blocked_reasons.clone(),
+        preview_summary: plan.preview_summary.clone(),
+        boundary: "Read-only scene generation plan preview; advisory and untrusted, does not generate drafts, does not write trusted files, and grants no browser command bridge, auto-apply, auto-merge, or quality guarantee authority.".to_string(),
+    }
+}
+
+fn validate_scene_generation_zones(values: &[SceneGenerationPlanZone]) -> Result<()> {
+    if values.is_empty() || values.len() > 32 {
+        return Err(anyhow!(
+            "scene generation plan proposedZones must contain between 1 and 32 zones"
+        ));
+    }
+    let mut zone_ids = BTreeSet::new();
+    for zone in values {
+        validate_path_component("scene generation plan proposedZones.zoneId", &zone.zone_id)?;
+        require_bounded_display_text("scene generation plan proposedZones.purpose", &zone.purpose)?;
+        if !zone_ids.insert(zone.zone_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene generation plan proposedZones.zoneId: {}",
+                zone.zone_id
+            ));
+        }
+        validate_unique_path_components(
+            "scene generation plan proposedZones.objectiveRefs",
+            "objectiveRef",
+            &zone.objective_refs,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_generation_checks(values: &[SceneGenerationScenarioCheck]) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "scene generation plan scenarioChecksToGenerate must not be empty"
+        ));
+    }
+    let mut check_ids = BTreeSet::new();
+    for check in values {
+        validate_path_component(
+            "scene generation plan scenarioChecksToGenerate.checkId",
+            &check.check_id,
+        )?;
+        validate_path_component(
+            "scene generation plan scenarioChecksToGenerate.scenarioId",
+            &check.scenario_id,
+        )?;
+        require_bounded_display_text(
+            "scene generation plan scenarioChecksToGenerate.description",
+            &check.description,
+        )?;
+        if !check_ids.insert(check.check_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene generation plan scenarioChecksToGenerate.checkId: {}",
+                check.check_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_generation_expected_evidence(
+    plan_id: &str,
+    values: &[SceneGenerationExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "scene generation plan expectedEvidence must not be empty"
+        ));
+    }
+    let mut evidence_ids = BTreeSet::new();
+    let mut path_hints = BTreeSet::new();
+    let expected_prefix = format!("evidence/scene-generation-plans/{plan_id}/");
+    for evidence in values {
+        validate_path_component(
+            "scene generation plan expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "scene generation plan expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !evidence_ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene generation plan expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !path_hints.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene generation plan expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_generation_target_hashes(
+    target_scene_ref: &str,
+    target_tilemap_ref: Option<&str>,
+    values: &[SceneGenerationTargetHash],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "scene generation plan targetHashes must not be empty"
+        ));
+    }
+    let mut allowed_targets = BTreeSet::from([target_scene_ref]);
+    if let Some(tilemap_ref) = target_tilemap_ref {
+        allowed_targets.insert(tilemap_ref);
+    }
+    let mut target_refs = BTreeSet::new();
+    for target in values {
+        validate_repo_relative_source_ref(
+            "scene generation plan targetHashes.targetRef",
+            &target.target_ref,
+        )?;
+        validate_snapshot_hash(
+            "scene generation plan targetHashes.expectedHash",
+            &target.expected_hash,
+        )?;
+        if !allowed_targets.contains(target.target_ref.as_str()) {
+            return Err(anyhow!(
+                "scene generation plan targetHashes targetRef is not a declared target: {}",
+                target.target_ref
+            ));
+        }
+        if !target_refs.insert(target.target_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene generation plan targetHashes.targetRef: {}",
+                target.target_ref
+            ));
+        }
+    }
+    if !target_refs.contains(target_scene_ref) {
+        return Err(anyhow!(
+            "scene generation plan targetHashes must include targetSceneRef"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_scene_generation_refs_against_intent(
+    field: &str,
+    required: &[LevelIntentRef],
+    allowed: &[LevelIntentRef],
+) -> Result<()> {
+    let allowed_ids = allowed
+        .iter()
+        .map(|value| value.ref_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let allowed_sources = allowed
+        .iter()
+        .map(|value| value.source_ref.as_str())
+        .collect::<BTreeSet<_>>();
+    for reference in required {
+        if !allowed_ids.contains(reference.ref_id.as_str())
+            || !allowed_sources.contains(reference.source_ref.as_str())
+        {
+            return Err(anyhow!(
+                "{field} contains ref not allowed by linked level intent: {}",
+                reference.ref_id
+            ));
+        }
+    }
+    Ok(())
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -57105,6 +57658,196 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("level-intent-v1.md"));
+    }
+
+    #[test]
+    fn scene_generation_plan_v1_accepts_valid_fixture_and_read_model() {
+        let plan_fixture = include_str!(
+            "../../../examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json"
+        );
+        let intent_fixture =
+            include_str!("../../../examples/level-intent-v1/level-intent.valid.fixture.json");
+        let plan = SceneGenerationPlanArtifact::from_json_str(plan_fixture)
+            .expect("valid scene generation plan fixture parses");
+        let intent = LevelIntentArtifact::from_json_str(intent_fixture)
+            .expect("valid level intent fixture parses");
+
+        plan.validate_against_intent(&intent)
+            .expect("plan validates against linked intent");
+        assert_eq!(plan.schema_version, "scene-generation-plan-v1");
+        assert_eq!(plan.plan_id, "plan_collect_and_exit_intro");
+        assert_eq!(plan.status, SceneGenerationPlanStatus::Planned);
+        assert_eq!(plan.proposed_zones.len(), 3);
+
+        let read_model = scene_generation_plan_read_model_from_json_str(plan_fixture)
+            .expect("read model builds from fixture");
+        assert_eq!(
+            read_model.schema_version,
+            "scene-generation-plan-read-model-v1"
+        );
+        assert_eq!(
+            read_model.target_scene_ref,
+            "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+        );
+        assert_eq!(
+            read_model.target_tilemap_ref.as_deref(),
+            Some(
+                "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json"
+            )
+        );
+        assert_eq!(read_model.zone_count, 3);
+        assert_eq!(read_model.target_hash_count, 2);
+        assert_eq!(
+            read_model.target_hash_refs,
+            vec![
+                "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+                    .to_string(),
+                "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json"
+                    .to_string(),
+            ]
+        );
+        assert!(read_model.blocked_reasons.is_empty());
+        assert!(read_model.boundary.contains("advisory"));
+        assert!(read_model.boundary.contains("untrusted"));
+        assert!(read_model.boundary.contains("does not generate"));
+        assert!(read_model.boundary.contains("does not write"));
+    }
+
+    #[test]
+    fn scene_generation_plan_v1_accepts_stale_and_blocked_fixtures() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/scene-generation-plan.stale.fixture.json"
+                ),
+                SceneGenerationPlanStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/scene-generation-plan.blocked.fixture.json"
+                ),
+                SceneGenerationPlanStatus::Blocked,
+            ),
+        ] {
+            let plan = SceneGenerationPlanArtifact::from_json_str(fixture)
+                .expect("stale/blocked scene generation plan fixture parses");
+            assert_eq!(plan.status, expected_status);
+            assert!(!plan.blocked_reasons.is_empty());
+
+            let read_model = scene_generation_plan_read_model_from_json_str(fixture)
+                .expect("stale/blocked fixture read model builds");
+            assert_eq!(read_model.status, match expected_status {
+                SceneGenerationPlanStatus::Planned => "planned",
+                SceneGenerationPlanStatus::Stale => "stale",
+                SceneGenerationPlanStatus::Blocked => "blocked",
+            });
+            assert_eq!(read_model.target_scene_ref, plan.target_scene_ref);
+            assert_eq!(read_model.target_tilemap_ref, plan.target_tilemap_ref);
+            assert_eq!(read_model.blocked_reasons, plan.blocked_reasons);
+            assert_eq!(read_model.target_hash_count, plan.target_hashes.len());
+        }
+    }
+
+    #[test]
+    fn scene_generation_plan_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/missing-intent.fixture.json"
+                ),
+                "intentId",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/unsupported-zone.fixture.json"
+                ),
+                "boss_room",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/unsafe-target.fixture.json"
+                ),
+                "escape",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/contradictory-strategy.fixture.json"
+                ),
+                "require and forbid",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/stale-target-hash.fixture.json"
+                ),
+                "blockedReasons",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/malformed-expected-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/scene-generation-plan-v1/invalid/blocked-without-reason.fixture.json"
+                ),
+                "blockedReasons",
+            ),
+        ] {
+            let error = SceneGenerationPlanArtifact::from_json_str(fixture)
+                .expect_err("invalid scene generation plan fixture is rejected");
+            assert!(
+                error.to_string().contains(expected)
+                    || error.to_string().contains("failed to parse"),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn scene_generation_plan_v1_validates_against_level_intent() {
+        let intent = LevelIntentArtifact::from_json_str(include_str!(
+            "../../../examples/level-intent-v1/level-intent.valid.fixture.json"
+        ))
+        .expect("intent fixture parses");
+        let mut plan = SceneGenerationPlanArtifact::from_json_str(include_str!(
+            "../../../examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json"
+        ))
+        .expect("plan fixture parses");
+
+        plan.intent_id = "missing_intent".to_string();
+        let missing_intent = plan
+            .validate_against_intent(&intent)
+            .expect_err("missing intent linkage rejected");
+        assert!(missing_intent.to_string().contains("intentId"));
+
+        plan.intent_id = intent.intent_id.clone();
+        plan.required_assets[0].ref_id = "unapproved_asset".to_string();
+        let missing_asset = plan
+            .validate_against_intent(&intent)
+            .expect_err("missing required asset rejected");
+        assert!(missing_asset.to_string().contains("requiredAssets"));
+
+        plan.required_assets[0].ref_id = intent.allowed_assets[0].ref_id.clone();
+        plan.proposed_zones[1].objective_refs = vec!["missing_objective".to_string()];
+        let missing_objective = plan
+            .validate_against_intent(&intent)
+            .expect_err("missing objective ref rejected");
+        assert!(missing_objective
+            .to_string()
+            .contains("missing intent objective"));
+    }
+
+    #[test]
+    fn scene_generation_plan_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/scene-generation-plan-v1.md");
+        assert!(doc.contains("advisory"));
+        assert!(doc.contains("does not generate"));
+        assert!(doc.contains("does not write"));
+        assert!(doc.contains("untrusted"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("scene-generation-plan-v1.md"));
     }
 
     #[test]
