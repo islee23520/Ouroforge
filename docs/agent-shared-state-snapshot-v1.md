@@ -100,7 +100,24 @@ validation and review-gated apply or promotion.
 
 Issue #670 MAP13.7.1 defines schema, docs, and snapshot fixtures. MAP13.7.2
 adds local staleness comparison against current project/task artifacts.
-Read-model/display compatibility belongs to MAP13.7.3.
+
+## MAP13.7.3 read-model/display compatibility
+
+MAP13.7.3 adds `schemaVersion:
+agent-shared-state-snapshot-read-model-v1`, a read-only display model for
+dashboard and Studio-style inspection. The display model summarizes snapshot id,
+milestone, status, observed time, hash counts, recent run count, open task
+count, ownership count, pending review count, generated roots, and
+`beforeContext` / `afterContext` labels. It surfaces `staleRefs`,
+`missingRefs`, `malformedReasons`, and `conflictingRefs` as blockers or
+validation reasons instead of converting them into write authority.
+
+The Studio multi-agent pipeline inspection read model accepts
+`agentSharedStateSnapshot`, `agentSharedStateSnapshots`, `stateSnapshot`, and
+`stateSnapshots` inputs and exposes a `state-snapshot` section. That section is
+display-only: stale or conflicting snapshots block the section visibly;
+malformed snapshots remain validation errors; missing snapshots remain a partial
+pipeline state.
 
 Issues #1 and #23 must remain open unless a separate explicit governance
 decision says otherwise.

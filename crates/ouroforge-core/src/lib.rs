@@ -3644,6 +3644,45 @@ pub struct AgentSharedStateSnapshotStalenessReport {
     pub boundary: String,
 }
 
+pub const AGENT_SHARED_STATE_SNAPSHOT_READ_MODEL_SCHEMA_VERSION: &str =
+    "agent-shared-state-snapshot-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AgentSharedStateSnapshotReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "snapshotId")]
+    pub snapshot_id: String,
+    pub milestone: String,
+    pub status: String,
+    #[serde(rename = "observedAt")]
+    pub observed_at: String,
+    #[serde(rename = "sceneHashCount")]
+    pub scene_hash_count: usize,
+    #[serde(rename = "tilemapHashCount")]
+    pub tilemap_hash_count: usize,
+    #[serde(rename = "behaviorVersionHashCount")]
+    pub behavior_version_hash_count: usize,
+    #[serde(rename = "recentRunCount")]
+    pub recent_run_count: usize,
+    #[serde(rename = "openTaskCount")]
+    pub open_task_count: usize,
+    #[serde(rename = "ownershipCount")]
+    pub ownership_count: usize,
+    #[serde(rename = "pendingReviewCount")]
+    pub pending_review_count: usize,
+    #[serde(rename = "beforeContextLabel")]
+    pub before_context_label: Option<String>,
+    #[serde(rename = "afterContextLabel")]
+    pub after_context_label: Option<String>,
+    pub blockers: Vec<String>,
+    #[serde(rename = "generatedRoots")]
+    pub generated_roots: Vec<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
 impl AgentSharedStateSnapshot {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let snapshot: AgentSharedStateSnapshot = serde_json::from_str(input)
@@ -3909,6 +3948,77 @@ impl AgentSharedStateSnapshot {
     }
 }
 
+pub fn agent_shared_state_snapshot_read_model_from_json_str(
+    input: &str,
+) -> AgentSharedStateSnapshotReadModel {
+    match AgentSharedStateSnapshot::from_json_str(input) {
+        Ok(snapshot) => AgentSharedStateSnapshotReadModel::from_snapshot(&snapshot),
+        Err(error) => AgentSharedStateSnapshotReadModel::malformed(format!("{error:#}")),
+    }
+}
+
+impl AgentSharedStateSnapshotReadModel {
+    pub fn from_snapshot(snapshot: &AgentSharedStateSnapshot) -> Self {
+        let blockers = snapshot
+            .stale_refs
+            .iter()
+            .chain(snapshot.missing_refs.iter())
+            .chain(snapshot.conflicting_refs.iter())
+            .chain(snapshot.malformed_reasons.iter())
+            .cloned()
+            .collect();
+        Self {
+            schema_version: AGENT_SHARED_STATE_SNAPSHOT_READ_MODEL_SCHEMA_VERSION.to_string(),
+            snapshot_id: snapshot.snapshot_id.clone(),
+            milestone: snapshot.milestone.clone(),
+            status: snapshot.status.as_str().to_string(),
+            observed_at: snapshot.observed_at.clone(),
+            scene_hash_count: snapshot.scene_hashes.len(),
+            tilemap_hash_count: snapshot.tilemap_hashes.len(),
+            behavior_version_hash_count: snapshot.behavior_version_hashes.len(),
+            recent_run_count: snapshot.recent_run_ids.len(),
+            open_task_count: snapshot.open_tasks.len(),
+            ownership_count: snapshot.ownership_map.len(),
+            pending_review_count: snapshot.pending_reviews.len(),
+            before_context_label: snapshot
+                .before_context
+                .as_ref()
+                .map(|context| context.label.clone()),
+            after_context_label: snapshot
+                .after_context
+                .as_ref()
+                .map(|context| context.label.clone()),
+            blockers,
+            generated_roots: snapshot.generated_state.roots.clone(),
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only agent shared state snapshot display model; it summarizes hashes, tasks, ownership, reviews, generated roots, stale/missing/malformed/conflicting evidence, and before/after context without executing commands, spawning agents, repairing stale state, mutating task boards, writing trusted browser state, applying changes, or merging PRs.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: AGENT_SHARED_STATE_SNAPSHOT_READ_MODEL_SCHEMA_VERSION.to_string(),
+            snapshot_id: "malformed-agent-shared-state-snapshot".to_string(),
+            milestone: "unknown".to_string(),
+            status: "malformed".to_string(),
+            observed_at: String::new(),
+            scene_hash_count: 0,
+            tilemap_hash_count: 0,
+            behavior_version_hash_count: 0,
+            recent_run_count: 0,
+            open_task_count: 0,
+            ownership_count: 0,
+            pending_review_count: 0,
+            before_context_label: None,
+            after_context_label: None,
+            blockers: Vec::new(),
+            generated_roots: Vec::new(),
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed agent shared state snapshot display model; it reports validation errors without executing commands, spawning agents, repairing stale state, mutating state, writing trusted browser state, applying changes, or merging PRs.".to_string(),
+        }
+    }
+}
+
 impl AgentSharedStateSnapshotCurrentState {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let current: AgentSharedStateSnapshotCurrentState = serde_json::from_str(input)
@@ -3958,6 +4068,19 @@ impl AgentSharedStateSnapshotCurrentState {
             "agent shared state snapshot current pendingReviews",
             &self.pending_reviews,
         )
+    }
+}
+
+impl AgentSharedStateSnapshotStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentSharedStateSnapshotStatus::Fresh => "fresh",
+            AgentSharedStateSnapshotStatus::Stale => "stale",
+            AgentSharedStateSnapshotStatus::Partial => "partial",
+            AgentSharedStateSnapshotStatus::Missing => "missing",
+            AgentSharedStateSnapshotStatus::Malformed => "malformed",
+            AgentSharedStateSnapshotStatus::Conflicting => "conflicting",
+        }
     }
 }
 
@@ -5674,6 +5797,20 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ],
             &mut malformed_reasons,
         );
+        let state_snapshots = pipeline_values(
+            value,
+            &[
+                "agent_shared_state_snapshots",
+                "agentSharedStateSnapshots",
+                "agent_shared_state_snapshot",
+                "agentSharedStateSnapshot",
+                "state_snapshots",
+                "stateSnapshots",
+                "state_snapshot",
+                "stateSnapshot",
+            ],
+            &mut malformed_reasons,
+        );
         let evidence_bundles = pipeline_values(
             value,
             &[
@@ -5739,6 +5876,7 @@ impl StudioMultiAgentPipelineInspectionReadModel {
                 "handoffId",
                 &mut malformed_reasons,
             ),
+            pipeline_state_snapshot_section(&state_snapshots, &mut malformed_reasons),
             pipeline_lane_section(
                 "review-critic",
                 "Review and critic lane",
@@ -5955,6 +6093,52 @@ fn pipeline_lane_section(
         item_count: count,
         blockers,
         malformed_reasons: Vec::new(),
+    }
+}
+
+fn pipeline_state_snapshot_section(
+    snapshots: &[&serde_json::Value],
+    malformed_reasons: &mut Vec<String>,
+) -> StudioMultiAgentPipelineInspectionSection {
+    if snapshots.is_empty() {
+        return StudioMultiAgentPipelineInspectionSection {
+            id: "state-snapshot".to_string(),
+            label: "Shared state snapshot".to_string(),
+            status: "missing".to_string(),
+            item_count: 0,
+            blockers: Vec::new(),
+            malformed_reasons: Vec::new(),
+        };
+    }
+
+    let mut blockers = Vec::new();
+    let mut section_malformed = Vec::new();
+    for (index, snapshot) in snapshots.iter().enumerate() {
+        let model = agent_shared_state_snapshot_read_model_from_json_str(&snapshot.to_string());
+        blockers.extend(model.blockers);
+        section_malformed.extend(
+            model
+                .malformed_reasons
+                .into_iter()
+                .map(|reason| format!("state-snapshot[{index}]: {reason}")),
+        );
+    }
+
+    malformed_reasons.extend(section_malformed.iter().cloned());
+    StudioMultiAgentPipelineInspectionSection {
+        id: "state-snapshot".to_string(),
+        label: "Shared state snapshot".to_string(),
+        status: if !section_malformed.is_empty() {
+            "malformed"
+        } else if !blockers.is_empty() {
+            "blocked"
+        } else {
+            "present"
+        }
+        .to_string(),
+        item_count: snapshots.len(),
+        blockers,
+        malformed_reasons: section_malformed,
     }
 }
 
@@ -45471,13 +45655,62 @@ scenarios:
     }
 
     #[test]
+    fn agent_shared_state_snapshot_read_model_reports_display_status_and_blockers() {
+        let fresh = agent_shared_state_snapshot_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ));
+        assert_eq!(
+            fresh.schema_version,
+            AGENT_SHARED_STATE_SNAPSHOT_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(fresh.status, "fresh");
+        assert_eq!(fresh.scene_hash_count, 1);
+        assert_eq!(fresh.tilemap_hash_count, 1);
+        assert_eq!(fresh.behavior_version_hash_count, 1);
+        assert_eq!(fresh.recent_run_count, 1);
+        assert_eq!(fresh.open_task_count, 2);
+        assert_eq!(fresh.ownership_count, 2);
+        assert_eq!(fresh.pending_review_count, 1);
+        assert_eq!(fresh.before_context_label.as_deref(), Some("before-review"));
+        assert_eq!(fresh.after_context_label.as_deref(), Some("after-review"));
+        assert!(fresh.blockers.is_empty());
+        assert!(fresh
+            .generated_roots
+            .iter()
+            .any(|root| root == "runs/multi-agent-pipeline"));
+        assert!(fresh.boundary.contains("Read-only"));
+        assert!(fresh.boundary.contains("without executing commands"));
+        assert!(fresh.boundary.contains("writing trusted browser state"));
+
+        let stale = agent_shared_state_snapshot_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.stale.fixture.json",
+        ));
+        assert_eq!(stale.status, "stale");
+        assert!(stale
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("scene-main")));
+
+        let malformed = agent_shared_state_snapshot_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.invalid.fixture.json",
+        ));
+        assert_eq!(malformed.status, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("sha256")));
+    }
+
+    #[test]
     fn agent_shared_state_snapshot_doc_audits_generated_state_and_governance() {
         let doc = read_repo_text("docs/agent-shared-state-snapshot-v1.md");
         for required in [
             "schemaVersion: agent-shared-state-snapshot-v1",
             "agent-shared-state-snapshot-staleness-report-v1",
+            "agent-shared-state-snapshot-read-model-v1",
             "read-only context evidence",
             "current-state fixture",
+            "display model",
             "sha256:<64-hex>",
             "beforeContext",
             "afterContext",
@@ -46186,6 +46419,10 @@ scenarios:
             "examples/multi-agent-pipeline-v1/demo-handoff-v2.fixture.json",
         ))
         .expect("handoff json");
+        let state_snapshot: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ))
+        .expect("state snapshot json");
         let evidence_bundle: serde_json::Value = serde_json::from_str(&read_json_fixture(
             "examples/multi-agent-pipeline-v1/demo-evidence-bundle.fixture.json",
         ))
@@ -46197,6 +46434,7 @@ scenarios:
                 "ownership_policy": ownership_policy,
                 "agent_work_package": work_package,
                 "agent_handoff_v2s": [handoff],
+                "agentSharedStateSnapshot": state_snapshot,
                 "loop_evidence_bundles": [evidence_bundle]
             })
             .to_string(),
@@ -46217,6 +46455,7 @@ scenarios:
             "ownership-policy",
             "work-package",
             "handoff",
+            "state-snapshot",
             "review-critic",
             "qa-queue",
             "performance-regression",
@@ -46264,6 +46503,53 @@ scenarios:
             .blockers
             .iter()
             .any(|reason| reason.contains("ownership evidence")));
+    }
+
+    #[test]
+    fn studio_pipeline_inspection_links_shared_state_snapshot_read_model() {
+        let fresh: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ))
+        .expect("fresh snapshot json");
+        let stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.stale.fixture.json",
+        ))
+        .expect("stale snapshot json");
+        let malformed = json!({
+            "schemaVersion": "agent-shared-state-snapshot-v1",
+            "snapshotId": "bad-snapshot",
+            "status": "fresh"
+        });
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({
+                "agentSharedStateSnapshots": [fresh, stale, malformed]
+            })
+            .to_string(),
+        );
+        let snapshots = model
+            .sections
+            .iter()
+            .find(|section| section.id == "state-snapshot")
+            .expect("state snapshot section");
+        assert_eq!(snapshots.status, "malformed");
+        assert_eq!(snapshots.item_count, 3);
+        assert!(snapshots
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("scene-main")));
+        assert!(snapshots
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("milestone") || reason.contains("projectManifestHash")));
+        assert_eq!(model.status, "malformed");
+
+        let missing = studio_multi_agent_pipeline_inspection_read_model_from_json_str("{}");
+        let missing_snapshots = missing
+            .sections
+            .iter()
+            .find(|section| section.id == "state-snapshot")
+            .expect("missing state snapshot section");
+        assert_eq!(missing_snapshots.status, "missing");
     }
 
     #[test]
