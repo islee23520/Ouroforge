@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "route-attempt-evidence-v1",
+  "attemptId": "qa14_6_malformed_route",
+  "runId": "run_route_attempt_smoke",
+  "objectiveId": "collect-goal-then-exit",
+  "scenarioId": "collect-and-exit",
+  "startState": { "stateId": "start", "worldStateRef": "evidence/scenarios/collect-and-exit/world-state-start.json" },
+  "strategyId": "simple-right",
+  "strategyKind": "simple_heuristic",
+  "actionSequence": [{ "actionId": "move-right", "kind": "move_right", "frame": 0 }],
+  "route": [],
+  "outcome": "inconclusive",
+  "evidenceRefs": [],
+  "budgetUsed": { "maxActions": 0, "actionsUsed": 2, "maxRouteNodes": 0, "routeNodesUsed": 0, "maxDurationMs": 0, "durationMs": 100 }
+}

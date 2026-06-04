@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "route-attempt-evidence-v1",
+  "attemptId": "qa14_6_blocked_route",
+  "runId": "run_route_attempt_smoke",
+  "objectiveId": "collect-goal-then-exit",
+  "scenarioId": "collect-and-exit",
+  "startState": { "stateId": "start", "worldStateRef": "evidence/scenarios/collect-and-exit/world-state-start.json" },
+  "strategyId": "simple-right",
+  "strategyKind": "simple_heuristic",
+  "actionSequence": [{ "actionId": "move-right", "kind": "move_right", "frame": 0 }],
+  "route": [{ "nodeId": "start", "x": 0, "y": 0 }],
+  "outcome": "blocked",
+  "evidenceRefs": ["evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "budgetUsed": { "maxActions": 4, "actionsUsed": 1, "maxRouteNodes": 4, "routeNodesUsed": 1, "maxDurationMs": 1000, "durationMs": 100 }
+}

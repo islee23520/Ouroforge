@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "route-attempt-evidence-v1",
+  "attemptId": "qa14_6_collect_goal_route",
+  "runId": "run_route_attempt_smoke",
+  "objectiveId": "collect-goal-then-exit",
+  "scenarioId": "collect-and-exit",
+  "startState": {
+    "stateId": "start-left-of-goal",
+    "worldStateRef": "evidence/scenarios/collect-and-exit/world-state-start.json"
+  },
+  "strategyId": "simple-right-then-interact",
+  "strategyKind": "simple_heuristic",
+  "actionSequence": [
+    { "actionId": "move-right-1", "kind": "move_right", "frame": 0, "target": "goal" },
+    { "actionId": "interact-goal", "kind": "interact", "frame": 12, "target": "goal" }
+  ],
+  "route": [
+    { "nodeId": "start", "x": 0, "y": 0, "evidenceRef": "evidence/scenarios/collect-and-exit/world-state-start.json" },
+    { "nodeId": "goal", "x": 2, "y": 0, "evidenceRef": "evidence/scenarios/collect-and-exit/world-state-goal.json" }
+  ],
+  "outcome": "passed",
+  "evidenceRefs": [
+    "evidence/scenarios/collect-and-exit/world-state-start.json",
+    "evidence/scenarios/collect-and-exit/scenario-result.json"
+  ],
+  "budgetUsed": {
+    "maxActions": 8,
+    "actionsUsed": 2,
+    "maxRouteNodes": 8,
+    "routeNodesUsed": 2,
+    "maxDurationMs": 5000,
+    "durationMs": 1200
+  },
+  "guardrails": [
+    "Route attempt evidence is not proof of global objective solvability.",
+    "No hidden workers, command bridge, trusted mutation, auto-fix, auto-apply, or auto-merge.",
+    "QA outputs remain evidence/backlog inputs only."
+  ]
+}
