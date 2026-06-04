@@ -78,7 +78,10 @@ Recommended issue labels remain descriptive, not automatic approval:
 Feature requests should use `.github/ISSUE_TEMPLATE/feature_request.yml` and
 name the roadmap bucket, evidence, explicit non-goals, and verification commands.
 Public readiness work should use `.github/ISSUE_TEMPLATE/public_readiness.yml`
-and state that the task does not publish, announce, or change visibility.
+and state that the task does not publish, announce, or change visibility. PRs
+should use `.github/PULL_REQUEST_TEMPLATE.md` to record drift-lock evidence, and
+maintainers can adapt `docs/post-launch-roadmap-response-snippets-v1.md` for
+clarification, design-gate, rejection, generated-state, and review-drift replies.
 
 ## Closure audit for triage-only PRs
 

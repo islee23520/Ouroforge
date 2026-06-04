@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Ouroforge accepts narrowly scoped feature requests that preserve the evidence-native loop. Avoid broad editor/engine/platform requests unless they include concrete MVP evidence and non-goals.
+        Ouroforge accepts narrowly scoped feature requests that preserve the evidence-native loop. Route requests through `docs/post-launch-roadmap-triage-v1.md`; design-gate buckets do not authorize implementation by themselves. Avoid broad editor/engine/platform requests unless they include concrete MVP evidence and non-goals.
   - type: textarea
     id: problem
     attributes:
@@ -18,6 +18,30 @@ body:
     attributes:
       label: Proposed scope
       description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: roadmap_bucket
+    attributes:
+      label: Roadmap bucket
+      description: Choose the smallest matching bucket from docs/post-launch-roadmap-triage-v1.md. Design-gate buckets do not authorize implementation by themselves.
+      options:
+        - Source Mutation Apply Design Gate
+        - Native Export Design Gate
+        - Plugin Design Gate
+        - Distributed QA Design Gate
+        - Visual Authoring v2
+        - Asset Pipeline v2
+        - Engine Expressiveness v3
+        - Public Docs v2
+        - Unsure / needs maintainer triage
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_route
+    attributes:
+      label: Acceptance, rejection, or move criteria
+      description: Explain why this should be accepted into the chosen bucket, moved to a design gate, clarified, rejected, or deferred as generated/local state.
     validations:
       required: true
   - type: textarea
@@ -44,4 +68,8 @@ body:
         - label: This request does not claim Ouroforge is a Godot replacement.
           required: true
         - label: This request can be verified with local artifacts or commands.
+          required: true
+        - label: This request names a roadmap bucket or explicitly asks for maintainer triage.
+          required: true
+        - label: This request does not rely on generated local state being committed unless a separate fixture-scoped issue authorizes it.
           required: true
