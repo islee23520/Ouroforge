@@ -3,6 +3,9 @@
 Issue #354 records the roadmap and #1 governance refresh after completing Visual
 Authoring v1 / Safe Local Edit Cockpit (#343-#354).
 
+#1 governance handoff comment:
+<https://github.com/shaun0927/Ouroforge/issues/1#issuecomment-4618659575>
+
 ## Completed milestone summary
 
 Visual Authoring v1 is complete as a bounded local-first safe edit-draft
