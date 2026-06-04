@@ -106,6 +106,57 @@ fn source_patch_preview_validation_passes_fixture_with_diff_and_file_class_evide
 }
 
 #[test]
+fn source_patch_preview_validation_checks_required_test_allowlist_metadata() {
+    let artifact = fixture_artifact();
+    let required_test = &artifact.required_tests[0];
+    assert_eq!(
+        required_test.allowlist_policy_id.as_deref(),
+        Some("source-patch-preview-safe-local-checks-v1")
+    );
+    assert_eq!(
+        required_test.command,
+        "cargo test -p ouroforge-core validates_engine_expressiveness_v2_regression_seed_and_pack -- --nocapture"
+    );
+    assert!(!required_test.argv.is_empty());
+
+    validate_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default())
+        .expect("fixture requiredTests metadata is allowlisted");
+}
+
+#[test]
+fn source_patch_preview_validation_blocks_forbidden_required_test_metadata() {
+    let mut artifact = fixture_artifact();
+    artifact.required_tests[0].command = "curl https://example.invalid".to_string();
+    artifact.required_tests[0].argv =
+        vec!["curl".to_string(), "https://example.invalid".to_string()];
+    artifact.required_tests[0].allowlist_policy_id =
+        Some("source-patch-preview-safe-local-checks-v1".to_string());
+
+    let validation =
+        inspect_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default());
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("requiredTests command forbidden")
+            && reason.contains("network")));
+}
+
+#[test]
+fn source_patch_preview_validation_blocks_required_test_command_argv_drift() {
+    let mut artifact = fixture_artifact();
+    artifact.required_tests[0].command = "cargo test".to_string();
+
+    let validation =
+        inspect_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default());
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("must match normalized argv")));
+}
+
+#[test]
 fn source_patch_preview_validation_blocks_missing_evidence_and_tests() {
     let mut artifact = fixture_artifact();
     artifact.linked_evidence.clear();

@@ -10338,6 +10338,14 @@ pub struct SourcePatchPreviewEvidenceRef {
 #[serde(deny_unknown_fields)]
 pub struct SourcePatchPreviewRequiredTest {
     pub command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub argv: Vec<String>,
+    #[serde(
+        rename = "allowlistPolicyId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub allowlist_policy_id: Option<String>,
     #[serde(rename = "executionAuthority")]
     pub execution_authority: String,
 }
@@ -11299,6 +11307,48 @@ pub fn inspect_source_patch_preview_artifact(
                 "required test command '{}' must remain copyable/not_executed metadata",
                 required_test.command
             ));
+        }
+        if let Some(policy_id) = &required_test.allowlist_policy_id {
+            if policy_id.trim().is_empty() {
+                blocked_reasons
+                    .push("requiredTests allowlistPolicyId must not be empty".to_string());
+            }
+            if policy_id != "source-patch-preview-safe-local-checks-v1" {
+                blocked_reasons.push(format!(
+                    "requiredTests allowlistPolicyId {policy_id} is unsupported"
+                ));
+            }
+            if required_test.argv.is_empty() {
+                blocked_reasons.push(
+                    "requiredTests argv required when allowlistPolicyId is present".to_string(),
+                );
+            }
+        }
+        if !required_test.argv.is_empty() {
+            let normalized = normalize_source_patch_test_command(&required_test.argv);
+            if required_test.command != normalized {
+                blocked_reasons.push(format!(
+                    "requiredTests command must match normalized argv `{normalized}`"
+                ));
+            }
+            let command = SourcePatchTestCommand {
+                command: required_test.command.clone(),
+                argv: required_test.argv.clone(),
+            };
+            if let Some(forbidden) = classify_source_patch_forbidden_test_command(&command) {
+                blocked_reasons.push(format!(
+                    "requiredTests command forbidden by allowlist policy: {}",
+                    forbidden.reason
+                ));
+            } else if default_source_patch_test_command_allowlist()
+                .match_command(&command)
+                .is_none()
+            {
+                blocked_reasons.push(
+                    "requiredTests command is not in the source patch test command allowlist"
+                        .to_string(),
+                );
+            }
         }
     }
 
