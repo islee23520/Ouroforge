@@ -3466,6 +3466,115 @@ pub struct AgentWorkPackageAcceptanceCriterion {
     pub evidence_refs: Vec<AuthoringLoopArtifactRef>,
 }
 
+pub const AGENT_WORK_PACKAGE_READ_MODEL_SCHEMA_VERSION: &str = "agent-work-package-read-model-v1";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AgentWorkPackageReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "workPackageId")]
+    pub work_package_id: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub role: String,
+    pub status: String,
+    #[serde(rename = "allowedArtifactCount")]
+    pub allowed_artifact_count: usize,
+    #[serde(rename = "acceptanceCriterionCount")]
+    pub acceptance_criterion_count: usize,
+    #[serde(rename = "expectedEvidenceCount")]
+    pub expected_evidence_count: usize,
+    #[serde(rename = "verificationCommandCount")]
+    pub verification_command_count: usize,
+    pub blockers: Vec<String>,
+    #[serde(rename = "ownershipRefs")]
+    pub ownership_refs: Vec<String>,
+    #[serde(rename = "handoffTargetPath")]
+    pub handoff_target_path: String,
+    #[serde(rename = "stateSnapshotPath", skip_serializing_if = "Option::is_none")]
+    pub state_snapshot_path: Option<String>,
+    #[serde(rename = "malformedReasons")]
+    pub malformed_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn agent_work_package_read_model_from_json_str(input: &str) -> AgentWorkPackageReadModel {
+    match AgentWorkPackage::from_json_str(input) {
+        Ok(package) => AgentWorkPackageReadModel::from_package(&package),
+        Err(error) => AgentWorkPackageReadModel::malformed(format!("{error:#}")),
+    }
+}
+
+impl AgentWorkPackageReadModel {
+    pub fn from_package(package: &AgentWorkPackage) -> Self {
+        let blockers = if package.blocked_reasons.is_empty() {
+            Vec::new()
+        } else {
+            package
+                .blocked_reasons
+                .iter()
+                .map(|reason| format!("{}: {reason}", package.work_package_id))
+                .collect()
+        };
+        Self {
+            schema_version: AGENT_WORK_PACKAGE_READ_MODEL_SCHEMA_VERSION.to_string(),
+            work_package_id: package.work_package_id.clone(),
+            task_id: package.task_id.clone(),
+            role: package.role.clone(),
+            status: package.status.as_str().to_string(),
+            allowed_artifact_count: package.allowed_artifacts.len(),
+            acceptance_criterion_count: package.acceptance_criteria.len(),
+            expected_evidence_count: package.expected_evidence.len(),
+            verification_command_count: package.verification_commands.len(),
+            blockers,
+            ownership_refs: package
+                .ownership_refs
+                .iter()
+                .map(|reference| reference.path.clone())
+                .collect(),
+            handoff_target_path: package.handoff_target.path.clone(),
+            state_snapshot_path: package
+                .state_snapshot_ref
+                .as_ref()
+                .map(|reference| reference.path.clone()),
+            malformed_reasons: Vec::new(),
+            boundary: "Read-only agent work package summary; it reports status, blockers, evidence counts, ownership refs, and handoff target without executing commands, spawning hidden agents, applying changes, writing trusted browser state, auto-merging, or self-approving.".to_string(),
+        }
+    }
+
+    fn malformed(reason: String) -> Self {
+        Self {
+            schema_version: AGENT_WORK_PACKAGE_READ_MODEL_SCHEMA_VERSION.to_string(),
+            work_package_id: "malformed-agent-work-package".to_string(),
+            task_id: "malformed-agent-work-package".to_string(),
+            role: "unknown".to_string(),
+            status: "malformed".to_string(),
+            allowed_artifact_count: 0,
+            acceptance_criterion_count: 0,
+            expected_evidence_count: 0,
+            verification_command_count: 0,
+            blockers: Vec::new(),
+            ownership_refs: Vec::new(),
+            handoff_target_path: String::new(),
+            state_snapshot_path: None,
+            malformed_reasons: vec![reason],
+            boundary: "Read-only malformed agent work package summary; it reports validation errors without executing commands, spawning agents, applying changes, writing trusted state, auto-merging, or self-approving.".to_string(),
+        }
+    }
+}
+
+impl AgentWorkPackageStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentWorkPackageStatus::Assigned => "assigned",
+            AgentWorkPackageStatus::Blocked => "blocked",
+            AgentWorkPackageStatus::Stale => "stale",
+            AgentWorkPackageStatus::ReadyForReview => "ready-for-review",
+            AgentWorkPackageStatus::Completed => "completed",
+        }
+    }
+}
+
 impl AgentWorkPackage {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let package: AgentWorkPackage = serde_json::from_str(input)?;
@@ -41811,6 +41920,61 @@ scenarios:
         let stale_error = AgentWorkPackage::from_json_str(&stale_without_snapshot.to_string())
             .expect_err("stale package without snapshot rejects package");
         assert!(stale_error.to_string().contains("stateSnapshotRef"));
+    }
+
+    #[test]
+    fn agent_work_package_read_model_reports_status_blockers_and_malformed_state() {
+        let ready = agent_work_package_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.ready-for-review.fixture.json",
+        ));
+        assert_eq!(
+            ready.schema_version,
+            AGENT_WORK_PACKAGE_READ_MODEL_SCHEMA_VERSION
+        );
+        assert_eq!(
+            ready.work_package_id,
+            "work-package-scene-design-ready-review"
+        );
+        assert_eq!(ready.status, "ready-for-review");
+        assert_eq!(ready.acceptance_criterion_count, 2);
+        assert_eq!(ready.verification_command_count, 1);
+        assert!(ready.blockers.is_empty());
+        assert!(ready
+            .ownership_refs
+            .iter()
+            .any(|path| path.contains("ownership-policy.no-conflict")));
+        assert!(ready.handoff_target_path.contains("agent-handoff-v2.valid"));
+        assert!(ready
+            .boundary
+            .contains("Read-only agent work package summary"));
+
+        let blocked = agent_work_package_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.blocked.fixture.json",
+        ));
+        assert_eq!(blocked.status, "blocked");
+        assert!(blocked
+            .blockers
+            .iter()
+            .any(|reason| reason.contains("ownership evidence")));
+
+        let stale = agent_work_package_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.stale.fixture.json",
+        ));
+        assert_eq!(stale.status, "stale");
+        assert!(stale
+            .state_snapshot_path
+            .as_deref()
+            .is_some_and(|path| path.contains("demo-state-snapshot.fixture.json")));
+
+        let malformed = agent_work_package_read_model_from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-work-package.invalid.fixture.json",
+        ));
+        assert_eq!(malformed.status, "malformed");
+        assert!(malformed
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("acceptanceCriteria")));
+        assert!(malformed.boundary.contains("validation errors"));
     }
 
     #[test]

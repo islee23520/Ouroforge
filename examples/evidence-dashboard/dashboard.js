@@ -1407,6 +1407,52 @@ const OuroforgeDashboard = (() => {
     return `<section class="panel ownership-policies"><h3>Ownership policy</h3><div class="artifact-grid">${cards}</div></section>`;
   }
 
+  function normalizeAgentWorkPackages(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderAgentWorkPackages(value = null) {
+    const packages = normalizeAgentWorkPackages(value);
+    if (!packages.length) {
+      return '<section class="panel agent-work-packages"><h3>Agent work package</h3><p class="empty-state">No agent work package is attached to this dashboard data.</p></section>';
+    }
+    const cards = packages.map((pkg) => {
+      const status = pkg.status || 'unknown';
+      const allowed = Array.isArray(pkg.allowedArtifacts) ? pkg.allowedArtifacts : [];
+      const criteria = Array.isArray(pkg.acceptanceCriteria) ? pkg.acceptanceCriteria : [];
+      const commands = Array.isArray(pkg.verificationCommands) ? pkg.verificationCommands : [];
+      const expected = Array.isArray(pkg.expectedEvidence) ? pkg.expectedEvidence : [];
+      const ownership = Array.isArray(pkg.ownershipRefs) ? pkg.ownershipRefs : [];
+      const forbidden = Array.isArray(pkg.forbiddenActions) ? pkg.forbiddenActions : [];
+      const blockers = Array.isArray(pkg.blockedReasons) ? pkg.blockedReasons : Array.isArray(pkg.blockers) ? pkg.blockers : [];
+      const malformed = Array.isArray(pkg.malformedReasons) ? pkg.malformedReasons : [];
+      const criterionRows = criteria.length ? criteria.map((criterion) => `<li><strong>${escapeText(criterion.id || 'criterion')}</strong>: ${escapeText(criterion.description || 'missing description')}<br><span class="run-meta">Evidence: ${escapeText((Array.isArray(criterion.evidenceRefs) ? criterion.evidenceRefs : []).map((ref) => ref.path || ref.id || 'ref').join(' · ') || 'missing')}</span></li>`).join('') : '<li class="artifact-warning">Missing or malformed acceptance criteria.</li>';
+      const commandText = commands.map((command) => command.command || '').filter(Boolean).join(' · ') || 'missing';
+      const ownershipText = ownership.map((ref) => typeof ref === 'string' ? ref : ref.path || ref.id || 'ref').join(' · ') || 'missing';
+      const expectedText = expected.map((ref) => typeof ref === 'string' ? ref : ref.path || ref.id || 'ref').join(' · ') || 'missing';
+      const allowedText = allowed.map((ref) => ref.path || ref.id || 'artifact').join(' · ') || 'missing';
+      const handoff = pkg.handoffTarget?.path || pkg.handoffTargetPath || pkg.handoffTarget?.id || 'missing';
+      return `<article class="artifact agent-work-package">
+        <h4>${escapeText(pkg.workPackageId || 'unknown-work-package')}</h4>
+        <p class="run-meta">Read-only agent work package. The dashboard displays status, blockers, expected evidence, ownership refs, and handoff target only; it does not execute commands, spawn hidden agents, apply changes, write trusted browser state, auto-merge, or self-approve.</p>
+        <div class="run-meta">Schema: ${escapeText(pkg.schemaVersion || 'unknown')} · task ${escapeText(pkg.taskId || 'unknown')} · role ${escapeText(pkg.role || 'unknown-role')} · <span class="${statusClass(status)}">${escapeText(status)}</span></div>
+        ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${malformed.length ? `<div class="artifact-warning">Malformed: ${escapeText(malformed.join(' · '))}</div>` : ''}
+        <div class="run-meta">Allowed artifacts: ${escapeText(allowedText)}</div>
+        <div class="run-meta">Expected evidence: ${escapeText(expectedText)}</div>
+        <div class="run-meta">Ownership refs: ${escapeText(ownershipText)}</div>
+        <div class="run-meta">Handoff target: ${escapeText(handoff)}</div>
+        <div class="run-meta">Inert verification command text: ${escapeText(commandText)}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'missing')}</div>
+        <h5>Acceptance criteria</h5><ul>${criterionRows}</ul>
+        <p class="run-meta">${escapeText(pkg.boundary || 'Agent work package display is read-only and command-inert.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel agent-work-packages"><h3>Agent work package</h3><div class="artifact-grid">${cards}</div></section>`;
+  }
+
   function normalizeAgentRoleModels(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1735,6 +1781,7 @@ const OuroforgeDashboard = (() => {
       ${renderProductionTaskBoards(run.production_task_boards || run.productionTaskBoards || run.production_task_board || run.productionTaskBoard || null)}
       ${renderOwnershipPolicies(run.ownership_policies || run.ownershipPolicies || run.ownership_policy || run.ownershipPolicy || null)}
       ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
+      ${renderAgentWorkPackages(run.agent_work_packages || run.agentWorkPackages || run.agent_work_package || run.agentWorkPackage || null)}
       ${renderAgentHandoffs(agentHandoffs || [
         ...normalizeAgentHandoffs(run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null),
         ...normalizeAgentHandoffs(run.agent_handoff_v2s || run.agentHandoffV2s || null),
@@ -1812,7 +1859,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

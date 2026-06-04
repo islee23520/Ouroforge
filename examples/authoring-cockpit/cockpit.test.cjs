@@ -1386,6 +1386,24 @@ assert.doesNotMatch(cockpit.renderAgentRoleModelSurface({ agent_role_model: { sc
 assert.match(cockpit.renderEvidencePane(run), /Agent role model/);
 assert.match(cockpit.renderAgentRoleModelSurface({}), /No agent role model/);
 
+const agentWorkPackageFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-work-package.blocked.fixture.json', 'utf8'));
+const malformedAgentWorkPackage = { schemaVersion: 'agent-work-package-read-model-v1', workPackageId: '<script>bad</script>', status: 'malformed', malformedReasons: ['acceptanceCriteria missing'], blockers: ['blocked <unsafe>'] };
+run.agent_work_package = agentWorkPackageFixture;
+const workPackageMarkup = cockpit.renderAgentWorkPackageSurface(run);
+assert.match(workPackageMarkup, /Agent work package/);
+assert.match(workPackageMarkup, /work-package-scene-design-blocked/);
+assert.match(workPackageMarkup, /ownership evidence must be reviewed/);
+assert.match(workPackageMarkup, /Inert verification command text/);
+assert.match(workPackageMarkup, /agent-handoff-v2.valid.fixture.json/);
+assert.match(workPackageMarkup, /Read-only agent work package surface/);
+assert.doesNotMatch(workPackageMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const malformedWorkPackageMarkup = cockpit.renderAgentWorkPackageSurface({ agent_work_package: malformedAgentWorkPackage });
+assert.match(malformedWorkPackageMarkup, /Malformed: acceptanceCriteria missing/);
+assert.match(malformedWorkPackageMarkup, /&lt;script&gt;bad&lt;\/script&gt;/);
+assert.doesNotMatch(malformedWorkPackageMarkup, /<script>bad<\/script>/);
+assert.match(cockpit.renderEvidencePane(run), /Agent work package/);
+assert.match(cockpit.renderAgentWorkPackageSurface({}), /No agent work package/);
+
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
 assert.match(cockpit.renderAgentHandoffSurface(run), /blocked/);
 assert.match(cockpit.renderAgentHandoffSurface(run), /&lt;handoff-loop&gt;/);
