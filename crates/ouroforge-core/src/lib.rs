@@ -9879,6 +9879,277 @@ pub fn validate_qa_worker_assignment_refs(
 
 const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1";
 const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
+const RUNTIME_STATE_SCHEMA_VERSION: &str = "runtime-state-v1";
+const RUNTIME_SAVE_ARTIFACT_SCHEMA_VERSION: &str = "runtime-save-artifact-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeStateV1 {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "stateId")]
+    pub state_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub tick: u64,
+    #[serde(rename = "recordedAtUnixMs")]
+    pub recorded_at_unix_ms: u128,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub flags: BTreeMap<String, bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inventory: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub progress: BTreeMap<String, i64>,
+    #[serde(default)]
+    pub entities: Vec<RuntimeStateEntity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
+    pub digest: RuntimeStateDigest,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeStateEntity {
+    #[serde(rename = "entityId")]
+    pub entity_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub velocity: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeStateDigest {
+    pub algorithm: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeSaveArtifactV1 {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "saveId")]
+    pub save_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "slotId")]
+    pub slot_id: String,
+    #[serde(rename = "createdAtUnixMs")]
+    pub created_at_unix_ms: u128,
+    pub state: RuntimeStateV1,
+    pub policy: RuntimeSaveGeneratedStatePolicy,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeSaveGeneratedStatePolicy {
+    #[serde(rename = "artifactPath")]
+    pub artifact_path: String,
+    #[serde(rename = "rootKind")]
+    pub root_kind: RuntimeSaveRootKind,
+    #[serde(rename = "trustedWriter")]
+    pub trusted_writer: String,
+    #[serde(rename = "browserWriteAccess")]
+    pub browser_write_access: RuntimeSaveBrowserWriteAccess,
+    #[serde(rename = "retention")]
+    pub retention: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeSaveRootKind {
+    GeneratedEvidence,
+    LocalGeneratedState,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeSaveBrowserWriteAccess {
+    None,
+    DraftOnly,
+}
+
+impl RuntimeStateV1 {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let state: RuntimeStateV1 =
+            serde_json::from_str(input).context("failed to parse Runtime State JSON")?;
+        state.validate()?;
+        Ok(state)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_STATE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "runtime state schemaVersion must be {RUNTIME_STATE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("runtime state stateId", &self.state_id)?;
+        validate_path_component("runtime state runId", &self.run_id)?;
+        if let Some(scenario_id) = &self.scenario_id {
+            validate_path_component("runtime state scenarioId", scenario_id)?;
+        }
+        validate_path_component("runtime state sceneId", &self.scene_id)?;
+        if self.entities.is_empty() {
+            return Err(anyhow!("runtime state entities must not be empty"));
+        }
+        let mut entity_ids = BTreeSet::new();
+        for (index, entity) in self.entities.iter().enumerate() {
+            entity.validate(index)?;
+            if !entity_ids.insert(entity.entity_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate runtime state entityId: {}",
+                    entity.entity_id
+                ));
+            }
+        }
+        validate_unique_path_components("runtime state", "inventory", &self.inventory)?;
+        for item in &self.inventory {
+            validate_path_component("runtime state inventory item", item)?;
+        }
+        for flag in self.flags.keys() {
+            validate_path_component("runtime state flag", flag)?;
+        }
+        for progress_key in self.progress.keys() {
+            validate_path_component("runtime state progress key", progress_key)?;
+        }
+        self.digest.validate("runtime state digest")?;
+        Ok(())
+    }
+}
+
+impl RuntimeStateEntity {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("runtime state entities[{index}].entityId"),
+            &self.entity_id,
+        )
+    }
+}
+
+impl RuntimeStateDigest {
+    fn validate(&self, field: &str) -> Result<()> {
+        if self.algorithm != "fnv1a64-canonical-json-v1" {
+            return Err(anyhow!(
+                "{field} algorithm must be fnv1a64-canonical-json-v1"
+            ));
+        }
+        require_text(&format!("{field} value"), &self.value)?;
+        if self.value.len() != 16 || !self.value.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(anyhow!("{field} value must be a 16 character hex digest"));
+        }
+        Ok(())
+    }
+}
+
+impl RuntimeSaveArtifactV1 {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: RuntimeSaveArtifactV1 =
+            serde_json::from_str(input).context("failed to parse Runtime Save Artifact JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != RUNTIME_SAVE_ARTIFACT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "runtime save artifact schemaVersion must be {RUNTIME_SAVE_ARTIFACT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("runtime save artifact saveId", &self.save_id)?;
+        validate_path_component("runtime save artifact runId", &self.run_id)?;
+        validate_path_component("runtime save artifact slotId", &self.slot_id)?;
+        self.state
+            .validate()
+            .context("runtime save artifact state is invalid")?;
+        if self.state.run_id != self.run_id {
+            return Err(anyhow!(
+                "runtime save artifact runId must match state runId"
+            ));
+        }
+        self.policy.validate()?;
+        Ok(())
+    }
+}
+
+impl RuntimeSaveGeneratedStatePolicy {
+    fn validate(&self) -> Result<()> {
+        match self.root_kind {
+            RuntimeSaveRootKind::GeneratedEvidence => {
+                validate_evidence_artifact_path(&self.artifact_path)?;
+                if !self
+                    .artifact_path
+                    .starts_with("evidence/runtime-state/saves/")
+                    || !self.artifact_path.ends_with(".save.json")
+                {
+                    return Err(anyhow!(
+                        "runtime save policy artifactPath must be evidence/runtime-state/saves/<slot>.save.json for generated evidence"
+                    ));
+                }
+            }
+            RuntimeSaveRootKind::LocalGeneratedState => {
+                validate_runtime_save_local_generated_path(&self.artifact_path)?;
+            }
+        }
+        if self.trusted_writer != "rust-local-runtime-save-v1" {
+            return Err(anyhow!(
+                "runtime save policy trustedWriter must be rust-local-runtime-save-v1"
+            ));
+        }
+        if self.browser_write_access != RuntimeSaveBrowserWriteAccess::None {
+            return Err(anyhow!(
+                "runtime save policy browserWriteAccess must be none for trusted save artifacts"
+            ));
+        }
+        require_text("runtime save policy retention", &self.retention)?;
+        Ok(())
+    }
+}
+
+fn validate_runtime_save_local_generated_path(path: &str) -> Result<()> {
+    require_text("runtime save policy artifactPath", path)?;
+    if !(path.starts_with("runs/") || path.starts_with(".omx/")) {
+        return Err(anyhow!(
+            "runtime save policy local generated artifactPath must start with runs/ or .omx/"
+        ));
+    }
+    if path.contains('\\') {
+        return Err(anyhow!(
+            "runtime save policy local generated artifactPath must not contain backslash separators"
+        ));
+    }
+    let candidate = Path::new(path);
+    if candidate.is_absolute() {
+        return Err(anyhow!(
+            "runtime save policy local generated artifactPath must be relative"
+        ));
+    }
+    for component in candidate.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "runtime save policy local generated artifactPath must stay inside its generated root"
+                ));
+            }
+        }
+    }
+    if !path.ends_with(".save.json") {
+        return Err(anyhow!(
+            "runtime save policy local generated artifactPath must end with .save.json"
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -45935,6 +46206,89 @@ scenarios:
         assert_eq!(summary.passed_count, 1);
         assert_eq!(summary.failed_count, 1);
         assert_eq!(summary.unsupported_count, 1);
+    }
+
+    #[test]
+    fn runtime_state_save_v1_accepts_schema_fixture_and_policy_boundary() {
+        let artifact = RuntimeSaveArtifactV1::from_json_str(include_str!(
+            "../../../examples/runtime-state-save-v1/valid/runtime-save.sample.json"
+        ))
+        .expect("runtime save fixture validates");
+
+        assert_eq!(artifact.schema_version, "runtime-save-artifact-v1");
+        assert_eq!(artifact.state.schema_version, "runtime-state-v1");
+        assert_eq!(artifact.state.scene_id, "foundation-scene");
+        assert_eq!(artifact.state.entities[0].entity_id, "player");
+        assert_eq!(
+            artifact.policy.root_kind,
+            RuntimeSaveRootKind::GeneratedEvidence
+        );
+        assert_eq!(
+            artifact.policy.browser_write_access,
+            RuntimeSaveBrowserWriteAccess::None
+        );
+    }
+
+    #[test]
+    fn runtime_state_save_v1_rejects_browser_writers_and_source_like_paths() {
+        let browser_writer = RuntimeSaveArtifactV1::from_json_str(include_str!(
+            "../../../examples/runtime-state-save-v1/invalid/browser-writer-save.json"
+        ))
+        .expect_err("browser trusted writer rejected");
+        assert!(
+            browser_writer.to_string().contains("trustedWriter")
+                || browser_writer.to_string().contains("browserWriteAccess"),
+            "unexpected error: {browser_writer:#}"
+        );
+
+        let source_like_path = RuntimeSaveArtifactV1::from_json_str(include_str!(
+            "../../../examples/runtime-state-save-v1/invalid/source-like-path-save.json"
+        ))
+        .expect_err("source-like generated save path rejected");
+        assert!(
+            source_like_path
+                .to_string()
+                .contains("evidence artifact path")
+                || source_like_path.to_string().contains("artifactPath"),
+            "unexpected error: {source_like_path:#}"
+        );
+    }
+
+    #[test]
+    fn runtime_state_v1_rejects_duplicate_entities_and_bad_digests() {
+        let duplicate_entities = RuntimeStateV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-state-v1",
+                "stateId": "state-1",
+                "runId": "run-1",
+                "sceneId": "scene-1",
+                "tick": 1,
+                "recordedAtUnixMs": 1780592000000u128,
+                "entities": [{ "entityId": "player" }, { "entityId": "player" }],
+                "digest": { "algorithm": "fnv1a64-canonical-json-v1", "value": "0123456789abcdef" }
+            })
+            .to_string(),
+        )
+        .expect_err("duplicate entity ids rejected");
+        assert!(duplicate_entities
+            .to_string()
+            .contains("duplicate runtime state entityId"));
+
+        let bad_digest = RuntimeStateV1::from_json_str(
+            &json!({
+                "schemaVersion": "runtime-state-v1",
+                "stateId": "state-1",
+                "runId": "run-1",
+                "sceneId": "scene-1",
+                "tick": 1,
+                "recordedAtUnixMs": 1780592000000u128,
+                "entities": [{ "entityId": "player" }],
+                "digest": { "algorithm": "sha256", "value": "not-a-digest" }
+            })
+            .to_string(),
+        )
+        .expect_err("unsupported digest algorithm rejected");
+        assert!(bad_digest.to_string().contains("digest algorithm"));
     }
 
     #[test]
