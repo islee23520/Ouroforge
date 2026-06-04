@@ -6962,28 +6962,41 @@ pub fn validate_qa_worker_assignment_refs(
                     assignment.target.evidence_ref
                 )
             })?;
-        if let Some(run_id) = json_string(&value, "runId").or_else(|| json_string(&value, "run_id"))
-        {
-            if run_id != artifact.run_id {
-                return Err(anyhow!(
-                    "qa worker assignments[{index}].target.evidenceRef is stale for runId {} (expected {})",
-                    run_id,
-                    artifact.run_id
-                ));
-            }
+        // Fail closed: target evidence must carry a run identity so freshness can
+        // actually be proven. Accepting an artifact with no runId/run_id would let
+        // an unversioned or stale target pass as current-run planning evidence.
+        let run_id = json_string(&value, "runId")
+            .or_else(|| json_string(&value, "run_id"))
+            .ok_or_else(|| {
+                anyhow!(
+                    "qa worker assignments[{index}].target.evidenceRef is missing a runId/run_id needed to prove freshness"
+                )
+            })?;
+        if run_id != artifact.run_id {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].target.evidenceRef is stale for runId {} (expected {})",
+                run_id,
+                artifact.run_id
+            ));
         }
+        // Fail closed: target evidence must carry a target identity so target-id
+        // drift can be rejected. Accepting an artifact with no recognized identity
+        // field would let it validate against any assignment targetId.
         let target_id = json_string(&value, "targetId")
             .or_else(|| json_string(&value, "target_id"))
             .or_else(|| json_string(&value, "scenarioId"))
             .or_else(|| json_string(&value, "scenario_id"))
-            .or_else(|| json_string(&value, "id"));
-        if let Some(target_id) = target_id {
-            if target_id != assignment.target.target_id {
-                return Err(anyhow!(
-                    "qa worker assignments[{index}].target.evidenceRef target id {target_id} does not match assignment targetId {}",
-                    assignment.target.target_id
-                ));
-            }
+            .or_else(|| json_string(&value, "id"))
+            .ok_or_else(|| {
+                anyhow!(
+                    "qa worker assignments[{index}].target.evidenceRef is missing a target identity field needed to reject target-id drift"
+                )
+            })?;
+        if target_id != assignment.target.target_id {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].target.evidenceRef target id {target_id} does not match assignment targetId {}",
+                assignment.target.target_id
+            ));
         }
     }
     Ok(())
@@ -39393,6 +39406,35 @@ scenarios:
         let stale_error = validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
             .expect_err("stale run refs are rejected");
         assert!(stale_error.to_string().contains("stale"));
+
+        // Fail closed: target evidence missing run identity cannot prove freshness.
+        write_json(
+            &artifacts.run_dir.join(stale_path),
+            &json!({
+                "targetId": assignment.assignments[0].target.target_id,
+                "artifact": "qa_worker_target_fixture"
+            }),
+        )
+        .expect("missing-runId target fixture writes");
+        let missing_run_error = validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
+            .expect_err("target evidence without runId is rejected");
+        assert!(missing_run_error.to_string().contains("missing a runId/run_id"));
+
+        // Fail closed: target evidence missing target identity cannot reject drift.
+        write_json(
+            &artifacts.run_dir.join(stale_path),
+            &json!({
+                "runId": assignment.run_id,
+                "artifact": "qa_worker_target_fixture"
+            }),
+        )
+        .expect("missing-targetId target fixture writes");
+        let missing_target_error =
+            validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
+                .expect_err("target evidence without target identity is rejected");
+        assert!(missing_target_error
+            .to_string()
+            .contains("missing a target identity field"));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
