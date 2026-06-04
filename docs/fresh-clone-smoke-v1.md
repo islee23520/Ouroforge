@@ -47,8 +47,11 @@ OUROFORGE_FRESH_CLONE_WORKERS=2 \
 ```
 
 `OUROFORGE_FRESH_CLONE_WORKERS` must be at least `2` so browser/scenario evidence
-is generated. `CARGO_TARGET_DIR` may be set by the caller; otherwise the script
-uses `<work-dir>/target` so build output stays outside the maintainer worktree.
+is generated. `CARGO_TARGET_DIR` may be set by the caller for an external build
+cache, but it must stay outside the repository; otherwise the script uses
+`<work-dir>/target` so build output stays inside the smoke work directory. The
+wrapper snapshots the maintainer worktree generated-state roots before and after
+the smoke and fails if their ignored/tracked status changes.
 
 ## Commands exercised
 
@@ -69,8 +72,8 @@ node --check examples/authoring-cockpit/cockpit.js
 node examples/authoring-cockpit/cockpit.test.cjs
 ```
 
-It then audits the maintainer worktree to confirm `runs/` and
-`examples/evidence-dashboard/dashboard-data.json` were not changed by the smoke.
+It then audits the maintainer worktree generated-state roots to confirm the
+smoke did not change their ignored/tracked status.
 
 ## Expected generated output
 

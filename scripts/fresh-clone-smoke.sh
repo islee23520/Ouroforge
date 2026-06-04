@@ -116,6 +116,24 @@ CLONE_DIR="$WORK_DIR/repo"
 GENERATED_DIR="$WORK_DIR/generated"
 mkdir -p "$CLONE_DIR" "$GENERATED_DIR"
 
+GENERATED_STATE_PATHS=(
+  runs
+  target
+  .omx
+  .omc
+  .openchrome
+  .claude
+  examples/evidence-dashboard/dashboard-data.json
+)
+REPO_GENERATED_STATE_BEFORE="$GENERATED_DIR/maintainer-generated-state-before.txt"
+REPO_GENERATED_STATE_AFTER="$GENERATED_DIR/maintainer-generated-state-after.txt"
+
+snapshot_repo_generated_state() {
+  git -C "$REPO_ROOT" status --short --ignored -- "${GENERATED_STATE_PATHS[@]}" | sort
+}
+
+snapshot_repo_generated_state >"$REPO_GENERATED_STATE_BEFORE"
+
 log "Fresh-clone-style workspace"
 echo "source_repo=$REPO_ROOT"
 echo "work_dir=$WORK_DIR"
@@ -189,10 +207,10 @@ run_and_capture cockpit-node-check node --check examples/authoring-cockpit/cockp
 run_and_capture cockpit-node-test node examples/authoring-cockpit/cockpit.test.cjs
 
 log "Maintainer worktree generated-state audit"
-repo_generated_state=$(git -C "$REPO_ROOT" status --short -- runs examples/evidence-dashboard/dashboard-data.json)
-if [[ -n "$repo_generated_state" ]]; then
-  echo "error: maintainer worktree generated-state paths changed unexpectedly" >&2
-  echo "$repo_generated_state" >&2
+snapshot_repo_generated_state >"$REPO_GENERATED_STATE_AFTER"
+if ! diff -u "$REPO_GENERATED_STATE_BEFORE" "$REPO_GENERATED_STATE_AFTER" >"$GENERATED_DIR/maintainer-generated-state.diff"; then
+  echo "error: maintainer generated-state status changed unexpectedly" >&2
+  cat "$GENERATED_DIR/maintainer-generated-state.diff" >&2
   exit 1
 fi
 
@@ -207,6 +225,8 @@ workers=$WORKERS
 cargo_target_dir=$CARGO_TARGET_DIR
 run_count=$run_count
 dashboard_data=$GENERATED_DIR/dashboard-data.json
+maintainer_generated_state_before=$REPO_GENERATED_STATE_BEFORE
+maintainer_generated_state_after=$REPO_GENERATED_STATE_AFTER
 non_goals=not installed, not published, not merged, no visibility change, no source apply, no browser trusted writes
 SUMMARY
 cat "$GENERATED_DIR/fresh-clone-smoke-summary.txt"

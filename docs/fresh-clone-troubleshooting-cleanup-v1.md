@@ -79,8 +79,10 @@ Use this audit after a smoke or quickstart run:
 git status --short --ignored
 ```
 
-Expected generated/local entries may appear with `!!`. Tracked source changes or
-unignored generated files should be investigated before opening a PR.
+Expected generated/local entries may appear with `!!`. The fresh-clone smoke
+snapshots these generated-state roots before and after execution and fails if
+their ignored/tracked status changes. Tracked source changes or unignored
+generated files should be investigated before opening a PR.
 
 ## Cleanup commands
 
