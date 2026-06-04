@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "source-patch-apply-transaction-v1",
+  "transactionId": "apply-transaction-702-sa15-4-1",
+  "createdAt": "2026-06-04T00:00:00Z",
+  "status": "blocked",
+  "evidence": {
+    "patchPreviewId": "patch-preview-702-sa15-4-1",
+    "patchPreviewRef": "mutation/source-patch-previews/patch-preview-702-sa15-4-1.json",
+    "sandboxReportId": "sandbox-report-702-sa15-4-1",
+    "sandboxReportRef": "sandbox/patch-preview-702-sa15-4-1/evidence/report.json",
+    "reviewDecisionId": "review-decision-702-sa15-4-1",
+    "reviewDecisionRef": "reviews/source-patch/review-decision-702-sa15-4-1.json",
+    "fileClassReportId": "file-class-report-702-sa15-4-1",
+    "fileClassReportRef": "evidence/source-file-class-report-702-sa15-4-1.json",
+    "diffIntegrityReportId": "diff-integrity-report-702-sa15-4-1",
+    "diffIntegrityReportRef": "evidence/patch-diff-integrity-report-702-sa15-4-1.json"
+  },
+  "baseRef": {
+    "branch": "main",
+    "previewCommit": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
+    "trustedApplyCommit": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
+    "staleTargetPolicy": "trusted apply must re-read target hashes immediately before any future write"
+  },
+  "targets": [
+    {
+      "path": "crates/ouroforge-core/src/lib.rs",
+      "fileClass": "trusted_rust_source",
+      "reviewLevel": "independent_review_required",
+      "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "expectedAfterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sandboxAfterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "diffSummary": {
+    "summary": "Model-only transaction artifact fixture; no trusted apply command is present.",
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 0,
+    "diffIntegrityReportRef": "evidence/patch-diff-integrity-report-702-sa15-4-1.json"
+  },
+  "rollbackRef": {
+    "rollbackPlanRef": "rollback/source-patch/apply-transaction-702-sa15-4-1.json",
+    "preApplyBranch": "main",
+    "preApplyCommit": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
+    "targetBeforeHashes": [
+      {
+        "path": "crates/ouroforge-core/src/lib.rs",
+        "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ],
+    "cleanupPolicyRef": "sandbox/patch-preview-702-sa15-4-1/cleanup.json"
+  },
+  "verificationCommands": [
+    {
+      "command": "cargo test -p ouroforge-core source_patch_apply_transaction",
+      "argv": ["cargo", "test", "-p", "ouroforge-core", "source_patch_apply_transaction"],
+      "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
+      "executionAuthority": "copyable_not_executed_by_transaction_artifact",
+      "expectedStatus": "passed"
+    }
+  ],
+  "postApplyScenarioRefs": [
+    {
+      "kind": "post_apply_verification_plan",
+      "path": "evidence/post-apply/source-patch-apply-transaction-702-sa15-4-1.json",
+      "required": true
+    }
+  ],
+  "blockedReasons": [
+    "SA15.4.1 models the transaction artifact only; trusted apply remains future-scoped"
+  ],
+  "guardrails": [
+    "apply transaction artifacts do not apply patches, merge branches, or write trusted files",
+    "verification commands are copyable metadata and are not executed by the transaction artifact",
+    "browser/dashboard/Studio surfaces remain read-only and cannot run commands or trusted writes",
+    "dependency manifests, CI/workflows, build scripts, generated state, and credentials remain blocked unless separately authorized"
+  ]
+}

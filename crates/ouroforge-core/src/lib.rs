@@ -11630,6 +11630,155 @@ pub struct SourcePatchSandboxTestExecutionReport {
     pub guardrails: Vec<String>,
 }
 
+pub const SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION: &str = "source-patch-apply-transaction-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchApplyTransactionStatus {
+    Blocked,
+    ReadyForTrustedApply,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionEvidenceLinks {
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "patchPreviewRef")]
+    pub patch_preview_ref: String,
+    #[serde(rename = "sandboxReportId")]
+    pub sandbox_report_id: String,
+    #[serde(rename = "sandboxReportRef")]
+    pub sandbox_report_ref: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    #[serde(rename = "reviewDecisionRef")]
+    pub review_decision_ref: String,
+    #[serde(rename = "fileClassReportId")]
+    pub file_class_report_id: String,
+    #[serde(rename = "fileClassReportRef")]
+    pub file_class_report_ref: String,
+    #[serde(rename = "diffIntegrityReportId")]
+    pub diff_integrity_report_id: String,
+    #[serde(rename = "diffIntegrityReportRef")]
+    pub diff_integrity_report_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionBaseRef {
+    pub branch: String,
+    #[serde(rename = "previewCommit")]
+    pub preview_commit: String,
+    #[serde(rename = "trustedApplyCommit")]
+    pub trusted_apply_commit: String,
+    #[serde(rename = "staleTargetPolicy")]
+    pub stale_target_policy: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionTarget {
+    pub path: String,
+    #[serde(rename = "fileClass")]
+    pub file_class: String,
+    #[serde(rename = "reviewLevel")]
+    pub review_level: String,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "expectedAfterHash")]
+    pub expected_after_hash: String,
+    #[serde(rename = "sandboxAfterHash")]
+    pub sandbox_after_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionDiffSummary {
+    pub summary: String,
+    #[serde(rename = "filesChanged")]
+    pub files_changed: usize,
+    pub additions: usize,
+    pub deletions: usize,
+    #[serde(rename = "diffIntegrityReportRef")]
+    pub diff_integrity_report_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionTargetBeforeHash {
+    pub path: String,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionRollbackRef {
+    #[serde(rename = "rollbackPlanRef")]
+    pub rollback_plan_ref: String,
+    #[serde(rename = "preApplyBranch")]
+    pub pre_apply_branch: String,
+    #[serde(rename = "preApplyCommit")]
+    pub pre_apply_commit: String,
+    #[serde(rename = "targetBeforeHashes")]
+    pub target_before_hashes: Vec<SourcePatchApplyTransactionTargetBeforeHash>,
+    #[serde(rename = "cleanupPolicyRef")]
+    pub cleanup_policy_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyVerificationCommand {
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+    #[serde(rename = "executionAuthority")]
+    pub execution_authority: String,
+    #[serde(rename = "expectedStatus")]
+    pub expected_status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionPostApplyRef {
+    pub kind: String,
+    pub path: String,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    pub status: SourcePatchApplyTransactionStatus,
+    pub evidence: SourcePatchApplyTransactionEvidenceLinks,
+    #[serde(rename = "baseRef")]
+    pub base_ref: SourcePatchApplyTransactionBaseRef,
+    pub targets: Vec<SourcePatchApplyTransactionTarget>,
+    #[serde(rename = "diffSummary")]
+    pub diff_summary: SourcePatchApplyTransactionDiffSummary,
+    #[serde(rename = "rollbackRef")]
+    pub rollback_ref: SourcePatchApplyTransactionRollbackRef,
+    #[serde(rename = "verificationCommands")]
+    pub verification_commands: Vec<SourcePatchApplyVerificationCommand>,
+    #[serde(rename = "postApplyScenarioRefs")]
+    pub post_apply_scenario_refs: Vec<SourcePatchApplyTransactionPostApplyRef>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 pub fn inspect_source_patch_test_command_allowlist(
     artifact: &SourcePatchTestCommandAllowlistArtifact,
 ) -> SourcePatchTestCommandAllowlistValidation {
