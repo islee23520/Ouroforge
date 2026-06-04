@@ -1416,3 +1416,43 @@ assert.match(sourceMutationGovernanceHandoff, /Source Mutation Preview v1 is com
 assert.match(sourceMutationGovernanceHandoff, /Source patch apply to the trusted maintainer worktree remains blocked/);
 assert.match(sourceMutationGovernanceHandoff, /#1 and #23 remain open/);
 assert.doesNotMatch(sourceMutationGovernanceHandoff, /can apply patches|can merge branches|trusted file write control|executes commands from the browser/i);
+
+const productionBundleComplete = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json', 'utf8'));
+const productionBundlePartial = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-evidence-bundle.partial.fixture.json', 'utf8'));
+const productionBundleConflict = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-evidence-bundle.unresolved-conflict.fixture.json', 'utf8'));
+const productionBundleMissingReview = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/production-evidence-bundle.missing-review.fixture.json', 'utf8'));
+const productionBundleMarkup = dashboard.renderProductionEvidenceBundles([productionBundleComplete, productionBundlePartial, productionBundleConflict, productionBundleMissingReview]);
+assert.match(productionBundleMarkup, /Production evidence bundle/);
+assert.match(productionBundleMarkup, /demo-production-evidence-bundle/);
+assert.match(productionBundleMarkup, /demo-production-evidence-bundle-partial/);
+assert.match(productionBundleMarkup, /Missing refs: qaResultRefs\[0\] awaits fixture refresh/);
+assert.match(productionBundleMarkup, /ownership-conflict-demo:Two work packages claim the same generated output root/);
+assert.match(productionBundleMarkup, /missing-review-demo:reviewer/);
+assert.match(productionBundleMarkup, /task-board ·/);
+assert.match(productionBundleMarkup, /Generated roots: runs\/multi-agent-pipeline/);
+assert.match(productionBundleMarkup, /hidden background agents/);
+assert.match(productionBundleMarkup, /does not spawn agents/);
+assert.match(productionBundleMarkup, /does not spawn agents, execute commands, apply changes, auto-merge, self-approve, or write trusted state/);
+assert.doesNotMatch(productionBundleMarkup, /<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
+assert.match(dashboard.renderProductionEvidenceBundles(null), /No production evidence bundle is attached/);
+const productionBundleXssMarkup = dashboard.renderProductionEvidenceBundles({
+  bundleId: '<bundle-xss>',
+  milestone: '<script>milestone</script>',
+  status: 'blocked',
+  taskBoardRef: { id: '<task>', path: 'runs/<task>.json' },
+  laneOutputs: [{ lane: '<script>lane</script>', status: '<blocked>', blockedReasons: ['<img src=x>'] }],
+  missingRefs: ['<missing-ref>'],
+  staleRefs: ['<stale-ref>'],
+  blockedReasons: ['<blocked-reason>'],
+  malformedReasons: ['<malformed-reason>'],
+  unresolvedConflicts: [{ id: '<conflict>', summary: '<summary>' }],
+  missingReviews: [{ id: '<review>', requiredReviewerRole: '<reviewer>' }],
+  generatedState: { roots: ['runs/<generated>'] },
+  forbiddenActions: ['<execute-command>'],
+  boundary: '<script>browser writes</script>',
+});
+assert.match(productionBundleXssMarkup, /&lt;bundle-xss&gt;/);
+assert.match(productionBundleXssMarkup, /&lt;script&gt;lane&lt;\/script&gt;/);
+assert.doesNotMatch(productionBundleXssMarkup, /<script>|<img|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand/);
+assert.match(dashboard.renderRunDetail({ ...run, productionEvidenceBundle: productionBundleConflict }), /Production evidence bundle/);
+assert.match(dashboard.renderRunDetail({ ...run, productionEvidenceBundle: productionBundleConflict }), /ownership-conflict-demo/);

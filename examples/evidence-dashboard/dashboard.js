@@ -1365,6 +1365,71 @@ const OuroforgeDashboard = (() => {
     return [];
   }
 
+  function normalizeProductionEvidenceBundles(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function productionBundleRefCount(bundle) {
+    return [
+      bundle.taskBoardRef,
+      bundle.roleModelRef,
+      bundle.ownershipPolicyRef,
+      ...(Array.isArray(bundle.workPackageRefs) ? bundle.workPackageRefs : []),
+      ...(Array.isArray(bundle.handoffRefs) ? bundle.handoffRefs : []),
+      ...(Array.isArray(bundle.stateSnapshotRefs) ? bundle.stateSnapshotRefs : []),
+      ...(Array.isArray(bundle.reviewDecisionRefs) ? bundle.reviewDecisionRefs : []),
+      ...(Array.isArray(bundle.qaResultRefs) ? bundle.qaResultRefs : []),
+      ...(Array.isArray(bundle.performanceRegressionRefs) ? bundle.performanceRegressionRefs : []),
+      ...(Array.isArray(bundle.decisionLedgerRefs) ? bundle.decisionLedgerRefs : []),
+      ...(Array.isArray(bundle.outcomeRefs) ? bundle.outcomeRefs : []),
+    ].filter(Boolean).length;
+  }
+
+  function renderProductionEvidenceBundles(value = null) {
+    const bundles = normalizeProductionEvidenceBundles(value);
+    if (!bundles.length) {
+      return '<section class="panel production-evidence-bundles"><h3>Production evidence bundle</h3><p class="empty-state">No production evidence bundle is attached to this dashboard data.</p><p class="run-meta">Read-only dashboard surface. The browser cannot spawn agents, execute commands, apply changes, auto-merge, self-approve, or write trusted state.</p></section>';
+    }
+    const cards = bundles.map((bundle) => {
+      const laneOutputs = Array.isArray(bundle.laneOutputs) ? bundle.laneOutputs : [];
+      const missing = Array.isArray(bundle.missingRefs) ? bundle.missingRefs : [];
+      const stale = Array.isArray(bundle.staleRefs) ? bundle.staleRefs : [];
+      const blocked = Array.isArray(bundle.blockedReasons) ? bundle.blockedReasons : [];
+      const malformed = Array.isArray(bundle.malformedReasons) ? bundle.malformedReasons : [];
+      const conflicts = Array.isArray(bundle.unresolvedConflicts) ? bundle.unresolvedConflicts : [];
+      const missingReviews = Array.isArray(bundle.missingReviews) ? bundle.missingReviews : [];
+      const forbidden = Array.isArray(bundle.forbiddenActions) ? bundle.forbiddenActions : [];
+      const generatedRoots = Array.isArray(bundle.generatedState?.roots) ? bundle.generatedState.roots : [];
+      const laneRows = laneOutputs.length
+        ? laneOutputs.map((lane) => `<li>${escapeText(lane.lane || lane.id || 'lane')} · <span class="${statusClass(lane.status || 'unknown')}">${escapeText(lane.status || 'unknown')}</span>${Array.isArray(lane.blockedReasons) && lane.blockedReasons.length ? ` · ${escapeText(lane.blockedReasons.join(' · '))}` : ''}</li>`).join('')
+        : '<li>No lane outputs recorded.</li>';
+      const blockerText = [
+        ...blocked,
+        ...conflicts.map((conflict) => `${conflict.id || 'conflict'}:${conflict.summary || 'unresolved conflict'}`),
+        ...missingReviews.map((review) => `${review.id || 'missing-review'}:${review.requiredReviewerRole || 'reviewer'}`),
+      ];
+      return `<article class="artifact production-evidence-bundle">
+        <h4>${escapeText(bundle.bundleId || 'unknown-production-bundle')}</h4>
+        <div class="run-meta"><span class="${statusClass(bundle.status || 'unknown')}">${escapeText(bundle.status || 'unknown')}</span> · refs:${productionBundleRefCount(bundle)} · lanes:${laneOutputs.length}</div>
+        <div class="run-meta">Milestone: ${escapeText(bundle.milestone || 'unrecorded')}</div>
+        ${missing.length ? `<div class="artifact-warning">Missing refs: ${escapeText(missing.join(' · '))}</div>` : '<div class="run-meta">No missing refs reported.</div>'}
+        ${stale.length ? `<div class="artifact-warning">Stale refs: ${escapeText(stale.join(' · '))}</div>` : '<div class="run-meta">No stale refs reported.</div>'}
+        ${blockerText.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockerText.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${malformed.length ? `<div class="artifact-warning">Malformed: ${escapeText(malformed.join(' · '))}</div>` : ''}
+        <ul>${laneRows}</ul>
+        <div class="run-meta">Generated roots: ${escapeText(generatedRoots.join(' · ') || 'none')}</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'none')}</div>
+        <p class="run-meta">${escapeText(bundle.boundary || 'Inert local audit artifact; dashboard is read-only.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel production-evidence-bundles"><h3>Production evidence bundle</h3>
+      <p class="run-meta">Read-only production evidence bundle. This dashboard displays state, blockers, missing/stale refs, lane outputs, and generated-state boundaries only; it does not spawn agents, execute commands, apply changes, auto-merge, self-approve, or write trusted state.</p>
+      <div class="artifact-grid">${cards}</div>
+    </section>`;
+  }
+
 
   function pipelineInspectionModel(run = {}) {
     return run?.studio_multi_agent_pipeline_inspection || run?.studioMultiAgentPipelineInspection || run?.multi_agent_pipeline_inspection || run?.multiAgentPipelineInspection || null;
@@ -1851,6 +1916,7 @@ const OuroforgeDashboard = (() => {
         ...normalizeAgentHandoffs(run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null),
         ...normalizeAgentHandoffs(run.agent_handoff_v2s || run.agentHandoffV2s || null),
       ])}
+      ${renderProductionEvidenceBundles(run.production_evidence_bundles || run.productionEvidenceBundles || run.production_evidence_bundle || run.productionEvidenceBundle || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
       ${renderJournalViewer(run)}
       ${renderMutationLifecycle(run)}
@@ -1888,7 +1954,11 @@ const OuroforgeDashboard = (() => {
       };
       const paint = () => {
         listEl.innerHTML = renderRunList(runs, selected && selected.summary.id);
-        detailEl.innerHTML = renderRunDetailWithState(selected, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null, [
+        const selectedWithTopLevelBundles = selected ? {
+          ...selected,
+          production_evidence_bundles: selected?.production_evidence_bundles || selected?.productionEvidenceBundles || data.production_evidence_bundles || data.productionEvidenceBundles || data.production_evidence_bundle || data.productionEvidenceBundle || null,
+        } : selected;
+        detailEl.innerHTML = renderRunDetailWithState(selectedWithTopLevelBundles, replayStateFor(selected), data.regression_matrix || data.regressionMatrix || null, data.loop_evidence_bundles || data.loopEvidenceBundles || null, [
           ...normalizeAgentHandoffs(data.agent_handoffs || data.agentHandoffs || null),
           ...normalizeAgentHandoffs(data.agent_handoff_v2s || data.agentHandoffV2s || null),
         ]);
@@ -1924,7 +1994,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

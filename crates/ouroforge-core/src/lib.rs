@@ -4687,11 +4687,26 @@ fn pipeline_decision_section(
 
 fn pipeline_blockers(value: &serde_json::Value) -> Vec<String> {
     let mut blockers = Vec::new();
-    for key in ["blockedReasons", "blockers", "missingRefs", "openRisks"] {
+    for key in [
+        "blockedReasons",
+        "blockers",
+        "missingRefs",
+        "staleRefs",
+        "openRisks",
+        "unresolvedConflicts",
+        "missingReviews",
+    ] {
         if let Some(items) = value.get(key).and_then(|raw| raw.as_array()) {
             for item in items {
                 if let Some(text) = item.as_str() {
                     blockers.push(text.to_string());
+                } else if let Some(summary) = item.get("summary").and_then(|raw| raw.as_str()) {
+                    blockers.push(summary.to_string());
+                } else if let Some(role) = item
+                    .get("requiredReviewerRole")
+                    .and_then(|raw| raw.as_str())
+                {
+                    blockers.push(format!("missing review: {role}"));
                 } else if let Some(description) =
                     item.get("description").and_then(|raw| raw.as_str())
                 {
@@ -43414,6 +43429,64 @@ scenarios:
         assert!(model
             .boundary
             .contains("Read-only Studio multi-agent pipeline"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_read_model_reports_blockers_and_malformed_state() {
+        let partial: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.partial.fixture.json",
+        ))
+        .expect("partial production evidence bundle json");
+        let stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.stale.fixture.json",
+        ))
+        .expect("stale production evidence bundle json");
+        let conflict: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.unresolved-conflict.fixture.json",
+        ))
+        .expect("conflict production evidence bundle json");
+        let missing_review: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.missing-review.fixture.json",
+        ))
+        .expect("missing-review production evidence bundle json");
+        let malformed = json!({
+            "bundleId": "malformed-production-bundle",
+            "malformedReasons": ["laneOutputs must be an array"]
+        });
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({
+                "productionEvidenceBundles": [partial, stale, conflict, missing_review, malformed]
+            })
+            .to_string(),
+        );
+        let bundle_section = model
+            .sections
+            .iter()
+            .find(|section| section.id == "production-evidence-bundle")
+            .expect("production evidence bundle section");
+        assert_eq!(bundle_section.status, "malformed");
+        assert_eq!(bundle_section.item_count, 5);
+        assert!(bundle_section
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("qaResultRefs[0] awaits fixture refresh")));
+        assert!(bundle_section
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("taskBoardRef is older")));
+        assert!(bundle_section
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("Two work packages claim")));
+        assert!(bundle_section
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("missing review: reviewer")));
+        assert!(bundle_section
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("laneOutputs must be an array")));
+        assert_eq!(model.status, "malformed");
     }
 
     #[test]
