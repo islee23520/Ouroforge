@@ -694,6 +694,29 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
     )
     .expect("accepted review-gated draft writes");
 
+    let source_like_transaction = temp.join("docs/draft-apply/source-like.json");
+    let source_like_rejected = run_cli_expect_failure(
+        &temp,
+        &[
+            "edit",
+            "draft-apply",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            &accepted_decision_id,
+            "--transaction-output",
+            source_like_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(source_like_rejected
+        .contains("visual edit draft apply transaction output must not target source-like path"));
+    assert!(!source_like_transaction.exists());
+
     let transaction_output = temp.join("runs/draft-apply/accepted.json");
     let applied = run_cli(
         &temp,

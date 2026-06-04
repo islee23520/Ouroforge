@@ -1336,6 +1336,10 @@ fn apply_visual_edit_draft_cli(
             previews.len()
         ));
     }
+    reject_generated_artifact_source_collision(
+        transaction_output,
+        "visual edit draft apply transaction",
+    )?;
     reject_transaction_output_target_collision(transaction_output, &scene_path)?;
     let preview = previews.remove(0);
     let operation = SceneOnlyMutationOperation {

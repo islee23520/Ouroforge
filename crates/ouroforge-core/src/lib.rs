@@ -25081,10 +25081,9 @@ fn dashboard_review_cockpit(
     let comparisons =
         dashboard_review_cockpit_stage_from_lifecycle(lifecycle, "compared", "Rerun comparisons");
     let promotions = dashboard_review_cockpit_promotion_stage(promotions);
-    // Report the furthest lifecycle stage reached. The progression is
-    // proposed -> reviewed -> scene_applied -> compared -> promoted, so a run
-    // that has been promoted must surface "promoted" even when earlier
-    // review/rerun artifacts are also present.
+    // Report the furthest lifecycle stage reached. Promotion outranks rerun
+    // comparison, which outranks review-gated applications and earlier review
+    // records, so accepted reviews do not hide applied visual draft evidence.
     let terminal_state = [
         &promotions,
         &comparisons,
