@@ -4,11 +4,12 @@ Date: 2026-06-02
 Branch: `issue-49-demo-fresh-clone-evidence`; refreshed on `al2-8-1-public-readiness-evidence`
 Status: pre-release MVP evidence for public-readiness review; this is not a launch announcement.
 
+Current image refresh: issue #370 PA1.4.2, 2026-06-04, from latest `main` after PA1.4.1.
 Current refresh audit: [`docs/public-demo-evidence-refresh-audit-v1.md`](public-demo-evidence-refresh-audit-v1.md) inventories stale demo references for issue #370 PA1.4.1 without generating or committing runtime artifacts.
 
 ## Demo media
 
-The screenshots below were refreshed on 2026-06-02 from the static local MVP surfaces with Chrome headless and a local `python3 -m http.server` process. They are committed as public demo references, not generated run evidence. The refreshed dashboard and cockpit captures use the AL2.8.1 generated dashboard export, including Platformer and Engine Expansion v1 smoke runs.
+The screenshots below were refreshed on 2026-06-04 from the static local MVP surfaces with Chrome headless and a local `python3 -m http.server` process. They are committed as public demo references, not generated run evidence. The dashboard capture uses a locally generated issue #370 PA1.4.2 dashboard export that remains untracked and currently records failed scenario verdict drift for Platformer and Engine Expansion v1 while browser smoke evidence still succeeds 4/4 for both runs.
 
 | Surface | Screenshot | Scope boundary |
 | --- | --- | --- |
@@ -37,6 +38,17 @@ CHROME=${OUROFORGE_CHROME:-"/Applications/Google Chrome.app/Contents/MacOS/Googl
 ```
 
 AL2.8.2 refresh wrote current image files for all three surfaces. Chrome headless emitted local updater/crashpad noise during capture; the tracked PNG files were still written and visually checked.
+
+Issue #370 PA1.4.2 refreshed the tracked PNGs again on 2026-06-04:
+
+- Platformer run: `runs/run-1780575535986-2550` (generated/untracked); browser smoke succeeded 4/4, scenario verdict failed on current objective-contact assertions.
+- Engine Expansion v1 run: `runs/run-1780575544692-26537` (generated/untracked); browser smoke succeeded 4/4, scenario verdict failed on current objective-contact-integration assertions.
+- Dashboard export: `examples/evidence-dashboard/dashboard-data.json` (generated/untracked).
+- Screenshot references updated in `docs/assets/demo/`; Chrome headless emitted local updater/crashpad noise and required timeout cleanup after each screenshot file was written.
+
+The failed scenario verdicts are recorded as current evidence drift, not hidden or
+reframed as a passing local MVP run. PA1.4.3 owns final docs wording, cleanup
+steps, and known-gap closure evidence.
 
 ## Chrome requirement
 
@@ -106,6 +118,7 @@ cargo audit
 ## Known limitations
 
 - Demo media are screenshots, not a polished launch trailer.
+- The 2026-06-04 dashboard refresh intentionally shows current failed scenario verdict drift while preserving successful browser-smoke evidence; it is not a production-quality launch proof.
 - Public visibility remains a separate manual decision.
 - The dashboard screenshot depends on locally exported `dashboard-data.json`; that generated file is intentionally not committed.
 - The cockpit is a static prototype that displays Rust-validated commands, transaction provenance, semantic comparison summaries, and scene-only mutation lifecycle state; it does not directly write files or execute commands from the browser.
