@@ -61,3 +61,12 @@ non-apply/read-only guardrails are missing.
 A passed validation means only that the transaction metadata is complete enough
 for a future separately scoped trusted apply implementation to consider. It does
 not itself authorize source writes.
+
+## Read-model compatibility (SA15.4.3)
+
+`source_patch_apply_transaction_read_model` summarizes transaction readiness,
+targets, evidence refs, blockers, allowed inspection actions, and forbidden apply
+or command actions for dashboard/Studio display. Dashboard and cockpit surfaces
+may render `source-patch-apply-transaction` mutation artifacts read-only; they do
+not expose apply, merge, command execution, browser command bridge, or trusted
+write controls.

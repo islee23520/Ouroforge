@@ -1,5 +1,5 @@
 use ouroforge_core::{
-    inspect_source_patch_apply_transaction_artifact,
+    inspect_source_patch_apply_transaction_artifact, source_patch_apply_transaction_read_model,
     validate_source_patch_apply_transaction_artifact, SourcePatchApplyTransactionArtifact,
     SourcePatchApplyTransactionStatus, SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION,
 };
@@ -206,4 +206,45 @@ fn source_patch_apply_transaction_validation_reports_blocked_transactions() {
         .expect_err("blocked transactions are not trusted-apply ready");
 
     assert!(error.to_string().contains("transaction status is blocked"));
+}
+
+#[test]
+fn source_patch_apply_transaction_read_model_is_display_only() {
+    let artifact = fixture();
+
+    let model = source_patch_apply_transaction_read_model(&artifact);
+
+    assert_eq!(
+        model.schema_version,
+        "source-patch-apply-transaction-read-model-v1"
+    );
+    assert_eq!(model.status, "passed");
+    assert_eq!(
+        model.readiness_label,
+        "ready_metadata_only_no_apply_authority"
+    );
+    assert!(model
+        .evidence_summary
+        .iter()
+        .any(|entry| entry.starts_with("sandbox:")));
+    assert!(model
+        .target_summaries
+        .iter()
+        .any(|entry| entry.contains("scenario_regression_fixture")));
+    assert!(model
+        .allowed_actions
+        .iter()
+        .any(|action| action == "inspect_transaction_evidence"));
+    for forbidden in [
+        "apply_patch",
+        "merge_branch",
+        "execute_command",
+        "write_trusted_file",
+        "browser_command_bridge",
+    ] {
+        assert!(model
+            .forbidden_actions
+            .iter()
+            .any(|action| action == forbidden));
+    }
 }

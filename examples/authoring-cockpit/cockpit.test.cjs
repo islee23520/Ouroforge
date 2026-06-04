@@ -157,6 +157,30 @@ const run = {
       ],
       guardrails: ['read-only bundle evidence', 'no source patch apply'],
     },
+  }, {
+    id: 'source-patch-apply-transaction',
+    kind: 'application/json',
+    path: 'mutation/source-patch-apply-transaction.json',
+    metadata: { read_only: true },
+    value: {
+      transactionId: 'apply-tx-1',
+      status: 'ready_for_trusted_apply',
+      evidence: {
+        patchPreviewRef: 'mutation/preview.json',
+        sandboxReportRef: 'sandbox/preview-1/evidence/report.json',
+        reviewDecisionRef: 'mutation/review-decision.json',
+        fileClassReportRef: 'evidence/file-class.json',
+        diffIntegrityReportRef: 'evidence/diff.json',
+      },
+      targets: [{ path: 'examples/source-patch-apply-transaction-v1/scenario-regression.json', fileClass: 'scenario_regression_fixture', reviewLevel: 'elevated_source_like_data_review' }],
+      rollbackRef: { rollbackPlanRef: 'rollback/apply-tx-1.json' },
+      readModel: {
+        status: 'passed',
+        readinessLabel: 'ready_metadata_only_no_apply_authority',
+        blockedReasons: [],
+        forbiddenActions: ['apply_patch', 'merge_branch', 'execute_command', 'write_trusted_file', 'browser_command_bridge'],
+      },
+    },
   }],
   loop_cockpit: {
     schemaVersion: 'studio-loop-cockpit-v1',
@@ -1090,4 +1114,9 @@ assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Source patch 
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /bundle-1/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /apply_patch/);
 assert.doesNotMatch(cockpit.renderSourcePatchEvidenceBundleSurface(run), /<button|applyCommand|mergeCommand/);
+assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /Source patch apply transaction/);
+assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply-tx-1/);
+assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /ready_metadata_only_no_apply_authority/);
+assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply_patch/);
+assert.doesNotMatch(cockpit.renderSourcePatchApplyTransactionSurface(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(cockpit.renderEvidencePane(run), /Source patch evidence bundle/);

@@ -11825,6 +11825,33 @@ pub struct SourcePatchApplyTransactionValidation {
     pub guardrails: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchApplyTransactionReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    pub status: String,
+    #[serde(rename = "readinessLabel")]
+    pub readiness_label: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "verificationCommandCount")]
+    pub verification_command_count: usize,
+    #[serde(rename = "targetSummaries")]
+    pub target_summaries: Vec<String>,
+    #[serde(rename = "evidenceSummary")]
+    pub evidence_summary: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "allowedActions")]
+    pub allowed_actions: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 impl SourcePatchApplyTransactionValidation {
     pub fn is_blocked(&self) -> bool {
         self.status == "blocked"
@@ -11912,6 +11939,72 @@ pub fn validate_source_patch_apply_transaction_artifact(
         ));
     }
     Ok(validation)
+}
+
+pub fn source_patch_apply_transaction_read_model(
+    artifact: &SourcePatchApplyTransactionArtifact,
+) -> SourcePatchApplyTransactionReadModel {
+    let validation = inspect_source_patch_apply_transaction_artifact(artifact);
+    let mut evidence_summary = vec![
+        format!("preview:{}", artifact.evidence.patch_preview_ref),
+        format!("sandbox:{}", artifact.evidence.sandbox_report_ref),
+        format!("review:{}", artifact.evidence.review_decision_ref),
+        format!("file-class:{}", artifact.evidence.file_class_report_ref),
+        format!(
+            "diff-integrity:{}",
+            artifact.evidence.diff_integrity_report_ref
+        ),
+        format!("rollback:{}", artifact.rollback_ref.rollback_plan_ref),
+    ];
+    evidence_summary.extend(
+        artifact
+            .post_apply_scenario_refs
+            .iter()
+            .map(|artifact_ref| format!("post-apply:{}:{}", artifact_ref.kind, artifact_ref.path)),
+    );
+    SourcePatchApplyTransactionReadModel {
+        schema_version: "source-patch-apply-transaction-read-model-v1".to_string(),
+        transaction_id: artifact.transaction_id.clone(),
+        status: validation.status.clone(),
+        readiness_label: if validation.is_blocked() {
+            "blocked_before_trusted_apply".to_string()
+        } else {
+            "ready_metadata_only_no_apply_authority".to_string()
+        },
+        target_count: artifact.targets.len(),
+        verification_command_count: artifact.verification_commands.len(),
+        target_summaries: artifact
+            .targets
+            .iter()
+            .map(|target| {
+                format!(
+                    "{}: {}/{}",
+                    target.path, target.file_class, target.review_level
+                )
+            })
+            .collect(),
+        evidence_summary,
+        blocked_reasons: validation.blocked_reasons,
+        allowed_actions: vec![
+            "inspect_transaction_evidence".to_string(),
+            "copy_verification_commands".to_string(),
+            "record_manual_follow_up".to_string(),
+        ],
+        forbidden_actions: vec![
+            "apply_patch".to_string(),
+            "merge_branch".to_string(),
+            "execute_command".to_string(),
+            "write_trusted_file".to_string(),
+            "browser_command_bridge".to_string(),
+            "bypass_review_gate".to_string(),
+        ],
+        guardrails: vec![
+            "read model is display-only and command-inert".to_string(),
+            "ready metadata does not apply source patches or merge branches".to_string(),
+            "dashboard and Studio surfaces may not write trusted files".to_string(),
+            "trusted apply remains separately scoped from transaction readiness".to_string(),
+        ],
+    }
 }
 
 fn inspect_source_patch_apply_transaction_evidence(

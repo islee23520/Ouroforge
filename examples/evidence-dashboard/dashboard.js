@@ -1168,6 +1168,44 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function sourcePatchApplyTransactions(run) {
+    return artifacts(run?.mutation_artifacts).filter((artifact) => artifact.id === 'source-patch-apply-transaction' || artifact.path === 'mutation/source-patch-apply-transaction.json');
+  }
+
+  function renderSourcePatchApplyTransactions(run) {
+    const transactions = sourcePatchApplyTransactions(run);
+    if (!transactions.length) {
+      return '<section class="panel source-patch-apply-transactions"><h3>Source patch apply transaction</h3><p class="empty-state">No source patch apply transaction is exported for this run.</p><p class="run-meta">Read-only dashboard surface. The browser cannot apply patches, merge branches, execute commands, write trusted files, or bypass review gates.</p></section>';
+    }
+    const cards = transactions.map((artifact) => {
+      const value = artifact.value || {};
+      const evidence = value.evidence || {};
+      const validation = value.readModel || value.read_model || value.validation || {};
+      const targets = Array.isArray(value.targets) ? value.targets : [];
+      const blockers = Array.isArray(validation.blockedReasons || validation.blocked_reasons)
+        ? (validation.blockedReasons || validation.blocked_reasons)
+        : (Array.isArray(value.blockedReasons || value.blocked_reasons) ? (value.blockedReasons || value.blocked_reasons) : []);
+      const forbidden = Array.isArray(validation.forbiddenActions || validation.forbidden_actions)
+        ? (validation.forbiddenActions || validation.forbidden_actions)
+        : ['apply_patch', 'merge_branch', 'execute_command', 'write_trusted_file', 'browser_command_bridge'];
+      const refs = [evidence.patchPreviewRef, evidence.sandboxReportRef, evidence.reviewDecisionRef, evidence.fileClassReportRef, evidence.diffIntegrityReportRef, value.rollbackRef?.rollbackPlanRef || value.rollback_ref?.rollback_plan_ref]
+        .filter(Boolean)
+        .map((ref) => typeof ref === 'string' ? ref : `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      return `<article class="artifact source-patch-apply-transaction">
+        <h4>${escapeText(value.transactionId || value.transaction_id || artifact.id || 'source patch transaction')}</h4>
+        <div class="run-meta"><span class="${statusClass(validation.status || value.status || 'unknown')}">${escapeText(validation.status || value.status || 'unknown')}</span> · ${escapeText(validation.readinessLabel || validation.readiness_label || 'readiness metadata only')}</div>
+        <div class="run-meta">Targets: ${escapeText(targets.map((target) => `${target.path || 'unknown'}:${target.fileClass || target.file_class || 'unknown'}`).join(' · ') || 'none')}</div>
+        <div class="run-meta">Refs: ${escapeText(refs.join(' · ') || artifact.path || 'none')}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blocked: ${escapeText(blockers.join(' · '))}</div>` : ''}
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · '))}</div>
+      </article>`;
+    }).join('');
+    return `<section class="panel source-patch-apply-transactions"><h3>Source patch apply transaction</h3>
+      <p class="run-meta">Read-only transaction readiness evidence. This dashboard renders readiness, blockers, targets, and refs only; it does not apply patches, merge branches, execute commands, write trusted files, or bypass review gates.</p>
+      <div class="artifact-grid">${cards}</div>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null, run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
   }
@@ -1199,6 +1237,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
+      ${renderSourcePatchApplyTransactions(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1275,7 +1314,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
