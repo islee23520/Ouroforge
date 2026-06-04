@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "ouroforge.runtime-frame-budget.v1",
+  "frameId": "tick-41",
+  "sceneId": "collect-and-exit-scene",
+  "scenarioId": "collect-and-exit",
+  "timings": {
+    "updateMs": 3.0,
+    "renderMs": 18.5,
+    "evidenceMs": 1.75,
+    "totalMs": 24.25
+  },
+  "budget": {
+    "updateMs": 8.0,
+    "renderMs": 16.0,
+    "evidenceMs": 4.0,
+    "totalMs": 20.0
+  },
+  "counts": {
+    "entityCount": 8,
+    "drawCallCount": 9,
+    "layerCount": 3,
+    "collisionPairCount": 2,
+    "activeAnimationCount": 2,
+    "activeVfxCount": 1,
+    "audioEventCount": 2
+  },
+  "readOnlyInspection": {
+    "trustedEmitter": "rust-local-runtime-frame-budget-contract",
+    "browserStudioMode": "read-only evidence inspection",
+    "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+  }
+}

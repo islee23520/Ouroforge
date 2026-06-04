@@ -13,6 +13,9 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
+pub mod runtime_frame_budget;
+pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
+
 static LEDGER_APPEND_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVIDENCE_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static MUTATION_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();

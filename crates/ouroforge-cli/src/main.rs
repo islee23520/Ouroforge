@@ -15,19 +15,20 @@ use ouroforge_core::{
     list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
     preview_scene_edit_transaction, project_run_metadata_from_manifest,
     promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
-    read_ledger_events, read_scene, reject_already_applied_visual_edit_draft_decision,
-    reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
-    run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    read_ledger_events, read_runtime_frame_budget, read_scene,
+    reject_already_applied_visual_edit_draft_decision, reject_generated_artifact_source_collision,
+    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
+    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     source_patch_preview_read_model, update_journal, validate_scene_reload,
     validate_source_patch_preview_artifact, validate_visual_edit_draft_review_preflight,
     write_agent_handoff_contract_from_path, write_regression_promotion_draft,
     write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
     BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
     PatchDiffIntegrityLimits, ProjectAssetManifest, ProjectAssetType, ProjectManifest,
-    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    SourcePatchPreviewArtifact, VisualEditDraftApplyCommandContext, VisualEditDraftArtifact,
-    VisualEditDraftTargetType, WorkerId,
+    ProjectSceneMutationContext, RuntimeFrameBudgetStatus, ScenarioRunConfig, SceneEdit,
+    SceneOnlyMutationOperation, Seed, SourcePatchPreviewArtifact,
+    VisualEditDraftApplyCommandContext, VisualEditDraftArtifact, VisualEditDraftTargetType,
+    WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -109,6 +110,10 @@ enum Commands {
     Scene {
         #[command(subcommand)]
         command: SceneCommand,
+    },
+    RuntimeDebug {
+        #[command(subcommand)]
+        command: RuntimeDebugCommand,
     },
     Edit {
         #[command(subcommand)]
@@ -245,6 +250,20 @@ enum SceneCommand {
         #[arg(long, value_name = "PATH")]
         transaction_output: Option<PathBuf>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum RuntimeDebugCommand {
+    FrameBudget {
+        #[command(subcommand)]
+        command: RuntimeFrameBudgetCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum RuntimeFrameBudgetCommand {
+    Validate { budget_path: PathBuf },
+    Show { budget_path: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1023,6 +1042,37 @@ fn main() -> Result<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&read_scene(scene_path)?)?
+            );
+        }
+        Commands::RuntimeDebug {
+            command:
+                RuntimeDebugCommand::FrameBudget {
+                    command: RuntimeFrameBudgetCommand::Validate { budget_path },
+                },
+        } => {
+            let budget = read_runtime_frame_budget(&budget_path)?;
+            let counts = budget.debug_counts();
+            let status = match budget.status() {
+                RuntimeFrameBudgetStatus::WithinBudget => "within-budget",
+                RuntimeFrameBudgetStatus::Violated => "violated",
+            };
+            println!("Runtime frame budget valid: {}", budget.frame_id);
+            println!("Scene: {}", budget.scene_id);
+            println!("Status: {status}");
+            println!("Draw calls: {}", counts.draw_call_count);
+            println!("Layers: {}", counts.layer_count);
+            println!("Collision pairs: {}", counts.collision_pair_count);
+            println!("Violation(s): {}", budget.computed_violations().len());
+        }
+        Commands::RuntimeDebug {
+            command:
+                RuntimeDebugCommand::FrameBudget {
+                    command: RuntimeFrameBudgetCommand::Show { budget_path },
+                },
+        } => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&read_runtime_frame_budget(budget_path)?)?
             );
         }
         Commands::Scene {

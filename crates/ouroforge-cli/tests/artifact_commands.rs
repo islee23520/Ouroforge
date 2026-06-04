@@ -19,6 +19,57 @@ scenarios:
 "#;
 
 #[test]
+fn runtime_frame_budget_cli_validates_and_shows_budget_fixtures() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let valid = repo_root.join("examples/runtime-frame-budget-v1/valid/frame-budget.sample.json");
+    let slow = repo_root.join("examples/runtime-frame-budget-v1/violation/frame-budget.slow.json");
+
+    let validated = run_cli(
+        &repo_root,
+        &[
+            "runtime-debug",
+            "frame-budget",
+            "validate",
+            valid.to_str().unwrap(),
+        ],
+    );
+    let shown = run_cli(
+        &repo_root,
+        &[
+            "runtime-debug",
+            "frame-budget",
+            "show",
+            slow.to_str().unwrap(),
+        ],
+    );
+
+    assert!(validated.contains("Runtime frame budget valid: tick-40"));
+    assert!(validated.contains("Status: within-budget"));
+    assert!(validated.contains("Draw calls: 7"));
+    assert!(shown.contains(r#""schemaVersion": "ouroforge.runtime-frame-budget.v1""#));
+    assert!(shown.contains(r#""frameId": "tick-41""#));
+}
+
+#[test]
+fn runtime_frame_budget_cli_rejects_malformed_budget_fixtures() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let malformed =
+        repo_root.join("examples/runtime-frame-budget-v1/invalid/negative-render-ms.json");
+
+    let output = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "runtime-debug",
+            "frame-budget",
+            "validate",
+            malformed.to_str().unwrap(),
+        ],
+    );
+
+    assert!(output.contains("renderMs must be non-negative"));
+}
+
+#[test]
 fn loop_handoff_writes_generated_contract_without_executing_allowed_commands() {
     let temp = unique_temp_dir("ouroforge-cli-loop-handoff-test");
     fs::create_dir_all(&temp).expect("temp dir exists");
