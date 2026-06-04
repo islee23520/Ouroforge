@@ -70,6 +70,11 @@ REPO_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$R
 if [[ -z "$WORK_DIR" ]]; then
   WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ouroforge-canonical-demo-XXXXXX")
   WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
+  if [[ "$WORK_REAL" == "$REPO_REAL" || "$WORK_REAL" == "$REPO_REAL"/* ]]; then
+    echo "error: work directory must be outside the repository: $WORK_DIR" >&2
+    rm -rf -- "$WORK_DIR"
+    exit 2
+  fi
 else
   WORK_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$WORK_DIR")
   WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
@@ -124,10 +129,10 @@ cargo_cli project validate "$REPO_ROOT/examples/playable-demo-v2/collect-and-exi
 log "Local run/evidence generation"
 before_repo_runs=$(mktemp "$WORK_DIR/repo-runs-before.XXXXXX")
 after_repo_runs=$(mktemp "$WORK_DIR/repo-runs-after.XXXXXX")
-find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$before_repo_runs"
+find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$before_repo_runs" || true
 (cd "$REPO_ROOT" && run_and_capture platformer-run cargo_cli run seeds/platformer.yaml --workers "$WORKERS")
 (cd "$REPO_ROOT" && run_and_capture engine-expansion-run cargo_cli run seeds/engine-expansion-v1-demo.yaml --workers "$WORKERS")
-find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$after_repo_runs"
+find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$after_repo_runs" || true
 mkdir -p "$WORK_DIR/runs"
 while IFS= read -r repo_run_dir; do
   [[ -n "$repo_run_dir" ]] || continue
@@ -195,9 +200,10 @@ log "Read-only static surface checks"
 (cd "$REPO_ROOT" && node examples/authoring-cockpit/cockpit.test.cjs)
 
 log "Generated-state audit"
-if git -C "$REPO_ROOT" status --short --ignored -- runs examples/evidence-dashboard/dashboard-data.json | grep -v '^!! target/' | grep -q .; then
+generated_state_status=$(git -C "$REPO_ROOT" status --short -- runs examples/evidence-dashboard/dashboard-data.json)
+if [[ -n "$generated_state_status" ]]; then
   echo "error: repository generated-state paths changed unexpectedly" >&2
-  git -C "$REPO_ROOT" status --short --ignored -- runs examples/evidence-dashboard/dashboard-data.json >&2
+  echo "$generated_state_status" >&2
   exit 1
 fi
 
