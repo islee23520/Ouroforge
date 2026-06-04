@@ -1319,6 +1319,44 @@ const OuroforgeDashboard = (() => {
     return `<section class="panel production-task-boards"><h3>Production task board</h3><div class="artifact-grid">${cards}</div></section>`;
   }
 
+  function normalizeOwnershipPolicies(value = null) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return [value];
+    return [];
+  }
+
+  function renderOwnershipPolicies(value = null) {
+    const policies = normalizeOwnershipPolicies(value);
+    if (!policies.length) {
+      return '<section class="panel ownership-policies"><h3>Ownership policy</h3><p class="empty-state">No file/artifact ownership policy is attached to this dashboard data.</p></section>';
+    }
+    const cards = policies.map((policy) => {
+      const entries = Array.isArray(policy.entries) ? policy.entries : [];
+      const forbidden = Array.isArray(policy.forbiddenActions) ? policy.forbiddenActions : [];
+      const guardrails = Array.isArray(policy.guardrails) ? policy.guardrails : [];
+      const blockers = entries.flatMap((entry) => Array.isArray(entry?.blockedReasons) ? entry.blockedReasons.map((reason) => `${entry.id || 'entry'}: ${reason}`) : []);
+      const escalations = entries.filter((entry) => entry?.escalation).map((entry) => `${entry.id || 'entry'}: ${entry.escalation.requiredDecision || entry.escalation.required_decision || 'decision required'}`);
+      const entryRows = entries.length ? entries.map((entry) => {
+        const target = entry.target || {};
+        const evidence = Array.isArray(entry.evidenceRefs) ? entry.evidenceRefs : [];
+        const workPackages = Array.isArray(entry.workPackageRefs) ? entry.workPackageRefs : [];
+        return `<li><strong>${escapeText(entry.id || 'entry')}</strong> · ${escapeText(entry.role || 'unknown-role')} · ${escapeText(entry.ownerAgent || 'unknown-owner')} · <span class="${statusClass(entry.state || 'unknown')}">${escapeText(entry.state || 'unknown')}</span><br><span class="run-meta">Mode: ${escapeText(entry.mode || 'unknown')} · Target: ${escapeText(target.kind || 'unknown')}:${escapeText(target.path || target.id || 'missing')} · Work packages: ${escapeText(workPackages.join(' · ') || 'missing')} · Evidence: ${escapeText(evidence.map((ref) => ref.path || ref.id || 'ref').join(' · ') || 'missing')}</span></li>`;
+      }).join('') : '<li class="artifact-warning">Missing or malformed ownership entries list.</li>';
+      return `<article class="artifact ownership-policy">
+        <h4>${escapeText(policy.policyId || 'unknown-policy')}</h4>
+        <p class="run-meta">Read-only ownership policy. The dashboard reports blockers, deferred states, and escalation requirements only; it does not lock files, spawn agents, execute commands, apply changes, write trusted browser state, auto-merge, or self-approve.</p>
+        <div class="run-meta">Schema: ${escapeText(policy.schemaVersion || 'unknown')} · entries ${escapeText(entries.length)} · milestone ${escapeText(policy.milestone || 'unknown')}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blockers: ${escapeText(blockers.join(' · '))}</div>` : '<div class="run-meta">No blockers reported.</div>'}
+        ${escalations.length ? `<div class="artifact-warning">Escalations: ${escapeText(escalations.join(' · '))}</div>` : '<div class="run-meta">No escalations reported.</div>'}
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · ') || 'missing')}</div>
+        <div class="run-meta">Guardrails: ${escapeText(guardrails.join(' · ') || 'missing')}</div>
+        <ul>${entryRows}</ul>
+        <p class="run-meta">${escapeText(policy.boundary || 'Ownership policy display is read-only.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel ownership-policies"><h3>Ownership policy</h3><div class="artifact-grid">${cards}</div></section>`;
+  }
+
   function normalizeAgentRoleModels(value = null) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === 'object') return [value];
@@ -1633,6 +1671,7 @@ const OuroforgeDashboard = (() => {
       ${renderLoopExecutionSummary(run.loop_execution || run.loopExecution || null)}
       ${renderLoopRecoveryStatus(run.loop_recovery || run.loopRecovery || run.loop_status || run.loopStatus || null)}
       ${renderProductionTaskBoards(run.production_task_boards || run.productionTaskBoards || run.production_task_board || run.productionTaskBoard || null)}
+      ${renderOwnershipPolicies(run.ownership_policies || run.ownershipPolicies || run.ownership_policy || run.ownershipPolicy || null)}
       ${renderAgentRoleModels(run.agent_role_models || run.agentRoleModels || run.agent_role_model || run.agentRoleModel || null)}
       ${renderAgentHandoffs(agentHandoffs || run.agent_handoffs || run.agentHandoffs || run.agent_handoff || run.agentHandoff || null)}
       ${renderLoopEvidenceBundles(loopEvidenceBundles || run.loop_evidence_bundles || run.loopEvidenceBundles || run.loop_evidence_bundle || run.loopEvidenceBundle || null)}
@@ -1705,7 +1744,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderProductionTaskBoards, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

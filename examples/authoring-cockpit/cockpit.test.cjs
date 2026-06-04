@@ -1339,6 +1339,21 @@ assert.match(blockedTaskBoardMarkup, /Waiting for #668/);
 assert.match(cockpit.renderEvidencePane(run), /Production task board/);
 assert.match(cockpit.renderProductionTaskBoardSurface({}), /No production task board/);
 
+const ownershipPolicyConflictFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/ownership-policy.conflict.fixture.json', 'utf8'));
+const ownershipPolicyEscalationFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/ownership-policy.escalation.fixture.json', 'utf8'));
+run.ownership_policy = ownershipPolicyConflictFixture;
+const ownershipPolicyMarkup = cockpit.renderOwnershipPolicySurface(run);
+assert.match(ownershipPolicyMarkup, /Ownership policy/);
+assert.match(ownershipPolicyMarkup, /ownership-policy-conflict/);
+assert.match(ownershipPolicyMarkup, /scene-write-a/);
+assert.match(ownershipPolicyMarkup, /Conflicts with reviewer write hold/);
+assert.match(ownershipPolicyMarkup, /Read-only ownership policy surface/);
+assert.doesNotMatch(ownershipPolicyMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+const escalationPolicyMarkup = cockpit.renderOwnershipPolicySurface({ ownership_policy: ownershipPolicyEscalationFixture });
+assert.match(escalationPolicyMarkup, /independent reviewer and critic approval/);
+assert.match(cockpit.renderEvidencePane(run), /Ownership policy/);
+assert.match(cockpit.renderOwnershipPolicySurface({}), /No file\/artifact ownership policy/);
+
 const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
 run.agent_role_model = agentRoleModelFixture;
 const roleModelMarkup = cockpit.renderAgentRoleModelSurface(run);
