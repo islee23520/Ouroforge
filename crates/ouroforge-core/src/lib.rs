@@ -23525,6 +23525,64 @@ pub struct SceneRenderBreakdownInspectionBoundary {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct SceneRenderQueue {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "frameId")]
+    pub frame_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub layers: Vec<SceneRenderQueueLayer>,
+    pub renderables: Vec<SceneRenderQueueRenderable>,
+    pub validation: SceneRenderQueueValidation,
+    #[serde(rename = "readOnlyInspection")]
+    pub read_only_inspection: SceneRenderBreakdownInspectionBoundary,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderQueueLayer {
+    pub id: String,
+    pub order: i64,
+    pub visible: bool,
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderQueueRenderable {
+    pub id: String,
+    #[serde(rename = "sourceKind")]
+    pub source_kind: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: String,
+    pub layer: String,
+    #[serde(rename = "layerOrder")]
+    pub layer_order: i64,
+    #[serde(rename = "localOrder")]
+    pub local_order: i64,
+    #[serde(rename = "stableKey")]
+    pub stable_key: String,
+    #[serde(rename = "drawOrder")]
+    pub draw_order: usize,
+    #[serde(rename = "primitiveKind")]
+    pub primitive_kind: String,
+    pub visible: bool,
+    #[serde(rename = "fallbackReason", skip_serializing_if = "Option::is_none")]
+    pub fallback_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneRenderQueueValidation {
+    pub status: String,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SceneTilemap {
     pub id: String,
     #[serde(rename = "tileSize")]
@@ -26679,6 +26737,336 @@ pub fn scene_render_order(scene: &SceneDocument) -> Vec<SceneRenderOrderEntry> {
         ))
     });
     entries
+}
+
+pub fn scene_render_queue(scene: &SceneDocument, frame_id: impl Into<String>) -> SceneRenderQueue {
+    let renderer = scene.renderer.as_ref();
+    let mut layers = renderer
+        .map(|renderer| {
+            renderer
+                .layers
+                .iter()
+                .map(|layer| SceneRenderQueueLayer {
+                    id: layer.id.clone(),
+                    order: layer.order,
+                    visible: layer.visible,
+                    kind: "scene".to_string(),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| {
+            vec![SceneRenderQueueLayer {
+                id: "default".to_string(),
+                order: 0,
+                visible: true,
+                kind: "scene".to_string(),
+            }]
+        });
+    let (layer_order, hidden_layers) = scene_layer_order_and_visibility(scene);
+    let layer_order_for = |layer: &str| layer_order.get(layer).copied().unwrap_or(0);
+
+    let mut renderables = Vec::new();
+    for entity in &scene.entities {
+        let layer = entity
+            .sprite
+            .layer
+            .clone()
+            .unwrap_or_else(|| "default".to_string());
+        let visible = entity.sprite.visible && !hidden_layers.contains(layer.as_str());
+        let primitive_kind =
+            if entity.components.ui_text.is_some() || entity.components.hud_value.is_some() {
+                "text"
+            } else if entity.sprite.asset.is_some() {
+                "sprite"
+            } else {
+                "rect"
+            };
+        renderables.push(SceneRenderQueueRenderable {
+            id: format!("entity-{}", entity.id),
+            source_kind: "entity".to_string(),
+            source_id: entity.id.clone(),
+            layer: layer.clone(),
+            layer_order: layer_order_for(layer.as_str()),
+            local_order: entity.sprite.order.unwrap_or(0),
+            stable_key: entity.id.clone(),
+            draw_order: 0,
+            primitive_kind: primitive_kind.to_string(),
+            visible,
+            fallback_reason: (!visible).then(|| {
+                if entity.sprite.visible {
+                    "renderer layer hidden".to_string()
+                } else {
+                    "sprite hidden".to_string()
+                }
+            }),
+        });
+    }
+
+    for tilemap in &scene.tilemaps {
+        for layer in &tilemap.layers {
+            let queue_layer = layer.id.clone();
+            renderables.push(SceneRenderQueueRenderable {
+                id: format!("tilemap-{}-{}", tilemap.id, layer.id),
+                source_kind: "tilemap-layer".to_string(),
+                source_id: format!("{}:{}", tilemap.id, layer.id),
+                layer: queue_layer.clone(),
+                layer_order: layer.order,
+                local_order: 0,
+                stable_key: format!("{}:{}", tilemap.id, layer.id),
+                draw_order: 0,
+                primitive_kind: "tilemap".to_string(),
+                visible: layer.visible,
+                fallback_reason: (!layer.visible).then(|| "tilemap layer hidden".to_string()),
+            });
+            if !layers.iter().any(|candidate| candidate.id == queue_layer) {
+                layers.push(SceneRenderQueueLayer {
+                    id: queue_layer,
+                    order: layer.order,
+                    visible: layer.visible,
+                    kind: "tilemap".to_string(),
+                });
+            }
+        }
+    }
+
+    if let Some(debug) = renderer.map(|renderer| &renderer.debug) {
+        if debug.show_camera || debug.show_bounds || debug.show_entity_ids {
+            let debug_layer_id = "__debug_overlay".to_string();
+            let debug_layer_order = 1_000_000_i64;
+            layers.push(SceneRenderQueueLayer {
+                id: debug_layer_id.clone(),
+                order: debug_layer_order,
+                visible: true,
+                kind: "debug-overlay".to_string(),
+            });
+            if debug.show_camera {
+                renderables.push(SceneRenderQueueRenderable {
+                    id: "debug-camera".to_string(),
+                    source_kind: "debug-overlay".to_string(),
+                    source_id: "camera".to_string(),
+                    layer: debug_layer_id.clone(),
+                    layer_order: debug_layer_order,
+                    local_order: 0,
+                    stable_key: "debug-camera".to_string(),
+                    draw_order: 0,
+                    primitive_kind: "debug_camera".to_string(),
+                    visible: true,
+                    fallback_reason: None,
+                });
+            }
+            if debug.show_bounds {
+                for entity in &scene.entities {
+                    renderables.push(SceneRenderQueueRenderable {
+                        id: format!("debug-bounds-{}", entity.id),
+                        source_kind: "debug-overlay".to_string(),
+                        source_id: entity.id.clone(),
+                        layer: debug_layer_id.clone(),
+                        layer_order: debug_layer_order,
+                        local_order: 10,
+                        stable_key: format!("debug-bounds-{}", entity.id),
+                        draw_order: 0,
+                        primitive_kind: "debug_bounds".to_string(),
+                        visible: true,
+                        fallback_reason: None,
+                    });
+                }
+            }
+            if debug.show_entity_ids {
+                for entity in &scene.entities {
+                    renderables.push(SceneRenderQueueRenderable {
+                        id: format!("debug-label-{}", entity.id),
+                        source_kind: "debug-overlay".to_string(),
+                        source_id: entity.id.clone(),
+                        layer: debug_layer_id.clone(),
+                        layer_order: debug_layer_order,
+                        local_order: 20,
+                        stable_key: format!("debug-label-{}", entity.id),
+                        draw_order: 0,
+                        primitive_kind: "debug_label".to_string(),
+                        visible: true,
+                        fallback_reason: None,
+                    });
+                }
+            }
+        }
+    }
+
+    renderables.sort_by(|left, right| {
+        (
+            left.layer_order,
+            left.layer.as_str(),
+            left.local_order,
+            left.stable_key.as_str(),
+        )
+            .cmp(&(
+                right.layer_order,
+                right.layer.as_str(),
+                right.local_order,
+                right.stable_key.as_str(),
+            ))
+    });
+    for (index, renderable) in renderables.iter_mut().enumerate() {
+        renderable.draw_order = index;
+    }
+
+    let mut queue = SceneRenderQueue {
+        schema_version: "ouroforge.scene-render-queue.v1".to_string(),
+        frame_id: frame_id.into(),
+        scene_id: scene.id.clone(),
+        layers,
+        renderables,
+        validation: SceneRenderQueueValidation {
+            status: "ready".to_string(),
+            blocked_reasons: Vec::new(),
+            warnings: Vec::new(),
+        },
+        read_only_inspection: SceneRenderBreakdownInspectionBoundary {
+            trusted_emitter: "rust-local-scene-contract".to_string(),
+            browser_studio_mode: "read-only evidence inspection".to_string(),
+            disallowed_actions: vec![
+                "trusted writes".to_string(),
+                "command bridge".to_string(),
+                "live mutation".to_string(),
+            ],
+        },
+    };
+    queue.validation = validate_scene_render_queue_model(&queue);
+    queue
+}
+
+pub fn validate_scene_render_queue_model(queue: &SceneRenderQueue) -> SceneRenderQueueValidation {
+    let mut blocked_reasons = Vec::new();
+    let mut warnings = Vec::new();
+    if queue.schema_version != "ouroforge.scene-render-queue.v1" {
+        blocked_reasons.push("schemaVersion must be ouroforge.scene-render-queue.v1".to_string());
+    }
+    if queue.renderables.is_empty() {
+        warnings.push("render queue contains no renderables".to_string());
+    }
+    let mut layer_ids = BTreeSet::new();
+    for layer in &queue.layers {
+        if let Err(error) = validate_path_component("scene render queue layer id", &layer.id) {
+            blocked_reasons.push(error.to_string());
+        }
+        if !matches!(layer.kind.as_str(), "scene" | "tilemap" | "debug-overlay") {
+            blocked_reasons.push(format!(
+                "unsupported scene render queue layer kind: {}",
+                layer.kind
+            ));
+        }
+        if !layer_ids.insert(layer.id.as_str()) {
+            blocked_reasons.push(format!(
+                "duplicate scene render queue layer id: {}",
+                layer.id
+            ));
+        }
+    }
+    let layer_orders = queue
+        .layers
+        .iter()
+        .map(|layer| (layer.id.as_str(), layer.order))
+        .collect::<BTreeMap<_, _>>();
+    let mut renderable_ids = BTreeSet::new();
+    let mut draw_orders = BTreeSet::new();
+    let mut expected_order = queue
+        .renderables
+        .iter()
+        .enumerate()
+        .map(|(index, renderable)| {
+            (
+                (
+                    renderable.layer_order,
+                    renderable.layer.as_str(),
+                    renderable.local_order,
+                    renderable.stable_key.as_str(),
+                ),
+                index,
+            )
+        })
+        .collect::<Vec<_>>();
+    expected_order.sort_by(|left, right| left.0.cmp(&right.0));
+    for (index, renderable) in queue.renderables.iter().enumerate() {
+        if let Err(error) =
+            validate_path_component("scene render queue renderable id", &renderable.id)
+        {
+            blocked_reasons.push(error.to_string());
+        }
+        if !renderable_ids.insert(renderable.id.as_str()) {
+            blocked_reasons.push(format!(
+                "duplicate scene render queue renderable id: {}",
+                renderable.id
+            ));
+        }
+        if !draw_orders.insert(renderable.draw_order) {
+            blocked_reasons.push(format!(
+                "duplicate scene render queue drawOrder: {}",
+                renderable.draw_order
+            ));
+        }
+        if renderable.draw_order != index {
+            blocked_reasons.push(format!(
+                "scene render queue drawOrder for {} must be contiguous and match sorted index {}",
+                renderable.id, index
+            ));
+        }
+        if !matches!(
+            renderable.primitive_kind.as_str(),
+            "rect"
+                | "sprite"
+                | "tilemap"
+                | "text"
+                | "debug_bounds"
+                | "debug_camera"
+                | "debug_label"
+        ) {
+            blocked_reasons.push(format!(
+                "unsupported scene render queue primitive kind: {}",
+                renderable.primitive_kind
+            ));
+        }
+        match layer_orders.get(renderable.layer.as_str()) {
+            Some(order) if *order == renderable.layer_order => {}
+            Some(order) => blocked_reasons.push(format!(
+                "scene render queue renderable {} layerOrder {} does not match layer {} order {}",
+                renderable.id, renderable.layer_order, renderable.layer, order
+            )),
+            None => blocked_reasons.push(format!(
+                "scene render queue renderable {} references unknown layer: {}",
+                renderable.id, renderable.layer
+            )),
+        }
+        if !renderable.visible && renderable.fallback_reason.is_none() {
+            warnings.push(format!(
+                "hidden renderable {} should include fallbackReason",
+                renderable.id
+            ));
+        }
+    }
+    let expected_indices = expected_order
+        .iter()
+        .map(|(_, index)| *index)
+        .collect::<Vec<_>>();
+    if expected_indices != (0..queue.renderables.len()).collect::<Vec<_>>() {
+        blocked_reasons.push(
+            "scene render queue renderables must be sorted by layerOrder, layer, localOrder, stableKey"
+                .to_string(),
+        );
+    }
+    let status = if blocked_reasons.is_empty() {
+        if warnings.is_empty() {
+            "ready"
+        } else {
+            "warning"
+        }
+    } else {
+        "blocked"
+    }
+    .to_string();
+    SceneRenderQueueValidation {
+        status,
+        blocked_reasons,
+        warnings,
+    }
 }
 
 pub fn scene_render_breakdown(
@@ -46643,6 +47031,200 @@ scenarios:
             serde_json::to_value(&breakdown.read_only_inspection).expect("boundary serializes")
                 ["disallowedActions"],
             json!(["trusted writes", "command bridge", "live mutation"])
+        );
+    }
+
+    #[test]
+    fn scene_render_queue_v1_sorts_scene_tilemap_hud_and_debug_primitives() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "queue-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "renderer": {
+                "version": "1",
+                "camera": { "x": 8, "y": 4 },
+                "viewport": { "width": 160, "height": 90 },
+                "background": "#172532",
+                "layers": [
+                    { "id": "actors", "order": 0 },
+                    { "id": "hud", "order": 10, "visible": false }
+                ],
+                "debug": {
+                    "showBounds": true,
+                    "showCamera": true,
+                    "showEntityIds": true
+                }
+            },
+            "tilemaps": [{
+                "id": "level",
+                "tileSize": { "width": 16, "height": 16 },
+                "grid": { "width": 1, "height": 1 },
+                "tiles": [{ "id": "grass", "color": "#22c55e" }],
+                "layers": [{ "id": "ground", "order": -5, "data": ["grass"] }]
+            }],
+            "entities": [
+                { "id": "zebra", "sprite": { "color": "#facc15", "layer": "actors", "order": 5 }, "components": { "transform": { "x": 40, "y": 20 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 8, "height": 8 }, "controllable": false } },
+                { "id": "player", "sprite": { "color": "#5eead4", "asset": "assets/sprites/player.svg", "layer": "actors", "order": 5 }, "components": { "transform": { "x": 24, "y": 20 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 16 }, "controllable": true } },
+                { "id": "hud_score", "sprite": { "color": "#ffffff", "layer": "hud", "order": 0 }, "components": { "transform": { "x": 0, "y": 0 }, "velocity": { "x": 0, "y": 0 }, "size": { "width": 8, "height": 8 }, "controllable": false, "uiText": { "text": "Score" } } }
+            ]
+        }))
+        .expect("queue fixture parses");
+        validate_scene(&scene).expect("queue scene validates");
+
+        let queue = scene_render_queue(&scene, "frame-0007");
+        assert_eq!(queue.schema_version, "ouroforge.scene-render-queue.v1");
+        assert_eq!(queue.frame_id, "frame-0007");
+        assert_eq!(queue.validation.status, "ready");
+        assert_eq!(
+            queue
+                .renderables
+                .iter()
+                .map(|renderable| (
+                    renderable.id.as_str(),
+                    renderable.draw_order,
+                    renderable.primitive_kind.as_str(),
+                    renderable.visible
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("tilemap-level-ground", 0, "tilemap", true),
+                ("entity-player", 1, "sprite", true),
+                ("entity-zebra", 2, "rect", true),
+                ("entity-hud_score", 3, "text", false),
+                ("debug-camera", 4, "debug_camera", true),
+                ("debug-bounds-hud_score", 5, "debug_bounds", true),
+                ("debug-bounds-player", 6, "debug_bounds", true),
+                ("debug-bounds-zebra", 7, "debug_bounds", true),
+                ("debug-label-hud_score", 8, "debug_label", true),
+                ("debug-label-player", 9, "debug_label", true),
+                ("debug-label-zebra", 10, "debug_label", true),
+            ]
+        );
+        assert_eq!(
+            queue
+                .renderables
+                .iter()
+                .find(|renderable| renderable.id == "entity-hud_score")
+                .and_then(|renderable| renderable.fallback_reason.as_deref()),
+            Some("renderer layer hidden")
+        );
+        assert_eq!(
+            serde_json::to_value(&queue.read_only_inspection).expect("boundary serializes")
+                ["disallowedActions"],
+            json!(["trusted writes", "command bridge", "live mutation"])
+        );
+    }
+
+    #[test]
+    fn scene_render_queue_validation_blocks_malformed_model_data() {
+        let mut queue = SceneRenderQueue {
+            schema_version: "ouroforge.scene-render-queue.v1".to_string(),
+            frame_id: "frame-bad".to_string(),
+            scene_id: "bad-scene".to_string(),
+            layers: vec![SceneRenderQueueLayer {
+                id: "actors".to_string(),
+                order: 0,
+                visible: true,
+                kind: "scene".to_string(),
+            }],
+            renderables: vec![SceneRenderQueueRenderable {
+                id: "entity-player".to_string(),
+                source_kind: "entity".to_string(),
+                source_id: "player".to_string(),
+                layer: "actors".to_string(),
+                layer_order: 0,
+                local_order: 0,
+                stable_key: "player".to_string(),
+                draw_order: 0,
+                primitive_kind: "sprite".to_string(),
+                visible: true,
+                fallback_reason: None,
+            }],
+            validation: SceneRenderQueueValidation {
+                status: "ready".to_string(),
+                blocked_reasons: Vec::new(),
+                warnings: Vec::new(),
+            },
+            read_only_inspection: SceneRenderBreakdownInspectionBoundary {
+                trusted_emitter: "rust-local-scene-contract".to_string(),
+                browser_studio_mode: "read-only evidence inspection".to_string(),
+                disallowed_actions: vec!["trusted writes".to_string()],
+            },
+        };
+        queue.layers.push(SceneRenderQueueLayer {
+            id: "actors".to_string(),
+            order: 0,
+            visible: true,
+            kind: "shader".to_string(),
+        });
+        queue.renderables.push(SceneRenderQueueRenderable {
+            id: "entity-player".to_string(),
+            source_kind: "entity".to_string(),
+            source_id: "player-copy".to_string(),
+            layer: "missing".to_string(),
+            layer_order: 99,
+            local_order: -1,
+            stable_key: "copy".to_string(),
+            draw_order: 0,
+            primitive_kind: "mesh3d".to_string(),
+            visible: true,
+            fallback_reason: None,
+        });
+
+        let validation = validate_scene_render_queue_model(&queue);
+        assert_eq!(validation.status, "blocked");
+        let reasons = validation.blocked_reasons.join(" | ");
+        assert!(reasons.contains("duplicate scene render queue layer id"));
+        assert!(reasons.contains("unsupported scene render queue layer kind"));
+        assert!(reasons.contains("duplicate scene render queue renderable id"));
+        assert!(reasons.contains("duplicate scene render queue drawOrder"));
+        assert!(reasons.contains("unsupported scene render queue primitive kind"));
+        assert!(reasons.contains("references unknown layer"));
+    }
+
+    #[test]
+    fn scene_render_queue_validation_reports_warning_state_without_blockers() {
+        let queue = SceneRenderQueue {
+            schema_version: "ouroforge.scene-render-queue.v1".to_string(),
+            frame_id: "frame-warning".to_string(),
+            scene_id: "warning-scene".to_string(),
+            layers: vec![SceneRenderQueueLayer {
+                id: "actors".to_string(),
+                order: 0,
+                visible: true,
+                kind: "scene".to_string(),
+            }],
+            renderables: vec![SceneRenderQueueRenderable {
+                id: "entity-player".to_string(),
+                source_kind: "entity".to_string(),
+                source_id: "player".to_string(),
+                layer: "actors".to_string(),
+                layer_order: 0,
+                local_order: 0,
+                stable_key: "player".to_string(),
+                draw_order: 0,
+                primitive_kind: "sprite".to_string(),
+                visible: false,
+                fallback_reason: None,
+            }],
+            validation: SceneRenderQueueValidation {
+                status: "ready".to_string(),
+                blocked_reasons: Vec::new(),
+                warnings: Vec::new(),
+            },
+            read_only_inspection: SceneRenderBreakdownInspectionBoundary {
+                trusted_emitter: "rust-local-scene-contract".to_string(),
+                browser_studio_mode: "read-only evidence inspection".to_string(),
+                disallowed_actions: vec!["trusted writes".to_string()],
+            },
+        };
+
+        let validation = validate_scene_render_queue_model(&queue);
+        assert_eq!(validation.status, "warning");
+        assert!(validation.blocked_reasons.is_empty());
+        assert_eq!(
+            validation.warnings,
+            vec!["hidden renderable entity-player should include fallbackReason"]
         );
     }
 
