@@ -38,6 +38,7 @@ separate maintainer actions:
 - [`public-readiness-audit.md`](public-readiness-audit.md) — readiness audit evidence.
 - [`public-launch-checklist.md`](public-launch-checklist.md) — manual launch/visibility checklist; it does not change repository visibility.
 - [`public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md) — launch governance and decision boundaries.
+- [`public-alpha-launch-governance-final-handoff-v1.md`](public-alpha-launch-governance-final-handoff-v1.md) — final roadmap/#1 handoff source, manual hold outcome, protected anchors, and next candidate audit.
 - [`public-alpha-launch-hold-criteria-v1.md`](public-alpha-launch-hold-criteria-v1.md) — manual hold criteria for launch blockers, evidence, owner, and cadence.
 - [`public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md) — manual response and rollback options after launch-governance blockers.
 - [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md) — public-alpha PR checklist, forbidden-scope gates, dependency/Lore expectations, and merge-readiness criteria.
