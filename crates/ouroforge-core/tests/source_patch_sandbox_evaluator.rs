@@ -1,9 +1,14 @@
 use ouroforge_core::{
-    inspect_source_patch_sandbox_evaluator_plan, validate_source_patch_sandbox_evaluator_plan,
-    SourcePatchPreviewApplyStatus, SourcePatchPreviewRequiredTest, SourcePatchSandboxCleanupPolicy,
+    apply_source_patch_preview_in_sandbox, inspect_source_patch_sandbox_evaluator_plan,
+    validate_source_patch_sandbox_evaluator_plan, SourcePatchPreviewApplyStatus,
+    SourcePatchPreviewArtifact, SourcePatchPreviewRequiredTest, SourcePatchSandboxCleanupPolicy,
     SourcePatchSandboxEvaluationInputs, SourcePatchSandboxEvaluatorPlan,
     SourcePatchSandboxLayoutPolicy, SOURCE_PATCH_SANDBOX_EVALUATOR_PLAN_SCHEMA_VERSION,
 };
+use serde_json::json;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn fixture_plan() -> SourcePatchSandboxEvaluatorPlan {
     SourcePatchSandboxEvaluatorPlan {
@@ -144,4 +149,187 @@ fn source_patch_sandbox_evaluator_plan_requires_validation_refs_and_apply_block(
         .blocked_reasons
         .iter()
         .any(|reason| reason.contains("does not execute")));
+}
+
+#[test]
+fn source_patch_sandbox_apply_writes_only_sandbox_worktree_and_report() {
+    let temp = sandbox_test_dir("apply-writes-only-sandbox");
+    let repo_root = temp.join("repo");
+    let run_dir = temp.join("run");
+    let target_rel = "crates/ouroforge-core/src/lib.rs";
+    let trusted_target = repo_root.join(target_rel);
+    fs::create_dir_all(trusted_target.parent().expect("target parent")).expect("create repo");
+    fs::create_dir_all(&run_dir).expect("create run dir");
+    fs::write(&trusted_target, "pub fn demo() {\n    1\n}\n").expect("write trusted target");
+
+    let snapshot_hash = test_file_hash(&trusted_target);
+    let before_hash = "sha256:26487e8eab103e0b035c5075ec7a50319e7e65b92c843c5e44d66b2e35d7b3d4";
+    let artifact = fixture_apply_artifact(target_rel, before_hash);
+    let plan = fixture_plan();
+
+    let result = apply_source_patch_preview_in_sandbox(&artifact, &plan, &repo_root, &run_dir)
+        .expect("sandbox apply succeeds");
+
+    assert_eq!(result.status, "passed");
+    assert!(result.commands_run.is_empty());
+    assert_eq!(
+        fs::read_to_string(&trusted_target).expect("read trusted"),
+        "pub fn demo() {\n    1\n}\n"
+    );
+    let sandbox_target = run_dir
+        .join("sandbox/patch-preview-1/worktree")
+        .join(target_rel);
+    assert_eq!(
+        fs::read_to_string(sandbox_target).expect("read sandbox"),
+        "pub fn demo() {\n    2\n}\n"
+    );
+    let report: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(run_dir.join("sandbox/patch-preview-1/evidence/report.json"))
+            .expect("report written"),
+    )
+    .expect("report json parses");
+    assert_eq!(report["commandsRun"], json!([]));
+    assert!(report["guardrails"]
+        .as_array()
+        .expect("guardrails array")
+        .iter()
+        .any(|guardrail| guardrail.as_str().unwrap_or_default().contains("no shell")));
+    assert_eq!(
+        result.target_snapshots[0].trusted_before_hash,
+        snapshot_hash
+    );
+    assert_eq!(result.target_snapshots[0].trusted_after_hash, snapshot_hash);
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
+fn source_patch_sandbox_apply_rejects_stale_target_without_trusted_write() {
+    let temp = sandbox_test_dir("apply-rejects-stale-target");
+    let repo_root = temp.join("repo");
+    let run_dir = temp.join("run");
+    let target_rel = "crates/ouroforge-core/src/lib.rs";
+    let trusted_target = repo_root.join(target_rel);
+    fs::create_dir_all(trusted_target.parent().expect("target parent")).expect("create repo");
+    fs::create_dir_all(&run_dir).expect("create run dir");
+    fs::write(&trusted_target, "pub fn demo() {\n    1\n}\n").expect("write trusted target");
+
+    let mut artifact = fixture_apply_artifact(target_rel, "fnv1a64-file-v1:0000000000000000");
+    artifact.targets[0].before_hash = "fnv1a64-file-v1:0000000000000000".to_string();
+    let error =
+        apply_source_patch_preview_in_sandbox(&artifact, &fixture_plan(), &repo_root, &run_dir)
+            .expect_err("stale target is rejected before sandbox write");
+
+    assert!(error.to_string().contains("stale source patch target"));
+    assert_eq!(
+        fs::read_to_string(&trusted_target).expect("trusted unchanged"),
+        "pub fn demo() {\n    1\n}\n"
+    );
+    assert!(!run_dir
+        .join("sandbox/patch-preview-1/worktree")
+        .join(target_rel)
+        .exists());
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+fn fixture_apply_artifact(target_rel: &str, before_hash: &str) -> SourcePatchPreviewArtifact {
+    serde_json::from_value(json!({
+        "schemaVersion": "patch-preview.v1",
+        "patchPreviewId": "patch-preview-1",
+        "proposalId": "proposal-1",
+        "createdAt": "2026-06-04T00:00:00Z",
+        "producer": {
+            "name": "test",
+            "version": "1",
+            "trustedBoundary": "unit-test"
+        },
+        "sourceMutationApplyStatus": "blocked",
+        "baseRef": {
+            "branch": "main",
+            "commit": "fixture",
+            "targetFreshness": "checked"
+        },
+        "staleTargetPolicy": "reject before sandbox copy",
+        "artifactHash": "fnv1a64-file-v1:1111111111111111",
+        "targets": [{
+            "path": target_rel,
+            "beforeHash": before_hash,
+            "fileClass": "rust_source",
+            "reviewLevel": "normal",
+            "classificationStatus": "potentially_allowed_later",
+            "classificationRationale": "unit test fixture target",
+            "blockedReasons": []
+        }],
+        "diffSummary": {
+            "summary": "Change demo return value in sandbox copy only",
+            "diffText": format!("diff --git a/{target_rel} b/{target_rel}\n--- a/{target_rel}\n+++ b/{target_rel}\n@@ -1,3 +1,3 @@\n pub fn demo() {{\n-    1\n+    2\n }}\n"),
+            "diffStats": {
+                "filesChanged": 1,
+                "additions": 1,
+                "deletions": 1,
+                "binaryOrOpaque": false,
+                "generatedOrigin": false,
+                "truncated": false
+            },
+            "hunks": [{
+                "path": target_rel,
+                "summary": "demo body changes from 1 to 2"
+            }]
+        },
+        "riskLevel": "low",
+        "riskIds": ["STM-01"],
+        "linkedEvidence": [{"kind": "unit-test", "path": "evidence/source-file-class-validation.json"}],
+        "expectedBehaviorChange": "sandbox copy changes only",
+        "requiredTests": [{
+            "command": "cargo test -p ouroforge-core --test source_patch_sandbox_evaluator -- --nocapture",
+            "argv": ["cargo", "test", "-p", "ouroforge-core", "--test", "source_patch_sandbox_evaluator", "--", "--nocapture"],
+            "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
+            "executionAuthority": "copyable_not_executed_metadata"
+        }],
+        "reviewerChecklist": ["confirm sandbox-only write"],
+        "rollbackExpectations": {
+            "requiredBeforeApply": true,
+            "minimumFields": ["beforeHash"]
+        },
+        "readModelPrototype": {
+            "status": "blocked",
+            "displayLabel": "sandbox apply fixture",
+            "fileClassSummary": "rust source",
+            "riskSummary": "low",
+            "primaryBlockedReason": "trusted apply remains blocked",
+            "allowedActions": ["sandbox preview"],
+            "forbiddenActions": ["trusted apply"]
+        }
+    }))
+    .expect("apply fixture parses")
+}
+
+fn sandbox_test_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time")
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "ouroforge-source-patch-sandbox-{name}-{}-{unique}",
+        std::process::id()
+    ));
+    if path.exists() {
+        fs::remove_dir_all(&path).expect("remove stale temp dir");
+    }
+    path
+}
+
+fn test_file_hash(path: &Path) -> String {
+    let bytes = fs::read(path).expect("read file for test hash");
+    format!("fnv1a64-file-v1:{:016x}", test_fnv1a64(&bytes))
+}
+
+fn test_fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }

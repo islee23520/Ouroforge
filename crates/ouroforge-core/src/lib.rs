@@ -10952,6 +10952,43 @@ impl SourcePatchSandboxEvaluatorPlanValidation {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxTargetSnapshot {
+    pub path: String,
+    #[serde(rename = "trustedBeforeHash")]
+    pub trusted_before_hash: String,
+    #[serde(rename = "sandboxBeforeHash")]
+    pub sandbox_before_hash: String,
+    #[serde(rename = "sandboxAfterHash")]
+    pub sandbox_after_hash: String,
+    #[serde(rename = "trustedAfterHash")]
+    pub trusted_after_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchSandboxApplyResult {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "sandboxRoot")]
+    pub sandbox_root: String,
+    #[serde(rename = "worktreePath")]
+    pub worktree_path: String,
+    #[serde(rename = "reportPath")]
+    pub report_path: String,
+    #[serde(rename = "targetSnapshots")]
+    pub target_snapshots: Vec<SourcePatchSandboxTargetSnapshot>,
+    #[serde(rename = "commandsRun")]
+    pub commands_run: Vec<String>,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+}
+
 pub fn inspect_source_patch_test_command_allowlist(
     artifact: &SourcePatchTestCommandAllowlistArtifact,
 ) -> SourcePatchTestCommandAllowlistValidation {
@@ -11320,6 +11357,456 @@ pub fn validate_source_patch_sandbox_evaluator_plan(
         ));
     }
     Ok(validation)
+}
+
+pub fn apply_source_patch_preview_in_sandbox(
+    artifact: &SourcePatchPreviewArtifact,
+    plan: &SourcePatchSandboxEvaluatorPlan,
+    trusted_repo_root: impl AsRef<Path>,
+    run_dir: impl AsRef<Path>,
+) -> Result<SourcePatchSandboxApplyResult> {
+    validate_source_patch_sandbox_evaluator_plan(plan)?;
+    if artifact.patch_preview_id != plan.inputs.patch_preview_id {
+        return Err(anyhow!(
+            "patch preview id {} does not match sandbox plan input {}",
+            artifact.patch_preview_id,
+            plan.inputs.patch_preview_id
+        ));
+    }
+    if artifact.source_mutation_apply_status != SourcePatchPreviewApplyStatus::Blocked {
+        return Err(anyhow!(
+            "trusted source mutation apply must remain blocked for sandbox preview"
+        ));
+    }
+    let diff_text = artifact
+        .diff_summary
+        .diff_text
+        .as_deref()
+        .ok_or_else(|| anyhow!("source patch sandbox apply requires diffSummary.diffText"))?;
+    let diff_files = parse_source_patch_sandbox_apply_diff(diff_text)?;
+    let run_dir = run_dir.as_ref();
+    let trusted_repo_root = trusted_repo_root.as_ref();
+    let sandbox_root = run_dir.join(&plan.layout.sandbox_root);
+    let worktree_root = run_dir.join(&plan.layout.worktree_path);
+    let evidence_root = run_dir.join(&plan.layout.evidence_path);
+    let report_path = run_dir.join(&plan.layout.report_path);
+
+    fs::create_dir_all(&sandbox_root).with_context(|| {
+        format!(
+            "failed to create source patch sandbox root {}",
+            sandbox_root.display()
+        )
+    })?;
+    fs::create_dir_all(&worktree_root).with_context(|| {
+        format!(
+            "failed to create source patch sandbox worktree {}",
+            worktree_root.display()
+        )
+    })?;
+    fs::create_dir_all(&evidence_root).with_context(|| {
+        format!(
+            "failed to create source patch sandbox evidence {}",
+            evidence_root.display()
+        )
+    })?;
+    ensure_path_inside(&sandbox_root, &worktree_root)?;
+    ensure_path_inside(&sandbox_root, &evidence_root)?;
+    ensure_path_inside(&sandbox_root, &report_path)?;
+
+    let diff_paths = diff_files
+        .iter()
+        .map(|file| file.target_path.clone())
+        .collect::<BTreeSet<_>>();
+    let target_paths = artifact
+        .targets
+        .iter()
+        .map(|target| target.path.clone())
+        .collect::<BTreeSet<_>>();
+    if diff_paths != target_paths {
+        return Err(anyhow!(
+            "sandbox apply diff targets must match preview targets exactly"
+        ));
+    }
+
+    let mut trusted_before_hashes = BTreeMap::<String, String>::new();
+    for target in &artifact.targets {
+        validate_patch_draft_target_path(&target.path)?;
+        let trusted_path = trusted_repo_root.join(&target.path);
+        let trusted_expected_hash =
+            source_patch_sandbox_file_hash_for_expected(&trusted_path, &target.before_hash)
+                .with_context(|| {
+                    format!(
+                        "failed to hash trusted source patch target {}",
+                        trusted_path.display()
+                    )
+                })?;
+        if target.before_hash != trusted_expected_hash {
+            return Err(anyhow!(
+                "stale source patch target {}: expected {}, found {}; trusted worktree was not modified",
+                target.path,
+                target.before_hash,
+                trusted_expected_hash
+            ));
+        }
+        let trusted_snapshot_hash =
+            source_patch_sandbox_file_hash(&trusted_path).with_context(|| {
+                format!(
+                    "failed to snapshot trusted source patch target {}",
+                    trusted_path.display()
+                )
+            })?;
+        trusted_before_hashes.insert(target.path.clone(), trusted_snapshot_hash);
+    }
+
+    for target in &artifact.targets {
+        let trusted_path = trusted_repo_root.join(&target.path);
+        let sandbox_path = worktree_root.join(&target.path);
+        ensure_path_inside(&worktree_root, &sandbox_path)?;
+        if let Some(parent) = sandbox_path.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "failed to create source patch sandbox target parent {}",
+                    parent.display()
+                )
+            })?;
+        }
+        fs::copy(&trusted_path, &sandbox_path).with_context(|| {
+            format!(
+                "failed to copy trusted target {} into sandbox {}",
+                trusted_path.display(),
+                sandbox_path.display()
+            )
+        })?;
+    }
+
+    for diff_file in &diff_files {
+        let sandbox_path = worktree_root.join(&diff_file.target_path);
+        ensure_path_inside(&worktree_root, &sandbox_path)?;
+        let original = fs::read_to_string(&sandbox_path).with_context(|| {
+            format!(
+                "failed to read sandbox target before apply {}",
+                sandbox_path.display()
+            )
+        })?;
+        let patched =
+            apply_source_patch_sandbox_hunks(&original, &diff_file.hunks).with_context(|| {
+                format!(
+                    "failed to apply source patch preview to sandbox target {}",
+                    diff_file.target_path
+                )
+            })?;
+        fs::write(&sandbox_path, patched).with_context(|| {
+            format!(
+                "failed to write patched sandbox target {}",
+                sandbox_path.display()
+            )
+        })?;
+    }
+
+    let mut target_snapshots = Vec::new();
+    for target in &artifact.targets {
+        let trusted_path = trusted_repo_root.join(&target.path);
+        let sandbox_path = worktree_root.join(&target.path);
+        let trusted_before_hash = trusted_before_hashes
+            .get(&target.path)
+            .cloned()
+            .unwrap_or_default();
+        let sandbox_before_hash = trusted_before_hash.clone();
+        let sandbox_after_hash =
+            source_patch_sandbox_file_hash(&sandbox_path).with_context(|| {
+                format!(
+                    "failed to hash sandbox target after apply {}",
+                    sandbox_path.display()
+                )
+            })?;
+        let trusted_after_hash =
+            source_patch_sandbox_file_hash(&trusted_path).with_context(|| {
+                format!(
+                    "failed to hash trusted target after sandbox apply {}",
+                    trusted_path.display()
+                )
+            })?;
+        if trusted_after_hash != trusted_before_hash {
+            return Err(anyhow!(
+                "trusted target {} changed during sandbox apply; refusing result",
+                target.path
+            ));
+        }
+        target_snapshots.push(SourcePatchSandboxTargetSnapshot {
+            path: target.path.clone(),
+            trusted_before_hash,
+            sandbox_before_hash,
+            sandbox_after_hash,
+            trusted_after_hash,
+        });
+    }
+
+    let result = SourcePatchSandboxApplyResult {
+        schema_version: "source-patch-sandbox-apply-result-v1".to_string(),
+        status: "passed".to_string(),
+        patch_preview_id: artifact.patch_preview_id.clone(),
+        sandbox_root: plan.layout.sandbox_root.clone(),
+        worktree_path: plan.layout.worktree_path.clone(),
+        report_path: plan.layout.report_path.clone(),
+        target_snapshots,
+        commands_run: Vec::new(),
+        guardrails: vec![
+            "source patch preview applied only to sandbox worktree copies".to_string(),
+            "trusted main worktree files are hashed before and after and are not written".to_string(),
+            "no shell, git apply, network, install, credential, dependency, or test commands are run".to_string(),
+            "sandbox report is generated under sandbox evidence only".to_string(),
+        ],
+        blocked_reasons: Vec::new(),
+    };
+    write_json_atomic(&report_path, &json!(result))?;
+    Ok(result)
+}
+
+#[derive(Debug, Clone)]
+struct SourcePatchSandboxApplyDiffFile {
+    target_path: String,
+    hunks: Vec<SourcePatchSandboxApplyHunk>,
+}
+
+#[derive(Debug, Clone)]
+struct SourcePatchSandboxApplyHunk {
+    old_start: usize,
+    lines: Vec<String>,
+}
+
+fn parse_source_patch_sandbox_apply_diff(
+    diff_text: &str,
+) -> Result<Vec<SourcePatchSandboxApplyDiffFile>> {
+    validate_unified_patch_diff_for_preview(diff_text, PatchDiffIntegrityLimits::default())?;
+    let mut files = Vec::<SourcePatchSandboxApplyDiffFile>::new();
+    let mut current_path: Option<String> = None;
+    let mut current_hunks = Vec::<SourcePatchSandboxApplyHunk>::new();
+    let mut current_hunk: Option<SourcePatchSandboxApplyHunk> = None;
+
+    for line in diff_text.lines() {
+        if line.starts_with("diff --git ") {
+            finish_source_patch_sandbox_apply_hunk(&mut current_hunks, &mut current_hunk);
+            finish_source_patch_sandbox_apply_file(
+                &mut files,
+                &mut current_path,
+                &mut current_hunks,
+            );
+        } else if line.starts_with("+++ ") {
+            let path = normalize_diff_path(line.trim_start_matches("+++ ").trim());
+            if path == "/dev/null" {
+                return Err(anyhow!(
+                    "source patch sandbox apply does not support deleting targets"
+                ));
+            }
+            current_path = Some(path);
+        } else if line.starts_with("@@ ") {
+            finish_source_patch_sandbox_apply_hunk(&mut current_hunks, &mut current_hunk);
+            let hunk = parse_unified_hunk_header(line).ok_or_else(|| {
+                anyhow!("source patch sandbox apply hunk header could not be parsed")
+            })?;
+            current_hunk = Some(SourcePatchSandboxApplyHunk {
+                old_start: hunk.old_start as usize,
+                lines: Vec::new(),
+            });
+        } else if let Some(hunk) = &mut current_hunk {
+            if matches!(line.as_bytes().first(), Some(b' ' | b'+' | b'-' | b'\\')) {
+                hunk.lines.push(line.to_string());
+            }
+        }
+    }
+    finish_source_patch_sandbox_apply_hunk(&mut current_hunks, &mut current_hunk);
+    finish_source_patch_sandbox_apply_file(&mut files, &mut current_path, &mut current_hunks);
+    if files.is_empty() {
+        return Err(anyhow!(
+            "source patch sandbox apply requires at least one diff target"
+        ));
+    }
+    Ok(files)
+}
+
+fn finish_source_patch_sandbox_apply_hunk(
+    hunks: &mut Vec<SourcePatchSandboxApplyHunk>,
+    current_hunk: &mut Option<SourcePatchSandboxApplyHunk>,
+) {
+    if let Some(hunk) = current_hunk.take() {
+        hunks.push(hunk);
+    }
+}
+
+fn finish_source_patch_sandbox_apply_file(
+    files: &mut Vec<SourcePatchSandboxApplyDiffFile>,
+    current_path: &mut Option<String>,
+    current_hunks: &mut Vec<SourcePatchSandboxApplyHunk>,
+) {
+    if let Some(target_path) = current_path.take() {
+        files.push(SourcePatchSandboxApplyDiffFile {
+            target_path,
+            hunks: std::mem::take(current_hunks),
+        });
+    }
+}
+
+fn apply_source_patch_sandbox_hunks(
+    original: &str,
+    hunks: &[SourcePatchSandboxApplyHunk],
+) -> Result<String> {
+    let had_trailing_newline = original.ends_with('\n');
+    let mut lines = original.split('\n').map(str::to_string).collect::<Vec<_>>();
+    if had_trailing_newline {
+        lines.pop();
+    }
+    let mut output = Vec::<String>::new();
+    let mut cursor = 0usize;
+    for hunk in hunks {
+        let hunk_start = hunk.old_start.saturating_sub(1);
+        if hunk_start < cursor || hunk_start > lines.len() {
+            return Err(anyhow!(
+                "source patch sandbox hunk start is outside target content"
+            ));
+        }
+        output.extend(lines[cursor..hunk_start].iter().cloned());
+        cursor = hunk_start;
+        for line in &hunk.lines {
+            if line.starts_with('\\') {
+                continue;
+            }
+            if let Some(expected) = line.strip_prefix(' ') {
+                let actual = lines.get(cursor).ok_or_else(|| {
+                    anyhow!("source patch sandbox context line is outside target")
+                })?;
+                if actual != expected {
+                    return Err(anyhow!(
+                        "source patch sandbox context mismatch: expected `{expected}`, found `{actual}`"
+                    ));
+                }
+                output.push(actual.clone());
+                cursor += 1;
+            } else if let Some(expected) = line.strip_prefix('-') {
+                let actual = lines.get(cursor).ok_or_else(|| {
+                    anyhow!("source patch sandbox removal line is outside target")
+                })?;
+                if actual != expected {
+                    return Err(anyhow!(
+                        "source patch sandbox removal mismatch: expected `{expected}`, found `{actual}`"
+                    ));
+                }
+                cursor += 1;
+            } else if let Some(added) = line.strip_prefix('+') {
+                output.push(added.to_string());
+            } else {
+                return Err(anyhow!(
+                    "source patch sandbox hunk line has unsupported prefix"
+                ));
+            }
+        }
+    }
+    output.extend(lines[cursor..].iter().cloned());
+    let mut patched = output.join("\n");
+    if had_trailing_newline {
+        patched.push('\n');
+    }
+    Ok(patched)
+}
+
+fn source_patch_sandbox_file_hash_for_expected(path: &Path, expected: &str) -> Result<String> {
+    let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+    if expected.starts_with("sha256:") {
+        return Ok(format!(
+            "sha256:{}",
+            source_patch_sandbox_sha256_hex(&bytes)
+        ));
+    }
+    if expected.starts_with("fnv1a64-file-v1:") {
+        return Ok(format!("fnv1a64-file-v1:{:016x}", fnv1a64(&bytes)));
+    }
+    Err(anyhow!(
+        "source patch sandbox beforeHash must use sha256: or fnv1a64-file-v1:"
+    ))
+}
+
+fn source_patch_sandbox_file_hash(path: &Path) -> Result<String> {
+    let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+    Ok(format!("fnv1a64-file-v1:{:016x}", fnv1a64(&bytes)))
+}
+
+fn source_patch_sandbox_sha256_hex(bytes: &[u8]) -> String {
+    const INITIAL: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+        0x5be0cd19,
+    ];
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
+    ];
+    let mut message = bytes.to_vec();
+    let bit_len = (message.len() as u64) * 8;
+    message.push(0x80);
+    while (message.len() % 64) != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    let mut hash = INITIAL;
+    for chunk in message.chunks(64) {
+        let mut w = [0u32; 64];
+        for (index, word) in w.iter_mut().take(16).enumerate() {
+            let start = index * 4;
+            *word = u32::from_be_bytes([
+                chunk[start],
+                chunk[start + 1],
+                chunk[start + 2],
+                chunk[start + 3],
+            ]);
+        }
+        for index in 16..64 {
+            let s0 = w[index - 15].rotate_right(7)
+                ^ w[index - 15].rotate_right(18)
+                ^ (w[index - 15] >> 3);
+            let s1 = w[index - 2].rotate_right(17)
+                ^ w[index - 2].rotate_right(19)
+                ^ (w[index - 2] >> 10);
+            w[index] = w[index - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[index - 7])
+                .wrapping_add(s1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = hash;
+        for index in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ ((!e) & g);
+            let temp1 = h
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[index])
+                .wrapping_add(w[index]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(maj);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+        for (slot, value) in hash.iter_mut().zip([a, b, c, d, e, f, g, h]) {
+            *slot = slot.wrapping_add(value);
+        }
+    }
+    hash.iter()
+        .map(|word| format!("{word:08x}"))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 pub fn normalize_source_patch_test_command(argv: &[String]) -> String {
