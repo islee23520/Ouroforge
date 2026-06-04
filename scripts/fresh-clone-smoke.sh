@@ -23,7 +23,7 @@ Options:
 Environment:
   OUROFORGE_FRESH_CLONE_WORKERS  Worker count for run commands (default: 2; use 2+ for browser/scenario evidence).
   OUROFORGE_CHROME               Optional Chrome/Chromium executable path when not found at a standard path.
-  CARGO_TARGET_DIR               Optional Cargo target dir. Defaults to WORK_DIR/target.
+  CARGO_TARGET_DIR               Optional Cargo target dir. Must be outside the repository. Defaults to WORK_DIR/target.
 USAGE
 }
 
@@ -129,7 +129,18 @@ log "Copy tracked repository files into isolated clone directory"
   git ls-files -z | tar --null -T - -cf -
 ) | tar -xf - -C "$CLONE_DIR"
 
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$WORK_DIR/target}"
+# Resolve and boundary-check the Cargo target dir. A caller-provided
+# CARGO_TARGET_DIR controls generated build-output placement just like
+# --work-dir, so it must stay outside the maintainer worktree or the smoke
+# would leak generated state into the repository it claims to keep clean.
+CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$WORK_DIR/target}"
+CARGO_TARGET_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$CARGO_TARGET_DIR")
+CARGO_TARGET_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$CARGO_TARGET_DIR")
+if [[ "$CARGO_TARGET_REAL" == "$REPO_REAL" || "$CARGO_TARGET_REAL" == "$REPO_REAL"/* ]]; then
+  echo "error: CARGO_TARGET_DIR must be outside the repository so generated build output stays isolated: $CARGO_TARGET_DIR" >&2
+  exit 2
+fi
+export CARGO_TARGET_DIR
 MANIFEST="$CLONE_DIR/Cargo.toml"
 
 cargo_cli() {
