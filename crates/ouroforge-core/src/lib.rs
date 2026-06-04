@@ -12476,18 +12476,25 @@ fn inspect_source_patch_stale_target_guard_linked_evidence(
     evidence_root: &Path,
     blocked_reasons: &mut Vec<String>,
 ) {
-    for (field, path, status_keys, required_statuses) in [
+    for (field, path, status_keys, required_statuses, required_fields) in [
         (
             "evidenceFreshness.patchPreviewRef",
             artifact.evidence_freshness.patch_preview_ref.as_str(),
             &["status", "validationStatus", "validation_status"][..],
             &["passed", "ready", "complete", "valid"][..],
+            vec![
+                SourcePatchStaleGuardRequiredEvidenceField::target_paths(artifact),
+                SourcePatchStaleGuardRequiredEvidenceField::head(&artifact.base_ref.expected_head),
+            ],
         ),
         (
             "evidenceFreshness.fileClassReportRef",
             artifact.evidence_freshness.file_class_report_ref.as_str(),
             &["status", "validationStatus", "validation_status"][..],
             &["passed", "valid", "complete"][..],
+            vec![SourcePatchStaleGuardRequiredEvidenceField::target_paths(
+                artifact,
+            )],
         ),
         (
             "evidenceFreshness.diffIntegrityReportRef",
@@ -12497,24 +12504,40 @@ fn inspect_source_patch_stale_target_guard_linked_evidence(
                 .as_str(),
             &["status", "validationStatus", "validation_status"][..],
             &["passed", "valid", "complete"][..],
+            vec![SourcePatchStaleGuardRequiredEvidenceField::target_paths(
+                artifact,
+            )],
         ),
         (
             "evidenceFreshness.sandboxReportRef",
             artifact.evidence_freshness.sandbox_report_ref.as_str(),
             &["status", "result", "validationStatus", "validation_status"][..],
             &["passed", "success", "succeeded", "complete"][..],
+            vec![SourcePatchStaleGuardRequiredEvidenceField::target_paths(
+                artifact,
+            )],
         ),
         (
             "evidenceFreshness.reviewDecisionRef",
             artifact.evidence_freshness.review_decision_ref.as_str(),
             &["status", "reviewStatus", "review_status", "decision"][..],
             &["accepted", "approved", "passed"][..],
+            vec![SourcePatchStaleGuardRequiredEvidenceField::transaction_id(
+                &artifact.transaction_id,
+            )],
         ),
         (
             "evidenceFreshness.applyTransactionRef",
             artifact.evidence_freshness.apply_transaction_ref.as_str(),
             &["status", "validationStatus", "validation_status"][..],
             &["ready_for_trusted_apply", "passed", "ready", "complete"][..],
+            vec![
+                SourcePatchStaleGuardRequiredEvidenceField::transaction_id(
+                    &artifact.transaction_id,
+                ),
+                SourcePatchStaleGuardRequiredEvidenceField::target_paths(artifact),
+                SourcePatchStaleGuardRequiredEvidenceField::head(&artifact.base_ref.expected_head),
+            ],
         ),
     ] {
         inspect_source_patch_stale_target_guard_linked_json(
@@ -12523,6 +12546,7 @@ fn inspect_source_patch_stale_target_guard_linked_evidence(
             path,
             status_keys,
             required_statuses,
+            &required_fields,
             blocked_reasons,
         );
     }
@@ -12532,8 +12556,47 @@ fn inspect_source_patch_stale_target_guard_linked_evidence(
         &artifact.worktree_context_ref,
         &["status", "validationStatus", "validation_status"],
         &["passed", "ready", "clean", "complete"],
+        &[
+            SourcePatchStaleGuardRequiredEvidenceField::target_paths(artifact),
+            SourcePatchStaleGuardRequiredEvidenceField::head(&artifact.base_ref.expected_head),
+        ],
         blocked_reasons,
     );
+}
+
+#[derive(Debug)]
+struct SourcePatchStaleGuardRequiredEvidenceField {
+    label: String,
+    expected: Vec<String>,
+}
+
+impl SourcePatchStaleGuardRequiredEvidenceField {
+    fn transaction_id(transaction_id: &str) -> SourcePatchStaleGuardRequiredEvidenceField {
+        SourcePatchStaleGuardRequiredEvidenceField {
+            label: "transactionId".to_string(),
+            expected: vec![transaction_id.to_string()],
+        }
+    }
+
+    fn target_paths(
+        artifact: &SourcePatchStaleTargetGuardArtifact,
+    ) -> SourcePatchStaleGuardRequiredEvidenceField {
+        SourcePatchStaleGuardRequiredEvidenceField {
+            label: "target path".to_string(),
+            expected: artifact
+                .targets
+                .iter()
+                .map(|target| target.path.clone())
+                .collect(),
+        }
+    }
+
+    fn head(expected_head: &str) -> SourcePatchStaleGuardRequiredEvidenceField {
+        SourcePatchStaleGuardRequiredEvidenceField {
+            label: "expected head".to_string(),
+            expected: vec![expected_head.to_string()],
+        }
+    }
 }
 
 fn inspect_source_patch_stale_target_guard_linked_json(
@@ -12542,6 +12605,7 @@ fn inspect_source_patch_stale_target_guard_linked_json(
     path: &str,
     status_keys: &[&str],
     required_statuses: &[&str],
+    required_fields: &[SourcePatchStaleGuardRequiredEvidenceField],
     blocked_reasons: &mut Vec<String>,
 ) {
     if let Err(error) = validate_relative_artifact_path(field, path) {
@@ -12566,6 +12630,35 @@ fn inspect_source_patch_stale_target_guard_linked_json(
             required_statuses.join(", ")
         ));
     }
+    for required in required_fields {
+        if required.expected.is_empty() {
+            continue;
+        }
+        if !required
+            .expected
+            .iter()
+            .any(|expected| json_contains_string(&value, expected))
+        {
+            blocked_reasons.push(format!(
+                "{field} linked evidence must contain {} matching one of: {}",
+                required.label,
+                required.expected.join(", ")
+            ));
+        }
+    }
+}
+
+fn json_contains_string(value: &serde_json::Value, expected: &str) -> bool {
+    match value {
+        serde_json::Value::String(actual) => actual == expected,
+        serde_json::Value::Array(values) => values
+            .iter()
+            .any(|value| json_contains_string(value, expected)),
+        serde_json::Value::Object(map) => map
+            .values()
+            .any(|value| json_contains_string(value, expected)),
+        _ => false,
+    }
 }
 
 fn inspect_source_patch_stale_target_guard_current_targets(
@@ -12581,6 +12674,20 @@ fn inspect_source_patch_stale_target_guard_current_targets(
             continue;
         }
         let target_path = worktree_root.join(&target.path);
+        if let Err(error) = ensure_path_inside(worktree_root, &target_path) {
+            blocked_reasons.push(format!(
+                "{field}.path {} must stay inside trusted worktree before stale guard hashing: {error}",
+                target.path
+            ));
+            continue;
+        }
+        if target_path_traverses_symlink(worktree_root, &target.path) {
+            blocked_reasons.push(format!(
+                "{field}.path {} must not resolve through a symlink before stale guard hashing",
+                target.path
+            ));
+            continue;
+        }
         if !target_path.is_file() {
             blocked_reasons.push(format!(
                 "{field}.path {} must exist as a regular file in the trusted worktree",
