@@ -14725,18 +14725,15 @@ fn validate_scene_generation_refs_against_intent(
     required: &[LevelIntentRef],
     allowed: &[LevelIntentRef],
 ) -> Result<()> {
-    let allowed_ids = allowed
+    // Validate each required reference as an exact (refId, sourceRef) pair. Using
+    // separate id and source sets would accept a plan that pairs an allowed refId
+    // with an allowed sourceRef from a *different* intent reference.
+    let allowed_pairs = allowed
         .iter()
-        .map(|value| value.ref_id.as_str())
-        .collect::<BTreeSet<_>>();
-    let allowed_sources = allowed
-        .iter()
-        .map(|value| value.source_ref.as_str())
+        .map(|value| (value.ref_id.as_str(), value.source_ref.as_str()))
         .collect::<BTreeSet<_>>();
     for reference in required {
-        if !allowed_ids.contains(reference.ref_id.as_str())
-            || !allowed_sources.contains(reference.source_ref.as_str())
-        {
+        if !allowed_pairs.contains(&(reference.ref_id.as_str(), reference.source_ref.as_str())) {
             return Err(anyhow!(
                 "{field} contains ref not allowed by linked level intent: {}",
                 reference.ref_id
@@ -57972,6 +57969,26 @@ scenarios:
         assert!(missing_objective
             .to_string()
             .contains("missing intent objective"));
+
+        // A required asset that pairs an allowed refId with a *different* allowed
+        // sourceRef must be rejected — the (refId, sourceRef) pair, not each value
+        // independently, has to be authorized by the linked intent.
+        let mut cross_pair = SceneGenerationPlanArtifact::from_json_str(include_str!(
+            "../../../examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json"
+        ))
+        .expect("plan fixture parses");
+        cross_pair.intent_id = intent.intent_id.clone();
+        cross_pair.required_assets[0].source_ref = intent.allowed_assets[1].source_ref.clone();
+        assert_ne!(
+            cross_pair.required_assets[0].ref_id,
+            intent.allowed_assets[1].ref_id
+        );
+        let mismatched_pair = cross_pair
+            .validate_against_intent(&intent)
+            .expect_err("mismatched refId/sourceRef pair rejected");
+        assert!(mismatched_pair
+            .to_string()
+            .contains("not allowed by linked level intent"));
     }
 
     #[test]
