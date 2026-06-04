@@ -18,7 +18,7 @@ A self-mutating engine is only safe if nothing it does is taken on faith. So Our
 
 Intent becomes a playable artifact with provenance at every link of the chain — which is what lets an AI-in-the-loop forge stay honest.
 
-> **Status:** pre-release private MVP, local-first, moving toward public open-source readiness. It runs one reproducible local demo today. Ouroforge is **not** a Godot replacement and makes no compatibility promises — treat it as an inspectable prototype. See [Maturity boundaries](#maturity-boundaries) for what it deliberately does not do, and the [Roadmap](docs/roadmap.md) for where the loop is heading.
+> **Status:** pre-release private MVP, local-first, with public-readiness evidence and launch-governance handoffs recorded for a future manual visibility review. It runs one reproducible local demo today. Ouroforge is **not** a Godot replacement and makes no compatibility promises — treat it as an inspectable prototype. See [Maturity boundaries](#maturity-boundaries) for what it deliberately does not do, and the [Roadmap](docs/roadmap.md) for where the loop is heading.
 
 ## Quickstart
 
@@ -81,7 +81,7 @@ Per-milestone evidence steps live in the matching `docs/*.md`; contribution expe
 | Roadmap & completed milestones | [`docs/roadmap.md`](docs/roadmap.md) |
 | Evidence fidelity & trust boundary | [`docs/evidence-fidelity-trust-boundary-v1.md`](docs/evidence-fidelity-trust-boundary-v1.md) |
 | Artifact write policy | [`docs/artifact-write-policy-v1.md`](docs/artifact-write-policy-v1.md) |
-| Public-readiness gates | [`docs/public-readiness-audit.md`](docs/public-readiness-audit.md), [`docs/public-launch-checklist.md`](docs/public-launch-checklist.md) |
+| Public-readiness gates | [`docs/public-readiness-audit.md`](docs/public-readiness-audit.md), [`docs/public-launch-checklist.md`](docs/public-launch-checklist.md), [`docs/public-alpha-readiness-governance-handoff-v1.md`](docs/public-alpha-readiness-governance-handoff-v1.md) |
 
 The full set of 90+ milestone contracts and demo-evidence notes lives under [`docs/`](docs/).
 
@@ -93,7 +93,7 @@ The full set of 90+ milestone contracts and demo-evidence notes lives under [`do
 - `examples/game-runtime`, `examples/runtime-probe` — the minimal 2D runtime and probe page.
 - `examples/evidence-dashboard`, `examples/authoring-cockpit` — read-only static inspection UIs over exported evidence.
 - `examples/*-v1`, `examples/*-v2`, `examples/*-regression` — milestone fixtures, scenario packs, and evidence smokes.
-- `docs/` — architecture, roadmap, trust-boundary/evidence contracts, milestone notes, and public-readiness audits.
+- `docs/` — architecture, roadmap, trust-boundary/evidence contracts, milestone notes, public-readiness audits, and Public Alpha Readiness handoff docs.
 
 ## Generated local state
 
