@@ -9,7 +9,6 @@
       "role": "critic",
       "ownerAgent": "critic-delta",
       "status": "blocked",
-      "dependsOn": ["task-board-schema"],
       "targetArtifacts": [
         {
           "id": "ownership-policy-doc",
@@ -36,7 +35,10 @@
     }
   ],
   "generatedState": {
-    "roots": ["runs/multi-agent-pipeline", "target"],
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "target"
+    ],
     "trackedFixtureOnly": true
   },
   "guardrails": [

@@ -62,6 +62,24 @@ Allowed v1 task kinds are:
 
 Unsupported kinds must fail validation instead of becoming generic execution authority.
 
+
+## Validation rules
+
+Rust validation rejects:
+
+- duplicate task ids;
+- dependency references that do not point at an in-board task;
+- self-dependencies and dependency cycles;
+- unsupported task kinds or roles;
+- missing target artifacts, acceptance criteria, or required evidence;
+- `blocked` tasks without `blockedReasons`;
+- `completed` tasks without `timestamps.completedAt`;
+- `statusTransition.to` values that do not match the current status;
+- invalid status-transition jumps such as `assigned` directly to `completed`;
+- active ownership conflicts where two non-released tasks with different owners target the same artifact id or path.
+
+Rejected, deferred, and completed tasks release active ownership for conflict detection; active proposed, assigned, in-progress, blocked, ready-for-review, and accepted tasks retain ownership until a later transition changes that state.
+
 ## Fixture set
 
 Tracked fixtures live under `examples/multi-agent-pipeline-v1/`:

@@ -2392,6 +2392,12 @@ pub struct ProductionTaskBoardTask {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub blocked_reasons: Vec<String>,
+    #[serde(
+        rename = "statusTransition",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub status_transition: Option<ProductionTaskStatusTransition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timestamps: Option<ProductionTaskTimestamps>,
 }
@@ -2446,6 +2452,13 @@ pub struct ProductionTaskTimestamps {
     pub completed_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionTaskStatusTransition {
+    pub from: ProductionTaskStatus,
+    pub to: ProductionTaskStatus,
+}
+
 impl ProductionTaskBoard {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let board: ProductionTaskBoard =
@@ -2496,6 +2509,104 @@ impl ProductionTaskBoard {
             return Err(anyhow!(
                 "production task board boundary must state that the board does not execute work"
             ));
+        }
+        self.validate_board_rules()?;
+        Ok(())
+    }
+
+    fn validate_board_rules(&self) -> Result<()> {
+        let mut task_ids = BTreeSet::new();
+        for task in &self.tasks {
+            if !task_ids.insert(task.id.clone()) {
+                return Err(anyhow!(
+                    "duplicate production task board task id: {}",
+                    task.id
+                ));
+            }
+        }
+
+        for task in &self.tasks {
+            for dependency in &task.depends_on {
+                if !task_ids.contains(dependency) {
+                    return Err(anyhow!(
+                        "production task board task {} dependsOn {} must reference an existing task",
+                        task.id,
+                        dependency
+                    ));
+                }
+                if dependency == &task.id {
+                    return Err(anyhow!(
+                        "production task board task {} cannot depend on itself",
+                        task.id
+                    ));
+                }
+            }
+        }
+        self.validate_dependency_cycles()?;
+        self.validate_target_ownership()?;
+        Ok(())
+    }
+
+    fn validate_dependency_cycles(&self) -> Result<()> {
+        fn visit(
+            task_id: &str,
+            tasks: &BTreeMap<&str, &ProductionTaskBoardTask>,
+            temporary: &mut BTreeSet<String>,
+            permanent: &mut BTreeSet<String>,
+        ) -> Result<()> {
+            if permanent.contains(task_id) {
+                return Ok(());
+            }
+            if !temporary.insert(task_id.to_string()) {
+                return Err(anyhow!(
+                    "production task board dependency cycle includes task {task_id}"
+                ));
+            }
+            let task = tasks
+                .get(task_id)
+                .ok_or_else(|| anyhow!("production task board task not found: {task_id}"))?;
+            for dependency in &task.depends_on {
+                visit(dependency, tasks, temporary, permanent)?;
+            }
+            temporary.remove(task_id);
+            permanent.insert(task_id.to_string());
+            Ok(())
+        }
+
+        let tasks = self
+            .tasks
+            .iter()
+            .map(|task| (task.id.as_str(), task))
+            .collect::<BTreeMap<_, _>>();
+        let mut temporary = BTreeSet::new();
+        let mut permanent = BTreeSet::new();
+        for task in &self.tasks {
+            visit(&task.id, &tasks, &mut temporary, &mut permanent)?;
+        }
+        Ok(())
+    }
+
+    fn validate_target_ownership(&self) -> Result<()> {
+        let mut owners = BTreeMap::<String, (&str, &str)>::new();
+        for task in &self.tasks {
+            if task.status.releases_ownership() {
+                continue;
+            }
+            for artifact in &task.target_artifacts {
+                for key in [&artifact.id, &artifact.path] {
+                    if let Some((existing_task, existing_owner)) = owners.get(key) {
+                        if *existing_owner != task.owner_agent {
+                            return Err(anyhow!(
+                                "production task board target ownership conflict for {key}: task {existing_task} owned by {existing_owner} conflicts with task {} owned by {}",
+                                task.id,
+                                task.owner_agent
+                            ));
+                        }
+                    } else {
+                        owners.insert(key.clone(), (task.id.as_str(), task.owner_agent.as_str()));
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -2560,7 +2671,92 @@ impl ProductionTaskBoardTask {
                 "production task board tasks[{index}] completed status requires timestamps.completedAt"
             ));
         }
+        if let Some(transition) = &self.status_transition {
+            transition.validate(&self.id, self.status)?;
+        }
         Ok(())
+    }
+}
+
+impl ProductionTaskStatusTransition {
+    fn validate(&self, task_id: &str, status: ProductionTaskStatus) -> Result<()> {
+        if self.to != status {
+            return Err(anyhow!(
+                "production task board task {task_id} statusTransition.to must match current status"
+            ));
+        }
+        if !self.from.can_transition_to(self.to) {
+            return Err(anyhow!(
+                "production task board task {task_id} cannot transition from {:?} to {:?}",
+                self.from,
+                self.to
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ProductionTaskStatus {
+    fn can_transition_to(self, next: ProductionTaskStatus) -> bool {
+        if self == next {
+            return true;
+        }
+        match self {
+            ProductionTaskStatus::Proposed => matches!(
+                next,
+                ProductionTaskStatus::Assigned
+                    | ProductionTaskStatus::Deferred
+                    | ProductionTaskStatus::Rejected
+            ),
+            ProductionTaskStatus::Assigned => matches!(
+                next,
+                ProductionTaskStatus::InProgress
+                    | ProductionTaskStatus::Blocked
+                    | ProductionTaskStatus::Deferred
+                    | ProductionTaskStatus::Rejected
+            ),
+            ProductionTaskStatus::InProgress => matches!(
+                next,
+                ProductionTaskStatus::Blocked
+                    | ProductionTaskStatus::ReadyForReview
+                    | ProductionTaskStatus::Deferred
+                    | ProductionTaskStatus::Rejected
+            ),
+            ProductionTaskStatus::Blocked => matches!(
+                next,
+                ProductionTaskStatus::Assigned
+                    | ProductionTaskStatus::InProgress
+                    | ProductionTaskStatus::Deferred
+                    | ProductionTaskStatus::Rejected
+            ),
+            ProductionTaskStatus::ReadyForReview => matches!(
+                next,
+                ProductionTaskStatus::Accepted
+                    | ProductionTaskStatus::Rejected
+                    | ProductionTaskStatus::Deferred
+            ),
+            ProductionTaskStatus::Accepted => matches!(
+                next,
+                ProductionTaskStatus::Completed | ProductionTaskStatus::Deferred
+            ),
+            ProductionTaskStatus::Rejected => matches!(next, ProductionTaskStatus::Deferred),
+            ProductionTaskStatus::Deferred => matches!(
+                next,
+                ProductionTaskStatus::Proposed
+                    | ProductionTaskStatus::Assigned
+                    | ProductionTaskStatus::Rejected
+            ),
+            ProductionTaskStatus::Completed => false,
+        }
+    }
+
+    fn releases_ownership(self) -> bool {
+        matches!(
+            self,
+            ProductionTaskStatus::Rejected
+                | ProductionTaskStatus::Deferred
+                | ProductionTaskStatus::Completed
+        )
     }
 }
 
@@ -39002,6 +39198,70 @@ scenarios:
             malformed_error_text.contains("missing field `requiredEvidence`"),
             "unexpected malformed fixture error: {malformed_error_text}"
         );
+    }
+
+    #[test]
+    fn production_task_board_v1_rejects_duplicate_ids_cycles_and_ownership_conflicts() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+        );
+        let base: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
+
+        let mut duplicate = base.clone();
+        let duplicated_task = duplicate["tasks"][0].clone();
+        duplicate["tasks"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicated_task);
+        let duplicate_error = ProductionTaskBoard::from_json_str(&duplicate.to_string())
+            .expect_err("duplicate task id rejects board");
+        assert!(duplicate_error.to_string().contains("duplicate"));
+
+        let mut cycle = base.clone();
+        cycle["tasks"][0]["dependsOn"] = json!(["task-board-schema"]);
+        let cycle_error = ProductionTaskBoard::from_json_str(&cycle.to_string())
+            .expect_err("dependency cycle rejects board");
+        assert!(cycle_error.to_string().contains("cycle"));
+
+        let mut conflict = base.clone();
+        conflict["tasks"][2]["targetArtifacts"][0]["id"] =
+            conflict["tasks"][1]["targetArtifacts"][0]["id"].clone();
+        conflict["tasks"][2]["targetArtifacts"][0]["path"] =
+            conflict["tasks"][1]["targetArtifacts"][0]["path"].clone();
+        let conflict_error = ProductionTaskBoard::from_json_str(&conflict.to_string())
+            .expect_err("duplicate target ownership rejects board");
+        assert!(conflict_error.to_string().contains("ownership conflict"));
+    }
+
+    #[test]
+    fn production_task_board_v1_enforces_status_transition_matrix() {
+        let body = read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+        );
+        let mut board: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
+
+        board["tasks"][1]["status"] = json!("completed");
+        board["tasks"][1]["timestamps"]["completedAt"] = json!("2026-06-04T16:30:00Z");
+        board["tasks"][1]["statusTransition"] = json!({
+            "from": "assigned",
+            "to": "completed"
+        });
+        let invalid_transition = ProductionTaskBoard::from_json_str(&board.to_string())
+            .expect_err("assigned cannot jump directly to completed");
+        assert!(invalid_transition.to_string().contains("cannot transition"));
+
+        board["tasks"][1]["status"] = json!("in-progress");
+        board["tasks"][1]["statusTransition"] = json!({
+            "from": "assigned",
+            "to": "in-progress"
+        });
+        board["tasks"][1]["timestamps"]
+            .as_object_mut()
+            .unwrap()
+            .remove("completedAt");
+        let valid = ProductionTaskBoard::from_json_str(&board.to_string())
+            .expect("assigned to in-progress is a valid metadata transition");
+        assert_eq!(valid.tasks[1].status, ProductionTaskStatus::InProgress);
     }
 
     #[test]
