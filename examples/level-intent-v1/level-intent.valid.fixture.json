@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "level-intent-v1",
+  "intentId": "intent_collect_and_exit_intro",
+  "levelId": "collect_and_exit_intro",
+  "targetGameMode": "collect_and_exit",
+  "levelSize": {
+    "width": 32,
+    "height": 18,
+    "unit": "tiles"
+  },
+  "playerGoals": [
+    {
+      "goalId": "learn_collect_key",
+      "description": "Teach the player to collect a key before reaching the exit."
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "collect_key",
+      "description": "Player collects the key.",
+      "requires": ["movement", "collision", "collect"]
+    },
+    {
+      "objectiveId": "reach_exit",
+      "description": "Player reaches the exit after the key is collected.",
+      "requires": ["movement", "trigger", "exit"]
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "one_screen_readable",
+      "description": "Keep the first level readable on one screen."
+    }
+  ],
+  "requiredMechanics": ["movement", "collision", "trigger", "collect", "exit"],
+  "allowedAssets": [
+    {
+      "refId": "player_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    },
+    {
+      "refId": "key_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/key.json"
+    }
+  ],
+  "allowedEntities": [
+    {
+      "refId": "player_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    },
+    {
+      "refId": "exit_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "difficultyTarget": "easy",
+  "pacingTarget": "steady",
+  "forbiddenPlacements": [
+    {
+      "placementId": "spawn_on_exit",
+      "targetRef": "spawn_exit_overlap",
+      "reason": "Spawn and exit must remain visually separate."
+    }
+  ],
+  "linkedGoals": {
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "scenarioIds": ["collect_and_exit_smoke"]
+  },
+  "status": "draft",
+  "guardrails": [
+    "Planning input only; this artifact does not generate level state.",
+    "No generation or trusted write is authorized by this fixture."
+  ]
+}

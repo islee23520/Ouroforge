@@ -67,7 +67,8 @@ validation, review gating, and generated-state checks accept it.
 Follow-up issues should proceed in this order unless a later live issue audit
 proves a safer dependency order:
 
-1. #628 - Level Intent and Design Constraint Model v1.
+1. #628 - Level Intent and Design Constraint Model v1
+   ([Level Intent v1](level-intent-v1.md)).
 2. #629 - Scene Generation Plan Artifact v1.
 3. #630 - Spatial Layout and Placement Constraint Solver v1.
 4. #631 - Tilemap and Terrain Generation Draft v1.

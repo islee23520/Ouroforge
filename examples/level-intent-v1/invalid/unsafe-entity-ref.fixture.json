@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "level-intent-v1",
+  "intentId": "intent_unsafe_entity_ref",
+  "levelId": "unsafe_entity_ref",
+  "targetGameMode": "collect_and_exit",
+  "levelSize": { "width": 16, "height": 12, "unit": "tiles" },
+  "playerGoals": [{ "goalId": "goal", "description": "A bounded player goal." }],
+  "objectives": [{ "objectiveId": "objective", "description": "A bounded objective.", "requires": ["movement"] }],
+  "constraints": [{ "constraintId": "constraint", "description": "A bounded constraint." }],
+  "requiredMechanics": ["movement"],
+  "allowedAssets": [{ "refId": "asset", "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json" }],
+  "allowedEntities": [{ "refId": "entity", "sourceRef": "../escape/scene.json" }],
+  "difficultyTarget": "easy",
+  "pacingTarget": "steady",
+  "forbiddenPlacements": [{ "placementId": "bad", "targetRef": "blocked_ref", "reason": "Keep blocked." }],
+  "linkedGoals": {
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "scenarioIds": ["smoke"]
+  },
+  "status": "draft"
+}

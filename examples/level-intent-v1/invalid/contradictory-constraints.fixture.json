@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "level-intent-v1",
+  "intentId": "intent_contradictory_constraints",
+  "levelId": "contradictory_constraints",
+  "targetGameMode": "collect_and_exit",
+  "levelSize": { "width": 16, "height": 12, "unit": "tiles" },
+  "playerGoals": [{ "goalId": "goal", "description": "A bounded player goal." }],
+  "objectives": [{ "objectiveId": "objective", "description": "A bounded objective.", "requires": ["movement"] }],
+  "constraints": [{ "constraintId": "constraint", "description": "A bounded constraint." }],
+  "requiredMechanics": ["movement", "collect"],
+  "forbiddenMechanics": ["collect"],
+  "allowedAssets": [{ "refId": "asset", "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json" }],
+  "forbiddenAssets": [{ "refId": "asset", "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json" }],
+  "allowedEntities": [{ "refId": "entity", "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json" }],
+  "difficultyTarget": "easy",
+  "pacingTarget": "steady",
+  "forbiddenPlacements": [{ "placementId": "bad", "targetRef": "asset", "reason": "Contradicts an allowed asset." }],
+  "linkedGoals": {
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "scenarioIds": ["smoke"]
+  },
+  "status": "draft"
+}

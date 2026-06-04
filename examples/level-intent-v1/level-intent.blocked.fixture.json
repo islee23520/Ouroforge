@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "level-intent-v1",
+  "intentId": "intent_blocked_patrol_arena",
+  "levelId": "patrol_arena",
+  "targetGameMode": "combat_arena",
+  "levelSize": {
+    "width": 40,
+    "height": 24,
+    "unit": "tiles"
+  },
+  "playerGoals": [
+    {
+      "goalId": "survive_patrol",
+      "description": "Player survives a bounded enemy patrol encounter."
+    }
+  ],
+  "objectives": [
+    {
+      "objectiveId": "avoid_patrol",
+      "description": "Player avoids a patrol and reaches a safe zone.",
+      "requires": ["movement", "collision", "enemy_patrol"]
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "patrol_asset_missing",
+      "description": "Enemy patrol fixture is intentionally not approved."
+    }
+  ],
+  "requiredMechanics": ["movement", "collision", "enemy_patrol"],
+  "allowedAssets": [
+    {
+      "refId": "player_asset",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/assets/player.json"
+    }
+  ],
+  "allowedEntities": [
+    {
+      "refId": "player_entity",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    }
+  ],
+  "difficultyTarget": "normal",
+  "pacingTarget": "escalating",
+  "forbiddenPlacements": [
+    {
+      "placementId": "enemy_on_spawn",
+      "targetRef": "enemy_spawn_overlap",
+      "reason": "Patrol must not overlap the player spawn."
+    }
+  ],
+  "linkedGoals": {
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "scenarioIds": ["patrol_arena_smoke"]
+  },
+  "status": "blocked",
+  "blockedReasons": [
+    "Enemy patrol asset and scenario evidence are not approved for trusted apply."
+  ],
+  "guardrails": [
+    "Blocked intent is visible but cannot authorize generation or writes."
+  ]
+}

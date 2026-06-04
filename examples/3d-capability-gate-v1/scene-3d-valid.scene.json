@@ -75,6 +75,20 @@
         }
       }
     ],
+    "colliders": [
+      {
+        "id": "cube-collider",
+        "shape": "box",
+        "body": "static",
+        "size": {
+          "x": 2,
+          "y": 2,
+          "z": 2
+        },
+        "collisionGroup": "solid",
+        "collisionMask": ["player", "solid"]
+      }
+    ],
     "metadata": {
       "generatedStateBoundary": "tracked fixture only; screenshots/runs/previews stay untracked"
     },
