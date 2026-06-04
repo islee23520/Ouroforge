@@ -308,3 +308,35 @@ assert.ok(compareBreakdowns(breakdown, changedBreakdown).changes.some((change) =
   assert.equal(atlasBreakdown.elements[0].assetRef, 'player-atlas');
   assert.equal(atlasBreakdown.elements[0].assetFrameRef, 'idle_0');
 }
+
+// Regression: an active animation frame asset must override the base sprite even
+// when that base sprite resolves through the sprite-atlas path. Previously the
+// atlas image for the base sprite was drawn and the animation frame asset was
+// silently dropped.
+{
+  const overrideContext = createContext();
+  const baseAtlasImage = { id: 'base-atlas-sheet' };
+  const frameImage = { id: 'hurt-frame-image' };
+  drawRuntime({
+    canvas: { width: 64, height: 64 },
+    context: overrideContext,
+    renderer: normalizeRenderer({ layers: [{ id: 'actors', order: 0 }] }),
+    world: {
+      sceneId: 'frame-override-test',
+      tick: 1,
+      bounds: { width: 64, height: 64 },
+      entities: [{ id: 'hero', sprite: { asset: 'player-atlas', frameId: 'idle_0', layer: 'actors' }, components: { transform: { x: 8, y: 12 }, size: { width: 16, height: 16 }, animation: {} } }],
+    },
+    assets: {
+      spriteFor: () => ({ image: baseAtlasImage, frame: { x: 16, y: 0, width: 16, height: 16 } }),
+      imageFor: (asset) => (asset === 'hurt-frame' ? frameImage : null),
+    },
+    animation: { activeSpriteFrame: () => ({ asset: 'hurt-frame' }) },
+  });
+  const overrideDraw = overrideContext.calls.find((call) => call[0] === 'drawImage');
+  assert.deepEqual(
+    overrideDraw,
+    ['drawImage', frameImage, 8, 12, 16, 16],
+    'animation frame asset must override the base sprite-atlas image',
+  );
+}

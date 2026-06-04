@@ -376,7 +376,10 @@
     const spriteAsset = entity.sprite && typeof entity.sprite.asset === 'string' ? entity.sprite.asset : null;
     const spriteFrameId = entity.sprite && typeof entity.sprite.frameId === 'string' ? entity.sprite.frameId : null;
     const preferFrameColor = activeFrame && typeof activeFrame.color === 'string' && !frameAsset;
-    const spriteImage = !preferFrameColor && assets && typeof assets.spriteFor === 'function' && spriteAsset
+    // An active animation frame asset (frameAsset) overrides the base sprite, so
+    // skip the sprite-atlas path when one is present; otherwise the base sprite
+    // sheet would be drawn and the animation override silently dropped.
+    const spriteImage = !preferFrameColor && !frameAsset && assets && typeof assets.spriteFor === 'function' && spriteAsset
       ? assets.spriteFor(spriteAsset, spriteFrameId)
       : null;
     const image = spriteImage && spriteImage.image ? spriteImage.image : (!preferFrameColor && assets && typeof assets.imageFor === 'function'
