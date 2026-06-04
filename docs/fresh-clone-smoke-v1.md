@@ -10,7 +10,8 @@ or track generated run/dashboard output.
 
 PA1.2.1 owns the onboarding command audit in
 [`fresh-clone-onboarding-command-audit-v1.md`](fresh-clone-onboarding-command-audit-v1.md).
-PA1.2.3 owns expanded troubleshooting and cleanup guidance.
+Expanded troubleshooting, prerequisite checks, and cleanup guidance are recorded
+in [`fresh-clone-troubleshooting-cleanup-v1.md`](fresh-clone-troubleshooting-cleanup-v1.md).
 
 ## Prerequisites
 

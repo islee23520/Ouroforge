@@ -97,9 +97,11 @@ The current quickstart command audit is recorded in
 [`docs/fresh-clone-onboarding-command-audit-v1.md`](docs/fresh-clone-onboarding-command-audit-v1.md).
 For an isolated fresh-clone-style smoke, run
 [`scripts/fresh-clone-smoke.sh`](scripts/fresh-clone-smoke.sh) as documented in
-[`docs/fresh-clone-smoke-v1.md`](docs/fresh-clone-smoke-v1.md). These notes
-clarify expected generated state and cleanup boundaries without changing
-repository visibility, release status, or trusted-write authority.
+[`docs/fresh-clone-smoke-v1.md`](docs/fresh-clone-smoke-v1.md). Troubleshooting
+and cleanup guidance lives in
+[`docs/fresh-clone-troubleshooting-cleanup-v1.md`](docs/fresh-clone-troubleshooting-cleanup-v1.md).
+These notes clarify expected generated state and cleanup boundaries without
+changing repository visibility, release status, or trusted-write authority.
 
 ## Core loop
 
