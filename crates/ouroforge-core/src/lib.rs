@@ -19081,6 +19081,663 @@ fn level_diff_status_label(status: LevelDiffStatus) -> &'static str {
     }
 }
 
+const AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION: &str = "agent-generated-level-draft-v1";
+const AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
+    "agent-generated-level-draft-read-model-v1";
+const MAX_AGENT_LEVEL_DRAFT_SECTIONS: usize = 32;
+const MAX_AGENT_LEVEL_DRAFT_OPERATIONS: usize = 128;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "draftKind")]
+    pub draft_kind: AgentGeneratedLevelDraftKind,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "tilemapDraftRef")]
+    pub tilemap_draft_ref: String,
+    #[serde(rename = "placementDraftRef")]
+    pub placement_draft_ref: String,
+    #[serde(rename = "reachabilityEvidenceRef")]
+    pub reachability_evidence_ref: String,
+    #[serde(rename = "objectiveProofRef")]
+    pub objective_proof_ref: String,
+    #[serde(rename = "heuristicEvidenceRef")]
+    pub heuristic_evidence_ref: String,
+    #[serde(rename = "diffEvidenceRef")]
+    pub diff_evidence_ref: String,
+    #[serde(rename = "targetHashes")]
+    pub target_hashes: Vec<AgentGeneratedLevelDraftTargetHash>,
+    pub author: AgentGeneratedLevelDraftAuthor,
+    pub sections: Vec<AgentGeneratedLevelDraftSection>,
+    pub operations: Vec<AgentGeneratedLevelDraftOperation>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<AgentGeneratedLevelDraftExpectedEvidence>,
+    pub status: AgentGeneratedLevelDraftStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftKind {
+    CompleteLevel,
+    PartialLevel,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftTargetHash {
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    #[serde(rename = "expectedHash")]
+    pub expected_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftAuthor {
+    #[serde(rename = "authorId")]
+    pub author_id: String,
+    pub source: AgentGeneratedLevelDraftAuthorSource,
+    #[serde(rename = "generatedBy")]
+    pub generated_by: String,
+    pub untrusted: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftAuthorSource {
+    Agent,
+    Tool,
+    Human,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftSection {
+    #[serde(rename = "sectionId")]
+    pub section_id: String,
+    pub kind: AgentGeneratedLevelDraftSectionKind,
+    pub summary: String,
+    pub completeness: AgentGeneratedLevelDraftSectionCompleteness,
+    #[serde(
+        rename = "conflictsWith",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub conflicts_with: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftSectionKind {
+    Tilemap,
+    EntityPlacement,
+    ObjectivePlacement,
+    EncounterPlacement,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftSectionCompleteness {
+    Complete,
+    Partial,
+    MissingEvidence,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftOperation {
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub kind: AgentGeneratedLevelDraftOperationKind,
+    #[serde(rename = "sectionRef")]
+    pub section_ref: String,
+    pub summary: String,
+    pub status: AgentGeneratedLevelDraftOperationStatus,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftOperationKind {
+    AddTile,
+    RemoveTile,
+    MoveEntity,
+    AddEntity,
+    UpdateObjective,
+    AddEncounter,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftOperationStatus {
+    Proposed,
+    Partial,
+    MissingEvidence,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: AgentGeneratedLevelDraftExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftExpectedEvidenceKind {
+    Constraint,
+    Reachability,
+    ObjectiveProof,
+    Preview,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentGeneratedLevelDraftStatus {
+    Drafted,
+    Partial,
+    MissingEvidence,
+    Unsupported,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentGeneratedLevelDraftReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    pub status: String,
+    #[serde(rename = "sectionCount")]
+    pub section_count: usize,
+    #[serde(rename = "operationCount")]
+    pub operation_count: usize,
+    #[serde(rename = "partialCount")]
+    pub partial_count: usize,
+    #[serde(rename = "missingEvidenceCount")]
+    pub missing_evidence_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "targetHashRefs")]
+    pub target_hash_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl AgentGeneratedLevelDraftArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: AgentGeneratedLevelDraftArtifact = serde_json::from_str(input)
+            .context("failed to parse Agent Generated Level Draft JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent generated level draft schemaVersion must be {AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent level draft draftId", &self.draft_id)?;
+        validate_path_component("agent level draft intentId", &self.intent_id)?;
+        validate_path_component("agent level draft planId", &self.plan_id)?;
+        validate_repo_relative_source_ref(
+            "agent level draft targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "agent level draft targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        validate_evidence_artifact_path(&self.tilemap_draft_ref)?;
+        validate_evidence_artifact_path(&self.placement_draft_ref)?;
+        validate_evidence_artifact_path(&self.reachability_evidence_ref)?;
+        validate_evidence_artifact_path(&self.objective_proof_ref)?;
+        validate_evidence_artifact_path(&self.heuristic_evidence_ref)?;
+        validate_evidence_artifact_path(&self.diff_evidence_ref)?;
+        validate_agent_level_draft_target_hashes(&self.target_scene_ref, &self.target_hashes)?;
+        self.author.validate()?;
+        validate_agent_level_draft_sections(&self.sections)?;
+        validate_agent_level_draft_operations(&self.sections, &self.operations)?;
+        validate_agent_level_draft_expected_evidence(&self.draft_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("agent level draft blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("agent level draft guardrails", guardrail)?;
+        }
+        validate_agent_level_draft_status(
+            self.status,
+            self.draft_kind,
+            &self.sections,
+            &self.operations,
+            &self.blocked_reasons,
+        )
+    }
+}
+
+impl AgentGeneratedLevelDraftAuthor {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("agent level draft author.authorId", &self.author_id)?;
+        require_bounded_display_text("agent level draft author.generatedBy", &self.generated_by)?;
+        if !self.untrusted {
+            return Err(anyhow!(
+                "agent generated level draft author.untrusted must be true until review-gated apply"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub fn agent_generated_level_draft_read_model_from_json_str(
+    input: &str,
+) -> Result<AgentGeneratedLevelDraftReadModel> {
+    let artifact = AgentGeneratedLevelDraftArtifact::from_json_str(input)?;
+    Ok(agent_generated_level_draft_read_model(&artifact))
+}
+
+pub fn agent_generated_level_draft_read_model(
+    artifact: &AgentGeneratedLevelDraftArtifact,
+) -> AgentGeneratedLevelDraftReadModel {
+    let partial_count = artifact
+        .sections
+        .iter()
+        .filter(|section| {
+            section.completeness == AgentGeneratedLevelDraftSectionCompleteness::Partial
+        })
+        .count()
+        + artifact
+            .operations
+            .iter()
+            .filter(|operation| {
+                operation.status == AgentGeneratedLevelDraftOperationStatus::Partial
+            })
+            .count();
+    let missing_evidence_count = artifact
+        .sections
+        .iter()
+        .filter(|section| {
+            section.completeness == AgentGeneratedLevelDraftSectionCompleteness::MissingEvidence
+        })
+        .count()
+        + artifact
+            .operations
+            .iter()
+            .filter(|operation| {
+                operation.status == AgentGeneratedLevelDraftOperationStatus::MissingEvidence
+            })
+            .count();
+    let unsupported_count = artifact
+        .sections
+        .iter()
+        .filter(|section| {
+            section.completeness == AgentGeneratedLevelDraftSectionCompleteness::Unsupported
+        })
+        .count()
+        + artifact
+            .operations
+            .iter()
+            .filter(|operation| {
+                operation.status == AgentGeneratedLevelDraftOperationStatus::Unsupported
+            })
+            .count();
+    AgentGeneratedLevelDraftReadModel {
+        schema_version: AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION.to_string(),
+        draft_id: artifact.draft_id.clone(),
+        intent_id: artifact.intent_id.clone(),
+        plan_id: artifact.plan_id.clone(),
+        status: agent_level_draft_status_label(artifact.status).to_string(),
+        section_count: artifact.sections.len(),
+        operation_count: artifact.operations.len(),
+        partial_count,
+        missing_evidence_count,
+        unsupported_count,
+        linked_evidence_refs: agent_level_draft_linked_refs(artifact),
+        target_hash_refs: artifact
+            .target_hashes
+            .iter()
+            .map(|target| target.target_ref.clone())
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only untrusted generated level draft; review-gated apply required, no scene writes, no trusted apply, no browser command bridge, no auto-apply, no auto-merge, no autonomous full game generation, and no production editor claim.".to_string(),
+    }
+}
+
+fn agent_level_draft_linked_refs(artifact: &AgentGeneratedLevelDraftArtifact) -> Vec<String> {
+    std::iter::once(artifact.tilemap_draft_ref.clone())
+        .chain(std::iter::once(artifact.placement_draft_ref.clone()))
+        .chain(std::iter::once(artifact.reachability_evidence_ref.clone()))
+        .chain(std::iter::once(artifact.objective_proof_ref.clone()))
+        .chain(std::iter::once(artifact.heuristic_evidence_ref.clone()))
+        .chain(std::iter::once(artifact.diff_evidence_ref.clone()))
+        .chain(
+            artifact
+                .expected_evidence
+                .iter()
+                .map(|evidence| evidence.path_hint.clone()),
+        )
+        .collect()
+}
+
+fn validate_agent_level_draft_sections(sections: &[AgentGeneratedLevelDraftSection]) -> Result<()> {
+    if sections.is_empty() || sections.len() > MAX_AGENT_LEVEL_DRAFT_SECTIONS {
+        return Err(anyhow!(
+            "agent level draft sections must contain between 1 and {MAX_AGENT_LEVEL_DRAFT_SECTIONS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    let mut kinds = BTreeSet::new();
+    for section in sections {
+        validate_path_component("agent level draft sections.sectionId", &section.section_id)?;
+        require_bounded_display_text("agent level draft sections.summary", &section.summary)?;
+        if !ids.insert(section.section_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate agent level draft sections.sectionId: {}",
+                section.section_id
+            ));
+        }
+        if !kinds.insert(section.kind) {
+            return Err(anyhow!(
+                "duplicate agent level draft sections.kind: {}",
+                agent_level_draft_section_kind_label(section.kind)
+            ));
+        }
+        validate_unique_path_components(
+            "agent level draft sections.conflictsWith",
+            "sectionRef",
+            &section.conflicts_with,
+        )?;
+    }
+    for section in sections {
+        for conflict in &section.conflicts_with {
+            if conflict == &section.section_id || !ids.contains(conflict.as_str()) {
+                return Err(anyhow!(
+                    "contradictory agent level draft section reference: {conflict}"
+                ));
+            }
+        }
+        if !section.conflicts_with.is_empty() {
+            return Err(anyhow!(
+                "contradictory agent level draft sections must be resolved before validation"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_agent_level_draft_operations(
+    sections: &[AgentGeneratedLevelDraftSection],
+    operations: &[AgentGeneratedLevelDraftOperation],
+) -> Result<()> {
+    if operations.is_empty() || operations.len() > MAX_AGENT_LEVEL_DRAFT_OPERATIONS {
+        return Err(anyhow!(
+            "agent level draft operations must contain between 1 and {MAX_AGENT_LEVEL_DRAFT_OPERATIONS} entries"
+        ));
+    }
+    let section_ids = sections
+        .iter()
+        .map(|section| section.section_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut ids = BTreeSet::new();
+    for operation in operations {
+        validate_path_component(
+            "agent level draft operations.operationId",
+            &operation.operation_id,
+        )?;
+        validate_path_component(
+            "agent level draft operations.sectionRef",
+            &operation.section_ref,
+        )?;
+        require_bounded_display_text("agent level draft operations.summary", &operation.summary)?;
+        if !section_ids.contains(operation.section_ref.as_str()) {
+            return Err(anyhow!(
+                "agent level draft operations.sectionRef references unknown section: {}",
+                operation.section_ref
+            ));
+        }
+        if !ids.insert(operation.operation_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate agent level draft operations.operationId: {}",
+                operation.operation_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_agent_level_draft_expected_evidence(
+    draft_id: &str,
+    values: &[AgentGeneratedLevelDraftExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "agent level draft expectedEvidence must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/agent-level-drafts/{draft_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    let mut kinds = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "agent level draft expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "agent level draft expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate agent level draft expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate agent level draft expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+        kinds.insert(evidence.kind);
+    }
+    for required in [
+        AgentGeneratedLevelDraftExpectedEvidenceKind::Constraint,
+        AgentGeneratedLevelDraftExpectedEvidenceKind::Reachability,
+        AgentGeneratedLevelDraftExpectedEvidenceKind::ObjectiveProof,
+    ] {
+        if !kinds.contains(&required) {
+            return Err(anyhow!(
+                "agent level draft expectedEvidence must include {} evidence",
+                agent_level_draft_expected_evidence_kind_label(required)
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_agent_level_draft_target_hashes(
+    target_scene_ref: &str,
+    values: &[AgentGeneratedLevelDraftTargetHash],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("agent level draft targetHashes must not be empty"));
+    }
+    let mut target_refs = BTreeSet::new();
+    for target in values {
+        validate_repo_relative_source_ref(
+            "agent level draft targetHashes.targetRef",
+            &target.target_ref,
+        )?;
+        validate_snapshot_hash(
+            "agent level draft targetHashes.expectedHash",
+            &target.expected_hash,
+        )?;
+        if !target_refs.insert(target.target_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate agent level draft targetHashes.targetRef: {}",
+                target.target_ref
+            ));
+        }
+    }
+    if !target_refs.contains(target_scene_ref) {
+        return Err(anyhow!(
+            "agent level draft targetHashes must include targetSceneRef"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_agent_level_draft_status(
+    status: AgentGeneratedLevelDraftStatus,
+    draft_kind: AgentGeneratedLevelDraftKind,
+    sections: &[AgentGeneratedLevelDraftSection],
+    operations: &[AgentGeneratedLevelDraftOperation],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_partial = sections.iter().any(|section| {
+        section.completeness == AgentGeneratedLevelDraftSectionCompleteness::Partial
+    }) || operations
+        .iter()
+        .any(|operation| operation.status == AgentGeneratedLevelDraftOperationStatus::Partial);
+    let has_missing = sections.iter().any(|section| {
+        section.completeness == AgentGeneratedLevelDraftSectionCompleteness::MissingEvidence
+    }) || operations.iter().any(|operation| {
+        operation.status == AgentGeneratedLevelDraftOperationStatus::MissingEvidence
+    });
+    let has_unsupported = draft_kind == AgentGeneratedLevelDraftKind::Unsupported
+        || sections.iter().any(|section| {
+            section.completeness == AgentGeneratedLevelDraftSectionCompleteness::Unsupported
+        })
+        || operations.iter().any(|operation| {
+            operation.status == AgentGeneratedLevelDraftOperationStatus::Unsupported
+        });
+    match status {
+        AgentGeneratedLevelDraftStatus::Drafted
+            if draft_kind == AgentGeneratedLevelDraftKind::CompleteLevel
+                && !has_partial
+                && !has_missing
+                && !has_unsupported
+                && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        AgentGeneratedLevelDraftStatus::Partial
+            if draft_kind == AgentGeneratedLevelDraftKind::PartialLevel
+                && has_partial
+                && !has_missing
+                && !has_unsupported
+                && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        AgentGeneratedLevelDraftStatus::MissingEvidence
+            if has_missing && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        AgentGeneratedLevelDraftStatus::Unsupported
+            if has_unsupported && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        AgentGeneratedLevelDraftStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        AgentGeneratedLevelDraftStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        AgentGeneratedLevelDraftStatus::Drafted => Err(anyhow!(
+            "agent level drafted status requires a complete draft with no partial, missing, unsupported, or blocked state"
+        )),
+        AgentGeneratedLevelDraftStatus::Partial => Err(anyhow!(
+            "agent level partial status requires partial_level draft kind, partial sections or operations, and no blockedReasons"
+        )),
+        AgentGeneratedLevelDraftStatus::MissingEvidence => Err(anyhow!(
+            "agent level missing_evidence status requires missing evidence sections or operations and no blockedReasons"
+        )),
+        AgentGeneratedLevelDraftStatus::Unsupported => Err(anyhow!(
+            "agent level unsupported status requires unsupported draft kind, section, or operation and no blockedReasons"
+        )),
+        AgentGeneratedLevelDraftStatus::Stale => Err(anyhow!(
+            "agent level stale status requires blockedReasons describing stale target hashes"
+        )),
+        AgentGeneratedLevelDraftStatus::Blocked => Err(anyhow!(
+            "agent level blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn agent_level_draft_status_label(status: AgentGeneratedLevelDraftStatus) -> &'static str {
+    match status {
+        AgentGeneratedLevelDraftStatus::Drafted => "drafted",
+        AgentGeneratedLevelDraftStatus::Partial => "partial",
+        AgentGeneratedLevelDraftStatus::MissingEvidence => "missing_evidence",
+        AgentGeneratedLevelDraftStatus::Unsupported => "unsupported",
+        AgentGeneratedLevelDraftStatus::Stale => "stale",
+        AgentGeneratedLevelDraftStatus::Blocked => "blocked",
+    }
+}
+
+fn agent_level_draft_section_kind_label(kind: AgentGeneratedLevelDraftSectionKind) -> &'static str {
+    match kind {
+        AgentGeneratedLevelDraftSectionKind::Tilemap => "tilemap",
+        AgentGeneratedLevelDraftSectionKind::EntityPlacement => "entity_placement",
+        AgentGeneratedLevelDraftSectionKind::ObjectivePlacement => "objective_placement",
+        AgentGeneratedLevelDraftSectionKind::EncounterPlacement => "encounter_placement",
+    }
+}
+
+fn agent_level_draft_expected_evidence_kind_label(
+    kind: AgentGeneratedLevelDraftExpectedEvidenceKind,
+) -> &'static str {
+    match kind {
+        AgentGeneratedLevelDraftExpectedEvidenceKind::Constraint => "constraint",
+        AgentGeneratedLevelDraftExpectedEvidenceKind::Reachability => "reachability",
+        AgentGeneratedLevelDraftExpectedEvidenceKind::ObjectiveProof => "objective_proof",
+        AgentGeneratedLevelDraftExpectedEvidenceKind::Preview => "preview",
+        AgentGeneratedLevelDraftExpectedEvidenceKind::ReadModel => "read_model",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -64096,6 +64753,157 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("level-visual-semantic-diff-v1.md"));
+    }
+
+    #[test]
+    fn agent_generated_level_draft_v1_accepts_drafted_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json"
+        );
+        let artifact = AgentGeneratedLevelDraftArtifact::from_json_str(fixture)
+            .expect("drafted agent level draft fixture parses");
+        assert_eq!(artifact.schema_version, "agent-generated-level-draft-v1");
+        assert_eq!(artifact.status, AgentGeneratedLevelDraftStatus::Drafted);
+        assert_eq!(
+            artifact.draft_kind,
+            AgentGeneratedLevelDraftKind::CompleteLevel
+        );
+        assert!(artifact.author.untrusted);
+        assert_eq!(artifact.sections.len(), 4);
+        assert_eq!(artifact.operations.len(), 4);
+
+        let read_model = agent_generated_level_draft_read_model_from_json_str(fixture)
+            .expect("agent level draft read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "agent-generated-level-draft-read-model-v1"
+        );
+        assert_eq!(read_model.status, "drafted");
+        assert_eq!(read_model.section_count, 4);
+        assert_eq!(read_model.operation_count, 4);
+        assert_eq!(read_model.partial_count, 0);
+        assert_eq!(read_model.missing_evidence_count, 0);
+        assert_eq!(read_model.unsupported_count, 0);
+        assert_eq!(read_model.target_hash_refs.len(), 2);
+        assert!(read_model.boundary.contains("untrusted generated"));
+        assert!(read_model.boundary.contains("review-gated apply required"));
+        assert!(read_model.boundary.contains("no scene writes"));
+        assert!(read_model.boundary.contains("no browser command bridge"));
+        assert!(read_model
+            .boundary
+            .contains("no autonomous full game generation"));
+    }
+
+    #[test]
+    fn agent_generated_level_draft_v1_accepts_partial_missing_unsupported_stale_and_blocked() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/level-draft.partial.fixture.json"
+                ),
+                AgentGeneratedLevelDraftStatus::Partial,
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/level-draft.missing-evidence.fixture.json"
+                ),
+                AgentGeneratedLevelDraftStatus::MissingEvidence,
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/level-draft.unsupported.fixture.json"
+                ),
+                AgentGeneratedLevelDraftStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/level-draft.stale.fixture.json"
+                ),
+                AgentGeneratedLevelDraftStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/level-draft.blocked.fixture.json"
+                ),
+                AgentGeneratedLevelDraftStatus::Blocked,
+            ),
+        ] {
+            let artifact = AgentGeneratedLevelDraftArtifact::from_json_str(fixture)
+                .expect("agent level draft state fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            if matches!(
+                expected_status,
+                AgentGeneratedLevelDraftStatus::Stale | AgentGeneratedLevelDraftStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn agent_generated_level_draft_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/unsafe-ref.fixture.json"
+                ),
+                "must not escape",
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/duplicate-operation.fixture.json"
+                ),
+                "duplicate agent level draft operations.operationId",
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/contradictory-sections.fixture.json"
+                ),
+                "contradictory agent level draft sections",
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/malformed-summary.fixture.json"
+                ),
+                "summary",
+            ),
+            (
+                include_str!(
+                    "../../../examples/agent-generated-level-draft-v1/invalid/status-drift.fixture.json"
+                ),
+                "drafted status",
+            ),
+        ] {
+            let error = AgentGeneratedLevelDraftArtifact::from_json_str(fixture)
+                .expect_err("invalid agent level draft fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn agent_generated_level_draft_v1_keeps_untrusted_boundary_documented() {
+        let doc = include_str!("../../../docs/agent-generated-level-draft-v1.md");
+        assert!(doc.contains("untrusted"));
+        assert!(doc.contains("review-gated apply"));
+        assert!(doc.contains("no scene writes"));
+        assert!(doc.contains("no trusted apply"));
+        assert!(doc.contains("browser command bridge"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+        assert!(doc.contains("No autonomous full game generation"));
+        assert!(doc.contains("No production editor"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("agent-generated-level-draft-v1.md"));
     }
 
     #[test]

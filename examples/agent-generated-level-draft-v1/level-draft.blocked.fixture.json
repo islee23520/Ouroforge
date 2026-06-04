@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "agent-generated-level-draft-v1",
+  "draftId": "agent_level_draft_blocked_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "draftKind": "complete_level",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "tilemapDraftRef": "evidence/tilemap-terrain-drafts/draft_collect_and_exit_tilemap_intro/read-model.json",
+  "placementDraftRef": "evidence/entity-objective-placement-drafts/draft_collect_and_exit_entities_intro/read-model.json",
+  "reachabilityEvidenceRef": "evidence/reachability/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-proof/objective_collect_and_exit_complete/read-model.json",
+  "heuristicEvidenceRef": "evidence/difficulty-pacing/heuristic_collect_and_exit_intro/read-model.json",
+  "diffEvidenceRef": "evidence/level-diff/diff_collect_and_exit_intro/read-model.json",
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "author": {
+    "authorId": "agent_level_designer",
+    "source": "agent",
+    "generatedBy": "local deterministic fixture generator",
+    "untrusted": true
+  },
+  "sections": [
+    {
+      "sectionId": "tilemap_floor",
+      "kind": "tilemap",
+      "summary": "Draft creation is blocked pending required source fixture review.",
+      "completeness": "complete"
+    }
+  ],
+  "operations": [
+    {
+      "operationId": "op_add_floor",
+      "kind": "add_tile",
+      "sectionRef": "tilemap_floor",
+      "summary": "Operation remains blocked until review evidence exists.",
+      "status": "proposed"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "constraint_expectation",
+      "kind": "constraint",
+      "pathHint": "evidence/agent-level-drafts/agent_level_draft_blocked_intro/constraint-expectation.json"
+    },
+    {
+      "evidenceId": "reachability_expectation",
+      "kind": "reachability",
+      "pathHint": "evidence/agent-level-drafts/agent_level_draft_blocked_intro/reachability-expectation.json"
+    },
+    {
+      "evidenceId": "objective_expectation",
+      "kind": "objective_proof",
+      "pathHint": "evidence/agent-level-drafts/agent_level_draft_blocked_intro/objective-proof-expectation.json"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": ["Required human review notes are not available."]
+}
