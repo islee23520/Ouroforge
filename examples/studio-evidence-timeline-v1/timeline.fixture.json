@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "studio-evidence-timeline-fixture-v1",
+  "runs": [
+    {
+      "summary": {
+        "id": "run-before",
+        "created_at_unix_ms": 1780600000000,
+        "run_dir": "runs/run-before",
+        "run_status": "completed",
+        "verdict_status": "failed",
+        "scenario_status": "failed",
+        "seed_id": "demo-game"
+      },
+      "screenshots": [
+        { "id": "before-shot", "kind": "image/png", "path": "evidence/before.png", "exists": true }
+      ],
+      "world_states": [
+        { "id": "before-world", "kind": "application/json", "path": "evidence/before-world.json", "value": { "player": { "x": 10 } }, "exists": true }
+      ],
+      "console_logs": [
+        { "id": "before-console", "kind": "application/json", "path": "evidence/console.json", "value": [{ "level": "error", "text": "goal missing" }], "exists": true }
+      ],
+      "performance_metrics": [
+        { "id": "before-perf", "kind": "application/json", "path": "evidence/perf.json", "value": { "frameMs": 18 }, "exists": true }
+      ],
+      "mutation_artifacts": [
+        { "id": "mutation-proposals", "kind": "application/json", "path": "mutation/proposals.json", "value": { "proposals": [{ "id": "proposal-1" }] }, "exists": true },
+        { "id": "source-patch-evidence-bundle", "kind": "application/json", "path": "mutation/source-patch-evidence-bundle.json", "metadata": { "read_only": true }, "value": { "bundleId": "bundle-1", "status": "partial" }, "exists": true }
+      ]
+    },
+    {
+      "summary": {
+        "id": "run-after",
+        "created_at_unix_ms": 1780600600000,
+        "run_dir": "runs/run-after",
+        "run_status": "completed",
+        "verdict_status": "passed",
+        "scenario_status": "passed",
+        "seed_id": "demo-game"
+      },
+      "screenshots": [
+        { "id": "after-shot", "kind": "image/png", "path": "evidence/after.png", "exists": false }
+      ],
+      "world_states": [
+        { "id": "after-world", "kind": "application/json", "path": "evidence/after-world.json", "value": { "player": { "x": 42 } }, "exists": true }
+      ],
+      "frame_metrics": [
+        { "id": "after-frame", "kind": "application/json", "path": "evidence/frame.json", "read_error": "malformed json", "exists": true }
+      ],
+      "mutation_artifacts": [
+        { "id": "source-patch-apply-transaction", "kind": "application/json", "path": "mutation/source-patch-apply-transaction.json", "metadata": { "read_only": true }, "value": { "transactionId": "tx-1", "status": "ready_metadata_only_no_apply_authority" }, "exists": true },
+        { "id": "source-patch-stale-target-guard", "kind": "application/json", "path": "mutation/source-patch-stale-target-guard.json", "metadata": { "read_only": true }, "value": { "status": "fresh_guard_metadata_only_no_apply_authority" }, "exists": true }
+      ],
+      "comparison": {
+        "present": true,
+        "artifacts": [
+          { "path": "comparisons/run-before--run-after.json", "before_run_id": "run-before", "after_run_id": "run-after", "classification": "improved", "exists": true }
+        ]
+      }
+    }
+  ]
+}

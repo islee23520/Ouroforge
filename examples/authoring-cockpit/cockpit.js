@@ -158,6 +158,92 @@ const OuroforgeCockpit = (() => {
     return [...runs].sort((left, right) => Number(right.summary.created_at_unix_ms || 0) - Number(left.summary.created_at_unix_ms || 0))[0] || null;
   }
 
+  function evidenceArtifacts(run, ...keys) {
+    return keys.flatMap((key) => Array.isArray(run?.[key]) ? run[key] : []);
+  }
+
+  function summarizeTimelineArtifactGroup(run, label, keys) {
+    const items = evidenceArtifacts(run, ...keys);
+    const missing = items.filter((artifact) => artifact?.exists === false);
+    const broken = items.filter((artifact) => artifact?.read_error || artifact?.readError);
+    return {
+      label,
+      count: items.length,
+      ids: items.map((artifact) => artifact?.id || artifact?.path || 'unknown'),
+      missing: missing.map((artifact) => artifact?.id || artifact?.path || 'unknown'),
+      broken: broken.map((artifact) => ({ id: artifact?.id || artifact?.path || 'unknown', reason: artifact?.read_error || artifact?.readError })),
+    };
+  }
+
+  function timelineDiagnosticsForRun(run, groups) {
+    const runId = run?.summary?.id || 'unknown-run';
+    return groups.flatMap((group) => [
+      ...group.missing.map((id) => ({ runId, kind: 'missing-evidence', artifactId: id, message: `${group.label} artifact is missing` })),
+      ...group.broken.map((item) => ({ runId, kind: 'broken-evidence', artifactId: item.id, message: `${group.label} artifact could not be read: ${item.reason}` })),
+    ]);
+  }
+
+  function timelineMutationLinks(run) {
+    return evidenceArtifacts(run, 'mutation_artifacts', 'mutationArtifacts').map((artifact) => ({
+      id: artifact?.id || artifact?.path || 'mutation-artifact',
+      path: artifact?.path || '',
+      kind: artifact?.kind || 'application/json',
+      readOnly: artifact?.metadata?.read_only !== false,
+    }));
+  }
+
+  function timelineSourceApplyLinks(run) {
+    return timelineMutationLinks(run).filter((artifact) => /source-patch|source-apply/.test(`${artifact.id} ${artifact.path}`));
+  }
+
+  function buildEvidenceTimelineModel(runs = []) {
+    const sortedRuns = [...(Array.isArray(runs) ? runs : [])].sort((left, right) => Number(left?.summary?.created_at_unix_ms || left?.summary?.createdAtUnixMs || 0) - Number(right?.summary?.created_at_unix_ms || right?.summary?.createdAtUnixMs || 0));
+    const entries = sortedRuns.map((run) => {
+      const summary = run?.summary || {};
+      const groups = [
+        summarizeTimelineArtifactGroup(run, 'screenshots', ['screenshots']),
+        summarizeTimelineArtifactGroup(run, 'world-state', ['world_states', 'worldStates']),
+        summarizeTimelineArtifactGroup(run, 'console/crash', ['console_logs', 'consoleLogs', 'cdp_trace_summaries', 'cdpTraceSummaries']),
+        summarizeTimelineArtifactGroup(run, 'performance', ['frame_metrics', 'frameMetrics', 'performance_metrics', 'performanceMetrics']),
+        summarizeTimelineArtifactGroup(run, 'mutation/source-apply', ['mutation_artifacts', 'mutationArtifacts']),
+      ];
+      return {
+        runId: summary.id || 'unknown-run',
+        runDir: summary.run_dir || summary.runDir || '',
+        createdAtUnixMs: Number(summary.created_at_unix_ms || summary.createdAtUnixMs || 0),
+        seedId: summary.seed_id || summary.seedId || 'unknown-seed',
+        verdictStatus: summary.verdict_status || summary.verdictStatus || 'unknown',
+        scenarioStatus: summary.scenario_status || summary.scenarioStatus || 'unknown',
+        runStatus: summary.run_status || summary.runStatus || 'unknown',
+        evidence: Object.fromEntries(groups.map((group) => [group.label, { count: group.count, ids: group.ids }])),
+        mutationLinks: timelineMutationLinks(run),
+        sourceApplyLinks: timelineSourceApplyLinks(run),
+        diagnostics: timelineDiagnosticsForRun(run, groups),
+      };
+    });
+    const comparisonCandidates = entries.slice(1).map((entry, index) => ({
+      beforeRunId: entries[index].runId,
+      afterRunId: entry.runId,
+      comparisonRefs: evidenceArtifacts(sortedRuns[index + 1], 'comparison_artifacts', 'comparisonArtifacts')
+        .concat(Array.isArray(sortedRuns[index + 1]?.comparison?.artifacts) ? sortedRuns[index + 1].comparison.artifacts : [])
+        .map((artifact) => artifact?.path || artifact?.id || 'comparison-artifact'),
+    }));
+    const diagnostics = entries.flatMap((entry) => entry.diagnostics);
+    return {
+      schemaVersion: 'studio-evidence-timeline-model-v1',
+      status: diagnostics.length ? 'diagnostics' : 'ready',
+      entries,
+      comparisonCandidates,
+      diagnostics,
+      guardrails: [
+        'timeline model is read-only exported evidence',
+        'browser Studio does not mutate evidence, run tests, apply source patches, execute commands, publish, deploy, or write trusted files',
+        'source mutation links remain Safe Source Apply handoff evidence only',
+      ],
+      forbiddenActions: ['write_trusted_file', 'execute_command', 'apply_patch', 'merge_branch', 'publish_deploy', 'rerun_tests_from_browser'],
+    };
+  }
+
   function renderTree(scene, selectedId) {
     return scene.entities.map((entity) => `<button class="tree-button ${entity.id === selectedId ? 'active' : ''}" data-entity-id="${escapeText(entity.id)}">${escapeText(entity.id)}<br><small>${entity.components.controllable ? 'controllable' : 'static'}</small></button>`).join('');
   }
@@ -2054,7 +2140,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
