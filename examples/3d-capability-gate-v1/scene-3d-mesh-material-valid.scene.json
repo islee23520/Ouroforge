@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-mesh-material-valid",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "meshes": [
+      {
+        "id": "cube-mesh",
+        "kind": "primitive",
+        "primitive": "cube",
+        "materialRef": "debug-mat",
+        "metadata": { "fixtureScope": "tiny deterministic primitive fixture; no importer" }
+      },
+      {
+        "id": "local-marker-mesh",
+        "kind": "local_asset",
+        "sourcePath": "assets/meshes/marker.mesh.json",
+        "expectedHash": "fnv1a64-file-v1:0123456789abcdef",
+        "materialRef": "debug-mat",
+        "metadata": { "fixtureScope": "source-like local path reference only" }
+      }
+    ],
+    "materials": [
+      {
+        "id": "debug-mat",
+        "kind": "unlit",
+        "baseColor": "#44ccff",
+        "metadata": { "fixtureScope": "bounded color-only material" }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "root-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "cube-mesh",
+        "materialRef": "debug-mat",
+        "components": [
+          { "kind": "mesh", "reference": "cube-mesh" },
+          { "kind": "material", "reference": "debug-mat" }
+        ],
+        "metadata": { "fixtureScope": "mesh/material schema validation only" }
+      }
+    ],
+    "metadata": {
+      "generatedStateBoundary": "tracked fixture only; no generated meshes or remote fetches"
+    }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D mesh/material refs, not renderer/importer evidence"
+  }
+}

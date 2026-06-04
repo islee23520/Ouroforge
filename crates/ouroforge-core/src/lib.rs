@@ -33937,6 +33937,10 @@ pub struct Scene3dGraph {
     pub active_camera_id: Option<String>,
     pub nodes: Vec<Scene3dNode>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub meshes: Vec<Scene3dMeshRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub materials: Vec<Scene3dMaterialRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cameras: Vec<Scene3dCamera>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -33960,6 +33964,12 @@ pub struct Scene3dNode {
     pub mesh_ref: Option<String>,
     #[serde(
         default,
+        rename = "materialRef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub material_ref: Option<String>,
+    #[serde(
+        default,
         rename = "colliderRef",
         skip_serializing_if = "Option::is_none"
     )]
@@ -33976,6 +33986,52 @@ pub struct Scene3dComponent {
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference: Option<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dMeshRef {
+    pub id: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primitive: Option<String>,
+    #[serde(
+        default,
+        rename = "sourcePath",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_path: Option<String>,
+    #[serde(
+        default,
+        rename = "materialRef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub material_ref: Option<String>,
+    #[serde(
+        default,
+        rename = "expectedHash",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expected_hash: Option<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dMaterialRef {
+    pub id: String,
+    pub kind: String,
+    #[serde(default, rename = "baseColor", skip_serializing_if = "Option::is_none")]
+    pub base_color: Option<String>,
+    #[serde(
+        default,
+        rename = "textureRef",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub texture_ref: Option<String>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -37403,6 +37459,8 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
             return Err(anyhow!("duplicate scene3d node id: {}", node.id));
         }
     }
+    let mesh_ids = validate_scene_3d_mesh_refs(graph)?;
+    let material_ids = validate_scene_3d_material_refs(graph)?;
     validate_scene_3d_cameras(graph, &node_ids)?;
     for node in &graph.nodes {
         if let Some(parent) = &node.parent {
@@ -37433,6 +37491,26 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
         }
         if let Some(mesh_ref) = &node.mesh_ref {
             validate_path_component(&format!("scene3d node {} meshRef", node.id), mesh_ref)?;
+            if !mesh_ids.is_empty() && !mesh_ids.contains(mesh_ref.as_str()) {
+                return Err(anyhow!(
+                    "scene3d node {} meshRef references missing mesh: {}",
+                    node.id,
+                    mesh_ref
+                ));
+            }
+        }
+        if let Some(material_ref) = &node.material_ref {
+            validate_path_component(
+                &format!("scene3d node {} materialRef", node.id),
+                material_ref,
+            )?;
+            if !material_ids.is_empty() && !material_ids.contains(material_ref.as_str()) {
+                return Err(anyhow!(
+                    "scene3d node {} materialRef references missing material: {}",
+                    node.id,
+                    material_ref
+                ));
+            }
         }
         if let Some(collider_ref) = &node.collider_ref {
             validate_path_component(
@@ -37451,7 +37529,7 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
             ));
         }
         for component in &node.components {
-            validate_scene_3d_component(&node.id, component)?;
+            validate_scene_3d_component(&node.id, component, &mesh_ids, &material_ids)?;
         }
         validate_scene_metadata(
             &format!("scene3d node {} metadata", node.id),
@@ -37632,13 +37710,175 @@ fn validate_scene_3d_viewport(camera_id: &str, viewport: &Scene3dViewport) -> Re
     Ok(())
 }
 
-fn validate_scene_3d_component(node_id: &str, component: &Scene3dComponent) -> Result<()> {
+fn validate_scene_3d_mesh_refs(graph: &Scene3dGraph) -> Result<BTreeSet<&str>> {
+    const MAX_3D_MESH_REFS: usize = 64;
+    if graph.meshes.len() > MAX_3D_MESH_REFS {
+        return Err(anyhow!("scene3d meshes must not exceed {MAX_3D_MESH_REFS}"));
+    }
+    let mut mesh_ids = BTreeSet::new();
+    for mesh in &graph.meshes {
+        validate_path_component("scene3d mesh id", &mesh.id)?;
+        if !mesh_ids.insert(mesh.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d mesh id: {}", mesh.id));
+        }
+        match mesh.kind.as_str() {
+            "primitive" => {
+                let primitive = mesh.primitive.as_deref().ok_or_else(|| {
+                    anyhow!("scene3d mesh {} primitive kind requires primitive", mesh.id)
+                })?;
+                match primitive {
+                    "cube" | "plane" | "triangle" => {}
+                    other => {
+                        return Err(anyhow!(
+                            "scene3d mesh {} unsupported primitive: {}",
+                            mesh.id,
+                            other
+                        ));
+                    }
+                }
+                if mesh.source_path.is_some() || mesh.expected_hash.is_some() {
+                    return Err(anyhow!(
+                        "scene3d mesh {} primitive must not declare sourcePath or expectedHash",
+                        mesh.id
+                    ));
+                }
+            }
+            "local_asset" => {
+                let source_path = mesh.source_path.as_deref().ok_or_else(|| {
+                    anyhow!("scene3d mesh {} local_asset requires sourcePath", mesh.id)
+                })?;
+                validate_scene_3d_mesh_source_path(
+                    &format!("scene3d mesh {} sourcePath", mesh.id),
+                    source_path,
+                )?;
+                if let Some(expected_hash) = &mesh.expected_hash {
+                    validate_visual_edit_draft_hash(
+                        &format!("scene3d mesh {} expectedHash", mesh.id),
+                        expected_hash,
+                    )?;
+                }
+                if mesh.primitive.is_some() {
+                    return Err(anyhow!(
+                        "scene3d mesh {} local_asset must not declare primitive",
+                        mesh.id
+                    ));
+                }
+            }
+            other => {
+                return Err(anyhow!(
+                    "scene3d mesh {} has unsupported kind: {}",
+                    mesh.id,
+                    other
+                ));
+            }
+        }
+        if let Some(material_ref) = &mesh.material_ref {
+            validate_path_component(
+                &format!("scene3d mesh {} materialRef", mesh.id),
+                material_ref,
+            )?;
+        }
+        validate_scene_metadata(
+            &format!("scene3d mesh {} metadata", mesh.id),
+            &mesh.metadata,
+        )?;
+    }
+    Ok(mesh_ids)
+}
+
+fn validate_scene_3d_mesh_source_path(field: &str, value: &str) -> Result<()> {
+    validate_scene_local_asset_path(field, value)?;
+    let extension = Path::new(value)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if extension == "obj" || value.to_ascii_lowercase().ends_with(".mesh.json") {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "{field} has unsupported extension for bounded 3d mesh references"
+        ))
+    }
+}
+
+fn validate_scene_3d_material_refs(graph: &Scene3dGraph) -> Result<BTreeSet<&str>> {
+    const MAX_3D_MATERIAL_REFS: usize = 64;
+    if graph.materials.len() > MAX_3D_MATERIAL_REFS {
+        return Err(anyhow!(
+            "scene3d materials must not exceed {MAX_3D_MATERIAL_REFS}"
+        ));
+    }
+    let mut material_ids = BTreeSet::new();
+    for material in &graph.materials {
+        validate_path_component("scene3d material id", &material.id)?;
+        if !material_ids.insert(material.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d material id: {}", material.id));
+        }
+        match material.kind.as_str() {
+            "unlit" | "lit" => {}
+            other => {
+                return Err(anyhow!(
+                    "scene3d material {} has unsupported kind: {}",
+                    material.id,
+                    other
+                ));
+            }
+        }
+        if let Some(base_color) = &material.base_color {
+            validate_scene_3d_base_color(
+                &format!("scene3d material {} baseColor", material.id),
+                base_color,
+            )?;
+        }
+        if let Some(texture_ref) = &material.texture_ref {
+            validate_path_component(
+                &format!("scene3d material {} textureRef", material.id),
+                texture_ref,
+            )?;
+        }
+        validate_scene_metadata(
+            &format!("scene3d material {} metadata", material.id),
+            &material.metadata,
+        )?;
+    }
+    for mesh in &graph.meshes {
+        if let Some(material_ref) = &mesh.material_ref {
+            if !material_ids.contains(material_ref.as_str()) {
+                return Err(anyhow!(
+                    "scene3d mesh {} materialRef references missing material: {}",
+                    mesh.id,
+                    material_ref
+                ));
+            }
+        }
+    }
+    Ok(material_ids)
+}
+
+fn validate_scene_3d_base_color(field: &str, value: &str) -> Result<()> {
+    let Some(hex) = value.strip_prefix('#') else {
+        return Err(anyhow!("{field} must use #RRGGBB"));
+    };
+    if hex.len() == 6 && hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        Ok(())
+    } else {
+        Err(anyhow!("{field} must use #RRGGBB"))
+    }
+}
+
+fn validate_scene_3d_component(
+    node_id: &str,
+    component: &Scene3dComponent,
+    mesh_ids: &BTreeSet<&str>,
+    material_ids: &BTreeSet<&str>,
+) -> Result<()> {
     validate_path_component(
         &format!("scene3d node {node_id} component kind"),
         &component.kind,
     )?;
     match component.kind.as_str() {
-        "mesh" | "collider" | "marker" => {}
+        "mesh" | "material" | "collider" | "marker" => {}
         other => {
             return Err(anyhow!(
                 "scene3d node {node_id} has unsupported component kind: {other}"
@@ -37653,6 +37893,21 @@ fn validate_scene_3d_component(node_id: &str, component: &Scene3dComponent) -> R
             ),
             reference,
         )?;
+        match component.kind.as_str() {
+            "mesh" if !mesh_ids.is_empty() && !mesh_ids.contains(reference.as_str()) => {
+                return Err(anyhow!(
+                    "scene3d node {node_id} component mesh reference missing mesh: {reference}"
+                ));
+            }
+            "material"
+                if !material_ids.is_empty() && !material_ids.contains(reference.as_str()) =>
+            {
+                return Err(anyhow!(
+                    "scene3d node {node_id} component material reference missing material: {reference}"
+                ));
+            }
+            _ => {}
+        }
     }
     validate_scene_metadata(
         &format!(
@@ -65383,6 +65638,55 @@ scenarios:
                 Ok(()) => panic!("{fixture} rejected by camera validation"),
                 Err(error) => error,
             };
+            assert!(
+                error.to_string().contains(expected),
+                "{fixture} error {error:#} contains {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn scene_3d_mesh_material_refs_v1_accept_bounded_local_fixture() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-mesh-material-valid.scene.json",
+        ))
+        .expect("3D mesh/material fixture parses");
+
+        validate_scene(&scene).expect("3D mesh/material fixture validates");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.meshes.len(), 2);
+        assert_eq!(graph.materials.len(), 1);
+        assert_eq!(graph.meshes[0].kind, "primitive");
+        assert_eq!(graph.meshes[0].primitive.as_deref(), Some("cube"));
+        assert_eq!(graph.meshes[1].kind, "local_asset");
+        assert_eq!(
+            graph.meshes[1].source_path.as_deref(),
+            Some("assets/meshes/marker.mesh.json")
+        );
+        assert_eq!(graph.nodes[0].mesh_ref.as_deref(), Some("cube-mesh"));
+        assert_eq!(graph.nodes[0].material_ref.as_deref(), Some("debug-mat"));
+    }
+
+    #[test]
+    fn scene_3d_mesh_material_refs_v1_reject_missing_unsafe_and_stale_refs() {
+        for (fixture, expected) in [
+            (
+                "examples/3d-capability-gate-v1/scene-3d-mesh-material-invalid-missing-ref.scene.json",
+                "materialRef references missing material",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-mesh-material-invalid-unsafe-path.scene.json",
+                "must be a local static asset path",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-mesh-material-invalid-stale-hash.scene.json",
+                "fnv1a64-file-v1:<16 lowercase hex>",
+            ),
+        ] {
+            let scene: SceneDocument = serde_json::from_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
+            let error =
+                validate_scene(&scene).expect_err("fixture rejected by mesh/material validation");
             assert!(
                 error.to_string().contains(expected),
                 "{fixture} error {error:#} contains {expected}"

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-mesh-material-unsafe-path",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "meshes": [
+      { "id": "remote-mesh", "kind": "local_asset", "sourcePath": "https://example.com/mesh.obj" }
+    ],
+    "nodes": [
+      {
+        "id": "root-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        }
+      }
+    ],
+    "metadata": {}
+  },
+  "metadata": { "expectedValidationError": "remote mesh refs are rejected" }
+}

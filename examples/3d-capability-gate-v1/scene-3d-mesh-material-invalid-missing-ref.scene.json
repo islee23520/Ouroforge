@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-mesh-material-missing-ref",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "meshes": [
+      { "id": "cube-mesh", "kind": "primitive", "primitive": "cube", "materialRef": "missing-mat" }
+    ],
+    "materials": [
+      { "id": "debug-mat", "kind": "unlit", "baseColor": "#44ccff" }
+    ],
+    "nodes": [
+      {
+        "id": "root-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "missing-mesh"
+      }
+    ],
+    "metadata": {}
+  },
+  "metadata": { "expectedValidationError": "missing mesh/material refs are rejected" }
+}

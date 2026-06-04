@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-mesh-material-stale-hash",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "meshes": [
+      {
+        "id": "local-marker-mesh",
+        "kind": "local_asset",
+        "sourcePath": "assets/meshes/marker.mesh.json",
+        "expectedHash": "fnv1a64-file-v1:STALE"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "root-cube",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "local-marker-mesh"
+      }
+    ],
+    "metadata": {}
+  },
+  "metadata": { "expectedValidationError": "stale or malformed mesh hash is rejected" }
+}
