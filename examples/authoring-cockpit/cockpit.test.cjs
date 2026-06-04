@@ -1158,6 +1158,21 @@ assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
+const agentRoleModelFixture = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/agent-roles.fixture.json', 'utf8'));
+run.agent_role_model = agentRoleModelFixture;
+const roleModelMarkup = cockpit.renderAgentRoleModelSurface(run);
+assert.match(roleModelMarkup, /Agent role model/);
+assert.match(roleModelMarkup, /designer/);
+assert.match(roleModelMarkup, /build-release-candidate-agent/);
+assert.match(roleModelMarkup, /no-self-review/);
+assert.match(roleModelMarkup, /self-approval/);
+assert.match(roleModelMarkup, /Read-only role accountability surface/);
+assert.doesNotMatch(roleModelMarkup, /<button|executeCommand|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(cockpit.renderAgentRoleModelSurface({ agent_role_model: { schemaVersion: 'agent-role-model-v1', milestone: '<bad>', roles: '<bad>', separationRequirements: [] } }), /Missing or malformed roles list/);
+assert.doesNotMatch(cockpit.renderAgentRoleModelSurface({ agent_role_model: { schemaVersion: 'agent-role-model-v1', milestone: '<script>bad<\/script>', roles: [], separationRequirements: [] } }), /<script>bad<\/script>/);
+assert.match(cockpit.renderEvidencePane(run), /Agent role model/);
+assert.match(cockpit.renderAgentRoleModelSurface({}), /No agent role model/);
+
 assert.match(cockpit.renderAgentHandoffSurface(run), /Agent handoff/);
 assert.match(cockpit.renderAgentHandoffSurface(run), /blocked/);
 assert.match(cockpit.renderAgentHandoffSurface(run), /&lt;handoff-loop&gt;/);
