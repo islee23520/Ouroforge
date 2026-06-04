@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "gameplay-state-ability-evidence-compatibility.v1",
+  "scope": "local-fixture",
+  "status": "malformed",
+  "stateReadModel": {
+    "schemaVersion": "gameplay-state-machine-read-model.v1",
+    "sourceRef": "../outside/state-machine.json",
+    "requiredFields": []
+  },
+  "abilityReadModel": {
+    "schemaVersion": "gameplay-ability-action-read-model.v1",
+    "sourceRef": "examples/gameplay-ability-action-v1/invalid/ability-action.invalid.fixture.json",
+    "requiredFields": ["commandBridge", "trustedWrite"]
+  },
+  "consumerRules": ["execute_script via plugin_loader"],
+  "evidenceRefs": [],
+  "blockedReasons": []
+}

@@ -20213,6 +20213,47 @@ pub struct GameplayStateTransitionDefinition {
     pub blocked_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayStateMachineReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "statePackId")]
+    pub state_pack_id: String,
+    pub status: String,
+    #[serde(rename = "machineCount")]
+    pub machine_count: usize,
+    #[serde(rename = "readyCount")]
+    pub ready_count: usize,
+    #[serde(rename = "partialCount")]
+    pub partial_count: usize,
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "machineIds")]
+    pub machine_ids: Vec<String>,
+    #[serde(rename = "stateIds")]
+    pub state_ids: Vec<String>,
+    #[serde(rename = "transitionIds")]
+    pub transition_ids: Vec<String>,
+    #[serde(rename = "initialStateIds")]
+    pub initial_state_ids: Vec<String>,
+    #[serde(rename = "targetRefs")]
+    pub target_refs: Vec<String>,
+    #[serde(rename = "triggerKinds")]
+    pub trigger_kinds: Vec<String>,
+    #[serde(rename = "guardKinds")]
+    pub guard_kinds: Vec<String>,
+    #[serde(rename = "actionKinds")]
+    pub action_kinds: Vec<String>,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum GameplayStateMachineStatus {
@@ -20228,6 +20269,101 @@ impl GameplayStateMachineArtifact {
             serde_json::from_str(input).context("failed to parse Gameplay State Machine JSON")?;
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    pub fn read_model_from_json_str(input: &str) -> Result<GameplayStateMachineReadModel> {
+        let artifact = Self::from_json_str(input)?;
+        Ok(artifact.read_model())
+    }
+
+    pub fn read_model(&self) -> GameplayStateMachineReadModel {
+        let mut state_ids = BTreeSet::new();
+        let mut transition_ids = BTreeSet::new();
+        let mut initial_state_ids = BTreeSet::new();
+        let mut target_refs = BTreeSet::new();
+        let mut trigger_kinds = BTreeSet::new();
+        let mut guard_kinds = BTreeSet::new();
+        let mut action_kinds = BTreeSet::new();
+        let mut linked_evidence_refs = BTreeSet::new();
+        let mut blocked_reasons = Vec::new();
+
+        for reference in &self.evidence_refs {
+            linked_evidence_refs.insert(reference.clone());
+        }
+        for reason in &self.blocked_reasons {
+            blocked_reasons.push(reason.clone());
+        }
+        for machine in &self.state_machines {
+            initial_state_ids.insert(machine.initial_state_id.clone());
+            for value in machine.target.values() {
+                target_refs.insert(value.clone());
+            }
+            for reference in &machine.evidence_refs {
+                linked_evidence_refs.insert(reference.clone());
+            }
+            for reason in &machine.blocked_reasons {
+                blocked_reasons.push(format!("{}: {reason}", machine.id));
+            }
+            for state in &machine.states {
+                state_ids.insert(format!("{}:{}", machine.id, state.id));
+                collect_gameplay_state_step_kinds(&state.entry_actions, &mut action_kinds);
+                collect_gameplay_state_step_kinds(&state.exit_actions, &mut action_kinds);
+                for reason in &state.blocked_reasons {
+                    blocked_reasons.push(format!("{}:{}: {reason}", machine.id, state.id));
+                }
+            }
+            for transition in &machine.transitions {
+                transition_ids.insert(format!("{}:{}", machine.id, transition.id));
+                collect_gameplay_state_step_kind(&transition.trigger, &mut trigger_kinds);
+                collect_gameplay_state_step_kinds(&transition.guards, &mut guard_kinds);
+                collect_gameplay_state_step_kinds(&transition.actions, &mut action_kinds);
+                if let Some(reason) = &transition.blocked_reason {
+                    blocked_reasons.push(format!("{}:{}: {reason}", machine.id, transition.id));
+                }
+            }
+        }
+
+        GameplayStateMachineReadModel {
+            schema_version: "gameplay-state-machine-read-model.v1".to_string(),
+            state_pack_id: self.state_pack_id.clone(),
+            status: gameplay_state_machine_status_label(self.status).to_string(),
+            machine_count: self.state_machines.len(),
+            ready_count: self
+                .state_machines
+                .iter()
+                .filter(|machine| machine.status == GameplayStateMachineStatus::Ready)
+                .count(),
+            partial_count: self
+                .state_machines
+                .iter()
+                .filter(|machine| machine.status == GameplayStateMachineStatus::Partial)
+                .count(),
+            blocked_count: self
+                .state_machines
+                .iter()
+                .filter(|machine| machine.status == GameplayStateMachineStatus::Blocked)
+                .count(),
+            unsupported_count: self
+                .state_machines
+                .iter()
+                .filter(|machine| machine.status == GameplayStateMachineStatus::Unsupported)
+                .count(),
+            machine_ids: self
+                .state_machines
+                .iter()
+                .map(|machine| machine.id.clone())
+                .collect(),
+            state_ids: state_ids.into_iter().collect(),
+            transition_ids: transition_ids.into_iter().collect(),
+            initial_state_ids: initial_state_ids.into_iter().collect(),
+            target_refs: target_refs.into_iter().collect(),
+            trigger_kinds: trigger_kinds.into_iter().collect(),
+            guard_kinds: guard_kinds.into_iter().collect(),
+            action_kinds: action_kinds.into_iter().collect(),
+            linked_evidence_refs: linked_evidence_refs.into_iter().collect(),
+            blocked_reasons,
+            boundary: "Read-only Gameplay State Machine evidence/read-model summary; no runtime execution, no script execution, no eval, no dynamic import, no plugin loader, no command bridge, no browser trusted writes, no source apply, and no production-stable scripting API claim.".to_string(),
+        }
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -20395,6 +20531,33 @@ impl GameplayStateTransitionDefinition {
             require_bounded_display_text("gameplay state transition blockedReason", reason)?;
         }
         Ok(())
+    }
+}
+
+fn gameplay_state_machine_status_label(status: GameplayStateMachineStatus) -> &'static str {
+    match status {
+        GameplayStateMachineStatus::Ready => "ready",
+        GameplayStateMachineStatus::Partial => "partial",
+        GameplayStateMachineStatus::Blocked => "blocked",
+        GameplayStateMachineStatus::Unsupported => "unsupported",
+    }
+}
+
+fn collect_gameplay_state_step_kinds(
+    steps: &[BTreeMap<String, serde_json::Value>],
+    output: &mut BTreeSet<String>,
+) {
+    for step in steps {
+        collect_gameplay_state_step_kind(step, output);
+    }
+}
+
+fn collect_gameplay_state_step_kind(
+    step: &BTreeMap<String, serde_json::Value>,
+    output: &mut BTreeSet<String>,
+) {
+    if let Some(kind) = step.get("kind").and_then(|value| value.as_str()) {
+        output.insert(kind.to_string());
     }
 }
 
@@ -20617,6 +20780,45 @@ pub struct GameplayAbilityCost {
     pub amount: u64,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayAbilityActionReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "abilityPackId")]
+    pub ability_pack_id: String,
+    pub status: String,
+    #[serde(rename = "abilityCount")]
+    pub ability_count: usize,
+    #[serde(rename = "readyCount")]
+    pub ready_count: usize,
+    #[serde(rename = "partialCount")]
+    pub partial_count: usize,
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "abilityIds")]
+    pub ability_ids: Vec<String>,
+    #[serde(rename = "actionIds")]
+    pub action_ids: Vec<String>,
+    #[serde(rename = "runtimeStatusCounts")]
+    pub runtime_status_counts: BTreeMap<String, usize>,
+    #[serde(rename = "targetRefs")]
+    pub target_refs: Vec<String>,
+    #[serde(rename = "triggerKinds")]
+    pub trigger_kinds: Vec<String>,
+    #[serde(rename = "effectKinds")]
+    pub effect_kinds: Vec<String>,
+    #[serde(rename = "costKinds")]
+    pub cost_kinds: Vec<String>,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum GameplayAbilityActionStatus {
@@ -20643,6 +20845,92 @@ impl GameplayAbilityActionArtifact {
             serde_json::from_str(input).context("failed to parse Gameplay Ability Action JSON")?;
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    pub fn read_model_from_json_str(input: &str) -> Result<GameplayAbilityActionReadModel> {
+        let artifact = Self::from_json_str(input)?;
+        Ok(artifact.read_model())
+    }
+
+    pub fn read_model(&self) -> GameplayAbilityActionReadModel {
+        let mut runtime_status_counts = BTreeMap::new();
+        let mut target_refs = BTreeSet::new();
+        let mut trigger_kinds = BTreeSet::new();
+        let mut effect_kinds = BTreeSet::new();
+        let mut cost_kinds = BTreeSet::new();
+        let mut linked_evidence_refs = BTreeSet::new();
+        let mut blocked_reasons = Vec::new();
+
+        for reference in &self.evidence_refs {
+            linked_evidence_refs.insert(reference.clone());
+        }
+        for reason in &self.blocked_reasons {
+            blocked_reasons.push(reason.clone());
+        }
+        for ability in &self.abilities {
+            *runtime_status_counts
+                .entry(gameplay_ability_runtime_status_label(ability.runtime_status).to_string())
+                .or_insert(0) += 1;
+            for value in ability.target.values() {
+                target_refs.insert(value.clone());
+            }
+            collect_gameplay_ability_step_kind(&ability.trigger, &mut trigger_kinds);
+            collect_gameplay_ability_step_kind(&ability.effect, &mut effect_kinds);
+            for cost in &ability.costs {
+                cost_kinds.insert(cost.kind.clone());
+            }
+            for reference in &ability.evidence_refs {
+                linked_evidence_refs.insert(reference.clone());
+            }
+            for reason in &ability.blocked_reasons {
+                blocked_reasons.push(format!("{}: {reason}", ability.id));
+            }
+        }
+
+        GameplayAbilityActionReadModel {
+            schema_version: "gameplay-ability-action-read-model.v1".to_string(),
+            ability_pack_id: self.ability_pack_id.clone(),
+            status: gameplay_ability_action_status_label(self.status).to_string(),
+            ability_count: self.abilities.len(),
+            ready_count: self
+                .abilities
+                .iter()
+                .filter(|ability| ability.status == GameplayAbilityActionStatus::Ready)
+                .count(),
+            partial_count: self
+                .abilities
+                .iter()
+                .filter(|ability| ability.status == GameplayAbilityActionStatus::Partial)
+                .count(),
+            blocked_count: self
+                .abilities
+                .iter()
+                .filter(|ability| ability.status == GameplayAbilityActionStatus::Blocked)
+                .count(),
+            unsupported_count: self
+                .abilities
+                .iter()
+                .filter(|ability| ability.status == GameplayAbilityActionStatus::Unsupported)
+                .count(),
+            ability_ids: self
+                .abilities
+                .iter()
+                .map(|ability| ability.id.clone())
+                .collect(),
+            action_ids: self
+                .abilities
+                .iter()
+                .map(|ability| ability.action_id.clone())
+                .collect(),
+            runtime_status_counts,
+            target_refs: target_refs.into_iter().collect(),
+            trigger_kinds: trigger_kinds.into_iter().collect(),
+            effect_kinds: effect_kinds.into_iter().collect(),
+            cost_kinds: cost_kinds.into_iter().collect(),
+            linked_evidence_refs: linked_evidence_refs.into_iter().collect(),
+            blocked_reasons,
+            boundary: "Read-only Gameplay Ability Action evidence/read-model summary; no runtime execution, no script execution, no eval, no dynamic import, no plugin loader, no command bridge, no browser trusted writes, no source apply, and no production-stable scripting API claim.".to_string(),
+        }
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -20750,6 +21038,35 @@ impl GameplayAbilityCooldown {
             }
         }
         Ok(())
+    }
+}
+
+fn gameplay_ability_action_status_label(status: GameplayAbilityActionStatus) -> &'static str {
+    match status {
+        GameplayAbilityActionStatus::Ready => "ready",
+        GameplayAbilityActionStatus::Partial => "partial",
+        GameplayAbilityActionStatus::Blocked => "blocked",
+        GameplayAbilityActionStatus::Unsupported => "unsupported",
+    }
+}
+
+fn gameplay_ability_runtime_status_label(status: GameplayAbilityRuntimeStatus) -> &'static str {
+    match status {
+        GameplayAbilityRuntimeStatus::Available => "available",
+        GameplayAbilityRuntimeStatus::Active => "active",
+        GameplayAbilityRuntimeStatus::OnCooldown => "on_cooldown",
+        GameplayAbilityRuntimeStatus::InsufficientCost => "insufficient_cost",
+        GameplayAbilityRuntimeStatus::Blocked => "blocked",
+        GameplayAbilityRuntimeStatus::Unsupported => "unsupported",
+    }
+}
+
+fn collect_gameplay_ability_step_kind(
+    step: &BTreeMap<String, serde_json::Value>,
+    output: &mut BTreeSet<String>,
+) {
+    if let Some(kind) = step.get("kind").and_then(|value| value.as_str()) {
+        output.insert(kind.to_string());
     }
 }
 
@@ -67785,6 +68102,107 @@ scenarios:
         let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
         assert!(scope.contains("#614 — State Machine and Ability Action Model v1"));
         assert!(scope.contains("abilities/actions describe bounded commands, action ids"));
+    }
+
+    #[test]
+    fn gameplay_state_ability_read_models_surface_compatible_status_evidence() {
+        let state_read_model =
+            GameplayStateMachineArtifact::read_model_from_json_str(include_str!(
+                "../../../examples/gameplay-state-machine-v1/state-machine.valid.fixture.json"
+            ))
+            .expect("state machine read model is generated from valid fixture");
+        assert_eq!(
+            state_read_model.schema_version,
+            "gameplay-state-machine-read-model.v1"
+        );
+        assert_eq!(state_read_model.machine_count, 3);
+        assert!(state_read_model
+            .transition_ids
+            .iter()
+            .any(|id| id == "player-dash-state:dash-starts-cooldown"));
+        assert!(state_read_model
+            .trigger_kinds
+            .iter()
+            .any(|kind| kind == "on_input"));
+        assert!(state_read_model
+            .action_kinds
+            .iter()
+            .any(|kind| kind == "start_cooldown"));
+        assert!(state_read_model.boundary.contains("Read-only"));
+        assert!(state_read_model.boundary.contains("no runtime execution"));
+
+        let ability_read_model =
+            GameplayAbilityActionArtifact::read_model_from_json_str(include_str!(
+                "../../../examples/gameplay-ability-action-v1/ability-action.valid.fixture.json"
+            ))
+            .expect("ability/action read model is generated from valid fixture");
+        assert_eq!(
+            ability_read_model.schema_version,
+            "gameplay-ability-action-read-model.v1"
+        );
+        assert_eq!(ability_read_model.ability_count, 5);
+        assert!(ability_read_model
+            .action_ids
+            .iter()
+            .any(|id| id == "action-dash"));
+        assert_eq!(
+            ability_read_model.runtime_status_counts.get("on_cooldown"),
+            Some(&1)
+        );
+        assert!(ability_read_model
+            .effect_kinds
+            .iter()
+            .any(|kind| kind == "complete_objective"));
+        assert!(ability_read_model.boundary.contains("Read-only"));
+        assert!(ability_read_model.boundary.contains("no runtime execution"));
+    }
+
+    #[test]
+    fn gameplay_state_ability_read_models_reject_missing_and_malformed_sources() {
+        let missing_state = GameplayStateMachineArtifact::read_model_from_json_str("{}")
+            .expect_err("missing state-machine fields fail before read-model generation");
+        assert!(
+            missing_state
+                .to_string()
+                .contains("failed to parse Gameplay State Machine JSON")
+                || missing_state.to_string().contains("schemaVersion"),
+            "unexpected missing state error: {missing_state}"
+        );
+
+        let malformed_ability = GameplayAbilityActionArtifact::read_model_from_json_str(
+            include_str!(
+                "../../../examples/gameplay-ability-action-v1/invalid/ability-action.invalid.fixture.json"
+            ),
+        )
+        .expect_err("invalid ability/action fixture fails before read-model generation");
+        assert!(
+            malformed_ability
+                .to_string()
+                .contains("target must not be empty")
+                || malformed_ability.to_string().contains("unsupported kind")
+                || malformed_ability.to_string().contains("durationMs"),
+            "unexpected malformed ability error: {malformed_ability}"
+        );
+    }
+
+    #[test]
+    fn gameplay_state_ability_evidence_compatibility_docs_audit_boundaries() {
+        let doc = include_str!("../../../docs/gameplay-state-ability-evidence-compatibility-v1.md");
+        assert!(doc.contains("Issue: #614"));
+        assert!(doc.contains("gameplay-state-machine-read-model.v1"));
+        assert!(doc.contains("gameplay-ability-action-read-model.v1"));
+        assert!(doc.contains("read-only summaries"));
+        assert!(doc.contains("does not authorize arbitrary"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+
+        let compat = include_str!(
+            "../../../examples/gameplay-state-ability-evidence-v1/read-model-compatibility.fixture.json"
+        );
+        assert!(compat.contains("gameplay-state-ability-evidence-compatibility.v1"));
+        assert!(compat.contains("gameplay-state-machine-read-model.v1"));
+        assert!(compat.contains("gameplay-ability-action-read-model.v1"));
+        assert!(compat.contains("display/evidence data only"));
     }
 
     #[test]
