@@ -18005,6 +18005,16 @@ fn validate_objective_expected_evidence(
 fn evaluate_objective_completion(
     artifact: &ObjectiveCompletionProofArtifact,
 ) -> Result<ObjectiveCompletionProofResult> {
+    if artifact.status == ObjectiveCompletionProofStatus::Blocked {
+        return Ok(objective_completion_result(
+            ObjectiveCompletionProofResultStatus::Blocked,
+            false,
+            false,
+            false,
+            "objective proof is blocked and cannot certify completion",
+        ));
+    }
+
     let unsupported_reasons = artifact
         .required_actions
         .iter()
@@ -18146,7 +18156,12 @@ fn validate_objective_completion_status(
             Ok(())
         }
         ObjectiveCompletionProofStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
-        ObjectiveCompletionProofStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        ObjectiveCompletionProofStatus::Blocked
+            if !blocked_reasons.is_empty()
+                && result.status == ObjectiveCompletionProofResultStatus::Blocked =>
+        {
+            Ok(())
+        }
         ObjectiveCompletionProofStatus::Proven => Err(anyhow!(
             "objective completion proven status requires complete result and no blockedReasons"
         )),
@@ -18163,7 +18178,7 @@ fn validate_objective_completion_status(
             "objective completion stale status requires blockedReasons"
         )),
         ObjectiveCompletionProofStatus::Blocked => Err(anyhow!(
-            "objective completion blocked status requires blockedReasons"
+            "objective completion blocked status requires a blocked result and blockedReasons"
         )),
     }
 }
@@ -63114,7 +63129,7 @@ scenarios:
                     "../../../examples/objective-completion-proof-v1/objective.blocked.fixture.json"
                 ),
                 ObjectiveCompletionProofStatus::Blocked,
-                ObjectiveCompletionProofResultStatus::Complete,
+                ObjectiveCompletionProofResultStatus::Blocked,
             ),
         ] {
             let artifact = ObjectiveCompletionProofArtifact::from_json_str(fixture)
@@ -63150,6 +63165,12 @@ scenarios:
                     "../../../examples/objective-completion-proof-v1/invalid/unsafe-ref.fixture.json"
                 ),
                 "must not escape",
+            ),
+            (
+                include_str!(
+                    "../../../examples/objective-completion-proof-v1/invalid/blocked-complete-result.fixture.json"
+                ),
+                "result drift",
             ),
         ] {
             let error = ObjectiveCompletionProofArtifact::from_json_str(fixture)

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "objective-completion-proof-v1",
-  "proofId": "objective_collect_and_exit_blocked",
+  "proofId": "objective_collect_and_exit_blocked_complete",
   "objectiveId": "collect_and_exit",
   "intentId": "intent_collect_intro",
   "planId": "plan_collect_intro",
@@ -38,17 +38,17 @@
     { "state": "objective", "from": "active", "to": "complete" }
   ],
   "result": {
-    "status": "blocked",
-    "objectiveComplete": false,
-    "winConditionMet": false,
+    "status": "complete",
+    "objectiveComplete": true,
+    "winConditionMet": true,
     "lossConditionTriggered": false,
-    "summary": "objective proof is blocked and cannot certify completion"
+    "summary": "objective proof completed under scoped local evidence"
   },
   "expectedEvidence": [
     {
       "evidenceId": "blocked-report",
       "kind": "read_model",
-      "pathHint": "evidence/objective-completion/objective_collect_and_exit_blocked/read-model.json"
+      "pathHint": "evidence/objective-completion/objective_collect_and_exit_blocked_complete/read-model.json"
     }
   ],
   "status": "blocked",
