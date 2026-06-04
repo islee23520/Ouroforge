@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "scenario-coverage-v8-3d-coverage-v1",
+  "issue": 606,
+  "id": "scenario-coverage-v8-3d-capability-matrix",
+  "scope": "Source-like regression coverage for bounded local 3D capability behavior; generated runs, screenshots, dashboard exports, temp projects, and local tool state remain untracked.",
+  "guardrails": [
+    "3D remains a bounded local capability gate, not production 3D readiness or a Godot replacement claim",
+    "Rust/local validation owns trusted persistence, source-like fixture validation, generated evidence writing, and CLI contracts",
+    "browser dashboard and Studio surfaces remain escaped read-only or draft-only and cannot write trusted state, execute commands, auto-apply, auto-merge, or bridge to local servers",
+    "existing 2D seeds, scenes, manifests, runs, dashboard exports, Studio read models, and source-like fixtures remain backward-compatible",
+    "#1 and #23 remain open"
+  ],
+  "features": [
+    {
+      "id": "transform-hierarchy",
+      "status": "covered",
+      "prUnit": "3D9.11.1",
+      "scenarioIds": ["core-3d-transform-render-collision"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/scenes/core-3d-regression.scene.json",
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs"
+      ]
+    },
+    {
+      "id": "camera-projection",
+      "status": "covered",
+      "prUnit": "3D9.11.1",
+      "scenarioIds": ["core-3d-transform-render-collision"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/scenes/core-3d-regression.scene.json",
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs"
+      ]
+    },
+    {
+      "id": "mesh-material-refs",
+      "status": "covered",
+      "prUnit": "3D9.11.1",
+      "scenarioIds": ["core-3d-transform-render-collision"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/scenes/core-3d-regression.scene.json",
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs"
+      ]
+    },
+    {
+      "id": "render-smoke",
+      "status": "covered",
+      "prUnit": "3D9.11.1",
+      "scenarioIds": ["core-3d-transform-render-collision"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs",
+        "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs"
+      ]
+    },
+    {
+      "id": "collision-trigger",
+      "status": "covered",
+      "prUnit": "3D9.11.1",
+      "scenarioIds": ["core-3d-transform-render-collision", "probe-animation-evaluator-regression"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs",
+        "examples/3d-capability-regression-v8/probe-animation-evaluator-smoke.test.cjs",
+        "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs"
+      ]
+    },
+    {
+      "id": "animation-playback",
+      "status": "covered",
+      "prUnit": "3D9.11.2",
+      "scenarioIds": ["probe-animation-evaluator-regression"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/scenes/probe-animation-regression.scene.json",
+        "examples/3d-capability-regression-v8/probe-animation-evaluator-smoke.test.cjs"
+      ],
+      "knownGap": "Bounded transform playback only; no skeletal animation authoring, IK, graph editor, or production animation system claim."
+    },
+    {
+      "id": "runtime-probe-contract",
+      "status": "covered",
+      "prUnit": "3D9.11.2",
+      "scenarioIds": ["probe-animation-evaluator-regression"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/probe-animation-evaluator-smoke.test.cjs",
+        "docs/3d-runtime-probe-contract-v1.md"
+      ]
+    },
+    {
+      "id": "evaluator-pass-fail",
+      "status": "covered",
+      "prUnit": "3D9.11.2",
+      "scenarioIds": ["core-3d-transform-render-collision", "probe-animation-evaluator-regression"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/probe-animation-evaluator-smoke.test.cjs",
+        "examples/3d-capability-regression-v8/invalid/scene-3d-missing-graph.scene.json",
+        "examples/3d-capability-regression-v8/invalid/scene-3d-animation-missing-target.scene.json"
+      ]
+    },
+    {
+      "id": "dashboard-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "3D9.11.3",
+      "scenarioIds": ["dashboard-present-missing-malformed-3d-fields"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs"
+      ]
+    },
+    {
+      "id": "studio-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "3D9.11.3",
+      "scenarioIds": ["studio-present-missing-malformed-3d-fields"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs"
+      ]
+    },
+    {
+      "id": "2d-compatibility-audit",
+      "status": "covered",
+      "prUnit": "3D9.11.3",
+      "scenarioIds": ["legacy-2d-runtime-compatibility"],
+      "evidenceRefs": [
+        "examples/3d-capability-regression-v8/core-3d-smoke.test.cjs",
+        "examples/3d-capability-regression-v8/coverage-read-model-compatibility.test.cjs"
+      ]
+    }
+  ],
+  "knownGaps": [
+    { "id": "production-3d-engine", "status": "out-of-scope", "reason": "The suite is a bounded local capability gate only." },
+    { "id": "gltf-import-pipeline", "status": "out-of-scope", "reason": "Broad GLTF/GLB import and remote asset loading are not part of #606." },
+    { "id": "advanced-lighting-pbr", "status": "out-of-scope", "reason": "Advanced lighting, PBR, and material graph behavior require separate authorization." },
+    { "id": "skeletal-animation-authoring", "status": "out-of-scope", "reason": "Only bounded transform playback evidence is covered." },
+    { "id": "native-export-plugin-hosted", "status": "out-of-scope", "reason": "Native export, plugin runtime, marketplace, hosted/cloud/server/auth behavior, and public launch surfaces are not authorized." },
+    { "id": "trusted-browser-writes", "status": "out-of-scope", "reason": "Browser/dashboard/Studio surfaces remain read-only or draft-only and cannot write trusted state or execute commands." }
+  ]
+}
