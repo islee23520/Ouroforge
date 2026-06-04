@@ -10459,6 +10459,7 @@ pub enum SourcePatchForbiddenTestCommandKind {
     CredentialAccess,
     DependencyMutation,
     DestructiveFilesystem,
+    WorkspaceEscape,
     SourceApplyOrMerge,
 }
 
@@ -10572,6 +10573,15 @@ fn classify_forbidden_source_patch_test_argv(
             "install, bootstrap, or package acquisition commands are not allowed",
         ));
     }
+    if program == "cargo" {
+        if let Some(reason) = cargo_source_patch_test_workspace_escape_reason(argv, &normalized) {
+            return Some(forbidden_source_patch_test_command_report(
+                SourcePatchForbiddenTestCommandKind::WorkspaceEscape,
+                &reason,
+            ));
+        }
+    }
+
     if (program == "cargo"
         && normalized
             .get(1)
@@ -10642,6 +10652,51 @@ fn classify_forbidden_source_patch_test_argv(
         ));
     }
     None
+}
+
+fn cargo_source_patch_test_workspace_escape_reason(
+    raw_argv: &[String],
+    normalized_argv: &[String],
+) -> Option<String> {
+    const BLOCKED_FLAGS: [&str; 3] = ["--manifest-path", "--config", "--target-dir"];
+    for arg in normalized_argv.iter().skip(1) {
+        if BLOCKED_FLAGS
+            .iter()
+            .any(|flag| arg == flag || arg.starts_with(&format!("{flag}=")))
+        {
+            return Some(format!(
+                "cargo sandbox tests may not override workspace, manifest, config, or target-dir with `{arg}`"
+            ));
+        }
+    }
+    for arg in raw_argv.iter().skip(1) {
+        if source_patch_test_arg_has_sandbox_escaping_path(arg) {
+            return Some(format!(
+                "cargo sandbox tests may not use absolute or parent-relative path argument `{}`",
+                arg.trim()
+            ));
+        }
+    }
+    None
+}
+
+fn source_patch_test_arg_has_sandbox_escaping_path(arg: &str) -> bool {
+    let trimmed = arg.trim();
+    if trimmed.is_empty() || trimmed == "--" {
+        return false;
+    }
+    let path_candidate = trimmed
+        .strip_prefix("--")
+        .and_then(|flag| flag.split_once('=').map(|(_, value)| value))
+        .unwrap_or(trimmed);
+    if path_candidate.is_empty() {
+        return false;
+    }
+    let path = Path::new(path_candidate);
+    path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
 }
 
 fn forbidden_source_patch_test_command_report(
