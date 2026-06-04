@@ -128,9 +128,22 @@ The 3D probe contract forbids:
 - native export, packaging, signing, publishing, hosted/cloud behavior, plugin
   runtime, marketplace behavior, or third-party code loading.
 
+## Runtime implementation status
+
+PR 3D9.8.2 implements the browser-runtime probe side for the local demo runtime:
+
+- `getWorldState()` exposes top-level `scene3dCamera`, `scene3dTransforms`, and
+  `scene3dProbe` fields while preserving existing 2D fields and existing
+  `scene3dRender`, `scene3dCollision`, and `scene3dAnimation` evidence.
+- `camera.scene3dCamera` and `camera.camera3d` provide compatibility aliases for
+  read-only 3D camera inspection.
+- `scene3dTransforms` resolves local/world transform rows for the bounded 3D
+  hierarchy and reports unavailable state explicitly for 2D-only scenes.
+- `getFrameStats()` adds 3D camera, transform, collision, render, and animation
+  counters without changing existing 2D counters.
+
 ## Implementation handoff
 
-PR 3D9.8.2 may implement or normalize runtime fields described here. PR 3D9.8.3
-may capture/export the fields and add malformed/missing read-model tests. Both
-follow-up PRs must keep the same conservative wording, generated-state audit,
-2D compatibility checks, and #1/#23 protection checks.
+PR 3D9.8.3 may capture/export the fields and add malformed/missing read-model
+tests. Follow-up PRs must keep the same conservative wording, generated-state
+audit, 2D compatibility checks, and #1/#23 protection checks.

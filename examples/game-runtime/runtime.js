@@ -857,6 +857,193 @@
       .map((clip) => [clip.id, clip]));
   }
 
+  function combineScene3dTransforms(parent, local) {
+    const parentTransform = transform3(parent);
+    const localTransform = transform3(local);
+    return {
+      translation: {
+        x: parentTransform.translation.x + localTransform.translation.x,
+        y: parentTransform.translation.y + localTransform.translation.y,
+        z: parentTransform.translation.z + localTransform.translation.z,
+      },
+      rotation: {
+        x: parentTransform.rotation.x + localTransform.rotation.x,
+        y: parentTransform.rotation.y + localTransform.rotation.y,
+        z: parentTransform.rotation.z + localTransform.rotation.z,
+      },
+      scale: {
+        x: parentTransform.scale.x * localTransform.scale.x,
+        y: parentTransform.scale.y * localTransform.scale.y,
+        z: parentTransform.scale.z * localTransform.scale.z,
+      },
+    };
+  }
+
+  function scene3dTransformSummary({ scene3d = world.scene3d, frameId = `tick-${world.tick}` } = {}) {
+    if (!scene3d || typeof scene3d !== 'object' || Array.isArray(scene3d)) {
+      return {
+        schemaVersion: 'ouroforge.scene3d-transform-probe.v1',
+        present: false,
+        frameId: String(frameId),
+        sceneId: world.sceneId,
+        nodeCount: 0,
+        transformCount: 0,
+        transforms: [],
+        warnings: ['scene3d graph unavailable'],
+        readOnlyInspection: {
+          trustedEmitter: 'browser-runtime-3d-probe',
+          browserStudioMode: 'read-only 3D transform hierarchy inspection',
+          disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'viewport persistence'],
+        },
+      };
+    }
+    const nodes = Array.isArray(scene3d.nodes) ? scene3d.nodes : [];
+    const nodesById = scene3dNodeById(scene3d);
+    const resolved = new Map();
+    const warnings = [];
+    function resolveNode(node, stack = []) {
+      if (!node || typeof node.id !== 'string') return null;
+      if (resolved.has(node.id)) return resolved.get(node.id);
+      const localTransform = transform3(node.localTransform);
+      let worldTransform = node.worldTransform && typeof node.worldTransform === 'object'
+        ? transform3(node.worldTransform)
+        : localTransform;
+      let depth = 0;
+      if (typeof node.parentId === 'string' || typeof node.parent === 'string') {
+        const parentId = String(node.parentId || node.parent);
+        const parent = nodesById.get(parentId);
+        if (!parent) {
+          warnings.push({ nodeId: node.id, warning: `missing parent ${parentId}` });
+        } else if (stack.includes(node.id) || stack.includes(parentId)) {
+          warnings.push({ nodeId: node.id, warning: `cycle detected near parent ${parentId}` });
+        } else {
+          const parentRow = resolveNode(parent, [...stack, node.id]);
+          if (parentRow) {
+            worldTransform = combineScene3dTransforms(parentRow.worldTransform, localTransform);
+            depth = parentRow.depth + 1;
+          }
+        }
+      }
+      const row = {
+        nodeId: node.id,
+        parentId: typeof node.parentId === 'string' ? node.parentId : (typeof node.parent === 'string' ? node.parent : null),
+        depth,
+        localTransform,
+        worldTransform,
+        meshRef: typeof node.meshRef === 'string' ? node.meshRef : null,
+        materialRef: typeof node.materialRef === 'string' ? node.materialRef : null,
+        colliderRef: typeof node.colliderRef === 'string' ? node.colliderRef : null,
+      };
+      resolved.set(node.id, row);
+      return row;
+    }
+    for (const node of nodes) resolveNode(node);
+    const transforms = nodes
+      .filter((node) => node && typeof node.id === 'string')
+      .map((node) => resolved.get(node.id))
+      .filter(Boolean);
+    return {
+      schemaVersion: 'ouroforge.scene3d-transform-probe.v1',
+      present: true,
+      frameId: String(frameId),
+      sceneId: world.sceneId,
+      nodeCount: nodes.length,
+      transformCount: transforms.length,
+      transforms,
+      warnings,
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-3d-probe',
+        browserStudioMode: 'read-only 3D transform hierarchy inspection',
+        disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'viewport persistence'],
+      },
+    };
+  }
+
+  function scene3dProbeSummary({ state, frameId = `tick-${world.tick}` }) {
+    const scene3d = state && state.scene3d && typeof state.scene3d === 'object' && !Array.isArray(state.scene3d)
+      ? state.scene3d
+      : null;
+    const transforms = scene3dTransformSummary({ scene3d, frameId });
+    return {
+      schemaVersion: 'ouroforge.scene3d-runtime-probe.v1',
+      present: Boolean(scene3d),
+      status: scene3d ? 'present' : 'unavailable',
+      frameId: String(frameId),
+      sceneId: world.sceneId,
+      sceneKind: state && state.sceneKind ? state.sceneKind : '2d',
+      nodeCount: scene3d && Array.isArray(scene3d.nodes) ? scene3d.nodes.length : 0,
+      transformCount: transforms.transformCount,
+      cameraCount: scene3d && Array.isArray(scene3d.cameras) ? scene3d.cameras.length : 0,
+      colliderCount: scene3d && Array.isArray(scene3d.colliders) ? scene3d.colliders.length : 0,
+      animationClipCount: scene3d && Array.isArray(scene3d.animationClips) ? scene3d.animationClips.length : 0,
+      animationStateCount: state && state.scene3dAnimation ? state.scene3dAnimation.stateCount || 0 : 0,
+      renderVisibleObjectCount: state && state.scene3dRender ? state.scene3dRender.visibleObjectCount || 0 : 0,
+      collisionEventCount: state && Array.isArray(state.scene3dCollisions) ? state.scene3dCollisions.length : 0,
+      transforms,
+      activeCamera: state && state.scene3dCamera ? state.scene3dCamera : null,
+      render: state && state.scene3dRender ? state.scene3dRender : null,
+      collision: state && state.scene3dCollision ? state.scene3dCollision : null,
+      animation: state && state.scene3dAnimation ? state.scene3dAnimation : null,
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-3d-probe',
+        browserStudioMode: 'read-only 3D runtime probe inspection',
+        disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'viewport persistence', 'trusted persistence'],
+      },
+      boundary: 'Browser-local read-only 3D probe evidence; not trusted persistence, command execution, production 3D parity, or a Godot replacement claim.',
+    };
+  }
+
+  function scene3dCameraProbeSummary({ scene3d = world.scene3d, frameId = `tick-${world.tick}` } = {}) {
+    if (!scene3d || typeof scene3d !== 'object' || Array.isArray(scene3d)) {
+      return {
+        schemaVersion: 'ouroforge.scene3d-camera-state.v1',
+        present: false,
+        frameId: String(frameId),
+        sceneId: world.sceneId,
+        activeCameraId: null,
+        activeCamera: null,
+        cameraCount: 0,
+        cameras: [],
+        emptyState: 'No scene3d camera state is available in the runtime probe.',
+        readOnlyInspection: {
+          trustedEmitter: 'browser-runtime-3d-probe',
+          browserStudioMode: 'read-only 3D camera evidence inspection',
+          disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'viewport persistence', 'camera editor tooling'],
+        },
+      };
+    }
+    const cameras = Array.isArray(scene3d.cameras) ? scene3d.cameras : [];
+    const activeCameraId = typeof scene3d.activeCameraId === 'string'
+      ? scene3d.activeCameraId
+      : (cameras.find((camera) => camera && camera.active === true) || cameras[0] || {}).id || null;
+    const rows = cameras
+      .filter((camera) => camera && typeof camera.id === 'string')
+      .map((camera) => ({
+        id: camera.id,
+        active: camera.id === activeCameraId || camera.active === true,
+        nodeId: typeof camera.nodeId === 'string' ? camera.nodeId : null,
+        transform: transform3(camera.transform),
+        projection: clone(camera.projection || {}),
+        viewport: clone(camera.viewport || {}),
+      }));
+    const activeCamera = rows.find((camera) => camera.id === activeCameraId) || rows.find((camera) => camera.active) || null;
+    return {
+      schemaVersion: 'ouroforge.scene3d-camera-state.v1',
+      present: rows.length > 0,
+      frameId: String(frameId),
+      sceneId: world.sceneId,
+      activeCameraId,
+      activeCamera,
+      cameraCount: rows.length,
+      cameras: rows,
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-3d-probe',
+        browserStudioMode: 'read-only 3D camera evidence inspection',
+        disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'viewport persistence', 'camera editor tooling'],
+      },
+    };
+  }
+
   function boundedScene3dKeyframes(clip) {
     const keyframes = Array.isArray(clip && clip.keyframes) ? clip.keyframes : [];
     return keyframes
@@ -1039,6 +1226,8 @@
       rendererCamera: clone(rendererState.camera),
       viewport: clone(rendererState.viewport),
       worldToScreen,
+      scene3dCamera: scene3dCameraProbeSummary(),
+      camera3d: scene3dCameraProbeSummary(),
     };
   }
 
@@ -1776,6 +1965,8 @@
       state.renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })
         : null;
+      state.scene3dCamera = scene3dCameraProbeSummary({ scene3d: state.scene3d, frameId });
+      state.scene3dTransforms = scene3dTransformSummary({ scene3d: state.scene3d, frameId });
       state.scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
         ? renderer.scene3dRenderSummary({ world: state, frameId })
         : null;
@@ -1786,6 +1977,7 @@
         : { present: false, events: [] };
       state.scene3dCollisions = Array.isArray(state.scene3dCollision.events) ? clone(state.scene3dCollision.events) : [];
       state.collisions = mergeCollisionEvents(Array.isArray(state.collisions) ? state.collisions : [], state.scene3dCollisions);
+      state.scene3dProbe = scene3dProbeSummary({ state, frameId });
       state.runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, state.renderQueue);
       const runtimeStateEvidence = runtimeState(frameId);
       state.runtimeState = {
@@ -1827,6 +2019,11 @@
         ? renderer.scene3dRenderSummary({ world, frameId })
         : { attemptedObjectCount: 0, visibleObjectCount: 0, skippedObjectCount: 0, failedObjectCount: 0 };
       const scene3dAnimation = scene3dAnimationSummary({ advanceFrames: 0, frameId });
+      const scene3dTransforms = scene3dTransformSummary({ scene3d: world.scene3d, frameId });
+      const scene3dCamera = scene3dCameraProbeSummary({ scene3d: world.scene3d, frameId });
+      const scene3dCollision = typeof collision.scene3dCollisionSummary === 'function'
+        ? collision.scene3dCollisionSummary({ world, frameId })
+        : { present: false, events: [] };
       const runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, renderQueue);
       return clone({
         tick: world.tick,
@@ -1846,6 +2043,11 @@
         scene3dRenderVisibleObjectCount: scene3dRender.visibleObjectCount || 0,
         scene3dRenderSkippedObjectCount: scene3dRender.skippedObjectCount || 0,
         scene3dRenderFailedObjectCount: scene3dRender.failedObjectCount || 0,
+        scene3dCameraCount: scene3dCamera.cameraCount || 0,
+        scene3dTransformNodeCount: scene3dTransforms.nodeCount || 0,
+        scene3dTransformCount: scene3dTransforms.transformCount || 0,
+        scene3dCollisionEventCount: Array.isArray(scene3dCollision.events) ? scene3dCollision.events.length : 0,
+        scene3dCollisionTriggerCount: scene3dCollision.triggerCount || 0,
         scene3dAnimationFrameId: frameId,
         scene3dAnimationStateCount: scene3dAnimation.stateCount || 0,
         scene3dAnimationActiveStateCount: scene3dAnimation.activeStateCount || 0,
