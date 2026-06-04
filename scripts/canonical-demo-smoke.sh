@@ -65,18 +65,19 @@ if (( WORKERS < 2 )); then
   exit 2
 fi
 
+REPO_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$REPO_ROOT")
+
 if [[ -z "$WORK_DIR" ]]; then
   WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ouroforge-canonical-demo-XXXXXX")
+  WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
 else
   WORK_DIR=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$WORK_DIR")
+  WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
+  if [[ "$WORK_REAL" == "$REPO_REAL" || "$WORK_REAL" == "$REPO_REAL"/* ]]; then
+    echo "error: work directory must be outside the repository: $WORK_DIR" >&2
+    exit 2
+  fi
   mkdir -p "$WORK_DIR"
-fi
-
-REPO_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$REPO_ROOT")
-WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
-if [[ "$WORK_REAL" == "$REPO_REAL" || "$WORK_REAL" == "$REPO_REAL"/* ]]; then
-  echo "error: work directory must be outside the repository: $WORK_DIR" >&2
-  exit 2
 fi
 
 cleanup() {
