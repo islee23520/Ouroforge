@@ -193,6 +193,29 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  source_apply_worktree_context: {
+    present: true,
+    status: 'blocked',
+    target_count: 2,
+    blocked_count: 2,
+    evidence_refs: ['evidence/source-apply/worktree-context.json'],
+    boundary: 'Read-only context evidence; browser/dashboard/Studio surfaces must not apply patches, execute commands, write trusted files, merge branches, or bypass review gates.',
+    reports: [{
+      schemaVersion: 'source-apply-worktree-context-v1',
+      status: 'blocked',
+      policyId: 'source-apply-worktree-boundary-v1',
+      branch: '<issue-701>',
+      headCommit: '<head>',
+      worktreeRoot: '<worktree>',
+      lockStatus: { active: false, attemptId: '<attempt>' },
+      blockedReasons: ['seeds/platformer.yaml: dirty-target: git status modified', '<script>blocked</script>'],
+      guardrails: ['browser/dashboard/Studio surfaces remain read-only and command-inert'],
+      targets: [
+        { path: 'seeds/platformer.yaml', gitStatus: 'modified', rootZone: 'trusted-source', fileClassDecision: 'allowed', blockedReasons: ['dirty-target: git status modified'] },
+        { path: '<script>bad</script>', gitStatus: 'untracked-collision', rootZone: 'trusted-source', fileClassDecision: 'allowed', blockedReasons: ['untracked-target-collision'] },
+      ],
+    }],
+  },
   visual_diff_preview: {
     present: true,
     summary_count: 2,
@@ -480,7 +503,7 @@ assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 21);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 22);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -946,6 +969,10 @@ assert.match(cockpit.renderStudioDraftAuthoringSurface({}), /No Studio draft aut
 const xssStudioDraft = { studio_draft_authoring: { present: true, boundary: '<script>boundary</script>', drafts: [{ draftId: '<img src=x onerror=alert(1)>', target: { type: '<script>scene</script>', path: '<b>path</b>' }, proposedOperations: [{ id: '<script>op</script>', kind: '<b>update</b>', path: '<i>path</i>', summary: '<script>summary</script>' }], expectedAfterSummary: '<script>after</script>', validationStatus: '<script>status</script>', blockedReasons: ['<script>blocked</script>'] }] } };
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<script>summary</script>'), 'studio draft summaries must be escaped');
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<img src=x onerror=alert(1)>'), 'studio draft ids must be escaped');
+const sourceApplyContextXss = cockpit.renderEvidencePane({ source_apply_worktree_context: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', reports: [{ policyId: '<img src=x onerror=alert(1)>', status: '<script>bad</script>', branch: '<script>branch</script>', headCommit: '<script>head</script>', lockStatus: { active: true, attemptId: '<script>lock</script>' }, blockedReasons: ['<script>blocked</script>'], targets: [{ path: '<img src=x onerror=alert(1)>', gitStatus: '<script>dirty</script>', rootZone: '<script>root</script>', fileClassDecision: '<script>decision</script>', blockedReasons: ['<script>target</script>'] }] }] } });
+assert.ok(!sourceApplyContextXss.includes('<script>blocked</script>'), 'source apply context text must be escaped');
+assert.ok(!sourceApplyContextXss.includes('<img src=x onerror=alert(1)>'), 'source apply target path must be escaped');
+assert.match(sourceApplyContextXss, /&lt;script&gt;blocked&lt;\/script&gt;/);
 // Attribute-boundary XSS evidence: untrusted draft fields rendered into HTML
 // attribute sinks (value="...", data-draft-field="...") must escape quotes so a
 // crafted field cannot break out of the attribute and inject an event handler.
@@ -1007,6 +1034,13 @@ assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifest
 assert.match(cockpit.renderStudioAssetInspectorSurface({}), /No asset inspector data/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
+assert.match(cockpit.renderEvidencePane(run), /Source apply context/);
+assert.match(cockpit.renderSourceApplyWorktreeContextSurface(run), /source-apply-worktree-boundary-v1/);
+assert.match(cockpit.renderSourceApplyWorktreeContextSurface(run), /dirty-target/);
+assert.match(cockpit.renderSourceApplyWorktreeContextSurface(run), /must not apply patches|does not apply patches/);
+assert.doesNotMatch(cockpit.renderSourceApplyWorktreeContextSurface(run), /<script>bad<\/script>/);
+assert.doesNotMatch(cockpit.renderSourceApplyWorktreeContextSurface(run), /<button/i);
+assert.match(cockpit.renderSourceApplyWorktreeContextSurface({}), /No source apply worktree context evidence/);
 assert.match(cockpit.renderEvidencePane(run), /Visual diff preview/);
 assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);

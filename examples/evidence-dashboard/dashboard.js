@@ -326,6 +326,54 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(preview.boundary || 'Read-only asset preview evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.')}</p>`;
   }
 
+  function renderSourceApplyWorktreeContext(run = {}) {
+    const context = run.source_apply_worktree_context || run.sourceApplyWorktreeContext || {};
+    if (!context.present) {
+      return `<p class="empty-state">${escapeText(context.empty_state || 'No source apply worktree context evidence is available for this run.')}</p>`;
+    }
+    const reports = Array.isArray(context.reports) ? context.reports : [];
+    const refs = Array.isArray(context.evidence_refs || context.evidenceRefs) ? (context.evidence_refs || context.evidenceRefs) : [];
+    const rows = [
+      ['Status', context.status || 'unknown'],
+      ['Reports', reports.length],
+      ['Targets', context.target_count ?? context.targetCount ?? reports.reduce((count, report) => count + (Array.isArray(report.targets) ? report.targets.length : 0), 0)],
+      ['Blocked reasons', context.blocked_count ?? context.blockedCount ?? reports.reduce((count, report) => count + (Array.isArray(report.blockedReasons || report.blocked_reasons) ? (report.blockedReasons || report.blocked_reasons).length : 0), 0)],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const reportRows = reports.length
+      ? reports.slice(0, 5).map((report) => {
+          const blocked = Array.isArray(report.blockedReasons || report.blocked_reasons) ? (report.blockedReasons || report.blocked_reasons) : [];
+          const guardrails = Array.isArray(report.guardrails) ? report.guardrails : [];
+          const lock = report.lockStatus || report.lock_status || {};
+          const targets = Array.isArray(report.targets) ? report.targets : [];
+          const targetRows = targets.slice(0, 8).map((target) => {
+            const reasons = Array.isArray(target.blockedReasons || target.blocked_reasons) ? (target.blockedReasons || target.blocked_reasons) : [];
+            return `<li><strong>${escapeText(target.path || 'unknown target')}</strong>: <span class="${statusClass(reasons.length ? 'blocked' : 'passed')}">${escapeText(reasons.length ? 'blocked' : 'passed')}</span> · ${escapeText(target.gitStatus || target.git_status || 'unknown git')} · ${escapeText(target.rootZone || target.root_zone || 'unknown root')} · ${escapeText(target.fileClassDecision || target.file_class_decision || 'unknown class')}<br><small>${escapeText(reasons.length ? reasons.join(' · ') : 'clean target context')}</small></li>`;
+          }).join('') || '<li>No target rows recorded.</li>';
+          const blockedRows = blocked.length
+            ? blocked.slice(0, 8).map((reason) => `<li>${escapeText(reason)}</li>`).join('')
+            : '<li>No blocked reasons recorded.</li>';
+          const guardrailRows = guardrails.length
+            ? guardrails.slice(0, 6).map((guardrail) => `<li>${escapeText(guardrail)}</li>`).join('')
+            : '<li>No guardrails recorded.</li>';
+          return `<article class="lifecycle-card">
+            <div class="journal-entry-header"><h4>${escapeText(report.policyId || report.policy_id || 'source apply context')}</h4><span class="${statusClass(report.status)}">${escapeText(report.status || 'unknown')}</span></div>
+            <dl class="project-mutation-context">
+              <dt>Branch/head</dt><dd>${escapeText(report.branch || 'unknown')} @ ${escapeText(report.headCommit || report.head_commit || 'unknown')}</dd>
+              <dt>Worktree</dt><dd>${escapeText(report.worktreeRoot || report.worktree_root || 'unknown')}</dd>
+              <dt>Lock</dt><dd>${escapeText(lock.active ? `active ${lock.attemptId || lock.attempt_id || ''}` : `inactive ${lock.attemptId || lock.attempt_id || ''}`)}</dd>
+            </dl>
+            <h5>Targets</h5><ul class="run-meta-list">${targetRows}</ul>
+            <h5>Blocked reasons</h5><ul class="run-meta-list">${blockedRows}</ul>
+            <h5>Guardrails</h5><ul class="run-meta-list">${guardrailRows}</ul>
+          </article>`;
+        }).join('')
+      : '<p class="empty-state compact">No parseable source apply context reports are available.</p>';
+    return `<div class="field-grid">${rows}</div>
+      <p class="run-meta">${escapeText(context.boundary || 'Read-only context evidence. The dashboard cannot apply patches, execute commands, write trusted files, merge branches, or bypass review gates.')}</p>
+      ${renderRefLinks('Source apply context evidence refs', refs, run)}
+      <div class="lifecycle-grid">${reportRows}</div>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -1119,6 +1167,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
+      <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1195,7 +1244,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

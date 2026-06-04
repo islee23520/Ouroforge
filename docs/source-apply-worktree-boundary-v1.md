@@ -8,7 +8,7 @@ mutation, CI/workflow mutation, build-script mutation, autonomous source repair,
 or production-ready mutation claims.
 
 This policy is an input to the Rust `source-apply-worktree-context-v1` inspector. The authoritative fixture shape
-is `examples/source-apply-worktree-boundary-v1/worktree-context-policy.sample.json`. SA15.3.2 adds validation/reporting for clean targets, dirty targets, untracked collisions, generated/hidden roots, symlinks, traversal, branch/head mismatch, active locks, and missing Git context.
+is `examples/source-apply-worktree-boundary-v1/worktree-context-policy.sample.json`. SA15.3.2 adds validation/reporting for clean targets, dirty targets, untracked collisions, generated/hidden roots, symlinks, traversal, branch/head mismatch, active locks, and missing Git context. SA15.3.3 adds read-model compatibility coverage proving the Rust context evidence remains display-only in dashboard and Studio surfaces.
 
 ## Worktree zones
 
@@ -108,9 +108,9 @@ The Rust validator emits a generated evidence-compatible report shaped like
 A #701 PR unit may close only when the combined work has policy docs/fixtures,
 context validation for safe/unsafe states, context evidence/read-model
 compatibility, focused tests for blocked cases, full required verification, and
-final evidence proving #1 and #23 remain open. SA15.3.1 policy docs plus
-SA15.3.2 Rust validation are still not sufficient to close #701 until the
-read-model compatibility unit is complete.
+final evidence proving #1 and #23 remain open. SA15.3.1 policy docs, SA15.3.2
+Rust validation, and SA15.3.3 dashboard/Studio read-model compatibility together
+are the intended #701 closure set.
 
 
 ## Focused validation checks
