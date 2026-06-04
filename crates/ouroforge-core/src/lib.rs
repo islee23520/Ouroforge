@@ -36499,8 +36499,14 @@ fn dashboard_camera_summary(world_state: &serde_json::Value) -> serde_json::Valu
         .and_then(|value| value.as_array())
         .cloned()
         .unwrap_or_default();
+    // Layer evidence may be emitted under renderer.layers, the camera-scoped
+    // camera.layers, or top-level layers. Fall back across all three (mirroring
+    // how cameras already resolves camera.cameras / worldState.cameras) so layers
+    // emitted under worldState.camera are not silently dropped.
     let layers = renderer
         .get("layers")
+        .or_else(|| camera.and_then(|value| value.get("layers")))
+        .or_else(|| world_state.get("layers"))
         .and_then(|value| value.as_array())
         .cloned()
         .unwrap_or_default();
@@ -56840,6 +56846,41 @@ scenarios:
         assert!(malformed.summary.project.is_none());
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_camera_summary_surfaces_camera_scoped_layers() {
+        // Layers emitted under worldState.camera (no renderer.layers) must still
+        // be surfaced, mirroring how cameras resolves camera.cameras.
+        let world_state = json!({
+            "camera": {
+                "activeCameraId": "follow-player",
+                "layers": [
+                    { "id": "sky", "order": -10, "visible": true, "parallaxFactor": 50, "cameraParticipation": true },
+                    { "id": "hud", "order": 10, "visible": true, "parallaxFactor": 100, "cameraParticipation": false }
+                ]
+            }
+        });
+        let summary = dashboard_camera_summary(&world_state);
+        assert_eq!(summary["present"], json!(true));
+        assert_eq!(summary["layerCount"], json!(2));
+        assert_eq!(summary["parallaxLayerCount"], json!(1));
+        assert_eq!(summary["cameraExcludedLayerCount"], json!(1));
+        assert_eq!(summary["layers"][0]["id"], json!("sky"));
+
+        // Top-level layers are also surfaced when neither renderer nor camera carry them.
+        let top_level = json!({ "layers": [{ "id": "ground", "order": 0, "parallaxFactor": 100 }] });
+        assert_eq!(dashboard_camera_summary(&top_level)["layerCount"], json!(1));
+
+        // renderer.layers still takes precedence (no regression).
+        let renderer_scoped = json!({
+            "renderer": { "layers": [{ "id": "a" }, { "id": "b" }] },
+            "camera": { "layers": [{ "id": "ignored" }] }
+        });
+        assert_eq!(
+            dashboard_camera_summary(&renderer_scoped)["layerCount"],
+            json!(2)
+        );
     }
 
     #[test]
