@@ -57,6 +57,17 @@ apply buttons, browser persistence, trusted writes, command execution, local
 server bridge, or review-decision controls; any trusted write remains routed
 through Rust CLI transactions and review-gated apply.
 
+Studio Draft Authoring Surface v1 may display temporary in-memory draft
+read-models from `dashboard-data.json` under `studio_draft_authoring` or
+`studioDraftAuthoring`. The surface supports scene, tilemap, and
+asset-reference draft rows as escaped display-only data with disabled/read-only
+controls, blocked-state hints, copyable draft JSON text, and copyable Rust CLI
+preview command text. The browser does not persist trusted draft state, write
+project/scene/tilemap/asset files, upload or fetch assets, execute local
+commands, bridge to a local server, apply edits, or treat preview metadata as a
+review decision. Trusted validation, transaction creation, review-gated apply,
+and persistence stay in the Rust CLI/manual terminal flow.
+
 Review-gated visual edit application evidence may appear in exported lifecycle data such as `mutation/visual-edit-applications.json`, review cockpit cards, journal sections, loop status/read-model summaries, or handoff evidence refs. The cockpit may render draft/proposal/patch-draft/decision ids, transaction links, before/after hashes, rollback metadata, rerun/compare refs, and reproducible command context as escaped read-only diagnostics. It must not turn those fields into apply, rerun, promote, resume, repair, or command-execution controls.
 
 ## Studio v3 demo surfaces

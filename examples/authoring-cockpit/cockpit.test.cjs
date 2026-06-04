@@ -752,6 +752,12 @@ assert.ok(!xssAssetInspectorMarkup.includes('<script>reason</script>'), 'asset i
 assert.ok(!xssAssetInspectorMarkup.includes('<script>frame</script>'), 'asset inspector atlas frames must be escaped');
 assert.ok(!xssAssetInspectorMarkup.includes('<script>tileset</script>'), 'asset inspector tilemaps must be escaped');
 assert.match(xssAssetInspectorMarkup, /&lt;script&gt;status&lt;\/script&gt;/);
+const cockpitReadme = fs.readFileSync(require.resolve('./README.md'), 'utf8');
+assert.match(cockpitReadme, /Studio Draft Authoring Surface v1/);
+assert.match(cockpitReadme, /scene, tilemap, and\s+asset-reference draft rows/);
+assert.match(cockpitReadme, /copyable draft JSON text/);
+assert.match(cockpitReadme, /does not persist trusted draft state, write/);
+assert.match(cockpitReadme, /upload or fetch assets, execute local\s+commands/);
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
 console.log('authoring cockpit smoke test passed');

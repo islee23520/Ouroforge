@@ -138,6 +138,7 @@ impact. They must not skip the trust-boundary sequence for convenience.
 Studio may:
 
 - maintain temporary draft state in browser memory;
+- render disabled/read-only scene, tilemap, and asset-reference draft controls as planning aids only;
 - render escaped preview/read-model state from trusted exported artifacts;
 - render escaped tilemap draft preview summaries, affected-cell counts, hashes,
   and collision/trigger metadata as display-only diagnostics;
@@ -145,7 +146,7 @@ Studio may:
   replacement asset ids, asset types, content hashes, and frame/event context as
   display-only diagnostics;
 - show warnings for stale, invalid, unsupported, or unreviewed drafts;
-- copy draft JSON to the clipboard or display copyable commands; and
+- display copyable draft JSON and copyable CLI command text without executing, uploading, fetching, or writing from the browser; and
 - explain which trusted CLI command a human can run outside the browser.
 
 Studio must not:
