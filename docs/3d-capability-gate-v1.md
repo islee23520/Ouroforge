@@ -117,12 +117,12 @@ assertions can observe 3D contact/trigger events through world-state
 `scene3d_collision` summaries. The behavior is documented in
 [`3d-collision-physics-v1.md`](./3d-collision-physics-v1.md).
 
-Issue #602 begins bounded 3D animation playback evidence with additive
+Issue #602 adds bounded 3D animation playback evidence with additive
 `scene3d.animationClips[]` and `scene3d.animationStates[]` source-like fields for
-transform clip/state validation. This first slice is schema-only: runtime
-playback, probe evidence, and scenario assertion compatibility remain staged in
-later #602 PR units. The behavior is documented in
-[`3d-animation-playback-v1.md`](./3d-animation-playback-v1.md).
+transform clip/state validation plus browser-local deterministic transform
+playback and read-only `scene3dAnimation` evidence. Dedicated scenario assertion
+compatibility remains staged in a later #602 PR unit. The behavior is documented
+in [`3d-animation-playback-v1.md`](./3d-animation-playback-v1.md).
 
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove

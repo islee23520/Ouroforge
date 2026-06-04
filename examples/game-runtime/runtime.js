@@ -132,6 +132,8 @@
     collisionEvents: [],
     scene3dCollision: null,
     scene3dCollisions: [],
+    scene3dAnimation: null,
+    scene3dAnimationEvents: [],
     collisionRules: { defaultLayer: 'default' },
     gameplayRules: { version: '1', flags: [] },
     sceneTransitions: [],
@@ -174,6 +176,24 @@
     return {
       x: Number.isFinite(source.x) ? source.x : fallback.x,
       y: Number.isFinite(source.y) ? source.y : fallback.y,
+    };
+  }
+
+  function vector3(value = {}, fallback = { x: 0, y: 0, z: 0 }) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      x: Number.isFinite(source.x) ? source.x : fallback.x,
+      y: Number.isFinite(source.y) ? source.y : fallback.y,
+      z: Number.isFinite(source.z) ? source.z : fallback.z,
+    };
+  }
+
+  function transform3(value = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      translation: vector3(source.translation),
+      rotation: vector3(source.rotation),
+      scale: vector3(source.scale, { x: 1, y: 1, z: 1 }),
     };
   }
 
@@ -821,6 +841,187 @@
     rendererState.viewport = clone(camera.viewport);
   }
 
+  function scene3dAnimationChannel(channel) {
+    return ['translation', 'rotation', 'scale'].includes(channel) ? channel : null;
+  }
+
+  function scene3dNodeById(scene3d) {
+    return new Map((Array.isArray(scene3d && scene3d.nodes) ? scene3d.nodes : [])
+      .filter((node) => node && typeof node.id === 'string')
+      .map((node) => [node.id, node]));
+  }
+
+  function scene3dClipById(scene3d) {
+    return new Map((Array.isArray(scene3d && scene3d.animationClips) ? scene3d.animationClips : [])
+      .filter((clip) => clip && typeof clip.id === 'string')
+      .map((clip) => [clip.id, clip]));
+  }
+
+  function boundedScene3dKeyframes(clip) {
+    const keyframes = Array.isArray(clip && clip.keyframes) ? clip.keyframes : [];
+    return keyframes
+      .filter((keyframe) => keyframe && Number.isFinite(keyframe.frame) && keyframe.value && typeof keyframe.value === 'object')
+      .map((keyframe) => ({ frame: Math.trunc(keyframe.frame), value: vector3(keyframe.value) }))
+      .sort((left, right) => left.frame - right.frame);
+  }
+
+  function interpolateScene3dVector(keyframes, frame) {
+    if (keyframes.length === 0) return null;
+    if (frame <= keyframes[0].frame) return clone(keyframes[0].value);
+    const last = keyframes[keyframes.length - 1];
+    if (frame >= last.frame) return clone(last.value);
+    for (let index = 1; index < keyframes.length; index += 1) {
+      const right = keyframes[index];
+      const left = keyframes[index - 1];
+      if (frame > right.frame) continue;
+      const span = Math.max(1, right.frame - left.frame);
+      const ratio = (frame - left.frame) / span;
+      return {
+        x: Math.round(left.value.x + ((right.value.x - left.value.x) * ratio)),
+        y: Math.round(left.value.y + ((right.value.y - left.value.y) * ratio)),
+        z: Math.round(left.value.z + ((right.value.z - left.value.z) * ratio)),
+      };
+    }
+    return clone(last.value);
+  }
+
+  function applyScene3dAnimationValue(node, channel, value) {
+    if (!node || !channel || !value) return;
+    node.localTransform = transform3(node.localTransform);
+    node.localTransform[channel] = clone(value);
+    if (node.worldTransform && typeof node.worldTransform === 'object') {
+      node.worldTransform = transform3(node.worldTransform);
+      node.worldTransform[channel] = clone(value);
+    }
+  }
+
+  function scene3dAnimationSummary({ advanceFrames = 0, frameId = `tick-${world.tick}` } = {}) {
+    const scene3d = world.scene3d && typeof world.scene3d === 'object' && !Array.isArray(world.scene3d)
+      ? world.scene3d
+      : null;
+    if (!scene3d) {
+      return {
+        schemaVersion: 'ouroforge.scene3d-animation-evidence.v1',
+        present: false,
+        frameId: String(frameId),
+        sceneId: world.sceneId,
+        clipCount: 0,
+        stateCount: 0,
+        activeStateCount: 0,
+        warningCount: 0,
+        states: [],
+        warnings: ['scene3d graph unavailable'],
+        boundary: 'Read-only bounded 3D transform animation evidence; no skeletal authoring, retargeting, IK, graph editor, or production animation tooling claim.',
+      };
+    }
+    const states = Array.isArray(scene3d.animationStates) ? scene3d.animationStates : [];
+    const clips = Array.isArray(scene3d.animationClips) ? scene3d.animationClips : [];
+    const nodesById = scene3dNodeById(scene3d);
+    const clipsById = scene3dClipById(scene3d);
+    const warnings = [];
+    const rows = [];
+    for (const state of states) {
+      if (!state || typeof state !== 'object') continue;
+      const clipId = String(state.clipId || '');
+      const clip = clipsById.get(clipId);
+      const targetNodeId = String(state.targetNodeId || (clip && clip.targetNodeId) || '');
+      const channel = scene3dAnimationChannel(state.channel || (clip && clip.channel));
+      const node = nodesById.get(targetNodeId);
+      const row = {
+        clipId,
+        targetNodeId,
+        channel: channel || String(state.channel || ''),
+        currentFrame: Number.isFinite(state.currentFrame) ? Math.trunc(state.currentFrame) : 0,
+        currentTimeMs: Number.isFinite(state.currentTimeMs) ? Math.trunc(state.currentTimeMs) : 0,
+        playing: state.playing !== false,
+        looped: Boolean(state.looped || (clip && clip.looped)),
+        status: 'ready',
+        value: null,
+        warnings: [],
+      };
+      if (!clip) {
+        row.status = 'missing_clip';
+        row.playing = false;
+        row.warnings.push(state.missingClipWarning || `missing animation clip ${clipId}`);
+      } else if (!node) {
+        row.status = 'missing_target';
+        row.playing = false;
+        row.warnings.push(`missing target node ${targetNodeId}`);
+      } else if (!channel) {
+        row.status = 'unsupported_channel';
+        row.playing = false;
+        row.warnings.push(`unsupported animation channel ${state.channel || clip.channel || 'unknown'}`);
+      } else {
+        const durationFrames = Number.isFinite(clip.durationFrames) && clip.durationFrames > 0
+          ? Math.trunc(clip.durationFrames)
+          : 0;
+        const keyframes = boundedScene3dKeyframes(clip);
+        if (durationFrames <= 0 || keyframes.length === 0) {
+          row.status = 'malformed_clip';
+          row.playing = false;
+          row.warnings.push(`malformed animation clip ${clipId}`);
+        } else {
+          let nextFrame = row.currentFrame;
+          if (row.playing && advanceFrames > 0) {
+            nextFrame += advanceFrames;
+            if (row.looped) {
+              nextFrame %= (durationFrames + 1);
+            } else if (nextFrame >= durationFrames) {
+              nextFrame = durationFrames;
+              row.playing = false;
+            }
+          }
+          row.currentFrame = Math.max(0, Math.min(durationFrames, nextFrame));
+          row.currentTimeMs += Math.max(0, advanceFrames) * fixedDeltaMs;
+          row.value = interpolateScene3dVector(keyframes, row.currentFrame);
+          applyScene3dAnimationValue(node, channel, row.value);
+          state.currentFrame = row.currentFrame;
+          state.currentTimeMs = row.currentTimeMs;
+          state.playing = row.playing;
+          state.looped = row.looped;
+          state.targetNodeId = targetNodeId;
+          state.channel = channel;
+        }
+      }
+      for (const warning of (Array.isArray(state.malformedClipWarnings) ? state.malformedClipWarnings : [])) {
+        row.warnings.push(String(warning));
+      }
+      for (const warning of row.warnings) warnings.push({ clipId, targetNodeId, warning });
+      rows.push(row);
+    }
+    const summary = {
+      schemaVersion: 'ouroforge.scene3d-animation-evidence.v1',
+      present: true,
+      frameId: String(frameId),
+      sceneId: world.sceneId,
+      clipCount: clips.length,
+      stateCount: rows.length,
+      activeStateCount: rows.filter((row) => row.playing && row.status === 'ready').length,
+      warningCount: warnings.length,
+      states: rows,
+      warnings,
+      boundary: 'Read-only bounded 3D transform animation evidence; no skeletal authoring, retargeting, IK, graph editor, or production animation tooling claim.',
+    };
+    world.scene3dAnimation = clone(summary);
+    world.scene3dAnimationEvents = rows.map((row) => ({
+      tick: world.tick,
+      frameId: String(frameId),
+      type: 'runtime.scene3d.animation.state',
+      sceneId: world.sceneId,
+      clipId: row.clipId,
+      targetNodeId: row.targetNodeId,
+      channel: row.channel,
+      currentFrame: row.currentFrame,
+      currentTimeMs: row.currentTimeMs,
+      playing: row.playing,
+      looped: row.looped,
+      status: row.status,
+      value: row.value,
+      warningCount: row.warnings.length,
+    }));
+    return summary;
+  }
+
   function cameraEvidence() {
     const active = activeCamera();
     const worldToScreen = {};
@@ -995,6 +1196,8 @@
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
     recordAnimationTransitions(beforeAnimationStates);
+    const scene3dAnimation = scene3dAnimationSummary({ advanceFrames: 1, frameId: `tick-${world.tick}` });
+    for (const event of world.scene3dAnimationEvents) record(event.type, event);
     const physicsEntities = world.entities.concat(typeof tilemap.collisionEntities === 'function' ? tilemap.collisionEntities(world.tilemaps) : []);
     if (typeof collision.stepAabbPhysics === 'function') {
       world.collisions = collision.stepAabbPhysics(physicsEntities, world.bounds, world.tick, world.collisionRules).events;
@@ -1091,10 +1294,13 @@
     world.collisionEvents = [];
     world.scene3dCollision = null;
     world.scene3dCollisions = [];
+    world.scene3dAnimation = null;
+    world.scene3dAnimationEvents = [];
     world.audioEvents = [];
     world.audioWarnings = [];
     world.vfxEvents = [];
     world.tick = 0;
+    scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
     const assetMetadata = assets.load(world, world.assetManifest);
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,
@@ -1573,6 +1779,8 @@
       state.scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
         ? renderer.scene3dRenderSummary({ world: state, frameId })
         : null;
+      state.scene3dAnimation = scene3dAnimationSummary({ advanceFrames: 0, frameId });
+      state.scene3dAnimationEvents = clone(world.scene3dAnimationEvents);
       state.scene3dCollision = typeof collision.scene3dCollisionSummary === 'function'
         ? collision.scene3dCollisionSummary({ world: state, frameId })
         : { present: false, events: [] };
@@ -1618,6 +1826,7 @@
       const scene3dRender = typeof renderer.scene3dRenderSummary === 'function'
         ? renderer.scene3dRenderSummary({ world, frameId })
         : { attemptedObjectCount: 0, visibleObjectCount: 0, skippedObjectCount: 0, failedObjectCount: 0 };
+      const scene3dAnimation = scene3dAnimationSummary({ advanceFrames: 0, frameId });
       const runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, renderQueue);
       return clone({
         tick: world.tick,
@@ -1637,6 +1846,10 @@
         scene3dRenderVisibleObjectCount: scene3dRender.visibleObjectCount || 0,
         scene3dRenderSkippedObjectCount: scene3dRender.skippedObjectCount || 0,
         scene3dRenderFailedObjectCount: scene3dRender.failedObjectCount || 0,
+        scene3dAnimationFrameId: frameId,
+        scene3dAnimationStateCount: scene3dAnimation.stateCount || 0,
+        scene3dAnimationActiveStateCount: scene3dAnimation.activeStateCount || 0,
+        scene3dAnimationWarningCount: scene3dAnimation.warningCount || 0,
         tilemapRenderLayerCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.layerCount : 0,
         tilemapRenderCellCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.cellCount : 0,
         tilemapRenderDrawnTileCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.drawnTileCount : 0,

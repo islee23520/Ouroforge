@@ -1,9 +1,10 @@
 # 3D Animation Playback Evidence v1
 
-Issue #602 begins bounded 3D animation playback evidence with a source-like
-scene model for transform clip references and playback state. This first slice
-adds schema and validation only; runtime playback, probe emission, and scenario
-assertion integration are staged in later #602 PR units.
+Issue #602 adds bounded 3D animation playback evidence with a source-like
+scene model for transform clip references and playback state. The current
+runtime slice advances transform-only clips deterministically in the browser
+runtime and exposes read-only `scene3dAnimation` world-state evidence. Dedicated
+scenario assertion integration remains staged in a later #602 PR unit.
 
 ## Scene Contract
 
@@ -35,6 +36,22 @@ channels, non-positive durations, empty or oversized keyframes, non-increasing
 keyframes, out-of-range frames, zero scale keyframe axes, state/clip target or
 channel drift, negative playback counters, and missing clip states that do not
 carry an explicit warning.
+
+## Runtime Playback
+
+`examples/game-runtime/runtime.js` advances `scene3d.animationStates[]` during
+`step()` using fixed-frame integer playback. The runtime applies the active
+clip value to the target node's `localTransform` channel (`translation`,
+`rotation`, or `scale`) and records `scene3dAnimation` evidence with:
+
+- schema version `ouroforge.scene3d-animation-evidence.v1`;
+- frame id, scene id, clip/state counts, active state count, warning count;
+- per-state clip id, target node, channel, current frame/time, playing/looped
+  state, interpolated vector value, status, and warnings;
+- `runtime.scene3d.animation.state` events for read-only probe inspection.
+
+Playback is intentionally local and deterministic. It does not fetch assets,
+execute commands, persist trusted files, or infer animation quality.
 
 ## Boundary
 
