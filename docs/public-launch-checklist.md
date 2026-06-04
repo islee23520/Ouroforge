@@ -53,7 +53,7 @@ A passing gate means:
 
 ## Stability monitoring handoff
 
-After a manual public-visibility decision, maintainers should use [`docs/public-demo-stability-monitoring-v1.md`](public-demo-stability-monitoring-v1.md) as the demo stability checklist and refresh-cadence playbook. That playbook is governance-only: it records manual smoke expectations, evidence retention, Chrome caveats, and generated-state cleanup without adding hosted monitoring, release automation, repository setting changes, or support guarantees.
+After a manual public-visibility decision, maintainers should use [`docs/public-demo-stability-monitoring-v1.md`](public-demo-stability-monitoring-v1.md) as the demo stability checklist and refresh-cadence playbook, with [`docs/public-demo-smoke-evidence-policy-v1.md`](public-demo-smoke-evidence-policy-v1.md) defining manual/CI evidence records. These playbooks are governance-only: they record manual smoke expectations, optional existing-check evidence, Chrome caveats, and generated-state cleanup without adding hosted monitoring, release automation, repository setting changes, or support guarantees.
 
 ## Manual decision checklist
 

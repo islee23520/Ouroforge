@@ -92,6 +92,10 @@ service or repository dependency.
 | After demo-affecting milestone | Runtime, dashboard, cockpit, Seed, scenario, or evidence schema changes | Fresh command summary and notes about changed screenshots/docs | New feature changes demo behavior without updated evidence |
 | Before public communication refresh | README, screenshots, roadmap, or public announcement draft changes | Wording scan and generated-state audit | Claims of production readiness, Godot replacement, secure sandbox, native export, plugin runtime, source apply, or support SLA |
 
+## CI/manual smoke evidence policy
+
+Use [`docs/public-demo-smoke-evidence-policy-v1.md`](public-demo-smoke-evidence-policy-v1.md) for the detailed evidence policy that distinguishes manual local smoke records from optional existing CI/check evidence. The policy does not add hosted infrastructure or launch automation; it only defines what evidence a maintainer records before using demo stability claims in public-facing decisions.
+
 ## Evidence retention
 
 For each scheduled refresh, keep a concise issue or PR comment with:
