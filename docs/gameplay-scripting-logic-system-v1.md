@@ -61,7 +61,7 @@ Follow-up work must keep these concepts separate:
 - state machines describe permitted states, transitions, guards, and effects;
 - abilities/actions describe bounded commands, action ids, triggers, cooldowns, costs, durations, effects, targets, and runtime status that a future runtime may interpret;
 - script module interfaces describe a future expansion boundary only, not an
-  executable runtime;
+  executable runtime, and must pass the #615 design gate before any runtime proposal;
 - sandbox/trust-boundary documents describe threat models and authorization
   requirements only, not a secure-sandbox guarantee;
 - drafts are untrusted candidate behavior changes;
