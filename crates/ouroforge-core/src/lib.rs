@@ -398,6 +398,18 @@ pub enum ScenarioAssertion {
     Scene3dAnimation {
         scene3d_animation: JsonPathAssertion,
     },
+    Scene3dProbe {
+        scene3d_probe: JsonPathAssertion,
+    },
+    Scene3dTransform {
+        scene3d_transform: JsonPathAssertion,
+    },
+    Scene3dRender {
+        scene3d_render: JsonPathAssertion,
+    },
+    Scene3dCollision {
+        scene3d_collision: JsonPathAssertion,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -1283,6 +1295,18 @@ fn regression_assertion_from_result(assertion: &serde_json::Value) -> Result<Sce
         }),
         "scene3d_animation" => Ok(ScenarioAssertion::Scene3dAnimation {
             scene3d_animation: json_path_assertion,
+        }),
+        "scene3d_probe" => Ok(ScenarioAssertion::Scene3dProbe {
+            scene3d_probe: json_path_assertion,
+        }),
+        "scene3d_transform" => Ok(ScenarioAssertion::Scene3dTransform {
+            scene3d_transform: json_path_assertion,
+        }),
+        "scene3d_render" => Ok(ScenarioAssertion::Scene3dRender {
+            scene3d_render: json_path_assertion,
+        }),
+        "scene3d_collision" => Ok(ScenarioAssertion::Scene3dCollision {
+            scene3d_collision: json_path_assertion,
         }),
         _ => Err(anyhow!(
             "regression promotion assertion target is unsupported: {target}"
@@ -20671,6 +20695,10 @@ impl ScenarioAssertion {
             } => transition_evidence,
             ScenarioAssertion::Scene3dCamera { scene3d_camera } => scene3d_camera,
             ScenarioAssertion::Scene3dAnimation { scene3d_animation } => scene3d_animation,
+            ScenarioAssertion::Scene3dProbe { scene3d_probe } => scene3d_probe,
+            ScenarioAssertion::Scene3dTransform { scene3d_transform } => scene3d_transform,
+            ScenarioAssertion::Scene3dRender { scene3d_render } => scene3d_render,
+            ScenarioAssertion::Scene3dCollision { scene3d_collision } => scene3d_collision,
         };
         assertion.validate(scenario_index, assertion_index)
     }
@@ -36417,6 +36445,30 @@ fn run_scenario<T: CdpTransport>(
             value: &scene3d_animation_source,
             evidence_ref: &scene3d_animation_path,
         },
+        scene3d_probe: AssertionSource {
+            value: world_state
+                .get("scene3dProbe")
+                .unwrap_or(&serde_json::Value::Null),
+            evidence_ref: &world_state_path,
+        },
+        scene3d_transform: AssertionSource {
+            value: world_state
+                .get("scene3dTransforms")
+                .unwrap_or(&serde_json::Value::Null),
+            evidence_ref: &world_state_path,
+        },
+        scene3d_render: AssertionSource {
+            value: world_state
+                .get("scene3dRender")
+                .unwrap_or(&serde_json::Value::Null),
+            evidence_ref: &world_state_path,
+        },
+        scene3d_collision: AssertionSource {
+            value: world_state
+                .get("scene3dCollision")
+                .unwrap_or(&serde_json::Value::Null),
+            evidence_ref: &world_state_path,
+        },
     };
     let assertions = evaluate_scenario_assertions(scenario, &assertion_sources);
     for assertion in &assertions {
@@ -37140,6 +37192,10 @@ struct ScenarioAssertionSources<'a> {
     transition_evidence: AssertionSource<'a>,
     scene3d_camera: AssertionSource<'a>,
     scene3d_animation: AssertionSource<'a>,
+    scene3d_probe: AssertionSource<'a>,
+    scene3d_transform: AssertionSource<'a>,
+    scene3d_render: AssertionSource<'a>,
+    scene3d_collision: AssertionSource<'a>,
 }
 
 struct VisualCheckpointCapture {
@@ -37332,6 +37388,22 @@ fn evaluate_scenario_assertions(
                     "scene3d_animation",
                     scene3d_animation,
                     sources.scene3d_animation,
+                ),
+                ScenarioAssertion::Scene3dProbe { scene3d_probe } => {
+                    ("scene3d_probe", scene3d_probe, sources.scene3d_probe)
+                }
+                ScenarioAssertion::Scene3dTransform { scene3d_transform } => (
+                    "scene3d_transform",
+                    scene3d_transform,
+                    sources.scene3d_transform,
+                ),
+                ScenarioAssertion::Scene3dRender { scene3d_render } => {
+                    ("scene3d_render", scene3d_render, sources.scene3d_render)
+                }
+                ScenarioAssertion::Scene3dCollision { scene3d_collision } => (
+                    "scene3d_collision",
+                    scene3d_collision,
+                    sources.scene3d_collision,
                 ),
             };
             let actual = read_json_path(source.value, &assertion.path)
@@ -67760,6 +67832,10 @@ scenarios:
             &vfx_events,
             &scene3d_camera,
             &scene3d_animation,
+            &none,
+            &none,
+            &none,
+            &none,
         );
 
         let assertions = evaluate_scenario_assertions(&scenario, &sources);
@@ -67802,6 +67878,96 @@ scenarios:
     }
 
     #[test]
+    fn evaluates_bounded_scene3d_assertion_targets_against_probe_evidence() {
+        let scenario = Scenario {
+            id: "scene3d-assertion-smoke".to_string(),
+            description: "bounded 3D assertion targets".to_string(),
+            steps: Vec::new(),
+            assertions: vec![
+                ScenarioAssertion::Scene3dProbe {
+                    scene3d_probe: json_path_equals("status", json!("present")),
+                },
+                ScenarioAssertion::Scene3dTransform {
+                    scene3d_transform: json_path_equals("transforms.0.nodeId", json!("cube-node")),
+                },
+                ScenarioAssertion::Scene3dRender {
+                    scene3d_render: json_path_assertion("visibleObjectCount", |assertion| {
+                        assertion.greater_than = Some(json!(0));
+                    }),
+                },
+                ScenarioAssertion::Scene3dCollision {
+                    scene3d_collision: json_path_equals("triggerCount", json!(1)),
+                },
+                ScenarioAssertion::Scene3dProbe {
+                    scene3d_probe: json_path_equals("nodeCount", json!(999)),
+                },
+            ],
+        };
+        let none = serde_json::Value::Null;
+        let scene3d_probe = json!({
+            "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+            "status": "present",
+            "nodeCount": 2
+        });
+        let scene3d_transform = json!({
+            "schemaVersion": "ouroforge.scene3d-transform-probe.v1",
+            "transforms": [{
+                "nodeId": "cube-node",
+                "worldTransform": { "translation": { "x": 4, "y": 1, "z": 0 } }
+            }]
+        });
+        let scene3d_render = json!({
+            "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+            "present": true,
+            "visibleObjectCount": 1
+        });
+        let scene3d_collision = json!({
+            "schemaVersion": "ouroforge.scene3d-collision-evidence.v1",
+            "present": true,
+            "triggerCount": 1
+        });
+        let sources = assertion_sources_for_test(
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &scene3d_probe,
+            &scene3d_transform,
+            &scene3d_render,
+            &scene3d_collision,
+        );
+
+        let assertions = evaluate_scenario_assertions(&scenario, &sources);
+
+        assert_eq!(assertions.len(), 5);
+        assert_eq!(assertions[0]["target"], "scene3d_probe");
+        assert_eq!(assertions[0]["passed"], true);
+        assert_eq!(assertions[1]["target"], "scene3d_transform");
+        assert_eq!(
+            assertions[1]["evidence_ref"],
+            "evidence/scene3d-transforms.json"
+        );
+        assert_eq!(assertions[1]["passed"], true);
+        assert_eq!(assertions[2]["target"], "scene3d_render");
+        assert_eq!(assertions[2]["operator"], "greaterThan");
+        assert_eq!(assertions[2]["passed"], true);
+        assert_eq!(assertions[3]["target"], "scene3d_collision");
+        assert_eq!(assertions[3]["passed"], true);
+        assert_eq!(assertions[4]["target"], "scene3d_probe");
+        assert_eq!(assertions[4]["passed"], false);
+        assert_eq!(assertions[4]["actual"], 2);
+    }
+
+    #[test]
     fn evaluates_3d_collision_trigger_events_through_collision_evidence() {
         let scenario = Scenario {
             id: "scene3d-collision-smoke".to_string(),
@@ -67841,6 +68007,10 @@ scenarios:
             &none,
             &none,
             &world_state["collisions"],
+            &none,
+            &none,
+            &none,
+            &none,
             &none,
             &none,
             &none,
@@ -76941,6 +77111,10 @@ scenarios:
         vfx_evidence: &'a serde_json::Value,
         scene3d_camera: &'a serde_json::Value,
         scene3d_animation: &'a serde_json::Value,
+        scene3d_probe: &'a serde_json::Value,
+        scene3d_transform: &'a serde_json::Value,
+        scene3d_render: &'a serde_json::Value,
+        scene3d_collision: &'a serde_json::Value,
     ) -> ScenarioAssertionSources<'a> {
         ScenarioAssertionSources {
             world_state: AssertionSource {
@@ -76998,6 +77172,22 @@ scenarios:
             scene3d_animation: AssertionSource {
                 value: scene3d_animation,
                 evidence_ref: "evidence/scene3d-animation.json",
+            },
+            scene3d_probe: AssertionSource {
+                value: scene3d_probe,
+                evidence_ref: "evidence/scene3d-probe.json",
+            },
+            scene3d_transform: AssertionSource {
+                value: scene3d_transform,
+                evidence_ref: "evidence/scene3d-transforms.json",
+            },
+            scene3d_render: AssertionSource {
+                value: scene3d_render,
+                evidence_ref: "evidence/scene3d-render.json",
+            },
+            scene3d_collision: AssertionSource {
+                value: scene3d_collision,
+                evidence_ref: "evidence/scene3d-collision.json",
             },
         }
     }
