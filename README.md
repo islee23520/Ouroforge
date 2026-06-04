@@ -95,7 +95,10 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 
 The current quickstart command audit is recorded in
 [`docs/fresh-clone-onboarding-command-audit-v1.md`](docs/fresh-clone-onboarding-command-audit-v1.md).
-It clarifies expected generated state and cleanup boundaries without changing
+For an isolated fresh-clone-style smoke, run
+[`scripts/fresh-clone-smoke.sh`](scripts/fresh-clone-smoke.sh) as documented in
+[`docs/fresh-clone-smoke-v1.md`](docs/fresh-clone-smoke-v1.md). These notes
+clarify expected generated state and cleanup boundaries without changing
 repository visibility, release status, or trusted-write authority.
 
 ## Core loop

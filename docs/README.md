@@ -16,7 +16,7 @@ commitment.
 | Understand the project quickly | [`../README.md`](../README.md) | Public-alpha overview, quickstart, safety model, non-goals, and repository map. |
 | Understand the loop architecture | [`architecture.md`](architecture.md) | Explains Seed → Run → Evidence → Evaluation → Journal → Mutation. |
 | See what is complete and what is next | [`roadmap.md`](roadmap.md) | Canonical roadmap and completed milestone references. |
-| Run or verify the public-alpha demo | [`fresh-clone-onboarding-command-audit-v1.md`](fresh-clone-onboarding-command-audit-v1.md), [`public-demo-evidence.md`](public-demo-evidence.md), [`public-demo-smoke-evidence-policy-v1.md`](public-demo-smoke-evidence-policy-v1.md) | Reproducible local demo evidence and generated-state expectations. |
+| Run or verify the public-alpha demo | [`fresh-clone-onboarding-command-audit-v1.md`](fresh-clone-onboarding-command-audit-v1.md), [`fresh-clone-smoke-v1.md`](fresh-clone-smoke-v1.md), [`public-demo-evidence.md`](public-demo-evidence.md), [`public-demo-smoke-evidence-policy-v1.md`](public-demo-smoke-evidence-policy-v1.md) | Reproducible local demo evidence and generated-state expectations. |
 | Check safety/trust boundaries | [`evidence-fidelity-trust-boundary-v1.md`](evidence-fidelity-trust-boundary-v1.md), [`public-alpha-security-trust-boundary-v1.md`](public-alpha-security-trust-boundary-v1.md), [`public-alpha-disclosure-and-sandbox-limitations-v1.md`](public-alpha-disclosure-and-sandbox-limitations-v1.md) | Browser read-only, generated-state, disclosure, sandbox/dry-run, and no-source-apply boundaries. |
 | Prepare or review a contribution | [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`artifact-write-policy-v1.md`](artifact-write-policy-v1.md), [`public-wording-guardrail-v1.md`](public-wording-guardrail-v1.md) | Review workflow, trusted-write categories, generated-state rules, and conservative wording checks. |
 
@@ -114,6 +114,7 @@ should remain ignored/untracked.
 ## Documents
 
 - [Fresh Clone Onboarding Command Audit v1](fresh-clone-onboarding-command-audit-v1.md) — PA1.2.1 quickstart command audit, expected generated state, and cleanup boundary notes.
+- [Fresh Clone Smoke v1](fresh-clone-smoke-v1.md) — PA1.2.2 isolated fresh-clone-style smoke wrapper, generated-output boundaries, and evidence summary.
 - [Canonical Demo Script v1](canonical-demo-script-v1.md) — non-destructive local demo command sequence, smoke wrapper, and command audit.
 - [Canonical Demo Readiness Evidence v1](canonical-demo-readiness-evidence-v1.md) — PA1.3.3 cleanup, failure-mode, generated-state, and closure evidence.
 - [Runtime State Invariant Checker v1](runtime-invariant-checker-v1.md) — QA14.5.1 invariant schema, statuses, fixtures, and guardrails.
