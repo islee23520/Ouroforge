@@ -42010,6 +42010,21 @@ scenarios:
             .unwrap_or_else(|error| panic!("{relative} reads: {error:#}"))
     }
 
+    fn read_repo_text(relative: &str) -> String {
+        fs::read_to_string(repo_fixture_path(relative))
+            .unwrap_or_else(|error| panic!("{relative} reads: {error:#}"))
+    }
+
+    fn js_function_source<'a>(source: &'a str, function_name: &str) -> &'a str {
+        let marker = format!("function {function_name}");
+        let start = source
+            .find(&marker)
+            .unwrap_or_else(|| panic!("{function_name} function exists"));
+        let rest = &source[start..];
+        let end = rest.find("\n  function ").unwrap_or(rest.len());
+        &rest[..end]
+    }
+
     #[test]
     fn agent_role_model_v1_accepts_fixture_roles_and_boundaries() {
         let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
@@ -42560,6 +42575,93 @@ scenarios:
                     .malformed_reasons
                     .iter()
                     .any(|reason| reason.contains("acceptanceCriteria"))));
+    }
+
+    #[test]
+    fn studio_multi_agent_pipeline_inspection_boundary_doc_audits_no_runner_claims() {
+        let doc = read_repo_text("docs/studio-multi-agent-pipeline-inspection-v1.md");
+        let dashboard = read_repo_text("examples/evidence-dashboard/dashboard.js");
+        let cockpit = read_repo_text("examples/authoring-cockpit/cockpit.js");
+        let dashboard_pipeline =
+            js_function_source(&dashboard, "renderStudioMultiAgentPipelineInspection");
+        let cockpit_pipeline =
+            js_function_source(&cockpit, "renderStudioMultiAgentPipelineInspectionSurface");
+        for required in [
+            "read-only",
+            "inspect-only",
+            "must not",
+            "execute commands",
+            "command bridge",
+            "spawn agents",
+            "hidden background agents",
+            "cloud/hosted orchestration",
+            "write trusted browser state",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "production readiness",
+            "Godot replacement",
+            "Escape all rendered data",
+            "Generated task boards",
+        ] {
+            assert!(
+                doc.contains(required),
+                "doc missing required boundary phrase: {required}"
+            );
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
+        for (name, source) in [
+            ("dashboard", dashboard_pipeline),
+            ("cockpit", cockpit_pipeline),
+        ] {
+            assert!(
+                source.contains("Studio multi-agent pipeline inspection"),
+                "{name} must render pipeline inspection surface"
+            );
+            assert!(
+                source.contains("escapeText"),
+                "{name} must escape rendered pipeline data"
+            );
+            assert!(
+                source.contains("does not execute commands"),
+                "{name} must state command inertness"
+            );
+            assert!(
+                source.contains("cloud orchestration"),
+                "{name} must state no cloud orchestration"
+            );
+            assert!(
+                source.contains("auto-apply"),
+                "{name} must state no auto-apply"
+            );
+            assert!(
+                source.contains("auto-merge"),
+                "{name} must state no auto-merge"
+            );
+            assert!(
+                source.contains("self-approve"),
+                "{name} must state no self-approval"
+            );
+            assert!(
+                !source.contains("executeCommand")
+                    && !source.contains("applyCommand")
+                    && !source.contains("mergeCommand")
+                    && !source.contains("browserCommandBridge"),
+                "{name} must not expose command/apply/merge bridge controls"
+            );
+        }
     }
 
     #[test]
