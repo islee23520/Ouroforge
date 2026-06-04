@@ -227,3 +227,35 @@ assert.ok(malformedBreakdown.absenceDiagnostics.some((diag) => diag.reason === '
 assert.ok(malformedBreakdown.absenceDiagnostics.some((diag) => diag.reason === 'fallback'));
 const changedBreakdown = renderBreakdown({ world: { sceneId: 'renderer-test', tick: 4, bounds: { width: 320, height: 180 }, entities: entities.map((entity) => entity.id === 'zebra' ? { ...entity, sprite: { ...entity.sprite, order: 0 } } : entity) }, renderer, frameId: 'frame-0004' });
 assert.ok(compareBreakdowns(breakdown, changedBreakdown).changes.some((change) => change.renderableId === 'renderer-test/entity:zebra' && change.field === 'drawOrder'));
+
+// Regression (#892, 못쟁이 blocking): drawRuntime resolved entity renderables
+// through a Map keyed on entity id, which silently collapsed duplicate or missing
+// ids to a single entity — the last match was drawn repeatedly and the earlier
+// entities were never drawn. Each entity must draw exactly once at its own
+// position/color regardless of id collisions.
+{
+  const idCollisionRenderer = normalizeRenderer({
+    version: '1',
+    background: '#000000',
+    layers: [{ id: 'actors', order: 0 }],
+  }, { width: 100, height: 100 });
+  const idCollisionContext = createContext();
+  const idCollisionEntities = [
+    { id: 'dup', sprite: { color: '#aa0000', layer: 'actors' }, components: { transform: { x: 10, y: 10 }, size: { width: 4, height: 4 } } },
+    { id: 'dup', sprite: { color: '#00bb00', layer: 'actors' }, components: { transform: { x: 20, y: 20 }, size: { width: 4, height: 4 } } },
+    { id: '', sprite: { color: '#0000cc', layer: 'actors' }, components: { transform: { x: 30, y: 30 }, size: { width: 4, height: 4 } } },
+    { id: '', sprite: { color: '#cccc00', layer: 'actors' }, components: { transform: { x: 40, y: 40 }, size: { width: 4, height: 4 } } },
+  ];
+  drawRuntime({
+    canvas: { width: 100, height: 100 },
+    context: idCollisionContext,
+    renderer: idCollisionRenderer,
+    world: { sceneId: 'id-collision-test', tick: 0, bounds: { width: 100, height: 100 }, entities: idCollisionEntities },
+    assets: { imageFor: () => null },
+    animation: { activeSpriteFrame: () => null },
+  });
+  const drawnColors = idCollisionContext.calls.filter((call) => call[0] === 'fillRect').map((call) => call[1]);
+  for (const color of ['#aa0000', '#00bb00', '#0000cc', '#cccc00']) {
+    assert.ok(drawnColors.includes(color), `entity ${color} must draw despite duplicate/missing id (no id-keyed collapse)`);
+  }
+}

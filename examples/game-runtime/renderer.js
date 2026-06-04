@@ -113,7 +113,9 @@
         fallbackReason: item.layer && item.layer.visible === false ? 'tilemap layer hidden' : null,
       });
     }
-    for (const entity of Array.isArray(world.entities) ? world.entities : []) {
+    const queueEntities = Array.isArray(world.entities) ? world.entities : [];
+    for (let entityIndex = 0; entityIndex < queueEntities.length; entityIndex += 1) {
+      const entity = queueEntities[entityIndex];
       const sprite = entity.sprite || {};
       const layer = sprite.layer || 'default';
       const visible = sprite.visible !== false && visibility.get(layer) !== false;
@@ -121,6 +123,9 @@
         id: `entity-${entity.id || 'missing-id'}`,
         sourceKind: 'entity',
         sourceId: String(entity.id || ''),
+        // Unique queue-local index so draws resolve to THIS entity, not the last
+        // entity sharing the same (possibly duplicate or empty) id.
+        entityIndex,
         layer,
         layerOrder: orders.get(layer) || 0,
         localOrder: Number.isFinite(sprite.order) ? sprite.order : 0,
@@ -138,15 +143,17 @@
         renderables.push({ id: 'debug-camera', sourceKind: 'debug-overlay', sourceId: 'camera', layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 0, stableKey: 'debug-camera', drawOrder: 0, primitiveKind: 'debug_camera', visible: true, fallbackReason: null });
       }
       if (activeRenderer.debug.showBounds) {
-        for (const entity of Array.isArray(world.entities) ? world.entities : []) {
-          const entityId = String(entity.id || '');
-          renderables.push({ id: `debug-bounds-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 10, stableKey: `debug-bounds-${entityId}`, drawOrder: 0, primitiveKind: 'debug_bounds', visible: true, fallbackReason: null });
+        const boundsEntities = Array.isArray(world.entities) ? world.entities : [];
+        for (let entityIndex = 0; entityIndex < boundsEntities.length; entityIndex += 1) {
+          const entityId = String(boundsEntities[entityIndex].id || '');
+          renderables.push({ id: `debug-bounds-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, entityIndex, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 10, stableKey: `debug-bounds-${entityId}`, drawOrder: 0, primitiveKind: 'debug_bounds', visible: true, fallbackReason: null });
         }
       }
       if (activeRenderer.debug.showEntityIds) {
-        for (const entity of Array.isArray(world.entities) ? world.entities : []) {
-          const entityId = String(entity.id || '');
-          renderables.push({ id: `debug-label-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 20, stableKey: `debug-label-${entityId}`, drawOrder: 0, primitiveKind: 'debug_label', visible: true, fallbackReason: null });
+        const labelEntities = Array.isArray(world.entities) ? world.entities : [];
+        for (let entityIndex = 0; entityIndex < labelEntities.length; entityIndex += 1) {
+          const entityId = String(labelEntities[entityIndex].id || '');
+          renderables.push({ id: `debug-label-${entityId}`, sourceKind: 'debug-overlay', sourceId: entityId, entityIndex, layer: debugLayer.id, layerOrder: debugLayer.order, localOrder: 20, stableKey: `debug-label-${entityId}`, drawOrder: 0, primitiveKind: 'debug_label', visible: true, fallbackReason: null });
         }
       }
     }
@@ -364,7 +371,10 @@
     if (!canvas || !context || !world) return [];
     const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: canvas.width, height: canvas.height });
     const queue = renderQueue({ world, renderer: activeRenderer, tilemap, frameId: `tick-${world.tick ?? 0}` });
-    const entitiesById = new Map((world.entities || []).map((entity) => [String(entity.id || ''), entity]));
+    // Resolve entity draws by unique queue-local index rather than by id: a Map
+    // keyed on id silently collapses duplicate or missing ids to a single entity,
+    // drawing the last match repeatedly and omitting the earlier entities.
+    const drawEntities = Array.isArray(world.entities) ? world.entities : [];
     const tilemapLayersById = new Map((tilemap && typeof tilemap.orderedLayers === 'function' ? tilemap.orderedLayers(world.tilemaps || []) : [])
       .map((item) => [`${item.tilemapId}:${item.layerId}`, item]));
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -375,10 +385,11 @@
       if (renderable.sourceKind === 'tilemap-layer') {
         drawTilemapLayer({ context, renderer: activeRenderer, item: tilemapLayersById.get(renderable.sourceId), assets });
       } else if (renderable.sourceKind === 'entity') {
-        const entity = entitiesById.get(renderable.sourceId);
+        const entity = drawEntities[renderable.entityIndex];
         if (entity) drawEntityRenderable({ context, renderer: activeRenderer, entity, assets, animation });
       } else if (renderable.sourceKind === 'debug-overlay') {
-        drawDebugRenderable({ context, renderer: activeRenderer, entity: entitiesById.get(renderable.sourceId), primitiveKind: renderable.primitiveKind, world });
+        const debugEntity = Number.isInteger(renderable.entityIndex) ? drawEntities[renderable.entityIndex] : undefined;
+        drawDebugRenderable({ context, renderer: activeRenderer, entity: debugEntity, primitiveKind: renderable.primitiveKind, world });
       }
     }
     context.fillStyle = '#f2f6f8';
