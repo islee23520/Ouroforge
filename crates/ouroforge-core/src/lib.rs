@@ -3505,6 +3505,336 @@ pub fn agent_work_package_read_model_from_json_str(input: &str) -> AgentWorkPack
     }
 }
 
+pub const AGENT_SHARED_STATE_SNAPSHOT_SCHEMA_VERSION: &str = "agent-shared-state-snapshot-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSharedStateSnapshot {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "snapshotId")]
+    pub snapshot_id: String,
+    pub milestone: String,
+    pub status: AgentSharedStateSnapshotStatus,
+    #[serde(rename = "observedAt")]
+    pub observed_at: String,
+    #[serde(rename = "projectManifestHash")]
+    pub project_manifest_hash: String,
+    #[serde(rename = "sceneHashes")]
+    pub scene_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "tilemapHashes")]
+    pub tilemap_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "assetManifestHash")]
+    pub asset_manifest_hash: String,
+    #[serde(rename = "behaviorVersionHashes")]
+    pub behavior_version_hashes: Vec<AgentSharedStateSnapshotHashRef>,
+    #[serde(rename = "scenarioPackHash")]
+    pub scenario_pack_hash: String,
+    #[serde(rename = "recentRunIds")]
+    pub recent_run_ids: Vec<String>,
+    #[serde(rename = "openTasks")]
+    pub open_tasks: Vec<String>,
+    #[serde(rename = "ownershipMap")]
+    pub ownership_map: Vec<AgentSharedStateSnapshotOwnership>,
+    #[serde(rename = "pendingReviews")]
+    pub pending_reviews: Vec<String>,
+    #[serde(rename = "beforeContext", skip_serializing_if = "Option::is_none")]
+    pub before_context: Option<AgentSharedStateSnapshotComparison>,
+    #[serde(rename = "afterContext", skip_serializing_if = "Option::is_none")]
+    pub after_context: Option<AgentSharedStateSnapshotComparison>,
+    #[serde(rename = "staleRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_refs: Vec<String>,
+    #[serde(rename = "missingRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_refs: Vec<String>,
+    #[serde(
+        rename = "malformedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub malformed_reasons: Vec<String>,
+    #[serde(
+        rename = "conflictingRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub conflicting_refs: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentSharedStateSnapshotStatus {
+    Fresh,
+    Stale,
+    Partial,
+    Missing,
+    Malformed,
+    Conflicting,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSharedStateSnapshotHashRef {
+    pub id: String,
+    pub path: String,
+    pub hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSharedStateSnapshotOwnership {
+    pub owner: String,
+    #[serde(rename = "artifactRefs")]
+    pub artifact_refs: Vec<AuthoringLoopArtifactRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSharedStateSnapshotComparison {
+    pub label: String,
+    #[serde(rename = "artifactRefs")]
+    pub artifact_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "staleRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_refs: Vec<String>,
+}
+
+impl AgentSharedStateSnapshot {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let snapshot: AgentSharedStateSnapshot = serde_json::from_str(input)
+            .context("failed to parse Agent Shared State Snapshot JSON")?;
+        snapshot.validate_schema()?;
+        Ok(snapshot)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != AGENT_SHARED_STATE_SNAPSHOT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "agent shared state snapshot schemaVersion must be {AGENT_SHARED_STATE_SNAPSHOT_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("agent shared state snapshot snapshotId", &self.snapshot_id)?;
+        require_text("agent shared state snapshot milestone", &self.milestone)?;
+        require_text("agent shared state snapshot observedAt", &self.observed_at)?;
+        if !self.observed_at.contains('T') || !self.observed_at.ends_with('Z') {
+            return Err(anyhow!(
+                "agent shared state snapshot observedAt must be UTC RFC3339-like text"
+            ));
+        }
+        validate_snapshot_hash(
+            "agent shared state snapshot projectManifestHash",
+            &self.project_manifest_hash,
+        )?;
+        validate_snapshot_hash(
+            "agent shared state snapshot assetManifestHash",
+            &self.asset_manifest_hash,
+        )?;
+        validate_snapshot_hash(
+            "agent shared state snapshot scenarioPackHash",
+            &self.scenario_pack_hash,
+        )?;
+        validate_nonempty_snapshot_hash_refs(
+            "agent shared state snapshot sceneHashes",
+            &self.scene_hashes,
+        )?;
+        validate_snapshot_hash_refs(
+            "agent shared state snapshot tilemapHashes",
+            &self.tilemap_hashes,
+        )?;
+        validate_snapshot_hash_refs(
+            "agent shared state snapshot behaviorVersionHashes",
+            &self.behavior_version_hashes,
+        )?;
+        validate_nonempty_text_list(
+            "agent shared state snapshot recentRunIds",
+            &self.recent_run_ids,
+        )?;
+        validate_nonempty_text_list("agent shared state snapshot openTasks", &self.open_tasks)?;
+        if self.ownership_map.is_empty() {
+            return Err(anyhow!(
+                "agent shared state snapshot ownershipMap must not be empty"
+            ));
+        }
+        for (index, ownership) in self.ownership_map.iter().enumerate() {
+            ownership.validate(index)?;
+        }
+        validate_optional_text_list(
+            "agent shared state snapshot pendingReviews",
+            &self.pending_reviews,
+        )?;
+        if let Some(context) = &self.before_context {
+            context.validate("agent shared state snapshot beforeContext")?;
+        }
+        if let Some(context) = &self.after_context {
+            context.validate("agent shared state snapshot afterContext")?;
+        }
+        validate_optional_text_list("agent shared state snapshot staleRefs", &self.stale_refs)?;
+        validate_optional_text_list(
+            "agent shared state snapshot missingRefs",
+            &self.missing_refs,
+        )?;
+        validate_optional_text_list(
+            "agent shared state snapshot malformedReasons",
+            &self.malformed_reasons,
+        )?;
+        validate_optional_text_list(
+            "agent shared state snapshot conflictingRefs",
+            &self.conflicting_refs,
+        )?;
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("agent shared state snapshot guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "agent shared state snapshot forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("agent shared state snapshot boundary", &self.boundary)?;
+        self.validate_status_shape()?;
+        self.validate_guardrails()
+    }
+
+    fn validate_status_shape(&self) -> Result<()> {
+        match self.status {
+            AgentSharedStateSnapshotStatus::Fresh => {
+                if !self.stale_refs.is_empty()
+                    || !self.missing_refs.is_empty()
+                    || !self.malformed_reasons.is_empty()
+                    || !self.conflicting_refs.is_empty()
+                {
+                    return Err(anyhow!(
+                        "fresh agent shared state snapshot must not include stale, missing, malformed, or conflicting refs"
+                    ));
+                }
+            }
+            AgentSharedStateSnapshotStatus::Stale => {
+                if self.stale_refs.is_empty() {
+                    return Err(anyhow!(
+                        "stale agent shared state snapshot requires staleRefs"
+                    ));
+                }
+            }
+            AgentSharedStateSnapshotStatus::Partial | AgentSharedStateSnapshotStatus::Missing => {
+                if self.missing_refs.is_empty() {
+                    return Err(anyhow!(
+                        "partial or missing agent shared state snapshot requires missingRefs"
+                    ));
+                }
+            }
+            AgentSharedStateSnapshotStatus::Malformed => {
+                if self.malformed_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "malformed agent shared state snapshot requires malformedReasons"
+                    ));
+                }
+            }
+            AgentSharedStateSnapshotStatus::Conflicting => {
+                if self.conflicting_refs.is_empty() {
+                    return Err(anyhow!(
+                        "conflicting agent shared state snapshot requires conflictingRefs"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_guardrails(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "browser command bridge",
+            "trusted browser writes",
+        ] {
+            if !forbidden.contains(phrase) {
+                return Err(anyhow!(
+                    "agent shared state snapshot forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        for phrase in [
+            "read-only",
+            "does not execute commands",
+            "does not mutate",
+            "does not write trusted browser state",
+            "does not repair stale state",
+            "does not claim production readiness",
+            "does not claim godot replacement",
+        ] {
+            if !boundary.contains(phrase) {
+                return Err(anyhow!(
+                    "agent shared state snapshot boundary must state {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl AgentSharedStateSnapshotOwnership {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("agent shared state snapshot ownershipMap[{index}].owner"),
+            &self.owner,
+        )?;
+        validate_nonempty_refs(
+            &format!("agent shared state snapshot ownershipMap[{index}].artifactRefs"),
+            &self.artifact_refs,
+        )
+    }
+}
+
+impl AgentSharedStateSnapshotComparison {
+    fn validate(&self, field: &str) -> Result<()> {
+        require_text(&format!("{field}.label"), &self.label)?;
+        validate_nonempty_refs(&format!("{field}.artifactRefs"), &self.artifact_refs)?;
+        validate_optional_text_list(&format!("{field}.staleRefs"), &self.stale_refs)
+    }
+}
+
+fn validate_nonempty_snapshot_hash_refs(
+    field: &str,
+    refs: &[AgentSharedStateSnapshotHashRef],
+) -> Result<()> {
+    if refs.is_empty() {
+        return Err(anyhow!("{field} must not be empty"));
+    }
+    validate_snapshot_hash_refs(field, refs)
+}
+
+fn validate_snapshot_hash_refs(
+    field: &str,
+    refs: &[AgentSharedStateSnapshotHashRef],
+) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    for (index, reference) in refs.iter().enumerate() {
+        validate_path_component(&format!("{field}[{index}].id"), &reference.id)?;
+        validate_relative_artifact_path(&format!("{field}[{index}].path"), &reference.path)?;
+        validate_snapshot_hash(&format!("{field}[{index}].hash"), &reference.hash)?;
+        if !ids.insert(reference.id.as_str()) {
+            return Err(anyhow!("{field} duplicate id: {}", reference.id));
+        }
+    }
+    Ok(())
+}
+
+fn validate_snapshot_hash(field: &str, value: &str) -> Result<()> {
+    require_text(field, value)?;
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return Err(anyhow!("{field} must use sha256:<64-hex> format"));
+    };
+    if hex.len() != 64 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err(anyhow!("{field} must use sha256:<64-hex> format"));
+    }
+    Ok(())
+}
+
 pub const AGENT_DECISION_LEDGER_READ_MODEL_SCHEMA_VERSION: &str =
     "agent-decision-ledger-read-model-v1";
 
@@ -44351,6 +44681,163 @@ scenarios:
             .iter()
             .any(|reason| reason.contains("acceptanceCriteria")));
         assert!(malformed.boundary.contains("validation errors"));
+    }
+
+    #[test]
+    fn agent_shared_state_snapshot_v1_accepts_fixture_states_and_boundaries() {
+        for (fixture, expected_status) in [
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+                AgentSharedStateSnapshotStatus::Fresh,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.stale.fixture.json",
+                AgentSharedStateSnapshotStatus::Stale,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.partial.fixture.json",
+                AgentSharedStateSnapshotStatus::Partial,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.missing.fixture.json",
+                AgentSharedStateSnapshotStatus::Missing,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.malformed.fixture.json",
+                AgentSharedStateSnapshotStatus::Malformed,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.conflicting.fixture.json",
+                AgentSharedStateSnapshotStatus::Conflicting,
+            ),
+        ] {
+            let snapshot = AgentSharedStateSnapshot::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(snapshot.schema_version, AGENT_SHARED_STATE_SNAPSHOT_SCHEMA_VERSION);
+            assert_eq!(snapshot.status, expected_status);
+            assert!(snapshot.project_manifest_hash.starts_with("sha256:"));
+            assert!(!snapshot.scene_hashes.is_empty());
+            assert!(!snapshot.recent_run_ids.is_empty());
+            assert!(!snapshot.open_tasks.is_empty());
+            assert!(!snapshot.ownership_map.is_empty());
+            assert!(snapshot.before_context.is_some());
+            assert!(snapshot.after_context.is_some());
+            assert!(snapshot.generated_state.tracked_fixture_only);
+            assert!(snapshot
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(snapshot.boundary.contains("Read-only agent shared state"));
+            assert!(snapshot.boundary.contains("does not execute commands"));
+            assert!(snapshot.boundary.contains("does not mutate"));
+            assert!(snapshot
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(snapshot.boundary.contains("does not repair stale state"));
+            assert!(snapshot
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "hidden background agents"));
+            assert!(snapshot
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(snapshot
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-merge"));
+            assert!(snapshot
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "self-approval"));
+        }
+    }
+
+    #[test]
+    fn agent_shared_state_snapshot_v1_rejects_invalid_and_status_drift() {
+        let invalid = AgentSharedStateSnapshot::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.invalid.fixture.json",
+        ))
+        .expect_err("invalid snapshot hash rejects");
+        assert!(format!("{invalid:#}").contains("sha256"));
+
+        let mut fresh_with_stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ))
+        .expect("snapshot json");
+        fresh_with_stale["staleRefs"] = json!(["scene-main drift"]);
+        let fresh_error = AgentSharedStateSnapshot::from_json_str(&fresh_with_stale.to_string())
+            .expect_err("fresh snapshot cannot hide stale refs");
+        assert!(format!("{fresh_error:#}").contains("fresh agent shared state snapshot"));
+
+        let mut stale_without_refs: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.stale.fixture.json",
+        ))
+        .expect("snapshot json");
+        stale_without_refs
+            .as_object_mut()
+            .expect("object")
+            .remove("staleRefs");
+        let stale_error = AgentSharedStateSnapshot::from_json_str(&stale_without_refs.to_string())
+            .expect_err("stale snapshot requires stale refs");
+        assert!(format!("{stale_error:#}").contains("requires staleRefs"));
+
+        let mut unsafe_boundary: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+        ))
+        .expect("snapshot json");
+        unsafe_boundary["boundary"] = json!("State snapshot can repair stale state.");
+        let boundary_error = AgentSharedStateSnapshot::from_json_str(&unsafe_boundary.to_string())
+            .expect_err("unsafe snapshot boundary rejects");
+        assert!(format!("{boundary_error:#}").contains("read-only"));
+    }
+
+    #[test]
+    fn agent_shared_state_snapshot_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/agent-shared-state-snapshot-v1.md");
+        for required in [
+            "schemaVersion: agent-shared-state-snapshot-v1",
+            "read-only context evidence",
+            "sha256:<64-hex>",
+            "beforeContext",
+            "afterContext",
+            "staleRefs",
+            "missingRefs",
+            "malformedReasons",
+            "conflictingRefs",
+            "does not execute commands",
+            "does not spawn agents",
+            "does not mutate",
+            "does not write trusted browser state",
+            "does not repair stale state",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "hidden background agents",
+            "Generated task boards",
+            "MAP13.7.2",
+            "MAP13.7.3",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(
+                doc.contains(required),
+                "agent shared state snapshot doc missing {required}"
+            );
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
     }
 
     #[test]

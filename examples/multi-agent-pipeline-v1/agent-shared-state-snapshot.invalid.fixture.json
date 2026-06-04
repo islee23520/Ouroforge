@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "agent-shared-state-snapshot-v1",
+  "snapshotId": "demo-shared-state-snapshot-invalid",
+  "milestone": "multi-agent-production-pipeline-v1",
+  "status": "fresh",
+  "observedAt": "2026-06-03T16:23:29Z",
+  "projectManifestHash": "md5:not-allowed",
+  "sceneHashes": [
+    {
+      "id": "scene-main",
+      "path": "examples/project-fixtures/minimal/scene.json",
+      "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "tilemapHashes": [
+    {
+      "id": "tilemap-main",
+      "path": "examples/project-fixtures/minimal/tilemap.json",
+      "hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "assetManifestHash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "behaviorVersionHashes": [
+    {
+      "id": "behavior-rules",
+      "path": "examples/multi-agent-pipeline-v1/agent-roles.fixture.json",
+      "hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "scenarioPackHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "recentRunIds": [
+    "run-demo-001"
+  ],
+  "openTasks": [
+    "task-review-qa-handoff",
+    "task-regression-refresh"
+  ],
+  "ownershipMap": [
+    {
+      "owner": "designer",
+      "artifactRefs": [
+        {
+          "id": "task-board",
+          "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+          "description": "fixture task board"
+        }
+      ]
+    },
+    {
+      "owner": "reviewer",
+      "artifactRefs": [
+        {
+          "id": "handoff",
+          "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+          "description": "fixture handoff"
+        }
+      ]
+    }
+  ],
+  "pendingReviews": [
+    "reviewer-decision-gate"
+  ],
+  "beforeContext": {
+    "label": "before-review",
+    "artifactRefs": [
+      {
+        "id": "before-task-board",
+        "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+        "description": "before review task board"
+      }
+    ]
+  },
+  "afterContext": {
+    "label": "after-review",
+    "artifactRefs": [
+      {
+        "id": "after-evidence-bundle",
+        "path": "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+        "description": "after review evidence bundle"
+      }
+    ]
+  },
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "snapshot is read-only context evidence",
+    "stale state is surfaced and not repaired by browser or agents",
+    "generated roots remain ignored unless fixture scoped",
+    "no production-ready or Godot replacement claim"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser writes",
+    "credentialed commands",
+    "network/install commands",
+    "release automation"
+  ],
+  "boundary": "Read-only agent shared state snapshot; it does not execute commands, does not mutate task boards, source files, dashboard exports, or local tool state, does not write trusted browser state, does not repair stale state, does not claim production readiness, and does not claim Godot replacement capability."
+}
