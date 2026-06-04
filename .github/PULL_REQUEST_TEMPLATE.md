@@ -36,4 +36,4 @@
 
 ## Notes
 
-Use `CONTRIBUTING.md`, `docs/public-wording-guardrail-v1.md`, and `docs/post-launch-roadmap-response-snippets-v1.md` for conservative issue and PR responses when scope is unclear or drifting.
+Use `CONTRIBUTING.md`, `docs/public-pr-intake-policy-v1.md`, `docs/public-wording-guardrail-v1.md`, and `docs/post-launch-roadmap-response-snippets-v1.md` for conservative issue and PR responses when scope is unclear or drifting.

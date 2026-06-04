@@ -37,6 +37,7 @@ references, not launch approval:
 - [`public-alpha-launch-governance-v1.md`](public-alpha-launch-governance-v1.md) — launch governance and decision boundaries.
 - [`public-alpha-launch-hold-criteria-v1.md`](public-alpha-launch-hold-criteria-v1.md) — manual hold criteria for launch blockers, evidence, owner, and cadence.
 - [`public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md) — manual response and rollback options after launch-governance blockers.
+- [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md) — public-alpha PR checklist and forbidden-scope intake gates.
 - [`public-alpha-readiness-governance-handoff-v1.md`](public-alpha-readiness-governance-handoff-v1.md) — handoff evidence for later governance.
 - [`public-alpha-readiness-final-audit-v1.md`](public-alpha-readiness-final-audit-v1.md) and [`public-alpha-readiness-final-report-v1.md`](public-alpha-readiness-final-report-v1.md) — final public-alpha readiness evidence.
 - [`release-versioning-policy-v1.md`](release-versioning-policy-v1.md) and [`release-artifact-policy-v1.md`](release-artifact-policy-v1.md) — versioning and release artifact policy without publication automation.
