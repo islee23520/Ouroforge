@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "demo_3d_scene_v1",
+    "name": "3D Demo Scene v1 Capability Gate"
+  },
+  "scenes": [
+    {
+      "id": "bounded-3d-demo",
+      "path": "scenes/bounded-3d-demo.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "3d-demo-scene-v1",
+      "path": "seeds/3d-demo-scene-v1.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "3d-demo-scene-v1",
+      "path": "scenarios/3d-demo-scene-v1.json"
+    }
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data",
+      "tmp"
+    ]
+  }
+}

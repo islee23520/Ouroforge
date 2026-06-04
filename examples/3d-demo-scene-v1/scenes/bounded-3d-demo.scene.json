@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "bounded-3d-demo",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "activeCameraId": "demo-camera",
+    "meshes": [
+      {
+        "id": "player-cube-mesh",
+        "kind": "primitive",
+        "primitive": "cube",
+        "materialRef": "player-cyan",
+        "metadata": {
+          "fixtureScope": "tiny deterministic primitive only; no importer, GLTF pipeline, or production renderer claim"
+        }
+      },
+      {
+        "id": "goal-marker-mesh",
+        "kind": "primitive",
+        "primitive": "cube",
+        "materialRef": "goal-amber",
+        "metadata": {
+          "fixtureScope": "trigger marker primitive only; not level-editor tooling"
+        }
+      }
+    ],
+    "materials": [
+      {
+        "id": "player-cyan",
+        "kind": "unlit",
+        "baseColor": "#22d3ee",
+        "metadata": { "fixtureScope": "bounded color-only material" }
+      },
+      {
+        "id": "goal-amber",
+        "kind": "unlit",
+        "baseColor": "#f59e0b",
+        "metadata": { "fixtureScope": "bounded color-only material" }
+      }
+    ],
+    "colliders": [
+      {
+        "id": "player-collider",
+        "shape": "box",
+        "body": "dynamic",
+        "size": { "x": 2, "y": 2, "z": 2 },
+        "collisionGroup": "actors",
+        "collisionMask": ["triggers", "world"]
+      },
+      {
+        "id": "goal-trigger",
+        "shape": "box",
+        "body": "trigger",
+        "trigger": true,
+        "size": { "x": 2, "y": 2, "z": 2 },
+        "collisionGroup": "triggers"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "demo-camera-rig",
+        "localTransform": {
+          "translation": { "x": 0, "y": 5, "z": 12 },
+          "rotation": { "x": -20, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "metadata": { "fixtureScope": "camera transform fixture only" }
+      },
+      {
+        "id": "demo-root",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "metadata": { "fixtureScope": "hierarchy root for deterministic transform resolution" }
+      },
+      {
+        "id": "player-cube",
+        "parent": "demo-root",
+        "localTransform": {
+          "translation": { "x": 0, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "player-cube-mesh",
+        "materialRef": "player-cyan",
+        "colliderRef": "player-collider",
+        "components": [
+          { "kind": "mesh", "reference": "player-cube-mesh" },
+          { "kind": "material", "reference": "player-cyan" },
+          { "kind": "collider", "reference": "player-collider" }
+        ],
+        "metadata": { "fixtureScope": "animated cube actor for bounded 3D demo" }
+      },
+      {
+        "id": "goal-trigger-node",
+        "parent": "demo-root",
+        "localTransform": {
+          "translation": { "x": 2, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "meshRef": "goal-marker-mesh",
+        "materialRef": "goal-amber",
+        "colliderRef": "goal-trigger",
+        "components": [
+          { "kind": "mesh", "reference": "goal-marker-mesh" },
+          { "kind": "material", "reference": "goal-amber" },
+          { "kind": "collider", "reference": "goal-trigger" }
+        ],
+        "metadata": { "fixtureScope": "trigger volume marker for deterministic collision evidence" }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "demo-camera",
+        "nodeId": "demo-camera-rig",
+        "active": true,
+        "transform": {
+          "translation": { "x": 0, "y": 5, "z": 12 },
+          "rotation": { "x": -20, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "projection": {
+          "kind": "perspective",
+          "fovDegrees": 60,
+          "near": 1,
+          "far": 1000,
+          "aspectMode": "viewport"
+        },
+        "viewport": { "x": 0, "y": 0, "width": 640, "height": 360 },
+        "metadata": { "fixtureScope": "bounded active camera for local demo evidence" }
+      }
+    ],
+    "animationClips": [
+      {
+        "id": "player-slide-to-trigger",
+        "targetNodeId": "player-cube",
+        "channel": "translation",
+        "durationFrames": 4,
+        "looped": false,
+        "keyframes": [
+          { "frame": 0, "value": { "x": 0, "y": 0, "z": 0 } },
+          { "frame": 4, "value": { "x": 2, "y": 0, "z": 0 } }
+        ],
+        "metadata": {
+          "capabilityGate": "bounded transform clip only; no skeletal animation, retargeting, or graph editor"
+        }
+      }
+    ],
+    "animationStates": [
+      {
+        "clipId": "player-slide-to-trigger",
+        "targetNodeId": "player-cube",
+        "channel": "translation",
+        "currentFrame": 4,
+        "currentTimeMs": 66,
+        "playing": false,
+        "looped": false
+      }
+    ],
+    "metadata": {
+      "generatedStateBoundary": "tracked source-like fixture only; generated runs, screenshots, dashboard data, and temp projects stay untracked"
+    }
+  },
+  "metadata": {
+    "capabilityGate": "bounded local 3D demo scene fixture, not production 3D readiness or Godot replacement evidence",
+    "issue": "#605"
+  }
+}

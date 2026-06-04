@@ -1,0 +1,38 @@
+id: demo-3d-scene-v1.capability-gate
+title: 3D Demo Scene v1 Capability Gate
+goal: Demonstrate a tiny deterministic 3D scene fixture with evidence-linked probe, render, transform, collision, camera, and animation assertions.
+constraints:
+  target: game-runtime
+acceptance:
+  - The demo remains a bounded local 3D capability gate, not a production 3D engine or Godot replacement claim.
+  - Rust/local validation owns trusted persistence and source-like fixture validation.
+  - Browser/dashboard/Studio surfaces remain read-only or draft-only for trusted state.
+  - Generated runs, screenshots, dashboard data, and temp output remain untracked.
+scenarios:
+  - id: bounded-3d-demo-evidence-smoke
+    description: Assert the tiny 3D demo fixture emits structured evidence for probe, transform, render, collision, camera, and animation surfaces.
+    steps:
+      - wait:
+          frames: 4
+    assertions:
+      - scene3d_probe:
+          path: status
+          equals: present
+      - scene3d_probe:
+          path: nodeCount
+          greaterThan: 0
+      - scene3d_transform:
+          path: transforms.0.nodeId
+          exists: true
+      - scene3d_render:
+          path: visibleObjectCount
+          greaterThan: 0
+      - scene3d_collision:
+          path: triggerCount
+          greaterThan: 0
+      - scene3d_camera:
+          path: activeCameraId
+          equals: demo-camera
+      - scene3d_animation:
+          path: states.0.clipId
+          equals: player-slide-to-trigger

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "3d-demo-scene-v1",
+  "description": "Tiny deterministic 3D demo capability-gate scenario pack. This is bounded local QA evidence, not production 3D readiness.",
+  "seed": "seeds/3d-demo-scene-v1.yaml",
+  "scenes": [
+    "scenes/bounded-3d-demo.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "bounded-3d-demo-evidence",
+      "description": "Probe, transform, render, collision, camera, and animation evidence for the source-like 3D demo fixture.",
+      "scenarios": [
+        {
+          "id": "bounded-3d-demo-evidence-smoke",
+          "description": "Assert the tiny 3D demo fixture emits structured evidence for bounded 3D QA surfaces.",
+          "steps": [
+            {
+              "wait": {
+                "frames": 4
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "scene3d_probe": {
+                "path": "status",
+                "equals": "present"
+              }
+            },
+            {
+              "scene3d_probe": {
+                "path": "nodeCount",
+                "greaterThan": 0
+              }
+            },
+            {
+              "scene3d_transform": {
+                "path": "transforms.0.nodeId",
+                "exists": true
+              }
+            },
+            {
+              "scene3d_render": {
+                "path": "visibleObjectCount",
+                "greaterThan": 0
+              }
+            },
+            {
+              "scene3d_collision": {
+                "path": "triggerCount",
+                "greaterThan": 0
+              }
+            },
+            {
+              "scene3d_camera": {
+                "path": "activeCameraId",
+                "equals": "demo-camera"
+              }
+            },
+            {
+              "scene3d_animation": {
+                "path": "states.0.clipId",
+                "equals": "player-slide-to-trigger"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

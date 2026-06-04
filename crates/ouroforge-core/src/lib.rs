@@ -65329,6 +65329,71 @@ scenarios:
     }
 
     #[test]
+    fn validates_3d_demo_scene_v1_fixture_seed_pack_and_project() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-demo-scene-v1/scenes/bounded-3d-demo.scene.json",
+        ))
+        .expect("3D demo scene fixture parses");
+        validate_scene(&scene).expect("3D demo scene fixture validates");
+        assert_eq!(scene.scene_kind, "3d");
+        let graph = scene.scene_3d.as_ref().expect("3D demo graph present");
+        assert_eq!(graph.active_camera_id.as_deref(), Some("demo-camera"));
+        assert_eq!(graph.nodes.len(), 4);
+        assert_eq!(graph.meshes.len(), 2);
+        assert_eq!(graph.materials.len(), 2);
+        assert_eq!(graph.colliders.len(), 2);
+        assert_eq!(graph.animation_clips.len(), 1);
+        assert_eq!(graph.animation_states.len(), 1);
+        assert_eq!(graph.nodes[2].id, "player-cube");
+        assert_eq!(graph.nodes[2].mesh_ref.as_deref(), Some("player-cube-mesh"));
+        assert_eq!(
+            graph.nodes[2].collider_ref.as_deref(),
+            Some("player-collider")
+        );
+        assert_eq!(graph.nodes[3].collider_ref.as_deref(), Some("goal-trigger"));
+        assert_eq!(graph.cameras[0].id, "demo-camera");
+        assert!(graph.cameras[0].active);
+        assert_eq!(graph.animation_clips[0].id, "player-slide-to-trigger");
+        assert_eq!(graph.animation_states[0].current_frame, 4);
+
+        let seed = Seed::from_yaml_str(include_str!(
+            "../../../examples/3d-demo-scene-v1/seeds/3d-demo-scene-v1.yaml"
+        ))
+        .expect("3D demo seed validates");
+        assert_eq!(seed.id, "demo-3d-scene-v1.capability-gate");
+        assert_eq!(seed.scenarios.len(), 1);
+        assert_eq!(seed.scenarios[0].assertions.len(), 7);
+        assert!(seed
+            .acceptance
+            .iter()
+            .any(|item| item.contains("not a production 3D engine")));
+
+        let pack = ScenarioPack::from_path(repo_fixture_path(
+            "examples/3d-demo-scene-v1/scenarios/3d-demo-scene-v1.json",
+        ))
+        .expect("3D demo scenario pack validates");
+        assert_eq!(pack.id, "3d-demo-scene-v1");
+        assert_eq!(pack.scenario_groups.len(), 1);
+        assert_eq!(pack.scenario_groups[0].scenarios.len(), 1);
+        assert_eq!(
+            pack.scenario_groups[0].scenarios[0].id,
+            "bounded-3d-demo-evidence-smoke"
+        );
+
+        let manifest_path = repo_fixture_path("examples/3d-demo-scene-v1/ouroforge.project.json");
+        let manifest =
+            ProjectManifest::from_path(&manifest_path).expect("3D demo project manifest validates");
+        assert_eq!(manifest.project.id, "demo_3d_scene_v1");
+        let report = manifest
+            .validate_references(manifest_path.parent().expect("manifest parent"))
+            .expect("3D demo project references validate");
+        assert_eq!(report.project_id, "demo_3d_scene_v1");
+        assert_eq!(report.source_refs, 3);
+        assert_eq!(report.asset_roots, 1);
+        assert_eq!(report.runs_root, "runs");
+    }
+
+    #[test]
     fn validates_engine_expressiveness_v2_regression_seed_and_pack() {
         let seed = Seed::from_yaml_str(include_str!(
             "../../../examples/engine-expressiveness-v2-regression/seeds/engine-expressiveness-v2-regression.yaml"
