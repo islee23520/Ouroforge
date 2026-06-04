@@ -102,6 +102,8 @@ Follow-up Visual Authoring v1 issues should be completed in this order:
    integrity expectations.
 5. **Edit Draft to Transaction CLI v1** — add Rust-trusted validation and
    transaction preview generation from draft JSON; Studio remains copy-only.
+   Implemented command documentation and smoke procedure are recorded in
+   `docs/edit-draft-transaction-cli-v1.md`.
 6. **Visual Diff Preview v1** — produce bounded visual/read-model diff evidence
    for accepted draft previews, malformed drafts, and no-op/stale states.
 7. **Review-Gated Visual Edit Apply v1** — apply only reviewed/accepted visual
