@@ -11,7 +11,7 @@ Ouroforge is currently a local-first private MVP moving toward public open-sourc
 
 ## Alpha response playbook
 
-For alpha security report classification, temporary private coordination, source preview/sandbox/browser-boundary examples, and conservative public wording, see [`docs/security-response-playbook-v1.md`](docs/security-response-playbook-v1.md). The playbook is governance-only and does not create a bounty, support SLA, production security guarantee, release process, repository visibility change, or automated advisory workflow.
+For alpha security report classification, temporary private coordination, severity triage, advisory/disclosure flow, source preview/sandbox/browser-boundary examples, and conservative public wording, see [`docs/security-response-playbook-v1.md`](docs/security-response-playbook-v1.md). The playbook is governance-only and does not create a bounty, response-time SLA, production security guarantee, release process, repository visibility change, or automated advisory workflow.
 
 ## Reporting a vulnerability
 
