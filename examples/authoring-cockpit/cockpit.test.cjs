@@ -1223,3 +1223,17 @@ assert.ok(evidenceTimeline.diagnostics.some((diagnostic) => diagnostic.kind === 
 assert.ok(evidenceTimeline.guardrails.join(' ').includes('read-only'));
 assert.ok(evidenceTimeline.forbiddenActions.includes('execute_command'));
 assert.ok(evidenceTimeline.forbiddenActions.includes('write_trusted_file'));
+
+const evidenceTimelineMarkup = cockpit.renderEvidenceTimelineSurface(evidenceTimeline);
+assert.match(evidenceTimelineMarkup, /Evidence timeline/);
+assert.match(evidenceTimelineMarkup, /run-before/);
+assert.match(evidenceTimelineMarkup, /run-after/);
+assert.match(evidenceTimelineMarkup, /Source-apply links/);
+assert.match(evidenceTimelineMarkup, /source-patch-apply-transaction/);
+assert.match(evidenceTimelineMarkup, /Before\/after comparison candidates/);
+assert.match(evidenceTimelineMarkup, /comparisons\/run-before--run-after\.json/);
+assert.match(evidenceTimelineMarkup, /missing-evidence/);
+assert.match(evidenceTimelineMarkup, /broken-evidence/);
+assert.doesNotMatch(evidenceTimelineMarkup, /<button|applyCommand|mergeCommand|executeCommand|browserCommandBridge/);
+assert.match(cockpit.renderEvidencePane(evidenceTimelineFixture.runs[1]), /Evidence timeline/);
+assert.match(cockpit.renderEvidenceTimelineSurface([]), /No run evidence/);
