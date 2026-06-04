@@ -72,6 +72,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`scene-component-model-v2.md`](scene-component-model-v2.md), [`scene-edit-transactions.md`](scene-edit-transactions.md), [`scene-only-mutation-v2.md`](scene-only-mutation-v2.md), [`scene-transitions-v1.md`](scene-transitions-v1.md)
 - [`asset-manifest-v1.md`](asset-manifest-v1.md), [`asset-pipeline-v1.md`](asset-pipeline-v1.md), [`asset-preview-evidence-v1.md`](asset-preview-evidence-v1.md), [`asset-reference-integrity-v1.md`](asset-reference-integrity-v1.md), [`sprite-atlas-manifest-v1.md`](sprite-atlas-manifest-v1.md), [`tileset-tilemap-authoring-v2.md`](tileset-tilemap-authoring-v2.md)
 - [`collision-physics-v2.md`](collision-physics-v2.md), [`gameplay-trigger-flags-v1.md`](gameplay-trigger-flags-v1.md), [`engine-expansion-v1.md`](engine-expansion-v1.md), [`engine-expressiveness-v2.md`](engine-expressiveness-v2.md)
+- [`3d-capability-gate-v1.md`](3d-capability-gate-v1.md), [`3d-scene-graph-v1.md`](3d-scene-graph-v1.md), [`3d-camera-projection-v1.md`](3d-camera-projection-v1.md), [`3d-mesh-material-refs-v1.md`](3d-mesh-material-refs-v1.md), [`3d-render-smoke-v1.md`](3d-render-smoke-v1.md), [`3d-collision-physics-v1.md`](3d-collision-physics-v1.md), [`3d-animation-playback-v1.md`](3d-animation-playback-v1.md)
 
 ## Authoring, Studio, and review surfaces
 
@@ -82,6 +83,7 @@ surfaces. They do not create browser trusted writes or source apply authority:
 - [`agent-handoff-contract-v1.md`](agent-handoff-contract-v1.md), [`agent-role-model-v1.md`](agent-role-model-v1.md), [`review-decision-ledger-v1.md`](review-decision-ledger-v1.md)
 - [`studio-v1.md`](studio-v1.md), [`studio-v2-cockpit.md`](studio-v2-cockpit.md), [`studio-v3-project-workspace-cockpit.md`](studio-v3-project-workspace-cockpit.md), [`studio-review-cockpit-v1.md`](studio-review-cockpit-v1.md), [`studio-evidence-fidelity-surfaces.md`](studio-evidence-fidelity-surfaces.md), [`studio-asset-inspector-v1.md`](studio-asset-inspector-v1.md)
 - [`visual-authoring-v1.md`](visual-authoring-v1.md), [`visual-edit-draft-model-v1.md`](visual-edit-draft-model-v1.md)
+- [`studio-3d-inspection-surface-v1.md`](studio-3d-inspection-surface-v1.md) — read-only escaped Studio 3D evidence inspection; no 3D editor, trusted write, command bridge, viewport persistence, production 3D, or Godot replacement claim.
 
 ## Source preview, sandbox, and apply-boundary references
 

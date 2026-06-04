@@ -171,6 +171,29 @@ git status --short --ignored
 coverage once the first 3D runtime fixtures exist. Dashboard/Studio issues should
 add read-only rendering, missing/malformed state, and XSS escaping coverage.
 
+
+## Completion status after #608
+
+3D Capability Gate v1 is recorded complete after issues #596-#608 closed. The
+completed evidence chain covers the scope contract, scene graph and transform
+hierarchy, camera/projection validation, mesh/material local refs, render smoke
+evidence, collision/trigger evidence, bounded animation playback, runtime probe
+contract, scenario/evaluator compatibility, deterministic 3D demo scene,
+Scenario Coverage v8, normalized dashboard read models, read-only Studio 3D
+inspection, and roadmap/#1 governance refresh.
+
+Completion remains bounded: it is not a full 3D editor, production 3D renderer,
+broad 3D compatibility promise, broad GLTF/import pipeline, advanced
+lighting/PBR/material graph, skeletal authoring system, native export path,
+plugin runtime, hosted/cloud/server/auth behavior, browser trusted-write path,
+command bridge, unrestricted source apply, public launch approval, secure-sandbox
+guarantee, shipped-game proof, or current Godot replacement claim.
+
+The recommended next milestone candidate after this gate is Gameplay Scripting /
+Logic System v1 (#611-#625), subject to its own scope contract, generated-state
+audit, 2D compatibility audit, and conservative wording. #1 remains the
+roadmap/final-goal anchor and #23 remains the memory/governance anchor.
+
 ## Non-goals for Milestone 9
 
 Milestone 9 does not authorize:
