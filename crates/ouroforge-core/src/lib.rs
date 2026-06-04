@@ -10744,6 +10744,12 @@ pub struct VisualDiffCollisionTriggerSummary {
 pub struct VisualDiffOperationSummary {
     #[serde(rename = "operationId")]
     pub operation_id: String,
+    #[serde(
+        rename = "transactionId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub transaction_id: Option<String>,
     pub target: VisualDiffSummaryTargetType,
     pub change: VisualDiffChangeKind,
     pub path: String,
@@ -10787,6 +10793,35 @@ pub struct VisualDiffScenarioImpact {
     pub scenario_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualDiffSummaryLinks {
+    #[serde(
+        rename = "proposalId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub proposal_id: Option<String>,
+    #[serde(
+        rename = "journalRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub journal_ref: Option<String>,
+    #[serde(
+        rename = "dashboardRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dashboard_ref: Option<String>,
+    #[serde(
+        rename = "expectedScenarioImpact",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expected_scenario_impact: Option<VisualDiffScenarioImpact>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10922,6 +10957,165 @@ impl VisualEditDraftArtifact {
             .into_iter()
             .map(|edit| preview_scene_edit_transaction(scene_path, edit))
             .collect()
+    }
+
+    pub fn generate_scene_visual_diff_summary_from_transactions(
+        &self,
+        scene_path: impl AsRef<Path>,
+        transactions: &[SceneEditTransaction],
+    ) -> Result<VisualDiffSummaryArtifact> {
+        self.validate()?;
+        if self.target.target_type != VisualEditDraftTargetType::Scene {
+            return Err(anyhow!(
+                "visual diff summary generation from scene transactions requires target type scene"
+            ));
+        }
+        if transactions.len() != self.proposed_operations.len() {
+            return Err(anyhow!(
+                "visual diff summary generation requires one scene transaction per draft operation"
+            ));
+        }
+        let scene_path = scene_path.as_ref();
+        let before_scene = read_scene(scene_path)?;
+        if let Some(target_id) = &self.target.id {
+            if target_id != &before_scene.id {
+                return Err(anyhow!(
+                    "visual diff summary scene target id mismatch: expected {}, found {}",
+                    target_id,
+                    before_scene.id
+                ));
+            }
+        }
+        let before_hash = hash_scene_document(&before_scene)?;
+        let (expected_algorithm, expected_before_hash) =
+            parse_visual_edit_draft_hash("visual edit draft beforeHash", &self.before_hash)?;
+        if before_hash.algorithm != expected_algorithm || before_hash.value != expected_before_hash
+        {
+            return Err(anyhow!(
+                "visual diff summary beforeHash mismatch: expected {}:{}, found {}:{}",
+                expected_algorithm,
+                expected_before_hash,
+                before_hash.algorithm,
+                before_hash.value
+            ));
+        }
+
+        let mut after_scene = before_scene.clone();
+        let mut affected_entity_ids = BTreeSet::new();
+        let mut operation_summaries = Vec::new();
+        let scene_path_text = scene_path.to_string_lossy().to_string();
+        for (operation, transaction) in self.proposed_operations.iter().zip(transactions) {
+            let Some(scene_operation) = &operation.scene_operation else {
+                return Err(anyhow!(
+                    "visual diff summary generation operation {} requires sceneOperation",
+                    operation.id
+                ));
+            };
+            let edit = scene_operation.to_scene_edit()?;
+            validate_visual_diff_scene_transaction_link(
+                operation,
+                transaction,
+                &scene_path_text,
+                &before_hash,
+                &edit,
+            )?;
+            let before_entity = find_scene_entity(&after_scene, &edit.entity_id)?;
+            let before_text = scene_edit_value_summary(before_entity, &edit.path)?;
+            apply_scene_edit(&mut after_scene, edit.clone()).with_context(|| {
+                format!(
+                    "visual diff summary generation operation {} failed model-only preview",
+                    operation.id
+                )
+            })?;
+            validate_scene(&after_scene).with_context(|| {
+                format!(
+                    "visual diff summary generation operation {} produced invalid scene preview",
+                    operation.id
+                )
+            })?;
+            let after_entity = find_scene_entity(&after_scene, &edit.entity_id)?;
+            let after_text = scene_edit_value_summary(after_entity, &edit.path)?;
+            affected_entity_ids.insert(edit.entity_id.clone());
+            operation_summaries.push(VisualDiffOperationSummary {
+                operation_id: operation.id.clone(),
+                transaction_id: Some(transaction.id.clone()),
+                target: VisualDiffSummaryTargetType::Scene,
+                change: visual_diff_change_from_draft_kind(&operation.kind),
+                path: operation.path.clone(),
+                summary: operation.summary.clone().unwrap_or_else(|| {
+                    scene_operation.summary.clone().unwrap_or_else(|| {
+                        format!(
+                            "Preview scene edit {} for entity {}.",
+                            edit.path, edit.entity_id
+                        )
+                    })
+                }),
+                before_text: Some(before_text),
+                after_text: Some(after_text),
+                affected_entity_ids: vec![edit.entity_id],
+                affected_tilemap_ids: Vec::new(),
+                affected_asset_ids: Vec::new(),
+                collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+            });
+        }
+
+        let affected_entity_ids = affected_entity_ids.into_iter().collect::<Vec<_>>();
+        let before = visual_diff_scene_snapshot_summary(
+            "Before visual edit draft scene transaction preview.",
+            &before_scene,
+            &affected_entity_ids,
+            VisualDiffChangeKind::Unchanged,
+        )?;
+        let after = visual_diff_scene_snapshot_summary(
+            &self.expected_after_summary,
+            &after_scene,
+            &affected_entity_ids,
+            VisualDiffChangeKind::Updated,
+        )?;
+        let source_refs = VisualDiffSourceRefs {
+            draft_id: Some(self.draft_id.clone()),
+            transaction_id: Some(visual_diff_summary_transaction_ref(transactions)?),
+            proposal_id: None,
+            journal_ref: self.linked_evidence.first().cloned(),
+            dashboard_ref: None,
+        };
+        let summary_seed = json!({
+            "draftId": self.draft_id,
+            "target": self.target,
+            "transactions": transactions.iter().map(|transaction| &transaction.id).collect::<Vec<_>>(),
+            "beforeSceneHash": before_hash,
+            "afterScene": after_scene,
+        });
+        let summary_id = format!(
+            "visual-diff-summary-{:016x}",
+            fnv1a64(&serde_json::to_vec(&canonical_json_value(summary_seed))?)
+        );
+        let summary = VisualDiffSummaryArtifact {
+            schema_version: VISUAL_DIFF_SUMMARY_SCHEMA_VERSION.to_string(),
+            summary_id,
+            target: VisualDiffSummaryTarget {
+                target_type: VisualDiffSummaryTargetType::Scene,
+                path: self.target.path.clone(),
+                id: self.target.id.clone(),
+            },
+            source_refs,
+            before,
+            after,
+            operation_summaries,
+            expected_scenario_impact: Some(VisualDiffScenarioImpact {
+                status: VisualDiffScenarioImpactStatus::Unknown,
+                summary:
+                    "Generated from visual edit draft and scene transaction preview data; scenario impact requires separate evidence."
+                        .to_string(),
+                scenario_ids: Vec::new(),
+                evidence: self.linked_evidence.clone(),
+            }),
+            guardrail:
+                "read-only generated visual diff summary; no apply, source writes, browser trusted writes, command bridge, UI rendering, dependency changes, or CI changes"
+                    .to_string(),
+        };
+        summary.validate()?;
+        Ok(summary)
     }
 
     pub fn validate_tilemap_preflight(
@@ -11218,6 +11412,584 @@ impl VisualDiffSummaryArtifact {
     }
 }
 
+pub fn generate_visual_diff_summary_from_scene_draft_transactions(
+    draft: &VisualEditDraftArtifact,
+    transactions: &[SceneEditTransaction],
+    links: VisualDiffSummaryLinks,
+) -> Result<VisualDiffSummaryArtifact> {
+    draft.validate()?;
+    if draft.target.target_type != VisualEditDraftTargetType::Scene {
+        return Err(anyhow!(
+            "visual diff scene generation requires target type scene"
+        ));
+    }
+    if transactions.is_empty() {
+        return Err(anyhow!(
+            "visual diff scene generation requires at least one transaction"
+        ));
+    }
+    if transactions.len() != draft.proposed_operations.len() {
+        return Err(anyhow!(
+            "visual diff scene generation transaction count {} must match draft operation count {}",
+            transactions.len(),
+            draft.proposed_operations.len()
+        ));
+    }
+
+    let target_type = VisualDiffSummaryTargetType::Scene;
+    let mut operation_summaries = Vec::new();
+    let mut before_entities = Vec::new();
+    let mut after_entities = Vec::new();
+    for (operation, transaction) in draft.proposed_operations.iter().zip(transactions) {
+        if transaction.schema_version != "ouroforge.scene-edit-transaction.v1" {
+            return Err(anyhow!(
+                "visual diff scene generation transaction {} has unsupported schemaVersion {}",
+                transaction.id,
+                transaction.schema_version
+            ));
+        }
+        if transaction.scene_path != draft.target.path {
+            return Err(anyhow!(
+                "visual diff scene generation transaction {} scenePath {} does not match draft target {}",
+                transaction.id,
+                transaction.scene_path,
+                draft.target.path
+            ));
+        }
+        let scene_operation = operation.scene_operation.as_ref().ok_or_else(|| {
+            anyhow!(
+                "visual diff scene generation operation {} requires sceneOperation",
+                operation.id
+            )
+        })?;
+        if scene_operation.entity_id != transaction.edit.entity_id
+            || scene_operation.scene_edit_path != transaction.edit.path
+        {
+            return Err(anyhow!(
+                "visual diff scene generation operation {} does not match transaction {} edit",
+                operation.id,
+                transaction.id
+            ));
+        }
+        let summary = operation_summary_text(operation, scene_operation.summary.as_deref());
+        let before_text = format!(
+            "beforeSceneHash={}:{}",
+            transaction.before_scene_hash.algorithm, transaction.before_scene_hash.value
+        );
+        let after_text = transaction
+            .after_scene_hash
+            .as_ref()
+            .map(|hash| format!("afterSceneHash={}:{}", hash.algorithm, hash.value))
+            .unwrap_or_else(|| {
+                format!(
+                    "validation failed: {}",
+                    transaction.validation_result.errors.join("; ")
+                )
+            });
+        operation_summaries.push(VisualDiffOperationSummary {
+            operation_id: operation.id.clone(),
+            transaction_id: Some(transaction.id.clone()),
+            target: target_type.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            path: scene_operation.scene_edit_path.clone(),
+            summary: summary.clone(),
+            before_text: Some(before_text),
+            after_text: Some(after_text),
+            affected_entity_ids: vec![scene_operation.entity_id.clone()],
+            affected_tilemap_ids: Vec::new(),
+            affected_asset_ids: Vec::new(),
+            collision_trigger_summary: scene_collision_trigger_summary(scene_operation),
+        });
+        before_entities.push(VisualDiffEntitySummary {
+            entity_id: scene_operation.entity_id.clone(),
+            change: VisualDiffChangeKind::Updated,
+            summary: format!(
+                "Entity `{}` before `{}`.",
+                scene_operation.entity_id, scene_operation.scene_edit_path
+            ),
+            sprite: None,
+            transform: None,
+            size: None,
+        });
+        after_entities.push(VisualDiffEntitySummary {
+            entity_id: scene_operation.entity_id.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            summary,
+            sprite: None,
+            transform: scene_operation_after_transform(scene_operation),
+            size: scene_operation_after_size(scene_operation),
+        });
+    }
+    let first_transaction = transactions.first().expect("checked non-empty");
+    let source_refs = visual_diff_source_refs(
+        Some(draft.draft_id.clone()),
+        Some(first_transaction.id.clone()),
+        links.proposal_id,
+        links.journal_ref,
+        links.dashboard_ref,
+    );
+    let summary = VisualDiffSummaryArtifact {
+        schema_version: VISUAL_DIFF_SUMMARY_SCHEMA_VERSION.to_string(),
+        summary_id: format!("visual-diff-{}", draft.draft_id),
+        target: visual_diff_target_from_draft(draft, target_type),
+        source_refs,
+        before: VisualDiffSnapshotSummary {
+            summary_text: format!(
+                "Scene `{}` before {} proposed visual edit operation(s).",
+                draft.target.path,
+                draft.proposed_operations.len()
+            ),
+            entity_summaries: before_entities,
+            tile_summaries: Vec::new(),
+            asset_summaries: Vec::new(),
+            collision_trigger_summary: aggregate_operation_collision_summary(&operation_summaries),
+        },
+        after: VisualDiffSnapshotSummary {
+            summary_text: draft.expected_after_summary.clone(),
+            entity_summaries: after_entities,
+            tile_summaries: Vec::new(),
+            asset_summaries: Vec::new(),
+            collision_trigger_summary: aggregate_operation_collision_summary(&operation_summaries),
+        },
+        operation_summaries,
+        expected_scenario_impact: links.expected_scenario_impact,
+        guardrail: visual_diff_generation_guardrail(),
+    };
+    summary.validate()?;
+    Ok(summary)
+}
+
+pub fn generate_visual_diff_summary_from_tilemap_draft_previews(
+    draft: &VisualEditDraftArtifact,
+    previews: &[VisualEditTilemapDraftPreview],
+    links: VisualDiffSummaryLinks,
+) -> Result<VisualDiffSummaryArtifact> {
+    draft.validate()?;
+    if draft.target.target_type != VisualEditDraftTargetType::Tilemap {
+        return Err(anyhow!(
+            "visual diff tilemap generation requires target type tilemap"
+        ));
+    }
+    if previews.is_empty() {
+        return Err(anyhow!(
+            "visual diff tilemap generation requires at least one preview"
+        ));
+    }
+    let target_type = VisualDiffSummaryTargetType::Tilemap;
+    let previews_by_id: BTreeMap<&str, &VisualEditTilemapDraftPreview> = previews
+        .iter()
+        .map(|preview| (preview.operation_id.as_str(), preview))
+        .collect();
+    let mut operation_summaries = Vec::new();
+    let mut before_tiles = Vec::new();
+    let mut after_tiles = Vec::new();
+    for operation in &draft.proposed_operations {
+        let tilemap_operation = operation.tilemap_operation.as_ref().ok_or_else(|| {
+            anyhow!(
+                "visual diff tilemap generation operation {} requires tilemapOperation",
+                operation.id
+            )
+        })?;
+        let preview = previews_by_id.get(operation.id.as_str()).ok_or_else(|| {
+            anyhow!(
+                "visual diff tilemap generation missing preview for operation {}",
+                operation.id
+            )
+        })?;
+        let collision_summary = tilemap_preview_collision_summary(preview);
+        let tile_ids = tilemap_operation
+            .tile_id
+            .clone()
+            .into_iter()
+            .collect::<Vec<_>>();
+        operation_summaries.push(VisualDiffOperationSummary {
+            operation_id: operation.id.clone(),
+            transaction_id: None,
+            target: target_type.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            path: operation.path.clone(),
+            summary: operation_summary_text(operation, Some(&preview.summary)),
+            before_text: Some(format!(
+                "beforeTilemapHash={}:{}",
+                preview.before_tilemap_hash.algorithm, preview.before_tilemap_hash.value
+            )),
+            after_text: Some(format!(
+                "afterTilemapHash={}:{}",
+                preview.after_tilemap_hash.algorithm, preview.after_tilemap_hash.value
+            )),
+            affected_entity_ids: Vec::new(),
+            affected_tilemap_ids: vec![preview.target_tilemap_asset_id.clone()],
+            affected_asset_ids: tilemap_operation
+                .tileset_asset_id
+                .clone()
+                .into_iter()
+                .collect(),
+            collision_trigger_summary: collision_summary.clone(),
+        });
+        before_tiles.push(VisualDiffTileSummary {
+            tilemap_id: preview.target_tilemap_asset_id.clone(),
+            layer_id: preview.layer_id.clone(),
+            change: VisualDiffChangeKind::Unchanged,
+            summary: format!(
+                "Layer `{}` before tilemap preview operation `{}`.",
+                preview.layer_id, operation.id
+            ),
+            affected_cells: preview.affected_cells,
+            tile_ids: tile_ids.clone(),
+        });
+        after_tiles.push(VisualDiffTileSummary {
+            tilemap_id: preview.target_tilemap_asset_id.clone(),
+            layer_id: preview.layer_id.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            summary: preview.summary.clone(),
+            affected_cells: preview.affected_cells,
+            tile_ids,
+        });
+    }
+    let summary = VisualDiffSummaryArtifact {
+        schema_version: VISUAL_DIFF_SUMMARY_SCHEMA_VERSION.to_string(),
+        summary_id: format!("visual-diff-{}", draft.draft_id),
+        target: visual_diff_target_from_draft(draft, target_type),
+        source_refs: visual_diff_source_refs(
+            Some(draft.draft_id.clone()),
+            None,
+            links.proposal_id,
+            links.journal_ref,
+            links.dashboard_ref,
+        ),
+        before: VisualDiffSnapshotSummary {
+            summary_text: format!(
+                "Tilemap `{}` before {} preview operation(s).",
+                draft.target.path,
+                draft.proposed_operations.len()
+            ),
+            entity_summaries: Vec::new(),
+            tile_summaries: before_tiles,
+            asset_summaries: Vec::new(),
+            collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+        },
+        after: VisualDiffSnapshotSummary {
+            summary_text: draft.expected_after_summary.clone(),
+            entity_summaries: Vec::new(),
+            tile_summaries: after_tiles,
+            asset_summaries: Vec::new(),
+            collision_trigger_summary: aggregate_operation_collision_summary(&operation_summaries),
+        },
+        operation_summaries,
+        expected_scenario_impact: links.expected_scenario_impact,
+        guardrail: visual_diff_generation_guardrail(),
+    };
+    summary.validate()?;
+    Ok(summary)
+}
+
+pub fn generate_visual_diff_summary_from_asset_reference_draft_previews(
+    draft: &VisualEditDraftArtifact,
+    previews: &[VisualEditAssetReferenceDraftPreview],
+    links: VisualDiffSummaryLinks,
+) -> Result<VisualDiffSummaryArtifact> {
+    draft.validate()?;
+    if draft.target.target_type != VisualEditDraftTargetType::AssetReference {
+        return Err(anyhow!(
+            "visual diff asset reference generation requires target type asset-reference"
+        ));
+    }
+    if previews.is_empty() {
+        return Err(anyhow!(
+            "visual diff asset reference generation requires at least one preview"
+        ));
+    }
+    let target_type = VisualDiffSummaryTargetType::AssetReference;
+    let previews_by_id: BTreeMap<&str, &VisualEditAssetReferenceDraftPreview> = previews
+        .iter()
+        .map(|preview| (preview.operation_id.as_str(), preview))
+        .collect();
+    let mut operation_summaries = Vec::new();
+    let mut before_assets = Vec::new();
+    let mut after_assets = Vec::new();
+    for operation in &draft.proposed_operations {
+        let asset_operation = operation.asset_reference_operation.as_ref().ok_or_else(|| {
+            anyhow!(
+                "visual diff asset reference generation operation {} requires assetReferenceOperation",
+                operation.id
+            )
+        })?;
+        let preview = previews_by_id.get(operation.id.as_str()).ok_or_else(|| {
+            anyhow!(
+                "visual diff asset reference generation missing preview for operation {}",
+                operation.id
+            )
+        })?;
+        operation_summaries.push(VisualDiffOperationSummary {
+            operation_id: operation.id.clone(),
+            transaction_id: None,
+            target: target_type.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            path: preview.target_reference_path.clone(),
+            summary: operation_summary_text(operation, Some(&preview.summary)),
+            before_text: Some(format!(
+                "targetReferencePath={}",
+                preview.target_reference_path
+            )),
+            after_text: Some(format!(
+                "replacementAssetId={}",
+                preview.replacement_asset_id
+            )),
+            affected_entity_ids: entity_ids_from_reference_path(&preview.target_reference_path),
+            affected_tilemap_ids: tilemap_ids_from_reference_path(&preview.target_reference_path),
+            affected_asset_ids: vec![preview.replacement_asset_id.clone()],
+            collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+        });
+        before_assets.push(VisualDiffAssetReferenceSummary {
+            asset_id: asset_operation.replacement_asset_id.clone(),
+            asset_type: preview.asset_type,
+            reference_path: preview.target_reference_path.clone(),
+            change: VisualDiffChangeKind::Unchanged,
+            summary: format!(
+                "Reference `{}` before replacement asset `{}` is linked.",
+                preview.target_reference_path, preview.replacement_asset_id
+            ),
+            content_hash: None,
+        });
+        after_assets.push(VisualDiffAssetReferenceSummary {
+            asset_id: preview.replacement_asset_id.clone(),
+            asset_type: preview.asset_type,
+            reference_path: preview.target_reference_path.clone(),
+            change: visual_diff_change_from_draft_kind(&operation.kind),
+            summary: preview.summary.clone(),
+            content_hash: Some(preview.content_hash.clone()),
+        });
+    }
+    let summary = VisualDiffSummaryArtifact {
+        schema_version: VISUAL_DIFF_SUMMARY_SCHEMA_VERSION.to_string(),
+        summary_id: format!("visual-diff-{}", draft.draft_id),
+        target: visual_diff_target_from_draft(draft, target_type),
+        source_refs: visual_diff_source_refs(
+            Some(draft.draft_id.clone()),
+            None,
+            links.proposal_id,
+            links.journal_ref,
+            links.dashboard_ref,
+        ),
+        before: VisualDiffSnapshotSummary {
+            summary_text: format!(
+                "Asset references in `{}` before {} proposed operation(s).",
+                draft.target.path,
+                draft.proposed_operations.len()
+            ),
+            entity_summaries: Vec::new(),
+            tile_summaries: Vec::new(),
+            asset_summaries: before_assets,
+            collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+        },
+        after: VisualDiffSnapshotSummary {
+            summary_text: draft.expected_after_summary.clone(),
+            entity_summaries: Vec::new(),
+            tile_summaries: Vec::new(),
+            asset_summaries: after_assets,
+            collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+        },
+        operation_summaries,
+        expected_scenario_impact: links.expected_scenario_impact,
+        guardrail: visual_diff_generation_guardrail(),
+    };
+    summary.validate()?;
+    Ok(summary)
+}
+
+fn visual_diff_target_from_draft(
+    draft: &VisualEditDraftArtifact,
+    target_type: VisualDiffSummaryTargetType,
+) -> VisualDiffSummaryTarget {
+    VisualDiffSummaryTarget {
+        target_type,
+        path: draft.target.path.clone(),
+        id: draft.target.id.clone(),
+    }
+}
+
+fn visual_diff_source_refs(
+    draft_id: Option<String>,
+    transaction_id: Option<String>,
+    proposal_id: Option<String>,
+    journal_ref: Option<String>,
+    dashboard_ref: Option<String>,
+) -> VisualDiffSourceRefs {
+    VisualDiffSourceRefs {
+        draft_id,
+        transaction_id,
+        proposal_id,
+        journal_ref,
+        dashboard_ref,
+    }
+}
+
+fn visual_diff_generation_guardrail() -> String {
+    "read-only generated diff summary; no apply, browser trusted writes, command bridge, source mutation, dependency mutation, or generated tracked output".to_string()
+}
+
+fn operation_summary_text(operation: &VisualEditDraftOperation, fallback: Option<&str>) -> String {
+    operation
+        .summary
+        .as_deref()
+        .or(fallback)
+        .unwrap_or("Visual edit operation affects the target draft.")
+        .to_string()
+}
+
+fn visual_diff_change_from_draft_kind(kind: &VisualEditDraftOperationKind) -> VisualDiffChangeKind {
+    match kind {
+        VisualEditDraftOperationKind::Add => VisualDiffChangeKind::Added,
+        VisualEditDraftOperationKind::Update => VisualDiffChangeKind::Updated,
+        VisualEditDraftOperationKind::Remove => VisualDiffChangeKind::Removed,
+        VisualEditDraftOperationKind::Reorder => VisualDiffChangeKind::Reordered,
+        VisualEditDraftOperationKind::LinkAsset => VisualDiffChangeKind::Linked,
+        VisualEditDraftOperationKind::UnlinkAsset => VisualDiffChangeKind::Unlinked,
+    }
+}
+
+fn scene_collision_trigger_summary(
+    operation: &VisualEditSceneDraftOperation,
+) -> VisualDiffCollisionTriggerSummary {
+    match operation.kind {
+        VisualEditSceneDraftOperationKind::ColliderToggle
+        | VisualEditSceneDraftOperationKind::ColliderSizeChange => {
+            VisualDiffCollisionTriggerSummary {
+                collision_cells_affected: 0,
+                trigger_cells_affected: 0,
+                collision_layer_ids: Vec::new(),
+                trigger_ids: Vec::new(),
+                summary: Some(format!(
+                    "Collider metadata for entity `{}` may change.",
+                    operation.entity_id
+                )),
+            }
+        }
+        VisualEditSceneDraftOperationKind::TriggerConfigChange => {
+            VisualDiffCollisionTriggerSummary {
+                collision_cells_affected: 0,
+                trigger_cells_affected: 1,
+                collision_layer_ids: Vec::new(),
+                trigger_ids: vec![operation.entity_id.clone()],
+                summary: Some(format!(
+                    "Trigger metadata for entity `{}` may change.",
+                    operation.entity_id
+                )),
+            }
+        }
+        _ => VisualDiffCollisionTriggerSummary::default(),
+    }
+}
+
+fn tilemap_preview_collision_summary(
+    preview: &VisualEditTilemapDraftPreview,
+) -> VisualDiffCollisionTriggerSummary {
+    let mut collision_layer_ids = preview
+        .collision_cells
+        .iter()
+        .map(|cell| cell.layer_id.clone())
+        .collect::<Vec<_>>();
+    collision_layer_ids.sort();
+    collision_layer_ids.dedup();
+    let mut trigger_ids = preview
+        .trigger_cells
+        .iter()
+        .filter_map(|cell| cell.trigger.clone())
+        .collect::<Vec<_>>();
+    trigger_ids.sort();
+    trigger_ids.dedup();
+    VisualDiffCollisionTriggerSummary {
+        collision_cells_affected: preview.collision_cells.len() as u32,
+        trigger_cells_affected: preview.trigger_cells.len() as u32,
+        collision_layer_ids,
+        trigger_ids,
+        summary: if preview.collision_cells.is_empty() && preview.trigger_cells.is_empty() {
+            None
+        } else {
+            Some("Affected tile cells include collision or trigger metadata.".to_string())
+        },
+    }
+}
+
+fn aggregate_operation_collision_summary(
+    operations: &[VisualDiffOperationSummary],
+) -> VisualDiffCollisionTriggerSummary {
+    let mut collision_layer_ids = BTreeSet::new();
+    let mut trigger_ids = BTreeSet::new();
+    let mut collision_cells_affected = 0u32;
+    let mut trigger_cells_affected = 0u32;
+    let mut has_summary = false;
+    for operation in operations {
+        collision_cells_affected = collision_cells_affected
+            .saturating_add(operation.collision_trigger_summary.collision_cells_affected);
+        trigger_cells_affected = trigger_cells_affected
+            .saturating_add(operation.collision_trigger_summary.trigger_cells_affected);
+        collision_layer_ids.extend(
+            operation
+                .collision_trigger_summary
+                .collision_layer_ids
+                .iter()
+                .cloned(),
+        );
+        trigger_ids.extend(
+            operation
+                .collision_trigger_summary
+                .trigger_ids
+                .iter()
+                .cloned(),
+        );
+        has_summary |= operation.collision_trigger_summary.summary.is_some();
+    }
+    VisualDiffCollisionTriggerSummary {
+        collision_cells_affected,
+        trigger_cells_affected,
+        collision_layer_ids: collision_layer_ids.into_iter().collect(),
+        trigger_ids: trigger_ids.into_iter().collect(),
+        summary: has_summary
+            .then(|| "One or more operations affect collision or trigger metadata.".to_string()),
+    }
+}
+
+fn scene_operation_after_transform(
+    operation: &VisualEditSceneDraftOperation,
+) -> Option<ScenePoint> {
+    if !matches!(
+        operation.kind,
+        VisualEditSceneDraftOperationKind::TransformMove
+    ) {
+        return None;
+    }
+    serde_json::from_value(operation.value.clone()?).ok()
+}
+
+fn scene_operation_after_size(operation: &VisualEditSceneDraftOperation) -> Option<SceneSize> {
+    if !matches!(
+        operation.kind,
+        VisualEditSceneDraftOperationKind::ColliderSizeChange
+    ) {
+        return None;
+    }
+    serde_json::from_value(operation.value.clone()?).ok()
+}
+
+fn entity_ids_from_reference_path(path: &str) -> Vec<String> {
+    path.split('.')
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find_map(|parts| (parts[0] == "entities").then(|| parts[1].to_string()))
+        .into_iter()
+        .collect()
+}
+
+fn tilemap_ids_from_reference_path(path: &str) -> Vec<String> {
+    path.split('.')
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find_map(|parts| (parts[0].contains("tilemap")).then(|| parts[1].to_string()))
+        .into_iter()
+        .collect()
+}
+
 impl VisualDiffSummaryTarget {
     pub fn validate(&self) -> Result<()> {
         validate_project_manifest_path("visual diff summary target.path", &self.path)?;
@@ -11351,6 +12123,12 @@ impl VisualDiffOperationSummary {
             "visual diff summary operationSummaries.operationId",
             &self.operation_id,
         )?;
+        if let Some(transaction_id) = &self.transaction_id {
+            validate_path_component(
+                "visual diff summary operationSummaries.transactionId",
+                transaction_id,
+            )?;
+        }
         validate_visual_edit_draft_operation_path(
             "visual diff summary operationSummaries.path",
             &self.path,
@@ -11393,6 +12171,166 @@ impl VisualDiffOperationSummary {
             .validate("visual diff summary operationSummaries.collisionTriggerSummary")?;
         Ok(())
     }
+}
+
+fn validate_visual_diff_scene_transaction_link(
+    operation: &VisualEditDraftOperation,
+    transaction: &SceneEditTransaction,
+    scene_path: &str,
+    before_hash: &SceneHash,
+    expected_edit: &SceneEdit,
+) -> Result<()> {
+    validate_path_component("visual diff summary transaction id", &transaction.id)?;
+    if transaction.schema_version != "ouroforge.scene-edit-transaction.v1" {
+        return Err(anyhow!(
+            "visual diff summary transaction {} has unsupported schemaVersion {}",
+            transaction.id,
+            transaction.schema_version
+        ));
+    }
+    if transaction.scene_path != scene_path {
+        return Err(anyhow!(
+            "visual diff summary transaction {} scenePath mismatch: expected {}, found {}",
+            transaction.id,
+            scene_path,
+            transaction.scene_path
+        ));
+    }
+    if transaction.before_scene_hash != *before_hash {
+        return Err(anyhow!(
+            "visual diff summary transaction {} beforeSceneHash does not match draft beforeHash",
+            transaction.id
+        ));
+    }
+    if transaction.validation_result.status != "passed" {
+        return Err(anyhow!(
+            "visual diff summary transaction {} must be passed before summary generation",
+            transaction.id
+        ));
+    }
+    if transaction.after_scene_hash.is_none() {
+        return Err(anyhow!(
+            "visual diff summary transaction {} missing afterSceneHash",
+            transaction.id
+        ));
+    }
+    if transaction.edit != *expected_edit {
+        return Err(anyhow!(
+            "visual diff summary transaction {} edit does not match draft operation {}",
+            transaction.id,
+            operation.id
+        ));
+    }
+    Ok(())
+}
+
+fn visual_diff_summary_transaction_ref(transactions: &[SceneEditTransaction]) -> Result<String> {
+    match transactions {
+        [] => Err(anyhow!(
+            "visual diff summary generation requires at least one transaction"
+        )),
+        [transaction] => Ok(transaction.id.clone()),
+        _ => {
+            let ids = transactions
+                .iter()
+                .map(|transaction| transaction.id.as_str())
+                .collect::<Vec<_>>();
+            Ok(format!(
+                "transaction-set-{:016x}",
+                fnv1a64(&serde_json::to_vec(&canonical_json_value(json!(ids)))?)
+            ))
+        }
+    }
+}
+
+fn visual_diff_scene_snapshot_summary(
+    summary_text: &str,
+    scene: &SceneDocument,
+    entity_ids: &[String],
+    change: VisualDiffChangeKind,
+) -> Result<VisualDiffSnapshotSummary> {
+    let mut entity_summaries = Vec::new();
+    for entity_id in entity_ids {
+        let entity = find_scene_entity(scene, entity_id)?;
+        entity_summaries.push(VisualDiffEntitySummary {
+            entity_id: entity.id.clone(),
+            change: change.clone(),
+            summary: format!(
+                "Entity {} sprite color {} at ({}, {}).",
+                entity.id,
+                entity.sprite.color,
+                entity.components.transform.x,
+                entity.components.transform.y
+            ),
+            sprite: Some(entity.sprite.color.clone()),
+            transform: Some(entity.components.transform.clone()),
+            size: Some(entity.components.size.clone()),
+        });
+    }
+    Ok(VisualDiffSnapshotSummary {
+        summary_text: summary_text.to_string(),
+        entity_summaries,
+        tile_summaries: Vec::new(),
+        asset_summaries: Vec::new(),
+        collision_trigger_summary: VisualDiffCollisionTriggerSummary::default(),
+    })
+}
+
+fn find_scene_entity<'a>(scene: &'a SceneDocument, entity_id: &str) -> Result<&'a SceneEntity> {
+    scene
+        .entities
+        .iter()
+        .find(|entity| entity.id == entity_id)
+        .ok_or_else(|| anyhow!("scene entity not found: {entity_id}"))
+}
+
+fn scene_edit_value_summary(entity: &SceneEntity, path: &str) -> Result<String> {
+    let value = match path {
+        "sprite.color" => json!(entity.sprite.color),
+        "components.transform.x" => json!(entity.components.transform.x),
+        "components.transform.y" => json!(entity.components.transform.y),
+        "components.velocity.x" => json!(entity.components.velocity.x),
+        "components.velocity.y" => json!(entity.components.velocity.y),
+        "components.size.width" => json!(entity.components.size.width),
+        "components.size.height" => json!(entity.components.size.height),
+        "components.controllable" => json!(entity.components.controllable),
+        "components.status.hitPoints" => json!(entity
+            .components
+            .status
+            .as_ref()
+            .and_then(|status| status.hit_points)),
+        "components.status.maxHitPoints" => json!(entity
+            .components
+            .status
+            .as_ref()
+            .and_then(|status| status.max_hit_points)),
+        "components.input.moveSpeed" => json!(entity
+            .components
+            .input
+            .as_ref()
+            .and_then(|input| input.move_speed)),
+        "components.input.jumpImpulse" => json!(entity
+            .components
+            .input
+            .as_ref()
+            .and_then(|input| input.jump_impulse)),
+        "components.cameraTarget.weight" => json!(entity
+            .components
+            .camera_target
+            .as_ref()
+            .map(|camera_target| camera_target.weight)),
+        "components.uiText.text" => json!(entity
+            .components
+            .ui_text
+            .as_ref()
+            .map(|ui_text| ui_text.text.as_str())),
+        _ => {
+            return Err(anyhow!(
+                "unsupported visual diff summary scene edit path `{path}`"
+            ))
+        }
+    };
+    Ok(value.to_string())
 }
 
 impl VisualDiffScenarioImpact {
@@ -24680,6 +25618,7 @@ scenarios:
                 "foundation-scene",
                 VisualDiffOperationSummary {
                     operation_id: "op-move-player".to_string(),
+                    transaction_id: None,
                     target: VisualDiffSummaryTargetType::Scene,
                     change: VisualDiffChangeKind::Updated,
                     path: "entities.player.components.transform.x".to_string(),
@@ -24725,6 +25664,7 @@ scenarios:
                 "demo_tilemap",
                 VisualDiffOperationSummary {
                     operation_id: "op-fill-ground".to_string(),
+                    transaction_id: None,
                     target: VisualDiffSummaryTargetType::Tilemap,
                     change: VisualDiffChangeKind::Updated,
                     path: "tilemap.layers.terrain.data".to_string(),
@@ -24780,6 +25720,7 @@ scenarios:
                 "asset_ref_preflight_manifest",
                 VisualDiffOperationSummary {
                     operation_id: "op-swap-sprite".to_string(),
+                    transaction_id: None,
                     target: VisualDiffSummaryTargetType::AssetReference,
                     change: VisualDiffChangeKind::Linked,
                     path: "scenes.collect-and-exit.entities.player.sprite.assetId".to_string(),
@@ -24851,6 +25792,196 @@ scenarios:
     }
 
     #[test]
+    fn visual_diff_generation_fixture_links_draft_transaction_journal_and_dashboard_sources() {
+        let fixture = serde_json::json!({
+            "schemaVersion": "visual-diff-summary-v1",
+            "summaryId": "summary-scene-draft-transaction",
+            "target": {
+                "type": "scene",
+                "path": "examples/game-runtime/scene.json",
+                "id": "foundation-scene"
+            },
+            "sourceRefs": {
+                "draftId": "scene-draft-va172",
+                "transactionId": "tx-scene-draft-va172",
+                "journalRef": "runs/va172/journal.md",
+                "dashboardRef": "runs/va172/dashboard.json"
+            },
+            "before": {
+                "summaryText": "Player stands at the start marker before the draft transaction.",
+                "entitySummaries": [{
+                    "entityId": "player",
+                    "change": "updated",
+                    "summary": "Player transform before the scene draft.",
+                    "sprite": "player-idle",
+                    "transform": { "x": 24, "y": 32 },
+                    "size": { "width": 16, "height": 16 }
+                }],
+                "tileSummaries": [{
+                    "tilemapId": "demo_tilemap",
+                    "layerId": "collision",
+                    "change": "unchanged",
+                    "summary": "Collision layer before the visual edit.",
+                    "affectedCells": 0,
+                    "tileIds": ["empty"]
+                }],
+                "assetSummaries": [{
+                    "assetId": "player-idle",
+                    "assetType": "image",
+                    "referencePath": "entities.player.sprite.assetId",
+                    "change": "unchanged",
+                    "summary": "Existing player sprite before the edit."
+                }],
+                "collisionTriggerSummary": {
+                    "collisionCellsAffected": 0,
+                    "triggerCellsAffected": 0,
+                    "summary": "No collision or trigger metadata changed before preview."
+                }
+            },
+            "after": {
+                "summaryText": "Player is moved right and a safe preview trigger is linked.",
+                "entitySummaries": [{
+                    "entityId": "player",
+                    "change": "updated",
+                    "summary": "Player transform after the generated transaction preview.",
+                    "sprite": "player-run",
+                    "transform": { "x": 48, "y": 32 },
+                    "size": { "width": 16, "height": 16 }
+                }],
+                "tileSummaries": [{
+                    "tilemapId": "demo_tilemap",
+                    "layerId": "collision",
+                    "change": "updated",
+                    "summary": "One collision cell is marked for reviewer visibility.",
+                    "affectedCells": 1,
+                    "tileIds": ["solid_ground"]
+                }],
+                "assetSummaries": [{
+                    "assetId": "player-run",
+                    "assetType": "image",
+                    "referencePath": "entities.player.sprite.assetId",
+                    "change": "linked",
+                    "summary": "Replacement player sprite is linked by the draft transaction.",
+                    "contentHash": {
+                        "algorithm": "fnv1a64-file-v1",
+                        "value": "0123456789abcdef"
+                    }
+                }],
+                "collisionTriggerSummary": {
+                    "collisionCellsAffected": 1,
+                    "triggerCellsAffected": 1,
+                    "collisionLayerIds": ["collision"],
+                    "triggerIds": ["preview-safe-zone"],
+                    "summary": "Generated diff exposes collision and trigger metadata before apply."
+                }
+            },
+            "operationSummaries": [{
+                "operationId": "op-move-player",
+                "target": "scene",
+                "change": "updated",
+                "path": "entities.player.components.transform.x",
+                "summary": "Move player x from 24 to 48 and link preview evidence.",
+                "beforeText": "x=24; sprite=player-idle",
+                "afterText": "x=48; sprite=player-run",
+                "affectedEntityIds": ["player"],
+                "affectedTilemapIds": ["demo_tilemap"],
+                "affectedAssetIds": ["player-run"],
+                "collisionTriggerSummary": {
+                    "collisionCellsAffected": 1,
+                    "triggerCellsAffected": 1,
+                    "collisionLayerIds": ["collision"],
+                    "triggerIds": ["preview-safe-zone"],
+                    "summary": "Operation summary preserves collision/trigger impact for review."
+                }
+            }],
+            "expectedScenarioImpact": {
+                "status": "known",
+                "summary": "The collect-and-exit scenario should still pass after the visual edit.",
+                "scenarioIds": ["collect-and-exit"],
+                "evidence": ["runs/va172/evidence/scenarios/collect-and-exit/scenario-result.json"]
+            },
+            "guardrail": "read-only generated diff summary; no apply, browser writes, command bridge, source mutation, dependency changes, or generated tracked output"
+        });
+
+        let summary: VisualDiffSummaryArtifact =
+            serde_json::from_value(fixture).expect("generation fixture parses");
+
+        summary
+            .validate()
+            .expect("generation fixture validates with VA1.7.2 links");
+        assert_eq!(
+            summary.source_refs.draft_id.as_deref(),
+            Some("scene-draft-va172")
+        );
+        assert_eq!(
+            summary.source_refs.transaction_id.as_deref(),
+            Some("tx-scene-draft-va172")
+        );
+        assert_eq!(
+            summary.source_refs.journal_ref.as_deref(),
+            Some("runs/va172/journal.md")
+        );
+        assert_eq!(
+            summary.source_refs.dashboard_ref.as_deref(),
+            Some("runs/va172/dashboard.json")
+        );
+        assert_eq!(
+            summary.operation_summaries[0].affected_entity_ids,
+            vec!["player".to_string()]
+        );
+        assert_eq!(
+            summary.operation_summaries[0].affected_tilemap_ids,
+            vec!["demo_tilemap".to_string()]
+        );
+        assert_eq!(
+            summary.operation_summaries[0].affected_asset_ids,
+            vec!["player-run".to_string()]
+        );
+        assert_eq!(
+            summary
+                .after
+                .collision_trigger_summary
+                .collision_cells_affected,
+            1
+        );
+        assert_eq!(
+            summary.after.collision_trigger_summary.trigger_ids,
+            vec!["preview-safe-zone".to_string()]
+        );
+        assert_eq!(
+            summary
+                .expected_scenario_impact
+                .as_ref()
+                .expect("known scenario impact")
+                .evidence,
+            vec!["runs/va172/evidence/scenarios/collect-and-exit/scenario-result.json".to_string()]
+        );
+        assert!(summary.guardrail.contains("read-only"));
+        assert!(summary.guardrail.contains("no apply"));
+        assert!(summary.guardrail.contains("source mutation"));
+    }
+
+    #[test]
+    fn visual_diff_generation_fixture_rejects_generated_summary_without_read_only_guardrail() {
+        let mut summary = valid_visual_diff_summary(VisualDiffSummaryTargetType::Scene);
+        summary.source_refs = VisualDiffSourceRefs {
+            draft_id: Some("scene-draft-va172".to_string()),
+            transaction_id: Some("tx-scene-draft-va172".to_string()),
+            proposal_id: None,
+            journal_ref: Some("runs/va172/journal.md".to_string()),
+            dashboard_ref: Some("runs/va172/dashboard.json".to_string()),
+        };
+        summary.guardrail =
+            "generated diff summary may apply transaction output automatically".to_string();
+
+        assert!(summary
+            .validate()
+            .expect_err("generated diff summaries must remain read-only/no-apply")
+            .to_string()
+            .contains("read-only and no apply"));
+    }
+
+    #[test]
     fn visual_diff_summary_v1_round_trips_scene_tilemap_and_asset_reference_models() {
         for target_type in [
             VisualDiffSummaryTargetType::Scene,
@@ -24916,6 +26047,207 @@ scenarios:
             .expect_err("known impact without scenario rejected")
             .to_string()
             .contains("scenarioId"));
+    }
+
+    #[test]
+    fn visual_diff_generation_from_scene_draft_transactions_links_sources_without_apply() {
+        let source_scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let scene = read_scene(&source_scene_path).expect("scene reads");
+        let scene_dir = PathBuf::from("target/visual-diff-scene-generation")
+            .join(format!("{}", unix_millis().expect("millis")));
+        fs::create_dir_all(&scene_dir).expect("scene fixture dir");
+        let scene_path = scene_dir.join("scene.json");
+        write_json(&scene_path, &json!(scene)).expect("scene fixture writes");
+        let before_bytes = fs::read(&scene_path).expect("scene bytes read before diff generation");
+        let before_hash = hash_scene_document(&scene).expect("scene hashes");
+        let mut draft = valid_scene_visual_edit_draft_for_scene(&scene);
+        draft.target.path = scene_path.to_string_lossy().to_string();
+        let transactions = draft
+            .preview_scene_edit_transactions(&scene_path)
+            .expect("transactions preview without apply");
+
+        let summary = generate_visual_diff_summary_from_scene_draft_transactions(
+            &draft,
+            &transactions,
+            VisualDiffSummaryLinks {
+                proposal_id: Some("proposal-visual-diff".to_string()),
+                journal_ref: Some("runs/demo/journal.md".to_string()),
+                dashboard_ref: Some("runs/demo/dashboard.json".to_string()),
+                expected_scenario_impact: Some(VisualDiffScenarioImpact {
+                    status: VisualDiffScenarioImpactStatus::Unknown,
+                    summary: "Scenario impact is linked but not yet measured.".to_string(),
+                    scenario_ids: Vec::new(),
+                    evidence: vec![
+                        "runs/demo/evidence/scenarios/smoke/scenario-result.json".to_string()
+                    ],
+                }),
+            },
+        )
+        .expect("diff summary generates");
+
+        summary.validate().expect("generated summary validates");
+        assert_eq!(
+            summary.target.target_type,
+            VisualDiffSummaryTargetType::Scene
+        );
+        assert_eq!(
+            summary.source_refs.draft_id.as_deref(),
+            Some(draft.draft_id.as_str())
+        );
+        assert_eq!(
+            summary.source_refs.transaction_id.as_deref(),
+            Some(transactions[0].id.as_str())
+        );
+        assert_eq!(
+            summary.source_refs.proposal_id.as_deref(),
+            Some("proposal-visual-diff")
+        );
+        assert_eq!(
+            summary.source_refs.journal_ref.as_deref(),
+            Some("runs/demo/journal.md")
+        );
+        assert_eq!(
+            summary.source_refs.dashboard_ref.as_deref(),
+            Some("runs/demo/dashboard.json")
+        );
+        assert_eq!(
+            summary.operation_summaries.len(),
+            draft.proposed_operations.len()
+        );
+        assert!(summary.operation_summaries[0]
+            .affected_entity_ids
+            .contains(&"player".to_string()));
+        assert!(summary.operation_summaries[0]
+            .before_text
+            .as_deref()
+            .expect("before text")
+            .contains(&before_hash.value));
+        assert_eq!(
+            fs::read(&scene_path).expect("scene bytes read after diff generation"),
+            before_bytes,
+            "diff generation must not apply edits"
+        );
+        fs::remove_dir_all(scene_dir).expect("fixture removed");
+    }
+
+    #[test]
+    fn visual_diff_generation_from_tilemap_previews_reports_collision_trigger_metadata() {
+        let (tilemap_asset, tilemap, tileset, observed_hash) = tilemap_authoring_fixture_parts();
+        let draft = valid_tilemap_visual_edit_draft_for_fixture();
+        let previews = draft
+            .preview_tilemap_edit_transactions(
+                &tilemap_asset.id,
+                &tilemap,
+                &tileset,
+                &observed_hash,
+            )
+            .expect("tilemap previews");
+
+        let summary = generate_visual_diff_summary_from_tilemap_draft_previews(
+            &draft,
+            &previews,
+            VisualDiffSummaryLinks {
+                journal_ref: Some("runs/demo/journal.md".to_string()),
+                dashboard_ref: Some("runs/demo/dashboard.json".to_string()),
+                ..VisualDiffSummaryLinks::default()
+            },
+        )
+        .expect("tilemap diff summary generates");
+
+        summary.validate().expect("generated summary validates");
+        assert_eq!(
+            summary.target.target_type,
+            VisualDiffSummaryTargetType::Tilemap
+        );
+        assert_eq!(
+            summary.source_refs.draft_id.as_deref(),
+            Some(draft.draft_id.as_str())
+        );
+        assert_eq!(summary.source_refs.transaction_id, None);
+        assert!(
+            summary
+                .after
+                .collision_trigger_summary
+                .collision_cells_affected
+                > 0
+        );
+        assert!(
+            summary
+                .after
+                .collision_trigger_summary
+                .trigger_cells_affected
+                > 0
+        );
+        assert!(summary.operation_summaries.iter().any(|operation| {
+            operation
+                .collision_trigger_summary
+                .summary
+                .as_deref()
+                .is_some_and(|text| text.contains("collision") || text.contains("trigger"))
+        }));
+    }
+
+    #[test]
+    fn visual_diff_generation_from_asset_reference_previews_links_dashboard_and_assets() {
+        let base_dir = unique_temp_dir("visual-diff-asset-reference-generation");
+        let manifest = valid_asset_reference_preflight_manifest(&base_dir);
+        let sprite = manifest
+            .assets
+            .iter()
+            .find(|asset| asset.id == "player_sprite")
+            .expect("sprite asset");
+        let mut draft: VisualEditDraftArtifact = serde_json::from_str(&read_visual_edit_draft_fixture(
+            "examples/visual-edit-draft-v1/valid/asset-reference-operations.visual-edit-draft.json",
+        ))
+        .expect("asset reference draft parses");
+        draft.target.id = Some(manifest.id.clone());
+        draft.proposed_operations[0]
+            .asset_reference_operation
+            .as_mut()
+            .expect("asset reference operation")
+            .expected_content_hash = Some(sprite.content_hash.clone());
+        let previews = draft
+            .preview_asset_reference_drafts(&manifest, &base_dir)
+            .expect("asset reference previews");
+
+        let summary = generate_visual_diff_summary_from_asset_reference_draft_previews(
+            &draft,
+            &previews,
+            VisualDiffSummaryLinks {
+                proposal_id: Some("proposal-asset-ref".to_string()),
+                dashboard_ref: Some("runs/demo/dashboard.json".to_string()),
+                ..VisualDiffSummaryLinks::default()
+            },
+        )
+        .expect("asset reference diff summary generates");
+
+        summary.validate().expect("generated summary validates");
+        assert_eq!(
+            summary.target.target_type,
+            VisualDiffSummaryTargetType::AssetReference
+        );
+        assert_eq!(
+            summary.source_refs.proposal_id.as_deref(),
+            Some("proposal-asset-ref")
+        );
+        assert_eq!(
+            summary.source_refs.dashboard_ref.as_deref(),
+            Some("runs/demo/dashboard.json")
+        );
+        assert!(summary.operation_summaries.iter().any(|operation| {
+            operation
+                .affected_asset_ids
+                .contains(&"player_sprite".to_string())
+                && operation
+                    .affected_entity_ids
+                    .contains(&"player".to_string())
+        }));
+        assert!(summary
+            .after
+            .asset_summaries
+            .iter()
+            .any(|asset| { asset.asset_id == "player_sprite" && asset.content_hash.is_some() }));
+        fs::remove_dir_all(base_dir).expect("fixture removed");
     }
 
     #[test]
@@ -25136,6 +26468,101 @@ scenarios:
             hash_scene_document(&scene_after_preview).expect("scene hashes"),
             before_hash
         );
+    }
+
+    #[test]
+    fn visual_edit_scene_draft_v1_generates_visual_diff_summary_from_transactions_without_apply() {
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let before_bytes = fs::read(&scene_path).expect("scene bytes read before summary");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let before_hash = hash_scene_document(&scene).expect("scene hashes");
+        let draft = valid_scene_visual_edit_draft_for_scene(&scene);
+        let transactions = draft
+            .preview_scene_edit_transactions(&scene_path)
+            .expect("scene draft previews transactions");
+
+        let summary = draft
+            .generate_scene_visual_diff_summary_from_transactions(&scene_path, &transactions)
+            .expect("visual diff summary generated");
+
+        summary.validate().expect("summary validates");
+        assert_eq!(summary.schema_version, VISUAL_DIFF_SUMMARY_SCHEMA_VERSION);
+        assert_eq!(
+            summary.source_refs.draft_id.as_deref(),
+            Some("draft-scene-preflight")
+        );
+        assert!(summary
+            .source_refs
+            .transaction_id
+            .as_deref()
+            .expect("transaction source ref")
+            .starts_with("transaction-set-"));
+        assert_eq!(summary.operation_summaries.len(), 2);
+        assert_eq!(
+            summary.operation_summaries[0].transaction_id.as_deref(),
+            Some(transactions[0].id.as_str())
+        );
+        assert_eq!(
+            summary.operation_summaries[0].before_text.as_deref(),
+            Some("32")
+        );
+        assert_eq!(
+            summary.operation_summaries[0].after_text.as_deref(),
+            Some("48")
+        );
+        assert_eq!(
+            summary.operation_summaries[1].before_text.as_deref(),
+            Some("\"#5eead4\"")
+        );
+        assert_eq!(
+            summary.operation_summaries[1].after_text.as_deref(),
+            Some("\"#ffcc00\"")
+        );
+        assert_eq!(
+            summary.before.entity_summaries[0]
+                .transform
+                .as_ref()
+                .unwrap()
+                .x,
+            32
+        );
+        assert_eq!(
+            summary.after.entity_summaries[0]
+                .transform
+                .as_ref()
+                .unwrap()
+                .x,
+            48
+        );
+        assert!(summary
+            .guardrail
+            .contains("read-only generated visual diff summary"));
+        assert_eq!(
+            fs::read(&scene_path).expect("scene bytes read after summary"),
+            before_bytes
+        );
+        let scene_after_summary = read_scene(&scene_path).expect("scene reads after summary");
+        assert_eq!(
+            hash_scene_document(&scene_after_summary).expect("scene hashes"),
+            before_hash
+        );
+    }
+
+    #[test]
+    fn visual_diff_summary_generation_rejects_unlinked_scene_transactions() {
+        let scene_path = repo_fixture_path("examples/game-runtime/scene.json");
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let draft = valid_scene_visual_edit_draft_for_scene(&scene);
+        let mut transactions = draft
+            .preview_scene_edit_transactions(&scene_path)
+            .expect("scene draft previews transactions");
+        transactions[0].edit.path = "components.transform.y".to_string();
+
+        let error = draft
+            .generate_scene_visual_diff_summary_from_transactions(&scene_path, &transactions)
+            .expect_err("mismatched transaction rejected");
+
+        assert!(error.to_string().contains("does not match draft operation"));
     }
 
     #[test]
