@@ -19663,6 +19663,279 @@ fn validate_gameplay_behavior_value(field: &str, value: &serde_json::Value) -> R
     }
 }
 
+const GAMEPLAY_EVENT_SIGNAL_SYSTEM_SCHEMA_VERSION: &str = "gameplay-event-signal-system.v1";
+const MAX_GAMEPLAY_EVENTS: usize = 256;
+const MAX_GAMEPLAY_EVENT_PARTIES: usize = 16;
+const MAX_GAMEPLAY_EVENT_PAYLOAD_FIELDS: usize = 32;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayEventSignalSystemArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "eventLogId")]
+    pub event_log_id: String,
+    pub scope: String,
+    pub status: GameplayEventSignalStatus,
+    pub events: Vec<GameplayEventSignalDefinition>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayEventSignalDefinition {
+    pub id: String,
+    #[serde(rename = "eventType")]
+    pub event_type: GameplayEventSignalType,
+    #[serde(rename = "signalName", skip_serializing_if = "Option::is_none")]
+    pub signal_name: Option<String>,
+    pub source: BTreeMap<String, String>,
+    pub target: BTreeMap<String, String>,
+    pub payload: BTreeMap<String, serde_json::Value>,
+    pub tick: u64,
+    #[serde(rename = "timestampUnixMs", skip_serializing_if = "Option::is_none")]
+    pub timestamp_unix_ms: Option<u128>,
+    #[serde(rename = "orderingIndex")]
+    pub ordering_index: u32,
+    pub consumed: bool,
+    #[serde(rename = "consumedBy", default, skip_serializing_if = "Vec::is_empty")]
+    pub consumed_by: Vec<String>,
+    #[serde(rename = "blockedReason", skip_serializing_if = "Option::is_none")]
+    pub blocked_reason: Option<String>,
+    #[serde(
+        rename = "evidenceRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayEventSignalStatus {
+    Ready,
+    Partial,
+    Blocked,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayEventSignalType {
+    CollisionContact,
+    TriggerEntered,
+    TriggerExited,
+    ItemCollected,
+    FlagChanged,
+    TimerElapsed,
+    InputAction,
+    SceneLoaded,
+    StateChanged,
+    BehaviorExecuted,
+}
+
+impl GameplayEventSignalSystemArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: GameplayEventSignalSystemArtifact = serde_json::from_str(input)
+            .context("failed to parse Gameplay Event Signal System JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GAMEPLAY_EVENT_SIGNAL_SYSTEM_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "gameplay event signal system schemaVersion must be {GAMEPLAY_EVENT_SIGNAL_SYSTEM_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("gameplay event signal eventLogId", &self.event_log_id)?;
+        validate_path_component("gameplay event signal scope", &self.scope)?;
+        validate_gameplay_event_signal_reason_state(
+            "gameplay event signal system",
+            self.status,
+            &self.blocked_reasons,
+        )?;
+        validate_gameplay_behavior_refs(
+            "gameplay event signal system evidenceRefs",
+            &self.evidence_refs,
+        )?;
+        validate_gameplay_behavior_reasons(
+            "gameplay event signal system blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        if self.events.is_empty() {
+            return Err(anyhow!(
+                "gameplay event signal system events must not be empty"
+            ));
+        }
+        if self.events.len() > MAX_GAMEPLAY_EVENTS {
+            return Err(anyhow!(
+                "gameplay event signal system must contain at most {MAX_GAMEPLAY_EVENTS} events"
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        for event in &self.events {
+            if !ids.insert(event.id.as_str()) {
+                return Err(anyhow!("duplicate gameplay event signal id `{}`", event.id));
+            }
+            event.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl GameplayEventSignalDefinition {
+    pub fn validate(&self) -> Result<()> {
+        validate_path_component("gameplay event signal id", &self.id)?;
+        if let Some(signal_name) = &self.signal_name {
+            validate_path_component("gameplay event signal signalName", signal_name)?;
+        }
+        validate_gameplay_event_signal_party(&self.id, "source", &self.source)?;
+        validate_gameplay_event_signal_party(&self.id, "target", &self.target)?;
+        validate_gameplay_event_signal_payload(&self.id, &self.payload)?;
+        if self.tick > 9_999_999_999 {
+            return Err(anyhow!(
+                "gameplay event signal `{}` tick must be bounded",
+                self.id
+            ));
+        }
+        if self.timestamp_unix_ms == Some(0) {
+            return Err(anyhow!(
+                "gameplay event signal `{}` timestampUnixMs must be non-zero when present",
+                self.id
+            ));
+        }
+        if self.ordering_index > MAX_GAMEPLAY_EVENTS as u32 {
+            return Err(anyhow!(
+                "gameplay event signal `{}` orderingIndex must be bounded",
+                self.id
+            ));
+        }
+        if !self.consumed && !self.consumed_by.is_empty() {
+            return Err(anyhow!(
+                "unconsumed gameplay event signal `{}` must not list consumedBy",
+                self.id
+            ));
+        }
+        if self.consumed && self.consumed_by.is_empty() {
+            return Err(anyhow!(
+                "consumed gameplay event signal `{}` must list at least one consumer in consumedBy",
+                self.id
+            ));
+        }
+        if self.consumed_by.len() > MAX_GAMEPLAY_EVENT_PARTIES {
+            return Err(anyhow!(
+                "gameplay event signal `{}` consumedBy must be bounded",
+                self.id
+            ));
+        }
+        for consumer in &self.consumed_by {
+            validate_path_component("gameplay event signal consumedBy", consumer)?;
+        }
+        if let Some(reason) = &self.blocked_reason {
+            require_bounded_display_text("gameplay event signal blockedReason", reason)?;
+        }
+        validate_gameplay_behavior_refs("gameplay event signal evidenceRefs", &self.evidence_refs)
+    }
+}
+
+fn validate_gameplay_event_signal_reason_state(
+    field: &str,
+    status: GameplayEventSignalStatus,
+    reasons: &[String],
+) -> Result<()> {
+    if matches!(
+        status,
+        GameplayEventSignalStatus::Blocked | GameplayEventSignalStatus::Unsupported
+    ) && reasons.is_empty()
+    {
+        return Err(anyhow!(
+            "{field} with blocked or unsupported status must include blockedReasons"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_gameplay_event_signal_party(
+    event_id: &str,
+    field: &str,
+    party: &BTreeMap<String, String>,
+) -> Result<()> {
+    if party.is_empty() {
+        return Err(anyhow!(
+            "gameplay event signal `{event_id}` {field} must not be empty"
+        ));
+    }
+    if party.len() > MAX_GAMEPLAY_EVENT_PARTIES {
+        return Err(anyhow!(
+            "gameplay event signal `{event_id}` {field} must be bounded"
+        ));
+    }
+    for (key, value) in party {
+        require_supported_gameplay_event_signal_key(field, key)?;
+        if key.ends_with("Ref") {
+            validate_repo_relative_source_ref("gameplay event signal party ref", value)?;
+        } else {
+            validate_path_component("gameplay event signal party", value)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_gameplay_event_signal_payload(
+    event_id: &str,
+    payload: &BTreeMap<String, serde_json::Value>,
+) -> Result<()> {
+    if payload.len() > MAX_GAMEPLAY_EVENT_PAYLOAD_FIELDS {
+        return Err(anyhow!(
+            "gameplay event signal `{event_id}` payload must be bounded"
+        ));
+    }
+    for (key, value) in payload {
+        require_supported_gameplay_event_signal_key("payload", key)?;
+        validate_gameplay_behavior_value(
+            &format!("gameplay event signal `{event_id}` payload.{key}"),
+            value,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_supported_gameplay_event_signal_key(field: &str, key: &str) -> Result<()> {
+    validate_path_component("gameplay event signal field key", key)?;
+    let normalized: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let forbidden = [
+        "script",
+        "command",
+        "commandbridge",
+        "trustedwrite",
+        "dynamicimport",
+        "pluginloader",
+        "eval",
+    ];
+    if forbidden.iter().any(|blocked| normalized.contains(blocked)) {
+        return Err(anyhow!(
+            "gameplay event signal {field} key `{key}` is forbidden because #613 does not authorize scripts, command bridges, plugin loading, or trusted browser writes"
+        ));
+    }
+    Ok(())
+}
+
 const AGENT_GENERATED_LEVEL_DRAFT_SCHEMA_VERSION: &str = "agent-generated-level-draft-v1";
 const AGENT_GENERATED_LEVEL_DRAFT_READ_MODEL_SCHEMA_VERSION: &str =
     "agent-generated-level-draft-read-model-v1";
@@ -66163,6 +66436,104 @@ scenarios:
         let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
         assert!(scope.contains("#612 — Gameplay Behavior Model v1"));
         assert!(scope.contains("arbitrary JS/Rust/Python/Lua/WASM script execution"));
+    }
+
+    #[test]
+    fn gameplay_event_signal_system_v1_accepts_ready_partial_and_blocked_fixtures() {
+        let ready = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json"
+        ))
+        .expect("ready gameplay event signal fixture parses");
+        assert_eq!(ready.schema_version, "gameplay-event-signal-system.v1");
+        assert_eq!(ready.status, GameplayEventSignalStatus::Ready);
+        assert_eq!(ready.events.len(), 6);
+        assert!(ready
+            .events
+            .iter()
+            .any(|event| event.event_type == GameplayEventSignalType::CollisionContact));
+        assert!(ready.events.iter().any(|event| event.event_type
+            == GameplayEventSignalType::TimerElapsed
+            && !event.consumed));
+        assert!(ready
+            .events
+            .iter()
+            .any(|event| event.consumed && !event.consumed_by.is_empty()));
+
+        let partial = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-event-signal-system-v1/event-signal.partial.fixture.json"
+        ))
+        .expect("partial gameplay event signal fixture parses");
+        assert_eq!(partial.status, GameplayEventSignalStatus::Partial);
+        assert!(!partial.events[0].consumed);
+
+        let blocked = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-event-signal-system-v1/event-signal.blocked.fixture.json"
+        ))
+        .expect("blocked gameplay event signal fixture parses");
+        assert_eq!(blocked.status, GameplayEventSignalStatus::Blocked);
+        assert!(blocked.blocked_reasons[0].contains("target resolution evidence"));
+    }
+
+    #[test]
+    fn gameplay_event_signal_system_v1_rejects_invalid_fixture_and_state_drift() {
+        let invalid = GameplayEventSignalSystemArtifact::from_json_str(include_str!(
+            "../../../examples/gameplay-event-signal-system-v1/invalid/event-signal.invalid.fixture.json"
+        ))
+        .expect_err("invalid gameplay event signal fixture is rejected");
+        assert!(
+            invalid
+                .to_string()
+                .contains("failed to parse Gameplay Event Signal System JSON")
+                || invalid.to_string().contains("source must not be empty")
+                || invalid.to_string().contains("consumedBy")
+                || invalid.to_string().contains("forbidden"),
+            "unexpected invalid fixture error: {invalid}"
+        );
+
+        let unconsumed_with_consumer = r#"{
+          "schemaVersion":"gameplay-event-signal-system.v1",
+          "eventLogId":"bad-consumed-state",
+          "scope":"local-fixture",
+          "status":"ready",
+          "events":[{"id":"bad","eventType":"input_action","signalName":"input_action","source":{"inputActionId":"jump"},"target":{"entityId":"player"},"payload":{"pressed":true},"tick":1,"orderingIndex":0,"consumed":false,"consumedBy":["jump-behavior"],"evidenceRefs":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let state_error =
+            GameplayEventSignalSystemArtifact::from_json_str(unconsumed_with_consumer)
+                .expect_err("unconsumed events cannot list consumers");
+        assert!(state_error.to_string().contains("consumedBy"));
+
+        let missing_target = r#"{
+          "schemaVersion":"gameplay-event-signal-system.v1",
+          "eventLogId":"missing-target",
+          "scope":"local-fixture",
+          "status":"ready",
+          "events":[{"id":"bad","eventType":"input_action","source":{"inputActionId":"jump"},"target":{},"payload":{"pressed":true},"tick":1,"orderingIndex":0,"consumed":false,"evidenceRefs":[]}],
+          "evidenceRefs":[],
+          "blockedReasons":[]
+        }"#;
+        let target_error = GameplayEventSignalSystemArtifact::from_json_str(missing_target)
+            .expect_err("event targets are required");
+        assert!(target_error
+            .to_string()
+            .contains("target must not be empty"));
+    }
+
+    #[test]
+    fn gameplay_event_signal_system_v1_docs_audit_no_script_boundary() {
+        let doc = include_str!("../../../docs/gameplay-event-signal-system-v1.md");
+        assert!(doc.contains("Issue: #613"));
+        assert!(doc.contains("structured data contract"));
+        assert!(doc.contains("collision_contact"));
+        assert!(doc.contains("behavior_executed"));
+        assert!(doc.contains("does not authorize arbitrary"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#613 — Event and Signal System v1"));
+        assert!(scope.contains("events and signals describe deterministic observations"));
     }
 
     #[test]

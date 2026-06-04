@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "gameplay-event-signal-system.v1",
+  "eventLogId": "demo-event-log",
+  "scope": "local-fixture",
+  "status": "ready",
+  "events": [
+    {
+      "id": "player-spike-contact",
+      "eventType": "collision_contact",
+      "signalName": "player_contacted_hazard",
+      "source": {
+        "entityId": "spike-trap-a",
+        "componentId": "collision"
+      },
+      "target": {
+        "entityId": "player",
+        "behaviorId": "spike-damage-contact"
+      },
+      "payload": {
+        "normal": {
+          "x": 0,
+          "y": -1
+        },
+        "damage": 1
+      },
+      "tick": 42,
+      "timestampUnixMs": 1700000000042,
+      "orderingIndex": 0,
+      "consumed": true,
+      "consumedBy": [
+        "spike-damage-contact"
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ]
+    },
+    {
+      "id": "keycard-collected",
+      "eventType": "item_collected",
+      "signalName": "item_collected",
+      "source": {
+        "entityId": "keycard-a"
+      },
+      "target": {
+        "entityId": "player",
+        "behaviorId": "collect-keycard"
+      },
+      "payload": {
+        "itemId": "blue-keycard",
+        "quantity": 1
+      },
+      "tick": 43,
+      "timestampUnixMs": 1700000000043,
+      "orderingIndex": 0,
+      "consumed": true,
+      "consumedBy": [
+        "collect-keycard"
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ]
+    },
+    {
+      "id": "blue-door-flag-changed",
+      "eventType": "flag_changed",
+      "signalName": "flag_changed",
+      "source": {
+        "systemId": "flag-store"
+      },
+      "target": {
+        "entityId": "blue-door",
+        "behaviorId": "open-blue-door"
+      },
+      "payload": {
+        "flag": "has_blue_keycard",
+        "oldValue": false,
+        "newValue": true
+      },
+      "tick": 44,
+      "timestampUnixMs": 1700000000044,
+      "orderingIndex": 0,
+      "consumed": true,
+      "consumedBy": [
+        "open-blue-door"
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ]
+    },
+    {
+      "id": "hazard-pulse-timer",
+      "eventType": "timer_elapsed",
+      "signalName": "timer_elapsed",
+      "source": {
+        "timerId": "hazard-pulse"
+      },
+      "target": {
+        "entityId": "spike-trap-a",
+        "behaviorId": "timed-hazard-pulse"
+      },
+      "payload": {
+        "durationMs": 1500,
+        "repeat": true
+      },
+      "tick": 45,
+      "timestampUnixMs": 1700000000045,
+      "orderingIndex": 0,
+      "consumed": false,
+      "blockedReason": "Timer event is captured before GL10.3.2 queue consumption rules.",
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ],
+      "consumedBy": []
+    },
+    {
+      "id": "dash-input-action",
+      "eventType": "input_action",
+      "signalName": "input_action",
+      "source": {
+        "inputActionId": "dash"
+      },
+      "target": {
+        "entityId": "player",
+        "behaviorId": "dash-ability-trigger"
+      },
+      "payload": {
+        "pressed": true,
+        "device": "keyboard"
+      },
+      "tick": 46,
+      "timestampUnixMs": 1700000000046,
+      "orderingIndex": 0,
+      "consumed": true,
+      "consumedBy": [
+        "dash-ability-trigger"
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ]
+    },
+    {
+      "id": "guard-state-changed",
+      "eventType": "state_changed",
+      "signalName": "state_changed",
+      "source": {
+        "entityId": "guard-a",
+        "componentId": "state-machine"
+      },
+      "target": {
+        "entityId": "guard-a",
+        "behaviorId": "patrol-guard-route-a"
+      },
+      "payload": {
+        "from": "idle",
+        "to": "patrol"
+      },
+      "tick": 47,
+      "timestampUnixMs": 1700000000047,
+      "orderingIndex": 0,
+      "consumed": true,
+      "consumedBy": [
+        "patrol-guard-route-a"
+      ],
+      "evidenceRefs": [
+        "docs/gameplay-event-signal-system-v1.md"
+      ]
+    }
+  ],
+  "evidenceRefs": [
+    "docs/gameplay-event-signal-system-v1.md"
+  ],
+  "blockedReasons": []
+}
