@@ -6989,6 +6989,21 @@ fn validate_runtime_invariant_evidence_ref(reference: &str) -> Result<()> {
         return validate_evidence_artifact_path(reference);
     }
     if reference.starts_with("invariants/") {
+        // Reject raw backslash separators and repeated path separators before the
+        // component check. On Unix `Path::components()` treats a backslash as an
+        // ordinary character, so a ref like `invariants/..\secret.json` would
+        // otherwise pass as a single normal component yet escape the subtree in a
+        // consumer that normalizes `\` to `/`. Fail closed on those raw shapes.
+        if reference.contains('\\') {
+            return Err(anyhow!(
+                "runtime invariant evidence ref must not contain backslash separators"
+            ));
+        }
+        if reference.contains("//") {
+            return Err(anyhow!(
+                "runtime invariant evidence ref must not contain repeated path separators"
+            ));
+        }
         let path = Path::new(reference);
         if path.is_absolute()
             || path.components().any(|component| {
@@ -38711,6 +38726,36 @@ scenarios:
             unsafe_ref.to_string().contains("escape")
                 || unsafe_ref.to_string().contains("evidence/")
         );
+
+        let backslash_escape = RuntimeInvariantEvidence::from_json_str(&base(json!({
+            "invariantId":"player-in-bounds","invariantType":"player_in_bounds","status":"passed","targetPath":"player.transform","evidenceRefs":["invariants/..\\secret.json"]
+        })).to_string()).expect_err("backslash escape under invariants/ rejected");
+        assert!(backslash_escape.to_string().contains("backslash"));
+    }
+
+    #[test]
+    fn runtime_invariant_evidence_ref_rejects_backslash_and_repeated_separators() {
+        // Pre-existing ignored run evidence shapes that Path::components() would
+        // normalize away on Unix must fail closed for the invariants/ subtree.
+        validate_runtime_invariant_evidence_ref("invariants/manual-placeholder.json")
+            .expect("plain run-relative invariants/ ref is accepted");
+
+        let backslash = validate_runtime_invariant_evidence_ref("invariants/..\\secret.json")
+            .expect_err("backslash parent segment rejected");
+        assert!(backslash.to_string().contains("backslash"));
+
+        let mixed_backslash =
+            validate_runtime_invariant_evidence_ref("invariants/nested\\child.json")
+                .expect_err("any backslash separator rejected");
+        assert!(mixed_backslash.to_string().contains("backslash"));
+
+        let repeated = validate_runtime_invariant_evidence_ref("invariants//child.json")
+            .expect_err("repeated separators rejected");
+        assert!(repeated.to_string().contains("repeated"));
+
+        let parent = validate_runtime_invariant_evidence_ref("invariants/../secret.json")
+            .expect_err("parent segment rejected");
+        assert!(parent.to_string().contains("escape"));
     }
 
     #[test]
