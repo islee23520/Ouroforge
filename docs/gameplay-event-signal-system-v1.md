@@ -67,9 +67,33 @@ custom code:
 | `state_changed` | state machine transition |
 | `behavior_executed` | validated behavior runtime outcome |
 
-GL10.3.1 defines the model and validation fixtures only. GL10.3.2 owns detailed
-queue ordering and runtime compatibility tests. GL10.3.3 owns event evidence and
-read-model/export compatibility surfaces.
+GL10.3.1 defines the model and validation fixtures only. GL10.3.2 adds a
+read-only deterministic queue summary over validated event artifacts. GL10.3.3
+owns event evidence and read-model/export compatibility surfaces.
+
+## Deterministic ordering and bounded queue rules
+
+Validated event artifacts use deterministic display/replay ordering before any
+later runtime consumes them:
+
+1. Validate event artifacts before ordering.
+2. Sort by `tick`, then `orderingIndex`, then stable `id` as the final tie
+   breaker.
+3. Keep consumed and unconsumed events visible; unconsumed events are not dropped
+   by the queue summary.
+4. Bound v1 fixture queues to at most 256 events.
+5. Treat the queue summary as read-only compatibility data, not runtime
+   execution or event dispatch authority.
+
+The queue summary shape is display/test data only:
+
+- `schemaVersion: "gameplay-event-signal-queue-summary.v1"`;
+- `eventLogId`, `eventCount`, `consumedCount`, and `unconsumedCount`;
+- `earliestTick` and `latestTick` for deterministic replay displays;
+- `orderedEventIds` sorted by `tick`, `orderingIndex`, and `id`;
+- `queueRules` and a boundary string that explicitly says no runtime execution,
+  no script execution, no command bridge, no browser trusted writes, no source
+  apply, and no production-stable scripting API claim.
 
 ## Validation expectations
 
