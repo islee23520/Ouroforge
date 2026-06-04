@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "source-patch-sandbox-evaluator-plan-v1",
+  "evaluationId": "smp1-10-demo-preview-001",
+  "createdAt": "2026-06-04T00:00:00Z",
+  "sourceMutationApplyStatus": "blocked",
+  "inputs": {
+    "patchPreviewId": "smp1-10-demo-preview-001",
+    "fileClassValidationRef": "examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json#targets[0]",
+    "diffIntegrityValidationRef": "examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json#diffSummary",
+    "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+  },
+  "layout": {
+    "sandboxId": "smp1-10-demo-preview-001",
+    "sandboxRoot": "sandbox/smp1-10-demo-preview-001",
+    "worktreePath": "sandbox/smp1-10-demo-preview-001/worktree",
+    "evidencePath": "sandbox/smp1-10-demo-preview-001/evidence",
+    "reportPath": "sandbox/smp1-10-demo-preview-001/evidence/report.json",
+    "cleanupPath": "sandbox/smp1-10-demo-preview-001/cleanup.json"
+  },
+  "cleanup": {
+    "cleanupRequired": true,
+    "preserveEvidence": true,
+    "onSuccess": "remove sandbox worktree after report capture; do not commit generated sandbox output",
+    "onFailure": "preserve generated evidence locally for reviewer inspection only",
+    "generatedOutputRoots": [
+      "sandbox/smp1-10-demo-preview-001/evidence",
+      "sandbox/smp1-10-demo-preview-001/worktree/target"
+    ]
+  },
+  "requiredTests": [
+    {
+      "command": "node --check examples/evidence-dashboard/dashboard.js",
+      "executionAuthority": "copyable_only_not_executed_by_plan_metadata",
+      "argv": [
+        "node",
+        "--check",
+        "examples/evidence-dashboard/dashboard.js"
+      ],
+      "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+    }
+  ],
+  "guardrails": [
+    "sandbox evaluator plan is inert metadata; it does not execute commands by itself",
+    "trusted main worktree is not modified by sandbox dry-run planning or generated evidence",
+    "source patch apply remains blocked outside generated sandbox worktree copies",
+    "browser/dashboard/Studio surfaces may display sandbox evidence read-only only"
+  ]
+}

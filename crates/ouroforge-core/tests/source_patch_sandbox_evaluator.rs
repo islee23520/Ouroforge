@@ -472,6 +472,103 @@ fn source_patch_sandbox_root_is_documented_generated_state() {
     .expect("sandbox root is generated state even for copied source-like paths");
 }
 
+#[test]
+fn source_mutation_preview_demo_sandbox_dry_run_keeps_generated_output_untracked() {
+    let temp = sandbox_test_dir("demo-dry-run-generated-evidence");
+    let repo_root = temp.join("repo");
+    let run_dir = temp.join("run");
+    let target_rel =
+        "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json";
+    let trusted_target = repo_root.join(target_rel);
+    fs::create_dir_all(trusted_target.parent().expect("target parent")).expect("create target dir");
+    fs::create_dir_all(repo_root.join("examples/evidence-dashboard")).expect("create smoke dir");
+    fs::create_dir_all(&run_dir).expect("create run dir");
+    fs::write(&trusted_target, "Preview demo copy stays unchanged.\n")
+        .expect("write trusted target");
+    fs::write(
+        repo_root.join("examples/evidence-dashboard/dashboard.js"),
+        "const dashboard = 'sandbox-demo-smoke';\n",
+    )
+    .expect("write allowlisted smoke target");
+
+    let plan: SourcePatchSandboxEvaluatorPlan = serde_json::from_str(include_str!(
+        "../../../examples/source-mutation-preview-demo-v1/sandbox-dry-run-plan.sample.json"
+    ))
+    .expect("demo sandbox plan parses");
+    validate_source_patch_sandbox_evaluator_plan(&plan).expect("demo sandbox plan validates");
+
+    let mut artifact: SourcePatchPreviewArtifact = serde_json::from_str(include_str!(
+        "../../../examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json"
+    ))
+    .expect("demo patch preview parses");
+    artifact.targets[0].before_hash =
+        "sha256:38793778fbe7534830aa471bba8225e353a31abef537ecd5b15d48d895cfd305".to_string();
+
+    let apply_result =
+        apply_source_patch_preview_in_sandbox(&artifact, &plan, &repo_root, &run_dir)
+            .expect("demo sandbox apply succeeds");
+    assert_eq!(apply_result.status, "passed");
+    assert_eq!(apply_result.patch_preview_id, "smp1-10-demo-preview-001");
+    assert!(apply_result.commands_run.is_empty());
+
+    let sandbox_target = run_dir.join(&plan.layout.worktree_path).join(target_rel);
+    assert_eq!(
+        fs::read_to_string(&trusted_target).expect("trusted target unchanged"),
+        "Preview demo copy stays unchanged.\n"
+    );
+    assert_eq!(
+        fs::read_to_string(sandbox_target).expect("sandbox target patched"),
+        "Preview demo copy would change only inside a generated sandbox.\n"
+    );
+    assert_eq!(
+        apply_result.target_snapshots[0].trusted_before_hash,
+        apply_result.target_snapshots[0].trusted_after_hash
+    );
+    assert_ne!(
+        apply_result.target_snapshots[0].sandbox_before_hash,
+        apply_result.target_snapshots[0].sandbox_after_hash
+    );
+
+    let test_report =
+        run_source_patch_sandbox_allowlisted_tests(&plan, &plan.required_tests, &run_dir)
+            .expect("allowlisted demo sandbox smoke succeeds");
+    assert_eq!(test_report.status, "passed");
+    assert_eq!(
+        test_report.commands_run,
+        vec!["node --check examples/evidence-dashboard/dashboard.js"]
+    );
+
+    let summary: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../examples/source-mutation-preview-demo-v1/sandbox-dry-run-evidence-summary.sample.json"
+    ))
+    .expect("demo dry-run evidence summary parses");
+    assert_eq!(summary["status"], "passed-in-temp-sandbox-smoke");
+    assert_eq!(summary["dryRunSummary"]["trustedWorktreeChanged"], false);
+    assert!(summary["recordedEvidenceRefs"]
+        .as_array()
+        .expect("evidence refs")
+        .iter()
+        .any(|entry| entry["path"] == plan.layout.report_path && entry["tracked"] == false));
+
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("core crate lives under crates/ouroforge-core");
+    assert!(
+        !workspace_root.join(&plan.layout.report_path).exists(),
+        "generated sandbox apply report must not be committed"
+    );
+    assert!(
+        !workspace_root
+            .join(&plan.layout.evidence_path)
+            .join("test-execution-report.json")
+            .exists(),
+        "generated sandbox test report must not be committed"
+    );
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
 fn fixture_apply_artifact(target_rel: &str, before_hash: &str) -> SourcePatchPreviewArtifact {
     serde_json::from_value(json!({
         "schemaVersion": "patch-preview.v1",

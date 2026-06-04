@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "source-mutation-preview-demo-sandbox-evidence-summary-v1",
+  "issue": 364,
+  "prUnitId": "SMP1.10.2",
+  "patchPreviewId": "smp1-10-demo-preview-001",
+  "sandboxEvaluationId": "smp1-10-demo-preview-001",
+  "status": "passed-in-temp-sandbox-smoke",
+  "recordedEvidenceRefs": [
+    {
+      "kind": "sandbox-dry-run-plan",
+      "path": "examples/source-mutation-preview-demo-v1/sandbox-dry-run-plan.sample.json"
+    },
+    {
+      "kind": "generated-sandbox-apply-report-ref",
+      "path": "sandbox/smp1-10-demo-preview-001/evidence/report.json",
+      "tracked": false
+    },
+    {
+      "kind": "generated-sandbox-test-report-ref",
+      "path": "sandbox/smp1-10-demo-preview-001/evidence/test-execution-report.json",
+      "tracked": false
+    }
+  ],
+  "dryRunSummary": {
+    "trustedWorktreeChanged": false,
+    "sandboxWorktreeChanged": true,
+    "commandsRun": [
+      "node --check examples/evidence-dashboard/dashboard.js"
+    ],
+    "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+  },
+  "guardrails": [
+    "source patch preview is applied only to generated sandbox worktree copies during the smoke",
+    "trusted main worktree target hash is checked before and after and is unchanged",
+    "generated sandbox evidence refs are documented but generated output is not committed",
+    "no browser trusted writes, command bridge, merge automation, dependency, CI/workflow, network, or install scope"
+  ]
+}

@@ -19,8 +19,8 @@
   "targets": [
     {
       "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
-      "beforeHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-      "afterHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "beforeHash": "sha256:38793778fbe7534830aa471bba8225e353a31abef537ecd5b15d48d895cfd305",
+      "afterHash": "sha256:f956987ecff2f7fdf4f4dbd1f234870d18c3fa8710bebde236a5e534e45952cd",
       "fileClass": "runtime_demo_config",
       "reviewLevel": "elevated_source_like_data_review",
       "classificationStatus": "potentially_allowed_later",
