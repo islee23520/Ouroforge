@@ -7,8 +7,8 @@ execution, browser writes, command bridges, auto-merge, auto-apply, dependency
 mutation, CI/workflow mutation, build-script mutation, autonomous source repair,
 or production-ready mutation claims.
 
-This policy is an input to later validation work. The authoritative fixture shape
-is `examples/source-apply-worktree-boundary-v1/worktree-context-policy.sample.json`.
+This policy is an input to the Rust `source-apply-worktree-context-v1` inspector. The authoritative fixture shape
+is `examples/source-apply-worktree-boundary-v1/worktree-context-policy.sample.json`. SA15.3.2 adds validation/reporting for clean targets, dirty targets, untracked collisions, generated/hidden roots, symlinks, traversal, branch/head mismatch, active locks, and missing Git context.
 
 ## Worktree zones
 
@@ -87,7 +87,7 @@ cannot prove that the target state inspected is the target state being written.
 
 ## Context evidence shape
 
-A future Rust validator should emit a generated evidence artifact shaped like
+The Rust validator emits a generated evidence-compatible report shaped like
 `source-apply-worktree-context-v1` with at least:
 
 - `schemaVersion`;
@@ -108,5 +108,18 @@ A future Rust validator should emit a generated evidence artifact shaped like
 A #701 PR unit may close only when the combined work has policy docs/fixtures,
 context validation for safe/unsafe states, context evidence/read-model
 compatibility, focused tests for blocked cases, full required verification, and
-final evidence proving #1 and #23 remain open. This SA15.3.1 policy PR alone is
-not sufficient to close #701.
+final evidence proving #1 and #23 remain open. SA15.3.1 policy docs plus
+SA15.3.2 Rust validation are still not sufficient to close #701 until the
+read-model compatibility unit is complete.
+
+
+## Focused validation checks
+
+```bash
+cargo test -p ouroforge-core source_apply_worktree_context -- --nocapture
+```
+
+These tests prove that the current validator accepts a clean allowed target without
+writing it and blocks dirty targets, generated roots, untracked collisions,
+symlink/traversal targets, missing branch/head context, branch/head mismatch, and
+active apply locks.
