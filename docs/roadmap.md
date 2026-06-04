@@ -147,6 +147,15 @@ shell/network/install commands, browser command bridges, public launch
 automation, native export, plugin runtime, and Godot replacement claims remain
 out of scope unless a separate later governance issue authorizes them.
 
+Public Alpha Launch Governance v1 is complete as a governance/documentation
+track. It produced manual visibility decision records, hold/rollback criteria,
+public issue and PR intake policies, security-response routing, demo-stability
+monitoring, a conservative communication pack, and post-launch roadmap triage
+references. It did not launch Ouroforge, publish an announcement, change
+repository visibility or GitHub settings, release packages, add product
+behavior, create support/security SLAs, implement source apply, or replace the
+#1/#23 governance anchors.
+
 ## Near-term governance and public-readiness work
 
 ### Public Alpha Readiness handoff
@@ -195,6 +204,8 @@ automated launch or roadmap-acceptance paths:
 - `docs/public-readiness-audit.md`
 - `docs/public-demo-evidence.md`
 - `docs/public-launch-checklist.md`
+- `docs/public-alpha-launch-governance-v1.md`
+- `docs/public-alpha-communication-pack-v1.md`
 - `docs/post-launch-roadmap-triage-v1.md`
 - `docs/public-alpha-communication-pack-v1.md`
 - `docs/public-alpha-launch-governance-v1.md`
@@ -202,6 +213,33 @@ automated launch or roadmap-acceptance paths:
 Maintainers should use those documents for separate manual repository visibility
 and post-launch roadmap decisions. Public launch and future milestone acceptance
 remain governance actions, not automated code paths.
+
+### Public Alpha Launch Governance outcome
+
+Public Alpha Launch Governance v1 (#378-#387) is recorded as **governance
+complete, launch not executed**. The completed artifacts define how maintainers
+may make, hold, communicate, audit, and roll back a future public-alpha decision,
+but the repository remains under the same manual visibility, release,
+publication, and support boundaries described above.
+
+Recommended next milestone candidates after this governance refresh are:
+
+1. **Production 2D Engine Core v1 (#583-#594)** — the next dependency-ordered
+   technical milestone, starting with camera/layer/viewport work and later
+   renderer, physics, input, runtime-state, audio/VFX, debug/profiling, demo,
+   regression, Studio inspection, and roadmap refresh issues.
+2. **Manual public visibility review** — only if maintainers separately choose
+   it, using the launch checklist, visibility decision records, communication
+   pack, hold/rollback criteria, issue/PR intake policy, security-response
+   routing, and fresh verification on the intended decision date.
+3. **Deferral/hold** — if any launch-governance blocker or generated-state,
+   wording, demo-stability, security-reporting, or #1/#23 anchor concern is
+   found during a future manual review.
+
+None of these candidates is automatically accepted by this roadmap refresh.
+Technical work still requires its own scoped issue/PR sequence; visibility,
+announcement, release, package publication, support, and security guarantees
+remain separate maintainer actions.
 
 ## Product direction
 
@@ -231,6 +269,10 @@ remain governance actions, not automated code paths.
   are evidence inputs for review/governance, not authority to apply patches,
   merge branches, execute browser-originated commands, mutate dependencies/CI,
   publish, package native exports, enable plugins, or launch publicly.
+- Treat Public Alpha Launch Governance v1 as complete but non-executing. Its
+  artifacts are decision/checklist/response inputs, not authority to toggle
+  visibility, publish announcements, release packages, accept public roadmap
+  scope automatically, promise support/security response times, or close #1/#23.
 
 ## Active anchors
 

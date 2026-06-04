@@ -43,6 +43,9 @@ separate maintainer actions:
 - [`public-alpha-launch-response-rollback-v1.md`](public-alpha-launch-response-rollback-v1.md) — manual response and rollback options after launch-governance blockers.
 - [`public-pr-intake-policy-v1.md`](public-pr-intake-policy-v1.md) — public-alpha PR checklist, forbidden-scope gates, dependency/Lore expectations, and merge-readiness criteria.
 - [`public-alpha-communication-pack-v1.md`](public-alpha-communication-pack-v1.md) — conservative public-alpha summary, demo/reporting pointers, non-goals, and forbidden-overclaim checklist.
+- Public Alpha Launch Governance v1 is complete as governance/docs only; it did
+  not publish an announcement, change repository visibility, release packages,
+  automate launch/rollback, add product behavior, or replace #1/#23.
 - [`public-alpha-readiness-governance-handoff-v1.md`](public-alpha-readiness-governance-handoff-v1.md) — handoff evidence for later governance.
 - [`public-alpha-readiness-final-audit-v1.md`](public-alpha-readiness-final-audit-v1.md) and [`public-alpha-readiness-final-report-v1.md`](public-alpha-readiness-final-report-v1.md) — final public-alpha readiness evidence.
 - [`release-versioning-policy-v1.md`](release-versioning-policy-v1.md) and [`release-artifact-policy-v1.md`](release-artifact-policy-v1.md) — versioning and release artifact policy without publication automation.

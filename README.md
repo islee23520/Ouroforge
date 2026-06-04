@@ -190,11 +190,14 @@ docs are preparation artifacts, not a visibility toggle or publication event.
 The roadmap and completed milestone references live in
 [`docs/roadmap.md`](docs/roadmap.md). Public-alpha readiness, launch governance,
 release artifact policy, communication-pack, and post-launch roadmap responses
-are documented as separate references rather than launch approval. Source Mutation Preview v1 is
-recorded there as complete but preview-only; it does not authorize trusted source
-apply, branch merge/rebase automation, browser command bridges, dependency/CI
-mutation, native export, plugin runtime, public launch automation, or Godot
-replacement claims.
+are documented as separate references rather than launch approval. Public Alpha
+Launch Governance v1 is recorded there as complete as a governance/documentation
+milestone only: it does not publish an announcement, change repository
+visibility, release packages, or approve public-launch execution. Source
+Mutation Preview v1 is also recorded there as complete but preview-only; it does
+not authorize trusted source apply, branch merge/rebase automation, browser
+command bridges, dependency/CI mutation, native export, plugin runtime, public
+launch automation, or Godot replacement claims.
 
 ## Contributor guide
 
