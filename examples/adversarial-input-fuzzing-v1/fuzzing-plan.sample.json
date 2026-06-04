@@ -44,6 +44,11 @@
       "pathHint": "evidence/scenarios/collect-and-exit/input-replay.json"
     },
     {
+      "evidenceId": "runtime-probe",
+      "artifactKind": "runtime_probe",
+      "pathHint": "evidence/fuzz/qa14_3_seeded_movement_fuzz/runtime-probe.json"
+    },
+    {
       "evidenceId": "fuzz-summary",
       "artifactKind": "fuzz_summary",
       "pathHint": "evidence/fuzz/qa14_3_seeded_movement_fuzz/summary.json"

@@ -6633,6 +6633,11 @@ fn validate_asset_preview_path(
 }
 
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
+const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
+const MAX_FUZZ_PLAN_RUNS: u32 = 100;
+const MAX_FUZZ_PLAN_DURATION_MS: u64 = 600_000;
+const MAX_FUZZ_PLAN_ARTIFACTS: u32 = 1_000;
+const MAX_FUZZ_PLAN_OUTPUT_BYTES: u64 = 100 * 1024 * 1024;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -6806,6 +6811,25 @@ impl AdversarialInputFuzzingPlanArtifact {
                 ));
             }
         }
+        if actions.contains(&FuzzAction::ReplayStep)
+            && self.input_domain.replay_evidence_ref.is_none()
+        {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan actionSet replay_step requires inputDomain.replayEvidenceRef"
+            ));
+        }
+        if actions.contains(&FuzzAction::SnapshotProbe)
+            && !self.expected_evidence.iter().any(|evidence| {
+                matches!(
+                    evidence.artifact_kind,
+                    FuzzExpectedEvidenceKind::RuntimeProbe | FuzzExpectedEvidenceKind::WorldState
+                )
+            })
+        {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan actionSet snapshot_probe requires runtime_probe or world_state expectedEvidence"
+            ));
+        }
         if self.constraints.is_empty() {
             return Err(anyhow!(
                 "adversarial input fuzzing plan constraints must not be empty"
@@ -6828,12 +6852,19 @@ impl AdversarialInputFuzzingPlanArtifact {
             ));
         }
         let mut evidence_ids = BTreeSet::new();
+        let mut path_hints = BTreeSet::new();
         for evidence in &self.expected_evidence {
-            evidence.validate()?;
+            evidence.validate(&self.output_root)?;
             if !evidence_ids.insert(evidence.evidence_id.as_str()) {
                 return Err(anyhow!(
                     "duplicate adversarial input fuzzing plan evidenceId: {}",
                     evidence.evidence_id
+                ));
+            }
+            if !path_hints.insert(evidence.path_hint.as_str()) {
+                return Err(anyhow!(
+                    "duplicate adversarial input fuzzing plan expectedEvidence.pathHint: {}",
+                    evidence.path_hint
                 ));
             }
         }
@@ -6912,29 +6943,29 @@ impl FuzzInputDomain {
 
 impl FuzzBudget {
     fn validate(&self) -> Result<()> {
-        if self.max_steps == 0 {
+        if self.max_steps == 0 || self.max_steps > MAX_FUZZ_PLAN_STEPS {
             return Err(anyhow!(
-                "adversarial input fuzzing plan budget.maxSteps must be greater than zero"
+                "adversarial input fuzzing plan budget.maxSteps must be between 1 and {MAX_FUZZ_PLAN_STEPS}"
             ));
         }
-        if self.max_runs == 0 {
+        if self.max_runs == 0 || self.max_runs > MAX_FUZZ_PLAN_RUNS {
             return Err(anyhow!(
-                "adversarial input fuzzing plan budget.maxRuns must be greater than zero"
+                "adversarial input fuzzing plan budget.maxRuns must be between 1 and {MAX_FUZZ_PLAN_RUNS}"
             ));
         }
-        if self.max_duration_ms == 0 {
+        if self.max_duration_ms == 0 || self.max_duration_ms > MAX_FUZZ_PLAN_DURATION_MS {
             return Err(anyhow!(
-                "adversarial input fuzzing plan budget.maxDurationMs must be greater than zero"
+                "adversarial input fuzzing plan budget.maxDurationMs must be between 1 and {MAX_FUZZ_PLAN_DURATION_MS}"
             ));
         }
-        if self.max_artifacts == 0 {
+        if self.max_artifacts == 0 || self.max_artifacts > MAX_FUZZ_PLAN_ARTIFACTS {
             return Err(anyhow!(
-                "adversarial input fuzzing plan budget.maxArtifacts must be greater than zero"
+                "adversarial input fuzzing plan budget.maxArtifacts must be between 1 and {MAX_FUZZ_PLAN_ARTIFACTS}"
             ));
         }
-        if self.max_output_bytes == 0 {
+        if self.max_output_bytes == 0 || self.max_output_bytes > MAX_FUZZ_PLAN_OUTPUT_BYTES {
             return Err(anyhow!(
-                "adversarial input fuzzing plan budget.maxOutputBytes must be greater than zero"
+                "adversarial input fuzzing plan budget.maxOutputBytes must be between 1 and {MAX_FUZZ_PLAN_OUTPUT_BYTES}"
             ));
         }
         Ok(())
@@ -6968,18 +6999,39 @@ impl FuzzStopCondition {
 }
 
 impl FuzzExpectedEvidence {
-    fn validate(&self) -> Result<()> {
+    fn validate(&self, output_root: &str) -> Result<()> {
         validate_path_component(
             "adversarial input fuzzing plan expectedEvidence.evidenceId",
             &self.evidence_id,
         )?;
         validate_evidence_artifact_path(&self.path_hint)?;
-        if !self.path_hint.starts_with("evidence/fuzz/")
-            && !self.path_hint.starts_with("evidence/scenarios/")
-        {
-            return Err(anyhow!(
-                "adversarial input fuzzing plan expectedEvidence.pathHint must stay under evidence/fuzz or evidence/scenarios"
-            ));
+        match self.artifact_kind {
+            FuzzExpectedEvidenceKind::FuzzInput | FuzzExpectedEvidenceKind::FuzzSummary => {
+                if !self.path_hint.starts_with(output_root) {
+                    return Err(anyhow!(
+                        "adversarial input fuzzing plan expectedEvidence.pathHint for fuzz outputs must stay under outputRoot"
+                    ));
+                }
+            }
+            FuzzExpectedEvidenceKind::ScenarioInputReplay
+            | FuzzExpectedEvidenceKind::ScenarioResult => {
+                if !self.path_hint.starts_with("evidence/scenarios/")
+                    || !self.path_hint.ends_with(".json")
+                {
+                    return Err(anyhow!(
+                        "adversarial input fuzzing plan expectedEvidence.pathHint for scenario evidence must be scenario JSON evidence"
+                    ));
+                }
+            }
+            FuzzExpectedEvidenceKind::WorldState | FuzzExpectedEvidenceKind::RuntimeProbe => {
+                if !self.path_hint.starts_with("evidence/scenarios/")
+                    && !self.path_hint.starts_with(output_root)
+                {
+                    return Err(anyhow!(
+                        "adversarial input fuzzing plan expectedEvidence.pathHint for probe evidence must stay under outputRoot or evidence/scenarios"
+                    ));
+                }
+            }
         }
         Ok(())
     }
@@ -39787,6 +39839,90 @@ scenarios:
         let error = AdversarialInputFuzzingPlanArtifact::from_json_str(missing_blocked_reason)
             .expect_err("blocked fuzzing plan needs reasons");
         assert!(error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_hardens_budget_actions_and_expected_outputs() {
+        let oversized_budget = AdversarialInputFuzzingPlanArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+                "planId": "qa14_3_oversized_budget",
+                "runId": "run_fuzzing_plan_smoke",
+                "inputDomain": {
+                    "domainId": "movement-buttons",
+                    "scenarioId": "collect-and-exit",
+                    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+                    "allowedKeys": ["left", "right"]
+                },
+                "deterministicSeed": 7,
+                "budget": { "maxSteps": 1001, "maxRuns": 1, "maxDurationMs": 2000, "maxArtifacts": 4, "maxOutputBytes": 65536 },
+                "actionSet": ["press_key", "release_key"],
+                "constraints": [{ "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }],
+                "stopCondition": { "conditionId": "budget-only", "description": "Stop at the declared budget." },
+                "expectedEvidence": [{ "evidenceId": "seeded-inputs", "artifactKind": "fuzz_input", "pathHint": "evidence/fuzz/qa14_3_oversized_budget/fuzz-inputs.json" }],
+                "outputRoot": "evidence/fuzz/qa14_3_oversized_budget/",
+                "cleanupPolicy": { "mode": "retain_on_failure" },
+                "status": "planned"
+            })
+            .to_string(),
+        )
+        .expect_err("oversized maxSteps rejected");
+        assert!(oversized_budget.to_string().contains("maxSteps"));
+
+        let replay_without_ref = AdversarialInputFuzzingPlanArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+                "planId": "qa14_3_replay_without_ref",
+                "runId": "run_fuzzing_plan_smoke",
+                "inputDomain": {
+                    "domainId": "movement-buttons",
+                    "scenarioId": "collect-and-exit",
+                    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+                    "allowedKeys": ["left", "right"]
+                },
+                "deterministicSeed": 7,
+                "budget": { "maxSteps": 8, "maxRuns": 1, "maxDurationMs": 2000, "maxArtifacts": 4, "maxOutputBytes": 65536 },
+                "actionSet": ["press_key", "replay_step"],
+                "constraints": [{ "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }],
+                "stopCondition": { "conditionId": "budget-only", "description": "Stop at the declared budget." },
+                "expectedEvidence": [{ "evidenceId": "seeded-inputs", "artifactKind": "fuzz_input", "pathHint": "evidence/fuzz/qa14_3_replay_without_ref/fuzz-inputs.json" }],
+                "outputRoot": "evidence/fuzz/qa14_3_replay_without_ref/",
+                "cleanupPolicy": { "mode": "retain_on_failure" },
+                "status": "planned"
+            })
+            .to_string(),
+        )
+        .expect_err("replay_step requires replay evidence ref");
+        assert!(replay_without_ref.to_string().contains("replayEvidenceRef"));
+
+        let duplicate_output = AdversarialInputFuzzingPlanArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "adversarial-input-fuzzing-plan-v1",
+                "planId": "qa14_3_duplicate_output",
+                "runId": "run_fuzzing_plan_smoke",
+                "inputDomain": {
+                    "domainId": "movement-buttons",
+                    "scenarioId": "collect-and-exit",
+                    "scenarioCandidateRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json",
+                    "allowedKeys": ["left", "right"]
+                },
+                "deterministicSeed": 7,
+                "budget": { "maxSteps": 8, "maxRuns": 1, "maxDurationMs": 2000, "maxArtifacts": 4, "maxOutputBytes": 65536 },
+                "actionSet": ["press_key", "release_key"],
+                "constraints": [{ "constraintId": "bounded-local-only", "description": "Use deterministic local evidence only." }],
+                "stopCondition": { "conditionId": "budget-only", "description": "Stop at the declared budget." },
+                "expectedEvidence": [
+                    { "evidenceId": "seeded-inputs", "artifactKind": "fuzz_input", "pathHint": "evidence/fuzz/qa14_3_duplicate_output/fuzz-inputs.json" },
+                    { "evidenceId": "seeded-inputs-copy", "artifactKind": "fuzz_summary", "pathHint": "evidence/fuzz/qa14_3_duplicate_output/fuzz-inputs.json" }
+                ],
+                "outputRoot": "evidence/fuzz/qa14_3_duplicate_output/",
+                "cleanupPolicy": { "mode": "retain_on_failure" },
+                "status": "planned"
+            })
+            .to_string(),
+        )
+        .expect_err("duplicate expected output paths are rejected");
+        assert!(duplicate_output.to_string().contains("pathHint"));
     }
 
     #[test]

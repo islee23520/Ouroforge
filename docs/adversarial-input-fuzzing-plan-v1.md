@@ -31,3 +31,7 @@ Guardrails:
 - Browser/dashboard/Studio surfaces may display this evidence but must not spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.
 
 Later QA14.3 PRs harden indexed replay/candidate references and add deterministic fuzz evidence read models. This initial artifact only defines and validates the bounded plan shape.
+
+## QA14.3.2 validation hardening
+
+QA14.3.2 adds fail-closed validation for oversized budgets, duplicate actions, replay actions without replay evidence, snapshot probe actions without probe/world-state evidence expectations, duplicate expected output paths, fuzz outputs outside `outputRoot`, scenario evidence path drift, and missing cleanup/stop-condition fields. These checks remain planning validation only; they do not execute fuzz runs or mutate trusted state.
