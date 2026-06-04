@@ -51,6 +51,10 @@ A passing gate means:
 - the Rust lockfile has no reported RustSec vulnerabilities;
 - generated artifacts remain untracked.
 
+## Stability monitoring handoff
+
+After a manual public-visibility decision, maintainers should use [`docs/public-demo-stability-monitoring-v1.md`](public-demo-stability-monitoring-v1.md) as the demo stability checklist and refresh-cadence playbook. That playbook is governance-only: it records manual smoke expectations, evidence retention, Chrome caveats, and generated-state cleanup without adding hosted monitoring, release automation, repository setting changes, or support guarantees.
+
 ## Manual decision checklist
 
 - [ ] All historical public-readiness PRs and #217 refresh PRs above are merged into `main`.
