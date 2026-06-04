@@ -19594,16 +19594,24 @@ fn validate_gameplay_behavior_reasons(field: &str, reasons: &[String]) -> Result
 
 fn require_supported_gameplay_behavior_key(field: &str, key: &str) -> Result<()> {
     validate_path_component("gameplay behavior field key", key)?;
+    // Normalize to lowercase alphanumerics so forbidden concepts are rejected
+    // regardless of snake_case, kebab-case, camelCase, or casing variants
+    // (e.g. `plugin_loader`, `Plugin-Loader`, `dynamic_import`, `trusted_write`).
+    let normalized: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
     let forbidden = [
         "script",
         "command",
-        "commandBridge",
-        "trustedWrite",
-        "dynamicImport",
-        "pluginLoader",
+        "commandbridge",
+        "trustedwrite",
+        "dynamicimport",
+        "pluginloader",
         "eval",
     ];
-    if forbidden.iter().any(|blocked| key.contains(blocked)) {
+    if forbidden.iter().any(|blocked| normalized.contains(blocked)) {
         return Err(anyhow!(
             "gameplay behavior {field} key `{key}` is forbidden because #612 does not authorize scripts, command bridges, plugin loading, or trusted browser writes"
         ));
@@ -66102,6 +66110,44 @@ scenarios:
         let blocked_error = GameplayBehaviorModelArtifact::from_json_str(blocked_without_reason)
             .expect_err("blocked status requires reasons");
         assert!(blocked_error.to_string().contains("blockedReasons"));
+    }
+
+    #[test]
+    fn gameplay_behavior_forbidden_keys_reject_separator_and_casing_variants() {
+        // #612 forbids plugin loaders, dynamic imports, command bridges, and
+        // trusted writes regardless of snake_case, kebab-case, camelCase, or
+        // casing. validate_path_component permits letters, digits, '-' and '_'
+        // (incl. uppercase), so every variant below reaches the forbidden check.
+        for key in [
+            "plugin_loader",
+            "plugin-loader",
+            "PluginLoader",
+            "PLUGIN_LOADER",
+            "dynamic_import",
+            "dynamicImport",
+            "trusted_write",
+            "command_bridge",
+            "command-bridge",
+            "run_script",
+            "Eval",
+        ] {
+            assert!(
+                require_supported_gameplay_behavior_key("variables", key).is_err(),
+                "forbidden key variant must be rejected: {key}"
+            );
+        }
+        for key in [
+            "health",
+            "is_active",
+            "patrol_index",
+            "cooldownState",
+            "ammo-count",
+        ] {
+            assert!(
+                require_supported_gameplay_behavior_key("variables", key).is_ok(),
+                "safe key must be accepted: {key}"
+            );
+        }
     }
 
     #[test]
