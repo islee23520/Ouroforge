@@ -20478,6 +20478,88 @@ fn source_file_dependency_manifest_names() -> &'static [&'static str] {
     ]
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchTargetClassValidation {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    pub targets: Vec<SourceFileClassReport>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+impl SourcePatchTargetClassValidation {
+    pub fn has_blocked_targets(&self) -> bool {
+        self.targets.iter().any(SourceFileClassReport::is_blocked)
+    }
+}
+
+pub fn classify_source_patch_preview_targets<I, P>(paths: I) -> SourcePatchTargetClassValidation
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let targets: Vec<SourceFileClassReport> =
+        paths.into_iter().map(classify_source_file_path).collect();
+    source_patch_target_class_validation(targets)
+}
+
+pub fn validate_source_patch_preview_targets<I, P>(
+    paths: I,
+) -> Result<SourcePatchTargetClassValidation>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let validation = classify_source_patch_preview_targets(paths);
+    if validation.has_blocked_targets() {
+        return Err(anyhow!(
+            "source patch preview target class validation blocked: {}",
+            validation.blocked_reasons.join("; ")
+        ));
+    }
+    Ok(validation)
+}
+
+fn source_patch_target_class_validation(
+    targets: Vec<SourceFileClassReport>,
+) -> SourcePatchTargetClassValidation {
+    let blocked_reasons: Vec<String> = targets
+        .iter()
+        .filter(|target| target.is_blocked())
+        .flat_map(|target| {
+            let path = target.path.clone();
+            let class = serde_json::to_value(&target.class)
+                .ok()
+                .and_then(|value| value.as_str().map(ToOwned::to_owned))
+                .unwrap_or_else(|| "unknown".to_string());
+            target
+                .blocked_reasons
+                .iter()
+                .map(move |reason| format!("{} ({class}): {reason}", path))
+        })
+        .collect();
+    SourcePatchTargetClassValidation {
+        schema_version: "source-patch-target-class-validation-v1".to_string(),
+        status: if blocked_reasons.is_empty() {
+            "passed".to_string()
+        } else {
+            "blocked".to_string()
+        },
+        targets,
+        blocked_reasons,
+        guardrails: vec![
+            "target class validation only; no diff evaluation or patch preview artifact"
+                .to_string(),
+            "blocked classes stop before sandbox dry-run or trusted source writes".to_string(),
+            "source patch apply and merge automation remain unimplemented".to_string(),
+            "browser/dashboard/Studio surfaces remain read-only and command-inert".to_string(),
+        ],
+    }
+}
+
 pub fn reject_generated_artifact_source_collision(
     output_path: &Path,
     artifact_label: &str,
@@ -31776,6 +31858,81 @@ scenarios:
         let opaque = classify_source_file_path_str("examples/assets/player.png");
         assert_eq!(opaque.class, SourceFileClassLabel::BinaryOpaque);
         assert!(opaque.is_blocked());
+    }
+
+    #[test]
+    fn source_patch_target_class_validation_blocks_dependency_ci_scripts_and_generated_roots() {
+        let validation = classify_source_patch_preview_targets([
+            "seeds/platformer.yaml",
+            "Cargo.toml",
+            ".github/workflows/ci.yml",
+            "build.rs",
+            "scripts/check.sh",
+            "runs/run-1/run.json",
+            "target/debug/output.txt",
+            "examples/demo/.cache/state.json",
+            "examples/assets/player.png",
+        ]);
+        assert_eq!(
+            validation.schema_version,
+            "source-patch-target-class-validation-v1"
+        );
+        assert_eq!(validation.status, "blocked");
+        assert!(validation.has_blocked_targets());
+        assert!(validation
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("no diff evaluation")));
+        for expected in [
+            "Cargo.toml",
+            ".github/workflows/ci.yml",
+            "build.rs",
+            "scripts/check.sh",
+            "runs/run-1/run.json",
+            "target/debug/output.txt",
+            "examples/demo/.cache/state.json",
+            "examples/assets/player.png",
+        ] {
+            assert!(
+                validation
+                    .blocked_reasons
+                    .iter()
+                    .any(|reason| reason.contains(expected)),
+                "missing blocked reason for {expected}: {:?}",
+                validation.blocked_reasons
+            );
+        }
+        let error = validate_source_patch_preview_targets(["seeds/platformer.yaml", "Cargo.lock"])
+            .expect_err("blocked target rejects preview preflight");
+        assert!(error
+            .to_string()
+            .contains("source patch preview target class validation blocked"));
+        assert!(error.to_string().contains("Cargo.lock"));
+    }
+
+    #[test]
+    fn source_patch_target_class_validation_allows_only_allowed_or_review_held_targets() {
+        let validation = validate_source_patch_preview_targets([
+            "seeds/platformer.yaml",
+            "docs/source-mutation-preview-v1.md",
+            "crates/ouroforge-core/src/lib.rs",
+            "examples/evidence-dashboard/dashboard.js",
+        ])
+        .expect("allowed and needs-approval targets may proceed to later review gates");
+        assert_eq!(validation.status, "passed");
+        assert!(validation.blocked_reasons.is_empty());
+        assert!(validation
+            .targets
+            .iter()
+            .any(|target| target.decision == SourceFileClassDecision::Allowed));
+        assert!(validation
+            .targets
+            .iter()
+            .any(SourceFileClassReport::needs_approval));
+        assert!(validation
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("source patch apply")));
     }
 
     #[test]
