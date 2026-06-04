@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+/// Sentinel used in place of the real local reference root in every emitted
+/// surface (report fields and error diagnostics) so the audit never leaks the
+/// operator's local path. See #979: redact the reference root in all output.
+const REDACTED_REFERENCE_ROOT: &str = "internal-local-root";
+
 const RO_VIBE_REQUIRED_FILES: &[&str] = &[
     "ro-sprites-anim/body/male/Novice_job0/act0_dir0_f0.png",
     "ro-sprites-anim/body/male/Novice_job0/act1_dir0_f0.png",
@@ -81,15 +86,11 @@ pub fn audit_internal_sprite_reference(
     profile: InternalSpriteAuditProfile,
 ) -> Result<InternalSpriteAuditReport> {
     let metadata = fs::metadata(reference_root).with_context(|| {
-        format!(
-            "internal sprite reference root not readable: {}",
-            reference_root.display()
-        )
+        format!("internal sprite reference root not readable: {REDACTED_REFERENCE_ROOT}")
     })?;
     if !metadata.is_dir() {
         return Err(anyhow!(
-            "internal sprite reference root is not a directory: {}",
-            reference_root.display()
+            "internal sprite reference root is not a directory: {REDACTED_REFERENCE_ROOT}"
         ));
     }
 
@@ -107,7 +108,7 @@ pub fn audit_internal_sprite_reference(
 
     Ok(InternalSpriteAuditReport {
         profile: profile.id().to_owned(),
-        reference_root: "internal-local-root".to_owned(),
+        reference_root: REDACTED_REFERENCE_ROOT.to_owned(),
         reference_root_redacted: true,
         distribution_policy: InternalSpriteDistributionPolicy {
             license_scope: "internal-use-only".to_owned(),
@@ -135,7 +136,15 @@ fn count_png_frames(root: &Path) -> Result<usize> {
     let mut png_frames = 0usize;
     while let Some(path) = pending.pop() {
         for entry in fs::read_dir(&path).with_context(|| {
-            format!("internal sprite directory not readable: {}", path.display())
+            // Redact the operator's local root; keep only the (already-public)
+            // path relative to it so diagnostics stay useful without leaking.
+            let shown = path
+                .strip_prefix(root)
+                .ok()
+                .filter(|relative| !relative.as_os_str().is_empty())
+                .map(|relative| format!("{REDACTED_REFERENCE_ROOT}/{}", relative.display()))
+                .unwrap_or_else(|| REDACTED_REFERENCE_ROOT.to_owned());
+            format!("internal sprite directory not readable: {shown}")
         })? {
             let entry = entry?;
             let path = entry.path();

@@ -84,9 +84,14 @@ fn audit_internal_sprite_reference_rejects_missing_root() {
     let error = audit_internal_sprite_reference(&root, InternalSpriteAuditProfile::RoVibeV1)
         .expect_err("missing root fails closed");
 
-    assert!(error
-        .to_string()
-        .contains("internal sprite reference root not readable"));
+    let message = error.to_string();
+    assert!(message.contains("internal sprite reference root not readable"));
+    // #979: the failure diagnostic must redact the operator's local root.
+    assert!(
+        !message.contains(root.to_str().unwrap()),
+        "missing-root error leaked the local reference path: {message}"
+    );
+    assert!(message.contains("internal-local-root"));
 }
 
 fn write_png_fixture(root: &Path, relative_path: &str) {

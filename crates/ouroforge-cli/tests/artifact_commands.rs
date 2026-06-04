@@ -1265,6 +1265,12 @@ fn asset_audit_internal_sprites_rejects_missing_root() {
     );
 
     assert!(output.contains("internal sprite reference root not readable"));
+    // #979: the failure diagnostic must redact the operator's local root.
+    assert!(
+        !output.contains(temp.to_str().unwrap()),
+        "missing-root error leaked the local reference path: {output}"
+    );
+    assert!(output.contains("internal-local-root"));
 }
 
 #[test]
