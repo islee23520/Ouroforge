@@ -10,14 +10,16 @@
   function rectForEntity(entity) {
     const transform = entity.components.transform;
     const collider = entity.components.collider;
-    if (!collider || collider.shape !== 'aabb') return null;
+    if (!collider || collider.shape !== 'aabb' || collider.disabled) return null;
     const offset = collider.offset || { x: 0, y: 0 };
     const size = collider.size || entity.components.size;
+    const body = collider.body || 'static';
+    const contactOnly = body === 'trigger' || body === 'sensor';
     return {
       entityId: entity.id,
-      body: collider.body || 'static',
-      sensor: Boolean(collider.sensor),
-      trigger: Boolean(collider.trigger || collider.sensor),
+      body,
+      sensor: Boolean(collider.sensor || body === 'sensor'),
+      trigger: Boolean(collider.trigger || collider.sensor || contactOnly),
       collisionGroup: typeof collider.collisionGroup === 'string' ? collider.collisionGroup : null,
       collisionMask: uniqueStrings(collider.collisionMask),
       x: transform.x + (offset.x || 0),
@@ -140,6 +142,28 @@
     return entry.rect;
   }
 
+  function intervalsOverlap(aMin, aMax, bMin, bMax) {
+    return aMin < bMax && aMax > bMin;
+  }
+
+  function perpendicularOverlap(a, b, axis) {
+    return axis === 'x'
+      ? intervalsOverlap(a.y, a.y + a.height, b.y, b.y + b.height)
+      : intervalsOverlap(a.x, a.x + a.width, b.x, b.x + b.width);
+  }
+
+  function sweptAxisCollision(before, after, other, axis, delta) {
+    if (!before || !after || !other || delta === 0 || !perpendicularOverlap(after, other, axis)) return false;
+    if (axis === 'x') {
+      return delta > 0
+        ? before.x + before.width <= other.x && after.x + after.width > other.x
+        : before.x >= other.x + other.width && after.x < other.x + other.width;
+    }
+    return delta > 0
+      ? before.y + before.height <= other.y && after.y + after.height > other.y
+      : before.y >= other.y + other.height && after.y < other.y + other.height;
+  }
+
   function resolveAxis({ entry, others, bounds, axis, tick, events, seen, options }) {
     const entity = entry.entity;
     const transform = entity.components.transform;
@@ -147,13 +171,16 @@
     const size = entity.components.size || { width: 0, height: 0 };
     const delta = velocity[axis] || 0;
     const limit = axis === 'x' ? Math.max(0, bounds.width - size.width) : Math.max(0, bounds.height - size.height);
+    const before = refreshRect(entry);
     transform[axis] = clamp(transform[axis] + delta, 0, limit);
     const active = refreshRect(entry);
     if (!active || active.trigger) return;
 
     for (const otherEntry of others) {
       const other = refreshRect(otherEntry);
-      if (!other || active.entityId === other.entityId || other.trigger || !pairAllowed(active, other, options) || !overlaps(active, other)) continue;
+      if (!other || active.entityId === other.entityId || other.trigger || !pairAllowed(active, other, options)) continue;
+      const blocked = overlaps(active, other) || sweptAxisCollision(before, active, other, axis, delta);
+      if (!blocked) continue;
       const id = `${pairId(active, other)}:contact:${axis}`;
       const normal = axis === 'x'
         ? { x: delta >= 0 ? -1 : 1, y: 0 }

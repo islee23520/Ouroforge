@@ -123,6 +123,9 @@
       gravity: 1,
       maxFallSpeed: 8,
       grounded: {},
+      contacts: {},
+      contactPairs: [],
+      blockedMovement: {},
     },
   };
   let rendererState = renderer.normalizeRenderer(defaultScene.renderer, defaultScene.bounds);
@@ -301,6 +304,7 @@
         size: size(components.collider.size, normalized.components.size),
         sensor: Boolean(components.collider.sensor),
         trigger: Boolean(components.collider.trigger),
+        disabled: Boolean(components.collider.disabled),
         collisionGroup: typeof components.collider.collisionGroup === 'string' ? components.collider.collisionGroup : null,
         collisionMask: Array.isArray(components.collider.collisionMask) ? components.collider.collisionMask.map(String) : [],
       };
@@ -512,11 +516,30 @@
 
   function refreshGroundedState(collisionEvents) {
     const grounded = {};
+    const contacts = {};
+    const contactPairs = [];
+    const blockedMovement = {};
     for (const entity of world.entities) {
-      if (isDynamicPhysicsEntity(entity)) grounded[entity.id] = false;
+      if (isDynamicPhysicsEntity(entity)) {
+        grounded[entity.id] = false;
+        contacts[entity.id] = [];
+        blockedMovement[entity.id] = { x: false, y: false };
+      }
     }
     for (const event of collisionEvents) {
       if (event.type !== 'runtime.collision.contact') continue;
+      contactPairs.push({ pairId: event.pairId, normal: event.normal || { x: 0, y: 0 } });
+      if (event.movingEntityId && contacts[event.movingEntityId]) {
+        contacts[event.movingEntityId].push({
+          pairId: event.pairId,
+          otherEntityId: event.otherEntityId,
+          normal: event.normal || { x: 0, y: 0 },
+        });
+      }
+      if (event.movingEntityId && blockedMovement[event.movingEntityId] && event.normal) {
+        if (event.normal.x !== 0) blockedMovement[event.movingEntityId].x = true;
+        if (event.normal.y !== 0) blockedMovement[event.movingEntityId].y = true;
+      }
       if (event.movingEntityId && event.normal && event.normal.y === -1) {
         grounded[event.movingEntityId] = true;
         const entity = entityById(event.movingEntityId);
@@ -526,6 +549,9 @@
       }
     }
     world.physics.grounded = grounded;
+    world.physics.contacts = contacts;
+    world.physics.contactPairs = contactPairs;
+    world.physics.blockedMovement = blockedMovement;
   }
 
   function entityById(entityId) {
@@ -750,9 +776,13 @@
         if (cell.trigger && world.goalFlags[cell.trigger] !== true) world.goalFlags[cell.trigger] = false;
       }
     }
-    world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {} };
+    world.physics = { gravity: 1, maxFallSpeed: 8, grounded: {}, contacts: {}, contactPairs: [], blockedMovement: {} };
     for (const entity of world.entities) {
-      if (isDynamicPhysicsEntity(entity)) world.physics.grounded[entity.id] = false;
+      if (isDynamicPhysicsEntity(entity)) {
+        world.physics.grounded[entity.id] = false;
+        world.physics.contacts[entity.id] = [];
+        world.physics.blockedMovement[entity.id] = { x: false, y: false };
+      }
     }
     for (const entity of world.entities) {
       const goalFlag = entity.components && entity.components.goalFlag;
