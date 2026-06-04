@@ -29,7 +29,8 @@
             "z": 1
           }
         },
-        "meshRef": "cube-mesh",
+        "meshRef": "cube_mesh",
+        "materialRef": "cube_material",
         "colliderRef": "cube-collider",
         "metadata": {
           "fixtureScope": "source-like 3D validation fixture"
@@ -37,7 +38,11 @@
         "components": [
           {
             "kind": "mesh",
-            "reference": "cube-mesh"
+            "reference": "cube_mesh"
+          },
+          {
+            "kind": "material",
+            "reference": "cube_material"
           },
           {
             "kind": "collider",

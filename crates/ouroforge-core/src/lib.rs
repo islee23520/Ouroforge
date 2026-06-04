@@ -11236,6 +11236,10 @@ pub struct ProjectAssetManifestEntry {
     pub tileset: Option<ProjectTilesetManifest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tilemap: Option<ProjectTilemapManifest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mesh: Option<ProjectMeshManifest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material: Option<ProjectMaterialManifest>,
     #[serde(
         rename = "durationMs",
         default,
@@ -11259,6 +11263,8 @@ pub enum ProjectAssetType {
     Tilemap,
     Audio,
     Font,
+    Mesh,
+    Material,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -11369,6 +11375,54 @@ pub struct ProjectTilemapLayer {
     pub data: Vec<Option<String>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectMeshManifest {
+    pub kind: ProjectMeshKind,
+    #[serde(rename = "vertexCount")]
+    pub vertex_count: u32,
+    #[serde(
+        rename = "indexCount",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub index_count: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectMeshKind {
+    PrimitiveCube,
+    PrimitivePlane,
+    FixtureMesh,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectMaterialManifest {
+    #[serde(rename = "baseColor")]
+    pub base_color: String,
+    #[serde(
+        rename = "textureAssetId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub texture_asset_id: Option<String>,
+    #[serde(default = "project_material_shading_unlit")]
+    pub shading: ProjectMaterialShading,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectMaterialShading {
+    Unlit,
+    Lit,
+}
+
+fn project_material_shading_unlit() -> ProjectMaterialShading {
+    ProjectMaterialShading::Unlit
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -11860,7 +11914,9 @@ fn preview_kind_for_asset(asset: &ProjectAssetManifestEntry) -> AssetPreviewKind
         ProjectAssetType::Tileset
         | ProjectAssetType::Tilemap
         | ProjectAssetType::Audio
-        | ProjectAssetType::Font => AssetPreviewKind::Metadata,
+        | ProjectAssetType::Font
+        | ProjectAssetType::Mesh
+        | ProjectAssetType::Material => AssetPreviewKind::Metadata,
     }
 }
 
@@ -16503,6 +16559,7 @@ impl ProjectAssetManifest {
 
         self.validate_sprite_atlases()?;
         self.validate_tilemaps()?;
+        self.validate_materials()?;
 
         Ok(ProjectAssetManifestValidationReport {
             manifest_id: self.id.clone(),
@@ -16606,6 +16663,41 @@ impl ProjectAssetManifest {
                 )
             })?;
             tilemap.validate_integrity(&tilemap_asset.id, tileset)?;
+        }
+        Ok(())
+    }
+
+    fn validate_materials(&self) -> Result<()> {
+        let assets_by_id: BTreeMap<&str, &ProjectAssetManifestEntry> = self
+            .assets
+            .iter()
+            .map(|asset| (asset.id.as_str(), asset))
+            .collect();
+        for material_asset in self
+            .assets
+            .iter()
+            .filter(|asset| asset.asset_type == ProjectAssetType::Material)
+        {
+            let Some(material) = &material_asset.material else {
+                continue;
+            };
+            let Some(texture_asset_id) = &material.texture_asset_id else {
+                continue;
+            };
+            let texture_asset = assets_by_id.get(texture_asset_id.as_str()).ok_or_else(|| {
+                anyhow!(
+                    "material {} textureAssetId references unknown asset {}",
+                    material_asset.id,
+                    texture_asset_id
+                )
+            })?;
+            if texture_asset.asset_type != ProjectAssetType::Image {
+                return Err(anyhow!(
+                    "material {} textureAssetId {} must reference an image asset",
+                    material_asset.id,
+                    texture_asset_id
+                ));
+            }
         }
         Ok(())
     }
@@ -16888,6 +16980,8 @@ struct ProjectSceneAssetRef {
 const PROJECT_SCENE_IMAGE_REF_TYPES: &[ProjectAssetType] =
     &[ProjectAssetType::Image, ProjectAssetType::SpriteAtlas];
 const PROJECT_SCENE_AUDIO_REF_TYPES: &[ProjectAssetType] = &[ProjectAssetType::Audio];
+const PROJECT_SCENE_MESH_REF_TYPES: &[ProjectAssetType] = &[ProjectAssetType::Mesh];
+const PROJECT_SCENE_MATERIAL_REF_TYPES: &[ProjectAssetType] = &[ProjectAssetType::Material];
 
 fn collect_project_scene_asset_refs(scene: &SceneDocument) -> Vec<ProjectSceneAssetRef> {
     let mut refs = Vec::new();
@@ -16947,6 +17041,43 @@ fn collect_project_scene_asset_refs(scene: &SceneDocument) -> Vec<ProjectSceneAs
                     asset_id: asset.clone(),
                     expected_types: PROJECT_SCENE_IMAGE_REF_TYPES,
                 });
+            }
+        }
+    }
+    if let Some(graph) = &scene.scene_3d {
+        for node in &graph.nodes {
+            if let Some(mesh_ref) = &node.mesh_ref {
+                refs.push(ProjectSceneAssetRef {
+                    field: format!("scene3d node {} meshRef", node.id),
+                    asset_id: mesh_ref.clone(),
+                    expected_types: PROJECT_SCENE_MESH_REF_TYPES,
+                });
+            }
+            if let Some(material_ref) = &node.material_ref {
+                refs.push(ProjectSceneAssetRef {
+                    field: format!("scene3d node {} materialRef", node.id),
+                    asset_id: material_ref.clone(),
+                    expected_types: PROJECT_SCENE_MATERIAL_REF_TYPES,
+                });
+            }
+            for component in &node.components {
+                let expected_types = match component.kind.as_str() {
+                    "mesh" => Some(PROJECT_SCENE_MESH_REF_TYPES),
+                    "material" => Some(PROJECT_SCENE_MATERIAL_REF_TYPES),
+                    _ => None,
+                };
+                if let (Some(reference), Some(expected_types)) =
+                    (&component.reference, expected_types)
+                {
+                    refs.push(ProjectSceneAssetRef {
+                        field: format!(
+                            "scene3d node {} component {} reference",
+                            node.id, component.kind
+                        ),
+                        asset_id: reference.clone(),
+                        expected_types,
+                    });
+                }
             }
         }
     }
@@ -17010,6 +17141,32 @@ impl ProjectAssetManifestEntry {
             (_, Some(_)) => {
                 return Err(anyhow!(
                     "{field}.tilemap is only allowed for tilemap assets"
+                ));
+            }
+            (_, None) => {}
+        }
+        match (&self.asset_type, &self.mesh) {
+            (ProjectAssetType::Mesh, Some(mesh)) => {
+                mesh.validate_schema(&format!("{field}.mesh"))?;
+            }
+            (ProjectAssetType::Mesh, None) => {
+                return Err(anyhow!("{field}.mesh is required for mesh assets"));
+            }
+            (_, Some(_)) => {
+                return Err(anyhow!("{field}.mesh is only allowed for mesh assets"));
+            }
+            (_, None) => {}
+        }
+        match (&self.asset_type, &self.material) {
+            (ProjectAssetType::Material, Some(material)) => {
+                material.validate_schema(&format!("{field}.material"))?;
+            }
+            (ProjectAssetType::Material, None) => {
+                return Err(anyhow!("{field}.material is required for material assets"));
+            }
+            (_, Some(_)) => {
+                return Err(anyhow!(
+                    "{field}.material is only allowed for material assets"
                 ));
             }
             (_, None) => {}
@@ -17386,6 +17543,37 @@ impl ProjectTilemapManifest {
     }
 }
 
+impl ProjectMeshManifest {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        const MAX_PROJECT_MESH_VERTICES: u32 = 10_000;
+        const MAX_PROJECT_MESH_INDICES: u32 = 30_000;
+        if self.vertex_count == 0 || self.vertex_count > MAX_PROJECT_MESH_VERTICES {
+            return Err(anyhow!(
+                "{field}.vertexCount must be between 1 and {MAX_PROJECT_MESH_VERTICES}"
+            ));
+        }
+        if let Some(index_count) = self.index_count {
+            if index_count == 0 || index_count > MAX_PROJECT_MESH_INDICES {
+                return Err(anyhow!(
+                    "{field}.indexCount must be between 1 and {MAX_PROJECT_MESH_INDICES} when present"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ProjectMaterialManifest {
+    fn validate_schema(&self, field: &str) -> Result<()> {
+        validate_scene_color(&self.base_color)
+            .with_context(|| format!("{field}.baseColor must be a bounded scene color"))?;
+        if let Some(texture_asset_id) = &self.texture_asset_id {
+            validate_path_component(&format!("{field}.textureAssetId"), texture_asset_id)?;
+        }
+        Ok(())
+    }
+}
+
 impl ProjectTilemapLayer {
     fn validate_schema(&self, field: &str) -> Result<()> {
         validate_path_component(&format!("{field}.id"), &self.id)?;
@@ -17466,6 +17654,7 @@ fn validate_project_asset_path(
         ProjectAssetType::SpriteAtlas | ProjectAssetType::Tileset | ProjectAssetType::Tilemap => {
             extension == "json"
         }
+        ProjectAssetType::Mesh | ProjectAssetType::Material => extension == "json",
         ProjectAssetType::Audio => matches!(extension.as_str(), "ogg" | "mp3" | "wav"),
         ProjectAssetType::Font => matches!(extension.as_str(), "ttf" | "otf" | "woff" | "woff2"),
     };
@@ -38108,6 +38297,12 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 ));
             }
         }
+        if let Some(material_ref) = &node.material_ref {
+            validate_path_component(
+                &format!("scene3d node {} materialRef", node.id),
+                material_ref,
+            )?;
+        }
         if let Some(collider_ref) = &node.collider_ref {
             validate_path_component(
                 &format!("scene3d node {} colliderRef", node.id),
@@ -56624,6 +56819,384 @@ scenarios:
     }
 
     #[test]
+    fn project_asset_manifest_resolves_3d_mesh_and_material_references() {
+        let root = unique_temp_dir("project-asset-3d-mesh-material-valid");
+        fs::create_dir_all(root.join("assets/3d")).expect("3d asset dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio asset dir");
+        fs::create_dir_all(root.join("assets/materials")).expect("material asset dir");
+        fs::create_dir_all(root.join("assets/textures")).expect("texture asset dir");
+        fs::write(
+            root.join("assets/3d/cube.mesh.json"),
+            br#"{"kind":"fixture_mesh","vertices":[[-1,-1,-1],[1,1,1]]}"#,
+        )
+        .expect("mesh fixture");
+        fs::write(
+            root.join("assets/materials/cube.material.json"),
+            br##"{"baseColor":"#5eead4","shading":"lit","textureAssetId":"cube_texture"}"##,
+        )
+        .expect("material fixture");
+        fs::write(root.join("assets/textures/cube.png"), b"texture fixture")
+            .expect("texture fixture");
+        let mesh_hash =
+            hash_project_asset_file(root.join("assets/3d/cube.mesh.json")).expect("mesh hash");
+        let material_hash =
+            hash_project_asset_file(root.join("assets/materials/cube.material.json"))
+                .expect("material hash");
+        let texture_hash =
+            hash_project_asset_file(root.join("assets/textures/cube.png")).expect("texture hash");
+
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "mesh_material_reference_fixture",
+                "assets": [
+                    {
+                        "id": "cube_mesh",
+                        "type": "mesh",
+                        "path": "assets/3d/cube.mesh.json",
+                        "contentHash": mesh_hash,
+                        "classification": "source_like",
+                        "mesh": {
+                            "kind": "fixture_mesh",
+                            "vertexCount": 8,
+                            "indexCount": 36
+                        }
+                    },
+                    {
+                        "id": "cube_texture",
+                        "type": "image",
+                        "path": "assets/textures/cube.png",
+                        "contentHash": texture_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 4, "height": 4 }
+                    },
+                    {
+                        "id": "cube_material",
+                        "type": "material",
+                        "path": "assets/materials/cube.material.json",
+                        "contentHash": material_hash,
+                        "classification": "source_like",
+                        "material": {
+                            "baseColor": "#5eead4",
+                            "textureAssetId": "cube_texture",
+                            "shading": "lit"
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("mesh/material manifest parses");
+        let asset_report = manifest
+            .validate_assets(&root)
+            .expect("mesh/material local assets validate");
+        assert_eq!(
+            asset_report.asset_types.get(&ProjectAssetType::Mesh),
+            Some(&1)
+        );
+        assert_eq!(
+            asset_report.asset_types.get(&ProjectAssetType::Material),
+            Some(&1)
+        );
+
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "sceneKind": "3d",
+            "id": "mesh-material-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [],
+            "scene3d": {
+                "version": "1",
+                "nodes": [{
+                    "id": "cube",
+                    "localTransform": {
+                        "translation": { "x": 0, "y": 0, "z": 0 },
+                        "rotation": { "x": 0, "y": 0, "z": 0 },
+                        "scale": { "x": 1, "y": 1, "z": 1 }
+                    },
+                    "meshRef": "cube_mesh",
+                    "materialRef": "cube_material",
+                    "components": [
+                        { "kind": "mesh", "reference": "cube_mesh" },
+                        { "kind": "material", "reference": "cube_material" }
+                    ]
+                }]
+            }
+        }))
+        .expect("3d scene parses");
+
+        validate_scene(&scene).expect("scene3d materialRef validates");
+        let report = manifest
+            .validate_scene_references(&scene)
+            .expect("3d refs resolve through project manifest");
+        assert_eq!(report.resolved_refs.len(), 4);
+        assert!(report.resolved_refs.iter().any(|reference| {
+            reference.field == "scene3d node cube meshRef"
+                && reference.asset_id == "cube_mesh"
+                && reference.asset_type == ProjectAssetType::Mesh
+        }));
+        assert!(report.resolved_refs.iter().any(|reference| {
+            reference.field == "scene3d node cube materialRef"
+                && reference.asset_id == "cube_material"
+                && reference.asset_type == ProjectAssetType::Material
+        }));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn project_asset_manifest_accepts_3d_mesh_material_fixture_from_disk() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/3d-capability-gate-v1/asset-manifest.mesh-material.valid.json");
+        let manifest =
+            ProjectAssetManifest::from_path(&fixture_path).expect("3d fixture manifest validates");
+        assert_eq!(manifest.id, "capability_gate_3d_mesh_material_fixture");
+        assert_eq!(manifest.assets.len(), 3);
+        assert_eq!(manifest.assets[0].asset_type, ProjectAssetType::Mesh);
+        assert_eq!(
+            manifest.assets[0].mesh.as_ref().map(|mesh| mesh.kind),
+            Some(ProjectMeshKind::FixtureMesh)
+        );
+        assert_eq!(manifest.assets[2].asset_type, ProjectAssetType::Material);
+        assert_eq!(
+            manifest.assets[2]
+                .material
+                .as_ref()
+                .and_then(|material| material.texture_asset_id.as_deref()),
+            Some("cube_texture")
+        );
+    }
+
+    #[test]
+    fn project_asset_manifest_rejects_broad_3d_import_and_material_drift() {
+        let root = unique_temp_dir("project-asset-3d-mesh-material-invalid");
+        fs::create_dir_all(root.join("assets/3d")).expect("3d asset dir");
+        fs::create_dir_all(root.join("assets/audio")).expect("audio asset dir");
+        fs::create_dir_all(root.join("assets/materials")).expect("material asset dir");
+        fs::create_dir_all(root.join("assets/textures")).expect("texture asset dir");
+        fs::create_dir_all(root.join("runs/3d")).expect("generated 3d dir");
+        fs::write(root.join("assets/3d/cube.mesh.json"), b"mesh fixture").expect("mesh");
+        fs::write(root.join("assets/3d/cube.gltf"), b"gltf fixture").expect("gltf");
+        fs::write(root.join("runs/3d/cube.mesh.json"), b"generated mesh").expect("generated");
+        fs::write(
+            root.join("assets/materials/cube.material.json"),
+            b"material fixture",
+        )
+        .expect("material");
+        fs::write(
+            root.join("assets/audio/not-a-texture.ogg"),
+            b"audio fixture",
+        )
+        .expect("audio");
+        fs::write(root.join("assets/textures/cube.png"), b"texture fixture").expect("texture");
+        let mesh_hash =
+            hash_project_asset_file(root.join("assets/3d/cube.mesh.json")).expect("mesh hash");
+        let gltf_hash =
+            hash_project_asset_file(root.join("assets/3d/cube.gltf")).expect("gltf hash");
+        let generated_hash =
+            hash_project_asset_file(root.join("runs/3d/cube.mesh.json")).expect("generated hash");
+        let material_hash =
+            hash_project_asset_file(root.join("assets/materials/cube.material.json"))
+                .expect("material hash");
+        let texture_hash =
+            hash_project_asset_file(root.join("assets/textures/cube.png")).expect("texture hash");
+
+        let mesh_missing_payload = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "missing_mesh_payload",
+            "assets": [{
+                "id": "cube_mesh",
+                "type": "mesh",
+                "path": "assets/3d/cube.mesh.json",
+                "contentHash": mesh_hash,
+                "classification": "source_like"
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&mesh_missing_payload.to_string())
+            .expect_err("mesh payload required");
+        assert!(rejected.to_string().contains("mesh is required"));
+
+        let pbr_material = json!({
+            "schemaVersion": "asset-manifest-v1",
+            "id": "pbr_material_fixture",
+            "assets": [{
+                "id": "cube_material",
+                "type": "material",
+                "path": "assets/materials/cube.material.json",
+                "contentHash": material_hash,
+                "classification": "source_like",
+                "material": {
+                    "baseColor": "#5eead4",
+                    "shading": "lit",
+                    "metallic": 1
+                }
+            }]
+        });
+        let rejected = ProjectAssetManifest::from_json_str(&pbr_material.to_string())
+            .expect_err("pbr-ish material field rejected");
+        assert!(format!("{rejected:#}").contains("unknown field"));
+
+        let manifest_with =
+            |path: &str,
+             hash: ProjectAssetContentHash,
+             classification: ProjectAssetClassification| {
+                ProjectAssetManifest::from_json_str(
+                    &json!({
+                        "schemaVersion": "asset-manifest-v1",
+                        "id": "invalid_3d_asset_fixture",
+                        "assets": [{
+                            "id": "cube_mesh",
+                            "type": "mesh",
+                            "path": path,
+                            "contentHash": hash,
+                            "classification": classification,
+                            "mesh": {
+                                "kind": "primitive_cube",
+                                "vertexCount": 8
+                            }
+                        }]
+                    })
+                    .to_string(),
+                )
+                .expect("manifest parses")
+            };
+        let gltf = manifest_with(
+            "assets/3d/cube.gltf",
+            gltf_hash,
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = gltf
+            .validate_assets(&root)
+            .expect_err("broad gltf import rejected");
+        assert!(rejected.to_string().contains("unsupported extension"));
+
+        let generated_source = manifest_with(
+            "runs/3d/cube.mesh.json",
+            generated_hash,
+            ProjectAssetClassification::SourceLike,
+        );
+        let rejected = generated_source
+            .validate_assets(&root)
+            .expect_err("source-like mesh cannot live under generated root");
+        assert!(rejected.to_string().contains("generated root runs"));
+
+        let wrong_texture_type = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "wrong_texture_type_fixture",
+                "assets": [
+                    {
+                        "id": "cube_mesh",
+                        "type": "mesh",
+                        "path": "assets/3d/cube.mesh.json",
+                        "contentHash": hash_project_asset_file(root.join("assets/3d/cube.mesh.json")).expect("mesh hash"),
+                        "classification": "source_like",
+                        "mesh": { "kind": "primitive_cube", "vertexCount": 8 }
+                    },
+                    {
+                        "id": "not_a_texture",
+                        "type": "audio",
+                        "path": "assets/audio/not-a-texture.ogg",
+                        "contentHash": hash_project_asset_file(root.join("assets/audio/not-a-texture.ogg")).expect("audio hash"),
+                        "classification": "source_like",
+                        "durationMs": 100
+                    },
+                    {
+                        "id": "cube_material",
+                        "type": "material",
+                        "path": "assets/materials/cube.material.json",
+                        "contentHash": hash_project_asset_file(root.join("assets/materials/cube.material.json")).expect("material hash"),
+                        "classification": "source_like",
+                        "material": {
+                            "baseColor": "#5eead4",
+                            "textureAssetId": "not_a_texture",
+                            "shading": "unlit"
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let rejected = wrong_texture_type
+            .validate_assets(&root)
+            .expect_err("material texture must point to image asset");
+        assert!(rejected
+            .to_string()
+            .contains("must reference an image asset"));
+
+        let manifest = ProjectAssetManifest::from_json_str(
+            &json!({
+                "schemaVersion": "asset-manifest-v1",
+                "id": "mesh_material_warning_fixture",
+                "assets": [
+                    {
+                        "id": "cube_mesh",
+                        "type": "mesh",
+                        "path": "assets/3d/cube.mesh.json",
+                        "contentHash": hash_project_asset_file(root.join("assets/3d/cube.mesh.json")).expect("mesh hash"),
+                        "classification": "source_like",
+                        "mesh": { "kind": "primitive_cube", "vertexCount": 8 }
+                    },
+                    {
+                        "id": "cube_texture",
+                        "type": "image",
+                        "path": "assets/textures/cube.png",
+                        "contentHash": texture_hash,
+                        "classification": "source_like",
+                        "dimensions": { "width": 4, "height": 4 }
+                    },
+                    {
+                        "id": "cube_material",
+                        "type": "material",
+                        "path": "assets/materials/cube.material.json",
+                        "contentHash": hash_project_asset_file(root.join("assets/materials/cube.material.json")).expect("material hash"),
+                        "classification": "source_like",
+                        "material": { "baseColor": "#5eead4", "textureAssetId": "cube_texture" }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("manifest parses");
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "sceneKind": "3d",
+            "id": "mesh-material-warning-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "entities": [],
+            "scene3d": {
+                "version": "1",
+                "nodes": [{
+                    "id": "cube",
+                    "localTransform": {
+                        "translation": { "x": 0, "y": 0, "z": 0 },
+                        "rotation": { "x": 0, "y": 0, "z": 0 },
+                        "scale": { "x": 1, "y": 1, "z": 1 }
+                    },
+                    "meshRef": "missing_mesh",
+                    "materialRef": "cube_mesh"
+                }]
+            }
+        }))
+        .expect("scene parses");
+        let report = manifest
+            .check_scene_reference_integrity(&scene, &root)
+            .expect("3d warning report builds without remote fetch");
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "missing_asset_ref"));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == "invalid_asset_type"));
+        assert!(!root.join("assets/remote.gltf").exists());
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
     fn project_asset_manifest_rejects_unknown_type_mismatch_and_remote_scene_refs() {
         let manifest = ProjectAssetManifest::from_json_str(
             &json!({
@@ -66243,12 +66816,16 @@ scenarios:
         assert_eq!(graph.version, "1");
         assert_eq!(graph.nodes.len(), 2);
         assert_eq!(graph.nodes[1].parent.as_deref(), Some("root-cube"));
-        assert_eq!(graph.nodes[0].mesh_ref.as_deref(), Some("cube-mesh"));
+        assert_eq!(graph.nodes[0].mesh_ref.as_deref(), Some("cube_mesh"));
+        assert_eq!(
+            graph.nodes[0].material_ref.as_deref(),
+            Some("cube_material")
+        );
         assert_eq!(
             graph.nodes[0].collider_ref.as_deref(),
             Some("cube-collider")
         );
-        assert_eq!(graph.nodes[0].components.len(), 2);
+        assert_eq!(graph.nodes[0].components.len(), 3);
         assert_eq!(graph.nodes[0].components[0].kind, "mesh");
     }
 

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "capability_gate_3d_mesh_material_fixture",
+  "assets": [
+    {
+      "id": "cube_mesh",
+      "type": "mesh",
+      "path": "assets/3d/cube.mesh.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "186f7fe9a0d36aba"
+      },
+      "classification": "source_like",
+      "mesh": {
+        "kind": "fixture_mesh",
+        "vertexCount": 8,
+        "indexCount": 6
+      },
+      "source": "Ouroforge deterministic 3D fixture"
+    },
+    {
+      "id": "cube_texture",
+      "type": "image",
+      "path": "assets/textures/cube.png",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "b7c9ad1a67502961"
+      },
+      "classification": "source_like",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "source": "Ouroforge deterministic texture fixture"
+    },
+    {
+      "id": "cube_material",
+      "type": "material",
+      "path": "assets/materials/cube.material.json",
+      "contentHash": {
+        "algorithm": "fnv1a64-file-v1",
+        "value": "872ac59fabecb8f4"
+      },
+      "classification": "source_like",
+      "material": {
+        "baseColor": "#5eead4",
+        "textureAssetId": "cube_texture",
+        "shading": "lit"
+      },
+      "source": "Ouroforge deterministic material fixture"
+    }
+  ],
+  "notes": "Tiny source-like 3D mesh/material fixture only; not GLTF, renderer, marketplace, or import-pipeline evidence."
+}

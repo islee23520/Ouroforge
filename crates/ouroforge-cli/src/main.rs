@@ -1269,6 +1269,8 @@ fn project_asset_type_label(asset_type: ProjectAssetType) -> &'static str {
         ProjectAssetType::Tilemap => "tilemap",
         ProjectAssetType::Audio => "audio",
         ProjectAssetType::Font => "font",
+        ProjectAssetType::Mesh => "mesh",
+        ProjectAssetType::Material => "material",
     }
 }
 

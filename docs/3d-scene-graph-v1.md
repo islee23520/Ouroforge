@@ -28,9 +28,11 @@ The `entities` array is still the legacy 2D entity list. It may be present in an
 - `localTransform`: required integer translation, rotation, and scale vectors with `x`, `y`, and `z` axes.
 - `worldTransform`: optional resolved transform slot checked by deterministic
   component-wise resolution.
-- `meshRef` / `colliderRef`: optional local identifiers, not a broad asset import pipeline.
+- `meshRef` / `materialRef` / `colliderRef`: optional local identifiers, not a
+  broad asset import pipeline. `meshRef` and `materialRef` resolve through
+  project-local Asset Manifest v1 entries when a manifest is supplied.
 - `components`: optional bounded component declarations. Version 1 accepts only
-  `mesh`, `collider`, and `marker` component kinds; script/runtime/editor
+  `mesh`, `material`, `collider`, and `marker` component kinds; script/runtime/editor
   components are intentionally rejected until a later issue scopes them.
 - `metadata`: bounded JSON metadata for fixture notes.
 
@@ -48,6 +50,9 @@ Tracked 3D fixtures live under `examples/3d-capability-gate-v1/` and are small, 
 The initial fixtures cover:
 
 - valid explicit 3D schema: `scene-3d-valid.scene.json`;
+- valid local mesh/material manifest fixture:
+  `asset-manifest.mesh-material.valid.json` with tiny JSON source-like assets
+  under `assets/3d/`, `assets/materials/`, and `assets/textures/`;
 - invalid explicit 3D schema with missing graph: `scene-3d-invalid-missing-graph.scene.json`;
 - malformed 3D transform shape: `scene-3d-malformed-transform.scene.json`;
 - hierarchy and component validation failures: `scene-3d-invalid-missing-parent.scene.json`,
