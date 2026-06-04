@@ -1426,6 +1426,71 @@
     };
   }
 
+  function boundedMs(value, fallback = 0) {
+    return Number.isFinite(value) && value >= 0 ? value : fallback;
+  }
+
+  function frameBudgetConfig() {
+    const debug = world.metadata && typeof world.metadata.runtimeDebug === 'object' ? world.metadata.runtimeDebug : {};
+    const budget = debug.frameBudget && typeof debug.frameBudget === 'object' ? debug.frameBudget : {};
+    return {
+      updateMs: boundedMs(budget.updateMs, 8),
+      renderMs: boundedMs(budget.renderMs, 16),
+      evidenceMs: boundedMs(budget.evidenceMs, 4),
+      totalMs: boundedMs(budget.totalMs, 20),
+    };
+  }
+
+  function frameTimings() {
+    const debug = world.metadata && typeof world.metadata.runtimeDebug === 'object' ? world.metadata.runtimeDebug : {};
+    const timings = debug.frameTimings && typeof debug.frameTimings === 'object' ? debug.frameTimings : {};
+    return {
+      updateMs: boundedMs(timings.updateMs, 0),
+      renderMs: boundedMs(timings.renderMs, 0),
+      evidenceMs: boundedMs(timings.evidenceMs, 0),
+      totalMs: boundedMs(timings.totalMs, fixedDeltaMs),
+    };
+  }
+
+  function frameDebugCounts(renderQueue) {
+    const renderables = Array.isArray(renderQueue && renderQueue.renderables) ? renderQueue.renderables : [];
+    return {
+      entityCount: world.entities.length,
+      drawCallCount: renderables.filter((renderable) => renderable.visible !== false).length,
+      layerCount: Array.isArray(renderQueue && renderQueue.layers) ? renderQueue.layers.length : 0,
+      collisionPairCount: Array.isArray(world.physics && world.physics.contactPairs) ? world.physics.contactPairs.length : 0,
+      activeAnimationCount: world.entities.filter((entity) => entity.components && entity.components.animation && entity.components.animation.state).length,
+      activeVfxCount: Array.isArray(world.vfxEvents) ? world.vfxEvents.length : 0,
+      audioEventCount: Array.isArray(world.audioEvents) ? world.audioEvents.length : 0,
+    };
+  }
+
+  function runtimeFrameBudgetEvidence(frameId, renderQueue) {
+    const timings = frameTimings();
+    const budget = frameBudgetConfig();
+    const violations = Object.keys(budget)
+      .filter((field) => timings[field] > budget[field])
+      .map((field) => ({ field, actualMs: timings[field], budgetMs: budget[field] }));
+    return {
+      schemaVersion: 'ouroforge.runtime-frame-budget.v1',
+      frameId,
+      sceneId: world.sceneId,
+      scenarioId: typeof world.metadata.scenarioId === 'string' ? world.metadata.scenarioId : null,
+      timings,
+      budget,
+      counts: frameDebugCounts(renderQueue),
+      status: violations.length ? 'violated' : 'within-budget',
+      slowFrame: violations.length > 0,
+      violations,
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-debug-probe',
+        browserStudioMode: 'read-only evidence inspection',
+        disallowedActions: ['trusted writes', 'command bridge', 'live mutation'],
+      },
+      authority: 'browser_runtime_evidence_input_not_profiler_truth',
+    };
+  }
+
   let sceneReady = Promise.resolve();
   const api = Object.freeze({
     getWorldState() {
@@ -1442,6 +1507,7 @@
       state.renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })
         : null;
+      state.runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, state.renderQueue);
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
       state.componentModel = componentModelDebugState(world.entities);
@@ -1461,6 +1527,7 @@
       const renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world, renderer: rendererState, tilemap, frameId })
         : { layers: [], renderables: [], validation: { status: 'unreported', blockedReasons: [], warnings: [] } };
+      const runtimeFrameBudget = runtimeFrameBudgetEvidence(frameId, renderQueue);
       return clone({
         tick: world.tick,
         fixedDeltaMs,
@@ -1478,6 +1545,10 @@
         tilemapRenderCellCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.cellCount : 0,
         tilemapRenderDrawnTileCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.drawnTileCount : 0,
         tilemapRenderMissingTileRefCount: renderQueue.tilemapStats ? renderQueue.tilemapStats.missingTileRefCount : 0,
+        runtimeFrameBudgetStatus: runtimeFrameBudget.status,
+        runtimeFrameBudgetViolationCount: runtimeFrameBudget.violations.length,
+        runtimeFrameBudgetFrameId: runtimeFrameBudget.frameId,
+        runtimeFrameBudgetCounts: runtimeFrameBudget.counts,
       });
     },
     getEvents() {

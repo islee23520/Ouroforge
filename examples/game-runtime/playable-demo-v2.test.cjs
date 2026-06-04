@@ -73,6 +73,12 @@ function createRuntime() {
   assert.equal(frameStats.renderQueueRenderableCount, state.renderQueue.renderables.length);
   assert.equal(frameStats.renderQueueDrawCallCount, state.renderQueue.renderables.filter((renderable) => renderable.visible !== false).length);
   assert.equal(frameStats.renderQueueSkippedCount, state.renderQueue.renderables.filter((renderable) => renderable.visible === false).length);
+  assert.equal(state.runtimeFrameBudget.schemaVersion, 'ouroforge.runtime-frame-budget.v1');
+  assert.equal(state.runtimeFrameBudget.status, 'within-budget');
+  assert.equal(state.runtimeFrameBudget.counts.drawCallCount, frameStats.renderQueueDrawCallCount);
+  assert.equal(state.runtimeFrameBudget.authority, 'browser_runtime_evidence_input_not_profiler_truth');
+  assert.equal(frameStats.runtimeFrameBudgetStatus, 'within-budget');
+  assert.equal(frameStats.runtimeFrameBudgetViolationCount, 0);
   assert.equal(state.assetManifest.errors.length, 0);
   assert.ok(state.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
   assert.equal(state.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
