@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "review-gated-level-apply-v1",
+  "transactionId": "level_apply_rejected",
+  "draftId": "agent_level_draft_collect_and_exit_intro",
+  "intentId": "intent_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "reviewDecision": {
+    "reviewDecisionId": "review_rejected",
+    "status": "rejected",
+    "reviewerId": "human_reviewer",
+    "draftAuthorId": "agent_level_designer",
+    "decisionRef": "evidence/level-apply/level_apply_rejected/review-decision.json"
+  },
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedBeforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "observedBeforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "targets": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "kind": "scene",
+      "transactionOutputRef": "evidence/level-apply/level_apply_rejected/scene-transaction-output.json",
+      "expectedAfterHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "rollbackMetadata": {
+    "rollbackPlanRef": "evidence/level-apply/level_apply_rejected/rollback-plan.json",
+    "preApplyBranch": "main",
+    "preApplyCommit": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetBeforeHashes": [
+      {
+        "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+        "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "rerunCommands": [
+    {
+      "command": "cargo test review_gated_level",
+      "argv": ["cargo", "test", "review_gated_level"],
+      "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+    }
+  ],
+  "evidenceRefs": [
+    {
+      "evidenceId": "agent_draft",
+      "kind": "agent_draft",
+      "pathHint": "evidence/level-apply/level_apply_rejected/agent-draft.json"
+    },
+    {
+      "evidenceId": "review_decision",
+      "kind": "review_decision",
+      "pathHint": "evidence/level-apply/level_apply_rejected/review-decision.json"
+    },
+    {
+      "evidenceId": "rollback_plan",
+      "kind": "rollback_plan",
+      "pathHint": "evidence/level-apply/level_apply_rejected/rollback-plan.json"
+    },
+    {
+      "evidenceId": "rerun_plan",
+      "kind": "rerun_plan",
+      "pathHint": "evidence/level-apply/level_apply_rejected/rerun-plan.json"
+    },
+    {
+      "evidenceId": "generated_state_audit",
+      "kind": "generated_state_audit",
+      "pathHint": "evidence/level-apply/level_apply_rejected/generated-state-audit.json"
+    }
+  ],
+  "status": "rejected",
+  "blockedReasons": ["Review rejected the generated level draft."],
+  "guardrails": [
+    "review-gated level apply metadata only; no auto-apply is authorized",
+    "no auto-merge, no self-approval, and no browser command bridge"
+  ]
+}

@@ -87,7 +87,8 @@ proves a safer dependency order:
    ([Level Visual Semantic Diff v1](level-visual-semantic-diff-v1.md)).
 10. #637 - Agent-Generated Level Draft v1
     ([Agent-Generated Level Draft v1](agent-generated-level-draft-v1.md)).
-11. #638 - Review-Gated Level Apply v1.
+11. #638 - Review-Gated Level Apply v1
+    ([Review-Gated Level Apply v1](review-gated-level-apply-v1.md)).
 12. #639 - Studio Level Design Inspection Surface v1.
 13. #640 - Agentic Level Design Demo v1.
 14. #641 - Scenario Coverage v10: Agentic Level Design Regression Suite.

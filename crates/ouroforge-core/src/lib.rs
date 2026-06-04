@@ -19738,6 +19738,639 @@ fn agent_level_draft_expected_evidence_kind_label(
     }
 }
 
+const REVIEW_GATED_LEVEL_APPLY_SCHEMA_VERSION: &str = "review-gated-level-apply-v1";
+const REVIEW_GATED_LEVEL_APPLY_READ_MODEL_SCHEMA_VERSION: &str =
+    "review-gated-level-apply-read-model-v1";
+const MAX_REVIEW_GATED_LEVEL_APPLY_TARGETS: usize = 16;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "reviewDecision")]
+    pub review_decision: ReviewGatedLevelApplyDecision,
+    #[serde(rename = "targetHashes")]
+    pub target_hashes: Vec<ReviewGatedLevelApplyTargetHash>,
+    pub targets: Vec<ReviewGatedLevelApplyTarget>,
+    #[serde(rename = "rollbackMetadata")]
+    pub rollback_metadata: ReviewGatedLevelApplyRollbackMetadata,
+    #[serde(rename = "rerunCommands")]
+    pub rerun_commands: Vec<ReviewGatedLevelApplyRerunCommand>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<ReviewGatedLevelApplyEvidenceRef>,
+    pub status: ReviewGatedLevelApplyStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyDecision {
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    pub status: ReviewGatedLevelApplyDecisionStatus,
+    #[serde(rename = "reviewerId")]
+    pub reviewer_id: String,
+    #[serde(rename = "draftAuthorId")]
+    pub draft_author_id: String,
+    #[serde(rename = "decisionRef")]
+    pub decision_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewGatedLevelApplyDecisionStatus {
+    Accepted,
+    Rejected,
+    Deferred,
+    Missing,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyTargetHash {
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    #[serde(rename = "expectedBeforeHash")]
+    pub expected_before_hash: String,
+    #[serde(rename = "observedBeforeHash")]
+    pub observed_before_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyTarget {
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    pub kind: ReviewGatedLevelApplyTargetKind,
+    #[serde(rename = "transactionOutputRef")]
+    pub transaction_output_ref: String,
+    #[serde(rename = "expectedAfterHash")]
+    pub expected_after_hash: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewGatedLevelApplyTargetKind {
+    Scene,
+    Tilemap,
+    PlacementEvidence,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyRollbackMetadata {
+    #[serde(rename = "rollbackPlanRef")]
+    pub rollback_plan_ref: String,
+    #[serde(rename = "preApplyBranch")]
+    pub pre_apply_branch: String,
+    #[serde(rename = "preApplyCommit")]
+    pub pre_apply_commit: String,
+    #[serde(rename = "targetBeforeHashes")]
+    pub target_before_hashes: Vec<ReviewGatedLevelApplyRollbackTarget>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyRollbackTarget {
+    #[serde(rename = "targetRef")]
+    pub target_ref: String,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyRerunCommand {
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyEvidenceRef {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: ReviewGatedLevelApplyEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewGatedLevelApplyEvidenceKind {
+    AgentDraft,
+    ReviewDecision,
+    LevelDiff,
+    RollbackPlan,
+    RerunPlan,
+    GeneratedStateAudit,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewGatedLevelApplyStatus {
+    ReadyForTrustedApply,
+    MissingReview,
+    Rejected,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewGatedLevelApplyReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    pub status: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "rerunCommandCount")]
+    pub rerun_command_count: usize,
+    #[serde(rename = "evidenceCount")]
+    pub evidence_count: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl ReviewGatedLevelApplyArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: ReviewGatedLevelApplyArtifact =
+            serde_json::from_str(input).context("failed to parse Review-Gated Level Apply JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != REVIEW_GATED_LEVEL_APPLY_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "review-gated level apply schemaVersion must be {REVIEW_GATED_LEVEL_APPLY_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component(
+            "review-gated level apply transactionId",
+            &self.transaction_id,
+        )?;
+        validate_path_component("review-gated level apply draftId", &self.draft_id)?;
+        validate_path_component("review-gated level apply intentId", &self.intent_id)?;
+        validate_path_component("review-gated level apply planId", &self.plan_id)?;
+        self.review_decision.validate()?;
+        validate_review_gated_level_apply_targets(&self.transaction_id, &self.targets)?;
+        validate_review_gated_level_apply_target_hashes(&self.targets, &self.target_hashes)?;
+        self.rollback_metadata.validate(&self.targets)?;
+        validate_review_gated_level_apply_rerun_commands(&self.rerun_commands)?;
+        validate_review_gated_level_apply_evidence(&self.transaction_id, &self.evidence_refs)?;
+        validate_review_gated_level_apply_guardrails(&self.guardrails)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("review-gated level apply blockedReasons", reason)?;
+        }
+        validate_review_gated_level_apply_status(
+            self.status,
+            &self.review_decision,
+            &self.target_hashes,
+            &self.blocked_reasons,
+        )
+    }
+}
+
+impl ReviewGatedLevelApplyDecision {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "review-gated level apply reviewDecision.reviewDecisionId",
+            &self.review_decision_id,
+        )?;
+        validate_path_component(
+            "review-gated level apply reviewDecision.reviewerId",
+            &self.reviewer_id,
+        )?;
+        validate_path_component(
+            "review-gated level apply reviewDecision.draftAuthorId",
+            &self.draft_author_id,
+        )?;
+        validate_evidence_artifact_path(&self.decision_ref)?;
+        Ok(())
+    }
+}
+
+impl ReviewGatedLevelApplyRollbackMetadata {
+    fn validate(&self, targets: &[ReviewGatedLevelApplyTarget]) -> Result<()> {
+        validate_evidence_artifact_path(&self.rollback_plan_ref)?;
+        validate_path_component(
+            "review-gated level apply rollbackMetadata.preApplyBranch",
+            &self.pre_apply_branch,
+        )?;
+        validate_snapshot_hash(
+            "review-gated level apply rollbackMetadata.preApplyCommit",
+            &self.pre_apply_commit,
+        )?;
+        if self.target_before_hashes.is_empty() {
+            return Err(anyhow!(
+                "review-gated level apply rollbackMetadata.targetBeforeHashes must not be empty"
+            ));
+        }
+        let target_refs = targets
+            .iter()
+            .map(|target| target.target_ref.as_str())
+            .collect::<BTreeSet<_>>();
+        let mut rollback_refs = BTreeSet::new();
+        for target in &self.target_before_hashes {
+            validate_repo_relative_source_ref(
+                "review-gated level apply rollbackMetadata.targetBeforeHashes.targetRef",
+                &target.target_ref,
+            )?;
+            validate_snapshot_hash(
+                "review-gated level apply rollbackMetadata.targetBeforeHashes.beforeHash",
+                &target.before_hash,
+            )?;
+            if !target_refs.contains(target.target_ref.as_str()) {
+                return Err(anyhow!(
+                    "review-gated level apply rollbackMetadata targetBeforeHashes targetRef is not an apply target: {}",
+                    target.target_ref
+                ));
+            }
+            if !rollback_refs.insert(target.target_ref.as_str()) {
+                return Err(anyhow!(
+                    "duplicate review-gated level apply rollback target: {}",
+                    target.target_ref
+                ));
+            }
+        }
+        for target in targets {
+            if !rollback_refs.contains(target.target_ref.as_str()) {
+                return Err(anyhow!(
+                    "review-gated level apply rollbackMetadata must include target: {}",
+                    target.target_ref
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn review_gated_level_apply_read_model_from_json_str(
+    input: &str,
+) -> Result<ReviewGatedLevelApplyReadModel> {
+    let artifact = ReviewGatedLevelApplyArtifact::from_json_str(input)?;
+    Ok(review_gated_level_apply_read_model(&artifact))
+}
+
+pub fn review_gated_level_apply_read_model(
+    artifact: &ReviewGatedLevelApplyArtifact,
+) -> ReviewGatedLevelApplyReadModel {
+    ReviewGatedLevelApplyReadModel {
+        schema_version: REVIEW_GATED_LEVEL_APPLY_READ_MODEL_SCHEMA_VERSION.to_string(),
+        transaction_id: artifact.transaction_id.clone(),
+        draft_id: artifact.draft_id.clone(),
+        review_decision_id: artifact.review_decision.review_decision_id.clone(),
+        status: review_gated_level_apply_status_label(artifact.status).to_string(),
+        target_count: artifact.targets.len(),
+        rerun_command_count: artifact.rerun_commands.len(),
+        evidence_count: artifact.evidence_refs.len(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Review-gated level apply contract; ready state requires accepted non-self review, fresh target hashes, rollback metadata, rerun evidence, and safe transaction outputs; no browser command bridge, no auto-apply, no auto-merge, no self-approval, no arbitrary script execution, and no autonomous full game generation.".to_string(),
+    }
+}
+
+fn validate_review_gated_level_apply_targets(
+    transaction_id: &str,
+    targets: &[ReviewGatedLevelApplyTarget],
+) -> Result<()> {
+    if targets.is_empty() || targets.len() > MAX_REVIEW_GATED_LEVEL_APPLY_TARGETS {
+        return Err(anyhow!(
+            "review-gated level apply targets must contain between 1 and {MAX_REVIEW_GATED_LEVEL_APPLY_TARGETS} entries"
+        ));
+    }
+    let mut target_refs = BTreeSet::new();
+    let mut output_refs = BTreeSet::new();
+    let expected_prefix = format!("evidence/level-apply/{transaction_id}/");
+    for target in targets {
+        validate_repo_relative_source_ref(
+            "review-gated level apply targets.targetRef",
+            &target.target_ref,
+        )?;
+        if matches!(target.kind, ReviewGatedLevelApplyTargetKind::Scene)
+            && !target.target_ref.ends_with(".scene.json")
+        {
+            return Err(anyhow!(
+                "review-gated level apply scene targets must point to .scene.json fixtures"
+            ));
+        }
+        validate_evidence_artifact_path(&target.transaction_output_ref)?;
+        if !target.transaction_output_ref.starts_with(&expected_prefix)
+            || !target.transaction_output_ref.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "review-gated level apply transactionOutputRef must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if target.transaction_output_ref == target.target_ref {
+            return Err(anyhow!(
+                "review-gated level apply transactionOutputRef must not collide with targetRef"
+            ));
+        }
+        validate_snapshot_hash(
+            "review-gated level apply targets.expectedAfterHash",
+            &target.expected_after_hash,
+        )?;
+        if !target_refs.insert(target.target_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate review-gated level apply targets.targetRef: {}",
+                target.target_ref
+            ));
+        }
+        if !output_refs.insert(target.transaction_output_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate review-gated level apply targets.transactionOutputRef: {}",
+                target.transaction_output_ref
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_review_gated_level_apply_target_hashes(
+    targets: &[ReviewGatedLevelApplyTarget],
+    target_hashes: &[ReviewGatedLevelApplyTargetHash],
+) -> Result<()> {
+    if target_hashes.is_empty() {
+        return Err(anyhow!(
+            "review-gated level apply targetHashes must not be empty"
+        ));
+    }
+    let target_refs = targets
+        .iter()
+        .map(|target| target.target_ref.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut hash_refs = BTreeSet::new();
+    for hash in target_hashes {
+        validate_repo_relative_source_ref(
+            "review-gated level apply targetHashes.targetRef",
+            &hash.target_ref,
+        )?;
+        validate_snapshot_hash(
+            "review-gated level apply targetHashes.expectedBeforeHash",
+            &hash.expected_before_hash,
+        )?;
+        validate_snapshot_hash(
+            "review-gated level apply targetHashes.observedBeforeHash",
+            &hash.observed_before_hash,
+        )?;
+        if hash.expected_before_hash != hash.observed_before_hash {
+            return Err(anyhow!(
+                "review-gated level apply target hash is stale: {}",
+                hash.target_ref
+            ));
+        }
+        if !target_refs.contains(hash.target_ref.as_str()) {
+            return Err(anyhow!(
+                "review-gated level apply targetHashes targetRef is not an apply target: {}",
+                hash.target_ref
+            ));
+        }
+        if !hash_refs.insert(hash.target_ref.as_str()) {
+            return Err(anyhow!(
+                "duplicate review-gated level apply targetHashes.targetRef: {}",
+                hash.target_ref
+            ));
+        }
+    }
+    for target in targets {
+        if !hash_refs.contains(target.target_ref.as_str()) {
+            return Err(anyhow!(
+                "review-gated level apply targetHashes must include target: {}",
+                target.target_ref
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_review_gated_level_apply_rerun_commands(
+    commands: &[ReviewGatedLevelApplyRerunCommand],
+) -> Result<()> {
+    if commands.is_empty() {
+        return Err(anyhow!(
+            "review-gated level apply rerunCommands must not be empty"
+        ));
+    }
+    for command in commands {
+        require_bounded_display_text(
+            "review-gated level apply rerunCommands.command",
+            &command.command,
+        )?;
+        if command.argv.is_empty() {
+            return Err(anyhow!(
+                "review-gated level apply rerunCommands.argv must not be empty"
+            ));
+        }
+        let normalized = normalize_source_patch_test_command(&command.argv);
+        if normalized != command.command {
+            return Err(anyhow!(
+                "review-gated level apply rerunCommands.command must match normalized argv `{normalized}`"
+            ));
+        }
+        if command.allowlist_policy_id != "source-patch-preview-safe-local-checks-v1" {
+            return Err(anyhow!(
+                "review-gated level apply rerunCommands.allowlistPolicyId must be source-patch-preview-safe-local-checks-v1"
+            ));
+        }
+        let test_command = SourcePatchTestCommand {
+            command: command.command.clone(),
+            argv: command.argv.clone(),
+        };
+        if let Some(forbidden) = classify_source_patch_forbidden_test_command(&test_command) {
+            return Err(anyhow!(
+                "review-gated level apply rerunCommands forbidden: {}",
+                forbidden.reason
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_review_gated_level_apply_evidence(
+    transaction_id: &str,
+    refs: &[ReviewGatedLevelApplyEvidenceRef],
+) -> Result<()> {
+    if refs.is_empty() {
+        return Err(anyhow!(
+            "review-gated level apply evidenceRefs must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/level-apply/{transaction_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    let mut kinds = BTreeSet::new();
+    for evidence in refs {
+        validate_path_component(
+            "review-gated level apply evidenceRefs.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "review-gated level apply evidenceRefs.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate review-gated level apply evidenceRefs.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate review-gated level apply evidenceRefs.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+        kinds.insert(evidence.kind);
+    }
+    for required in [
+        ReviewGatedLevelApplyEvidenceKind::AgentDraft,
+        ReviewGatedLevelApplyEvidenceKind::ReviewDecision,
+        ReviewGatedLevelApplyEvidenceKind::RollbackPlan,
+        ReviewGatedLevelApplyEvidenceKind::RerunPlan,
+        ReviewGatedLevelApplyEvidenceKind::GeneratedStateAudit,
+    ] {
+        if !kinds.contains(&required) {
+            return Err(anyhow!(
+                "review-gated level apply evidenceRefs must include {} evidence",
+                review_gated_level_apply_evidence_kind_label(required)
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_review_gated_level_apply_guardrails(guardrails: &[String]) -> Result<()> {
+    if guardrails.is_empty() {
+        return Err(anyhow!(
+            "review-gated level apply guardrails must not be empty"
+        ));
+    }
+    for guardrail in guardrails {
+        require_bounded_display_text("review-gated level apply guardrails", guardrail)?;
+    }
+    let text = guardrails.join(" ").to_ascii_lowercase();
+    for required in [
+        "review-gated",
+        "no auto-apply",
+        "no auto-merge",
+        "no self-approval",
+        "no browser command bridge",
+    ] {
+        if !text.contains(required) {
+            return Err(anyhow!(
+                "review-gated level apply guardrails must include {required}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_review_gated_level_apply_status(
+    status: ReviewGatedLevelApplyStatus,
+    decision: &ReviewGatedLevelApplyDecision,
+    target_hashes: &[ReviewGatedLevelApplyTargetHash],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let is_self_approval = decision.reviewer_id == decision.draft_author_id;
+    let has_stale_target = target_hashes
+        .iter()
+        .any(|hash| hash.expected_before_hash != hash.observed_before_hash);
+    match status {
+        ReviewGatedLevelApplyStatus::ReadyForTrustedApply
+            if decision.status == ReviewGatedLevelApplyDecisionStatus::Accepted
+                && !is_self_approval
+                && !has_stale_target
+                && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        ReviewGatedLevelApplyStatus::MissingReview
+            if decision.status == ReviewGatedLevelApplyDecisionStatus::Missing
+                && !blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        ReviewGatedLevelApplyStatus::Rejected
+            if matches!(
+                decision.status,
+                ReviewGatedLevelApplyDecisionStatus::Rejected
+                    | ReviewGatedLevelApplyDecisionStatus::Deferred
+            ) && !blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        ReviewGatedLevelApplyStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        ReviewGatedLevelApplyStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        ReviewGatedLevelApplyStatus::ReadyForTrustedApply => Err(anyhow!(
+            "review-gated level apply ready status requires accepted non-self review, fresh target hashes, and no blockedReasons"
+        )),
+        ReviewGatedLevelApplyStatus::MissingReview => Err(anyhow!(
+            "review-gated level apply missing_review status requires missing review decision and blockedReasons"
+        )),
+        ReviewGatedLevelApplyStatus::Rejected => Err(anyhow!(
+            "review-gated level apply rejected status requires rejected/deferred review decision and blockedReasons"
+        )),
+        ReviewGatedLevelApplyStatus::Stale => Err(anyhow!(
+            "review-gated level apply stale status requires blockedReasons"
+        )),
+        ReviewGatedLevelApplyStatus::Blocked => Err(anyhow!(
+            "review-gated level apply blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn review_gated_level_apply_status_label(status: ReviewGatedLevelApplyStatus) -> &'static str {
+    match status {
+        ReviewGatedLevelApplyStatus::ReadyForTrustedApply => "ready_for_trusted_apply",
+        ReviewGatedLevelApplyStatus::MissingReview => "missing_review",
+        ReviewGatedLevelApplyStatus::Rejected => "rejected",
+        ReviewGatedLevelApplyStatus::Stale => "stale",
+        ReviewGatedLevelApplyStatus::Blocked => "blocked",
+    }
+}
+
+fn review_gated_level_apply_evidence_kind_label(
+    kind: ReviewGatedLevelApplyEvidenceKind,
+) -> &'static str {
+    match kind {
+        ReviewGatedLevelApplyEvidenceKind::AgentDraft => "agent_draft",
+        ReviewGatedLevelApplyEvidenceKind::ReviewDecision => "review_decision",
+        ReviewGatedLevelApplyEvidenceKind::LevelDiff => "level_diff",
+        ReviewGatedLevelApplyEvidenceKind::RollbackPlan => "rollback_plan",
+        ReviewGatedLevelApplyEvidenceKind::RerunPlan => "rerun_plan",
+        ReviewGatedLevelApplyEvidenceKind::GeneratedStateAudit => "generated_state_audit",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -64904,6 +65537,149 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("agent-generated-level-draft-v1.md"));
+    }
+
+    #[test]
+    fn review_gated_level_apply_v1_accepts_ready_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/review-gated-level-apply-v1/level-apply.ready.fixture.json"
+        );
+        let artifact = ReviewGatedLevelApplyArtifact::from_json_str(fixture)
+            .expect("ready review-gated level apply fixture parses");
+        assert_eq!(artifact.schema_version, "review-gated-level-apply-v1");
+        assert_eq!(
+            artifact.status,
+            ReviewGatedLevelApplyStatus::ReadyForTrustedApply
+        );
+        assert_eq!(
+            artifact.review_decision.status,
+            ReviewGatedLevelApplyDecisionStatus::Accepted
+        );
+        assert_ne!(
+            artifact.review_decision.reviewer_id,
+            artifact.review_decision.draft_author_id
+        );
+        assert_eq!(artifact.targets.len(), 2);
+
+        let read_model = review_gated_level_apply_read_model_from_json_str(fixture)
+            .expect("review-gated level apply read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "review-gated-level-apply-read-model-v1"
+        );
+        assert_eq!(read_model.status, "ready_for_trusted_apply");
+        assert_eq!(read_model.target_count, 2);
+        assert_eq!(read_model.rerun_command_count, 1);
+        assert!(read_model.boundary.contains("accepted non-self review"));
+        assert!(read_model.boundary.contains("rollback metadata"));
+        assert!(read_model.boundary.contains("no auto-apply"));
+        assert!(read_model.boundary.contains("no self-approval"));
+    }
+
+    #[test]
+    fn review_gated_level_apply_v1_accepts_blocked_missing_review_rejected_and_stale() {
+        for (fixture, expected_status) in [
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/level-apply.missing-review.fixture.json"
+                ),
+                ReviewGatedLevelApplyStatus::MissingReview,
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/level-apply.rejected.fixture.json"
+                ),
+                ReviewGatedLevelApplyStatus::Rejected,
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/level-apply.stale.fixture.json"
+                ),
+                ReviewGatedLevelApplyStatus::Stale,
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/level-apply.blocked.fixture.json"
+                ),
+                ReviewGatedLevelApplyStatus::Blocked,
+            ),
+        ] {
+            let artifact = ReviewGatedLevelApplyArtifact::from_json_str(fixture)
+                .expect("review-gated level apply state fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            assert!(!artifact.blocked_reasons.is_empty());
+        }
+    }
+
+    #[test]
+    fn review_gated_level_apply_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/missing-review.fixture.json"
+                ),
+                "accepted non-self review",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/self-approval.fixture.json"
+                ),
+                "accepted non-self review",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/auto-apply-command.fixture.json"
+                ),
+                "forbidden",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/stale-target.fixture.json"
+                ),
+                "target hash is stale",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/output-collision.fixture.json"
+                ),
+                "transactionOutputRef",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "evidenceRefs",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/missing-rollback.fixture.json"
+                ),
+                "rollbackMetadata",
+            ),
+        ] {
+            let error = ReviewGatedLevelApplyArtifact::from_json_str(fixture)
+                .expect_err("invalid review-gated level apply fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn review_gated_level_apply_v1_keeps_boundary_documented() {
+        let doc = include_str!("../../../docs/review-gated-level-apply-v1.md");
+        assert!(doc.contains("accepted non-self review"));
+        assert!(doc.contains("rollback metadata"));
+        assert!(doc.contains("No browser trusted writes"));
+        assert!(doc.contains("No auto-apply"));
+        assert!(doc.contains("No auto-merge"));
+        assert!(doc.contains("No self-approval"));
+        assert!(doc.contains("No autonomous full game generation"));
+        assert!(doc.contains("No production editor"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("review-gated-level-apply-v1.md"));
     }
 
     #[test]
