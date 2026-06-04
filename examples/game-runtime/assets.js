@@ -118,6 +118,10 @@
     for (const entity of Array.isArray(scene.entities) ? scene.entities : []) {
       const asset = entity && entity.sprite && entity.sprite.asset;
       if (typeof asset === 'string' && asset.length > 0) refs.add(asset);
+      const vfx = entity && entity.components && entity.components.vfx;
+      for (const emitter of (vfx && Array.isArray(vfx.emitters)) ? vfx.emitters : []) {
+        if (typeof emitter.asset === 'string' && emitter.asset.length > 0) refs.add(emitter.asset);
+      }
       const animation = entity && entity.components && entity.components.animation;
       if (animation) {
         addFrameAssets(animation.frames);

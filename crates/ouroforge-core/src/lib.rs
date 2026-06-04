@@ -30425,6 +30425,8 @@ pub struct SceneComponents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animation: Option<SceneAnimation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vfx: Option<SceneVfx>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<SceneAudio>,
 }
 
@@ -30689,6 +30691,31 @@ pub struct SceneAnimationState {
     pub elapsed_frames: u32,
     #[serde(default, rename = "frameIndex")]
     pub frame_index: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneVfx {
+    pub emitters: Vec<SceneVfxEmitter>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneVfxEmitter {
+    pub id: String,
+    pub kind: String,
+    pub trigger: String,
+    #[serde(default)]
+    pub disabled: bool,
+    #[serde(rename = "particleCount")]
+    pub particle_count: u32,
+    #[serde(rename = "lifetimeFrames")]
+    pub lifetime_frames: u32,
+    pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -33219,6 +33246,9 @@ fn validate_scene(scene: &SceneDocument) -> Result<()> {
         if let Some(animation) = &entity.components.animation {
             validate_scene_animation(&entity.id, animation, scene.asset_manifest.as_ref())?;
         }
+        if let Some(vfx) = &entity.components.vfx {
+            validate_scene_vfx(&entity.id, vfx, scene.asset_manifest.as_ref())?;
+        }
         if let Some(audio) = &entity.components.audio {
             validate_scene_audio(&entity.id, audio, scene.asset_manifest.as_ref())?;
         }
@@ -34874,6 +34904,84 @@ fn validate_scene_animation_frame(
             manifest,
             &[AssetManifestKind::Image, AssetManifestKind::Sprite],
         )?;
+    }
+    Ok(())
+}
+
+fn validate_scene_vfx(
+    entity_id: &str,
+    vfx: &SceneVfx,
+    manifest: Option<&AssetManifest>,
+) -> Result<()> {
+    if vfx.emitters.is_empty() {
+        return Err(anyhow!(
+            "scene entity {entity_id} vfx emitters must not be empty"
+        ));
+    }
+    if vfx.emitters.len() > 16 {
+        return Err(anyhow!(
+            "scene entity {entity_id} vfx emitters must contain at most 16 emitters"
+        ));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    for (index, emitter) in vfx.emitters.iter().enumerate() {
+        validate_path_component(
+            &format!("scene entity {entity_id} vfx emitters[{index}].id"),
+            &emitter.id,
+        )?;
+        if !ids.insert(emitter.id.as_str()) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} vfx emitter id: {}",
+                emitter.id
+            ));
+        }
+        if !matches!(emitter.kind.as_str(), "burst" | "trail" | "spark") {
+            return Err(anyhow!(
+                "scene entity {entity_id} vfx emitter {} kind must be burst, trail, or spark",
+                emitter.id
+            ));
+        }
+        if !matches!(
+            emitter.trigger.as_str(),
+            "tick" | "animation_state" | "manual"
+        ) {
+            return Err(anyhow!(
+                "scene entity {entity_id} vfx emitter {} trigger must be tick, animation_state, or manual",
+                emitter.id
+            ));
+        }
+        if emitter.particle_count == 0 || emitter.particle_count > 64 {
+            return Err(anyhow!(
+                "scene entity {entity_id} vfx emitter {} particleCount must be between 1 and 64",
+                emitter.id
+            ));
+        }
+        if emitter.lifetime_frames == 0 || emitter.lifetime_frames > 120 {
+            return Err(anyhow!(
+                "scene entity {entity_id} vfx emitter {} lifetimeFrames must be between 1 and 120",
+                emitter.id
+            ));
+        }
+        validate_scene_color(&emitter.color).with_context(|| {
+            format!(
+                "scene entity {entity_id} vfx emitter {} color is invalid",
+                emitter.id
+            )
+        })?;
+        if let Some(layer) = &emitter.layer {
+            validate_path_component(
+                &format!("scene entity {entity_id} vfx emitter {} layer", emitter.id),
+                layer,
+            )?;
+        }
+        if let Some(asset) = &emitter.asset {
+            validate_scene_asset_ref(
+                &format!("scene entity {entity_id} vfx emitter {} asset", emitter.id),
+                asset,
+                manifest,
+                &[AssetManifestKind::Image, AssetManifestKind::Sprite],
+            )?;
+        }
     }
     Ok(())
 }
@@ -58796,6 +58904,84 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("frameDuration must be greater than 0"));
+    }
+
+    #[test]
+    fn scene_vfx_v1_accepts_bounded_emitters_and_rejects_malformed_assets() {
+        let scene: SceneDocument = serde_json::from_value(json!({
+            "schemaVersion": "1",
+            "id": "vfx-v1-scene",
+            "bounds": { "width": 320, "height": 180 },
+            "assetManifest": {
+                "schemaVersion": "1",
+                "id": "runtime-v1-assets",
+                "assets": [
+                    { "id": "spark-sprite", "kind": "sprite", "path": "assets/sprites/goal.svg" }
+                ]
+            },
+            "entities": [{
+                "id": "player",
+                "sprite": { "color": "#5eead4", "asset": "spark-sprite" },
+                "components": {
+                    "transform": { "x": 0, "y": 0 },
+                    "velocity": { "x": 0, "y": 0 },
+                    "size": { "width": 16, "height": 16 },
+                    "controllable": true,
+                    "vfx": {
+                        "emitters": [
+                            { "id": "run-dust", "kind": "trail", "trigger": "tick", "particleCount": 4, "lifetimeFrames": 6, "color": "#94a3b8", "asset": "spark-sprite", "layer": "actors" },
+                            { "id": "disabled-spark", "kind": "spark", "trigger": "manual", "disabled": true, "particleCount": 2, "lifetimeFrames": 12, "color": "#facc15" }
+                        ]
+                    }
+                }
+            }]
+        }))
+        .expect("vfx scene parses");
+        validate_scene(&scene).expect("bounded vfx emitters validate");
+        let emitters = &scene.entities[0]
+            .components
+            .vfx
+            .as_ref()
+            .expect("vfx")
+            .emitters;
+        assert_eq!(emitters.len(), 2);
+        assert!(emitters[1].disabled);
+
+        let mut bad_kind = scene.clone();
+        bad_kind.entities[0]
+            .components
+            .vfx
+            .as_mut()
+            .expect("vfx")
+            .emitters[0]
+            .kind = "gpu_particle".to_string();
+        let rejected = validate_scene(&bad_kind).expect_err("unsupported vfx kind rejected");
+        assert!(rejected.to_string().contains("kind must be"));
+
+        let mut too_many_particles = scene.clone();
+        too_many_particles.entities[0]
+            .components
+            .vfx
+            .as_mut()
+            .expect("vfx")
+            .emitters[0]
+            .particle_count = 65;
+        let rejected =
+            validate_scene(&too_many_particles).expect_err("unbounded particle count rejected");
+        assert!(rejected.to_string().contains("particleCount"));
+
+        let mut missing_asset = scene.clone();
+        missing_asset.entities[0]
+            .components
+            .vfx
+            .as_mut()
+            .expect("vfx")
+            .emitters[0]
+            .asset = Some("missing-spark".to_string());
+        let rejected = validate_scene(&missing_asset).expect_err("missing vfx asset rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown asset manifest id"));
     }
 
     #[test]
