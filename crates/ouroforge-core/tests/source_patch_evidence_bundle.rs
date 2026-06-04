@@ -48,6 +48,64 @@ fn source_patch_evidence_bundle_round_trips_complete_fixture_without_apply_autho
 }
 
 #[test]
+fn source_patch_evidence_bundle_preserves_sandbox_test_and_review_evidence_links() {
+    let bundle = fixture_bundle();
+
+    let sandbox_ref = bundle
+        .sandbox_report_ref
+        .as_ref()
+        .expect("complete bundle carries sandbox report ref");
+    let test_ref = bundle
+        .test_summary_ref
+        .as_ref()
+        .expect("complete bundle carries test summary ref");
+    let review_ref = bundle
+        .review_decision_ref
+        .as_ref()
+        .expect("complete bundle carries review decision ref");
+
+    assert_eq!(bundle.dry_run_summary.status, "passed");
+    assert_eq!(
+        bundle
+            .dry_run_summary
+            .report_ref
+            .as_ref()
+            .expect("dry run summary links sandbox report"),
+        sandbox_ref
+    );
+    assert_eq!(bundle.review_summary.status, "reviewed");
+    assert_eq!(
+        bundle
+            .review_summary
+            .decision_ref
+            .as_ref()
+            .expect("review summary links review decision"),
+        review_ref
+    );
+    for artifact_ref in [sandbox_ref, test_ref, review_ref] {
+        assert!(
+            bundle
+                .linked_evidence
+                .iter()
+                .any(|linked| linked.kind == artifact_ref.kind && linked.path == artifact_ref.path),
+            "linkedEvidence must preserve {} at {}",
+            artifact_ref.kind,
+            artifact_ref.path
+        );
+    }
+    assert!(bundle
+        .required_test_summary
+        .commands
+        .iter()
+        .all(|command| { !command.contains("git apply") && !command.contains("git merge") }));
+
+    let validation =
+        validate_source_patch_evidence_bundle(&bundle).expect("linked complete bundle validates");
+    assert_eq!(validation.status, "passed");
+    assert_eq!(validation.artifact_count, bundle.linked_evidence.len());
+}
+
+#[test]
 fn source_patch_evidence_bundle_supports_partial_blocked_and_stale_states() {
     let mut partial = fixture_bundle();
     partial.status = SourcePatchEvidenceBundleStatus::Partial;

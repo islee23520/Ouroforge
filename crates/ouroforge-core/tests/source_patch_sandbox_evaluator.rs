@@ -344,6 +344,71 @@ fn source_patch_sandbox_allowlisted_tests_reject_forbidden_commands_before_execu
 }
 
 #[test]
+fn source_patch_sandbox_allowlisted_tests_capture_failed_smoke_without_trusted_writes() {
+    let temp = sandbox_test_dir("allowlisted-tests-capture-failed-smoke");
+    let trusted_dir = temp.join("repo");
+    let run_dir = temp.join("run");
+    let trusted_file = trusted_dir.join("examples/evidence-dashboard/dashboard.js");
+    let worktree_file =
+        run_dir.join("sandbox/patch-preview-1/worktree/examples/evidence-dashboard/dashboard.js");
+    fs::create_dir_all(trusted_file.parent().expect("trusted parent")).expect("create trusted dir");
+    fs::create_dir_all(worktree_file.parent().expect("worktree parent")).expect("create worktree");
+    fs::write(&trusted_file, "const trusted = 'unchanged';\n").expect("write trusted js");
+    fs::write(&worktree_file, "const broken = ;\n").expect("write invalid sandbox js");
+
+    let required_tests = vec![SourcePatchPreviewRequiredTest {
+        command: "node --check examples/evidence-dashboard/dashboard.js".to_string(),
+        argv: vec![
+            "node".to_string(),
+            "--check".to_string(),
+            "examples/evidence-dashboard/dashboard.js".to_string(),
+        ],
+        allowlist_policy_id: Some("source-patch-preview-safe-local-checks-v1".to_string()),
+        execution_authority: "sandbox_allowlisted_execution".to_string(),
+    }];
+
+    let error =
+        run_source_patch_sandbox_allowlisted_tests(&fixture_plan(), &required_tests, &run_dir)
+            .expect_err("allowed sandbox smoke command should report execution failure");
+    assert!(error
+        .to_string()
+        .contains("source patch sandbox test execution blocked"));
+    assert_eq!(
+        fs::read_to_string(&trusted_file).expect("trusted file unchanged"),
+        "const trusted = 'unchanged';\n"
+    );
+
+    let report_path = run_dir.join("sandbox/patch-preview-1/evidence/test-execution-report.json");
+    let report_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&report_path).expect("failed report written"))
+            .expect("failed report parses");
+    assert_eq!(report_json["status"], "blocked");
+    assert_eq!(
+        report_json["commandsRun"][0],
+        "node --check examples/evidence-dashboard/dashboard.js"
+    );
+    assert_eq!(report_json["tests"][0]["status"], "failed");
+    assert!(report_json["blockedReasons"][0]
+        .as_str()
+        .expect("blocked reason")
+        .contains("command exited with status"));
+    assert!(report_json["tests"][0]["stderrPreview"]
+        .as_str()
+        .expect("stderr preview")
+        .contains("SyntaxError"));
+    assert!(report_json["guardrails"]
+        .as_array()
+        .expect("guardrails array")
+        .iter()
+        .any(|guardrail| guardrail
+            .as_str()
+            .unwrap_or_default()
+            .contains("current_dir")));
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
 fn source_patch_sandbox_apply_requires_passed_preview_validation() {
     let temp = sandbox_test_dir("apply-requires-validation");
     let repo_root = temp.join("repo");
