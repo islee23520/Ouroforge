@@ -15,6 +15,7 @@
     "targetFreshness": "fixture-not-live"
   },
   "staleTargetPolicy": "regenerate_preview_before_any_future_review_if_target_hash_or_latest_main_changes",
+  "artifactHash": "sha256:fixture-preview-artifact-hash",
   "targets": [
     {
       "path": "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
@@ -31,6 +32,7 @@
   ],
   "diffSummary": {
     "summary": "Fixture-only preview of a text label change in a deterministic scene file.",
+    "diffText": "diff --git a/examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json b/examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json\n--- a/examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json\n+++ b/examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json\n@@ -1 +1 @@\n-old label\n+new label\n",
     "diffStats": {
       "filesChanged": 1,
       "additions": 1,

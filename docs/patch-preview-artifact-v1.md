@@ -7,7 +7,7 @@ explain proposed file changes, file classes, risk, evidence, expected behavior,
 required tests, reviewer checks, and blocked reasons, but it does not write
 source files, execute commands, approve changes, or merge patches.
 
-This document is design/control scope only. Source mutation application remains
+This document is design/control scope only. The implemented schema structs and fixture-backed serde tests for issue #358 SMP1.4.1 use the existing `patch-preview.v1` schema string and remain preview-only. Source mutation application remains
 blocked until a later explicit implementation milestone authorizes an apply path
 with review, rollback, sandbox, stale-target, and generated-state controls.
 
@@ -25,6 +25,7 @@ A patch preview artifact should include:
 | `sourceMutationApplyStatus` | yes | Must be `blocked`; any `applied`, `merged`, or command-executed state is invalid for this design gate. |
 | `baseRef` | yes | Branch/commit/hash context the preview was generated against. |
 | `staleTargetPolicy` | yes | How target hash or latest-main drift forces regeneration before review. |
+| `artifactHash` | yes | Hash of the serialized preview artifact or deterministic fixture hash used to detect stale/mismatched preview evidence. |
 
 ## Target files
 
@@ -47,6 +48,8 @@ The preview should make the proposed change reviewable without requiring hidden
 patch application:
 
 - `summary`: concise human-readable change summary.
+- `diffText`: optional bounded unified diff text for review; it is inert data,
+  not an executable patch.
 - `diffStats`: files changed, additions, deletions, binary/opaque indicators,
   generated-origin indicators, and truncation status.
 - `hunks`: bounded text hunk summaries or explicit omitted-content warnings.

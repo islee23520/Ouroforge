@@ -10228,6 +10228,198 @@ pub struct PatchDraftArtifact {
     pub drafts: Vec<PatchDraft>,
 }
 
+pub const SOURCE_PATCH_PREVIEW_SCHEMA_VERSION: &str = "patch-preview.v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchPreviewApplyStatus {
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchPreviewRiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewProducer {
+    pub name: String,
+    pub version: String,
+    #[serde(rename = "trustedBoundary")]
+    pub trusted_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewBaseRef {
+    pub branch: String,
+    pub commit: String,
+    #[serde(rename = "targetFreshness")]
+    pub target_freshness: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewTarget {
+    pub path: String,
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "afterHash", default, skip_serializing_if = "Option::is_none")]
+    pub after_hash: Option<String>,
+    #[serde(rename = "fileClass")]
+    pub file_class: String,
+    #[serde(rename = "reviewLevel")]
+    pub review_level: String,
+    #[serde(rename = "classificationStatus")]
+    pub classification_status: String,
+    #[serde(rename = "classificationRationale")]
+    pub classification_rationale: String,
+    #[serde(rename = "blockedReasons", default)]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewDiffStats {
+    #[serde(rename = "filesChanged")]
+    pub files_changed: usize,
+    pub additions: usize,
+    pub deletions: usize,
+    #[serde(rename = "binaryOrOpaque")]
+    pub binary_or_opaque: bool,
+    #[serde(rename = "generatedOrigin")]
+    pub generated_origin: bool,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewHunkSummary {
+    pub path: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewDiffSummary {
+    pub summary: String,
+    #[serde(rename = "diffText", default, skip_serializing_if = "Option::is_none")]
+    pub diff_text: Option<String>,
+    #[serde(rename = "diffStats")]
+    pub diff_stats: SourcePatchPreviewDiffStats,
+    pub hunks: Vec<SourcePatchPreviewHunkSummary>,
+    #[serde(
+        rename = "largeDiffWarning",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub large_diff_warning: Option<String>,
+    #[serde(
+        rename = "binaryOrOpaqueWarning",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub binary_or_opaque_warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewEvidenceRef {
+    pub kind: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewRequiredTest {
+    pub command: String,
+    #[serde(rename = "executionAuthority")]
+    pub execution_authority: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewRollbackExpectations {
+    #[serde(rename = "requiredBeforeApply")]
+    pub required_before_apply: bool,
+    #[serde(rename = "minimumFields")]
+    pub minimum_fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewReadModelPrototype {
+    pub status: String,
+    #[serde(rename = "displayLabel")]
+    pub display_label: String,
+    #[serde(rename = "fileClassSummary")]
+    pub file_class_summary: String,
+    #[serde(rename = "riskSummary")]
+    pub risk_summary: String,
+    #[serde(rename = "primaryBlockedReason")]
+    pub primary_blocked_reason: String,
+    #[serde(rename = "allowedActions")]
+    pub allowed_actions: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    pub producer: SourcePatchPreviewProducer,
+    #[serde(rename = "sourceMutationApplyStatus")]
+    pub source_mutation_apply_status: SourcePatchPreviewApplyStatus,
+    #[serde(rename = "baseRef")]
+    pub base_ref: SourcePatchPreviewBaseRef,
+    #[serde(rename = "staleTargetPolicy")]
+    pub stale_target_policy: String,
+    #[serde(rename = "artifactHash")]
+    pub artifact_hash: String,
+    pub targets: Vec<SourcePatchPreviewTarget>,
+    #[serde(rename = "diffSummary")]
+    pub diff_summary: SourcePatchPreviewDiffSummary,
+    #[serde(rename = "riskLevel")]
+    pub risk_level: SourcePatchPreviewRiskLevel,
+    #[serde(rename = "riskIds")]
+    pub risk_ids: Vec<String>,
+    #[serde(rename = "linkedEvidence")]
+    pub linked_evidence: Vec<SourcePatchPreviewEvidenceRef>,
+    #[serde(rename = "expectedBehaviorChange")]
+    pub expected_behavior_change: String,
+    #[serde(rename = "requiredTests")]
+    pub required_tests: Vec<SourcePatchPreviewRequiredTest>,
+    #[serde(rename = "reviewerChecklist")]
+    pub reviewer_checklist: Vec<String>,
+    #[serde(rename = "rollbackExpectations")]
+    pub rollback_expectations: SourcePatchPreviewRollbackExpectations,
+    #[serde(
+        rename = "readModelPrototype",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub read_model_prototype: Option<SourcePatchPreviewReadModelPrototype>,
+}
+
+impl SourcePatchPreviewArtifact {
+    pub fn apply_is_blocked(&self) -> bool {
+        self.source_mutation_apply_status == SourcePatchPreviewApplyStatus::Blocked
+    }
+}
+
 pub const PATCH_DIFF_INTEGRITY_SCHEMA_VERSION: &str = "patch-diff-integrity-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
