@@ -131,6 +131,8 @@ pub struct InputStep {
     pub up: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down: Option<bool>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub actions: BTreeMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -1645,10 +1647,17 @@ impl ScenarioStep {
                     && input.right.is_none()
                     && input.up.is_none()
                     && input.down.is_none()
+                    && input.actions.is_empty()
                 {
                     return Err(anyhow!(
-                        "scenarios[{scenario_index}].steps[{step_index}].input must set at least one direction"
+                        "scenarios[{scenario_index}].steps[{step_index}].input must set at least one direction or action"
                     ));
+                }
+                for action in input.actions.keys() {
+                    validate_path_component(
+                        &format!("scenarios[{scenario_index}].steps[{step_index}].input action id"),
+                        action,
+                    )?;
                 }
             }
             ScenarioStep::Transition { transition } => {
@@ -47852,6 +47861,36 @@ scenarios:
             seed.scenarios[0].steps[2],
             ScenarioStep::Transition { .. }
         ));
+    }
+
+    #[test]
+    fn parses_scenario_input_action_step_without_breaking_legacy_directions() {
+        let valid = r#"
+id: action-input.seed
+title: Action Input Seed
+goal: Validate action input steps.
+constraints:
+  target: game-runtime
+acceptance:
+  - Action input parses.
+scenarios:
+  - id: action-input-smoke
+    description: Exercise additive action ids beside legacy directions.
+    steps:
+      - input:
+          right: true
+          actions:
+            jump: true
+            interact: false
+"#;
+
+        let seed = Seed::from_yaml_str(valid).expect("action input step parses");
+        let ScenarioStep::Input { input } = &seed.scenarios[0].steps[0] else {
+            panic!("expected input step");
+        };
+        assert_eq!(input.right, Some(true));
+        assert_eq!(input.actions.get("jump"), Some(&true));
+        assert_eq!(input.actions.get("interact"), Some(&false));
     }
 
     #[test]

@@ -1,6 +1,8 @@
 (() => {
   const fixedDeltaMs = 16;
   const input = { left: false, right: false, up: false, down: false };
+  const rawKeys = {};
+  const actionInput = {};
   const events = [];
   const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [] };
   const snapshotFactory = (window.OuroforgeSnapshots || {
@@ -167,6 +169,29 @@
     return Array.isArray(value) ? value.map(String) : [];
   }
 
+  function normalizeActionMap(value = null) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    const actions = Array.isArray(source && source.actions) ? source.actions : [];
+    return {
+      actions: actions
+        .filter((action) => action && typeof action === 'object' && typeof action.id === 'string')
+        .map((action) => ({
+          id: action.id,
+          keyboard: stringList(action.keyboard).map((key) => key.toLowerCase()),
+          gamepad: action.gamepad && typeof action.gamepad === 'object'
+            ? {
+              buttons: stringList(action.gamepad.buttons).map((button) => button.toLowerCase()),
+              axes: Array.isArray(action.gamepad.axes)
+                ? action.gamepad.axes
+                  .filter((axis) => axis && typeof axis.axis === 'string')
+                  .map((axis) => ({ axis: axis.axis.toLowerCase(), direction: String(axis.direction || '') }))
+                : [],
+            }
+            : null,
+        })),
+    };
+  }
+
   function statusComponent(value = {}, fallback = null) {
     const source = value && typeof value === 'object' ? value : {};
     const base = fallback && typeof fallback === 'object' ? fallback : {};
@@ -192,6 +217,9 @@
       moveSpeed: Number.isFinite(source.moveSpeed) ? source.moveSpeed : (Number.isFinite(base.moveSpeed) ? base.moveSpeed : 2),
       jumpImpulse: Number.isFinite(source.jumpImpulse) ? source.jumpImpulse : (Number.isFinite(base.jumpImpulse) ? base.jumpImpulse : null),
       allowedActions: stringList(Object.prototype.hasOwnProperty.call(source, 'allowedActions') ? source.allowedActions : base.allowedActions),
+      actionMap: Object.prototype.hasOwnProperty.call(source, 'actionMap')
+        ? normalizeActionMap(source.actionMap)
+        : (base.actionMap ? clone(base.actionMap) : null),
     };
   }
 
@@ -479,23 +507,79 @@
     }
   }
 
+  function keyAlias(key) {
+    const normalized = String(key || '').toLowerCase();
+    if (normalized === 'arrowleft') return 'left';
+    if (normalized === 'arrowright') return 'right';
+    if (normalized === 'arrowup') return 'up';
+    if (normalized === 'arrowdown') return 'down';
+    if (normalized === ' ') return 'space';
+    return normalized;
+  }
+
+  function rawKeyPressed(key) {
+    const normalized = keyAlias(key);
+    if (Object.prototype.hasOwnProperty.call(input, normalized)) return Boolean(input[normalized]);
+    return Boolean(rawKeys[normalized]);
+  }
+
+  function legacyActionState() {
+    return {
+      move: Boolean(input.left || input.right || input.up || input.down),
+      move_left: Boolean(input.left),
+      move_right: Boolean(input.right),
+      move_up: Boolean(input.up),
+      move_down: Boolean(input.down),
+      jump: Boolean(input.up),
+      interact: false,
+    };
+  }
+
+  function actionMapState(inputComponent = {}) {
+    const map = inputComponent.actionMap && Array.isArray(inputComponent.actionMap.actions)
+      ? inputComponent.actionMap
+      : null;
+    if (!map) return legacyActionState();
+    const resolved = {};
+    for (const action of map.actions) {
+      const keys = Array.isArray(action.keyboard) ? action.keyboard : [];
+      resolved[action.id] = keys.some((key) => rawKeyPressed(key));
+    }
+    return { ...legacyActionState(), ...resolved };
+  }
+
+  function resolvedActionState(inputComponent = null) {
+    const entity = player();
+    const component = inputComponent || (entity.components.input || {});
+    return { ...actionMapState(component), ...clone(actionInput) };
+  }
+
+  function actionAllowed(allowedActions, actionId, legacyGroup = null) {
+    if (!Array.isArray(allowedActions) || allowedActions.length === 0) return true;
+    return allowedActions.includes(actionId) || (legacyGroup ? allowedActions.includes(legacyGroup) : false);
+  }
+
   function applyInput() {
     const entity = player();
     const velocity = entity.components.velocity;
     const inputComponent = entity.components.input || {};
     const allowedActions = Array.isArray(inputComponent.allowedActions) ? inputComponent.allowedActions : [];
-    const canMove = allowedActions.length === 0 || allowedActions.includes('move');
-    const canJump = (allowedActions.length === 0 || allowedActions.includes('jump')) && Number.isFinite(inputComponent.jumpImpulse);
-    const speed = canMove ? (Number.isFinite(inputComponent.moveSpeed) ? inputComponent.moveSpeed : 2) : 0;
-    velocity.x = ((input.right ? 1 : 0) - (input.left ? 1 : 0)) * speed;
+    const actions = resolvedActionState(inputComponent);
+    const canMoveLeft = actionAllowed(allowedActions, 'move_left', 'move');
+    const canMoveRight = actionAllowed(allowedActions, 'move_right', 'move');
+    const canMoveUp = actionAllowed(allowedActions, 'move_up', 'move');
+    const canMoveDown = actionAllowed(allowedActions, 'move_down', 'move');
+    const canJump = actionAllowed(allowedActions, 'jump') && Number.isFinite(inputComponent.jumpImpulse);
+    const speed = Number.isFinite(inputComponent.moveSpeed) ? inputComponent.moveSpeed : 2;
+    velocity.x = (((actions.move_right && canMoveRight) ? 1 : 0) - ((actions.move_left && canMoveLeft) ? 1 : 0)) * speed;
     if (canJump) {
-      if (input.up && world.physics.grounded[entity.id]) {
+      if (actions.jump && world.physics.grounded[entity.id]) {
         velocity.y = -inputComponent.jumpImpulse;
         world.physics.grounded[entity.id] = false;
-        record('runtime.physics.jump', { entityId: entity.id, impulse: inputComponent.jumpImpulse });
+        record('runtime.physics.jump', { entityId: entity.id, actionId: 'jump', impulse: inputComponent.jumpImpulse });
       }
     } else {
-      velocity.y = ((input.down ? 1 : 0) - (input.up ? 1 : 0)) * speed;
+      velocity.y = (((actions.move_down && canMoveDown) ? 1 : 0) - ((actions.move_up && canMoveUp) ? 1 : 0)) * speed;
     }
   }
 
@@ -755,6 +839,9 @@
   function loadScene(scene) {
     const normalized = normalizeScene(scene);
     snapshots = snapshotFactory.createSnapshotRegistry();
+    for (const key of Object.keys(input)) input[key] = false;
+    for (const key of Object.keys(rawKeys)) delete rawKeys[key];
+    for (const actionId of Object.keys(actionInput)) delete actionInput[actionId];
     world.schemaVersion = normalized.schemaVersion;
     world.sceneId = normalized.id;
     world.bounds = clone(normalized.bounds);
@@ -938,7 +1025,21 @@
         input[key] = Boolean(nextInput[key]);
       }
     }
-    record('runtime.input.changed', { input });
+    if (nextInput.keys && typeof nextInput.keys === 'object' && !Array.isArray(nextInput.keys)) {
+      for (const [key, value] of Object.entries(nextInput.keys)) {
+        rawKeys[keyAlias(key)] = Boolean(value);
+      }
+    }
+    if (nextInput.actions && typeof nextInput.actions === 'object' && !Array.isArray(nextInput.actions)) {
+      for (const [actionId, value] of Object.entries(nextInput.actions)) {
+        actionInput[String(actionId)] = Boolean(value);
+      }
+    }
+    record('runtime.input.changed', {
+      input: clone(input),
+      rawInput: { directions: clone(input), keys: clone(rawKeys) },
+      actionState: resolvedActionState(),
+    });
     renderDebug();
     return api.getWorldState();
   }
@@ -1021,6 +1122,9 @@
     getWorldState() {
       const state = clone(world);
       state.input = clone(input);
+      state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
+      state.actionInput = clone(actionInput);
+      state.actionState = resolvedActionState();
       const frameId = `tick-${world.tick}`;
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.camera = cameraEvidence();
@@ -1092,16 +1196,22 @@
   });
 
   window.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft') setInput({ left: true });
-    if (event.key === 'ArrowRight') setInput({ right: true });
-    if (event.key === 'ArrowUp') setInput({ up: true });
-    if (event.key === 'ArrowDown') setInput({ down: true });
+    const key = keyAlias(event.key);
+    const patch = { keys: { [key]: true } };
+    if (key === 'left' || key === 'a') patch.left = true;
+    if (key === 'right' || key === 'd') patch.right = true;
+    if (key === 'up' || key === 'w' || key === 'space') patch.up = true;
+    if (key === 'down' || key === 's') patch.down = true;
+    setInput(patch);
   });
   window.addEventListener('keyup', (event) => {
-    if (event.key === 'ArrowLeft') setInput({ left: false });
-    if (event.key === 'ArrowRight') setInput({ right: false });
-    if (event.key === 'ArrowUp') setInput({ up: false });
-    if (event.key === 'ArrowDown') setInput({ down: false });
+    const key = keyAlias(event.key);
+    const patch = { keys: { [key]: false } };
+    if (key === 'left' || key === 'a') patch.left = false;
+    if (key === 'right' || key === 'd') patch.right = false;
+    if (key === 'up' || key === 'w' || key === 'space') patch.up = false;
+    if (key === 'down' || key === 's') patch.down = false;
+    setInput(patch);
   });
 
   function sceneSourceFromLocation(locationValue = globalThis.location) {
