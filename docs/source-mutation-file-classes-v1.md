@@ -5,9 +5,11 @@ artifact. It classifies which repository file classes could be considered by a
 future source patch proposal workflow and which classes remain disallowed unless
 a separate explicit design approval changes the boundary.
 
-This document is design/control only. It does not implement source mutation,
-source patch generation, source patch application, file-class enforcement,
-preview schemas, sandbox behavior, browser trusted writes, or command execution.
+This document is the design/control matrix. The implemented #356 classifier and
+preflight report shape are documented in `docs/source-file-class-validator-v1.md`.
+Neither document implements source mutation, source patch generation, source
+patch application, sandbox behavior, browser trusted writes, or command
+execution.
 
 ## Classification statuses
 

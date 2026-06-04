@@ -85,7 +85,9 @@ specific blocker and maintainer-approved replacement ordering:
 
 1. **Source File Class Validator** — classify eligible source-like files and
    reject generated, ignored, dependency, workflow, build-script, lockfile, tool
-   state, and unsafe path targets before any patch preview is created.
+   state, and unsafe path targets before any patch preview is created. Implemented
+   report shape, hard-block behavior, fixtures, and verification notes are
+   documented in `docs/source-file-class-validator-v1.md`.
 2. **Patch Diff Integrity** — validate unified diff shape, file paths, hunk
    consistency, expected old/new hashes where available, maximum size, allowed
    file classes, and no hidden binary or generated-state changes.
