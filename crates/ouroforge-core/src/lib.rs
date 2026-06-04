@@ -68206,6 +68206,35 @@ scenarios:
     }
 
     #[test]
+    fn script_module_interface_design_gate_v1_audits_no_runtime_boundary() {
+        let doc = include_str!("../../../docs/script-module-interface-design-gate-v1.md");
+        assert!(doc.contains("Issue: #615"));
+        assert!(doc.contains("design-only"));
+        assert!(doc.contains("read validated world"));
+        assert!(doc.contains("request bounded actions"));
+        assert!(doc.contains("emit structured events/signals"));
+        assert!(doc.contains("requiredTests"));
+        assert!(doc.contains("Forbidden APIs and fields"));
+        assert!(doc.contains("filesystem reads/writes"));
+        assert!(doc.contains("process spawning, shell execution, command execution"));
+        assert!(doc.contains("network, hosted/cloud/server/auth/account behavior"));
+        assert!(doc.contains("secrets, environment variables, credentials"));
+        assert!(doc.contains("eval"));
+        assert!(doc.contains("dynamic import"));
+        assert!(doc.contains("plugin loading"));
+        assert!(doc.contains("browser trusted writes"));
+        assert!(doc.contains("Review, sandbox, and evidence requirements"));
+        assert!(doc.contains("Deterministic execution expectations"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+        assert!(!doc.contains("script runtime is implemented"));
+        assert!(!doc.contains("trusted browser write enabled"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#615 design gate"));
+    }
+
+    #[test]
     fn agent_generated_level_draft_v1_accepts_drafted_fixture_and_read_model() {
         let fixture = include_str!(
             "../../../examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json"
