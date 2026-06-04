@@ -251,12 +251,13 @@ publication, and support boundaries described above.
 Recommended next milestone candidates after this governance refresh are:
 
 1. **3D Capability Gate v1 (#596-#608)** — the next dependency-ordered technical
-   branch, starting with the #596 scope/contract and then scene graph, camera,
-   mesh/material local references, render smoke evidence, physics, animation,
-   runtime probe, scenario compatibility, demo, Studio inspection, regression,
-   and roadmap refresh issues. Keep it a scoped capability gate, not a broad 3D
-   parity, production-engine, native-export, plugin-runtime, or Godot replacement
-   claim.
+   branch, starting with the #596 scope/contract in
+   [`docs/3d-capability-gate-v1.md`](3d-capability-gate-v1.md) and then scene
+   graph, camera, mesh/material local references, render smoke evidence, physics,
+   animation, runtime probe, scenario compatibility, demo, Studio inspection,
+   regression, and roadmap refresh issues. Keep it a scoped capability gate, not
+   a broad 3D parity, production-engine, native-export, plugin-runtime, or Godot
+   replacement claim.
 2. **Gameplay Scripting / Logic System v1 (#611-#625)** — a later candidate for
    bounded behavior models and safe script/logic boundaries after the 3D gate or
    by explicit maintainer resequencing.
