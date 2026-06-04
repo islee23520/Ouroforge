@@ -2587,23 +2587,31 @@ impl ProductionTaskBoard {
     }
 
     fn validate_target_ownership(&self) -> Result<()> {
-        let mut owners = BTreeMap::<String, (&str, &str)>::new();
+        // Artifact ids and paths occupy separate namespaces: an artifact id must
+        // only conflict with another task's artifact id, and a path only with
+        // another path. Keying both into one map would falsely reject a valid
+        // board where one task's artifact id equals another task's path string.
+        let mut id_owners = BTreeMap::<&str, (&str, &str)>::new();
+        let mut path_owners = BTreeMap::<&str, (&str, &str)>::new();
         for task in &self.tasks {
             if task.status.releases_ownership() {
                 continue;
             }
             for artifact in &task.target_artifacts {
-                for key in [&artifact.id, &artifact.path] {
+                for (namespace, key, owners) in [
+                    ("id", artifact.id.as_str(), &mut id_owners),
+                    ("path", artifact.path.as_str(), &mut path_owners),
+                ] {
                     if let Some((existing_task, existing_owner)) = owners.get(key) {
                         if *existing_owner != task.owner_agent {
                             return Err(anyhow!(
-                                "production task board target ownership conflict for {key}: task {existing_task} owned by {existing_owner} conflicts with task {} owned by {}",
+                                "production task board target ownership conflict for {namespace} {key}: task {existing_task} owned by {existing_owner} conflicts with task {} owned by {}",
                                 task.id,
                                 task.owner_agent
                             ));
                         }
                     } else {
-                        owners.insert(key.clone(), (task.id.as_str(), task.owner_agent.as_str()));
+                        owners.insert(key, (task.id.as_str(), task.owner_agent.as_str()));
                     }
                 }
             }
@@ -39396,6 +39404,15 @@ scenarios:
         let conflict_error = ProductionTaskBoard::from_json_str(&conflict.to_string())
             .expect_err("duplicate target ownership rejects board");
         assert!(conflict_error.to_string().contains("ownership conflict"));
+
+        // Cross-namespace: one task's artifact path equal to another task's
+        // artifact id (different owners) is NOT an ownership conflict — ids and
+        // paths are separate namespaces.
+        let mut cross_namespace = base.clone();
+        cross_namespace["tasks"][2]["targetArtifacts"][0]["path"] =
+            cross_namespace["tasks"][1]["targetArtifacts"][0]["id"].clone();
+        ProductionTaskBoard::from_json_str(&cross_namespace.to_string())
+            .expect("artifact path matching a different task's id is not an ownership conflict");
     }
 
     #[test]
