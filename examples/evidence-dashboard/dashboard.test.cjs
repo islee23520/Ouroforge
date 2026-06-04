@@ -279,6 +279,33 @@ const run = {
       ],
       readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
     },
+    renderer: {
+      version: '1',
+      camera: { x: 80, y: 30 },
+      viewport: { width: 160, height: 90 },
+      layers: [
+        { id: '<sky>', order: -10, visible: true, parallaxFactor: 50, cameraParticipation: true },
+        { id: '<hud>', order: 10, visible: true, parallaxFactor: 100, cameraParticipation: false },
+      ],
+    },
+    camera: {
+      activeCameraId: '<follow-player>',
+      rendererCamera: { x: 80, y: 30 },
+      viewport: { width: 160, height: 90 },
+      cameras: [{
+        id: '<follow-player>',
+        active: true,
+        followTarget: '<player>',
+        position: { x: 80, y: 30 },
+        viewport: { width: 160, height: 90 },
+        clampBounds: { x: 0, y: 0, width: 240, height: 120 },
+        zoom: 100,
+      }],
+      worldToScreen: {
+        '<player>': { x: 140, y: 66, layer: 'actors', cameraOffset: { x: 80, y: 30 } },
+        '<hud>': { x: 12, y: 8, layer: '<hud>', cameraOffset: { x: 0, y: 0 } },
+      },
+    },
     gameplay: {
       present: true,
       declaredFlagCount: 2,
@@ -762,6 +789,14 @@ assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /Collision ce
 assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /3 collision \/ 1 trigger \/ 1 hazard \/ 1 goal/);
 assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /&lt;platformer-ground&gt;/);
 assert.match(dashboard.renderTilemapSummary({}), /No tilemap world-state summary/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /Active camera/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /&lt;follow-player&gt;/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /parallax 50/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /camera disabled/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /World-to-screen samples/);
+assert.match(dashboard.renderCameraLayerSummary(run.engine_summaries), /Read-only camera\/layer evidence/);
+assert.doesNotMatch(dashboard.renderCameraLayerSummary(run.engine_summaries), /<follow-player>/);
+assert.match(dashboard.renderCameraLayerSummary({}), /No camera\/layer read model/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Renderable elements/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Render queue/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Queue status/);

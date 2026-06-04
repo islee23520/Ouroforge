@@ -33443,6 +33443,7 @@ pub struct RunDashboardEngineSummaries {
     pub scene: serde_json::Value,
     pub components: serde_json::Value,
     pub renderer: serde_json::Value,
+    pub camera: serde_json::Value,
     pub render_breakdown: serde_json::Value,
     pub render_queue: serde_json::Value,
     pub tilemaps: serde_json::Value,
@@ -36274,6 +36275,7 @@ fn read_dashboard_engine_summaries(
             scene: json!({}),
             components: json!({}),
             renderer: json!({}),
+            camera: json!({ "present": false, "emptyState": "No camera/layer read model is available." }),
             render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
             render_queue: json!({ "present": false, "emptyState": "No scene render queue evidence is available." }),
             tilemaps: json!({}),
@@ -36308,8 +36310,11 @@ fn read_dashboard_engine_summaries(
             "present": world_state.get("renderer").is_some(),
             "version": world_state.pointer("/renderer/version").cloned().unwrap_or(json!(null)),
             "renderedEntities": dashboard_array_len(world_state.pointer("/renderer/renderedEntities")),
-            "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null))
+            "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null)),
+            "viewport": world_state.pointer("/renderer/viewport").cloned().unwrap_or(json!(null)),
+            "layers": world_state.pointer("/renderer/layers").cloned().unwrap_or(json!([]))
         }),
+        camera: dashboard_camera_summary(world_state),
         render_breakdown: dashboard_render_breakdown_summary(world_state),
         render_queue: dashboard_render_queue_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
@@ -36480,6 +36485,89 @@ fn dashboard_render_queue_summary(world_state: &serde_json::Value) -> serde_json
         "layers": layers,
         "renderables": renderables,
         "readOnlyInspection": read_only
+    })
+}
+
+fn dashboard_camera_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let camera = world_state.get("camera");
+    let renderer = world_state
+        .get("renderer")
+        .unwrap_or(&serde_json::Value::Null);
+    let cameras = camera
+        .and_then(|value| value.get("cameras"))
+        .or_else(|| world_state.get("cameras"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let layers = renderer
+        .get("layers")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let world_to_screen = camera
+        .and_then(|value| value.get("worldToScreen"))
+        .and_then(|value| value.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let active_camera_id = camera
+        .and_then(|value| value.get("activeCameraId"))
+        .or_else(|| world_state.get("activeCameraId"))
+        .cloned()
+        .unwrap_or(json!(null));
+    let active_camera = cameras
+        .iter()
+        .find(|entry| entry.get("active").and_then(|value| value.as_bool()) == Some(true))
+        .cloned()
+        .unwrap_or(json!(null));
+    let renderer_camera = camera
+        .and_then(|value| value.get("rendererCamera"))
+        .or_else(|| renderer.get("camera"))
+        .cloned()
+        .unwrap_or(json!(null));
+    let viewport = camera
+        .and_then(|value| value.get("viewport"))
+        .or_else(|| renderer.get("viewport"))
+        .cloned()
+        .unwrap_or(json!(null));
+    let parallax_layer_count = layers
+        .iter()
+        .filter(|layer| {
+            layer
+                .get("parallaxFactor")
+                .and_then(|value| value.as_i64())
+                .is_some_and(|factor| factor != 100)
+        })
+        .count();
+    let camera_excluded_layer_count = layers
+        .iter()
+        .filter(|layer| {
+            layer
+                .get("cameraParticipation")
+                .and_then(|value| value.as_bool())
+                == Some(false)
+        })
+        .count();
+    let present = camera.is_some() || !cameras.is_empty() || !layers.is_empty();
+    json!({
+        "present": present,
+        "emptyState": if present { "" } else { "No camera/layer read model is available." },
+        "activeCameraId": active_camera_id,
+        "activeCamera": active_camera,
+        "rendererCamera": renderer_camera,
+        "viewport": viewport,
+        "cameraCount": cameras.len(),
+        "layerCount": layers.len(),
+        "parallaxLayerCount": parallax_layer_count,
+        "cameraExcludedLayerCount": camera_excluded_layer_count,
+        "worldToScreenSampleCount": world_to_screen.len(),
+        "cameras": cameras,
+        "layers": layers,
+        "worldToScreen": world_to_screen,
+        "readOnlyInspection": {
+            "trustedEmitter": "browser-runtime-world-state",
+            "browserStudioMode": "read-only camera/layer evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "scene mutation", "browser runtime control"]
+        }
     })
 }
 
@@ -56779,7 +56867,43 @@ scenarios:
                         "audio": { "events": [] }
                     }
                 }],
-                "renderer": { "version": "1", "camera": { "x": 0, "y": 0 }, "renderedEntities": [{ "entityId": "player" }] },
+                "renderer": {
+                    "version": "1",
+                    "camera": { "x": 80, "y": 30 },
+                    "viewport": { "width": 160, "height": 90 },
+                    "layers": [
+                        { "id": "sky", "order": -10, "visible": true, "parallaxFactor": 50, "cameraParticipation": true },
+                        { "id": "actors", "order": 0, "visible": true, "parallaxFactor": 100, "cameraParticipation": true },
+                        { "id": "hud", "order": 10, "visible": true, "parallaxFactor": 100, "cameraParticipation": false }
+                    ],
+                    "renderedEntities": [{ "entityId": "player" }]
+                },
+                "activeCameraId": "follow-player",
+                "cameras": [{
+                    "id": "follow-player",
+                    "active": true,
+                    "position": { "x": 80, "y": 30 },
+                    "viewport": { "width": 160, "height": 90 },
+                    "followTarget": "player",
+                    "clampBounds": { "x": 0, "y": 0, "width": 240, "height": 120 }
+                }],
+                "camera": {
+                    "activeCameraId": "follow-player",
+                    "rendererCamera": { "x": 80, "y": 30 },
+                    "viewport": { "width": 160, "height": 90 },
+                    "cameras": [{
+                        "id": "follow-player",
+                        "active": true,
+                        "position": { "x": 80, "y": 30 },
+                        "viewport": { "width": 160, "height": 90 },
+                        "followTarget": "player",
+                        "clampBounds": { "x": 0, "y": 0, "width": 240, "height": 120 }
+                    }],
+                    "worldToScreen": {
+                        "player": { "x": -40, "y": 42, "layer": "actors", "cameraOffset": { "x": 80, "y": 30 } },
+                        "hud_goal": { "x": 8, "y": 8, "layer": "hud", "cameraOffset": { "x": 0, "y": 0 } }
+                    }
+                },
                 "renderBreakdown": {
                     "schemaVersion": "ouroforge.scene-render-breakdown.v1",
                     "frameId": "tick-4",
@@ -56860,6 +56984,38 @@ scenarios:
         assert_eq!(
             model.engine_summaries.renderer["renderedEntities"],
             json!(1)
+        );
+        assert_eq!(model.engine_summaries.camera["present"], json!(true));
+        assert_eq!(
+            model.engine_summaries.camera["activeCameraId"],
+            json!("follow-player")
+        );
+        assert_eq!(model.engine_summaries.camera["cameraCount"], json!(1));
+        assert_eq!(model.engine_summaries.camera["layerCount"], json!(3));
+        assert_eq!(
+            model.engine_summaries.camera["parallaxLayerCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.camera["cameraExcludedLayerCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.camera["worldToScreenSampleCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.camera["worldToScreen"]["hud_goal"]["cameraOffset"],
+            json!({ "x": 0, "y": 0 })
+        );
+        assert_eq!(
+            model.engine_summaries.camera["readOnlyInspection"]["disallowedActions"],
+            json!([
+                "trusted writes",
+                "command bridge",
+                "scene mutation",
+                "browser runtime control"
+            ])
         );
         assert_eq!(
             model.engine_summaries.render_breakdown["present"],

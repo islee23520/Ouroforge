@@ -459,7 +459,34 @@ const run = {
     present: true,
     source_world_state: 'evidence/world.json',
     scene: { sceneId: 'trigger-flags-v1-fixture', entityCount: 3, tick: 1 },
-    renderer: { version: '1', renderedEntities: 3, camera: { x: 0, y: 0 } },
+    renderer: {
+      version: '1',
+      renderedEntities: 3,
+      camera: { x: 80, y: 30 },
+      viewport: { width: 160, height: 90 },
+      layers: [
+        { id: '<sky>', order: -10, visible: true, parallaxFactor: 50, cameraParticipation: true },
+        { id: '<hud>', order: 10, visible: true, parallaxFactor: 100, cameraParticipation: false },
+      ],
+    },
+    camera: {
+      activeCameraId: '<follow-player>',
+      rendererCamera: { x: 80, y: 30 },
+      viewport: { width: 160, height: 90 },
+      cameras: [{
+        id: '<follow-player>',
+        active: true,
+        followTarget: '<player>',
+        position: { x: 80, y: 30 },
+        viewport: { width: 160, height: 90 },
+        clampBounds: { x: 0, y: 0, width: 240, height: 120 },
+        zoom: 100,
+      }],
+      worldToScreen: {
+        '<player>': { x: 140, y: 66, layer: 'actors', cameraOffset: { x: 80, y: 30 } },
+        '<hud>': { x: 12, y: 8, layer: '<hud>', cameraOffset: { x: 0, y: 0 } },
+      },
+    },
     render_breakdown: {
       present: true,
       frameId: 12,
@@ -647,7 +674,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goa
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 24);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 25);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -848,6 +875,16 @@ assert.match(cockpit.renderEngineExpansionSurface(run), /Render breakdown/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /1 element\(s\), 1 absence diagnostic\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /Camera\/layer inspection/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /Camera\/layer inspection/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /&lt;follow-player&gt;/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /follow &lt;player&gt;/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /parallax 50/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /screen-space/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /World-to-screen samples/);
+assert.match(cockpit.renderCameraLayerInspectionSurface(run), /scene mutation/);
+assert.doesNotMatch(cockpit.renderCameraLayerInspectionSurface(run), /<follow-player>/);
+assert.match(cockpit.renderCameraLayerInspectionSurface({ engine_summaries: { present: true, camera: '<bad>' } }), /missing or malformed/);
 assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);

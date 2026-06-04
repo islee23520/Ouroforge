@@ -213,6 +213,37 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><h4>Renderables</h4><ul class="run-meta-list">${elementRows}</ul><h4>Render queue</h4><ul class="run-meta-list">${queueRows}</ul><h4>Absence diagnostics</h4><ul class="run-meta-list">${absenceRows}</ul><p class="run-meta">Read-only inspection only; disallowed actions: ${escapeText(disallowed)}.</p>`;
   }
 
+  function renderCameraLayerSummary(summary = {}) {
+    const camera = summary?.camera || summary?.camera_state || summary?.cameraState || {};
+    const renderer = summary?.renderer || {};
+    const queue = summary?.render_queue || summary?.renderQueue || {};
+    if (!summary?.present || !camera || typeof camera !== 'object' || Array.isArray(camera)) {
+      return '<p class="empty-state">No camera/layer read model is available.</p>';
+    }
+    const cameras = Array.isArray(camera.cameras) ? camera.cameras : [];
+    const layers = Array.isArray(renderer.layers)
+      ? renderer.layers
+      : (Array.isArray(queue.layers) ? queue.layers : []);
+    const worldToScreen = camera.worldToScreen && typeof camera.worldToScreen === 'object' && !Array.isArray(camera.worldToScreen)
+      ? camera.worldToScreen
+      : {};
+    const active = camera.activeCamera || cameras.find((entry) => entry && entry.id === camera.activeCameraId) || cameras.find((entry) => entry && entry.active) || {};
+    const rendererCamera = camera.rendererCamera || renderer.camera || {};
+    const viewport = camera.viewport || renderer.viewport || active.viewport || {};
+    const rows = [
+      ['Active camera', camera.activeCameraId || active.id || 'default'],
+      ['Renderer camera', JSON.stringify(rendererCamera)],
+      ['Viewport', JSON.stringify(viewport)],
+      ['Camera records', cameras.length],
+      ['Layer records', layers.length],
+      ['World-to-screen samples', Object.keys(worldToScreen).length],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const cameraRows = cameras.slice(0, 6).map((entry) => `<li><strong>${escapeText(entry?.id || 'camera')}</strong>: ${escapeText(entry?.active ? 'active' : 'inactive')} · follow ${escapeText(entry?.followTarget || 'none')} · position ${escapeText(JSON.stringify(entry?.position || {}))} · clamp ${escapeText(JSON.stringify(entry?.clampBounds || {}))}</li>`).join('') || '<li>No camera records exported.</li>';
+    const layerRows = layers.slice(0, 8).map((layer) => `<li><strong>${escapeText(layer?.id || 'layer')}</strong>: order ${escapeText(layer?.order ?? '?')} · ${escapeText(layer?.visible === false ? 'hidden' : 'visible')} · parallax ${escapeText(layer?.parallaxFactor ?? 'n/a')} · camera ${escapeText(layer?.cameraParticipation === false ? 'disabled' : 'participates')}</li>`).join('') || '<li>No layer records exported.</li>';
+    const sampleRows = Object.entries(worldToScreen).slice(0, 6).map(([entityId, sample]) => `<li><strong>${escapeText(entityId)}</strong>: screen ${escapeText(JSON.stringify({ x: sample?.x, y: sample?.y }))} · layer ${escapeText(sample?.layer || 'default')} · offset ${escapeText(JSON.stringify(sample?.cameraOffset || {}))}</li>`).join('') || '<li>No world-to-screen samples exported.</li>';
+    return `<div class="field-grid">${rows}</div><h4>Cameras</h4><ul class="run-meta-list">${cameraRows}</ul><h4>Layers</h4><ul class="run-meta-list">${layerRows}</ul><h4>World-to-screen samples</h4><ul class="run-meta-list">${sampleRows}</ul><p class="run-meta">Read-only camera/layer evidence only; the dashboard cannot write scene state, execute commands, or control the browser runtime.</p>`;
+  }
+
   function renderGameplaySummary(summary = {}) {
     const gameplay = summary?.gameplay || {};
     if (!summary?.present || !gameplay.present) {
@@ -1508,6 +1539,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Evidence categories</h3>${renderCategorySummary(run.summary?.evidence_categories || run.evidence_categories || [])}</section>
       <section class="panel"><h3>Runtime probe contract</h3>${renderProbeContractStatus(run.probe_contract_status || run.summary?.probe_contract_status || {})}</section>
       <section class="panel"><h3>Tilemap authoring evidence</h3>${renderTilemapSummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Camera/layer read model</h3>${renderCameraLayerSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Scene render breakdown</h3>${renderRenderBreakdownSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
@@ -1600,7 +1632,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
