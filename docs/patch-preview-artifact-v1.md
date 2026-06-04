@@ -218,8 +218,10 @@ Command Allowlist v1 policy. A required test may include:
 - `allowlistPolicyId`: currently `source-patch-preview-safe-local-checks-v1`;
 - `executionAuthority`: still copyable-only and not executed by preview validation.
 
-Validation rejects policy-linked tests whose command text does not match normalized
-`argv`, whose `argv` is forbidden by the command policy, or whose `argv` is not
-in the inert allowlist. This remains metadata validation only; it does not run
-commands, create sandboxes, apply patches, merge branches, or write trusted
-source files.
+Whenever `argv` is present, validation rejects tests whose command text does not
+match normalized `argv`, whose `argv` is forbidden by the command policy, or
+whose `argv` is not in the inert allowlist. `allowlistPolicyId` identifies the
+current preview policy and, when present, requires `argv`; it does not grant any
+additional execution authority. This remains metadata validation only; it does
+not run commands, create sandboxes, apply patches, merge branches, or write
+trusted source files.
