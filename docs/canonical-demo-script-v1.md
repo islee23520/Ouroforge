@@ -293,7 +293,7 @@ cargo run -p ouroforge-cli -- edit draft-preview --project examples/playable-dem
 cargo run -p ouroforge-cli -- edit draft-preview --project examples/playable-demo-v2/collect-and-exit/ouroforge.project.json examples/visual-edit-draft-v1/valid/collect-and-exit-asset-frame-demo.visual-edit-draft.json
 cargo run -p ouroforge-cli -- patch-preview validate examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json
 bash -n scripts/canonical-demo-smoke.sh
-OUROFORGE_DEMO_WORKERS=1 CARGO_TARGET_DIR=/tmp/ouroforge-canonical-demo-target scripts/canonical-demo-smoke.sh --keep
+OUROFORGE_DEMO_WORKERS=2 CARGO_TARGET_DIR=/tmp/ouroforge-canonical-demo-target scripts/canonical-demo-smoke.sh --keep
 cargo fmt --check
 node --check examples/evidence-dashboard/dashboard.js
 node examples/evidence-dashboard/dashboard.test.cjs
