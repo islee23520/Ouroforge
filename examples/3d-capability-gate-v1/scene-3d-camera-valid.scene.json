@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-camera-valid",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "activeCameraId": "main-camera",
+    "nodes": [
+      {
+        "id": "camera-rig",
+        "localTransform": {
+          "translation": { "x": 0, "y": 4, "z": 12 },
+          "rotation": { "x": -15, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        }
+      }
+    ],
+    "cameras": [
+      {
+        "id": "main-camera",
+        "nodeId": "camera-rig",
+        "active": true,
+        "transform": {
+          "translation": { "x": 0, "y": 4, "z": 12 },
+          "rotation": { "x": -15, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "projection": {
+          "kind": "perspective",
+          "fovDegrees": 60,
+          "near": 1,
+          "far": 1000,
+          "aspectMode": "viewport"
+        },
+        "viewport": { "x": 0, "y": 0, "width": 640, "height": 360 },
+        "metadata": { "fixtureScope": "bounded 3D camera validation" }
+      }
+    ]
+  }
+}

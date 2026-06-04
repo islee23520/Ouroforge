@@ -90,6 +90,10 @@ documents without `sceneKind` continue to default to `2d`. The source-like 3D
 fixture policy and graph shape are documented in
 [`3d-scene-graph-v1.md`](./3d-scene-graph-v1.md).
 
+Issue #598 begins bounded 3D camera/projection validation. The camera schema,
+viewport rules, and source-like camera fixtures are documented in
+[`3d-camera-projection-v1.md`](./3d-camera-projection-v1.md).
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard

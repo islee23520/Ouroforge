@@ -32950,7 +32950,15 @@ pub struct SceneBounds {
 pub struct Scene3dGraph {
     #[serde(default = "scene_3d_graph_v1")]
     pub version: String,
+    #[serde(
+        default,
+        rename = "activeCameraId",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub active_camera_id: Option<String>,
     pub nodes: Vec<Scene3dNode>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cameras: Vec<Scene3dCamera>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -32991,6 +32999,54 @@ pub struct Scene3dComponent {
     pub reference: Option<String>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dCamera {
+    pub id: String,
+    #[serde(default, rename = "nodeId", skip_serializing_if = "Option::is_none")]
+    pub node_id: Option<String>,
+    #[serde(default)]
+    pub active: bool,
+    pub transform: Scene3dTransform,
+    pub projection: Scene3dProjection,
+    pub viewport: Scene3dViewport,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dProjection {
+    pub kind: String,
+    #[serde(
+        default,
+        rename = "fovDegrees",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub fov_degrees: Option<i64>,
+    pub near: i64,
+    pub far: i64,
+    #[serde(
+        default,
+        rename = "orthographicHeight",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub orthographic_height: Option<i64>,
+    #[serde(default = "scene_3d_aspect_mode_viewport", rename = "aspectMode")]
+    pub aspect_mode: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dViewport {
+    #[serde(default)]
+    pub x: i64,
+    #[serde(default)]
+    pub y: i64,
+    pub width: i64,
+    pub height: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -36071,6 +36127,10 @@ fn scene_3d_graph_v1() -> String {
     "1".to_string()
 }
 
+fn scene_3d_aspect_mode_viewport() -> String {
+    "viewport".to_string()
+}
+
 fn scene_renderer_v1() -> String {
     "1".to_string()
 }
@@ -36364,6 +36424,7 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
             return Err(anyhow!("duplicate scene3d node id: {}", node.id));
         }
     }
+    validate_scene_3d_cameras(graph, &node_ids)?;
     for node in &graph.nodes {
         if let Some(parent) = &node.parent {
             validate_path_component(&format!("scene3d node {} parent", node.id), parent)?;
@@ -36449,6 +36510,145 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_cameras(graph: &Scene3dGraph, node_ids: &BTreeSet<&str>) -> Result<()> {
+    if graph.cameras.is_empty() {
+        if graph.active_camera_id.is_some() {
+            return Err(anyhow!("scene3d activeCameraId requires cameras"));
+        }
+        return Ok(());
+    }
+    let active_camera_id = graph
+        .active_camera_id
+        .as_deref()
+        .ok_or_else(|| anyhow!("scene3d cameras require activeCameraId"))?;
+    validate_path_component("scene3d activeCameraId", active_camera_id)?;
+    let mut camera_ids = BTreeSet::new();
+    let mut active_flags = 0usize;
+    for camera in &graph.cameras {
+        validate_path_component("scene3d camera id", &camera.id)?;
+        if !camera_ids.insert(camera.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d camera id: {}", camera.id));
+        }
+        if camera.active {
+            active_flags += 1;
+            if camera.id != active_camera_id {
+                return Err(anyhow!(
+                    "scene3d camera {} active flag does not match activeCameraId {}",
+                    camera.id,
+                    active_camera_id
+                ));
+            }
+        }
+        if let Some(node_id) = &camera.node_id {
+            validate_path_component(&format!("scene3d camera {} nodeId", camera.id), node_id)?;
+            if !node_ids.contains(node_id.as_str()) {
+                return Err(anyhow!(
+                    "scene3d camera {} references missing nodeId: {}",
+                    camera.id,
+                    node_id
+                ));
+            }
+        }
+        validate_scene_3d_transform(
+            &format!("scene3d camera {} transform", camera.id),
+            &camera.transform,
+        )?;
+        validate_scene_3d_projection(&camera.id, &camera.projection)?;
+        validate_scene_3d_viewport(&camera.id, &camera.viewport)?;
+        validate_scene_metadata(
+            &format!("scene3d camera {} metadata", camera.id),
+            &camera.metadata,
+        )?;
+    }
+    if active_flags > 1 {
+        return Err(anyhow!(
+            "scene3d cameras must not contain duplicate active flags"
+        ));
+    }
+    if !camera_ids.contains(active_camera_id) {
+        return Err(anyhow!(
+            "scene3d activeCameraId references missing camera: {}",
+            active_camera_id
+        ));
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_projection(camera_id: &str, projection: &Scene3dProjection) -> Result<()> {
+    if projection.near <= 0 {
+        return Err(anyhow!(
+            "scene3d camera {camera_id} near plane must be positive"
+        ));
+    }
+    if projection.far <= projection.near {
+        return Err(anyhow!(
+            "scene3d camera {camera_id} far plane must be greater than near plane"
+        ));
+    }
+    match projection.aspect_mode.as_str() {
+        "viewport" | "square" => {}
+        other => {
+            return Err(anyhow!(
+                "scene3d camera {camera_id} unsupported aspectMode: {other}"
+            ));
+        }
+    }
+    match projection.kind.as_str() {
+        "perspective" => {
+            let fov = projection.fov_degrees.ok_or_else(|| {
+                anyhow!("scene3d camera {camera_id} perspective projection requires fovDegrees")
+            })?;
+            if !(1..=179).contains(&fov) {
+                return Err(anyhow!(
+                    "scene3d camera {camera_id} fovDegrees must be between 1 and 179"
+                ));
+            }
+            if projection.orthographic_height.is_some() {
+                return Err(anyhow!(
+                    "scene3d camera {camera_id} perspective projection must not set orthographicHeight"
+                ));
+            }
+        }
+        "orthographic" => {
+            let height = projection.orthographic_height.ok_or_else(|| {
+                anyhow!(
+                    "scene3d camera {camera_id} orthographic projection requires orthographicHeight"
+                )
+            })?;
+            if height <= 0 {
+                return Err(anyhow!(
+                    "scene3d camera {camera_id} orthographicHeight must be positive"
+                ));
+            }
+            if projection.fov_degrees.is_some() {
+                return Err(anyhow!(
+                    "scene3d camera {camera_id} orthographic projection must not set fovDegrees"
+                ));
+            }
+        }
+        other => {
+            return Err(anyhow!(
+                "scene3d camera {camera_id} unsupported projection kind: {other}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scene_3d_viewport(camera_id: &str, viewport: &Scene3dViewport) -> Result<()> {
+    if viewport.x < 0 || viewport.y < 0 {
+        return Err(anyhow!(
+            "scene3d camera {camera_id} viewport origin must not be negative"
+        ));
+    }
+    if viewport.width <= 0 || viewport.height <= 0 {
+        return Err(anyhow!(
+            "scene3d camera {camera_id} viewport dimensions must be positive"
+        ));
     }
     Ok(())
 }
@@ -63510,6 +63710,55 @@ scenarios:
         assert!(error
             .to_string()
             .contains("worldTransform does not match deterministic resolution"));
+    }
+
+    #[test]
+    fn scene_3d_camera_v1_accepts_bounded_active_camera_fixture() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-camera-valid.scene.json",
+        ))
+        .expect("3D camera fixture parses");
+
+        validate_scene(&scene).expect("3D camera fixture validates");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.active_camera_id.as_deref(), Some("main-camera"));
+        assert_eq!(graph.cameras.len(), 1);
+        let camera = &graph.cameras[0];
+        assert!(camera.active);
+        assert_eq!(camera.node_id.as_deref(), Some("camera-rig"));
+        assert_eq!(camera.projection.kind, "perspective");
+        assert_eq!(camera.projection.fov_degrees, Some(60));
+        assert_eq!(camera.viewport.width, 640);
+        assert_eq!(camera.viewport.height, 360);
+    }
+
+    #[test]
+    fn scene_3d_camera_v1_rejects_invalid_active_projection_and_viewport() {
+        for (fixture, expected) in [
+            (
+                "examples/3d-capability-gate-v1/scene-3d-camera-invalid-missing-active.scene.json",
+                "cameras require activeCameraId",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-camera-invalid-projection.scene.json",
+                "fovDegrees must be between 1 and 179",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-camera-invalid-viewport.scene.json",
+                "viewport dimensions must be positive",
+            ),
+        ] {
+            let scene: SceneDocument = serde_json::from_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
+            let error = match validate_scene(&scene) {
+                Ok(()) => panic!("{fixture} rejected by camera validation"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains(expected),
+                "{fixture} error {error:#} contains {expected}"
+            );
+        }
     }
 
     #[test]
