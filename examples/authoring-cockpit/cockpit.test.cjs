@@ -566,6 +566,41 @@ const run = {
         disallowedActions: ['writes', 'commands', 'scene mutation', 'browser runtime control'],
       },
     },
+    scene3d_hierarchy: {
+      present: true,
+      sceneId: 'trigger-flags-v1-fixture',
+      nodeCount: 2,
+      rootCount: 1,
+      parentedNodeCount: 1,
+      transforms: [
+        { nodeId: '<root-node>', parentId: null, worldTransform: { translation: { x: 0, y: 0, z: 0 } } },
+        { nodeId: '<cube-node>', parentId: '<root-node>', worldTransform: { translation: { x: 1, y: 2, z: 3 } } },
+      ],
+      boundary: 'Read-only bounded 3D hierarchy evidence; no 3D editor or viewport persistence claim.',
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'viewport persistence', 'scene mutation'] },
+    },
+    scene3d_camera: {
+      present: true,
+      activeCameraId: '<main-camera>',
+      cameraCount: 1,
+      cameras: [{
+        id: '<main-camera>',
+        active: true,
+        projection: { kind: '<perspective>', fovDegrees: 60, near: 1, far: 1000 },
+        viewport: { x: 0, y: 0, width: 320, height: 180 },
+      }],
+      boundary: 'Read-only 3D camera evidence; no viewport persistence or camera editor tooling.',
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'viewport persistence', 'scene mutation'] },
+    },
+    scene3d_probe: {
+      present: true,
+      status: '<present>',
+      sceneKind: '3d',
+      nodeCount: 2,
+      cameraCount: 1,
+      animationStateCount: 1,
+      boundary: 'Read-only 3D runtime probe evidence; browser probe output is not trusted persistence.',
+    },
     scene3d_render: {
       present: true,
       frameId: 12,
@@ -598,6 +633,23 @@ const run = {
       events: [{ type: 'runtime.scene3d.collision.trigger', pairId: '<goal:player>' }],
       invalidColliders: [{ nodeId: '<broken>', colliderRef: '<missing-box>', reason: '<missing collider>' }],
       boundary: 'Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.',
+    },
+    scene3d_animation: {
+      present: true,
+      stateCount: 1,
+      playingStateCount: 0,
+      states: [{ clipId: '<idle-clip>', targetNodeId: '<cube-node>', channel: '<translation>', currentFrame: 3, playing: false }],
+      events: [{ type: '<animation-event>', payload: { targetNodeId: '<cube-node>' } }],
+      boundary: 'Read-only bounded 3D animation evidence; no skeletal authoring, IK, or graph editor claim.',
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'timeline persistence', 'scene mutation'] },
+    },
+    scene3d_scenario_verdicts: {
+      present: true,
+      verdictCount: 1,
+      failedVerdictCount: 0,
+      verdicts: [{ scenarioId: '<studio-3d-scenario>', status: 'passed', assertionCount: 3 }],
+      boundary: 'Read-only 3D scenario verdict evidence; Studio cannot execute scenarios.',
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'scenario execution', 'promotion'] },
     },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
@@ -805,7 +857,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goa
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 27);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 28);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -1107,6 +1159,35 @@ assert.match(cockpit.renderRuntimeStateInspectionSurface({ engine_summaries: { p
 const xssRuntimeState = cockpit.renderRuntimeStateInspectionSurface({ engine_summaries: { present: true, runtime_state: { present: true, stateId: '<script>state</script>', sceneId: '<img>', digest: { algorithm: '<svg>', value: '<b>' }, saveEvents: [{ type: '<script>save</script>', payload: { saveId: '<img>', slotId: '<svg>', stateDigest: { value: '<b>' } } }], replayEvents: [{ payload: { frameId: '<i>', status: '<p>', expected: { value: '<em>' }, actual: { value: '<strong>' } } }], snapshots: [{ snapshotId: '<script>snap</script>', tick: '<img>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] } } } });
 assert.doesNotMatch(xssRuntimeState, /<script>|<img|<svg>|<b>|<i>|<p>|<em>/);
 assert.match(xssRuntimeState, /&lt;script&gt;state&lt;\/script&gt;/);
+assert.match(cockpit.renderStudioNavigation(run), /3D inspection/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Scene hierarchy/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Active camera\/projection/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Mesh\/material refs/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Collision\/trigger evidence/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Animation state/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Scenario verdicts/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /&lt;cube-node&gt;/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /&lt;perspective&gt;/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /&lt;cube-mesh&gt;/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /Studio cannot execute scenarios/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /not a 3D editor/);
+assert.match(cockpit.renderStudio3dInspectionSurface(run), /viewport persistence/);
+assert.doesNotMatch(cockpit.renderStudio3dInspectionSurface(run), /<cube-node>|<perspective>|<cube-mesh>|<studio-3d-scenario>/);
+assert.match(cockpit.renderStudio3dInspectionSurface({ engine_summaries: { present: false, empty_state: '<script>missing</script>' } }), /&lt;script&gt;missing&lt;\/script&gt;/);
+assert.match(cockpit.renderStudio3dInspectionSurface({ engine_summaries: { present: true, scene3d_hierarchy: '<bad>', scene3d_camera: { present: false, emptyState: '<camera missing>' }, scene3d_render: { present: false, emptyState: '<render missing>' } } }), /Malformed 3D read model/);
+const xssStudio3d = cockpit.renderStudio3dInspectionSurface({
+  engine_summaries: {
+    present: true,
+    scene3d_hierarchy: { present: true, transforms: [{ nodeId: '<script>node</script>', parentId: '<img>', worldTransform: { translation: '<svg>' } }], boundary: '<b>hierarchy</b>' },
+    scene3d_camera: { present: true, cameras: [{ id: '<script>camera</script>', active: true, projection: { kind: '<img>', fovDegrees: '<svg>', near: '<b>', far: '<i>' }, viewport: { width: '<p>' } }] },
+    scene3d_render: { present: true, renderables: [{ id: '<script>cube</script>', nodeId: '<img>', meshRef: '<svg>', materialRef: '<b>', cameraId: '<i>', visible: false, fallbackReason: '<p>skip</p>' }], fallbackReasons: ['<script>fallback</script>'] },
+    scene3d_collision: { present: true, events: [{ type: '<script>collision</script>', pairId: '<img>' }], invalidColliders: [{ colliderRef: '<svg>', reason: '<b>' }] },
+    scene3d_animation: { present: true, states: [{ clipId: '<script>clip</script>', targetNodeId: '<img>', channel: '<svg>', playing: false }], events: [{ type: '<b>event</b>' }] },
+    scene3d_scenario_verdicts: { present: true, verdicts: [{ scenarioId: '<script>scenario</script>', status: '<img>', assertionCount: '<svg>' }], boundary: '<b>verdict</b>' },
+  },
+});
+assert.doesNotMatch(xssStudio3d, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssStudio3d, /&lt;script&gt;node&lt;\/script&gt;/);
 assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);

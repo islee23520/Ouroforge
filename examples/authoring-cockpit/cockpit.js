@@ -470,6 +470,7 @@ const OuroforgeCockpit = (() => {
       { id: 'scene-editing', label: 'Scene editing commands', present: true, detail: 'Rust-validated command generation' },
       { id: 'authoring-provenance', label: 'Authoring provenance', present: Boolean(run?.transaction_provenance), detail: run?.transaction_provenance?.transactionId || 'no transaction-bound run loaded' },
       { id: 'engine-expansion', label: 'Engine Expansion state', present: Boolean(run?.engine_summaries?.present), detail: run?.engine_summaries?.source_world_state || 'world-state summary unavailable' },
+      { id: 'studio-3d-inspection', label: '3D inspection', present: Boolean(run?.engine_summaries?.scene3d_hierarchy?.present || run?.engine_summaries?.scene3d_camera?.present || run?.engine_summaries?.scene3d_render?.present || run?.engine_summaries?.scene3d_collision?.present || run?.engine_summaries?.scene3d_animation?.present || run?.engine_summaries?.scene3d_scenario_verdicts?.present), detail: run?.engine_summaries?.scene3d_probe?.status || run?.engine_summaries?.scene3dProbe?.status || '3D read models unavailable' },
       { id: 'camera-layer-inspection', label: 'Camera/layer inspection', present: Boolean(run?.engine_summaries?.camera || run?.engine_summaries?.camera_state || run?.engine_summaries?.cameraState), detail: run?.engine_summaries?.camera?.scene3dCamera?.activeCameraId || run?.engine_summaries?.camera?.activeCameraId || run?.engine_summaries?.camera_state?.activeCameraId || run?.engine_summaries?.cameraState?.activeCameraId || 'camera read model unavailable' },
       { id: 'render-breakdown-inspection', label: 'Render breakdown inspection', present: Boolean(run?.engine_summaries?.render_breakdown?.present || run?.engine_summaries?.renderBreakdown?.present), detail: `${(run?.engine_summaries?.render_breakdown?.elements || run?.engine_summaries?.renderBreakdown?.elements || []).length} renderable row(s)` },
       { id: 'runtime-profiler-inspection', label: 'Runtime profiler inspection', present: Boolean(run?.engine_summaries?.runtime_frame_budget || run?.engine_summaries?.runtimeFrameBudget), detail: run?.engine_summaries?.runtime_frame_budget?.status || run?.engine_summaries?.runtimeFrameBudget?.status || 'frame-budget read model unavailable' },
@@ -662,6 +663,112 @@ const OuroforgeCockpit = (() => {
     const value = record?.[snakeKey] ?? record?.[camelKey];
     if (value === null || value === undefined || value === '') return fallback;
     return value;
+  }
+
+  function scene3dReadModel(summary, snakeKey, camelKey) {
+    const value = summary?.[snakeKey] ?? summary?.[camelKey];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value;
+  }
+
+  function scene3dMalformed(summary, snakeKey, camelKey) {
+    const value = summary?.[snakeKey] ?? summary?.[camelKey];
+    return value !== undefined && value !== null && (typeof value !== 'object' || Array.isArray(value));
+  }
+
+  function scene3dListRows(items, emptyText, renderRow, limit = 12) {
+    if (!Array.isArray(items) || !items.length) return `<div class="surface-row">${escapeText(emptyText)}</div>`;
+    return items.slice(0, limit).map(renderRow).join('');
+  }
+
+  function scene3dDisallowedActions(...models) {
+    const actions = models.flatMap((model) => {
+      const inspection = model?.readOnlyInspection || model?.read_only_inspection || {};
+      const values = inspection.disallowedActions || inspection.disallowed_actions || [];
+      return Array.isArray(values) ? values : [];
+    });
+    return [...new Set(actions.concat(['trusted writes', 'command bridge', 'viewport persistence', 'scene mutation', 'browser runtime control']))];
+  }
+
+  function renderStudio3dInspectionSurface(run) {
+    const summary = run?.engine_summaries;
+    if (!summary?.present) {
+      return `<section id="studio-3d-inspection" class="panel"><h2>3D inspection</h2><p class="empty">${escapeText(summary?.empty_state || 'No Engine Expansion read model is available for 3D inspection.')}</p><p class="hint">Read-only Studio surface. The browser does not write files, execute commands, persist viewport manipulation, or act as a 3D editor.</p></section>`;
+    }
+    const hierarchy = scene3dReadModel(summary, 'scene3d_hierarchy', 'scene3dHierarchy');
+    const camera = scene3dReadModel(summary, 'scene3d_camera', 'scene3dCamera');
+    const probe = scene3dReadModel(summary, 'scene3d_probe', 'scene3dProbe');
+    const render = scene3dReadModel(summary, 'scene3d_render', 'scene3dRender');
+    const collision = scene3dReadModel(summary, 'scene3d_collision', 'scene3dCollision');
+    const animation = scene3dReadModel(summary, 'scene3d_animation', 'scene3dAnimation');
+    const verdicts = scene3dReadModel(summary, 'scene3d_scenario_verdicts', 'scene3dScenarioVerdicts');
+    const malformed = [
+      ['hierarchy', 'scene3d_hierarchy', 'scene3dHierarchy'],
+      ['camera', 'scene3d_camera', 'scene3dCamera'],
+      ['probe', 'scene3d_probe', 'scene3dProbe'],
+      ['render', 'scene3d_render', 'scene3dRender'],
+      ['collision', 'scene3d_collision', 'scene3dCollision'],
+      ['animation', 'scene3d_animation', 'scene3dAnimation'],
+      ['scenario verdicts', 'scene3d_scenario_verdicts', 'scene3dScenarioVerdicts'],
+    ].filter(([, snake, camel]) => scene3dMalformed(summary, snake, camel)).map(([label]) => label);
+    const transforms = Array.isArray(hierarchy?.transforms) ? hierarchy.transforms : [];
+    const cameras = Array.isArray(camera?.cameras) ? camera.cameras : [];
+    const renderables = Array.isArray(render?.renderables) ? render.renderables : [];
+    const collisionEvents = Array.isArray(collision?.events) ? collision.events : [];
+    const invalidColliders = Array.isArray(collision?.invalidColliders || collision?.invalid_colliders) ? (collision.invalidColliders || collision.invalid_colliders) : [];
+    const animationStates = Array.isArray(animation?.states) ? animation.states : [];
+    const animationEvents = Array.isArray(animation?.events) ? animation.events : [];
+    const scenarioVerdicts = Array.isArray(verdicts?.verdicts) ? verdicts.verdicts : [];
+    const meshMaterialRefs = renderables.map((renderable) => ({
+      id: renderable?.id || renderable?.nodeId || renderable?.node_id || 'scene3d-renderable',
+      nodeId: renderable?.nodeId || renderable?.node_id || 'unknown node',
+      meshRef: renderable?.meshRef || renderable?.mesh_ref || 'none',
+      materialRef: renderable?.materialRef || renderable?.material_ref || 'none',
+      visible: renderable?.visible !== false,
+      fallbackReason: renderable?.fallbackReason || renderable?.fallback_reason || '',
+    }));
+    const cards = [
+      ['Probe status', probe?.status || (probe?.present === false ? 'missing' : 'unknown')],
+      ['Scene kind', probe?.sceneKind || probe?.scene_kind || 'unknown'],
+      ['Hierarchy nodes', hierarchy?.nodeCount ?? hierarchy?.node_count ?? transforms.length],
+      ['Root / parented', `${hierarchy?.rootCount ?? hierarchy?.root_count ?? 0} / ${hierarchy?.parentedNodeCount ?? hierarchy?.parented_node_count ?? 0}`],
+      ['Active 3D camera', camera?.activeCameraId || camera?.active_camera_id || 'unrecorded'],
+      ['Camera count', camera?.cameraCount ?? camera?.camera_count ?? cameras.length],
+      ['Mesh / material refs', `${render?.meshCount ?? render?.mesh_count ?? 0} / ${render?.materialCount ?? render?.material_count ?? 0}`],
+      ['Render visible/skipped', `${render?.visibleObjectCount ?? render?.visible_object_count ?? 0} / ${render?.skippedObjectCount ?? render?.skipped_object_count ?? 0}`],
+      ['Collision contact/trigger', `${collision?.contactCount ?? collision?.contact_count ?? 0} / ${collision?.triggerCount ?? collision?.trigger_count ?? 0}`],
+      ['Animation playing/total', `${animation?.playingStateCount ?? animation?.playing_state_count ?? 0} / ${animation?.stateCount ?? animation?.state_count ?? animationStates.length}`],
+      ['Scenario verdicts', `${verdicts?.failedVerdictCount ?? verdicts?.failed_verdict_count ?? 0} failed / ${verdicts?.verdictCount ?? verdicts?.verdict_count ?? scenarioVerdicts.length} total`],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const hierarchyRows = scene3dListRows(transforms, hierarchy?.emptyState || hierarchy?.empty_state || 'No 3D hierarchy rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.nodeId || entry?.node_id || 'node')}</strong> ${surfaceState(entry?.parentId || entry?.parent_id, entry?.parentId || entry?.parent_id ? 'parented' : 'root')}<br><small>parent ${escapeText(entry?.parentId || entry?.parent_id || 'none')} · transform ${escapeText(compactJson(entry?.worldTransform || entry?.world_transform || entry?.localTransform || entry?.local_transform || {}))}</small></div>`);
+    const cameraRows = scene3dListRows(cameras, camera?.emptyState || camera?.empty_state || 'No 3D camera rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || 'camera')}</strong> ${surfaceState(Boolean(entry?.active), entry?.active ? 'active' : 'inactive')}<br><small>projection ${escapeText(entry?.projection?.kind || 'unknown')} · fov ${escapeText(entry?.projection?.fovDegrees ?? entry?.projection?.fov_degrees ?? 'n/a')} · near/far ${escapeText(entry?.projection?.near ?? '?')}/${escapeText(entry?.projection?.far ?? '?')} · viewport ${escapeText(compactJson(entry?.viewport || {}))}</small></div>`);
+    const meshRows = scene3dListRows(meshMaterialRefs, 'No mesh/material refs exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry.id)}</strong> ${surfaceState(entry.visible, entry.visible ? 'visible' : 'skipped')}<br><small>node ${escapeText(entry.nodeId)} · mesh ${escapeText(entry.meshRef)} · material ${escapeText(entry.materialRef)}${entry.fallbackReason ? ` · ${escapeText(entry.fallbackReason)}` : ''}</small></div>`);
+    const renderRows = scene3dListRows(renderables, render?.emptyState || render?.empty_state || 'No 3D render rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.id || entry?.nodeId || entry?.node_id || 'renderable')}</strong> ${surfaceState(entry?.visible !== false, entry?.primitive || entry?.meshKind || entry?.mesh_kind || 'renderable')}<br><small>camera ${escapeText(entry?.cameraId || entry?.camera_id || render?.cameraId || render?.camera_id || 'none')} · screenshot ${escapeText(render?.screenshotArtifact || render?.screenshot_artifact || 'not produced')}</small></div>`);
+    const collisionRows = scene3dListRows(collisionEvents.concat(invalidColliders), collision?.emptyState || collision?.empty_state || 'No 3D collision rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.type || entry?.colliderRef || entry?.collider_ref || entry?.nodeId || entry?.node_id || '3D collision evidence')}</strong><br><small>${escapeText(compactJson(entry))}</small></div>`);
+    const animationRows = scene3dListRows(animationStates.concat(animationEvents), animation?.emptyState || animation?.empty_state || 'No 3D animation rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.clipId || entry?.clip_id || entry?.type || '3D animation state')}</strong> ${surfaceState(entry?.playing !== false, entry?.playing === false ? 'paused' : 'playing/evidence')}<br><small>${escapeText(compactJson(entry))}</small></div>`);
+    const verdictRows = scene3dListRows(scenarioVerdicts, verdicts?.emptyState || verdicts?.empty_state || 'No 3D scenario verdict rows exported.', (entry) => `<div class="surface-row"><strong>${escapeText(entry?.scenarioId || entry?.scenario_id || 'scenario')}</strong> ${surfaceState(entry?.status === 'passed', entry?.status || 'unknown')}<br><small>assertions ${escapeText(entry?.assertionCount ?? entry?.assertion_count ?? 'unknown')} · ${escapeText(compactJson(entry))}</small></div>`);
+    const boundaries = [hierarchy, camera, probe, render, collision, animation, verdicts]
+      .map((model) => model?.boundary)
+      .filter(Boolean)
+      .map((boundary) => `<li>${escapeText(boundary)}</li>`)
+      .join('') || '<li>Display-only 3D evidence inspection; no editor, trusted write, or command authority.</li>';
+    const malformedMarkup = malformed.length
+      ? `<p class="error">Malformed 3D read model(s): ${escapeText(malformed.join(', '))}</p>`
+      : '<p class="hint">3D read models loaded or reported as visibly missing.</p>';
+    return `<section id="studio-3d-inspection" class="panel"><h2>3D inspection</h2>
+      <p class="hint">Escaped read-only 3D capability evidence. This panel is not a 3D editor, does not persist viewport manipulation, does not execute commands, and does not write trusted files.</p>
+      ${malformedMarkup}
+      <div class="field-grid">${cards}</div>
+      <h3>Scene hierarchy</h3>${hierarchyRows}
+      <h3>Active camera/projection</h3>${cameraRows}
+      <h3>Mesh/material refs</h3>${meshRows}
+      <h3>Render summary</h3>${renderRows}
+      <h3>Collision/trigger evidence</h3>${collisionRows}
+      <h3>Animation state</h3>${animationRows}
+      <h3>Scenario verdicts</h3>${verdictRows}
+      <h3>3D boundaries</h3><ul>${boundaries}</ul>
+      <p class="hint">Disallowed actions: ${escapeText(scene3dDisallowedActions(hierarchy, camera, probe, render, collision, animation, verdicts).join(' · '))}</p>
+    </section>`;
   }
 
   function renderCameraLayerInspectionSurface(run) {
@@ -2802,7 +2909,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -2891,7 +2998,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
