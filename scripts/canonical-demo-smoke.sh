@@ -67,9 +67,14 @@ fi
 
 REPO_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$REPO_ROOT")
 
+# WORK_DIR_OWNED gates destructive cleanup: only directories this script created
+# (or verified empty before use) may be removed on exit, so an explicit
+# --work-dir pointing at a populated user path is never recursively deleted.
+WORK_DIR_OWNED=0
 if [[ -z "$WORK_DIR" ]]; then
   WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ouroforge-canonical-demo-XXXXXX")
   WORK_REAL=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$WORK_DIR")
+  WORK_DIR_OWNED=1
   if [[ "$WORK_REAL" == "$REPO_REAL" || "$WORK_REAL" == "$REPO_REAL"/* ]]; then
     echo "error: work directory must be outside the repository: $WORK_DIR" >&2
     rm -rf -- "$WORK_DIR"
@@ -82,12 +87,31 @@ else
     echo "error: work directory must be outside the repository: $WORK_DIR" >&2
     exit 2
   fi
-  mkdir -p "$WORK_DIR"
+  if [[ -e "$WORK_DIR" ]]; then
+    if [[ ! -d "$WORK_DIR" ]]; then
+      echo "error: --work-dir must be a directory: $WORK_DIR" >&2
+      exit 2
+    fi
+    if [[ -n "$(ls -A -- "$WORK_DIR" 2>/dev/null)" ]]; then
+      echo "error: --work-dir must be empty or not exist so the smoke can own and clean it: $WORK_DIR" >&2
+      echo "       (refusing to recursively delete a pre-existing populated directory)" >&2
+      exit 2
+    fi
+    # Pre-existing but empty: safe for the script to own and remove on exit.
+    WORK_DIR_OWNED=1
+  else
+    mkdir -p "$WORK_DIR"
+    WORK_DIR_OWNED=1
+  fi
 fi
 
 cleanup() {
   if [[ "$KEEP" -eq 0 ]]; then
-    rm -rf -- "$WORK_DIR"
+    if [[ "$WORK_DIR_OWNED" -eq 1 ]]; then
+      rm -rf -- "$WORK_DIR"
+    else
+      echo "Not removing unowned work directory: $WORK_DIR" >&2
+    fi
   else
     echo "Kept generated demo work directory: $WORK_DIR"
   fi
@@ -132,6 +156,18 @@ after_repo_runs=$(mktemp "$WORK_DIR/repo-runs-after.XXXXXX")
 find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$before_repo_runs" || true
 (cd "$REPO_ROOT" && run_and_capture platformer-run cargo_cli run seeds/platformer.yaml --workers "$WORKERS")
 (cd "$REPO_ROOT" && run_and_capture engine-expansion-run cargo_cli run seeds/engine-expansion-v1-demo.yaml --workers "$WORKERS")
+# Propagate CLI run failures: run_and_capture intentionally proceeds so logs are
+# collected for every step, but an infrastructure failure (e.g. missing browser)
+# that still leaves a run directory behind must not be reported as a passing smoke.
+for run_label in platformer-run engine-expansion-run; do
+  run_status_file="$WORK_DIR/${run_label}.status"
+  run_status=$(cat "$run_status_file" 2>/dev/null || echo "missing")
+  if [[ "$run_status" != "0" ]]; then
+    echo "error: ${run_label} run failed (exit=${run_status}); see $WORK_DIR/${run_label}.log" >&2
+    cat "$WORK_DIR/${run_label}.log" >&2 2>/dev/null || true
+    exit 1
+  fi
+done
 find "$REPO_ROOT/runs" -maxdepth 1 -type d -name 'run-*' -print 2>/dev/null | sort >"$after_repo_runs" || true
 mkdir -p "$WORK_DIR/runs"
 while IFS= read -r repo_run_dir; do
