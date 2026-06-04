@@ -392,10 +392,39 @@ fn source_patch_apply_transaction_exports_generated_dashboard_artifact_read_only
         .as_ref()
         .expect("transaction value is readable");
     assert_eq!(value["transactionId"], artifact.transaction_id);
-    assert_eq!(
-        value["readModel"]["readinessLabel"],
-        "shape_valid_pending_linked_evidence_no_apply_authority"
+    assert!(
+        serde_json::from_value::<SourcePatchApplyTransactionArtifact>(value.clone()).is_ok(),
+        "persisted generated artifact remains schema-pure and round-trippable"
     );
+    assert!(value.get("readModel").is_none());
     assert!(value.get("applyCommand").is_none());
     assert!(value.get("mergeCommand").is_none());
+}
+
+#[test]
+fn source_patch_apply_transaction_linked_evidence_validation_rejects_unstructured_string_matches() {
+    let artifact = fixture();
+    let root = unique_run_dir("source-patch-apply-unstructured-linked-evidence");
+    write_linked_evidence_fixtures(&root, &artifact);
+    write_json_at(
+        &root,
+        &artifact.evidence.review_decision_ref,
+        json!({
+            "notes": [artifact.evidence.review_decision_id, "accepted"],
+            "status": "pending"
+        }),
+    );
+
+    let validation =
+        inspect_source_patch_apply_transaction_artifact_with_evidence_root(&artifact, &root);
+
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("reviewDecisionRef") && reason.contains("expected id")));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("reviewDecisionRef") && reason.contains("statuses")));
 }

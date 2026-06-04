@@ -11464,14 +11464,7 @@ pub fn write_source_patch_apply_transaction_artifact(
             )
         })?;
     }
-    let mut value = serde_json::to_value(artifact)?;
-    if let serde_json::Value::Object(map) = &mut value {
-        map.insert(
-            "readModel".to_string(),
-            serde_json::to_value(source_patch_apply_transaction_read_model(artifact))?,
-        );
-    }
-    write_json_atomic(&path, &value)?;
+    write_json_atomic(&path, &json!(artifact))?;
     Ok(path)
 }
 
@@ -12062,111 +12055,137 @@ fn inspect_source_patch_apply_transaction_linked_evidence(
     evidence_root: &Path,
     blocked_reasons: &mut Vec<String>,
 ) {
-    for (field, path, expected_id, required_statuses) in [
-        (
-            "evidence.patchPreviewRef",
-            artifact.evidence.patch_preview_ref.as_str(),
-            artifact.evidence.patch_preview_id.as_str(),
-            &["passed", "ready", "complete", "valid"][..],
-        ),
-        (
-            "evidence.sandboxReportRef",
-            artifact.evidence.sandbox_report_ref.as_str(),
-            artifact.evidence.sandbox_report_id.as_str(),
-            &["passed", "success", "succeeded", "complete"][..],
-        ),
-        (
-            "evidence.reviewDecisionRef",
-            artifact.evidence.review_decision_ref.as_str(),
-            artifact.evidence.review_decision_id.as_str(),
-            &["accepted", "approved", "passed"][..],
-        ),
-        (
-            "evidence.fileClassReportRef",
-            artifact.evidence.file_class_report_ref.as_str(),
-            artifact.evidence.file_class_report_id.as_str(),
-            &["passed", "valid", "complete"][..],
-        ),
-        (
-            "evidence.diffIntegrityReportRef",
-            artifact.evidence.diff_integrity_report_ref.as_str(),
-            artifact.evidence.diff_integrity_report_id.as_str(),
-            &["passed", "valid", "complete"][..],
-        ),
+    for contract in [
+        SourcePatchApplyLinkedEvidenceContract {
+            field: "evidence.patchPreviewRef",
+            path: artifact.evidence.patch_preview_ref.as_str(),
+            expected_id: artifact.evidence.patch_preview_id.as_str(),
+            id_keys: &["patchPreviewId", "patch_preview_id", "id"],
+            status_keys: &["status", "validationStatus", "validation_status"],
+            required_statuses: &["passed", "ready", "complete", "valid"],
+        },
+        SourcePatchApplyLinkedEvidenceContract {
+            field: "evidence.sandboxReportRef",
+            path: artifact.evidence.sandbox_report_ref.as_str(),
+            expected_id: artifact.evidence.sandbox_report_id.as_str(),
+            id_keys: &["sandboxReportId", "sandbox_report_id", "id"],
+            status_keys: &["status", "result", "validationStatus", "validation_status"],
+            required_statuses: &["passed", "success", "succeeded", "complete"],
+        },
+        SourcePatchApplyLinkedEvidenceContract {
+            field: "evidence.reviewDecisionRef",
+            path: artifact.evidence.review_decision_ref.as_str(),
+            expected_id: artifact.evidence.review_decision_id.as_str(),
+            id_keys: &["reviewDecisionId", "review_decision_id", "id"],
+            status_keys: &["status", "reviewStatus", "review_status", "decision"],
+            required_statuses: &["accepted", "approved", "passed"],
+        },
+        SourcePatchApplyLinkedEvidenceContract {
+            field: "evidence.fileClassReportRef",
+            path: artifact.evidence.file_class_report_ref.as_str(),
+            expected_id: artifact.evidence.file_class_report_id.as_str(),
+            id_keys: &["fileClassReportId", "file_class_report_id", "id"],
+            status_keys: &["status", "validationStatus", "validation_status"],
+            required_statuses: &["passed", "valid", "complete"],
+        },
+        SourcePatchApplyLinkedEvidenceContract {
+            field: "evidence.diffIntegrityReportRef",
+            path: artifact.evidence.diff_integrity_report_ref.as_str(),
+            expected_id: artifact.evidence.diff_integrity_report_id.as_str(),
+            id_keys: &["diffIntegrityReportId", "diff_integrity_report_id", "id"],
+            status_keys: &["status", "validationStatus", "validation_status"],
+            required_statuses: &["passed", "valid", "complete"],
+        },
     ] {
         inspect_source_patch_apply_transaction_linked_json(
             evidence_root,
-            field,
-            path,
-            expected_id,
-            required_statuses,
+            contract,
             blocked_reasons,
         );
     }
 }
 
+#[derive(Clone, Copy)]
+struct SourcePatchApplyLinkedEvidenceContract<'a> {
+    field: &'a str,
+    path: &'a str,
+    expected_id: &'a str,
+    id_keys: &'a [&'a str],
+    status_keys: &'a [&'a str],
+    required_statuses: &'a [&'a str],
+}
+
 fn inspect_source_patch_apply_transaction_linked_json(
     evidence_root: &Path,
-    field: &str,
-    path: &str,
-    expected_id: &str,
-    required_statuses: &[&str],
+    contract: SourcePatchApplyLinkedEvidenceContract<'_>,
     blocked_reasons: &mut Vec<String>,
 ) {
-    if let Err(error) = validate_relative_artifact_path(field, path) {
+    if let Err(error) = validate_relative_artifact_path(contract.field, contract.path) {
         blocked_reasons.push(error.to_string());
         return;
     }
-    let evidence_path = evidence_root.join(path);
+    let evidence_path = evidence_root.join(contract.path);
     let value = match read_json_value(&evidence_path) {
         Ok(value) => value,
         Err(error) => {
             blocked_reasons.push(format!(
-                "{field} linked evidence {} must exist and be readable JSON: {error}",
+                "{} linked evidence {} must exist and be readable JSON: {error}",
+                contract.field,
                 evidence_path.display()
             ));
             return;
         }
     };
-    if !json_contains_string(&value, expected_id) {
+    if !json_object_has_any_string_field(&value, contract.id_keys, contract.expected_id) {
         blocked_reasons.push(format!(
-            "{field} linked evidence must contain expected id {expected_id}"
+            "{} linked evidence must record expected id {} in one of fields: {}",
+            contract.field,
+            contract.expected_id,
+            contract.id_keys.join(", ")
         ));
     }
-    if !json_contains_any_string_ci(&value, required_statuses) {
+    if !json_object_has_any_string_field_ci(
+        &value,
+        contract.status_keys,
+        contract.required_statuses,
+    ) {
         blocked_reasons.push(format!(
-            "{field} linked evidence must record one of statuses: {}",
-            required_statuses.join(", ")
+            "{} linked evidence must record one of statuses in fields {}: {}",
+            contract.field,
+            contract.status_keys.join(", "),
+            contract.required_statuses.join(", ")
         ));
     }
 }
 
-fn json_contains_string(value: &serde_json::Value, expected: &str) -> bool {
-    match value {
-        serde_json::Value::String(actual) => actual == expected,
-        serde_json::Value::Array(values) => values
-            .iter()
-            .any(|value| json_contains_string(value, expected)),
-        serde_json::Value::Object(map) => map
-            .values()
-            .any(|value| json_contains_string(value, expected)),
-        _ => false,
-    }
+fn json_object_has_any_string_field(
+    value: &serde_json::Value,
+    keys: &[&str],
+    expected: &str,
+) -> bool {
+    let Some(map) = value.as_object() else {
+        return false;
+    };
+    keys.iter()
+        .filter_map(|key| map.get(*key))
+        .any(|value| value.as_str() == Some(expected))
 }
 
-fn json_contains_any_string_ci(value: &serde_json::Value, expected: &[&str]) -> bool {
-    match value {
-        serde_json::Value::String(actual) => expected
-            .iter()
-            .any(|expected| actual.eq_ignore_ascii_case(expected)),
-        serde_json::Value::Array(values) => values
-            .iter()
-            .any(|value| json_contains_any_string_ci(value, expected)),
-        serde_json::Value::Object(map) => map
-            .values()
-            .any(|value| json_contains_any_string_ci(value, expected)),
-        _ => false,
-    }
+fn json_object_has_any_string_field_ci(
+    value: &serde_json::Value,
+    keys: &[&str],
+    expected: &[&str],
+) -> bool {
+    let Some(map) = value.as_object() else {
+        return false;
+    };
+    keys.iter().filter_map(|key| map.get(*key)).any(|value| {
+        value.as_str().is_some_and(|actual| {
+            expected
+                .iter()
+                .any(|expected| actual.eq_ignore_ascii_case(expected))
+        })
+    })
 }
 
 fn inspect_source_patch_apply_transaction_evidence(
