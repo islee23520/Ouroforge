@@ -32681,6 +32681,20 @@ pub struct Scene3dVector {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct Scene3dResolvedNodeTransform {
+    #[serde(rename = "nodeId")]
+    pub node_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    pub depth: usize,
+    #[serde(rename = "localTransform")]
+    pub local_transform: Scene3dTransform,
+    #[serde(rename = "worldTransform")]
+    pub world_transform: Scene3dTransform,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SceneCollisionRules {
     #[serde(default = "collision_rules_v2")]
     pub version: String,
@@ -36081,6 +36095,21 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 .and_then(|parent| parent.parent.as_deref());
         }
     }
+    let resolved = resolve_scene_3d_world_transform_map(graph)?;
+    for node in &graph.nodes {
+        if let Some(expected) = &node.world_transform {
+            let actual = &resolved
+                .get(node.id.as_str())
+                .ok_or_else(|| anyhow!("scene3d node {} missing resolved transform", node.id))?
+                .world_transform;
+            if actual != expected {
+                return Err(anyhow!(
+                    "scene3d node {} worldTransform does not match deterministic resolution",
+                    node.id
+                ));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -36137,6 +36166,132 @@ fn validate_scene_3d_vector(field: &str, vector: &Scene3dVector) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn resolve_scene_3d_world_transforms(
+    scene: &SceneDocument,
+) -> Result<Vec<Scene3dResolvedNodeTransform>> {
+    validate_scene(scene)?;
+    let Some(graph) = &scene.scene_3d else {
+        return Ok(Vec::new());
+    };
+    let resolved = resolve_scene_3d_world_transform_map(graph)?;
+    graph
+        .nodes
+        .iter()
+        .map(|node| {
+            resolved
+                .get(node.id.as_str())
+                .cloned()
+                .ok_or_else(|| anyhow!("scene3d node {} missing resolved transform", node.id))
+        })
+        .collect()
+}
+
+fn resolve_scene_3d_world_transform_map(
+    graph: &Scene3dGraph,
+) -> Result<BTreeMap<&str, Scene3dResolvedNodeTransform>> {
+    let nodes_by_id = graph
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+    let mut resolved = BTreeMap::new();
+    for node in &graph.nodes {
+        resolve_scene_3d_node_world_transform(node, &nodes_by_id, &mut resolved)?;
+    }
+    Ok(resolved)
+}
+
+fn resolve_scene_3d_node_world_transform<'a>(
+    node: &'a Scene3dNode,
+    nodes_by_id: &BTreeMap<&'a str, &'a Scene3dNode>,
+    resolved: &mut BTreeMap<&'a str, Scene3dResolvedNodeTransform>,
+) -> Result<Scene3dResolvedNodeTransform> {
+    if let Some(existing) = resolved.get(node.id.as_str()) {
+        return Ok(existing.clone());
+    }
+    let (depth, world_transform) = if let Some(parent_id) = node.parent.as_deref() {
+        let parent = nodes_by_id.get(parent_id).ok_or_else(|| {
+            anyhow!(
+                "scene3d node {} references missing parent: {}",
+                node.id,
+                parent_id
+            )
+        })?;
+        let parent_resolved = resolve_scene_3d_node_world_transform(parent, nodes_by_id, resolved)?;
+        (
+            parent_resolved.depth + 1,
+            compose_scene_3d_transforms(&parent_resolved.world_transform, &node.local_transform)
+                .with_context(|| {
+                    format!("failed to resolve scene3d node {} worldTransform", node.id)
+                })?,
+        )
+    } else {
+        (0, node.local_transform.clone())
+    };
+    let resolved_transform = Scene3dResolvedNodeTransform {
+        node_id: node.id.clone(),
+        parent: node.parent.clone(),
+        depth,
+        local_transform: node.local_transform.clone(),
+        world_transform,
+    };
+    resolved.insert(node.id.as_str(), resolved_transform.clone());
+    Ok(resolved_transform)
+}
+
+fn compose_scene_3d_transforms(
+    parent: &Scene3dTransform,
+    local: &Scene3dTransform,
+) -> Result<Scene3dTransform> {
+    Ok(Scene3dTransform {
+        translation: add_scene_3d_vectors(&parent.translation, &local.translation, "translation")?,
+        rotation: add_scene_3d_vectors(&parent.rotation, &local.rotation, "rotation")?,
+        scale: multiply_scene_3d_vectors(&parent.scale, &local.scale, "scale")?,
+    })
+}
+
+fn add_scene_3d_vectors(
+    left: &Scene3dVector,
+    right: &Scene3dVector,
+    field: &str,
+) -> Result<Scene3dVector> {
+    Ok(Scene3dVector {
+        x: left
+            .x
+            .checked_add(right.x)
+            .ok_or_else(|| anyhow!("scene3d {field}.x overflow"))?,
+        y: left
+            .y
+            .checked_add(right.y)
+            .ok_or_else(|| anyhow!("scene3d {field}.y overflow"))?,
+        z: left
+            .z
+            .checked_add(right.z)
+            .ok_or_else(|| anyhow!("scene3d {field}.z overflow"))?,
+    })
+}
+
+fn multiply_scene_3d_vectors(
+    left: &Scene3dVector,
+    right: &Scene3dVector,
+    field: &str,
+) -> Result<Scene3dVector> {
+    Ok(Scene3dVector {
+        x: left
+            .x
+            .checked_mul(right.x)
+            .ok_or_else(|| anyhow!("scene3d {field}.x overflow"))?,
+        y: left
+            .y
+            .checked_mul(right.y)
+            .ok_or_else(|| anyhow!("scene3d {field}.y overflow"))?,
+        z: left
+            .z
+            .checked_mul(right.z)
+            .ok_or_else(|| anyhow!("scene3d {field}.z overflow"))?,
+    })
 }
 
 fn validate_scene_component_defaults(
@@ -62796,6 +62951,50 @@ scenarios:
                 "{fixture} error {error:#} contains {expected}"
             );
         }
+    }
+
+    #[test]
+    fn scene_3d_world_transform_v1_resolves_nested_hierarchy_deterministically() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-nested-world-transform.scene.json",
+        ))
+        .expect("nested world transform fixture parses");
+
+        validate_scene(&scene).expect("nested world transform fixture validates");
+        let resolved = resolve_scene_3d_world_transforms(&scene).expect("world transforms resolve");
+        assert_eq!(resolved.len(), 3);
+        assert_eq!(
+            resolved
+                .iter()
+                .map(|entry| (entry.node_id.as_str(), entry.depth))
+                .collect::<Vec<_>>(),
+            vec![("root-platform", 0), ("mid-pivot", 1), ("leaf-marker", 2)]
+        );
+        let leaf = resolved
+            .iter()
+            .find(|entry| entry.node_id == "leaf-marker")
+            .expect("leaf resolved");
+        assert_eq!(
+            leaf.world_transform,
+            Scene3dTransform {
+                translation: Scene3dVector { x: 8, y: 6, z: 1 },
+                rotation: Scene3dVector { x: 5, y: 10, z: 15 },
+                scale: Scene3dVector { x: 6, y: 8, z: 4 },
+            }
+        );
+    }
+
+    #[test]
+    fn scene_3d_world_transform_v1_rejects_mismatched_declared_world_transform() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-invalid-world-transform.scene.json",
+        ))
+        .expect("invalid world transform fixture parses");
+
+        let error = validate_scene(&scene).expect_err("mismatched worldTransform is rejected");
+        assert!(error
+            .to_string()
+            .contains("worldTransform does not match deterministic resolution"));
     }
 
     #[test]

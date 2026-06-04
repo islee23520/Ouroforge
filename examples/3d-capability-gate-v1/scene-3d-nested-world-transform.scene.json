@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1",
+  "sceneKind": "3d",
+  "id": "capability-gate-3d-nested-world-transform",
+  "bounds": { "width": 640, "height": 360 },
+  "entities": [],
+  "scene3d": {
+    "version": "1",
+    "nodes": [
+      {
+        "id": "root-platform",
+        "localTransform": {
+          "translation": { "x": 10, "y": 0, "z": 2 },
+          "rotation": { "x": 0, "y": 15, "z": 0 },
+          "scale": { "x": 2, "y": 2, "z": 2 }
+        },
+        "worldTransform": {
+          "translation": { "x": 10, "y": 0, "z": 2 },
+          "rotation": { "x": 0, "y": 15, "z": 0 },
+          "scale": { "x": 2, "y": 2, "z": 2 }
+        }
+      },
+      {
+        "id": "mid-pivot",
+        "parent": "root-platform",
+        "localTransform": {
+          "translation": { "x": -3, "y": 5, "z": 1 },
+          "rotation": { "x": 5, "y": 0, "z": 10 },
+          "scale": { "x": 3, "y": 1, "z": 2 }
+        },
+        "worldTransform": {
+          "translation": { "x": 7, "y": 5, "z": 3 },
+          "rotation": { "x": 5, "y": 15, "z": 10 },
+          "scale": { "x": 6, "y": 2, "z": 4 }
+        }
+      },
+      {
+        "id": "leaf-marker",
+        "parent": "mid-pivot",
+        "localTransform": {
+          "translation": { "x": 1, "y": 1, "z": -2 },
+          "rotation": { "x": 0, "y": -5, "z": 5 },
+          "scale": { "x": 1, "y": 4, "z": 1 }
+        },
+        "worldTransform": {
+          "translation": { "x": 8, "y": 6, "z": 1 },
+          "rotation": { "x": 5, "y": 10, "z": 15 },
+          "scale": { "x": 6, "y": 8, "z": 4 }
+        },
+        "components": [
+          { "kind": "marker", "reference": "nested-resolution-fixture" }
+        ]
+      }
+    ],
+    "metadata": {
+      "resolutionRule": "component-wise translation/rotation addition and scale multiplication for bounded fixture validation"
+    }
+  }
+}

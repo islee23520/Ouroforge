@@ -26,7 +26,8 @@ The `entities` array is still the legacy 2D entity list. It may be present in an
 - `id`: path-safe node identifier.
 - `parent`: optional parent node identifier. Hierarchy validation is completed by later #597 PR units.
 - `localTransform`: required integer translation, rotation, and scale vectors with `x`, `y`, and `z` axes.
-- `worldTransform`: optional resolved transform slot for later deterministic world-transform evidence.
+- `worldTransform`: optional resolved transform slot checked by deterministic
+  component-wise resolution.
 - `meshRef` / `colliderRef`: optional local identifiers, not a broad asset import pipeline.
 - `components`: optional bounded component declarations. Version 1 accepts only
   `mesh`, `collider`, and `marker` component kinds; script/runtime/editor
@@ -34,8 +35,11 @@ The `entities` array is still the legacy 2D entity list. It may be present in an
 - `metadata`: bounded JSON metadata for fixture notes.
 
 Hierarchy validation rejects duplicate ids, missing parents, self-parenting, and
-cycles. Scale axes must be non-zero. Numeric components are deliberately bounded
-for small deterministic local scenes.
+cycles. Deterministic world-transform resolution is intentionally bounded:
+translation and rotation vectors add through the parent chain, while scale
+vectors multiply by axis. This is fixture validation math, not a broad 3D matrix
+or renderer contract. Scale axes must be non-zero. Numeric components are
+deliberately bounded for small deterministic local scenes.
 
 ## Source-like fixture policy
 
@@ -51,6 +55,8 @@ The initial fixtures cover:
   `scene-3d-invalid-cycle.scene.json`,
   `scene-3d-invalid-zero-scale.scene.json`, and
   `scene-3d-invalid-unsupported-component.scene.json`;
+- deterministic world-transform resolution: `scene-3d-nested-world-transform.scene.json`
+  and `scene-3d-invalid-world-transform.scene.json`;
 - mixed explicit 3D scene with legacy 2D compatibility data: `scene-3d-mixed-2d-compatibility.scene.json`.
 
 ## Boundaries
