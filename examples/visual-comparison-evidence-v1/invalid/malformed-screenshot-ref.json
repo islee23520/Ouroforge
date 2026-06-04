@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "visual-comparison-evidence-v1",
+  "comparisonId": "qa14_7_malformed_screenshot_ref",
+  "runId": "run_visual_comparison_smoke",
+  "scenarioId": "collect-and-exit",
+  "checkpointId": "goal-checkpoint",
+  "before": { "screenshotRef": "../private/before.gif", "format": "png", "width": 320, "height": 180 },
+  "after": { "screenshotRef": "evidence/screenshots/after-goal.png", "format": "png", "width": 320, "height": 180 },
+  "outcome": "changed",
+  "pixelDiffSummary": { "totalPixels": 57600, "changedPixels": 12, "changedPercentX1000": 20 },
+  "changedRegions": [{ "regionId": "bad", "x": 1, "y": 1, "width": 1, "height": 1, "changedPixels": 1 }],
+  "thresholds": [{ "thresholdId": "pixel-threshold", "maxChangedPixels": 32, "maxChangedPercentX1000": 50 }],
+  "evidenceRefs": ["evidence/screenshots/after-goal.png"]
+}

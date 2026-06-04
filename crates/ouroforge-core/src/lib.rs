@@ -7069,6 +7069,370 @@ impl RouteAttemptBudgetUsed {
     }
 }
 
+const VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION: &str = "visual-comparison-evidence-v1";
+const MAX_VISUAL_COMPARISON_DIMENSION: u32 = 16_384;
+const MAX_VISUAL_COMPARISON_CHANGED_REGIONS: usize = 256;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonEvidenceArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "comparisonId")]
+    pub comparison_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "checkpointId")]
+    pub checkpoint_id: String,
+    pub before: VisualComparisonScreenshotRef,
+    pub after: VisualComparisonScreenshotRef,
+    pub outcome: VisualComparisonOutcome,
+    #[serde(rename = "pixelDiffSummary", skip_serializing_if = "Option::is_none")]
+    pub pixel_diff_summary: Option<VisualComparisonPixelDiffSummary>,
+    #[serde(
+        rename = "changedRegions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub changed_regions: Vec<VisualComparisonChangedRegion>,
+    pub thresholds: Vec<VisualComparisonThreshold>,
+    #[serde(
+        rename = "metadataRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub metadata_refs: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "unsupportedReason", skip_serializing_if = "Option::is_none")]
+    pub unsupported_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonScreenshotRef {
+    #[serde(rename = "screenshotRef", skip_serializing_if = "Option::is_none")]
+    pub screenshot_ref: Option<String>,
+    #[serde(rename = "metadataRef", skip_serializing_if = "Option::is_none")]
+    pub metadata_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<VisualComparisonImageFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(rename = "missingReason", skip_serializing_if = "Option::is_none")]
+    pub missing_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualComparisonImageFormat {
+    Png,
+    Jpeg,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualComparisonOutcome {
+    Unchanged,
+    Changed,
+    MissingScreenshot,
+    MalformedScreenshot,
+    MismatchedDimensions,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonPixelDiffSummary {
+    #[serde(rename = "totalPixels")]
+    pub total_pixels: u64,
+    #[serde(rename = "changedPixels")]
+    pub changed_pixels: u64,
+    #[serde(rename = "changedPercentX1000")]
+    pub changed_percent_x1000: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonChangedRegion {
+    #[serde(rename = "regionId")]
+    pub region_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "changedPixels")]
+    pub changed_pixels: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonThreshold {
+    #[serde(rename = "thresholdId")]
+    pub threshold_id: String,
+    #[serde(rename = "maxChangedPixels")]
+    pub max_changed_pixels: u64,
+    #[serde(rename = "maxChangedPercentX1000")]
+    pub max_changed_percent_x1000: u32,
+}
+
+impl VisualComparisonEvidenceArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: VisualComparisonEvidenceArtifact = serde_json::from_str(input)
+            .context("failed to parse Visual Comparison Evidence JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "visual comparison evidence schemaVersion must be {VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("visual comparison comparisonId", &self.comparison_id)?;
+        validate_path_component("visual comparison runId", &self.run_id)?;
+        validate_path_component("visual comparison scenarioId", &self.scenario_id)?;
+        validate_path_component("visual comparison checkpointId", &self.checkpoint_id)?;
+        self.before.validate("visual comparison before")?;
+        self.after.validate("visual comparison after")?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("visual comparison evidenceRefs must not be empty"));
+        }
+        for reference in &self.evidence_refs {
+            validate_evidence_artifact_path(reference)?;
+        }
+        for reference in &self.metadata_refs {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.ends_with(".json") {
+                return Err(anyhow!(
+                    "visual comparison metadataRefs must be JSON evidence"
+                ));
+            }
+        }
+        if self.thresholds.is_empty()
+            && !matches!(
+                self.outcome,
+                VisualComparisonOutcome::MissingScreenshot
+                    | VisualComparisonOutcome::Unsupported
+                    | VisualComparisonOutcome::Blocked
+            )
+        {
+            return Err(anyhow!(
+                "visual comparison thresholds are required for comparable outcomes"
+            ));
+        }
+        let mut threshold_ids = BTreeSet::new();
+        for threshold in &self.thresholds {
+            threshold.validate()?;
+            if !threshold_ids.insert(threshold.threshold_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual comparison thresholdId: {}",
+                    threshold.threshold_id
+                ));
+            }
+        }
+        if self.changed_regions.len() > MAX_VISUAL_COMPARISON_CHANGED_REGIONS {
+            return Err(anyhow!(
+                "visual comparison changedRegions exceeds limit of {MAX_VISUAL_COMPARISON_CHANGED_REGIONS}"
+            ));
+        }
+        let mut region_ids = BTreeSet::new();
+        for region in &self.changed_regions {
+            region.validate()?;
+            if !region_ids.insert(region.region_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual comparison changed regionId: {}",
+                    region.region_id
+                ));
+            }
+        }
+        if let Some(summary) = &self.pixel_diff_summary {
+            summary.validate()?;
+        }
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("visual comparison blockedReasons", reason)?;
+        }
+        if let Some(reason) = &self.unsupported_reason {
+            require_bounded_display_text("visual comparison unsupportedReason", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("visual comparison guardrail", guardrail)?;
+        }
+        self.validate_outcome_consistency()
+    }
+
+    fn validate_outcome_consistency(&self) -> Result<()> {
+        match self.outcome {
+            VisualComparisonOutcome::Unchanged => {
+                let summary = self.pixel_diff_summary.as_ref().ok_or_else(|| {
+                    anyhow!("visual comparison unchanged outcome requires pixelDiffSummary")
+                })?;
+                if summary.changed_pixels != 0 || !self.changed_regions.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison unchanged outcome must not include changed pixels or regions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Changed => {
+                let summary = self.pixel_diff_summary.as_ref().ok_or_else(|| {
+                    anyhow!("visual comparison changed outcome requires pixelDiffSummary")
+                })?;
+                if summary.changed_pixels == 0 || self.changed_regions.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison changed outcome requires changed pixels and changedRegions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MissingScreenshot => {
+                if !self.before.is_missing() && !self.after.is_missing() {
+                    return Err(anyhow!(
+                        "visual comparison missing_screenshot outcome requires a missing screenshot ref"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MismatchedDimensions => {
+                if self.before.dimensions() == self.after.dimensions() {
+                    return Err(anyhow!(
+                        "visual comparison mismatched_dimensions outcome requires differing dimensions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Unsupported => {
+                if self.unsupported_reason.is_none() {
+                    return Err(anyhow!(
+                        "visual comparison unsupported outcome requires unsupportedReason"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison blocked outcome requires blockedReasons"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MalformedScreenshot => {}
+        }
+        Ok(())
+    }
+}
+
+impl VisualComparisonScreenshotRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        match (&self.screenshot_ref, &self.missing_reason) {
+            (Some(reference), None) => {
+                validate_evidence_artifact_path(reference)?;
+                if !(reference.ends_with(".png")
+                    || reference.ends_with(".jpg")
+                    || reference.ends_with(".jpeg"))
+                {
+                    return Err(anyhow!(
+                        "{field}.screenshotRef must be PNG or JPEG evidence"
+                    ));
+                }
+                if self.format.is_none() || self.width.is_none() || self.height.is_none() {
+                    return Err(anyhow!(
+                        "{field} present screenshot requires format, width, and height"
+                    ));
+                }
+                let (width, height) = self.dimensions().unwrap_or_default();
+                if width == 0
+                    || height == 0
+                    || width > MAX_VISUAL_COMPARISON_DIMENSION
+                    || height > MAX_VISUAL_COMPARISON_DIMENSION
+                {
+                    return Err(anyhow!(
+                        "{field} dimensions must be between 1 and {MAX_VISUAL_COMPARISON_DIMENSION}"
+                    ));
+                }
+            }
+            (None, Some(reason)) => {
+                require_bounded_display_text(&format!("{field}.missingReason"), reason)?;
+            }
+            (Some(_), Some(_)) => {
+                return Err(anyhow!(
+                    "{field} must not include missingReason when screenshotRef is present"
+                ));
+            }
+            (None, None) => {
+                return Err(anyhow!("{field} requires screenshotRef or missingReason"));
+            }
+        }
+        if let Some(reference) = &self.metadata_ref {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.ends_with(".json") {
+                return Err(anyhow!("{field}.metadataRef must be JSON evidence"));
+            }
+        }
+        Ok(())
+    }
+
+    fn is_missing(&self) -> bool {
+        self.screenshot_ref.is_none() && self.missing_reason.is_some()
+    }
+
+    fn dimensions(&self) -> Option<(u32, u32)> {
+        Some((self.width?, self.height?))
+    }
+}
+
+impl VisualComparisonPixelDiffSummary {
+    fn validate(&self) -> Result<()> {
+        if self.total_pixels == 0 || self.changed_pixels > self.total_pixels {
+            return Err(anyhow!(
+                "visual comparison pixelDiffSummary changedPixels must be <= totalPixels"
+            ));
+        }
+        if self.changed_percent_x1000 > 100_000 {
+            return Err(anyhow!(
+                "visual comparison pixelDiffSummary changedPercentX1000 must be <= 100000"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualComparisonChangedRegion {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("visual comparison changedRegions.regionId", &self.region_id)?;
+        if self.width == 0 || self.height == 0 || self.changed_pixels == 0 {
+            return Err(anyhow!(
+                "visual comparison changedRegions must have nonzero width, height, and changedPixels"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualComparisonThreshold {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "visual comparison thresholds.thresholdId",
+            &self.threshold_id,
+        )?;
+        if self.max_changed_percent_x1000 > 100_000 {
+            return Err(anyhow!(
+                "visual comparison thresholds.maxChangedPercentX1000 must be <= 100000"
+            ));
+        }
+        Ok(())
+    }
+}
+
 const QA_SCENARIO_CANDIDATE_SCHEMA_VERSION: &str = "qa-scenario-candidate-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -41578,6 +41942,65 @@ scenarios:
         assert_eq!(malformed.route_attempts.malformed_count, 1);
 
         fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn visual_comparison_evidence_accepts_unchanged_and_changed_fixtures() {
+        let unchanged = VisualComparisonEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json"
+        ))
+        .expect("unchanged visual comparison fixture parses");
+        assert_eq!(
+            unchanged.schema_version,
+            VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION
+        );
+        assert_eq!(unchanged.outcome, VisualComparisonOutcome::Unchanged);
+        assert_eq!(unchanged.pixel_diff_summary.unwrap().changed_pixels, 0);
+        assert!(unchanged
+            .guardrails
+            .iter()
+            .any(|guardrail| guardrail.contains("No aesthetic")));
+
+        let changed = VisualComparisonEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/visual-comparison-evidence-v1/visual-comparison-changed.sample.json"
+        ))
+        .expect("changed visual comparison fixture parses");
+        assert_eq!(changed.outcome, VisualComparisonOutcome::Changed);
+        assert_eq!(changed.changed_regions.len(), 1);
+        assert_eq!(
+            changed.pixel_diff_summary.as_ref().unwrap().changed_pixels,
+            64
+        );
+    }
+
+    #[test]
+    fn visual_comparison_evidence_rejects_missing_thresholds_and_bad_screenshot_refs() {
+        let missing_thresholds = include_str!(
+            "../../../examples/visual-comparison-evidence-v1/invalid/missing-thresholds.json"
+        );
+        let error = VisualComparisonEvidenceArtifact::from_json_str(missing_thresholds)
+            .expect_err("comparable outcomes require thresholds");
+        assert!(error.to_string().contains("thresholds"));
+
+        let malformed_ref = include_str!(
+            "../../../examples/visual-comparison-evidence-v1/invalid/malformed-screenshot-ref.json"
+        );
+        let error = VisualComparisonEvidenceArtifact::from_json_str(malformed_ref)
+            .expect_err("unsafe or unsupported screenshot refs are rejected");
+        assert!(
+            error.to_string().contains("evidence artifact path")
+                || error.to_string().contains("PNG or JPEG")
+        );
+
+        let mut missing = VisualComparisonEvidenceArtifact::from_json_str(include_str!(
+            "../../../examples/visual-comparison-evidence-v1/invalid/missing-screenshot-state.json"
+        ))
+        .expect("explicit missing screenshot state is accepted");
+        missing.after.screenshot_ref = Some("evidence/screenshots/after-goal.png".to_string());
+        let error = missing
+            .validate()
+            .expect_err("missing screenshot state cannot also include screenshotRef");
+        assert!(error.to_string().contains("missingReason"));
     }
 
     #[test]

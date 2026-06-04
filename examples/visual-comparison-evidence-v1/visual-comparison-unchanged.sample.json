@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "visual-comparison-evidence-v1",
+  "comparisonId": "qa14_7_collect_goal_visual",
+  "runId": "run_visual_comparison_smoke",
+  "scenarioId": "collect-and-exit",
+  "checkpointId": "goal-checkpoint",
+  "before": {
+    "screenshotRef": "evidence/screenshots/before-goal.png",
+    "metadataRef": "evidence/screenshots/before-goal.metadata.json",
+    "format": "png",
+    "width": 320,
+    "height": 180
+  },
+  "after": {
+    "screenshotRef": "evidence/screenshots/after-goal.png",
+    "metadataRef": "evidence/screenshots/after-goal.metadata.json",
+    "format": "png",
+    "width": 320,
+    "height": 180
+  },
+  "outcome": "unchanged",
+  "pixelDiffSummary": { "totalPixels": 57600, "changedPixels": 0, "changedPercentX1000": 0 },
+  "thresholds": [{ "thresholdId": "pixel-threshold", "maxChangedPixels": 32, "maxChangedPercentX1000": 50 }],
+  "metadataRefs": ["evidence/screenshots/before-goal.metadata.json", "evidence/screenshots/after-goal.metadata.json"],
+  "evidenceRefs": ["evidence/screenshots/before-goal.png", "evidence/screenshots/after-goal.png", "evidence/scenarios/collect-and-exit/scenario-result.json"],
+  "guardrails": [
+    "Visual comparison evidence records deterministic metadata and pixel metrics only.",
+    "No aesthetic, subjective quality, fun, production safety, or market-readiness claim is implied.",
+    "Browser and Studio surfaces remain read-only and cannot compute trusted diffs or apply fixes."
+  ]
+}
