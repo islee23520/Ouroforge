@@ -25,11 +25,16 @@ A useful private report should include:
 - reproduction steps that avoid exposing secrets or private data;
 - expected impact and suggested mitigation, if known.
 
+For public-alpha responsible disclosure guidance, including what to keep private,
+maintainer disclosure flow, and sandbox/dry-run limitations, see
+[`docs/public-alpha-disclosure-and-sandbox-limitations-v1.md`](docs/public-alpha-disclosure-and-sandbox-limitations-v1.md).
+
 ## Public alpha trust boundary
 
 For the current public-alpha security/trust boundary, including local-first
 execution, browser read-only surfaces, no-command-bridge/no-source-apply
-authority, generated-state boundaries, and conservative security wording, see
+authority, generated-state boundaries, conservative security wording, and
+sandbox limitation pointers, see
 [`docs/public-alpha-security-trust-boundary-v1.md`](docs/public-alpha-security-trust-boundary-v1.md).
 
 ## Local execution boundary

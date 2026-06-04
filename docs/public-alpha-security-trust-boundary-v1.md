@@ -85,6 +85,10 @@ For wording scans and replacements, use
 `docs/public-wording-guardrail-v1.md` and
 `docs/public-wording-audit-process-v1.md`.
 
+For responsible disclosure guidance, manual maintainer disclosure flow, and
+sandbox/dry-run limitation wording, see
+[`docs/public-alpha-disclosure-and-sandbox-limitations-v1.md`](public-alpha-disclosure-and-sandbox-limitations-v1.md).
+
 ## Verification expectations
 
 PRs touching this boundary should record:
