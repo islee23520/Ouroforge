@@ -21,7 +21,7 @@
       "path": "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
       "beforeHash": "sha256:fixture-before-hash",
       "afterHash": "sha256:fixture-after-hash-if-later-authorized",
-      "fileClass": "deterministic_scene_fixture",
+      "fileClass": "runtime_demo_config",
       "reviewLevel": "elevated_source_like_data_review",
       "classificationStatus": "potentially_allowed_later",
       "classificationRationale": "Tracked deterministic scene fixture; still requires preview, review, rollback, sandbox, and stale-target controls before any apply path.",

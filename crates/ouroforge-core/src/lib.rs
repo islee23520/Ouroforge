@@ -10434,9 +10434,71 @@ pub struct SourcePatchPreviewValidation {
     pub guardrails: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchPreviewReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub status: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "diffFileCount")]
+    pub diff_file_count: usize,
+    #[serde(rename = "changedLines")]
+    pub changed_lines: usize,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "targetSummaries")]
+    pub target_summaries: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 impl SourcePatchPreviewValidation {
     pub fn is_blocked(&self) -> bool {
         self.status == "blocked"
+    }
+}
+
+pub fn source_patch_preview_read_model(
+    validation: &SourcePatchPreviewValidation,
+) -> SourcePatchPreviewReadModel {
+    let (diff_file_count, changed_lines) = validation
+        .diff_integrity_validation
+        .as_ref()
+        .map(|diff| {
+            (
+                diff.report.file_count,
+                diff.report.counts.added + diff.report.counts.removed,
+            )
+        })
+        .unwrap_or((0, 0));
+    SourcePatchPreviewReadModel {
+        schema_version: "source-patch-preview-read-model-v1".to_string(),
+        status: validation.status.clone(),
+        patch_preview_id: validation.patch_preview_id.clone(),
+        target_count: validation.file_class_validation.targets.len(),
+        diff_file_count,
+        changed_lines,
+        blocked_reasons: validation.blocked_reasons.clone(),
+        target_summaries: validation
+            .file_class_validation
+            .targets
+            .iter()
+            .map(|target| {
+                let class = serde_json::to_value(&target.class)
+                    .ok()
+                    .and_then(|value| value.as_str().map(ToOwned::to_owned))
+                    .unwrap_or_else(|| "unknown".to_string());
+                let decision = serde_json::to_value(&target.decision)
+                    .ok()
+                    .and_then(|value| value.as_str().map(ToOwned::to_owned))
+                    .unwrap_or_else(|| "unknown".to_string());
+                format!("{}: {class}/{decision}", target.path)
+            })
+            .collect(),
+        guardrails: validation.guardrails.clone(),
     }
 }
 
@@ -10474,6 +10536,128 @@ pub fn inspect_source_patch_preview_artifact(
     }
     if artifact.targets.is_empty() {
         blocked_reasons.push("targets must not be empty".to_string());
+    }
+
+    let mut target_paths_seen = BTreeSet::<String>::new();
+    let mut target_path_set = BTreeSet::<String>::new();
+    for (index, target) in artifact.targets.iter().enumerate() {
+        let field = format!("targets[{index}]");
+        if !target_paths_seen.insert(target.path.clone()) {
+            blocked_reasons.push(format!("duplicate target path {}", target.path));
+        }
+        target_path_set.insert(target.path.clone());
+        push_if_blank(&mut blocked_reasons, &format!("{field}.path"), &target.path);
+        require_sha256_like(
+            &mut blocked_reasons,
+            &format!("{field}.beforeHash"),
+            &target.before_hash,
+        );
+        if let Some(after_hash) = &target.after_hash {
+            require_sha256_like(
+                &mut blocked_reasons,
+                &format!("{field}.afterHash"),
+                after_hash,
+            );
+        }
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.fileClass"),
+            &target.file_class,
+        );
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.reviewLevel"),
+            &target.review_level,
+        );
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("{field}.classificationRationale"),
+            &target.classification_rationale,
+        );
+        if !matches!(
+            target.classification_status.as_str(),
+            "potentially_allowed_later" | "restricted_separate_approval" | "blocked_by_design"
+        ) {
+            blocked_reasons.push(format!(
+                "{field}.classificationStatus has unsupported value {}",
+                target.classification_status
+            ));
+        }
+        let class_report = classify_source_file_path_str(&target.path);
+        let expected_file_class = source_file_class_label_value(&class_report.class);
+        if target.file_class != expected_file_class {
+            blocked_reasons.push(format!(
+                "{field}.fileClass expected {expected_file_class} from current file-class policy for {}",
+                target.path
+            ));
+        }
+        let expected_status = match class_report.decision {
+            SourceFileClassDecision::Allowed => "potentially_allowed_later",
+            SourceFileClassDecision::NeedsApproval => "restricted_separate_approval",
+            SourceFileClassDecision::Blocked => "blocked_by_design",
+        };
+        if class_report.is_blocked() && target.blocked_reasons.is_empty() {
+            blocked_reasons.push(format!(
+                "{field}.blockedReasons required for blocked target {}",
+                target.path
+            ));
+        }
+        if target.classification_status != expected_status {
+            blocked_reasons.push(format!(
+                "{field}.classificationStatus expected {expected_status} from current file-class policy for {}",
+                target.path
+            ));
+        }
+    }
+
+    push_if_blank(
+        &mut blocked_reasons,
+        "diffSummary.summary",
+        &artifact.diff_summary.summary,
+    );
+    if artifact.diff_summary.diff_stats.truncated
+        && artifact.diff_summary.large_diff_warning.is_none()
+    {
+        blocked_reasons
+            .push("largeDiffWarning required when diffStats.truncated is true".to_string());
+    }
+    if artifact.diff_summary.diff_stats.binary_or_opaque
+        && artifact.diff_summary.binary_or_opaque_warning.is_none()
+    {
+        blocked_reasons.push(
+            "binaryOrOpaqueWarning required when diffStats.binaryOrOpaque is true".to_string(),
+        );
+    }
+    if artifact.diff_summary.diff_stats.generated_origin
+        && !preview_has_blocked_reason_containing(artifact, "generated")
+    {
+        blocked_reasons.push(
+            "generated-origin preview requires generated blocked/promotion rationale".to_string(),
+        );
+    }
+    for (index, hunk) in artifact.diff_summary.hunks.iter().enumerate() {
+        if !target_path_set.contains(&hunk.path) {
+            blocked_reasons.push(format!(
+                "diffSummary.hunks[{index}].path {} is missing from targets",
+                hunk.path
+            ));
+        }
+        push_if_blank(
+            &mut blocked_reasons,
+            &format!("diffSummary.hunks[{index}].summary"),
+            &hunk.summary,
+        );
+    }
+
+    if artifact.risk_ids.is_empty() {
+        blocked_reasons.push("riskIds must not be empty".to_string());
+    }
+    for risk_id in &artifact.risk_ids {
+        if !is_known_source_patch_risk_id(risk_id) {
+            blocked_reasons.push(format!(
+                "riskIds contains unsupported threat-model id {risk_id}"
+            ));
+        }
     }
     if artifact.linked_evidence.is_empty() {
         blocked_reasons.push("linkedEvidence must not be empty".to_string());
@@ -10651,6 +10835,63 @@ pub fn validate_source_patch_preview_artifact(
         ));
     }
     Ok(validation)
+}
+
+fn push_if_blank(blocked_reasons: &mut Vec<String>, field: &str, value: &str) {
+    if value.trim().is_empty() {
+        blocked_reasons.push(format!("{field} must not be empty"));
+    }
+}
+
+fn require_sha256_like(blocked_reasons: &mut Vec<String>, field: &str, value: &str) {
+    push_if_blank(blocked_reasons, field, value);
+    if !value.trim().is_empty() && !value.starts_with("sha256:") {
+        blocked_reasons.push(format!("{field} must use sha256: prefix"));
+    }
+}
+
+fn source_file_class_label_value(class: &SourceFileClassLabel) -> String {
+    serde_json::to_value(class)
+        .ok()
+        .and_then(|value| value.as_str().map(ToOwned::to_owned))
+        .map(|value| value.replace('-', "_"))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn preview_has_blocked_reason_containing(
+    artifact: &SourcePatchPreviewArtifact,
+    needle: &str,
+) -> bool {
+    artifact.targets.iter().any(|target| {
+        target
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.to_ascii_lowercase().contains(needle))
+    }) || artifact
+        .read_model_prototype
+        .as_ref()
+        .is_some_and(|model| model.primary_blocked_reason.contains(needle))
+}
+
+fn is_known_source_patch_risk_id(risk_id: &str) -> bool {
+    matches!(
+        risk_id,
+        "STM-01"
+            | "STM-02"
+            | "STM-03"
+            | "STM-04"
+            | "STM-05"
+            | "STM-06"
+            | "STM-07"
+            | "STM-08"
+            | "STM-09"
+            | "STM-10"
+            | "STM-11"
+            | "STM-12"
+            | "STM-13"
+            | "STM-14"
+            | "STM-15"
+    )
 }
 
 pub const PATCH_DIFF_INTEGRITY_SCHEMA_VERSION: &str = "patch-diff-integrity-v1";
