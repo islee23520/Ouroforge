@@ -36129,7 +36129,10 @@ fn validate_scene_3d_transform(field: &str, transform: &Scene3dTransform) -> Res
 fn validate_scene_3d_vector(field: &str, vector: &Scene3dVector) -> Result<()> {
     const MAX_3D_COMPONENT_ABS: i64 = 1_000_000_000;
     for (axis, value) in [("x", vector.x), ("y", vector.y), ("z", vector.z)] {
-        if value.abs() > MAX_3D_COMPONENT_ABS {
+        // unsigned_abs avoids the i64::MIN.abs() overflow (which panics in checked
+        // builds and wraps to a negative value in release), so the minimum i64 is
+        // correctly rejected as outside the bounded range.
+        if value.unsigned_abs() > MAX_3D_COMPONENT_ABS as u64 {
             return Err(anyhow!("{field}.{axis} exceeds bounded 3d range"));
         }
     }
@@ -62683,6 +62686,28 @@ scenarios:
         ))
         .expect_err("malformed 3D transform is rejected by schema parsing");
         assert!(malformed.to_string().contains("missing field `z`"));
+
+        // i64::MIN must be rejected as out of range, not overflow on abs().
+        let extreme = validate_scene_3d_vector(
+            "test vector",
+            &Scene3dVector {
+                x: i64::MIN,
+                y: 0,
+                z: 0,
+            },
+        )
+        .expect_err("i64::MIN component is rejected without overflow");
+        assert!(extreme.to_string().contains("exceeds bounded 3d range"));
+        // A within-bound vector still validates.
+        validate_scene_3d_vector(
+            "test vector",
+            &Scene3dVector {
+                x: 1_000_000_000,
+                y: -1_000_000_000,
+                z: 0,
+            },
+        )
+        .expect("vector at the bound is accepted");
     }
 
     #[test]
