@@ -624,6 +624,9 @@ const visualAuthoringDoc = fs.readFileSync(require.resolve('../../docs/visual-au
 assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
 assert.match(visualAuthoringDoc, /Review-gated visual apply/);
 assert.match(visualAuthoringDoc, /Dashboard mutation lifecycle and Studio mutation surfaces show draft\/proposal\/patch\/decision\/transaction ids/);
+assert.match(visualAuthoringDoc, /Known gaps and out-of-scope behavior/);
+assert.match(visualAuthoringDoc, /committed generated runs, transactions, previews, dashboard exports, smoke\s+outputs, screenshots, logs, or package bundles/);
+assert.match(visualAuthoringDoc, /broader editor ergonomics, richer visual diff UI affordances, production\s+asset import, source mutation apply/);
 assert.match(visualAuthoringDoc, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
 
 // Untrusted artifact/journal content must be HTML-escaped, not rendered as markup.

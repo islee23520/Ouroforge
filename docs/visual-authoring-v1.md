@@ -263,6 +263,27 @@ Scenario Coverage v5 and keeps Studio/dashboard surfaces read-only while Rust
 validation, transaction preview, review-gated apply, rollback/evidence writes,
 and generated-state cleanup remain the trusted boundary.
 
+### Known gaps and out-of-scope behavior
+
+Scenario Coverage v5 is a regression suite, not a product-expansion milestone.
+The coverage matrix intentionally does **not** claim:
+
+- a production visual editor, visual scripting system, hosted Studio, plugin
+  runtime, asset marketplace, native export, public launch, or Godot replacement;
+- browser-side trusted file writes, uploads, fetch/import flows, command
+  execution, local server bridges, review-decision creation, draft apply, rerun,
+  rollback, auto-merge, or release automation;
+- secure sandbox guarantees for arbitrary untrusted content; or
+- committed generated runs, transactions, previews, dashboard exports, smoke
+  outputs, screenshots, logs, or package bundles outside explicit source-like
+  fixtures.
+
+Remaining gaps after #353 are therefore roadmap scope, not regressions in this
+suite: broader editor ergonomics, richer visual diff UI affordances, production
+asset import, source mutation apply, export/build packaging, plugin execution,
+and public launch readiness all require later issue contracts and fresh
+guardrail evidence.
+
 ## Verification gates for follow-up issues
 
 Every Visual Authoring v1 issue should run issue-specific focused checks plus the

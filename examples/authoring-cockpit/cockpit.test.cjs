@@ -768,6 +768,10 @@ assert.match(visualAuthoringDoc, /do not add new Studio controls, dashboard\s+wr
 assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
 assert.match(visualAuthoringDoc, /Studio renders before\/after summaries, operation summaries, collision\/trigger counts/);
 assert.match(visualAuthoringDoc, /Studio may render draft ids, operation summaries, blocked reasons, and copyable inert preview command text only/);
+assert.match(visualAuthoringDoc, /Known gaps and out-of-scope behavior/);
+assert.match(visualAuthoringDoc, /Scenario Coverage v5 is a regression suite, not a product-expansion milestone/);
+assert.match(visualAuthoringDoc, /browser-side trusted file writes, uploads, fetch\/import flows, command\s+execution, local server bridges/);
+assert.match(visualAuthoringDoc, /Remaining gaps after #353 are therefore roadmap scope, not regressions in this\s+suite/);
 assert.match(visualAuthoringDoc, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
 const dashboardReadme = fs.readFileSync(require.resolve('../evidence-dashboard/README.md'), 'utf8');
 assert.match(dashboardReadme, /Visual Authoring Demo v1 dashboard boundary audit/);
