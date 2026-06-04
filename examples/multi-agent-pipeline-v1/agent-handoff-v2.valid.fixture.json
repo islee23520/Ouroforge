@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "agent-handoff-v2",
+  "handoffId": "handoff-v2-valid",
+  "fromRole": "designer",
+  "toRole": "reviewer",
+  "taskId": "task-board-schema",
+  "status": "ready",
+  "artifactRefs": [
+    {
+      "id": "task-board",
+      "path": "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+      "description": "fixture-scoped task board context"
+    }
+  ],
+  "assumptions": [
+    "The receiving role uses tracked fixture evidence only",
+    "No hidden context is required beyond listed artifacts and evidence links"
+  ],
+  "decisions": [
+    {
+      "id": "reviewer-handoff-decision",
+      "kind": "agent-review",
+      "description": "reviewer accepts or blocks the handoff explicitly"
+    }
+  ],
+  "evidenceLinks": [
+    {
+      "id": "ownership-policy",
+      "path": "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+      "description": "fixture-scoped ownership policy evidence"
+    }
+  ],
+  "openRisks": [
+    {
+      "id": "stale-fixture-risk",
+      "severity": "low",
+      "description": "Fixture evidence can become stale if task ids change",
+      "mitigation": "Re-run Rust validation before accepting downstream work"
+    }
+  ],
+  "acceptanceChecklist": [
+    {
+      "id": "evidence-linked",
+      "description": "All required evidence links are present and fixture-scoped",
+      "checked": true,
+      "evidenceRefs": [
+        {
+          "id": "ownership-policy",
+          "path": "examples/multi-agent-pipeline-v1/ownership-policy.no-conflict.fixture.json",
+          "description": "fixture-scoped ownership evidence"
+        }
+      ]
+    },
+    {
+      "id": "no-apply-authority",
+      "description": "Handoff does not grant apply, merge, command, or browser write authority",
+      "checked": true,
+      "evidenceRefs": []
+    }
+  ],
+  "staleStateIndicators": [],
+  "nextRecommendedAction": "Reviewer inspects listed evidence, records an explicit decision, and stops if evidence is stale or missing.",
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "browser command bridge",
+    "trusted browser file writes",
+    "remote worker pool",
+    "release automation"
+  ],
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data/multi-agent-pipeline",
+      "target"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "boundary": "advisory handoff evidence only; it does not execute commands, lock files, write trusted state, apply changes, merge branches, spawn agents, or grant production authority"
+}
