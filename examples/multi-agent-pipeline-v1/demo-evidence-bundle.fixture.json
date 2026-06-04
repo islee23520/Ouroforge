@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "authoring-loop-evidence-bundle-v1",
+  "loopId": "multi-agent-demo-fixture",
+  "status": "completed",
+  "plan": {
+    "id": "demo-loop-plan",
+    "kind": "loop-plan",
+    "path": "examples/multi-agent-pipeline-v1/demo-task-board.fixture.json",
+    "description": "tracked fixture-scoped demo task board"
+  },
+  "steps": [
+    {
+      "stepId": "qa-queue-lane",
+      "kind": "rerun",
+      "status": "completed",
+      "outputs": [
+        {
+          "id": "qa-queue-step-output",
+          "kind": "step-output",
+          "path": "runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json",
+          "stepId": "qa-queue-lane",
+          "description": "bounded QA queue metadata; fixture does not spawn workers"
+        }
+      ]
+    },
+    {
+      "stepId": "performance-regression-lane",
+      "kind": "promote-regression",
+      "status": "completed",
+      "outputs": [
+        {
+          "id": "regression-lane-step-output",
+          "kind": "step-output",
+          "path": "runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json",
+          "stepId": "performance-regression-lane",
+          "description": "performance/regression metadata without production-safety claim"
+        }
+      ]
+    },
+    {
+      "stepId": "bundle-production-evidence",
+      "kind": "summarize",
+      "status": "completed",
+      "outputs": [
+        {
+          "id": "production-bundle-step-output",
+          "kind": "step-output",
+          "path": "runs/multi-agent-pipeline/demo/bundles/production-evidence-bundle.json",
+          "stepId": "bundle-production-evidence",
+          "description": "inspectable bundle index for the bounded prototype demo"
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "id": "demo-qa-run",
+      "kind": "run",
+      "path": "runs/multi-agent-pipeline/demo/runs/qa-run.json",
+      "description": "fixture-scoped QA run summary"
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "demo-comparison",
+      "kind": "comparison",
+      "path": "runs/multi-agent-pipeline/demo/comparisons/qa-vs-baseline.json",
+      "description": "fixture-scoped comparison summary"
+    }
+  ],
+  "proposals": [
+    {
+      "id": "demo-work-package-proposal",
+      "kind": "proposal",
+      "path": "runs/multi-agent-pipeline/demo/work-packages/gameplay-engineer-proposal.json",
+      "description": "untrusted work-package proposal metadata"
+    }
+  ],
+  "reviewDecisions": [
+    {
+      "id": "demo-review-decision",
+      "kind": "review-decision",
+      "path": "runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json",
+      "description": "append-only reviewer decision metadata"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "demo-placeholder-transaction",
+      "kind": "transaction",
+      "path": "runs/multi-agent-pipeline/demo/transactions/validated-placeholder-transaction.json",
+      "description": "validation metadata only; no trusted source mutation"
+    }
+  ],
+  "regressionPromotions": [
+    {
+      "id": "demo-regression-promotion",
+      "kind": "regression-promotion",
+      "path": "runs/multi-agent-pipeline/demo/regression/regression-promotion-review.json",
+      "description": "explicit regression promotion review metadata"
+    }
+  ],
+  "matrixSnapshots": [
+    {
+      "id": "demo-regression-matrix",
+      "kind": "matrix-snapshot",
+      "path": "runs/multi-agent-pipeline/demo/regression/regression-matrix.json",
+      "description": "fixture-scoped regression matrix snapshot"
+    }
+  ],
+  "journalSummaries": [
+    {
+      "id": "demo-journal-summary",
+      "kind": "journal-summary",
+      "path": "runs/multi-agent-pipeline/demo/journal/demo-summary.md",
+      "description": "fixture-scoped journal summary"
+    }
+  ],
+  "generatedState": {
+    "roots": ["runs/multi-agent-pipeline"],
+    "trackedFixtureOnly": true
+  },
+  "boundary": "Generated local index fixture only; does not move artifacts, write source state, spawn agents, add browser controls, apply mutations, merge branches, publish artifacts, or claim production readiness."
+}

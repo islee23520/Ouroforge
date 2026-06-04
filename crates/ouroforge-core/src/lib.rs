@@ -38703,6 +38703,102 @@ scenarios:
     }
 
     #[test]
+    fn multi_agent_demo_pipeline_qa_review_bundle_flow_stays_inert_and_complete() {
+        let flow: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/demo-qa-review-flow.fixture.json",
+        ))
+        .expect("demo QA/review flow fixture parses");
+        assert_eq!(
+            flow["schemaVersion"],
+            json!("multi-agent-demo-qa-review-flow-v1")
+        );
+        assert_eq!(flow["qaQueue"]["status"], json!("queued"));
+        assert!(flow["qaQueue"]["workerAssignment"]["boundary"]
+            .as_str()
+            .expect("worker boundary")
+            .contains("does not spawn workers"));
+        assert_eq!(
+            flow["performanceRegressionLane"]["status"],
+            json!("blocked-until-qa-evidence-refresh")
+        );
+        assert!(flow["performanceRegressionLane"]["forbiddenClaims"]
+            .as_array()
+            .expect("forbidden claims")
+            .iter()
+            .any(|claim| claim == "production ready"));
+        assert_ne!(
+            flow["reviewGate"]["reviewer"], flow["reviewGate"]["critic"],
+            "reviewer and critic identities stay independent"
+        );
+        assert_eq!(flow["decisionLedger"]["appendOnly"], json!(true));
+        let events = flow["decisionLedger"]["events"]
+            .as_array()
+            .expect("decision events");
+        assert!(events.iter().any(|event| {
+            event["kind"] == json!("multi_agent.review_decision")
+                && event["actor"] == flow["reviewGate"]["reviewer"]
+        }));
+        assert!(events.iter().any(|event| {
+            event["kind"] == json!("multi_agent.critic_finding")
+                && event["actor"] == flow["reviewGate"]["critic"]
+        }));
+        let guardrails = flow["guardrails"]
+            .as_array()
+            .expect("flow guardrails")
+            .iter()
+            .filter_map(|value| value.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        for required in [
+            "no hidden background agents",
+            "no unbounded spawning",
+            "no auto-apply",
+            "no browser trusted writes",
+            "no remote worker pool",
+        ] {
+            assert!(
+                guardrails.contains(required),
+                "flow guardrails include {required}"
+            );
+        }
+        assert!(flow["boundary"]
+            .as_str()
+            .expect("flow boundary")
+            .contains("does not run QA workers"));
+
+        let bundle_body =
+            read_json_fixture("examples/multi-agent-pipeline-v1/demo-evidence-bundle.fixture.json");
+        let bundle = AuthoringLoopEvidenceBundle::from_json_str(&bundle_body)
+            .expect("demo evidence bundle fixture validates");
+        assert_eq!(bundle.loop_id, "multi-agent-demo-fixture");
+        assert_eq!(bundle.status, AuthoringLoopEvidenceBundleStatus::Completed);
+        assert!(bundle.missing_refs.is_empty());
+        assert!(bundle.generated_state.tracked_fixture_only);
+        assert_eq!(bundle.steps.len(), 3);
+        assert_eq!(bundle.runs.len(), 1);
+        assert_eq!(bundle.comparisons.len(), 1);
+        assert_eq!(bundle.proposals.len(), 1);
+        assert_eq!(bundle.review_decisions.len(), 1);
+        assert_eq!(bundle.transactions.len(), 1);
+        assert_eq!(bundle.regression_promotions.len(), 1);
+        assert_eq!(bundle.matrix_snapshots.len(), 1);
+        assert_eq!(bundle.journal_summaries.len(), 1);
+        assert!(bundle
+            .steps
+            .iter()
+            .all(|step| step.missing_refs.is_empty() && !step.outputs.is_empty()));
+        assert!(bundle.boundary.contains("does not move artifacts"));
+        assert!(bundle.boundary.contains("spawn agents"));
+        assert!(bundle.boundary.contains("claim production readiness"));
+
+        let cockpit = build_studio_loop_cockpit_read_model(std::slice::from_ref(&bundle), &[]);
+        assert_eq!(cockpit.loops.len(), 1);
+        assert_eq!(cockpit.loops[0].bundle_status.as_deref(), Some("completed"));
+        assert!(cockpit.loops[0].bundle_missing_refs.is_empty());
+        assert!(cockpit.boundary.contains("does not execute commands"));
+    }
+
+    #[test]
     fn agent_role_model_v1_rejects_unsupported_roles_and_forbidden_outputs() {
         let invalid =
             read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.invalid.fixture.json");

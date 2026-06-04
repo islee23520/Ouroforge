@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "multi-agent-demo-qa-review-flow-v1",
+  "demoId": "multi-agent-demo-fixture",
+  "status": "review-held-pending-qa-refresh",
+  "qaQueue": {
+    "status": "queued",
+    "candidateIds": ["demo-smoke-route", "demo-regression-budget"],
+    "workerAssignment": {
+      "mode": "fixture-only",
+      "boundedWorkers": 2,
+      "boundary": "Read-only queue metadata; this fixture does not spawn workers or run scenarios."
+    },
+    "evidenceRefs": ["runs/multi-agent-pipeline/demo/qa/qa-queue-evidence.json"]
+  },
+  "performanceRegressionLane": {
+    "status": "blocked-until-qa-evidence-refresh",
+    "budgetPolicy": "demo-local-budget-v1",
+    "evidenceRefs": ["runs/multi-agent-pipeline/demo/regression/regression-lane-evidence.json"],
+    "forbiddenClaims": ["production safety", "production ready", "Godot replacement"]
+  },
+  "reviewGate": {
+    "reviewer": "reviewer-fixture-agent",
+    "critic": "critic-fixture-agent",
+    "status": "held",
+    "decisionRefs": ["runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json"],
+    "requiredEvidence": ["qa-queue-evidence", "regression-lane-evidence", "ownership-conflict-report"],
+    "independence": "reviewer and critic are distinct from proposal author and from each other"
+  },
+  "decisionLedger": {
+    "appendOnly": true,
+    "events": [
+      {
+        "eventId": "review-hold-001",
+        "actor": "reviewer-fixture-agent",
+        "kind": "multi_agent.review_decision",
+        "status": "held",
+        "evidenceRefs": ["runs/multi-agent-pipeline/demo/decisions/review-decision-ledger.json"]
+      },
+      {
+        "eventId": "critic-risk-001",
+        "actor": "critic-fixture-agent",
+        "kind": "multi_agent.critic_finding",
+        "status": "open",
+        "evidenceRefs": ["runs/multi-agent-pipeline/demo/critic/critic-risk-report.json"]
+      }
+    ]
+  },
+  "evidenceBundleRef": "examples/multi-agent-pipeline-v1/demo-evidence-bundle.fixture.json",
+  "guardrails": [
+    "no hidden background agents",
+    "no unbounded spawning",
+    "no auto-apply, auto-merge, self-approval, or reviewer bypass",
+    "no browser trusted writes or command bridge",
+    "no remote worker pool, hosted service, or production CI/CD automation",
+    "agent outputs remain untrusted until local Rust validation and accepted review"
+  ],
+  "boundary": "Fixture-scoped QA/review flow metadata only; it does not run QA workers, apply proposals, merge branches, write trusted files, or publish artifacts."
+}
