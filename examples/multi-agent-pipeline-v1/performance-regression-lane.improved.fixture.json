@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "performance-regression-lane-v1",
+  "laneId": "demo-performance-regression-lane-improved",
+  "milestone": "multi-agent-production-pipeline-v1",
+  "riskArea": {
+    "riskId": "frame-budget-regression",
+    "category": "performance-regression",
+    "summary": "Compare baseline and candidate scenario runs before promotion."
+  },
+  "assignedRole": "performance-regression-agent",
+  "assignedAgent": "performance-zeta",
+  "classification": "improved",
+  "baselineRuns": [
+    {
+      "id": "baseline-run",
+      "path": "runs/multi-agent-pipeline/demo/performance/baseline-run.json",
+      "description": "baseline local run evidence"
+    }
+  ],
+  "comparisonRuns": [
+    {
+      "id": "comparison-run",
+      "path": "runs/multi-agent-pipeline/demo/performance/comparison-run.json",
+      "description": "candidate local comparison run evidence"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "average-frame-ms",
+      "name": "average-frame-ms",
+      "unit": "milliseconds",
+      "baselineValue": 13.2,
+      "comparisonValue": 13.4,
+      "deltaValue": 0.2,
+      "notes": "Local fixture values for regression-lane schema coverage only."
+    },
+    {
+      "id": "p95-frame-ms",
+      "name": "p95-frame-ms",
+      "unit": "milliseconds",
+      "baselineValue": 15.9,
+      "comparisonValue": 16.0,
+      "deltaValue": 0.1
+    }
+  ],
+  "thresholds": [
+    {
+      "id": "avg-frame-budget",
+      "metricId": "average-frame-ms",
+      "operator": "delta-less-than-or-equal",
+      "value": 1.0,
+      "classificationIfExceeded": "regressed",
+      "rationale": "Average frame delta over one millisecond requires regression review before promotion."
+    },
+    {
+      "id": "p95-frame-budget",
+      "metricId": "p95-frame-ms",
+      "operator": "less-than-or-equal",
+      "value": 16.6,
+      "classificationIfExceeded": "regressed",
+      "rationale": "P95 frame time remains under the v1 frame-budget evidence target."
+    }
+  ],
+  "evidenceLinks": {
+    "runComparisonRefs": [
+      {
+        "id": "run-comparison",
+        "path": "runs/multi-agent-pipeline/demo/performance/run-comparison.json",
+        "description": "run comparison evidence"
+      }
+    ],
+    "frameBudgetRefs": [
+      {
+        "id": "frame-budget",
+        "path": "examples/runtime-frame-budget-v1/frame-budget.sample.json",
+        "description": "frame budget fixture evidence"
+      }
+    ],
+    "scenarioMatrixRefs": [
+      {
+        "id": "scenario-matrix",
+        "path": "docs/multi-agent-pipeline-coverage-matrix-v1.md",
+        "description": "scenario matrix coverage reference"
+      }
+    ],
+    "qaQueueRefs": [
+      {
+        "id": "qa-queue",
+        "path": "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+        "description": "linked QA queue fixture"
+      }
+    ],
+    "reviewGateRefs": [
+      {
+        "id": "review-gate",
+        "path": "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        "description": "linked review/critic gate fixture"
+      }
+    ],
+    "browserMetricWarnings": [
+      "Browser metrics are advisory evidence inputs only; Rust/local validation owns trusted classification."
+    ]
+  },
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "Performance/regression lane output is explicit local evidence for reviewer promotion decisions",
+    "Browser metrics are advisory evidence inputs and not trusted absolute truth",
+    "generated roots remain ignored unless fixture scoped"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "unbounded spawning",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "reviewer bypass",
+    "browser command bridge",
+    "trusted browser writes",
+    "remote worker pool",
+    "credentialed commands",
+    "network/install commands",
+    "dependency mutation",
+    "production readiness",
+    "Godot replacement"
+  ],
+  "boundary": "Performance/regression lane is inert local evidence; it does not execute commands, does not spawn agents, does not mutate trusted files, does not write trusted browser state, does not auto-apply, does not auto-merge, does not self-approve, does not claim production readiness, and does not claim Godot replacement capability.",
+  "blockedReasons": []
+}

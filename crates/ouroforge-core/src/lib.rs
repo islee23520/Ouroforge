@@ -14773,6 +14773,343 @@ impl QaAgentRunCommandContext {
     }
 }
 
+pub const PERFORMANCE_REGRESSION_LANE_SCHEMA_VERSION: &str = "performance-regression-lane-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceRegressionLaneArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "laneId")]
+    pub lane_id: String,
+    pub milestone: String,
+    #[serde(rename = "riskArea")]
+    pub risk_area: QaAgentRiskArea,
+    #[serde(rename = "assignedRole")]
+    pub assigned_role: String,
+    #[serde(rename = "assignedAgent")]
+    pub assigned_agent: String,
+    pub classification: PerformanceRegressionClassification,
+    #[serde(rename = "baselineRuns")]
+    pub baseline_runs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "comparisonRuns")]
+    pub comparison_runs: Vec<AuthoringLoopArtifactRef>,
+    pub metrics: Vec<PerformanceRegressionMetric>,
+    pub thresholds: Vec<PerformanceRegressionThreshold>,
+    #[serde(rename = "evidenceLinks")]
+    pub evidence_links: PerformanceRegressionEvidenceLinks,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceRegressionMetric {
+    pub id: String,
+    pub name: String,
+    pub unit: String,
+    #[serde(rename = "baselineValue")]
+    pub baseline_value: serde_json::Value,
+    #[serde(rename = "comparisonValue")]
+    pub comparison_value: serde_json::Value,
+    #[serde(rename = "deltaValue")]
+    pub delta_value: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceRegressionThreshold {
+    pub id: String,
+    #[serde(rename = "metricId")]
+    pub metric_id: String,
+    pub operator: PerformanceRegressionThresholdOperator,
+    pub value: serde_json::Value,
+    #[serde(rename = "classificationIfExceeded")]
+    pub classification_if_exceeded: PerformanceRegressionClassification,
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceRegressionEvidenceLinks {
+    #[serde(rename = "runComparisonRefs")]
+    pub run_comparison_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "frameBudgetRefs")]
+    pub frame_budget_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "scenarioMatrixRefs")]
+    pub scenario_matrix_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "qaQueueRefs")]
+    pub qa_queue_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "reviewGateRefs")]
+    pub review_gate_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(
+        rename = "browserMetricWarnings",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub browser_metric_warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum PerformanceRegressionClassification {
+    Improved,
+    Unchanged,
+    Regressed,
+    Inconclusive,
+    MissingBaseline,
+    Unsupported,
+    Stale,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum PerformanceRegressionThresholdOperator {
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    DeltaLessThanOrEqual,
+    DeltaGreaterThanOrEqual,
+}
+
+impl PerformanceRegressionLaneArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: PerformanceRegressionLaneArtifact = serde_json::from_str(input)
+            .context("failed to parse Performance Regression Lane JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != PERFORMANCE_REGRESSION_LANE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "performance regression lane schemaVersion must be {PERFORMANCE_REGRESSION_LANE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("performance regression lane laneId", &self.lane_id)?;
+        require_text("performance regression lane milestone", &self.milestone)?;
+        self.risk_area
+            .validate("performance regression lane riskArea")?;
+        validate_path_component(
+            "performance regression lane assignedRole",
+            &self.assigned_role,
+        )?;
+        validate_path_component(
+            "performance regression lane assignedAgent",
+            &self.assigned_agent,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane baselineRuns",
+            &self.baseline_runs,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane comparisonRuns",
+            &self.comparison_runs,
+        )?;
+        if self.metrics.is_empty() {
+            return Err(anyhow!(
+                "performance regression lane metrics must not be empty"
+            ));
+        }
+        let mut metric_ids = BTreeSet::new();
+        for (index, metric) in self.metrics.iter().enumerate() {
+            metric.validate(index)?;
+            if !metric_ids.insert(metric.id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate performance regression lane metric id: {}",
+                    metric.id
+                ));
+            }
+        }
+        if self.thresholds.is_empty() {
+            return Err(anyhow!(
+                "performance regression lane thresholds must not be empty"
+            ));
+        }
+        for (index, threshold) in self.thresholds.iter().enumerate() {
+            threshold.validate(index, &metric_ids)?;
+        }
+        self.evidence_links.validate()?;
+        validate_optional_text_list(
+            "performance regression lane blockedReasons",
+            &self.blocked_reasons,
+        )?;
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("performance regression lane guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "performance regression lane forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("performance regression lane boundary", &self.boundary)?;
+        self.validate_classification_shape()?;
+        self.validate_guardrails()
+    }
+
+    fn validate_classification_shape(&self) -> Result<()> {
+        match self.classification {
+            PerformanceRegressionClassification::Regressed
+            | PerformanceRegressionClassification::Inconclusive
+            | PerformanceRegressionClassification::MissingBaseline
+            | PerformanceRegressionClassification::Unsupported
+            | PerformanceRegressionClassification::Stale => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "performance regression lane {:?} classification requires blockedReasons",
+                        self.classification
+                    ));
+                }
+            }
+            PerformanceRegressionClassification::Improved
+            | PerformanceRegressionClassification::Unchanged => {}
+        }
+        Ok(())
+    }
+
+    fn validate_guardrails(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "unbounded spawning",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "reviewer bypass",
+            "browser command bridge",
+            "trusted browser writes",
+            "remote worker pool",
+            "production readiness",
+            "Godot replacement",
+        ] {
+            if !forbidden.contains(&phrase.to_ascii_lowercase()) {
+                return Err(anyhow!(
+                    "performance regression lane forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        for phrase in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not mutate trusted files",
+            "does not write trusted browser state",
+            "does not auto-apply",
+            "does not auto-merge",
+            "does not self-approve",
+            "does not claim production readiness",
+            "does not claim godot replacement",
+        ] {
+            if !boundary.contains(phrase) {
+                return Err(anyhow!(
+                    "performance regression lane boundary must state it {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl PerformanceRegressionMetric {
+    fn validate(&self, index: usize) -> Result<()> {
+        validate_path_component(
+            &format!("performance regression lane metrics[{index}].id"),
+            &self.id,
+        )?;
+        validate_path_component(
+            &format!("performance regression lane metrics[{index}].name"),
+            &self.name,
+        )?;
+        require_text(
+            &format!("performance regression lane metrics[{index}].unit"),
+            &self.unit,
+        )?;
+        for (field, value) in [
+            ("baselineValue", &self.baseline_value),
+            ("comparisonValue", &self.comparison_value),
+            ("deltaValue", &self.delta_value),
+        ] {
+            if !(value.is_number() || value.is_string()) {
+                return Err(anyhow!(
+                    "performance regression lane metrics[{index}].{field} must be a number or explicit textual value"
+                ));
+            }
+        }
+        if let Some(notes) = &self.notes {
+            require_bounded_display_text(
+                &format!("performance regression lane metrics[{index}].notes"),
+                notes,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl PerformanceRegressionThreshold {
+    fn validate(&self, index: usize, metric_ids: &BTreeSet<&str>) -> Result<()> {
+        validate_path_component(
+            &format!("performance regression lane thresholds[{index}].id"),
+            &self.id,
+        )?;
+        validate_path_component(
+            &format!("performance regression lane thresholds[{index}].metricId"),
+            &self.metric_id,
+        )?;
+        if !metric_ids.contains(self.metric_id.as_str()) {
+            return Err(anyhow!(
+                "performance regression lane thresholds[{index}].metricId must reference an existing metric"
+            ));
+        }
+        if !(self.value.is_number() || self.value.is_string()) {
+            return Err(anyhow!(
+                "performance regression lane thresholds[{index}].value must be a number or explicit textual value"
+            ));
+        }
+        require_bounded_display_text(
+            &format!("performance regression lane thresholds[{index}].rationale"),
+            &self.rationale,
+        )
+    }
+}
+
+impl PerformanceRegressionEvidenceLinks {
+    fn validate(&self) -> Result<()> {
+        validate_nonempty_refs(
+            "performance regression lane evidenceLinks.runComparisonRefs",
+            &self.run_comparison_refs,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane evidenceLinks.frameBudgetRefs",
+            &self.frame_budget_refs,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane evidenceLinks.scenarioMatrixRefs",
+            &self.scenario_matrix_refs,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane evidenceLinks.qaQueueRefs",
+            &self.qa_queue_refs,
+        )?;
+        validate_nonempty_refs(
+            "performance regression lane evidenceLinks.reviewGateRefs",
+            &self.review_gate_refs,
+        )?;
+        validate_optional_text_list(
+            "performance regression lane evidenceLinks.browserMetricWarnings",
+            &self.browser_metric_warnings,
+        )
+    }
+}
+
 const QA_WORKER_ASSIGNMENT_SCHEMA_VERSION: &str = "qa-worker-assignment-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -55886,6 +56223,183 @@ scenarios:
             "Issues #1 and #23 must remain open",
         ] {
             assert!(doc.contains(required), "QA queue doc missing {required}");
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn performance_regression_lane_v1_accepts_classification_fixtures_and_boundaries() {
+        for (fixture, expected_classification) in [
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+                PerformanceRegressionClassification::Unchanged,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.improved.fixture.json",
+                PerformanceRegressionClassification::Improved,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.regressed.fixture.json",
+                PerformanceRegressionClassification::Regressed,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.inconclusive.fixture.json",
+                PerformanceRegressionClassification::Inconclusive,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.missing-baseline.fixture.json",
+                PerformanceRegressionClassification::MissingBaseline,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.unsupported.fixture.json",
+                PerformanceRegressionClassification::Unsupported,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json",
+                PerformanceRegressionClassification::Stale,
+            ),
+        ] {
+            let lane = PerformanceRegressionLaneArtifact::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(lane.schema_version, PERFORMANCE_REGRESSION_LANE_SCHEMA_VERSION);
+            assert_eq!(lane.classification, expected_classification);
+            assert_eq!(lane.assigned_role, "performance-regression-agent");
+            assert!(!lane.baseline_runs.is_empty());
+            assert!(!lane.comparison_runs.is_empty());
+            assert!(lane
+                .evidence_links
+                .run_comparison_refs
+                .iter()
+                .any(|reference| reference.path.contains("run-comparison")));
+            assert!(lane
+                .evidence_links
+                .frame_budget_refs
+                .iter()
+                .any(|reference| reference.path.contains("frame-budget")));
+            assert!(lane
+                .evidence_links
+                .scenario_matrix_refs
+                .iter()
+                .any(|reference| reference.path.contains("matrix")));
+            assert!(lane
+                .evidence_links
+                .qa_queue_refs
+                .iter()
+                .any(|reference| reference.path.contains("qa-agent-work-queue")));
+            assert!(lane
+                .evidence_links
+                .review_gate_refs
+                .iter()
+                .any(|reference| reference.path.contains("review-critic-gate")));
+            assert!(lane
+                .evidence_links
+                .browser_metric_warnings
+                .iter()
+                .any(|warning| warning.contains("advisory evidence inputs")));
+            assert!(lane.generated_state.tracked_fixture_only);
+            assert!(lane
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(lane.boundary.contains("does not execute commands"));
+            assert!(lane.boundary.contains("does not spawn agents"));
+            assert!(lane.boundary.contains("does not mutate trusted files"));
+            assert!(lane
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(lane.boundary.contains("does not auto-apply"));
+            assert!(lane.boundary.contains("does not auto-merge"));
+            assert!(lane.boundary.contains("does not self-approve"));
+        }
+    }
+
+    #[test]
+    fn performance_regression_lane_v1_rejects_malformed_refs_and_boundary_drift() {
+        let malformed = PerformanceRegressionLaneArtifact::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.malformed.fixture.json",
+        ))
+        .expect_err("malformed performance lane fixture rejects");
+        assert!(format!("{malformed:#}").contains("reviewGateRefs"));
+
+        let mut invalid_threshold: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+        ))
+        .expect("lane json");
+        invalid_threshold["thresholds"][0]["metricId"] = json!("unknown-metric");
+        let threshold_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&invalid_threshold.to_string())
+                .expect_err("unknown threshold metric rejects");
+        assert!(format!("{threshold_error:#}").contains("metricId"));
+
+        let mut missing_blocker: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.regressed.fixture.json",
+        ))
+        .expect("lane json");
+        missing_blocker["blockedReasons"] = json!([]);
+        let blocker_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&missing_blocker.to_string())
+                .expect_err("regressed lane without blocked reason rejects");
+        assert!(format!("{blocker_error:#}").contains("blockedReasons"));
+
+        let mut unsafe_boundary: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+        ))
+        .expect("lane json");
+        unsafe_boundary["boundary"] =
+            json!("Performance lane can execute commands and promote without review.");
+        let boundary_error =
+            PerformanceRegressionLaneArtifact::from_json_str(&unsafe_boundary.to_string())
+                .expect_err("unsafe boundary rejects");
+        assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn performance_regression_lane_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/performance-regression-lane-v1.md");
+        for required in [
+            "schemaVersion: performance-regression-lane-v1",
+            "improved",
+            "unchanged",
+            "regressed",
+            "inconclusive",
+            "missing-baseline",
+            "unsupported",
+            "stale",
+            "run comparison",
+            "frame budget",
+            "scenario matrix",
+            "QA queue",
+            "review/critic gate",
+            "Browser metrics are advisory evidence inputs only",
+            "does not execute commands",
+            "does not spawn agents",
+            "does not mutate trusted files",
+            "does not write trusted browser state",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "reviewer bypass",
+            "Generated",
+            "MAP13.10.1",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(
+                doc.contains(required),
+                "performance regression lane doc missing {required}"
+            );
         }
         for forbidden in [
             "autonomously complete arbitrary games",
