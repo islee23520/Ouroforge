@@ -101,6 +101,27 @@ const run = {
       { invariantId: '<script>bad</script>', invariantType: 'finite_transform', status: 'passed', targetPath: 'player.transform', evidenceRefs: ['evidence/scenarios/scaffold-smoke/world-state.json'] },
     ] }],
   },
+  fuzzing_plans: {
+    present: true,
+    status: 'planned',
+    plan_count: 1,
+    blocked_count: 0,
+    exhausted_count: 0,
+    malformed_count: 0,
+    evidence_refs: ['evidence/fuzzing-plans/fuzzing-plan.json'],
+    boundary: 'Read-only adversarial input fuzzing plans; dashboard must not run fuzzers.',
+    plans: [{
+      planId: 'qa14_3_seeded_movement_fuzz',
+      runId: 'run-1',
+      deterministicSeed: 424242,
+      inputDomain: { scenarioId: 'collect-and-exit', domainId: 'movement-buttons' },
+      budget: { maxRuns: 4, maxSteps: 32 },
+      outputRoot: 'evidence/fuzz/qa14_3_seeded_movement_fuzz/',
+      cleanupPolicy: { mode: 'retain_for_review' },
+      status: 'planned',
+      expectedEvidence: [{ evidenceId: 'seeded-inputs' }, { evidenceId: 'runtime-probe' }],
+    }],
+  },
   qa_worker_assignments: {
     present: true,
     status: 'blocked',
@@ -740,6 +761,9 @@ assert.match(dashboard.renderSourceApplyWorktreeContext(run), /browser\/dashboar
 assert.match(dashboard.renderRuntimeInvariants(run), /Runtime invariant evidence refs/);
 assert.match(dashboard.renderRuntimeInvariants(run), /health was negative/);
 assert.match(dashboard.renderRuntimeInvariants(run), /qa14_5_runtime_dashboard/);
+assert.match(dashboard.renderFuzzingPlans(run), /Adversarial input fuzzing plan refs/);
+assert.match(dashboard.renderFuzzingPlans(run), /qa14_3_seeded_movement_fuzz/);
+assert.match(dashboard.renderFuzzingPlans(run), /seed 424242/);
 assert.match(dashboard.renderQaWorkerAssignments(run), /QA worker assignment refs/);
 assert.match(dashboard.renderQaWorkerAssignments(run), /budget gate pending/);
 assert.match(dashboard.renderQaWorkerAssignments(run), /qa-worker-1/);
@@ -752,6 +776,7 @@ assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
 assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
+assert.match(dashboard.renderRunDetail(run), /Adversarial input fuzzing plans/);
 assert.match(dashboard.renderRunDetail(run), /QA worker assignments/);
 assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
@@ -759,6 +784,7 @@ assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, emp
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
 assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
+assert.match(dashboard.renderFuzzingPlans({ fuzzing_plans: { present: false, empty_state: 'No fuzzing plan evidence' } }), /No fuzzing plan evidence/);
 assert.match(dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: false, empty_state: 'No worker assignment evidence' } }), /No worker assignment evidence/);
 
 const visualAuthoringDoc = fs.readFileSync(require.resolve('../../docs/visual-authoring-v1.md'), 'utf8');
@@ -782,6 +808,22 @@ const xssRun = {
   asset_loading: { present: true, attempt_count: 1, loaded_count: 0, failed_count: 1, rejected_count: 0, fallback_count: 0, evidence_refs: ['javascript:alert(1)'], boundary: '<script>boundary</script>', records: [{ attemptId: '<script>attempt</script>', assetId: '<img src=x onerror=alert(1)>', path: '<b>bad</b>', status: '<script>failed</script>', failureReason: '<script>reason</script>' }] },
   asset_preview: { present: true, preview_count: 1, warning_count: 1, evidence_refs: ['javascript:alert(1)'], boundary: '<script>preview-boundary</script>', records: [{ assetId: '<img src=x onerror=alert(1)>', assetType: '<script>type</script>', sourcePath: '<b>bad</b>', previewKind: '<script>kind</script>', image: { width: '<script>', height: '<img>' } }], warnings: [{ assetId: '<img>', kind: '<script>warning</script>', message: '<script>preview reason</script>', path: '<b>bad</b>' }] },
   source_apply_worktree_context: { present: true, status: '<script>blocked</script>', target_count: 1, blocked_count: 1, evidence_refs: ['javascript:alert(1)'], boundary: '<script>context-boundary</script>', reports: [{ status: '<script>blocked</script>', policyId: '<script>policy</script>', branch: '<script>branch</script>', headCommit: '<script>head</script>', worktreeRoot: '<b>worktree</b>', lockStatus: { active: true, attemptId: '<script>attempt</script>' }, blockedReasons: ['<script>blocked reason</script>'], guardrails: ['<script>guardrail</script>'], targets: [{ path: '<img src=x onerror=alert(1)>', gitStatus: '<script>modified</script>', rootZone: '<script>root</script>', fileClassDecision: '<script>allowed</script>', blockedReasons: ['<script>target reason</script>'] }] }] },
+  fuzzing_plans: {
+    present: true,
+    status: '<script>planned</script>',
+    boundary: '<script>fuzz-boundary</script>',
+    evidence_refs: ['javascript:alert(1)'],
+    plans: [{
+      planId: '<script>plan</script>',
+      status: '<script>status</script>',
+      deterministicSeed: '<script>seed</script>',
+      inputDomain: { scenarioId: '<script>scenario</script>' },
+      budget: { maxRuns: '<script>runs</script>', maxSteps: '<script>steps</script>' },
+      outputRoot: '<script>output</script>',
+      cleanupPolicy: { mode: '<script>cleanup</script>' },
+      expectedEvidence: [{ evidenceId: '<script>evidence</script>' }],
+    }],
+  },
   journal_view: { path: 'journal.md', exists: true, summary: '<b>unsafe</b>', entries: [{ heading: '<img>', category: 'summary', body: '<script>alert(1)</script>', evidence_refs: [], verdict_refs: [], mutation_refs: [] }], evidence_refs: [], verdict_refs: [], mutation_refs: [] },
   comparison: { present: true, empty_state: '', artifacts: [{ id: '<img>', path: 'mutation/<script>.json', exists: true, read_error: '<script>alert(1)</script>', before_run_id: '<script>', after_run_id: '<img>', classification: '<script>', deltas: { '<script>': '<img>' }, evidence_refs: ['javascript:alert(1)', '<script>'], unsupported: ['<script>alert(1)</script>'], value: { unsafe: '<script>alert(1)</script>' } }] },
   verdict: {}, journal: '<script>alert(1)</script>',
@@ -806,6 +848,9 @@ assert.ok(!sourceApplyXss.includes('<img src=x onerror=alert(1)>'), 'source appl
 const invariantXss = dashboard.renderRuntimeInvariants({ runtime_invariants: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], summaries: [{ modelId: '<script>model</script>', runId: '<script>run</script>' }], evidence: [{ checks: [{ invariantId: '<script>check</script>', invariantType: '<script>type</script>', status: '<script>status</script>', targetPath: '<script>target</script>', message: '<script>message</script>' }] }] } });
 assert.ok(!invariantXss.includes('<script>check</script>'), 'runtime invariant check ids must be escaped');
 assert.ok(!invariantXss.includes('<script>boundary</script>'), 'runtime invariant boundary must be escaped');
+const fuzzingPlanXss = dashboard.renderFuzzingPlans({ fuzzing_plans: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], plans: [{ planId: '<script>plan</script>', status: '<script>status</script>', deterministicSeed: '<script>seed</script>', inputDomain: { scenarioId: '<script>scenario</script>' }, budget: { maxRuns: '<script>runs</script>', maxSteps: '<script>steps</script>' }, outputRoot: '<script>output</script>', cleanupPolicy: { mode: '<script>cleanup</script>' }, blockedReasons: ['<script>blocked</script>'], expectedEvidence: [{ evidenceId: '<script>evidence</script>' }] }] } });
+assert.ok(!fuzzingPlanXss.includes('<script>plan</script>'), 'fuzzing plan ids must be escaped');
+assert.ok(!fuzzingPlanXss.includes('<script>boundary</script>'), 'fuzzing plan boundary must be escaped');
 const qaWorkerXss = dashboard.renderQaWorkerAssignments({ qa_worker_assignments: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], plans: [{ planId: '<script>plan</script>', assignments: [{ assignmentId: '<script>assignment</script>', workerId: '<script>worker</script>', assignedLane: '<script>lane</script>', status: '<script>status</script>', target: { targetType: '<script>target</script>', targetId: '<script>target-id</script>' }, budget: { maxRuns: '<script>runs</script>' }, timeoutMs: '<script>timeout</script>', outputRoot: '<script>output</script>', cleanupPolicy: { mode: '<script>cleanup</script>' }, blockedReasons: ['<script>blocked</script>'] }] }] } });
 assert.ok(!qaWorkerXss.includes('<script>assignment</script>'), 'qa worker assignment ids must be escaped');
 assert.ok(!qaWorkerXss.includes('<script>boundary</script>'), 'qa worker assignment boundary must be escaped');

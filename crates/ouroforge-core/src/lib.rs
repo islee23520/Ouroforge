@@ -7061,6 +7061,79 @@ fn validate_fuzz_output_root(output_root: &str, plan_id: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn validate_adversarial_input_fuzzing_plan_refs(
+    run_dir: impl AsRef<Path>,
+    plan: &AdversarialInputFuzzingPlanArtifact,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    plan.validate()?;
+    let index = read_evidence_index(run_dir)?;
+    let indexed_paths = index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let expected_refs = [
+        plan.input_domain.scenario_candidate_ref.as_deref(),
+        plan.input_domain.replay_evidence_ref.as_deref(),
+    ];
+    for reference in expected_refs.into_iter().flatten() {
+        if !indexed_paths.contains(reference) {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan reference is missing from evidence index: {reference}"
+            ));
+        }
+        let value = read_json_value(run_dir.join(reference)).with_context(|| {
+            format!("adversarial input fuzzing plan reference is unreadable: {reference}")
+        })?;
+        validate_fuzz_linked_reference_freshness(plan, reference, &value)?;
+    }
+    Ok(())
+}
+
+fn validate_fuzz_linked_reference_freshness(
+    plan: &AdversarialInputFuzzingPlanArtifact,
+    reference: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    let run_id = json_string(value, "runId").or_else(|| json_string(value, "run_id"));
+    match run_id {
+        Some(run_id) if run_id == plan.run_id => {}
+        Some(run_id) => {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan reference is stale for runId {run_id}; expected {} at {reference}",
+                plan.run_id
+            ));
+        }
+        None => {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan reference is missing a runId/run_id: {reference}"
+            ));
+        }
+    }
+
+    let scenario_id =
+        json_string(value, "scenarioId").or_else(|| json_string(value, "scenario_id"));
+    if let Some(scenario_id) = scenario_id {
+        if scenario_id != plan.input_domain.scenario_id {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan reference scenarioId drift at {reference}: {scenario_id} != {}",
+                plan.input_domain.scenario_id
+            ));
+        }
+    }
+
+    let target_id = json_string(value, "targetId").or_else(|| json_string(value, "target_id"));
+    if let Some(target_id) = target_id {
+        if target_id != plan.input_domain.domain_id && target_id != plan.input_domain.scenario_id {
+            return Err(anyhow!(
+                "adversarial input fuzzing plan reference target identity drift at {reference}: {target_id}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 const QA_WORKER_ASSIGNMENT_SCHEMA_VERSION: &str = "qa-worker-assignment-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -31354,6 +31427,7 @@ pub struct RunDashboardReadModel {
     pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
     pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
+    pub fuzzing_plans: RunDashboardFuzzingPlans,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -31610,6 +31684,21 @@ pub struct RunDashboardRuntimeInvariants {
     pub evidence_refs: Vec<String>,
     pub summaries: Vec<RuntimeInvariantEvidenceSummary>,
     pub evidence: Vec<RuntimeInvariantEvidence>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardFuzzingPlans {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub plan_count: usize,
+    pub blocked_count: usize,
+    pub exhausted_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub plans: Vec<AdversarialInputFuzzingPlanArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -31988,6 +32077,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
     let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
+    let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -32045,6 +32135,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         source_apply_worktree_context,
         runtime_invariants,
         qa_worker_assignments,
+        fuzzing_plans,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -32362,6 +32453,100 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_artifact_is_fuzzing_plan(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("adversarial_input_fuzzing_plan")
+        || artifact.id.contains("fuzzing-plan")
+        || artifact.id.contains("fuzz-plan")
+        || artifact.path.contains("adversarial-input-fuzzing")
+        || artifact.path.contains("fuzzing-plan")
+}
+
+fn read_dashboard_fuzzing_plans(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardFuzzingPlans> {
+    let artifacts =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_fuzzing_plan)?;
+    let boundary = "Read-only adversarial input fuzzing plans; dashboard/Studio surfaces must not run fuzzers, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, auto-merge, or claim quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardFuzzingPlans {
+            present: false,
+            empty_state: "No adversarial input fuzzing plans are indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            plan_count: 0,
+            blocked_count: 0,
+            exhausted_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            plans: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut plans = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<AdversarialInputFuzzingPlanArtifact>(value.clone()) {
+            Ok(plan) if plan.validate().is_ok() => plans.push(plan),
+            _ => malformed_count += 1,
+        }
+    }
+    plans.sort_by(|left, right| {
+        (left.run_id.as_str(), left.plan_id.as_str())
+            .cmp(&(right.run_id.as_str(), right.plan_id.as_str()))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let plan_count = plans.len();
+    let blocked_count = plans
+        .iter()
+        .filter(|plan| plan.status == FuzzPlanStatus::Blocked)
+        .count();
+    let exhausted_count = plans
+        .iter()
+        .filter(|plan| plan.status == FuzzPlanStatus::Exhausted)
+        .count();
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if exhausted_count > 0 {
+        "exhausted"
+    } else if plan_count > 0 {
+        "planned"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardFuzzingPlans {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        plan_count,
+        blocked_count,
+        exhausted_count,
+        malformed_count,
+        evidence_refs,
+        plans,
+        artifacts,
+        boundary,
+    })
 }
 
 fn dashboard_artifact_is_qa_worker_assignment(artifact: &EvidenceArtifact) -> bool {
@@ -39923,6 +40108,133 @@ scenarios:
         )
         .expect_err("duplicate expected output paths are rejected");
         assert!(duplicate_output.to_string().contains("pathHint"));
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_ref_validation_accepts_indexed_candidate_and_replay() {
+        let (root, artifacts) = create_test_run("fuzzing-plan-refs");
+        let mut plan = AdversarialInputFuzzingPlanArtifact::from_json_str(include_str!(
+            "../../../examples/adversarial-input-fuzzing-v1/fuzzing-plan.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        plan.run_id = json_string(&run, "id").expect("run id present");
+
+        for reference in [
+            plan.input_domain.scenario_candidate_ref.as_deref().unwrap(),
+            plan.input_domain.replay_evidence_ref.as_deref().unwrap(),
+        ] {
+            fs::create_dir_all(
+                artifacts
+                    .run_dir
+                    .join(Path::new(reference).parent().unwrap()),
+            )
+            .expect("reference parent exists");
+            write_json(
+                &artifacts.run_dir.join(reference),
+                &json!({
+                    "runId": plan.run_id,
+                    "scenarioId": plan.input_domain.scenario_id,
+                    "targetId": plan.input_domain.domain_id,
+                    "artifact": "fuzz_link_fixture"
+                }),
+            )
+            .expect("reference writes");
+            add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("fuzz-link-{}", reference.replace('/', "-")),
+                "application/json",
+                reference,
+                json!({ "artifact": "fuzz_link_fixture" }),
+            )
+            .expect("reference indexed");
+        }
+
+        validate_adversarial_input_fuzzing_plan_refs(&artifacts.run_dir, &plan)
+            .expect("fresh indexed candidate/replay refs validate");
+
+        let replay_ref = plan.input_domain.replay_evidence_ref.as_deref().unwrap();
+        write_json(
+            &artifacts.run_dir.join(replay_ref),
+            &json!({
+                "runId": "stale-run",
+                "scenarioId": plan.input_domain.scenario_id,
+                "targetId": plan.input_domain.domain_id,
+                "artifact": "fuzz_link_fixture"
+            }),
+        )
+        .expect("stale replay writes");
+        let stale = validate_adversarial_input_fuzzing_plan_refs(&artifacts.run_dir, &plan)
+            .expect_err("stale replay refs rejected");
+        assert!(stale.to_string().contains("stale"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn adversarial_input_fuzzing_plan_dashboard_read_model_reports_present_missing_and_malformed() {
+        let (missing_root, missing_artifacts) = create_test_run("fuzzing-plan-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.fuzzing_plans.present);
+        assert_eq!(missing.fuzzing_plans.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("fuzzing-plan-dashboard-present");
+        let mut plan = AdversarialInputFuzzingPlanArtifact::from_json_str(include_str!(
+            "../../../examples/adversarial-input-fuzzing-v1/fuzzing-plan.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        plan.run_id = json_string(&run, "id").expect("run id present");
+        let path = "evidence/fuzzing-plans/fuzzing-plan.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/fuzzing-plans"))
+            .expect("fuzzing evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(plan)).expect("plan writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "adversarial-input-fuzzing-plan",
+            "application/json",
+            path,
+            json!({ "artifact": "adversarial_input_fuzzing_plan" }),
+        )
+        .expect("plan indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.fuzzing_plans.present);
+        assert_eq!(dashboard.fuzzing_plans.status, "planned");
+        assert_eq!(dashboard.fuzzing_plans.plan_count, 1);
+        assert_eq!(
+            dashboard.fuzzing_plans.evidence_refs,
+            vec![path.to_string()]
+        );
+        assert!(dashboard
+            .fuzzing_plans
+            .boundary
+            .contains("must not run fuzzers"));
+        fs::remove_dir_all(root).expect("fixture removed");
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("fuzzing-plan-dashboard-malformed");
+        let malformed_path = "evidence/fuzzing-plans/fuzzing-plan-malformed.json";
+        fs::create_dir_all(malformed_artifacts.run_dir.join("evidence/fuzzing-plans"))
+            .expect("fuzzing evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed plan writes");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "adversarial-input-fuzzing-plan-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "adversarial_input_fuzzing_plan" }),
+        )
+        .expect("malformed plan indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.fuzzing_plans.present);
+        assert_eq!(malformed.fuzzing_plans.status, "malformed");
+        assert_eq!(malformed.fuzzing_plans.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
     }
 
     #[test]

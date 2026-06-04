@@ -35,3 +35,7 @@ Later QA14.3 PRs harden indexed replay/candidate references and add deterministi
 ## QA14.3.2 validation hardening
 
 QA14.3.2 adds fail-closed validation for oversized budgets, duplicate actions, replay actions without replay evidence, snapshot probe actions without probe/world-state evidence expectations, duplicate expected output paths, fuzz outputs outside `outputRoot`, scenario evidence path drift, and missing cleanup/stop-condition fields. These checks remain planning validation only; they do not execute fuzz runs or mutate trusted state.
+
+## QA14.3.3 replay/evidence linkage and read model
+
+QA14.3.3 adds indexed reference validation for scenario candidate and replay evidence. A fuzzing plan reference must be indexed, readable JSON, match the plan `runId`, and avoid scenario/target identity drift. The run dashboard/read model exposes `fuzzing_plans` with present/missing/malformed status, counts, evidence refs, parsed plans, and a conservative read-only boundary. Static dashboard rendering is display-only and does not execute fuzzers, spawn workers, write trusted state, or authorize auto-fix/apply/merge behavior.

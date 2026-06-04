@@ -380,6 +380,34 @@ const OuroforgeDashboard = (() => {
 
 
 
+  function renderFuzzingPlans(run = {}) {
+    const model = run.fuzzing_plans || run.fuzzingPlans || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || 'No adversarial input fuzzing plans are available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const plans = Array.isArray(model.plans) ? model.plans : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Plans', model.plan_count ?? model.planCount ?? 0],
+      ['Blocked', model.blocked_count ?? model.blockedCount ?? 0],
+      ['Exhausted', model.exhausted_count ?? model.exhaustedCount ?? 0],
+      ['Malformed', model.malformed_count ?? model.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const planRows = plans.slice(0, 12).map((plan) => {
+      const inputDomain = plan.inputDomain || plan.input_domain || {};
+      const budget = plan.budget || {};
+      const cleanup = plan.cleanupPolicy || plan.cleanup_policy || {};
+      const blocked = Array.isArray(plan.blockedReasons || plan.blocked_reasons) ? (plan.blockedReasons || plan.blocked_reasons) : [];
+      const expected = Array.isArray(plan.expectedEvidence || plan.expected_evidence) ? (plan.expectedEvidence || plan.expected_evidence) : [];
+      return `<li><strong>${escapeText(plan.planId || plan.plan_id || 'fuzzing plan')}</strong>: <span class="${statusClass(plan.status)}">${escapeText(plan.status || 'unknown')}</span> · seed ${escapeText(plan.deterministicSeed ?? plan.deterministic_seed ?? '?')}<br><small>${escapeText(inputDomain.scenarioId || inputDomain.scenario_id || 'scenario')} · maxRuns ${escapeText(budget.maxRuns ?? budget.max_runs ?? '?')} · maxSteps ${escapeText(budget.maxSteps ?? budget.max_steps ?? '?')} · cleanup ${escapeText(cleanup.mode || 'unknown')} · ${escapeText(plan.outputRoot || plan.output_root || 'no output root')} · expected ${escapeText(expected.length)} · ${escapeText(blocked.join(' · ') || 'bounded deterministic evidence plan')}</small></li>`;
+    }).join('') || '<li>No parseable adversarial input fuzzing plans are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Fuzzing plans</h4><ul class="run-meta-list">${planRows}</ul>
+      ${renderRefLinks('Adversarial input fuzzing plan refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only adversarial input fuzzing plans; dashboard surfaces do not run fuzzers, spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.')}</p>`;
+  }
+
   function renderQaWorkerAssignments(run = {}) {
     const model = run.qa_worker_assignments || run.qaWorkerAssignments || {};
     if (!model.present) {
@@ -1403,6 +1431,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
+      <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
@@ -1484,7 +1513,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
