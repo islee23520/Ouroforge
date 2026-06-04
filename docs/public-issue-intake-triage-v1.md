@@ -8,6 +8,7 @@ release, automate launch actions, or implement product behavior.
 
 Use this playbook for public GitHub issues during the public-alpha governance
 period. It complements `docs/post-launch-roadmap-triage-v1.md`,
+`docs/public-issue-response-snippets-v1.md`,
 `docs/public-launch-checklist.md`, and `docs/security-response-playbook-v1.md`.
 When documents overlap, use the most conservative route and keep #1 and #23 open
 unless a separate explicit governance decision says otherwise.
@@ -106,9 +107,20 @@ Public intake should start with the closest existing template:
   demo/onboarding, communication, checklist, and template/documentation work.
 
 If a report does not fit a template, maintainers should add the minimum triage
-fields above in a comment before accepting work. This policy intentionally does
-not add GitHub automation, issue forms that hide existing templates, labeler
-rules, issue actions, or repository settings.
+fields above in a comment before accepting work. Use
+`docs/public-issue-response-snippets-v1.md` for conservative acknowledgement,
+conversion, duplicate, close, generated-state, and support-question replies.
+This policy intentionally does not add GitHub automation, issue forms that hide
+existing templates, labeler rules, issue actions, or repository settings.
+
+## Response and closure alignment
+
+After classifying an issue, use `docs/public-issue-response-snippets-v1.md` to
+choose whether to keep it open for triage, request information, convert it to a
+scoped issue or documentation-only PR, answer and close, close as duplicate,
+close as out of scope, defer generated-state-only evidence, or redirect
+security-sensitive details. Those snippets are maintainer aids only; they do not
+create support SLAs or accept work automatically.
 
 ## Docs/template audit for PLG1.4.1
 
