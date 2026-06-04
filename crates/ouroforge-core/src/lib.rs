@@ -3661,8 +3661,12 @@ impl AgentDecisionLedger {
         for (index, decision) in self.decisions.iter().enumerate() {
             decision.validate_schema(index)?;
         }
+        self.validate_unique_decision_ids()?;
         self.pipeline_refs.validate_schema()?;
+        self.validate_decision_evidence_refs()?;
+        self.validate_stale_ref_targets()?;
         self.append_only.validate_schema()?;
+        self.validate_append_only_consistency()?;
         validate_optional_text_list("agent decision ledger staleRefs", &self.stale_refs)?;
         validate_optional_text_list(
             "agent decision ledger malformedReasons",
@@ -3714,6 +3718,89 @@ impl AgentDecisionLedger {
             }
         }
         Ok(())
+    }
+
+    fn validate_unique_decision_ids(&self) -> Result<()> {
+        let mut ids = BTreeSet::new();
+        for decision in &self.decisions {
+            if !ids.insert(decision.decision_id.as_str()) {
+                return Err(anyhow!(
+                    "agent decision ledger duplicate decisionId: {}",
+                    decision.decision_id
+                ));
+            }
+            let mut alternative_ids = BTreeSet::new();
+            for alternative in &decision.alternatives_rejected {
+                if !alternative_ids.insert(alternative.id.as_str()) {
+                    return Err(anyhow!(
+                        "agent decision ledger decision {} duplicate alternativesRejected id: {}",
+                        decision.decision_id,
+                        alternative.id
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_decision_evidence_refs(&self) -> Result<()> {
+        let known = self.known_artifact_refs();
+        for decision in &self.decisions {
+            for evidence_ref in &decision.evidence_refs {
+                if !known
+                    .iter()
+                    .any(|candidate| artifact_refs_match(candidate, evidence_ref))
+                {
+                    return Err(anyhow!(
+                        "agent decision ledger decision {} evidenceRefs target is unknown: {}",
+                        decision.decision_id,
+                        evidence_ref.id
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_stale_ref_targets(&self) -> Result<()> {
+        let known = self.known_artifact_refs();
+        for stale_ref in &self.stale_refs {
+            let anchored_to_decision = self
+                .decisions
+                .iter()
+                .any(|decision| stale_ref.contains(&decision.decision_id));
+            let anchored_to_artifact = known.iter().any(|reference| {
+                stale_ref.contains(&reference.id) || stale_ref.contains(&reference.path)
+            });
+            if !anchored_to_decision && !anchored_to_artifact {
+                return Err(anyhow!(
+                    "agent decision ledger staleRefs target is unknown: {stale_ref}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_append_only_consistency(&self) -> Result<()> {
+        if self.status != AgentDecisionLedgerStatus::AppendOnlyViolation
+            && self.append_only.sequence as usize != self.decisions.len()
+        {
+            return Err(anyhow!(
+                "agent decision ledger appendOnly.sequence must match decisions length for non-violation ledgers"
+            ));
+        }
+        Ok(())
+    }
+
+    fn known_artifact_refs(&self) -> Vec<&AuthoringLoopArtifactRef> {
+        let mut refs = vec![&self.pipeline_refs.task_board_ref];
+        refs.extend(self.pipeline_refs.work_package_refs.iter());
+        refs.extend(self.pipeline_refs.handoff_refs.iter());
+        refs.extend(self.pipeline_refs.review_gate_refs.iter());
+        refs.extend(self.pipeline_refs.qa_result_refs.iter());
+        refs.extend(self.pipeline_refs.performance_regression_refs.iter());
+        refs.extend(self.pipeline_refs.evidence_bundle_refs.iter());
+        refs
     }
 
     fn validate_guardrails(&self) -> Result<()> {
@@ -3872,8 +3959,16 @@ impl AgentDecisionLedgerAppendOnly {
             "agent decision ledger appendOnly.entryOrderHash",
             &self.entry_order_hash,
         )?;
+        validate_ledger_hash_text(
+            "agent decision ledger appendOnly.entryOrderHash",
+            &self.entry_order_hash,
+        )?;
         if let Some(previous) = &self.previous_ledger_hash {
             require_text(
+                "agent decision ledger appendOnly.previousLedgerHash",
+                previous,
+            )?;
+            validate_ledger_hash_text(
                 "agent decision ledger appendOnly.previousLedgerHash",
                 previous,
             )?;
@@ -3886,6 +3981,24 @@ impl AgentDecisionLedgerAppendOnly {
         }
         Ok(())
     }
+}
+
+fn artifact_refs_match(left: &AuthoringLoopArtifactRef, right: &AuthoringLoopArtifactRef) -> bool {
+    left.id == right.id && left.path == right.path
+}
+
+fn validate_ledger_hash_text(field: &str, value: &str) -> Result<()> {
+    let Some(hex) = value.strip_prefix("fnv1a64-ledger-v1:") else {
+        return Err(anyhow!(
+            "{field} must use fnv1a64-ledger-v1:<16-hex> format"
+        ));
+    };
+    if hex.len() != 16 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err(anyhow!(
+            "{field} must use fnv1a64-ledger-v1:<16-hex> format"
+        ));
+    }
+    Ok(())
 }
 
 pub const PRODUCTION_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "production-evidence-bundle-v1";
@@ -43689,7 +43802,7 @@ scenarios:
             "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
         ))
         .expect("ledger json");
-        active_with_stale["staleRefs"] = json!(["task board drift"]);
+        active_with_stale["staleRefs"] = json!(["decision-001 stale task board drift"]);
         let active_error = AgentDecisionLedger::from_json_str(&active_with_stale.to_string())
             .expect_err("active ledger cannot hide stale refs");
         assert!(format!("{active_error:#}").contains("active agent decision ledger"));
@@ -43712,6 +43825,73 @@ scenarios:
         let boundary_error = AgentDecisionLedger::from_json_str(&unsafe_boundary.to_string())
             .expect_err("unsafe boundary rejects");
         assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn agent_decision_ledger_v1_rejects_reference_and_append_only_drift() {
+        let mut duplicate_decision: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        duplicate_decision["decisions"][1]["decisionId"] = json!("decision-001");
+        let duplicate_error = AgentDecisionLedger::from_json_str(&duplicate_decision.to_string())
+            .expect_err("duplicate decision ids reject");
+        assert!(format!("{duplicate_error:#}").contains("duplicate decisionId"));
+
+        let mut duplicate_alternative: serde_json::Value =
+            serde_json::from_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+            ))
+            .expect("ledger json");
+        let repeated_alternative =
+            duplicate_alternative["decisions"][0]["alternativesRejected"][0].clone();
+        duplicate_alternative["decisions"][0]["alternativesRejected"]
+            .as_array_mut()
+            .unwrap()
+            .push(repeated_alternative);
+        let alternative_error =
+            AgentDecisionLedger::from_json_str(&duplicate_alternative.to_string())
+                .expect_err("duplicate rejected alternatives reject");
+        assert!(format!("{alternative_error:#}").contains("duplicate alternativesRejected id"));
+
+        let mut unknown_evidence: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        unknown_evidence["decisions"][0]["evidenceRefs"][0] = json!({
+            "id": "unknown-evidence",
+            "path": "runs/multi-agent-pipeline/demo/unknown.json"
+        });
+        let evidence_error = AgentDecisionLedger::from_json_str(&unknown_evidence.to_string())
+            .expect_err("unknown decision evidence refs reject");
+        assert!(format!("{evidence_error:#}").contains("evidenceRefs target is unknown"));
+
+        let mut stale_unknown: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.stale.fixture.json",
+        ))
+        .expect("ledger json");
+        stale_unknown["staleRefs"] = json!(["unlinked stale artifact"]);
+        let stale_error = AgentDecisionLedger::from_json_str(&stale_unknown.to_string())
+            .expect_err("stale refs must target known decision or artifact refs");
+        assert!(format!("{stale_error:#}").contains("staleRefs target is unknown"));
+
+        let mut sequence_drift: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        sequence_drift["appendOnly"]["sequence"] = json!(1);
+        let sequence_error = AgentDecisionLedger::from_json_str(&sequence_drift.to_string())
+            .expect_err("non-violation ledgers require append-only sequence consistency");
+        assert!(format!("{sequence_error:#}").contains("appendOnly.sequence"));
+
+        let mut bad_hash: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+        ))
+        .expect("ledger json");
+        bad_hash["appendOnly"]["entryOrderHash"] = json!("sha256:not-this-contract");
+        let hash_error = AgentDecisionLedger::from_json_str(&bad_hash.to_string())
+            .expect_err("ledger hash shape rejects drift");
+        assert!(format!("{hash_error:#}").contains("fnv1a64-ledger-v1"));
     }
 
     #[test]
