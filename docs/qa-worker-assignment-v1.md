@@ -1,6 +1,6 @@
 # QA Worker Assignment and Budget Policy v1
 
-Status: **QA14.4.1 worker assignment artifact, statuses, fixtures, and docs** for issue #685.
+Status: **QA14.4.1/QA14.4.2 worker assignment artifact plus budget/output/ref validation** for issue #685.
 
 This document defines a local, bounded QA/playtest worker assignment artifact. It is a planning/evidence contract only: it does not spawn workers, run browsers, execute commands, mutate trusted state, or authorize auto-fix/apply/merge behavior.
 
@@ -47,4 +47,8 @@ The invalid fixture demonstrates that missing/unbounded budget and timeout value
 
 ## QA14.4.1 boundary
 
-QA14.4.1 adds the artifact model, validation, statuses, fixtures, and documentation. It intentionally does not add worker execution, browser trusted writes, remote orchestration, read-model export, or dashboard/Studio display. Budget/output-root/stale-ref hardening and read-model compatibility remain separate fixed PR units under #685.
+QA14.4.1 adds the artifact model, validation, statuses, fixtures, and documentation. It intentionally does not add worker execution, browser trusted writes, remote orchestration, read-model export, or dashboard/Studio display.
+
+## QA14.4.2 validation boundary
+
+QA14.4.2 hardens local validation for worker ids, bounded budgets, non-zero timeouts, generated output roots, explicit cleanup policy, duplicate assignments, overlapping output roots, missing indexed target refs, and stale run/target refs. These checks still do not execute workers; they only reject unsafe or stale assignment evidence before it can be treated as usable QA planning input. Read-model compatibility remains a separate fixed PR unit under #685.

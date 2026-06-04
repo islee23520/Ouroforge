@@ -6772,6 +6772,15 @@ impl QaWorkerAssignmentArtifact {
                 ));
             }
         }
+        for (left_index, left) in self.assignments.iter().enumerate() {
+            for (right_index, right) in self.assignments.iter().enumerate().skip(left_index + 1) {
+                if qa_worker_output_roots_overlap(&left.output_root, &right.output_root) {
+                    return Err(anyhow!(
+                        "qa worker assignment outputRoot overlap between assignments[{left_index}] and assignments[{right_index}]"
+                    ));
+                }
+            }
+        }
         for guardrail in &self.guardrails {
             require_bounded_display_text("qa worker assignment guardrail", guardrail)?;
         }
@@ -6910,6 +6919,72 @@ fn validate_qa_worker_output_root(output_root: &str, worker_id: &str) -> Result<
         return Err(anyhow!(
             "qa worker assignment outputRoot must stay under {expected_prefix}"
         ));
+    }
+    Ok(())
+}
+
+fn qa_worker_output_roots_overlap(left: &str, right: &str) -> bool {
+    let normalize = |value: &str| {
+        if value.ends_with('/') {
+            value.to_string()
+        } else {
+            format!("{value}/")
+        }
+    };
+    let left = normalize(left);
+    let right = normalize(right);
+    left.starts_with(&right) || right.starts_with(&left)
+}
+
+pub fn validate_qa_worker_assignment_refs(
+    run_dir: impl AsRef<Path>,
+    artifact: &QaWorkerAssignmentArtifact,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    artifact.validate()?;
+    let index = read_evidence_index(run_dir)?;
+    let indexed_paths = index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    for (index, assignment) in artifact.assignments.iter().enumerate() {
+        if !indexed_paths.contains(assignment.target.evidence_ref.as_str()) {
+            return Err(anyhow!(
+                "qa worker assignments[{index}].target.evidenceRef is missing from evidence index: {}",
+                assignment.target.evidence_ref
+            ));
+        }
+        let value =
+            read_json_value(run_dir.join(&assignment.target.evidence_ref)).with_context(|| {
+                format!(
+                    "failed to read qa worker assignments[{index}].target.evidenceRef {}",
+                    assignment.target.evidence_ref
+                )
+            })?;
+        if let Some(run_id) = json_string(&value, "runId").or_else(|| json_string(&value, "run_id"))
+        {
+            if run_id != artifact.run_id {
+                return Err(anyhow!(
+                    "qa worker assignments[{index}].target.evidenceRef is stale for runId {} (expected {})",
+                    run_id,
+                    artifact.run_id
+                ));
+            }
+        }
+        let target_id = json_string(&value, "targetId")
+            .or_else(|| json_string(&value, "target_id"))
+            .or_else(|| json_string(&value, "scenarioId"))
+            .or_else(|| json_string(&value, "scenario_id"))
+            .or_else(|| json_string(&value, "id"));
+        if let Some(target_id) = target_id {
+            if target_id != assignment.target.target_id {
+                return Err(anyhow!(
+                    "qa worker assignments[{index}].target.evidenceRef target id {target_id} does not match assignment targetId {}",
+                    assignment.target.target_id
+                ));
+            }
+        }
     }
     Ok(())
 }
@@ -39203,6 +39278,123 @@ scenarios:
         )
         .expect_err("unknown remote worker fields are rejected");
         assert!(!unknown_remote_field.to_string().is_empty());
+    }
+
+    #[test]
+    fn qa_worker_assignment_rejects_overlapping_output_roots_and_missing_cleanup() {
+        let overlapping = QaWorkerAssignmentArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-worker-assignment-v1",
+                "planId": "qa14_4_overlap",
+                "runId": "run_qa_worker_assignment_smoke",
+                "assignments": [
+                    {
+                        "assignmentId": "worker-root",
+                        "workerId": "qa-worker-1",
+                        "assignedLane": "scenario-playtest",
+                        "target": { "targetType": "scenario_candidate", "targetId": "collect-and-exit", "evidenceRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json" },
+                        "budget": { "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 1, "maxOutputBytes": 1024 },
+                        "timeoutMs": 1000,
+                        "runCount": 0,
+                        "outputRoot": "evidence/qa-workers/qa-worker-1/run/",
+                        "cleanupPolicy": { "mode": "retain_on_failure" },
+                        "status": "assigned"
+                    },
+                    {
+                        "assignmentId": "worker-child",
+                        "workerId": "qa-worker-1",
+                        "assignedLane": "scenario-playtest",
+                        "target": { "targetType": "scenario_candidate", "targetId": "collect-and-exit-2", "evidenceRef": "evidence/scenarios/collect-and-exit-2/scenario-candidate.json" },
+                        "budget": { "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 1, "maxOutputBytes": 1024 },
+                        "timeoutMs": 1000,
+                        "runCount": 0,
+                        "outputRoot": "evidence/qa-workers/qa-worker-1/run/child/",
+                        "cleanupPolicy": { "mode": "retain_on_failure" },
+                        "status": "assigned"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect_err("overlapping output roots are rejected");
+        assert!(overlapping.to_string().contains("overlap"));
+
+        let missing_cleanup = QaWorkerAssignmentArtifact::from_json_str(
+            &json!({
+                "schemaVersion": "qa-worker-assignment-v1",
+                "planId": "qa14_4_missing_cleanup",
+                "runId": "run_qa_worker_assignment_smoke",
+                "assignments": [{
+                    "assignmentId": "missing-cleanup",
+                    "workerId": "qa-worker-1",
+                    "assignedLane": "scenario-playtest",
+                    "target": { "targetType": "scenario_candidate", "targetId": "collect-and-exit", "evidenceRef": "evidence/scenarios/collect-and-exit/scenario-candidate.json" },
+                    "budget": { "maxRuns": 1, "maxDurationMs": 1000, "maxArtifacts": 1, "maxOutputBytes": 1024 },
+                    "timeoutMs": 1000,
+                    "runCount": 0,
+                    "outputRoot": "evidence/qa-workers/qa-worker-1/run/",
+                    "status": "assigned"
+                }]
+            })
+            .to_string(),
+        )
+        .expect_err("cleanup policy is required");
+        assert!(!missing_cleanup.to_string().is_empty());
+    }
+
+    #[test]
+    fn qa_worker_assignment_ref_validation_accepts_indexed_targets_and_blocks_stale_refs() {
+        let (root, artifacts) = create_test_run("qa-worker-assignment-refs");
+        let mut assignment = QaWorkerAssignmentArtifact::from_json_str(include_str!(
+            "../../../examples/qa-worker-assignment-v1/worker-assignment.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        assignment.run_id = json_string(&run, "id").expect("run id present");
+
+        for item in &assignment.assignments {
+            fs::create_dir_all(
+                artifacts
+                    .run_dir
+                    .join(Path::new(&item.target.evidence_ref).parent().unwrap()),
+            )
+            .expect("target parent exists");
+            write_json(
+                &artifacts.run_dir.join(&item.target.evidence_ref),
+                &json!({
+                    "runId": assignment.run_id,
+                    "targetId": item.target.target_id,
+                    "artifact": "qa_worker_target_fixture"
+                }),
+            )
+            .expect("target fixture writes");
+            add_evidence_artifact(
+                &artifacts.run_dir,
+                &format!("qa-worker-target-{}", item.assignment_id),
+                "application/json",
+                &item.target.evidence_ref,
+                json!({ "artifact": "qa_worker_target_fixture" }),
+            )
+            .expect("target indexed");
+        }
+        validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
+            .expect("indexed fresh target refs validate");
+
+        let stale_path = &assignment.assignments[0].target.evidence_ref;
+        write_json(
+            &artifacts.run_dir.join(stale_path),
+            &json!({
+                "runId": "stale-run",
+                "targetId": assignment.assignments[0].target.target_id,
+                "artifact": "qa_worker_target_fixture"
+            }),
+        )
+        .expect("stale target fixture writes");
+        let stale_error = validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
+            .expect_err("stale run refs are rejected");
+        assert!(stale_error.to_string().contains("stale"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
     }
 
     #[test]
