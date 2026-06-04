@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-collect-and-exit-tilemap-demo",
+  "target": {
+    "type": "tilemap",
+    "path": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+    "id": "collect_and_exit_tilemap"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-add-obstacle-preview",
+      "kind": "update",
+      "path": "layers.collision.tiles[3,3]",
+      "summary": "Draft adding one collision obstacle cell in the collect-and-exit tilemap.",
+      "value": {
+        "tileId": "ground",
+        "x": 3,
+        "y": 3
+      },
+      "tilemapOperation": {
+        "kind": "tile_set",
+        "layerId": "collision",
+        "x": 3,
+        "y": 3,
+        "tileId": "ground",
+        "tilesetAssetId": "collect_and_exit_tileset",
+        "summary": "Preview adding one obstacle cell through tilemap draft validation."
+      }
+    },
+    {
+      "id": "op-remove-obstacle-preview",
+      "kind": "remove",
+      "path": "layers.collision.tiles[4,3]",
+      "summary": "Draft removing one collision obstacle cell from the collect-and-exit tilemap.",
+      "value": {
+        "x": 4,
+        "y": 3
+      },
+      "tilemapOperation": {
+        "kind": "tile_remove",
+        "layerId": "collision",
+        "x": 4,
+        "y": 3,
+        "summary": "Preview removing one obstacle cell through tilemap draft validation."
+      }
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:4e35f8e351364178",
+  "expectedAfterSummary": "Collect-and-exit tilemap draft demonstrates obstacle add/remove intent without committing generated preview outputs.",
+  "linkedEvidence": [
+    "runs/demo/evidence/tilemaps/collect-and-exit-tilemap-preview.json"
+  ],
+  "author": {
+    "type": "agent",
+    "id": "visual-authoring-demo",
+    "source": "source-like-fixture"
+  },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

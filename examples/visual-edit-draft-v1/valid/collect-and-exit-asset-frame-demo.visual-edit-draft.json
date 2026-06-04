@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-collect-and-exit-asset-frame-demo",
+  "target": {
+    "type": "asset-reference",
+    "path": "examples/playable-demo-v2/collect-and-exit/asset-manifest.json",
+    "id": "collect_and_exit_demo_assets"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-player-frame-replacement-preview",
+      "kind": "link_asset",
+      "path": "scenes.collect-and-exit.entities.player.sprite.frameId",
+      "summary": "Draft replacing the player sprite frame reference with a manifest-backed atlas frame.",
+      "value": {
+        "replacementAssetId": "collect_and_exit_atlas",
+        "frameId": "player_idle_1"
+      },
+      "assetReferenceOperation": {
+        "kind": "sprite_frame_reference",
+        "targetReferencePath": "scenes.collect-and-exit.entities.player.sprite.frameId",
+        "replacementAssetId": "collect_and_exit_atlas",
+        "expectedAssetType": "sprite_atlas",
+        "expectedContentHash": {
+          "algorithm": "fnv1a64-file-v1",
+          "value": "9771bcfd71451b09"
+        },
+        "frameId": "player_idle_1",
+        "summary": "Preview selecting a known collect-and-exit atlas frame without importing or fetching assets."
+      }
+    }
+  ],
+  "beforeHash": "fnv1a64-file-v1:9771bcfd71451b09",
+  "expectedAfterSummary": "Collect-and-exit asset-reference draft demonstrates atlas frame replacement intent while preserving manifest and asset write guardrails.",
+  "linkedEvidence": [
+    "runs/demo/evidence/assets/collect-and-exit-asset-frame-preview.json"
+  ],
+  "author": {
+    "type": "agent",
+    "id": "visual-authoring-demo",
+    "source": "source-like-fixture"
+  },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}

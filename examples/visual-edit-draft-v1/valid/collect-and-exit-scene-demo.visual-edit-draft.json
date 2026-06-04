@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "visual-edit-draft-v1",
+  "draftId": "draft-collect-and-exit-scene-demo",
+  "target": {
+    "type": "scene",
+    "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+    "id": "collect-and-exit-scene"
+  },
+  "proposedOperations": [
+    {
+      "id": "op-key-move-preview",
+      "kind": "update",
+      "path": "entities.key.components.transform.x",
+      "summary": "Draft moving the collect key farther along the one-screen demo path.",
+      "value": 144,
+      "sceneOperation": {
+        "kind": "transform_move",
+        "entityId": "key",
+        "sceneEditPath": "components.transform.x",
+        "value": 144,
+        "summary": "Preview a key-position move through the trusted scene transaction path."
+      }
+    },
+    {
+      "id": "op-hud-goal-text-preview",
+      "kind": "update",
+      "path": "entities.hud_goal.components.uiText.text",
+      "summary": "Draft a conservative HUD goal wording change.",
+      "value": "Goal: collect the key, then exit",
+      "sceneOperation": {
+        "kind": "hud_text_change",
+        "entityId": "hud_goal",
+        "sceneEditPath": "components.uiText.text",
+        "value": "Goal: collect the key, then exit",
+        "summary": "Preview a HUD text change without browser persistence."
+      }
+    }
+  ],
+  "beforeHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "expectedAfterSummary": "Collect-and-exit scene draft demonstrates key movement and HUD text authoring before trusted preview/apply evidence is generated.",
+  "linkedEvidence": [
+    "runs/demo/evidence/scenarios/collect-and-exit/scenario-result.json"
+  ],
+  "author": {
+    "type": "agent",
+    "id": "visual-authoring-demo",
+    "source": "source-like-fixture"
+  },
+  "validationStatus": "unvalidated",
+  "blockedReasons": []
+}
