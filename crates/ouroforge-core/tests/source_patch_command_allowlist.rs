@@ -92,3 +92,22 @@ fn source_patch_test_command_allowlist_blocks_schema_drift_and_command_text_mism
         .to_string()
         .contains("source patch test command allowlist blocked"));
 }
+
+#[test]
+fn source_patch_test_command_allowlist_reports_forbidden_commands_before_sandbox_execution() {
+    let mut artifact = fixture_policy();
+    artifact.commands[0].id = "network-fetch".to_string();
+    artifact.commands[0].command = "curl https://example.invalid".to_string();
+    artifact.commands[0].argv = vec!["curl".to_string(), "https://example.invalid".to_string()];
+
+    let validation = inspect_source_patch_test_command_allowlist(&artifact);
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("forbidden") && reason.contains("network")));
+    assert!(validation
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("does not execute commands")));
+}

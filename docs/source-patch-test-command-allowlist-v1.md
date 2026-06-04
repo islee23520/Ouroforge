@@ -51,3 +51,19 @@ with single spaces. The stored `command` must match that normalized value.
 - Network, install, credential, dependency mutation, destructive filesystem, and
   arbitrary shell command rejection is handled by the follow-up forbidden-command
   policy unit.
+
+## Forbidden command rejection
+
+SMP1.5.2 adds a fail-closed classifier that rejects forbidden command classes
+before allowlist prefix matching and before any future sandbox execution. The
+classifier blocks:
+
+- shell execution and shell metacharacter composition;
+- network and remote-service commands;
+- install/bootstrap/package acquisition commands;
+- dependency mutation commands;
+- credential, token, or cloud-auth commands;
+- destructive filesystem/worktree reset commands; and
+- source patch apply, merge, rebase, push, or auto-apply commands.
+
+A rejected command records a reason and the boundary that no command was run.
