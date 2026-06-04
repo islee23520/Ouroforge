@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { normalizeAnimation, advanceAnimation, advanceAnimations, activeSpriteFrame } = require('./animation.js');
+const { normalizeAnimation, inferAnimationState, advanceAnimation, advanceAnimations, activeSpriteFrame } = require('./animation.js');
 
 const animation = normalizeAnimation({
   mode: 'sprite_frame',
@@ -58,3 +58,30 @@ const entity = { components: { animation: normalizeAnimation({ mode: 'sprite_fra
 advanceAnimations([entity], 1);
 assert.equal(entity.components.animation.state.frameIndex, 1);
 assert.equal(normalizeAnimation({ mode: 'transform', frames: [] }), null);
+
+
+const stateful = normalizeAnimation({
+  mode: 'sprite_frame',
+  frameDuration: 1,
+  currentClip: 'idle',
+  stateClips: { idle: 'idle', run: 'run', jump: 'jump', collect: 'collect', hit: 'hit' },
+  clips: [
+    { id: 'idle', frameDuration: 3, frames: [{ color: '#111111' }] },
+    { id: 'run', frameDuration: 1, frames: [{ color: '#222222' }, { color: '#333333' }] },
+    { id: 'jump', frameDuration: 1, loop: false, frames: [{ color: '#444444' }] },
+    { id: 'collect', frameDuration: 1, loop: false, frames: [{ color: '#555555' }] },
+    { id: 'hit', frameDuration: 1, loop: false, frames: [{ color: '#666666' }] },
+  ],
+});
+assert.equal(stateful.state.activeState, 'idle');
+advanceAnimation(stateful, 1, { stateName: 'run' });
+assert.deepEqual(stateful.state, { activeState: 'run', currentClip: 'run', elapsedFrames: 1, frameIndex: 1 });
+advanceAnimation(stateful, 1, { stateName: 'run' });
+assert.deepEqual(stateful.state, { activeState: 'run', currentClip: 'run', elapsedFrames: 2, frameIndex: 0 });
+advanceAnimation(stateful, 1, { stateName: 'jump' });
+assert.deepEqual(stateful.state, { activeState: 'jump', currentClip: 'jump', elapsedFrames: 1, frameIndex: 0 });
+
+assert.equal(inferAnimationState({ components: { animation: stateful, velocity: { x: 2, y: 0 } } }), 'run');
+assert.equal(inferAnimationState({ components: { animation: stateful, velocity: { x: 0, y: -3 } } }), 'jump');
+assert.equal(inferAnimationState({ components: { animation: stateful, velocity: { x: 0, y: 0 }, status: { states: ['hit'] } } }), 'hit');
+assert.equal(inferAnimationState({ components: { animation: stateful, velocity: { x: 0, y: 0 }, status: { states: ['collect'] } } }), 'collect');
