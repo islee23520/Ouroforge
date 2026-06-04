@@ -554,6 +554,51 @@
     return { ...actionMapState(component), ...clone(actionInput) };
   }
 
+  function inputActionDiagnostics(inputComponent = null) {
+    const entity = player();
+    const component = inputComponent || (entity.components.input || {});
+    const allowedActions = Array.isArray(component.allowedActions) ? component.allowedActions : [];
+    const mapActions = component.actionMap && Array.isArray(component.actionMap.actions)
+      ? component.actionMap.actions
+      : [];
+    const actionIds = new Set();
+    const keyboardBindings = new Map();
+    const duplicateActions = [];
+    const conflictingBindings = [];
+    const unmappedActions = [];
+    for (const action of mapActions) {
+      if (!action || typeof action.id !== 'string') continue;
+      if (actionIds.has(action.id)) duplicateActions.push(action.id);
+      actionIds.add(action.id);
+      const keys = Array.isArray(action.keyboard) ? action.keyboard : [];
+      if (keys.length === 0) unmappedActions.push(action.id);
+      for (const key of keys) {
+        const normalized = keyAlias(key);
+        const existing = keyboardBindings.get(normalized);
+        if (existing && existing !== action.id) {
+          conflictingBindings.push({ key: normalized, actions: [existing, action.id] });
+        } else {
+          keyboardBindings.set(normalized, action.id);
+        }
+      }
+    }
+    const missingActions = mapActions.length > 0
+      ? allowedActions.filter((action) => !actionIds.has(action))
+      : [];
+    const explicitActions = Object.keys(actionInput);
+    const unresolvedOverrides = explicitActions.filter((action) => mapActions.length > 0 && !actionIds.has(action));
+    return {
+      present: mapActions.length > 0 || explicitActions.length > 0,
+      missingActions,
+      conflictingBindings,
+      duplicateActions,
+      unmappedActions,
+      unresolvedOverrides,
+      warningCount: missingActions.length + conflictingBindings.length + duplicateActions.length + unmappedActions.length + unresolvedOverrides.length,
+      readOnlyInspection: { trustedEmitter: 'browser-runtime-evidence-helper', browserStudioMode: 'read-only evidence inspection', disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+    };
+  }
+
   function actionAllowed(allowedActions, actionId, legacyGroup = null) {
     if (!Array.isArray(allowedActions) || allowedActions.length === 0) return true;
     return allowedActions.includes(actionId) || (legacyGroup ? allowedActions.includes(legacyGroup) : false);
@@ -1039,6 +1084,7 @@
       input: clone(input),
       rawInput: { directions: clone(input), keys: clone(rawKeys) },
       actionState: resolvedActionState(),
+      actionDiagnostics: inputActionDiagnostics(),
     });
     renderDebug();
     return api.getWorldState();
@@ -1125,6 +1171,7 @@
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
       state.actionInput = clone(actionInput);
       state.actionState = resolvedActionState();
+      state.inputDiagnostics = inputActionDiagnostics();
       const frameId = `tick-${world.tick}`;
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.camera = cameraEvidence();

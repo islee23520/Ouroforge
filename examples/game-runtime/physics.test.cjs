@@ -183,6 +183,11 @@ player = state.entities.find((entity) => entity.id === 'player');
 assert.equal(player.components.transform.x, 32, 'scenario/runtime action override resolves move_right without a raw direction');
 assert.equal(state.actionState.move_right, true);
 assert.equal(state.input.right, false, 'legacy raw direction remains separate from resolved action state');
+assert.equal(state.inputDiagnostics.warningCount, 0, 'valid action map has no runtime diagnostics');
+api.setInput({ actions: { dash: true } });
+state = api.getWorldState();
+assert.equal(state.inputDiagnostics.warningCount, 1, 'unmapped action override is visible as explicit evidence');
+assert.deepEqual(Array.from(state.inputDiagnostics.unresolvedOverrides), ['dash']);
 
 state = api.loadScene(defaultLayerScene);
 api.setInput({ right: true });

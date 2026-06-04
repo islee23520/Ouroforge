@@ -546,6 +546,22 @@ const run = {
       contactPairCount: 1,
       blockedMovement: { player: { x: false, y: true } },
     },
+    input: {
+      present: true,
+      mappedActionCount: 3,
+      activeActionCount: 2,
+      activeActions: ['<move_right>', 'interact'],
+      warningCount: 3,
+      rawInput: { keys: { '<d>': true } },
+      diagnostics: {
+        missingActions: ['<dash>'],
+        unmappedActions: ['interact'],
+        duplicateActions: [],
+        unresolvedOverrides: ['interact'],
+        conflictingBindings: [{ key: '<d>', actions: ['<move_right>', '<dash>'] }],
+        readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'scene mutation', 'browser runtime control'] },
+      },
+    },
     collision: {
       present: true,
       rules: { player_key: { a: 'player', b: 'key', event: 'collect_key' } },
@@ -883,6 +899,7 @@ assert.match(xssRuntimeEvents, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /trigger-flags-v1-fixture/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Gameplay\/HUD/);
+assert.match(cockpit.renderEngineExpansionSurface(run), /Input actions/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Render breakdown/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /1 element\(s\), 1 absence diagnostic\(s\)/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 trigger event\(s\), 2 HUD value\(s\)/);
@@ -911,6 +928,15 @@ assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite\.visib
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite hidden/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /browser runtime control/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: '<bad>' } }), /missing or malformed/);
+assert.match(cockpit.renderInputActionInspectionSurface(run), /Input action mapping/);
+assert.match(cockpit.renderInputActionInspectionSurface(run), /&lt;dash&gt;/);
+assert.match(cockpit.renderInputActionInspectionSurface(run), /&lt;move_right&gt; \/ &lt;dash&gt;/);
+assert.match(cockpit.renderInputActionInspectionSurface(run), /browser runtime control/);
+assert.doesNotMatch(cockpit.renderInputActionInspectionSurface(run), /<dash>/);
+assert.match(cockpit.renderInputActionInspectionSurface({ engine_summaries: { present: true, input: '<bad>' } }), /No input action read model/);
+const xssInputAction = cockpit.renderInputActionInspectionSurface({ engine_summaries: { present: true, input: { present: true, mappedActionCount: 1, activeActions: ['<script>run</script>'], rawInput: { keys: { '<img>': true } }, diagnostics: { missingActions: ['<svg>'], conflictingBindings: [{ key: '<b>', actions: ['<i>', '<p>'] }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] } } } } });
+assert.doesNotMatch(xssInputAction, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssInputAction, /&lt;svg&gt;/);
 const xssRenderBreakdown = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: '<script>frame</script>', sceneId: '<img>', elements: [{ renderableId: '<script>renderable</script>', entityId: '<img src=x onerror=alert(1)>', frameId: '<svg>', drawOrder: '<b>', layer: '<i>', primitiveCategory: '<p>', debugLabel: '<script>label</script>' }], absenceDiagnostics: [{ entityId: '<script>hidden</script>', reason: '<img>', layer: '<svg>', detail: '<b>detail</b>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, boundary: '<script>boundary</script>' } } });
 assert.doesNotMatch(xssRenderBreakdown, /<script>|<img|<svg>|<b>|<i>|<p>/);
 assert.match(xssRenderBreakdown, /&lt;script&gt;renderable&lt;\/script&gt;/);

@@ -308,6 +308,22 @@ const run = {
         '<hud>': { x: 12, y: 8, layer: '<hud>', cameraOffset: { x: 0, y: 0 } },
       },
     },
+    input: {
+      present: true,
+      mappedActionCount: 3,
+      activeActionCount: 2,
+      activeActions: ['<move_right>', 'interact'],
+      warningCount: 3,
+      rawInput: { keys: { '<d>': true } },
+      diagnostics: {
+        missingActions: ['<dash>'],
+        unmappedActions: ['interact'],
+        duplicateActions: [],
+        unresolvedOverrides: ['interact'],
+        conflictingBindings: [{ key: '<d>', actions: ['<move_right>', '<dash>'] }],
+        readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+      },
+    },
     gameplay: {
       present: true,
       declaredFlagCount: 2,
@@ -817,6 +833,13 @@ assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /HUD value components/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Goal: Collect coin/);
 assert.match(dashboard.renderGameplaySummary({}), /No trigger\/flag world-state summary/);
+assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /input action evidence/);
+assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /3/);
+assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /&lt;dash&gt;/);
+assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /&lt;move_right&gt; \/ &lt;dash&gt;/);
+assert.match(dashboard.renderInputActionSummary(run.engine_summaries), /trusted writes, command bridge, live mutation/);
+assert.doesNotMatch(dashboard.renderInputActionSummary(run.engine_summaries), /<dash>/);
+assert.match(dashboard.renderInputActionSummary({}), /No input action read model/);
 assert.match(dashboard.renderJournalViewer({ ...run, journal_view: { path: 'journal.md', exists: false, read_error: 'missing journal artifact', entries: [] } }), /missing journal artifact/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: 'missing', stages: [], command_hints: [] } }), /No mutation lifecycle stages/);
 assert.match(dashboard.renderMutationLifecycle({ mutation_lifecycle: { terminal_state: '<script>', command_hints: [], stages: [{ id: 'scene_applied', label: '<img>', state: '<bad>', artifact_path: 'mutation/scene-applications.json', record_count: 1, records: [{ id: '<script>', project: { projectId: '<img>', manifestPath: '<script>', manifestHash: { algorithm: '<b>', value: '<i>' }, scenePath: '<p>', sceneHash: { algorithm: '<u>', value: '<em>' } }, rollback: { scenePath: '<svg>', restoreHash: { value: '<hash>' } } }] }] } }), /&lt;script&gt;/);
