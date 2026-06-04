@@ -40,12 +40,14 @@ browser writes, package assets, load plugins, or implement runtime asset loading
 | `id` | yes | Stable local manifest id using bounded Ouroforge id characters. |
 | `assets[]` | yes | Asset entries. Empty manifests are rejected. |
 | `assets[].id` | yes | Stable local asset id; duplicate ids are rejected. |
-| `assets[].type` | yes | One of `image`, `sprite_atlas`, `tileset`, `tilemap`, `audio`, or `font`. |
+| `assets[].type` | yes | One of `image`, `sprite_atlas`, `tileset`, `tilemap`, `audio`, `font`, `mesh`, or `material`. |
 | `assets[].path` | yes | Project-relative file path; duplicate paths are rejected. |
 | `assets[].contentHash` | yes | File integrity hash. Algorithm must be `fnv1a64-file-v1`; value is 16 lowercase hex characters. |
 | `assets[].classification` | yes | `source_like` for tracked source assets or `generated` for generated/local evidence assets. |
 | `dimensions` | image-like optional metadata | Width and height must both be greater than zero when present. Sprite atlas image references require image dimensions for bounds validation. |
 | `atlas` | `sprite_atlas` only | Sprite atlas payload with `imageAssetId`, named frame rectangles, and optional animation frame refs. See `docs/sprite-atlas-manifest-v1.md`. |
+| `mesh` | `mesh` only | Bounded 3D mesh descriptor. `kind` is limited to `primitive_cube`, `primitive_plane`, or `fixture_mesh`; `vertexCount` and optional `indexCount` must stay within small deterministic fixture bounds. |
+| `material` | `material` only | Bounded 3D material descriptor. `baseColor` uses the existing scene color format, optional `textureAssetId` must reference an image asset, and `shading` is only `unlit` or `lit`. |
 | `durationMs` | audio optional metadata | Duration must be greater than zero when present. |
 | `license`, `source`, `metadata` | optional | Human review notes only; not remote authority. |
 
@@ -90,6 +92,8 @@ Asset validation rejects:
 - missing files;
 - duplicate asset ids or duplicate asset paths;
 - sprite atlas entries with missing image refs, duplicate frame ids, out-of-bounds frame rectangles, or unknown animation frame refs;
+- mesh entries without bounded mesh payloads, unsupported mesh kinds, zero or oversized vertex/index counts, broad model import extensions, or source-like files under generated roots;
+- material entries without bounded material payloads, invalid base colors, unsupported material fields, texture refs to missing/non-image assets, PBR/shader-graph fields, or source-like files under generated roots;
 - unsupported file extensions for the declared type;
 - non-`fnv1a64-file-v1` hash algorithms;
 - malformed hash strings; and
@@ -109,6 +113,8 @@ ignored unless a future issue explicitly scopes a tiny deterministic fixture.
 | `tilemap` | `json` |
 | `audio` | `ogg`, `mp3`, `wav` |
 | `font` | `ttf`, `otf`, `woff`, `woff2` |
+| `mesh` | `json` |
+| `material` | `json` |
 
 Tileset/tilemap payloads may include bounded authoring metadata used by
 `docs/tileset-tilemap-authoring-v2.md`; runtime/dashboard consumers treat the
@@ -116,6 +122,10 @@ extracted cells as read-only evidence, not editor write authority. Asset
 Reference Integrity v1 is documented in
 `docs/asset-reference-integrity-v1.md`; it covers scene reference warning
 evidence for missing refs, stale hashes, invalid types, and unresolved ids.
+For 3D scenes, `scene3d` `meshRef` / `materialRef` and bounded `mesh` /
+`material` component references resolve through the same report as local asset
+ids. The report never fetches remote models, textures, CDN assets, marketplace
+assets, or broad import-pipeline data.
 
 ## Boundary and non-goals
 
@@ -126,6 +136,8 @@ Asset Manifest v1 keeps trusted validation in Rust and does not authorize:
   server execution bridges;
 - remote asset fetches, hosting, CDN, cloud storage, accounts, or marketplace
   behavior;
+- broad GLTF/GLB/model import pipelines, PBR material systems, shader graphs, or
+  advanced lighting authoring;
 - plugin loading, dynamic code loading, native export, packaging, or asset bundle
   export;
 - source-code mutation, arbitrary patch apply, dependency mutation, auto-apply,

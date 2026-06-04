@@ -94,6 +94,14 @@ Issue #598 begins bounded 3D camera/projection validation. The camera schema,
 viewport rules, and source-like camera fixtures are documented in
 [`3d-camera-projection-v1.md`](./3d-camera-projection-v1.md).
 
+Issue #599 adds the local mesh/material reference slice. Meshes and materials
+are project-local Asset Manifest v1 entries backed by tiny deterministic JSON
+fixtures. `scene3d` nodes may reference them through `meshRef`, `materialRef`,
+or bounded `mesh` / `material` component references. The asset integrity report
+surfaces missing, stale, incompatible, malformed, or unsupported 3D references
+without fetching remote assets or treating GLTF/GLB files, PBR material graphs,
+marketplaces, or CDN URLs as supported inputs.
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard
