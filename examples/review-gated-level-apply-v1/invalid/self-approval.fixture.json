@@ -40,7 +40,11 @@
   "rerunCommands": [
     {
       "command": "cargo test review_gated_level",
-      "argv": ["cargo", "test", "review_gated_level"],
+      "argv": [
+        "cargo",
+        "test",
+        "review_gated_level"
+      ],
       "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
     }
   ],
@@ -54,6 +58,11 @@
       "evidenceId": "review_decision",
       "kind": "review_decision",
       "pathHint": "evidence/level-apply/level_apply_invalid_self_approval/review-decision.json"
+    },
+    {
+      "evidenceId": "level_diff",
+      "kind": "level_diff",
+      "pathHint": "evidence/level-apply/level_apply_invalid_self_approval/level-diff.json"
     },
     {
       "evidenceId": "rollback_plan",

@@ -20387,7 +20387,11 @@ impl ReviewGatedLevelApplyArtifact {
         validate_review_gated_level_apply_target_hashes(&self.targets, &self.target_hashes)?;
         self.rollback_metadata.validate(&self.targets)?;
         validate_review_gated_level_apply_rerun_commands(&self.rerun_commands)?;
-        validate_review_gated_level_apply_evidence(&self.transaction_id, &self.evidence_refs)?;
+        validate_review_gated_level_apply_evidence(
+            &self.transaction_id,
+            self.status,
+            &self.evidence_refs,
+        )?;
         validate_review_gated_level_apply_guardrails(&self.guardrails)?;
         for reason in &self.blocked_reasons {
             require_bounded_display_text("review-gated level apply blockedReasons", reason)?;
@@ -20658,6 +20662,7 @@ fn validate_review_gated_level_apply_rerun_commands(
 
 fn validate_review_gated_level_apply_evidence(
     transaction_id: &str,
+    status: ReviewGatedLevelApplyStatus,
     refs: &[ReviewGatedLevelApplyEvidenceRef],
 ) -> Result<()> {
     if refs.is_empty() {
@@ -20709,6 +20714,16 @@ fn validate_review_gated_level_apply_evidence(
                 review_gated_level_apply_evidence_kind_label(required)
             ));
         }
+    }
+    if status == ReviewGatedLevelApplyStatus::ReadyForTrustedApply
+        && !kinds.contains(&ReviewGatedLevelApplyEvidenceKind::LevelDiff)
+    {
+        return Err(anyhow!(
+            "review-gated level apply ready_for_trusted_apply artifacts must include {} evidence",
+            review_gated_level_apply_evidence_kind_label(
+                ReviewGatedLevelApplyEvidenceKind::LevelDiff
+            )
+        ));
     }
     Ok(())
 }
@@ -66208,6 +66223,12 @@ scenarios:
                     "../../../examples/review-gated-level-apply-v1/invalid/missing-rollback.fixture.json"
                 ),
                 "rollbackMetadata",
+            ),
+            (
+                include_str!(
+                    "../../../examples/review-gated-level-apply-v1/invalid/ready-missing-level-diff.fixture.json"
+                ),
+                "ready_for_trusted_apply artifacts must include level_diff",
             ),
         ] {
             let error = ReviewGatedLevelApplyArtifact::from_json_str(fixture)
