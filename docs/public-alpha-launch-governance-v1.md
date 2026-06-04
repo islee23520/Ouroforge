@@ -55,7 +55,7 @@ playbooks, or checklists unless a later issue explicitly authorizes more.
 | --- | --- | --- | --- |
 | 1 | Milestone scope contract | #378 | This document: scope, dependency order, launch boundary, verification, closure gates. |
 | 2 | Visibility decision record | #379 | Go/no-go/hold template, review fields, examples, and manual visibility boundary. |
-| 3 | Hold and rollback criteria | #380 | Checklist/playbook for blockers, deferral, rollback notes, and evidence needed before reconsideration. |
+| 3 | Hold and rollback criteria | #380 | [`public-alpha-launch-hold-criteria-v1.md`](public-alpha-launch-hold-criteria-v1.md) plus later rollback notes: blocker, deferral, and evidence needed before reconsideration. |
 | 4 | Public issue intake | #381 | Issue triage policy/snippets/templates for public-alpha requests without support guarantees. |
 | 5 | Public PR intake | #382 | PR review/intake policy, maintainer expectations, and forbidden-scope handling. |
 | 6 | Security response | Security playbook docs | Vulnerability-reporting flow, escalation boundaries, and no public security guarantee overclaim. |
