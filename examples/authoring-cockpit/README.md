@@ -114,6 +114,27 @@ evidence, fetches remote assets, executes commands, or acts as a marketplace,
 plugin host, native export path, production editor, or visual asset editor. See
 `../../docs/studio-asset-inspector-v1.md`.
 
+## Production 2D runtime inspection boundary
+
+When `dashboard-data.json` includes Production 2D read models, the cockpit may
+display renderer/layer/camera, physics/collision/contact, input/action/replay,
+animation/VFX/audio, save/load/runtime-state digest, and profiler/frame-budget
+evidence as escaped read-only state. The runtime save/state panel shows
+snapshots, save created/loaded events, replay digest comparisons, digest values,
+authority labels, and disallowed actions for inspection only.
+
+These panels do not write source, scene, tilemap, asset, save, project,
+dashboard, run, or evidence files; do not persist trusted browser state; do not
+execute commands; do not bridge to a local server; do not mutate saves or replay
+baselines; and do not claim production editor, hosted Studio, native export,
+plugin runtime, visual scripting, public launch, production-ready engine, or
+Godot replacement behavior. Rust/local workflows remain the trusted authority
+for validation, persistence, generated evidence, source-like fixtures, save/load
+state, replay digest comparison, and CLI behavior. Generated run/dashboard/
+screenshot/temp/local tool outputs stay untracked unless a later issue
+explicitly scopes a tiny deterministic source-like fixture. See
+`../../docs/production-2d-studio-inspection-v1.md`.
+
 ## Expressive Scene Inspection v2
 
 When `dashboard-data.json` includes the Engine Expansion read model, the cockpit
