@@ -6,6 +6,7 @@ Status: pre-release MVP evidence for public-readiness review; this is not a laun
 
 Current image refresh: issue #370 PA1.4.2, 2026-06-04, from latest `main` after PA1.4.1.
 Current refresh audit: [`docs/public-demo-evidence-refresh-audit-v1.md`](public-demo-evidence-refresh-audit-v1.md) inventories stale demo references for issue #370 PA1.4.1 without generating or committing runtime artifacts.
+Current finalization record: [`docs/public-demo-evidence-finalization-v1.md`](public-demo-evidence-finalization-v1.md) records #370 PA1.4.3 run ids, cleanup, known gaps, and closure guardrails.
 
 ## Demo media
 
