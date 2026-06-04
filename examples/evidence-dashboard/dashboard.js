@@ -1176,6 +1176,44 @@ const OuroforgeDashboard = (() => {
     return artifacts(run?.mutation_artifacts).filter((artifact) => artifact.id === 'source-patch-apply-transaction' || artifact.path === 'mutation/source-patch-apply-transaction.json');
   }
 
+  function sourcePatchStaleTargetGuards(run) {
+    return artifacts(run?.mutation_artifacts).filter((artifact) => artifact.id === 'source-patch-stale-target-guard' || artifact.path === 'mutation/source-patch-stale-target-guard.json');
+  }
+
+  function renderSourcePatchStaleTargetGuards(run) {
+    const guards = sourcePatchStaleTargetGuards(run);
+    if (!guards.length) {
+      return '<section class="panel source-patch-stale-target-guards"><h3>Source patch stale target guard</h3><p class="empty-state">No source patch stale target guard is exported for this run.</p><p class="run-meta">Read-only dashboard surface. The browser cannot apply patches, merge branches, execute commands, write trusted files, or bypass review gates.</p></section>';
+    }
+    const cards = guards.map((artifact) => {
+      const value = artifact.value || {};
+      const freshness = value.evidenceFreshness || value.evidence_freshness || {};
+      const validation = value.readModel || value.read_model || value.validation || {};
+      const targets = Array.isArray(value.targets) ? value.targets : [];
+      const blockers = Array.isArray(validation.blockedReasons || validation.blocked_reasons)
+        ? (validation.blockedReasons || validation.blocked_reasons)
+        : (Array.isArray(value.blockedReasons || value.blocked_reasons) ? (value.blockedReasons || value.blocked_reasons) : []);
+      const forbidden = Array.isArray(validation.forbiddenActions || validation.forbidden_actions)
+        ? (validation.forbiddenActions || validation.forbidden_actions)
+        : ['apply_patch', 'merge_branch', 'execute_command', 'write_trusted_file', 'browser_command_bridge'];
+      const refs = [freshness.patchPreviewRef, freshness.sandboxReportRef, freshness.reviewDecisionRef, freshness.fileClassReportRef, freshness.diffIntegrityReportRef, freshness.applyTransactionRef, value.worktreeContextRef || value.worktree_context_ref]
+        .filter(Boolean)
+        .map((ref) => typeof ref === 'string' ? ref : `${ref.kind || 'artifact'}:${ref.path || 'missing'}`);
+      return `<article class="artifact source-patch-stale-target-guard">
+        <h4>${escapeText(value.guardId || value.guard_id || artifact.id || 'source patch stale target guard')}</h4>
+        <div class="run-meta"><span class="${statusClass(validation.status || value.status || 'unknown')}">${escapeText(validation.status || value.status || 'unknown')}</span> · ${escapeText(validation.readinessLabel || validation.readiness_label || 'stale-target readiness metadata only')}</div>
+        <div class="run-meta">Targets: ${escapeText(targets.map((target) => `${target.path || 'unknown'}:${target.fileClass || target.file_class || 'unknown'}:${target.fileStatus || target.file_status || 'unknown'}`).join(' · ') || 'none')}</div>
+        <div class="run-meta">Refs: ${escapeText(refs.join(' · ') || artifact.path || 'none')}</div>
+        ${blockers.length ? `<div class="artifact-warning">Blocked: ${escapeText(blockers.join(' · '))}</div>` : ''}
+        <div class="run-meta">Forbidden actions: ${escapeText(forbidden.join(' · '))}</div>
+      </article>`;
+    }).join('');
+    return `<section class="panel source-patch-stale-target-guards"><h3>Source patch stale target guard</h3>
+      <p class="run-meta">Read-only stale-target readiness evidence. This dashboard renders target freshness, blockers, and refs only; it does not apply patches, merge branches, execute commands, write trusted files, or bypass review gates.</p>
+      <div class="artifact-grid">${cards}</div>
+    </section>`;
+  }
+
   function renderSourcePatchApplyTransactions(run) {
     const transactions = sourcePatchApplyTransactions(run);
     if (!transactions.length) {
@@ -1242,6 +1280,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
+      ${renderSourcePatchStaleTargetGuards(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -1318,7 +1357,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

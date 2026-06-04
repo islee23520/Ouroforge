@@ -1,6 +1,7 @@
 use ouroforge_core::{
     inspect_source_patch_stale_target_guard_artifact,
     inspect_source_patch_stale_target_guard_artifact_with_roots,
+    source_patch_stale_target_guard_read_model, write_source_patch_stale_target_guard_artifact,
     SourcePatchStaleTargetGuardArtifact, SourcePatchStaleTargetGuardStatus,
     SOURCE_PATCH_STALE_TARGET_GUARD_SCHEMA_VERSION,
 };
@@ -35,6 +36,16 @@ fn write_json(root: &Path, rel: &str, value: serde_json::Value) {
     let path = root.join(rel);
     fs::create_dir_all(path.parent().unwrap()).expect("parent dir created");
     fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).expect("json written");
+}
+
+fn write_minimal_dashboard_run(root: &Path) {
+    write_json(
+        root,
+        "run.json",
+        json!({"id":"run-source-patch-stale-target-guard","created_at_unix_ms":1}),
+    );
+    write_json(root, "verdict.json", json!({"status":"passed"}));
+    write_json(root, "evidence/index.json", json!({"artifacts":[]}));
 }
 
 fn write_empty_target(root: &Path, artifact: &SourcePatchStaleTargetGuardArtifact) {
@@ -165,6 +176,80 @@ fn source_patch_stale_target_guard_validates_fresh_current_target_and_linked_evi
         .guardrails
         .iter()
         .any(|guardrail| guardrail.contains("does not apply patches")));
+}
+
+#[test]
+fn source_patch_stale_target_guard_read_model_is_display_only() {
+    let artifact = fixture();
+
+    let model = source_patch_stale_target_guard_read_model(&artifact);
+
+    assert_eq!(
+        model.schema_version,
+        "source-patch-stale-target-guard-read-model-v1"
+    );
+    assert_eq!(
+        model.readiness_label,
+        "shape_valid_pending_current_target_and_evidence_checks_no_apply_authority"
+    );
+    assert!(model
+        .target_summaries
+        .iter()
+        .any(|entry| entry.contains("scenario_regression_fixture")));
+    assert!(model
+        .evidence_summary
+        .iter()
+        .any(|entry| entry.starts_with("sandbox:")));
+    assert!(model
+        .allowed_actions
+        .iter()
+        .any(|action| action == "inspect_guard_evidence"));
+    for forbidden in [
+        "apply_patch",
+        "merge_branch",
+        "execute_command",
+        "write_trusted_file",
+        "browser_command_bridge",
+    ] {
+        assert!(model
+            .forbidden_actions
+            .iter()
+            .any(|action| action == forbidden));
+    }
+}
+
+#[test]
+fn source_patch_stale_target_guard_exports_generated_dashboard_artifact_read_only() {
+    use ouroforge_core::read_dashboard_run;
+
+    let run_dir = unique_temp_dir("source-patch-stale-target-guard-dashboard");
+    write_minimal_dashboard_run(&run_dir);
+    let artifact = fixture();
+    let path = write_source_patch_stale_target_guard_artifact(&run_dir, &artifact)
+        .expect("guard writes under mutation generated state");
+    assert!(path.ends_with("mutation/source-patch-stale-target-guard.json"));
+
+    let dashboard = read_dashboard_run(&run_dir).expect("dashboard reads generated guard");
+    let exported = dashboard
+        .mutation_artifacts
+        .iter()
+        .find(|artifact| artifact.id == "source-patch-stale-target-guard")
+        .expect("guard exported as mutation artifact");
+    assert_eq!(
+        exported.path,
+        "mutation/source-patch-stale-target-guard.json"
+    );
+    assert_eq!(exported.metadata["read_only"], true);
+    let value = exported.value.as_ref().expect("guard value is readable");
+    assert_eq!(value["guardId"], artifact.guard_id);
+    assert!(
+        serde_json::from_value::<SourcePatchStaleTargetGuardArtifact>(value.clone()).is_ok(),
+        "persisted generated artifact remains schema-pure and round-trippable"
+    );
+    assert!(value.get("readModel").is_none());
+    assert!(value.get("applyCommand").is_none());
+    assert!(value.get("mergeCommand").is_none());
+    assert!(value.get("browserCommandBridge").is_none());
 }
 
 #[test]

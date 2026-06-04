@@ -11468,6 +11468,26 @@ pub fn write_source_patch_apply_transaction_artifact(
     Ok(path)
 }
 
+pub fn write_source_patch_stale_target_guard_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+) -> Result<PathBuf> {
+    validate_source_patch_stale_target_guard_artifact(artifact)?;
+    let path = run_dir
+        .as_ref()
+        .join("mutation/source-patch-stale-target-guard.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create source patch stale target guard directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
 pub fn validate_source_patch_evidence_bundle(
     bundle: &SourcePatchEvidenceBundleArtifact,
 ) -> Result<SourcePatchEvidenceBundleValidation> {
@@ -11798,6 +11818,33 @@ pub struct SourcePatchStaleTargetGuardValidation {
     pub guardrails: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "guardId")]
+    pub guard_id: String,
+    pub status: String,
+    #[serde(rename = "readinessLabel")]
+    pub readiness_label: String,
+    #[serde(rename = "targetCount")]
+    pub target_count: usize,
+    #[serde(rename = "guardResultCount")]
+    pub guard_result_count: usize,
+    #[serde(rename = "targetSummaries")]
+    pub target_summaries: Vec<String>,
+    #[serde(rename = "evidenceSummary")]
+    pub evidence_summary: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "allowedActions")]
+    pub allowed_actions: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 impl SourcePatchStaleTargetGuardValidation {
     pub fn is_blocked(&self) -> bool {
         self.status == "blocked"
@@ -11931,6 +11978,64 @@ pub fn inspect_source_patch_stale_target_guard_artifact_with_roots(
         "blocked".to_string()
     };
     validation
+}
+
+pub fn source_patch_stale_target_guard_read_model(
+    artifact: &SourcePatchStaleTargetGuardArtifact,
+) -> SourcePatchStaleTargetGuardReadModel {
+    let validation = inspect_source_patch_stale_target_guard_artifact(artifact);
+    let evidence = &artifact.evidence_freshness;
+    SourcePatchStaleTargetGuardReadModel {
+        schema_version: "source-patch-stale-target-guard-read-model-v1".to_string(),
+        guard_id: artifact.guard_id.clone(),
+        status: validation.status.clone(),
+        readiness_label: if validation.is_blocked() {
+            "blocked_before_trusted_apply".to_string()
+        } else {
+            "shape_valid_pending_current_target_and_evidence_checks_no_apply_authority".to_string()
+        },
+        target_count: artifact.targets.len(),
+        guard_result_count: artifact.guard_results.len(),
+        target_summaries: artifact
+            .targets
+            .iter()
+            .map(|target| {
+                format!(
+                    "{}: {}/{}",
+                    target.path, target.file_class, target.file_status
+                )
+            })
+            .collect(),
+        evidence_summary: vec![
+            format!("preview:{}", evidence.patch_preview_ref),
+            format!("file-class:{}", evidence.file_class_report_ref),
+            format!("diff-integrity:{}", evidence.diff_integrity_report_ref),
+            format!("sandbox:{}", evidence.sandbox_report_ref),
+            format!("review:{}", evidence.review_decision_ref),
+            format!("transaction:{}", evidence.apply_transaction_ref),
+            format!("worktree:{}", artifact.worktree_context_ref),
+        ],
+        blocked_reasons: validation.blocked_reasons,
+        allowed_actions: vec![
+            "inspect_guard_evidence".to_string(),
+            "inspect_current_target_hashes".to_string(),
+            "record_manual_follow_up".to_string(),
+        ],
+        forbidden_actions: vec![
+            "apply_patch".to_string(),
+            "merge_branch".to_string(),
+            "execute_command".to_string(),
+            "write_trusted_file".to_string(),
+            "browser_command_bridge".to_string(),
+            "bypass_review_gate".to_string(),
+        ],
+        guardrails: vec![
+            "read model is display-only and command-inert".to_string(),
+            "fresh metadata does not apply source patches or merge branches".to_string(),
+            "dashboard and Studio surfaces may not write trusted files".to_string(),
+            "trusted apply remains separately scoped from stale target readiness".to_string(),
+        ],
+    }
 }
 
 fn inspect_source_patch_stale_target_guard_base_ref(
@@ -31459,6 +31564,10 @@ fn select_dashboard_mutation_artifacts(run_dir: &Path) -> Result<Vec<RunDashboar
         (
             "source-patch-apply-transaction",
             "mutation/source-patch-apply-transaction.json",
+        ),
+        (
+            "source-patch-stale-target-guard",
+            "mutation/source-patch-stale-target-guard.json",
         ),
         (
             "mutation-evolve-v1-demo-summary",

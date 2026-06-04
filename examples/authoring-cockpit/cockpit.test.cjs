@@ -553,6 +553,34 @@ const run = {
     composition: { entityCount: 3, parentedEntityCount: 0 },
   },
 };
+
+run.mutation_artifacts.push({
+  id: 'source-patch-stale-target-guard',
+  kind: 'application/json',
+  path: 'mutation/source-patch-stale-target-guard.json',
+  metadata: { read_only: true },
+  value: {
+    guardId: 'stale-guard-1',
+    status: 'fresh',
+    evidenceFreshness: {
+      patchPreviewRef: 'mutation/preview.json',
+      sandboxReportRef: 'sandbox/preview-1/evidence/report.json',
+      reviewDecisionRef: 'mutation/review-decision.json',
+      fileClassReportRef: 'evidence/file-class.json',
+      diffIntegrityReportRef: 'evidence/diff.json',
+      applyTransactionRef: 'mutation/source-patch-apply-transaction.json',
+    },
+    worktreeContextRef: 'evidence/source-apply-worktree-context.json',
+    targets: [{ path: 'examples/source-patch-apply-transaction-v1/scenario-regression.json', fileClass: 'scenario_regression_fixture', fileStatus: 'exists_and_matches_expected_before_hash' }],
+    readModel: {
+      status: 'fresh_current_targets_and_linked_evidence_no_apply_authority',
+      readinessLabel: 'fresh_guard_metadata_only_no_apply_authority',
+      blockedReasons: [],
+      forbiddenActions: ['apply_patch', 'merge_branch', 'execute_command', 'write_trusted_file', 'browser_command_bridge'],
+    },
+  },
+});
+
 assert.match(cockpit.qaCommand(), /run seeds\/platformer\.yaml --workers 4/);
 assert.equal(cockpit.qaTransactionCommand('seeds/platformer.yaml', '.omx/tmp/transaction.json', 4), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4 --transaction .omx/tmp/transaction.json');
 assert.match(cockpit.dashboardExportCommand(), /dashboard export/);
@@ -1143,4 +1171,9 @@ assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply-tx-1/
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /ready_metadata_only_no_apply_authority/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply_patch/);
 assert.doesNotMatch(cockpit.renderSourcePatchApplyTransactionSurface(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
+assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /Source patch stale target guard/);
+assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /stale-guard-1/);
+assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /fresh_guard_metadata_only_no_apply_authority/);
+assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /apply_patch/);
+assert.doesNotMatch(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(cockpit.renderEvidencePane(run), /Source patch evidence bundle/);
