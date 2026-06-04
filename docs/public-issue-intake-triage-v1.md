@@ -51,7 +51,9 @@ unless a separate explicit governance decision says otherwise.
 ## Recommended label set
 
 These labels are recommended repository vocabulary only. This PR does not create,
-rename, delete, or configure labels in GitHub.
+rename, delete, or configure labels in GitHub. Template-level labels are
+provisional hints; the selected public intake category and maintainer triage
+comment are authoritative for routing.
 
 | Label | Meaning | Notes |
 | --- | --- | --- |
