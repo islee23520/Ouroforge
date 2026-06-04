@@ -16667,6 +16667,12 @@ pub struct MutationReviewDecision {
     pub expected_hashes: Option<MutationReviewExpectedHashes>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub guardrail_checklist: Option<MutationReviewGuardrailChecklist>,
+    #[serde(
+        rename = "sourcePatchReview",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_patch_review: Option<SourcePatchReviewDecisionLink>,
     pub decided_at_unix_ms: u128,
 }
 
@@ -16689,6 +16695,7 @@ pub struct MutationReviewDecisionInput {
     pub reviewer: String,
     pub expected_hashes: Option<MutationReviewExpectedHashes>,
     pub guardrail_checklist: Option<MutationReviewGuardrailChecklist>,
+    pub source_patch_review: Option<SourcePatchReviewDecisionLink>,
 }
 
 impl PatchDraftArtifact {
@@ -16814,6 +16821,34 @@ impl MutationReviewDecision {
         }
         if let Some(checklist) = &self.guardrail_checklist {
             checklist.validate()?;
+        }
+        if let Some(source_patch_review) = &self.source_patch_review {
+            validate_source_patch_review_decision_link(source_patch_review)?;
+            if source_patch_review.review_decision_id != self.id {
+                return Err(anyhow!(
+                    "source patch reviewDecisionId {} must match mutation review decision id {}",
+                    source_patch_review.review_decision_id,
+                    self.id
+                ));
+            }
+            if !self.evidence_refs.iter().any(|evidence_ref| {
+                source_patch_review
+                    .linked_evidence
+                    .iter()
+                    .any(|source_ref| source_ref.path == *evidence_ref)
+            }) {
+                return Err(anyhow!("source patch review linkage must share at least one mutation review evidence ref"));
+            }
+            if matches!(self.state, MutationReviewState::Accepted)
+                && !matches!(
+                    source_patch_review.status,
+                    SourcePatchReviewStatus::Reviewed
+                )
+            {
+                return Err(anyhow!(
+                    "accepted mutation review decisions must map to reviewed source patch status"
+                ));
+            }
         }
         Ok(())
     }
@@ -16953,6 +16988,7 @@ pub fn append_mutation_review_decision(
         reviewer: input.reviewer,
         expected_hashes: input.expected_hashes,
         guardrail_checklist: input.guardrail_checklist.or(Some(Default::default())),
+        source_patch_review: input.source_patch_review,
         decided_at_unix_ms: unix_millis()?,
     };
     let draft_ids = drafts
@@ -17040,6 +17076,7 @@ pub fn append_mutation_review_decision_for_proposal_from_path(
             reviewer,
             expected_hashes: None,
             guardrail_checklist: Some(Default::default()),
+            source_patch_review: None,
         },
     )
 }
@@ -39156,6 +39193,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("accepted decision appends");
@@ -39171,6 +39210,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("rejected decision appends");
@@ -39224,6 +39265,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect_err("missing reason fails");
@@ -39239,6 +39282,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect_err("missing evidence fails");
@@ -39271,6 +39316,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("decision appends");
@@ -39303,6 +39350,8 @@ scenarios:
                     evidence_index_hash: Some("evidence-index-hash".to_string()),
                 }),
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("deferred decision appends");
@@ -39333,6 +39382,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect_err("missing proposal id fails");
@@ -39355,6 +39406,8 @@ scenarios:
                     browser_read_only: true,
                     evidence_refs_checked: true,
                 }),
+
+                source_patch_review: None,
             },
         )
         .expect_err("failed guardrail checklist rejects decision");
@@ -39385,6 +39438,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect_err("mismatched proposal id fails");
@@ -39753,6 +39808,7 @@ scenarios:
             expected_hashes: None,
             guardrail_checklist: Some(Default::default()),
             decided_at_unix_ms: 2,
+            source_patch_review: None,
         };
         let application = SceneOnlyMutationApplicationRecord {
             id: "scene-application-1".to_string(),
@@ -42411,6 +42467,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("rejected decision appends");
@@ -42509,6 +42567,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("deferred decision appends");
@@ -42617,6 +42677,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect_err("mismatched proposal/draft id rejected");
@@ -42700,6 +42762,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("rejected decision appends");
@@ -47494,6 +47558,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes: None,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("review accepted");
@@ -48072,6 +48138,8 @@ scenarios:
                 reviewer: "test-reviewer".to_string(),
                 expected_hashes,
                 guardrail_checklist: Some(Default::default()),
+
+                source_patch_review: None,
             },
         )
         .expect("accepted decision appends")
