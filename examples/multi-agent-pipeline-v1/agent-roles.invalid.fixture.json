@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "agent-role-model-v1",
+  "milestone": "#1 Milestone 13: Multi-Agent Production Pipeline",
+  "roles": [
+    {
+      "role": "hidden-cloud-orchestrator",
+      "purpose": "Invalid role that would imply hidden remote orchestration.",
+      "allowedOutputs": ["publish"],
+      "requiredInputArtifacts": ["unreviewed-plan"],
+      "requiredEvidence": [],
+      "handoffTargets": ["reviewer"],
+      "forbiddenActions": ["self-approval", "auto-apply", "hidden agent spawning"]
+    }
+  ],
+  "separationRequirements": [
+    {
+      "id": "no-self-review",
+      "description": "invalid fixture still shows intended separation boundary",
+      "appliesTo": ["hidden-cloud-orchestrator"],
+      "blockedCondition": "same actor proposes and approves",
+      "requiredEvidence": ["reviewer-id"]
+    }
+  ],
+  "generatedState": { "roots": ["runs/multi-agent-pipeline"], "trackedFixtureOnly": true },
+  "guardrails": ["invalid fixture must fail before it grants authority"],
+  "forbiddenActions": ["hidden background agents", "auto-apply", "auto-merge", "self-approval"]
+}
