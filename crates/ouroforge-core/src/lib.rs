@@ -17269,12 +17269,31 @@ fn evaluate_reachability_query(
             "start cell is blocked or hazardous",
         ));
     }
-    if !is_reachability_walkable(cells, query.to) {
+    // Objective-bearing queries must terminate on an Objective cell. A missing or
+    // non-objective target is a MissingObjective failure, not a silently validated
+    // path to an arbitrary walkable cell.
+    if matches!(
+        query.kind,
+        ReachabilityQueryKind::StartToGoal | ReachabilityQueryKind::CheckpointToObjective
+    ) && cells
+        .get(&query.to)
+        .copied()
+        .unwrap_or(ReachabilityCellKind::Walkable)
+        != ReachabilityCellKind::Objective
+    {
         return Ok(unreachable_reachability_result(
             query,
             ReachabilityBlockerKind::MissingObjective,
             Some(query.to),
-            "target objective cell is blocked or hazardous",
+            "objective-bearing query target cell is not marked as an objective",
+        ));
+    }
+    if !is_reachability_walkable(cells, query.to) {
+        return Ok(unreachable_reachability_result(
+            query,
+            ReachabilityBlockerKind::BlockedCell,
+            Some(query.to),
+            "target cell is blocked or hazardous",
         ));
     }
     match find_reachability_path(grid, cells, query.from, query.to) {
@@ -61788,6 +61807,53 @@ scenarios:
                 "expected error containing {expected}, got {error}"
             );
         }
+    }
+
+    #[test]
+    fn reachability_pathing_evidence_v1_reports_missing_objective_target() {
+        let mut value: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../examples/reachability-pathing-evidence-v1/reachability.valid.fixture.json"
+        ))
+        .expect("valid fixture json");
+        // Demote the goal cell (4,1) from objective to walkable.
+        for cell in value["cells"].as_array_mut().unwrap() {
+            if cell["point"]["x"] == json!(4) && cell["point"]["y"] == json!(1) {
+                cell["kind"] = json!("walkable");
+            }
+        }
+
+        // A start-to-goal query whose target is not an objective must be reported
+        // unreachable with a MissingObjective blocker (and the evidence fails).
+        value["results"] = json!([{
+            "queryId": "start_to_goal",
+            "status": "unreachable",
+            "blocker": {
+                "kind": "missing_objective",
+                "point": { "x": 4, "y": 1 },
+                "summary": "objective-bearing query target cell is not marked as an objective"
+            }
+        }]);
+        value["status"] = json!("failed");
+        let artifact = ReachabilityPathingEvidenceArtifact::from_json_str(&value.to_string())
+            .expect("missing-objective evidence validates when recorded as unreachable");
+        assert_eq!(
+            artifact.results[0].status,
+            ReachabilityQueryStatus::Unreachable
+        );
+        assert_eq!(
+            artifact.results[0].blocker.as_ref().unwrap().kind,
+            ReachabilityBlockerKind::MissingObjective
+        );
+
+        // Recording the same non-objective goal as reachable must now be rejected.
+        value["results"] = json!([{
+            "queryId": "start_to_goal",
+            "status": "reachable",
+            "path": [{ "x": 0, "y": 1 }, { "x": 4, "y": 1 }]
+        }]);
+        value["status"] = json!("validated");
+        ReachabilityPathingEvidenceArtifact::from_json_str(&value.to_string())
+            .expect_err("a non-objective goal can no longer be recorded as reachable");
     }
 
     #[test]
