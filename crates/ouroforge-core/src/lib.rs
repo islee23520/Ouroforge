@@ -31911,6 +31911,41 @@ scenarios:
     }
 
     #[test]
+    fn source_patch_target_class_validation_serializes_report_shape() {
+        let validation = classify_source_patch_preview_targets([
+            "seeds/platformer.yaml",
+            "docs/source-file-class-validator-v1.md",
+            "Cargo.lock",
+        ]);
+        let value = serde_json::to_value(&validation).expect("validation serializes");
+        assert_eq!(
+            value["schemaVersion"],
+            json!("source-patch-target-class-validation-v1")
+        );
+        assert_eq!(value["status"], json!("blocked"));
+        assert!(value["targets"]
+            .as_array()
+            .is_some_and(|targets| targets.len() == 3));
+        assert_eq!(
+            value["targets"][0]["schemaVersion"],
+            json!("source-file-class-v1")
+        );
+        assert_eq!(value["targets"][0]["decision"], json!("allowed"));
+        assert_eq!(value["targets"][1]["decision"], json!("needs-approval"));
+        assert_eq!(value["targets"][2]["class"], json!("dependency-manifest"));
+        assert!(value["blockedReasons"][0]
+            .as_str()
+            .is_some_and(|reason| reason.contains("Cargo.lock")));
+        assert!(value["guardrails"]
+            .as_array()
+            .expect("guardrails")
+            .iter()
+            .any(|guardrail| guardrail
+                .as_str()
+                .is_some_and(|text| text.contains("no diff evaluation"))));
+    }
+
+    #[test]
     fn source_patch_target_class_validation_allows_only_allowed_or_review_held_targets() {
         let validation = validate_source_patch_preview_targets([
             "seeds/platformer.yaml",
