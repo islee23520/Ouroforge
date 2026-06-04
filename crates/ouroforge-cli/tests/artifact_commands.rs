@@ -162,6 +162,63 @@ fn project_validate_reports_manifest_summary_and_rejects_invalid_manifest() {
 }
 
 #[test]
+fn patch_preview_validate_and_show_are_read_only_inspection_commands() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let preview_path =
+        repo_root.join("examples/patch-preview-artifact-v1/patch-preview.sample.json");
+    let before = fs::read_to_string(&preview_path).expect("preview fixture reads before CLI");
+
+    let validation_output = run_cli(
+        &repo_root,
+        &[
+            "patch-preview",
+            "validate",
+            preview_path.to_str().unwrap(),
+            "--max-files",
+            "32",
+            "--max-changed-lines",
+            "5000",
+        ],
+    );
+    let validation: serde_json::Value =
+        serde_json::from_str(&validation_output).expect("validation output parses");
+    assert_eq!(
+        validation["schemaVersion"],
+        "source-patch-preview-validation-v1"
+    );
+    assert_eq!(validation["status"], "passed");
+    assert!(validation["guardrails"]
+        .as_array()
+        .expect("guardrails array")
+        .iter()
+        .any(|guardrail| guardrail
+            .as_str()
+            .expect("guardrail text")
+            .contains("no source patch apply")));
+
+    let show_output = run_cli(
+        &repo_root,
+        &["patch-preview", "show", preview_path.to_str().unwrap()],
+    );
+    let read_model: serde_json::Value =
+        serde_json::from_str(&show_output).expect("read model output parses");
+    assert_eq!(
+        read_model["schemaVersion"],
+        "source-patch-preview-read-model-v1"
+    );
+    assert_eq!(read_model["status"], "passed");
+    assert_eq!(read_model["targetCount"], 1);
+    assert_eq!(read_model["diffFileCount"], 1);
+    assert!(
+        !read_model.to_string().contains("applyCommand"),
+        "read model must not expose apply authority"
+    );
+
+    let after = fs::read_to_string(&preview_path).expect("preview fixture reads after CLI");
+    assert_eq!(after, before, "patch-preview commands are read-only");
+}
+
+#[test]
 fn edit_draft_preview_emits_deterministic_scene_transaction_preview_without_writes() {
     let temp = unique_temp_dir("ouroforge-cli-edit-draft-preview-test");
     write_visual_edit_preview_project(&temp);
@@ -3163,6 +3220,35 @@ fn attach_expected_review_hashes(run_dir: &Path, decision_id: &str) {
         serde_json::to_string_pretty(&review).expect("review serializes"),
     )
     .expect("review hashes written");
+}
+
+#[test]
+fn patch_preview_cli_rejects_blocked_preview_without_running_commands() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixture = repo_root.join("examples/patch-preview-artifact-v1/patch-preview.sample.json");
+    let temp = unique_temp_dir("ouroforge-cli-patch-preview-blocked");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let preview_path = temp.join("patch-preview.sample.json");
+    let mut preview: serde_json::Value = read_json(&fixture);
+    preview["linkedEvidence"] = serde_json::json!([]);
+    fs::write(
+        &preview_path,
+        serde_json::to_string_pretty(&preview).expect("preview serializes"),
+    )
+    .expect("preview writes");
+
+    let output = run_cli_expect_failure(
+        &temp,
+        &["patch-preview", "validate", preview_path.to_str().unwrap()],
+    );
+
+    assert!(output.contains("source patch preview validation blocked"));
+    assert!(output.contains("linkedEvidence must not be empty"));
+    assert!(
+        !temp.join("runs").exists(),
+        "patch-preview validate must not create run artifacts or execute commands"
+    );
+    fs::remove_dir_all(temp).ok();
 }
 
 fn read_json(path: impl AsRef<Path>) -> serde_json::Value {

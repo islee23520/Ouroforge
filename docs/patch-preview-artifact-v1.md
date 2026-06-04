@@ -183,3 +183,27 @@ The UI copy should say "preview", "blocked", "read-only", "copy command", and
 If a future issue prototypes this display in dashboard or Studio code, that issue
 must run the relevant Node gates and repeat the no-apply/no-command-bridge audit.
 This issue adds only the display contract.
+
+## Implemented validation and CLI read model
+
+Issue #358 adds an inert Rust schema, validation report, compact read model, and
+read-only CLI inspection path for `patch-preview.v1` artifacts.
+
+The CLI commands are inspection-only:
+
+```bash
+ouroforge patch-preview validate examples/patch-preview-artifact-v1/patch-preview.sample.json
+ouroforge patch-preview show examples/patch-preview-artifact-v1/patch-preview.sample.json
+```
+
+- `validate` parses the artifact, runs required-field checks, source file class
+  validation, and patch diff integrity validation, then prints
+  `source-patch-preview-validation-v1` JSON. It exits non-zero when validation is
+  blocked.
+- `show` prints `source-patch-preview-read-model-v1` JSON for read-only display.
+  It does not apply patches, run required tests, create sandboxes, write trusted
+  source files, merge branches, or execute commands.
+
+Required tests are still copyable metadata only. A passed validation means the
+preview artifact is internally consistent enough for later review/read-model
+surfaces; it is not apply, merge, sandbox, or command authority.

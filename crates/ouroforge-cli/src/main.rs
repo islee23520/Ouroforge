@@ -18,15 +18,16 @@ use ouroforge_core::{
     read_ledger_events, read_scene, reject_already_applied_visual_edit_draft_decision,
     reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
     run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
-    validate_scene_reload, validate_visual_edit_draft_review_preflight,
+    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    source_patch_preview_read_model, update_journal, validate_scene_reload,
+    validate_source_patch_preview_artifact, validate_visual_edit_draft_review_preflight,
     write_agent_handoff_contract_from_path, write_regression_promotion_draft,
     write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
     BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
-    ProjectAssetManifest, ProjectAssetType, ProjectManifest, ProjectSceneMutationContext,
-    ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
-    VisualEditDraftApplyCommandContext, VisualEditDraftArtifact, VisualEditDraftTargetType,
-    WorkerId,
+    PatchDiffIntegrityLimits, ProjectAssetManifest, ProjectAssetType, ProjectManifest,
+    ProjectSceneMutationContext, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    SourcePatchPreviewArtifact, VisualEditDraftApplyCommandContext, VisualEditDraftArtifact,
+    VisualEditDraftTargetType, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -116,6 +117,28 @@ enum Commands {
     Loop {
         #[command(subcommand)]
         command: LoopCommand,
+    },
+    PatchPreview {
+        #[command(subcommand)]
+        command: PatchPreviewCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PatchPreviewCommand {
+    Validate {
+        preview_path: PathBuf,
+        #[arg(long, default_value_t = 32)]
+        max_files: usize,
+        #[arg(long, default_value_t = 5_000)]
+        max_changed_lines: usize,
+    },
+    Show {
+        preview_path: PathBuf,
+        #[arg(long, default_value_t = 32)]
+        max_files: usize,
+        #[arg(long, default_value_t = 5_000)]
+        max_changed_lines: usize,
     },
 }
 
@@ -410,6 +433,53 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::PatchPreview {
+            command:
+                PatchPreviewCommand::Validate {
+                    preview_path,
+                    max_files,
+                    max_changed_lines,
+                },
+        } => {
+            let artifact: SourcePatchPreviewArtifact = serde_json::from_str(
+                &std::fs::read_to_string(&preview_path).with_context(|| {
+                    format!("failed to read patch preview {}", preview_path.display())
+                })?,
+            )
+            .with_context(|| format!("failed to parse patch preview {}", preview_path.display()))?;
+            let validation = validate_source_patch_preview_artifact(
+                &artifact,
+                PatchDiffIntegrityLimits {
+                    max_files,
+                    max_changed_lines,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&validation)?);
+        }
+        Commands::PatchPreview {
+            command:
+                PatchPreviewCommand::Show {
+                    preview_path,
+                    max_files,
+                    max_changed_lines,
+                },
+        } => {
+            let artifact: SourcePatchPreviewArtifact = serde_json::from_str(
+                &std::fs::read_to_string(&preview_path).with_context(|| {
+                    format!("failed to read patch preview {}", preview_path.display())
+                })?,
+            )
+            .with_context(|| format!("failed to parse patch preview {}", preview_path.display()))?;
+            let validation = ouroforge_core::inspect_source_patch_preview_artifact(
+                &artifact,
+                PatchDiffIntegrityLimits {
+                    max_files,
+                    max_changed_lines,
+                },
+            );
+            let read_model = source_patch_preview_read_model(&validation);
+            println!("{}", serde_json::to_string_pretty(&read_model)?);
+        }
         Commands::Loop {
             command: LoopCommand::DryRun { plan_path },
         } => {
