@@ -93,6 +93,11 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory .
 - Authoring cockpit: <http://127.0.0.1:8000/examples/authoring-cockpit/>
 - Runtime demo: <http://127.0.0.1:8000/examples/game-runtime/>
 
+The current quickstart command audit is recorded in
+[`docs/fresh-clone-onboarding-command-audit-v1.md`](docs/fresh-clone-onboarding-command-audit-v1.md).
+It clarifies expected generated state and cleanup boundaries without changing
+repository visibility, release status, or trusted-write authority.
+
 ## Core loop
 
 Ouroforge's loop is built around evidence over assertion:
