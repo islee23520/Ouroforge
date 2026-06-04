@@ -34065,6 +34065,7 @@ pub struct RunDashboardEngineSummaries {
     pub animation: serde_json::Value,
     pub audio: serde_json::Value,
     pub physics: serde_json::Value,
+    pub input: serde_json::Value,
     pub collision: serde_json::Value,
     pub gameplay: serde_json::Value,
     pub triggers: serde_json::Value,
@@ -36783,6 +36784,53 @@ fn dashboard_collision_summary(world_state: &serde_json::Value) -> serde_json::V
     })
 }
 
+fn dashboard_input_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let action_state = world_state.get("actionState").cloned().unwrap_or(json!({}));
+    let raw_input = world_state.get("rawInput").cloned().unwrap_or(json!({}));
+    let action_input = world_state.get("actionInput").cloned().unwrap_or(json!({}));
+    let diagnostics = world_state
+        .get("inputDiagnostics")
+        .cloned()
+        .unwrap_or(json!({ "present": false, "warningCount": 0 }));
+    let active_actions = action_state
+        .as_object()
+        .map(|actions| {
+            actions
+                .iter()
+                .filter(|(_, value)| value.as_bool() == Some(true))
+                .map(|(action, _)| json!(action))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let mapped_action_count = world_state
+        .pointer("/componentModel/entities")
+        .and_then(|entities| entities.as_array())
+        .map(|entities| {
+            entities
+                .iter()
+                .filter_map(|entity| entity.pointer("/components/input/actionMap/actions"))
+                .filter_map(|actions| actions.as_array())
+                .map(Vec::len)
+                .sum::<usize>()
+        })
+        .unwrap_or(0);
+    let active_action_count = active_actions.len();
+    json!({
+        "present": world_state.get("actionState").is_some() || world_state.get("inputDiagnostics").is_some(),
+        "rawInput": raw_input,
+        "actionState": action_state,
+        "actionInput": action_input,
+        "activeActions": active_actions,
+        "activeActionCount": active_action_count,
+        "mappedActionCount": mapped_action_count,
+        "diagnostics": diagnostics,
+        "warningCount": world_state
+            .pointer("/inputDiagnostics/warningCount")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0)
+    })
+}
+
 fn dashboard_transition_summary(world_state: &serde_json::Value) -> serde_json::Value {
     let transition_events = world_state
         .get("transitionEvents")
@@ -36897,6 +36945,7 @@ fn read_dashboard_engine_summaries(
             animation: json!({}),
             audio: json!({}),
             physics: json!({}),
+            input: json!({ "present": false, "emptyState": "No input action read model is available." }),
             collision: json!({}),
             gameplay: json!({}),
             triggers: json!({}),
@@ -36954,6 +37003,7 @@ fn read_dashboard_engine_summaries(
             "contactPairCount": dashboard_array_len(world_state.pointer("/physics/contactPairs")),
             "blockedMovement": world_state.pointer("/physics/blockedMovement").cloned().unwrap_or(json!({}))
         }),
+        input: dashboard_input_summary(world_state),
         collision: dashboard_collision_summary(world_state),
         gameplay: dashboard_gameplay_summary(world_state),
         triggers: dashboard_trigger_summary(world_state),
@@ -58695,12 +58745,26 @@ scenarios:
                     "contactPairs": [{ "pairId": "floor:player", "normal": { "x": 0, "y": -1 } }],
                     "blockedMovement": { "player": { "x": false, "y": true } }
                 },
+                "rawInput": { "directions": { "left": false, "right": true, "up": false, "down": false }, "keys": { "d": true } },
+                "actionInput": { "interact": true },
+                "actionState": { "move_left": false, "move_right": true, "jump": false, "interact": true },
+                "inputDiagnostics": {
+                    "present": true,
+                    "missingActions": ["dash"],
+                    "conflictingBindings": [{ "key": "d", "actions": ["move_right", "dash"] }],
+                    "duplicateActions": [],
+                    "unmappedActions": ["interact"],
+                    "unresolvedOverrides": ["interact"],
+                    "warningCount": 4,
+                    "readOnlyInspection": { "trustedEmitter": "browser-runtime-evidence-helper", "browserStudioMode": "read-only evidence inspection", "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
+                },
                 "gameplayRules": { "version": "1", "flags": [{ "id": "coin_collected", "initial": false }, { "id": "door_open", "initial": true }] },
                 "goalFlags": { "coin_collected": true, "door_open": true, "player_alive": true },
                 "sceneTransitions": [{ "id": "to_level_2", "toScene": "scenes/level-2.scene.json", "label": "Level 2" }],
                 "transitionEvents": [{ "status": "succeeded", "id": "to_level_2", "fromSceneId": "foundation-scene", "toSceneId": "level-2" }],
                 "componentModel": {
-                    "counts": { "trigger": 1, "goalFlag": 1, "hudValue": 2 },
+                    "counts": { "trigger": 1, "goalFlag": 1, "hudValue": 2, "input": 1 },
+                    "entities": [{ "entityId": "player", "components": { "input": { "actionMap": { "actions": [{ "id": "move_right" }, { "id": "jump" }] } } } }],
                     "hudValues": [
                         { "entityId": "hud_goal", "kind": "goal", "label": "Goal", "value": "Collect coin", "bindFlag": "coin_collected", "flagValue": true, "text": "Goal: Collect coin" },
                         { "entityId": "hud_health", "kind": "health", "label": "HP", "value": "3/3", "text": "HP: 3/3" }
@@ -58859,6 +58923,18 @@ scenarios:
         assert_eq!(
             model.engine_summaries.physics["blockedMovement"]["player"]["y"],
             json!(true)
+        );
+        assert_eq!(model.engine_summaries.input["present"], json!(true));
+        assert_eq!(model.engine_summaries.input["mappedActionCount"], json!(2));
+        assert_eq!(model.engine_summaries.input["activeActionCount"], json!(2));
+        assert_eq!(
+            model.engine_summaries.input["activeActions"],
+            json!(["interact", "move_right"])
+        );
+        assert_eq!(model.engine_summaries.input["warningCount"], json!(4));
+        assert_eq!(
+            model.engine_summaries.input["diagnostics"]["missingActions"],
+            json!(["dash"])
         );
         assert_eq!(
             model.engine_summaries.collision["rules"]["defaultLayer"],

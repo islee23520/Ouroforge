@@ -269,6 +269,35 @@ const OuroforgeDashboard = (() => {
     return `<div class="field-grid">${rows}</div><p class="run-meta">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>`;
   }
 
+  function renderInputActionSummary(summary = {}) {
+    const input = summary?.input || {};
+    if (!summary?.present || !input.present) {
+      return '<p class="empty-state">No input action read model is available.</p>';
+    }
+    const activeActions = Array.isArray(input.activeActions) && input.activeActions.length
+      ? input.activeActions.join(', ')
+      : 'none';
+    const diagnostics = input.diagnostics && typeof input.diagnostics === 'object' ? input.diagnostics : {};
+    const warningRows = [
+      ['Missing actions', diagnostics.missingActions],
+      ['Unmapped actions', diagnostics.unmappedActions],
+      ['Duplicate actions', diagnostics.duplicateActions],
+      ['Unresolved overrides', diagnostics.unresolvedOverrides],
+    ].map(([label, values]) => `<li><strong>${escapeText(label)}</strong>: ${escapeText(Array.isArray(values) && values.length ? values.join(', ') : 'none')}</li>`).join('');
+    const conflictRows = Array.isArray(diagnostics.conflictingBindings) && diagnostics.conflictingBindings.length
+      ? diagnostics.conflictingBindings.map((conflict) => `<li><strong>Conflict ${escapeText(conflict.key || 'key')}</strong>: ${escapeText(Array.isArray(conflict.actions) ? conflict.actions.join(' / ') : 'unknown')}</li>`).join('')
+      : '<li><strong>Conflicting bindings</strong>: none</li>';
+    const rows = [
+      ['Mapped actions', input.mappedActionCount ?? 0],
+      ['Active actions', `${input.activeActionCount ?? 0} (${activeActions})`],
+      ['Warnings', input.warningCount ?? diagnostics.warningCount ?? 0],
+      ['Raw keys', Object.keys(input.rawInput?.keys || {}).filter((key) => input.rawInput.keys[key]).join(', ') || 'none'],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const boundary = diagnostics.readOnlyInspection || {};
+    const disallowed = Array.isArray(boundary.disallowedActions) ? boundary.disallowedActions.join(', ') : 'trusted writes, command bridge, live mutation';
+    return `<div class="field-grid">${rows}</div><ul class="run-meta-list">${warningRows}${conflictRows}</ul><p class="run-meta">Read-only input action evidence; disallowed actions: ${escapeText(disallowed)}</p>`;
+  }
+
   function renderAssetIntegrity(run = {}) {
     const integrity = run.asset_integrity || run.assetIntegrity || {};
     if (!integrity.present) {
@@ -1543,6 +1572,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Camera/layer read model</h3>${renderCameraLayerSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Scene render breakdown</h3>${renderRenderBreakdownSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Gameplay trigger/flags</h3>${renderGameplaySummary(run.engine_summaries || {})}</section>
+      <section class="panel"><h3>Input action mapping</h3>${renderInputActionSummary(run.engine_summaries || {})}</section>
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
@@ -1633,7 +1663,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

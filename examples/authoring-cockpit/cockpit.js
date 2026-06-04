@@ -519,6 +519,7 @@ const OuroforgeCockpit = (() => {
       ['Animation', `${summaryValue(summary, 'animation', 'animatedEntityCount', 0)} animated entit(ies)`],
       ['Audio', `${summaryValue(summary, 'audio', 'audioEntityCount', 0)} audio entit(ies), ${summaryValue(summary, 'audio', 'audioEventCount', 0)} event(s)`],
       ['Physics/contact', `${summaryValue(summary, 'physics', 'colliderEntityCount', 0)} collider entit(ies), ${summaryValue(summary, 'physics', 'collisionEventCount', 0)} event(s)`],
+      ['Input actions', `${summaryValue(summary, 'input', 'mappedActionCount', 0)} mapped, ${summaryValue(summary, 'input', 'activeActionCount', 0)} active, ${summaryValue(summary, 'input', 'warningCount', 0)} warning(s)`],
       ['Gameplay/HUD', `${summaryValue(summary, 'gameplay', 'worldFlagCount', 0)} flag(s), ${summaryValue(summary, 'gameplay', 'trueFlagCount', 0)} true, ${summaryValue(summary, 'gameplay', 'triggerCollisionEventCount', 0)} trigger event(s), ${summaryValue(summary, 'gameplay', 'hudValueEntityCount', 0)} HUD value(s)`],
       ['Reload', `${summaryValue(summary, 'reload', 'reloadCount', 0)} reload(s), last ${summaryValue(summary, 'reload', 'lastStatus')}`],
       ['Composition', `${summaryValue(summary, 'composition', 'entityCount', 0)} composed entit(ies), ${summaryValue(summary, 'composition', 'parentedEntityCount', 0)} parented`],
@@ -527,6 +528,47 @@ const OuroforgeCockpit = (() => {
       <p class="hint">Preview-only read model from exported evidence. The cockpit does not own scene state or persist edits; use generated Rust commands for validation-gated changes.</p>
       <div class="field-grid">${cards}</div>
       <p class="hint">Source world-state: ${escapeText(summary.source_world_state || 'unknown')}</p>
+    </section>`;
+  }
+
+  function renderInputActionInspectionSurface(run) {
+    const summary = run?.engine_summaries;
+    const input = summary?.input || null;
+    if (!summary?.present || !input || typeof input !== 'object' || Array.isArray(input) || input.present === false) {
+      return `<section id="input-action-inspection" class="panel"><h2>Input action mapping</h2><p class="empty">${escapeText(input?.emptyState || input?.empty_state || 'No input action read model is available for this run.')}</p><p class="hint">Read-only inspection only: this panel does not write files, execute commands, mutate scenes, or control the browser runtime.</p></section>`;
+    }
+    const diagnostics = input.diagnostics && typeof input.diagnostics === 'object' && !Array.isArray(input.diagnostics) ? input.diagnostics : {};
+    const readOnlyInspection = diagnostics.readOnlyInspection || diagnostics.read_only_inspection || {};
+    const disallowedActions = Array.isArray(readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
+      ? (readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
+      : ['trusted writes', 'command bridge', 'scene mutation', 'browser runtime control'];
+    const activeActions = Array.isArray(input.activeActions || input.active_actions) ? (input.activeActions || input.active_actions) : [];
+    const warningItems = [
+      ['Missing actions', diagnostics.missingActions || diagnostics.missing_actions],
+      ['Unmapped actions', diagnostics.unmappedActions || diagnostics.unmapped_actions],
+      ['Duplicate actions', diagnostics.duplicateActions || diagnostics.duplicate_actions],
+      ['Unresolved overrides', diagnostics.unresolvedOverrides || diagnostics.unresolved_overrides],
+    ].map(([label, values]) => `<li><strong>${escapeText(label)}</strong>: ${escapeText(Array.isArray(values) && values.length ? values.join(', ') : 'none')}</li>`).join('');
+    const conflicts = Array.isArray(diagnostics.conflictingBindings || diagnostics.conflicting_bindings)
+      ? (diagnostics.conflictingBindings || diagnostics.conflicting_bindings)
+      : [];
+    const conflictRows = conflicts.length
+      ? conflicts.map((conflict) => `<div class="surface-row"><strong>${escapeText(conflict?.key || 'key')}</strong> ${surfaceState(false, 'conflict')}<br><small>${escapeText(Array.isArray(conflict?.actions) ? conflict.actions.join(' / ') : 'unknown actions')}</small></div>`).join('')
+      : '<div class="surface-row">No conflicting keyboard bindings recorded.</div>';
+    const rawKeys = input.rawInput?.keys || input.raw_input?.keys || {};
+    const activeKeys = objectEntries(rawKeys).filter(([, value]) => value === true).map(([key]) => key);
+    const cards = [
+      ['Mapped actions', input.mappedActionCount ?? input.mapped_action_count ?? 0],
+      ['Active actions', `${input.activeActionCount ?? input.active_action_count ?? activeActions.length} (${activeActions.join(', ') || 'none'})`],
+      ['Warnings', input.warningCount ?? input.warning_count ?? diagnostics.warningCount ?? diagnostics.warning_count ?? 0],
+      ['Active raw keys', activeKeys.join(', ') || 'none'],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    return `<section id="input-action-inspection" class="panel"><h2>Input action mapping</h2>
+      <p class="hint">Read-only action-state and diagnostics evidence from runtime world-state. This surface cannot write scene state, execute commands, mutate sources, or control the browser runtime.</p>
+      <div class="field-grid">${cards}</div>
+      <h3>Diagnostics</h3><ul>${warningItems}</ul>
+      <h3>Conflicts</h3>${conflictRows}
+      <p class="hint">Disallowed actions: ${escapeText(disallowedActions.join(' · '))}</p>
     </section>`;
   }
 
@@ -2310,7 +2352,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentHandoffSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -2395,7 +2437,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
