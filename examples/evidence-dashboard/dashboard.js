@@ -724,6 +724,37 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(model.boundary || 'Read-only QA agent work queues; dashboard surfaces do not execute queue commands, spawn agents, write trusted state, auto-fix, auto-apply, auto-merge, or self-approve.')}</p>`;
   }
 
+  function renderPerformanceRegressionLanes(run = {}) {
+    const model = run.performance_regression_lanes || run.performanceRegressionLanes || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || model.emptyState || 'No performance/regression lanes are available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const lanes = Array.isArray(model.lanes) ? model.lanes : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Lanes', model.lane_count ?? model.laneCount ?? lanes.length],
+      ['Improved/unchanged', `${model.improved_count ?? model.improvedCount ?? 0}/${model.unchanged_count ?? model.unchangedCount ?? 0}`],
+      ['Regressed/inconclusive', `${model.regressed_count ?? model.regressedCount ?? 0}/${model.inconclusive_count ?? model.inconclusiveCount ?? 0}`],
+      ['Missing/unsupported/stale', `${model.missing_baseline_count ?? model.missingBaselineCount ?? 0}/${model.unsupported_count ?? model.unsupportedCount ?? 0}/${model.stale_count ?? model.staleCount ?? 0}`],
+      ['Malformed', model.malformed_count ?? model.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const laneRows = lanes.slice(0, 12).map((lane) => {
+      const evidenceLinks = lane.evidenceLinks || lane.evidence_links || {};
+      const metrics = Array.isArray(lane.metrics) ? lane.metrics : [];
+      const thresholds = Array.isArray(lane.thresholds) ? lane.thresholds : [];
+      const blocked = Array.isArray(lane.blockedReasons || lane.blocked_reasons) ? (lane.blockedReasons || lane.blocked_reasons) : [];
+      const stale = Array.isArray(lane.staleRunRefs || lane.stale_run_refs) ? (lane.staleRunRefs || lane.stale_run_refs) : [];
+      const browserWarnings = Array.isArray(evidenceLinks.browserMetricWarnings || evidenceLinks.browser_metric_warnings) ? (evidenceLinks.browserMetricWarnings || evidenceLinks.browser_metric_warnings) : [];
+      const linkCount = ['runComparisonRefs', 'frameBudgetRefs', 'scenarioMatrixRefs', 'qaQueueRefs', 'reviewGateRefs'].reduce((count, key) => count + (Array.isArray(evidenceLinks[key]) ? evidenceLinks[key].length : 0), 0);
+      return `<li><strong>${escapeText(lane.laneId || lane.lane_id || 'regression lane')}</strong>: <span class="${statusClass(lane.classification)}">${escapeText(lane.classification || 'unknown')}</span> · ${escapeText(lane.assignedRole || lane.assigned_role || 'role')}<br><small>metrics ${escapeText(metrics.length)} · thresholds ${escapeText(thresholds.length)} · linked refs ${escapeText(linkCount)} · browser warnings ${escapeText(browserWarnings.length)}</small>${blocked.length || stale.length ? `<br><small>Blockers/stale: ${escapeText([...blocked, ...stale].join(' · '))}</small>` : ''}</li>`;
+    }).join('') || '<li>No parseable performance/regression lanes are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Performance/regression lanes</h4><ul class="run-meta-list">${laneRows}</ul>
+      ${renderRefLinks('Performance/regression linked refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only performance/regression lanes; dashboard surfaces do not execute commands, spawn agents, write trusted state, promote regressions, auto-apply, auto-merge, or self-approve.')}</p>`;
+  }
+
   function renderRuntimeInvariants(run = {}) {
     const invariants = run.runtime_invariants || run.runtimeInvariants || {};
     if (!invariants.present) {
@@ -2007,6 +2038,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
       <section class="panel"><h3>QA agent work queues</h3>${renderQaAgentWorkQueues(run)}</section>
+      <section class="panel"><h3>Performance/regression lanes</h3>${renderPerformanceRegressionLanes(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
@@ -2103,7 +2135,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

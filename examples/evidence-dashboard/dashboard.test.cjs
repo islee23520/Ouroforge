@@ -1695,3 +1695,31 @@ assert.match(productionBundleXssMarkup, /&lt;script&gt;lane&lt;\/script&gt;/);
 assert.doesNotMatch(productionBundleXssMarkup, /<script>|<img|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand/);
 assert.match(dashboard.renderRunDetail({ ...run, productionEvidenceBundle: productionBundleConflict }), /Production evidence bundle/);
 assert.match(dashboard.renderRunDetail({ ...run, productionEvidenceBundle: productionBundleConflict }), /ownership-conflict-demo/);
+
+const performanceRegressionLane = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json', 'utf8'));
+const performanceRegressionMarkup = dashboard.renderPerformanceRegressionLanes({
+  performanceRegressionLanes: {
+    present: true,
+    status: 'stale',
+    laneCount: 1,
+    staleCount: 1,
+    evidenceRefs: [
+      'runs/multi-agent-pipeline/demo/performance/run-comparison.json',
+      'examples/runtime-frame-budget-v1/frame-budget.sample.json',
+      'docs/multi-agent-pipeline-coverage-matrix-v1.md',
+      'examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json',
+      'examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json',
+    ],
+    lanes: [performanceRegressionLane],
+    boundary: 'Read-only performance/regression lanes; dashboard surfaces do not execute commands, spawn agents, write trusted state, promote regressions, auto-apply, auto-merge, or self-approve.',
+  },
+});
+assert.match(performanceRegressionMarkup, /Performance\/regression lanes/);
+assert.match(performanceRegressionMarkup, /demo-performance-regression-lane-stale/);
+assert.match(performanceRegressionMarkup, /stale-baseline-run\.json/);
+assert.match(performanceRegressionMarkup, /frame-budget\.sample\.json/);
+assert.match(performanceRegressionMarkup, /qa-agent-work-queue\.valid\.fixture\.json/);
+assert.match(performanceRegressionMarkup, /Read-only performance\/regression lanes/);
+assert.doesNotMatch(performanceRegressionMarkup, /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
+assert.match(dashboard.renderPerformanceRegressionLanes({ performanceRegressionLanes: { present: false, emptyState: 'No lanes.' } }), /No lanes/);
+assert.match(dashboard.renderRunDetail({ ...run, performanceRegressionLanes: { present: true, lanes: [performanceRegressionLane] } }), /Performance\/regression lanes/);

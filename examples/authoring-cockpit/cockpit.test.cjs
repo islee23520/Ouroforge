@@ -1938,3 +1938,16 @@ assert.match(productionBundleXssSurface, /&lt;script&gt;lane&lt;\/script&gt;/);
 assert.doesNotMatch(productionBundleXssSurface, /<script>|<img|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand/);
 assert.match(cockpit.renderEvidencePane({ ...run, productionEvidenceBundle: productionBundleMissingReview }), /Production evidence bundle/);
 assert.match(cockpit.renderEvidencePane({ ...run, productionEvidenceBundle: productionBundleMissingReview }), /missing-review-demo/);
+
+const performanceRegressionLane = JSON.parse(fs.readFileSync('examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json', 'utf8'));
+const performanceRegressionSurface = cockpit.renderPerformanceRegressionLaneSurface({ performanceRegressionLanes: { lanes: [performanceRegressionLane], boundary: 'Read-only performance/regression lanes; Studio does not execute commands, promote regressions, auto-apply, auto-merge, or self-approve.' } });
+assert.match(performanceRegressionSurface, /Performance\/regression lane/);
+assert.match(performanceRegressionSurface, /demo-performance-regression-lane-stale/);
+assert.match(performanceRegressionSurface, /frame budget/);
+assert.match(performanceRegressionSurface, /QA queue/);
+assert.match(performanceRegressionSurface, /review gate/);
+assert.match(performanceRegressionSurface, /stale-baseline-run\.json/);
+assert.match(performanceRegressionSurface, /Browser metrics are advisory evidence inputs/);
+assert.doesNotMatch(performanceRegressionSurface, /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
+assert.match(cockpit.renderPerformanceRegressionLaneSurface(null), /No performance\/regression lane/);
+assert.match(cockpit.renderEvidencePane({ ...run, performanceRegressionLane }), /Performance\/regression lane/);

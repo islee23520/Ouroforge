@@ -6400,6 +6400,18 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ],
             &mut malformed_reasons,
         );
+        let performance_regression_lanes = pipeline_values(
+            value,
+            &[
+                "performance_regression_lanes",
+                "performanceRegressionLanes",
+                "performance_regression_lane",
+                "performanceRegressionLane",
+                "regression_lanes",
+                "regressionLanes",
+            ],
+            &mut malformed_reasons,
+        );
 
         let mut sections = vec![
             pipeline_collection_section(
@@ -6446,11 +6458,10 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ),
             pipeline_review_critic_gate_section(&review_critic_gates, &mut malformed_reasons),
             pipeline_qa_queue_section(&task_boards, &qa_agent_work_queues, &mut malformed_reasons),
-            pipeline_lane_section(
-                "performance-regression",
-                "Performance and regression lane",
+            pipeline_performance_regression_section(
                 &task_boards,
-                |task| pipeline_text_contains_any(task, &["performance", "regression"]),
+                &performance_regression_lanes,
+                &mut malformed_reasons,
             ),
             pipeline_decision_section(
                 &task_boards,
@@ -6807,6 +6818,74 @@ fn pipeline_qa_queue_section(
     StudioMultiAgentPipelineInspectionSection {
         id: "qa-queue".to_string(),
         label: "QA queue".to_string(),
+        status: status.to_string(),
+        item_count,
+        blockers,
+        malformed_reasons: section_malformed,
+    }
+}
+
+fn pipeline_performance_regression_section(
+    task_boards: &[&serde_json::Value],
+    lanes: &[&serde_json::Value],
+    malformed_reasons: &mut Vec<String>,
+) -> StudioMultiAgentPipelineInspectionSection {
+    let task_lane = pipeline_lane_section(
+        "performance-regression",
+        "Performance and regression lane",
+        task_boards,
+        |task| pipeline_text_contains_any(task, &["performance", "regression"]),
+    );
+    let mut item_count = task_lane.item_count;
+    let mut blockers = task_lane.blockers;
+    let mut section_malformed = Vec::new();
+
+    for (index, lane_value) in lanes.iter().enumerate() {
+        match serde_json::from_value::<PerformanceRegressionLaneArtifact>((*lane_value).clone()) {
+            Ok(lane) if lane.validate().is_ok() => {
+                item_count += 1;
+                blockers.extend(lane.blocked_reasons.clone());
+                blockers.extend(
+                    lane.stale_run_refs
+                        .iter()
+                        .map(|reference| format!("{} stale run ref: {reference}", lane.lane_id)),
+                );
+                if !matches!(
+                    lane.classification,
+                    PerformanceRegressionClassification::Improved
+                        | PerformanceRegressionClassification::Unchanged
+                ) {
+                    blockers.push(format!(
+                        "{} classification {}",
+                        lane.lane_id,
+                        lane.classification.as_str()
+                    ));
+                }
+            }
+            Ok(_) => section_malformed.push(format!(
+                "performance-regression-lane[{index}] failed regression lane validation"
+            )),
+            Err(error) => section_malformed.push(format!(
+                "performance-regression-lane[{index}] malformed: {error:#}"
+            )),
+        }
+    }
+
+    malformed_reasons.extend(section_malformed.iter().cloned());
+    let status = if !section_malformed.is_empty() {
+        "malformed"
+    } else if !blockers.is_empty() {
+        "blocked"
+    } else if item_count == 0 && task_boards.is_empty() && lanes.is_empty() {
+        "missing"
+    } else if item_count == 0 {
+        "empty"
+    } else {
+        "present"
+    };
+    StudioMultiAgentPipelineInspectionSection {
+        id: "performance-regression".to_string(),
+        label: "Performance and regression lane".to_string(),
         status: status.to_string(),
         item_count,
         blockers,
@@ -14880,6 +14959,20 @@ pub enum PerformanceRegressionClassification {
     MissingBaseline,
     Unsupported,
     Stale,
+}
+
+impl PerformanceRegressionClassification {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PerformanceRegressionClassification::Improved => "improved",
+            PerformanceRegressionClassification::Unchanged => "unchanged",
+            PerformanceRegressionClassification::Regressed => "regressed",
+            PerformanceRegressionClassification::Inconclusive => "inconclusive",
+            PerformanceRegressionClassification::MissingBaseline => "missing-baseline",
+            PerformanceRegressionClassification::Unsupported => "unsupported",
+            PerformanceRegressionClassification::Stale => "stale",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -42085,6 +42178,7 @@ pub struct RunDashboardReadModel {
     pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
     pub qa_agent_work_queues: RunDashboardQaAgentWorkQueues,
+    pub performance_regression_lanes: RunDashboardPerformanceRegressionLanes,
     pub fuzzing_plans: RunDashboardFuzzingPlans,
     pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
     pub route_attempts: RunDashboardRouteAttempts,
@@ -42420,6 +42514,26 @@ pub struct RunDashboardQaAgentWorkQueues {
     pub malformed_count: usize,
     pub evidence_refs: Vec<String>,
     pub queues: Vec<QaAgentWorkQueueArtifact>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPerformanceRegressionLanes {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub lane_count: usize,
+    pub improved_count: usize,
+    pub unchanged_count: usize,
+    pub regressed_count: usize,
+    pub inconclusive_count: usize,
+    pub missing_baseline_count: usize,
+    pub unsupported_count: usize,
+    pub stale_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub lanes: Vec<PerformanceRegressionLaneArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -42836,6 +42950,8 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
     let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
     let qa_agent_work_queues = read_dashboard_qa_agent_work_queues(run_dir, &evidence)?;
+    let performance_regression_lanes =
+        read_dashboard_performance_regression_lanes(run_dir, &evidence)?;
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
     let route_attempts = read_dashboard_route_attempts(run_dir, &evidence)?;
@@ -42898,6 +43014,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         runtime_invariants,
         qa_worker_assignments,
         qa_agent_work_queues,
+        performance_regression_lanes,
         fuzzing_plans,
         qa_scenario_candidates,
         route_attempts,
@@ -43442,6 +43559,18 @@ fn dashboard_artifact_is_qa_agent_work_queue(artifact: &EvidenceArtifact) -> boo
         || artifact.path.contains("qa-work-queue")
 }
 
+fn dashboard_artifact_is_performance_regression_lane(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("performance_regression_lane")
+        || artifact.id.contains("performance-regression-lane")
+        || artifact.id.contains("regression-lane")
+        || artifact.path.contains("performance-regression-lane")
+        || artifact.path.contains("regression-lane")
+}
+
 fn dashboard_artifact_is_route_attempt(artifact: &EvidenceArtifact) -> bool {
     artifact
         .metadata
@@ -43916,6 +44045,166 @@ fn qa_agent_work_queue_evidence_refs(queue: &QaAgentWorkQueueArtifact) -> Vec<St
         );
         refs.extend(item.stale_run_refs.clone());
     }
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn read_dashboard_performance_regression_lanes(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardPerformanceRegressionLanes> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_performance_regression_lane,
+    )?;
+    let boundary = "Read-only performance/regression lanes; dashboard/Studio surfaces may display linked run comparison, frame budget, scenario matrix, QA queue, review-gate, stale-ref, and browser-warning refs but must not execute commands, spawn agents, write trusted state, promote regressions, auto-apply, auto-merge, self-approve, or claim production guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardPerformanceRegressionLanes {
+            present: false,
+            empty_state: "No performance/regression lanes are indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            lane_count: 0,
+            improved_count: 0,
+            unchanged_count: 0,
+            regressed_count: 0,
+            inconclusive_count: 0,
+            missing_baseline_count: 0,
+            unsupported_count: 0,
+            stale_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            lanes: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut lanes = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<PerformanceRegressionLaneArtifact>(value.clone()) {
+            Ok(lane) if lane.validate().is_ok() => {
+                evidence_refs.extend(performance_regression_lane_evidence_refs(&lane));
+                lanes.push(lane);
+            }
+            _ => malformed_count += 1,
+        }
+    }
+    lanes.sort_by(|left, right| left.lane_id.cmp(&right.lane_id));
+    evidence_refs.sort();
+    evidence_refs.dedup();
+
+    let lane_count = lanes.len();
+    let mut improved_count = 0usize;
+    let mut unchanged_count = 0usize;
+    let mut regressed_count = 0usize;
+    let mut inconclusive_count = 0usize;
+    let mut missing_baseline_count = 0usize;
+    let mut unsupported_count = 0usize;
+    let mut stale_count = 0usize;
+    for lane in &lanes {
+        match lane.classification {
+            PerformanceRegressionClassification::Improved => improved_count += 1,
+            PerformanceRegressionClassification::Unchanged => unchanged_count += 1,
+            PerformanceRegressionClassification::Regressed => regressed_count += 1,
+            PerformanceRegressionClassification::Inconclusive => inconclusive_count += 1,
+            PerformanceRegressionClassification::MissingBaseline => missing_baseline_count += 1,
+            PerformanceRegressionClassification::Unsupported => unsupported_count += 1,
+            PerformanceRegressionClassification::Stale => stale_count += 1,
+        }
+    }
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if regressed_count > 0 {
+        "regressed"
+    } else if missing_baseline_count > 0 {
+        "missing-baseline"
+    } else if stale_count > 0 {
+        "stale"
+    } else if unsupported_count > 0 {
+        "unsupported"
+    } else if inconclusive_count > 0 {
+        "inconclusive"
+    } else if lane_count > 0 && improved_count + unchanged_count == lane_count {
+        "passed"
+    } else if lane_count > 0 {
+        "mixed"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardPerformanceRegressionLanes {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        lane_count,
+        improved_count,
+        unchanged_count,
+        regressed_count,
+        inconclusive_count,
+        missing_baseline_count,
+        unsupported_count,
+        stale_count,
+        malformed_count,
+        evidence_refs,
+        lanes,
+        artifacts,
+        boundary,
+    })
+}
+
+fn performance_regression_lane_evidence_refs(
+    lane: &PerformanceRegressionLaneArtifact,
+) -> Vec<String> {
+    let mut refs = Vec::new();
+    refs.extend(
+        lane.baseline_runs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(
+        lane.comparison_runs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(lane.stale_run_refs.clone());
+    refs.extend(
+        lane.evidence_links
+            .run_comparison_refs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(
+        lane.evidence_links
+            .frame_budget_refs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(
+        lane.evidence_links
+            .scenario_matrix_refs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(
+        lane.evidence_links
+            .qa_queue_refs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
+    refs.extend(
+        lane.evidence_links
+            .review_gate_refs
+            .iter()
+            .map(|reference| reference.path.clone()),
+    );
     refs.sort();
     refs.dedup();
     refs
@@ -56652,6 +56941,112 @@ scenarios:
                 "doc must not contain forbidden claim: {forbidden}"
             );
         }
+    }
+
+    #[test]
+    fn performance_regression_lane_dashboard_links_comparison_budget_matrix_qa_and_review_refs() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("performance-regression-lane-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.performance_regression_lanes.present);
+        assert_eq!(missing.performance_regression_lanes.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("performance-regression-lane-dashboard-present");
+        let lane = PerformanceRegressionLaneArtifact::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+        ))
+        .expect("lane fixture validates");
+        let path = "evidence/performance-regression-lane/lane.json";
+        fs::create_dir_all(
+            artifacts
+                .run_dir
+                .join("evidence/performance-regression-lane"),
+        )
+        .expect("lane evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(lane)).expect("lane writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "performance-regression-lane",
+            "application/json",
+            path,
+            json!({ "artifact": "performance_regression_lane" }),
+        )
+        .expect("lane indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.performance_regression_lanes.present);
+        assert_eq!(dashboard.performance_regression_lanes.status, "passed");
+        assert_eq!(dashboard.performance_regression_lanes.lane_count, 1);
+        assert_eq!(dashboard.performance_regression_lanes.unchanged_count, 1);
+        for expected_ref in [
+            "runs/multi-agent-pipeline/demo/performance/run-comparison.json",
+            "examples/runtime-frame-budget-v1/frame-budget.sample.json",
+            "docs/multi-agent-pipeline-coverage-matrix-v1.md",
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ] {
+            assert!(
+                dashboard
+                    .performance_regression_lanes
+                    .evidence_refs
+                    .iter()
+                    .any(|reference| reference == expected_ref),
+                "missing linked regression lane ref {expected_ref}"
+            );
+        }
+        assert!(dashboard
+            .performance_regression_lanes
+            .boundary
+            .contains("Read-only performance/regression lanes"));
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn performance_regression_lane_is_studio_inspection_compatible() {
+        let lane: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.valid.fixture.json",
+        ))
+        .expect("lane json");
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "performanceRegressionLane": lane }).to_string(),
+        );
+        let section = model
+            .sections
+            .iter()
+            .find(|section| section.id == "performance-regression")
+            .expect("performance regression section");
+        assert_eq!(section.status, "present");
+        assert_eq!(section.item_count, 1);
+        assert!(section.blockers.is_empty());
+
+        let stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/performance-regression-lane.stale.fixture.json",
+        ))
+        .expect("stale lane json");
+        let blocked = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "performanceRegressionLanes": [stale] }).to_string(),
+        );
+        let blocked_section = blocked
+            .sections
+            .iter()
+            .find(|section| section.id == "performance-regression")
+            .expect("performance regression section");
+        assert_eq!(blocked_section.status, "blocked");
+        assert!(blocked_section
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("stale run ref")));
+
+        let malformed = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "performanceRegressionLane": { "laneId": "malformed" } }).to_string(),
+        );
+        assert_eq!(malformed.status, "malformed");
+        let malformed_section = malformed
+            .sections
+            .iter()
+            .find(|section| section.id == "performance-regression")
+            .expect("performance regression section");
+        assert_eq!(malformed_section.status, "malformed");
     }
 
     #[test]
