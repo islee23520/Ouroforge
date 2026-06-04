@@ -209,6 +209,7 @@ have to scan every milestone contract first.
 | What is the trust boundary? | [`docs/README.md#safetytrust-boundaries`](docs/README.md#safetytrust-boundaries) |
 | Where are milestone references grouped? | [`docs/README.md`](docs/README.md) |
 | What wording is forbidden or risky? | [`docs/public-wording-guardrail-v1.md`](docs/public-wording-guardrail-v1.md), [`docs/public-wording-audit-process-v1.md`](docs/public-wording-audit-process-v1.md) |
+| Where is the final docs IA audit? | [`docs/docs-link-wording-audit-pa1.5.3.md`](docs/docs-link-wording-audit-pa1.5.3.md) |
 
 ## Repository map
 
