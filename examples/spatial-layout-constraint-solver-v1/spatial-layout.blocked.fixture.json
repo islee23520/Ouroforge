@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "spatial-layout-constraint-solver-v1",
+  "solverId": "solver_blocked_missing_plan",
+  "planId": "plan_missing_required_layout_inputs",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 20, "height": 12, "tileSize": 16 },
+  "placements": [
+    { "placementId": "spawn", "kind": "spawn", "rect": { "x": 1, "y": 5, "width": 2, "height": 2 } }
+  ],
+  "constraints": [
+    { "constraintId": "goal_reachable", "kind": "goal_reachable_zone", "description": "Goal reachability cannot be checked without a goal placement.", "subjectRefs": ["spawn"], "maxDistance": 20 }
+  ],
+  "constraintResults": [
+    { "constraintId": "goal_reachable", "status": "skipped", "summary": "Goal placement is missing." }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "blocked_report", "kind": "constraint_report", "pathHint": "evidence/spatial-layout-constraints/solver_blocked_missing_plan/blocked-report.json" }
+  ],
+  "status": "blocked",
+  "blockedReasons": [
+    "Required goal placement is not available yet."
+  ]
+}

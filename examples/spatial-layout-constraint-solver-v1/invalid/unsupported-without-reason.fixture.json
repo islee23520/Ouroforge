@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "spatial-layout-constraint-solver-v1",
+  "solverId": "solver_unsupported_without_reason",
+  "planId": "plan_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 16, "height": 12, "tileSize": 16 },
+  "placements": [
+    { "placementId": "moving_platform", "kind": "platform", "rect": { "x": 4, "y": 5, "width": 2, "height": 1 } }
+  ],
+  "constraints": [
+    { "constraintId": "moving_platform_path", "kind": "unsupported", "description": "Unsupported constraint without reason.", "subjectRefs": ["moving_platform"] }
+  ],
+  "constraintResults": [
+    { "constraintId": "moving_platform_path", "status": "unsupported", "summary": "Unsupported needs a reason." }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "report", "kind": "unsupported_report", "pathHint": "evidence/spatial-layout-constraints/solver_unsupported_without_reason/report.json" }
+  ],
+  "status": "unsupported"
+}

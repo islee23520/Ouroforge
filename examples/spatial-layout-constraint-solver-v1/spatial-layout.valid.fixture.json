@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "spatial-layout-constraint-solver-v1",
+  "solverId": "solver_collect_and_exit_intro",
+  "planId": "plan_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "targetTilemapRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+  "grid": { "width": 32, "height": 18, "tileSize": 16 },
+  "placements": [
+    { "placementId": "spawn", "kind": "spawn", "zoneRef": "start_zone", "rect": { "x": 1, "y": 8, "width": 2, "height": 2 } },
+    { "placementId": "key", "kind": "key", "zoneRef": "key_zone", "rect": { "x": 10, "y": 8, "width": 1, "height": 1 } },
+    { "placementId": "door", "kind": "door", "zoneRef": "exit_zone", "rect": { "x": 18, "y": 8, "width": 1, "height": 2 } },
+    { "placementId": "goal", "kind": "goal", "zoneRef": "exit_zone", "rect": { "x": 24, "y": 8, "width": 2, "height": 2 } },
+    { "placementId": "hazard", "kind": "hazard", "zoneRef": "transition_zone", "rect": { "x": 6, "y": 4, "width": 1, "height": 1 } },
+    { "placementId": "platform", "kind": "platform", "zoneRef": "transition_zone", "rect": { "x": 12, "y": 12, "width": 4, "height": 1 } },
+    { "placementId": "checkpoint", "kind": "checkpoint", "zoneRef": "key_zone", "rect": { "x": 15, "y": 8, "width": 1, "height": 1 } }
+  ],
+  "constraints": [
+    { "constraintId": "within_bounds", "kind": "bounds", "description": "All placements stay inside the bounded grid." },
+    { "constraintId": "no_overlap", "kind": "no_overlap", "description": "Interactive placements do not overlap." },
+    { "constraintId": "spawn_safe", "kind": "spawn_safe_zone", "description": "Spawn has deterministic clearance from hazards.", "subjectRefs": ["spawn"], "targetRefs": ["hazard"], "minDistance": 3 },
+    { "constraintId": "goal_reachable", "kind": "goal_reachable_zone", "description": "Goal is within a bounded straight-line reachability proxy.", "subjectRefs": ["spawn"], "targetRefs": ["goal"], "maxDistance": 32 },
+    { "constraintId": "hazard_spacing", "kind": "hazard_spacing", "description": "Multiple hazards would need spacing when present.", "minDistance": 2 },
+    { "constraintId": "door_after_key", "kind": "door_key_relation", "description": "The key appears before the door along the deterministic x axis.", "subjectRefs": ["door"], "targetRefs": ["key"] }
+  ],
+  "constraintResults": [
+    { "constraintId": "within_bounds", "status": "satisfied", "summary": "All placements are inside the grid." },
+    { "constraintId": "no_overlap", "status": "satisfied", "summary": "No declared placements overlap." },
+    { "constraintId": "spawn_safe", "status": "satisfied", "summary": "Spawn and hazard clearance meets the minimum." },
+    { "constraintId": "goal_reachable", "status": "satisfied", "summary": "Goal is within the bounded reachability proxy." },
+    { "constraintId": "hazard_spacing", "status": "skipped", "summary": "Only one hazard is present." },
+    { "constraintId": "door_after_key", "status": "satisfied", "summary": "Key appears before door." }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "constraint_report", "kind": "constraint_report", "pathHint": "evidence/spatial-layout-constraints/solver_collect_and_exit_intro/constraint-report.json" },
+    { "evidenceId": "read_model", "kind": "read_model", "pathHint": "evidence/spatial-layout-constraints/solver_collect_and_exit_intro/read-model.json" }
+  ],
+  "status": "validated",
+  "guardrails": [
+    "Deterministic validation evidence only; no scene generation or trusted write is authorized.",
+    "Unsupported solver cases must be explicit rather than inferred by hidden AI judgment."
+  ]
+}

@@ -14743,6 +14743,849 @@ fn validate_scene_generation_refs_against_intent(
     Ok(())
 }
 
+const SPATIAL_LAYOUT_CONSTRAINT_SOLVER_SCHEMA_VERSION: &str = "spatial-layout-constraint-solver-v1";
+const MAX_SPATIAL_LAYOUT_GRID_TILES: u32 = 256;
+const MAX_SPATIAL_LAYOUT_PLACEMENTS: usize = 128;
+const MAX_SPATIAL_LAYOUT_CONSTRAINTS: usize = 64;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutConstraintSolverArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "solverId")]
+    pub solver_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "targetTilemapRef", skip_serializing_if = "Option::is_none")]
+    pub target_tilemap_ref: Option<String>,
+    pub grid: SpatialLayoutGrid,
+    pub placements: Vec<SpatialLayoutPlacement>,
+    pub constraints: Vec<SpatialLayoutConstraint>,
+    #[serde(rename = "constraintResults")]
+    pub constraint_results: Vec<SpatialLayoutConstraintResult>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<SpatialLayoutExpectedEvidence>,
+    pub status: SpatialLayoutSolverStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutGrid {
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "tileSize")]
+    pub tile_size: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutPlacement {
+    #[serde(rename = "placementId")]
+    pub placement_id: String,
+    pub kind: SpatialLayoutPlacementKind,
+    #[serde(rename = "zoneRef", skip_serializing_if = "Option::is_none")]
+    pub zone_ref: Option<String>,
+    pub rect: SpatialLayoutRect,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialLayoutPlacementKind {
+    Spawn,
+    Goal,
+    Hazard,
+    Platform,
+    Door,
+    Key,
+    Checkpoint,
+    Solid,
+    Reward,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutConstraint {
+    #[serde(rename = "constraintId")]
+    pub constraint_id: String,
+    pub kind: SpatialLayoutConstraintKind,
+    pub description: String,
+    #[serde(rename = "subjectRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub subject_refs: Vec<String>,
+    #[serde(rename = "targetRefs", default, skip_serializing_if = "Vec::is_empty")]
+    pub target_refs: Vec<String>,
+    #[serde(rename = "minDistance", skip_serializing_if = "Option::is_none")]
+    pub min_distance: Option<u32>,
+    #[serde(rename = "maxDistance", skip_serializing_if = "Option::is_none")]
+    pub max_distance: Option<u32>,
+    #[serde(rename = "unsupportedReason", skip_serializing_if = "Option::is_none")]
+    pub unsupported_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialLayoutConstraintKind {
+    Bounds,
+    NoOverlap,
+    SpawnSafeZone,
+    GoalReachableZone,
+    HazardSpacing,
+    PlatformSpacing,
+    DoorKeyRelation,
+    CheckpointSpacing,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutConstraintResult {
+    #[serde(rename = "constraintId")]
+    pub constraint_id: String,
+    pub status: SpatialLayoutConstraintStatus,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialLayoutConstraintStatus {
+    Satisfied,
+    Violated,
+    Unsupported,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: SpatialLayoutEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialLayoutEvidenceKind {
+    ConstraintReport,
+    ViolationReport,
+    UnsupportedReport,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialLayoutSolverStatus {
+    Validated,
+    Violated,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SpatialLayoutConstraintSolverReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "solverId")]
+    pub solver_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    pub status: String,
+    #[serde(rename = "gridWidth")]
+    pub grid_width: u32,
+    #[serde(rename = "gridHeight")]
+    pub grid_height: u32,
+    #[serde(rename = "placementCount")]
+    pub placement_count: usize,
+    #[serde(rename = "constraintCount")]
+    pub constraint_count: usize,
+    #[serde(rename = "satisfiedCount")]
+    pub satisfied_count: usize,
+    #[serde(rename = "violatedCount")]
+    pub violated_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "skippedCount")]
+    pub skipped_count: usize,
+    #[serde(rename = "expectedEvidenceRefs")]
+    pub expected_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl SpatialLayoutConstraintSolverArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: SpatialLayoutConstraintSolverArtifact = serde_json::from_str(input)
+            .context("failed to parse Spatial Layout Constraint Solver JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SPATIAL_LAYOUT_CONSTRAINT_SOLVER_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "spatial layout constraint solver schemaVersion must be {SPATIAL_LAYOUT_CONSTRAINT_SOLVER_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("spatial layout solver solverId", &self.solver_id)?;
+        validate_path_component("spatial layout solver planId", &self.plan_id)?;
+        validate_repo_relative_source_ref(
+            "spatial layout solver targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "spatial layout solver targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        if let Some(tilemap_ref) = &self.target_tilemap_ref {
+            validate_repo_relative_source_ref(
+                "spatial layout solver targetTilemapRef",
+                tilemap_ref,
+            )?;
+        }
+        self.grid.validate()?;
+        validate_spatial_layout_placements(&self.grid, &self.placements)?;
+        validate_spatial_layout_constraints(&self.placements, &self.constraints)?;
+        validate_spatial_layout_expected_evidence(&self.solver_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("spatial layout solver blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("spatial layout solver guardrails", guardrail)?;
+        }
+        let evaluated =
+            evaluate_spatial_layout_constraints(&self.grid, &self.placements, &self.constraints)?;
+        validate_spatial_layout_results(&self.constraint_results, &evaluated)?;
+        validate_spatial_layout_status(self.status, &self.constraint_results, &self.blocked_reasons)
+    }
+}
+
+impl SpatialLayoutGrid {
+    fn validate(&self) -> Result<()> {
+        if self.width == 0
+            || self.height == 0
+            || self.width > MAX_SPATIAL_LAYOUT_GRID_TILES
+            || self.height > MAX_SPATIAL_LAYOUT_GRID_TILES
+        {
+            return Err(anyhow!(
+                "spatial layout grid width and height must be between 1 and {MAX_SPATIAL_LAYOUT_GRID_TILES}"
+            ));
+        }
+        if self.tile_size == 0 || self.tile_size > 256 {
+            return Err(anyhow!(
+                "spatial layout grid tileSize must be between 1 and 256"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl SpatialLayoutRect {
+    fn validate(&self, field: &str, grid: &SpatialLayoutGrid) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Err(anyhow!("{field} width and height must be positive"));
+        }
+        if self.x.saturating_add(self.width) > grid.width
+            || self.y.saturating_add(self.height) > grid.height
+        {
+            return Err(anyhow!("{field} exceeds spatial layout grid bounds"));
+        }
+        Ok(())
+    }
+
+    fn overlaps(self, other: Self) -> bool {
+        self.x < other.x.saturating_add(other.width)
+            && self.x.saturating_add(self.width) > other.x
+            && self.y < other.y.saturating_add(other.height)
+            && self.y.saturating_add(self.height) > other.y
+    }
+
+    fn distance_to(self, other: Self) -> u32 {
+        let self_right = self.x.saturating_add(self.width);
+        let other_right = other.x.saturating_add(other.width);
+        let dx = if self_right < other.x {
+            other.x - self_right
+        } else {
+            self.x.saturating_sub(other_right)
+        };
+        let self_bottom = self.y.saturating_add(self.height);
+        let other_bottom = other.y.saturating_add(other.height);
+        let dy = if self_bottom < other.y {
+            other.y - self_bottom
+        } else {
+            self.y.saturating_sub(other_bottom)
+        };
+        dx.saturating_add(dy)
+    }
+
+    fn center(self) -> (u32, u32) {
+        (
+            self.x.saturating_add(self.width / 2),
+            self.y.saturating_add(self.height / 2),
+        )
+    }
+}
+
+pub fn spatial_layout_constraint_solver_read_model_from_json_str(
+    input: &str,
+) -> Result<SpatialLayoutConstraintSolverReadModel> {
+    let artifact = SpatialLayoutConstraintSolverArtifact::from_json_str(input)?;
+    Ok(spatial_layout_constraint_solver_read_model(&artifact))
+}
+
+pub fn spatial_layout_constraint_solver_read_model(
+    artifact: &SpatialLayoutConstraintSolverArtifact,
+) -> SpatialLayoutConstraintSolverReadModel {
+    let count_status = |status| {
+        artifact
+            .constraint_results
+            .iter()
+            .filter(|result| result.status == status)
+            .count()
+    };
+    SpatialLayoutConstraintSolverReadModel {
+        schema_version: "spatial-layout-constraint-solver-read-model-v1".to_string(),
+        solver_id: artifact.solver_id.clone(),
+        plan_id: artifact.plan_id.clone(),
+        status: spatial_layout_solver_status_label(artifact.status).to_string(),
+        grid_width: artifact.grid.width,
+        grid_height: artifact.grid.height,
+        placement_count: artifact.placements.len(),
+        constraint_count: artifact.constraints.len(),
+        satisfied_count: count_status(SpatialLayoutConstraintStatus::Satisfied),
+        violated_count: count_status(SpatialLayoutConstraintStatus::Violated),
+        unsupported_count: count_status(SpatialLayoutConstraintStatus::Unsupported),
+        skipped_count: count_status(SpatialLayoutConstraintStatus::Skipped),
+        expected_evidence_refs: artifact
+            .expected_evidence
+            .iter()
+            .map(|evidence| evidence.path_hint.clone())
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only spatial layout constraint evidence; deterministic local validation only, no hidden AI judgment, no scene generation, no trusted writes, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_spatial_layout_placements(
+    grid: &SpatialLayoutGrid,
+    placements: &[SpatialLayoutPlacement],
+) -> Result<()> {
+    if placements.is_empty() || placements.len() > MAX_SPATIAL_LAYOUT_PLACEMENTS {
+        return Err(anyhow!(
+            "spatial layout placements must contain between 1 and {MAX_SPATIAL_LAYOUT_PLACEMENTS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for placement in placements {
+        validate_path_component(
+            "spatial layout placements.placementId",
+            &placement.placement_id,
+        )?;
+        if let Some(zone_ref) = &placement.zone_ref {
+            validate_path_component("spatial layout placements.zoneRef", zone_ref)?;
+        }
+        placement
+            .rect
+            .validate("spatial layout placements.rect", grid)?;
+        for tag in &placement.tags {
+            validate_path_component("spatial layout placements.tags", tag)?;
+        }
+        if !ids.insert(placement.placement_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate spatial layout placements.placementId: {}",
+                placement.placement_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_spatial_layout_constraints(
+    placements: &[SpatialLayoutPlacement],
+    constraints: &[SpatialLayoutConstraint],
+) -> Result<()> {
+    if constraints.is_empty() || constraints.len() > MAX_SPATIAL_LAYOUT_CONSTRAINTS {
+        return Err(anyhow!(
+            "spatial layout constraints must contain between 1 and {MAX_SPATIAL_LAYOUT_CONSTRAINTS} entries"
+        ));
+    }
+    let placement_ids = placements
+        .iter()
+        .map(|placement| placement.placement_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut ids = BTreeSet::new();
+    for constraint in constraints {
+        validate_path_component(
+            "spatial layout constraints.constraintId",
+            &constraint.constraint_id,
+        )?;
+        require_bounded_display_text(
+            "spatial layout constraints.description",
+            &constraint.description,
+        )?;
+        validate_unique_path_components(
+            "spatial layout constraints.subjectRefs",
+            "placementRef",
+            &constraint.subject_refs,
+        )?;
+        validate_unique_path_components(
+            "spatial layout constraints.targetRefs",
+            "placementRef",
+            &constraint.target_refs,
+        )?;
+        for reference in constraint
+            .subject_refs
+            .iter()
+            .chain(constraint.target_refs.iter())
+        {
+            if !placement_ids.contains(reference.as_str()) {
+                return Err(anyhow!(
+                    "spatial layout constraint references missing placement: {reference}"
+                ));
+            }
+        }
+        if matches!(constraint.kind, SpatialLayoutConstraintKind::Unsupported)
+            && constraint.unsupported_reason.is_none()
+        {
+            return Err(anyhow!(
+                "spatial layout unsupported constraint requires unsupportedReason"
+            ));
+        }
+        if let Some(reason) = &constraint.unsupported_reason {
+            require_bounded_display_text("spatial layout constraints.unsupportedReason", reason)?;
+        }
+        if !ids.insert(constraint.constraint_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate spatial layout constraints.constraintId: {}",
+                constraint.constraint_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_spatial_layout_expected_evidence(
+    solver_id: &str,
+    values: &[SpatialLayoutExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!("spatial layout expectedEvidence must not be empty"));
+    }
+    let expected_prefix = format!("evidence/spatial-layout-constraints/{solver_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "spatial layout expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "spatial layout expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate spatial layout expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate spatial layout expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_spatial_layout_results(
+    actual: &[SpatialLayoutConstraintResult],
+    expected: &[SpatialLayoutConstraintResult],
+) -> Result<()> {
+    if actual.len() != expected.len() {
+        return Err(anyhow!(
+            "spatial layout constraintResults must match constraint count"
+        ));
+    }
+    let actual_by_id = actual
+        .iter()
+        .map(|result| (result.constraint_id.as_str(), result))
+        .collect::<BTreeMap<_, _>>();
+    for expected_result in expected {
+        let Some(actual_result) = actual_by_id.get(expected_result.constraint_id.as_str()) else {
+            return Err(anyhow!(
+                "spatial layout constraintResults missing constraintId: {}",
+                expected_result.constraint_id
+            ));
+        };
+        require_bounded_display_text(
+            "spatial layout constraintResults.summary",
+            &actual_result.summary,
+        )?;
+        if actual_result.status != expected_result.status {
+            return Err(anyhow!(
+                "spatial layout constraintResults status drift for {}: {:?} != {:?}",
+                expected_result.constraint_id,
+                actual_result.status,
+                expected_result.status
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_spatial_layout_status(
+    status: SpatialLayoutSolverStatus,
+    results: &[SpatialLayoutConstraintResult],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_violated = results
+        .iter()
+        .any(|result| result.status == SpatialLayoutConstraintStatus::Violated);
+    let has_unsupported = results
+        .iter()
+        .any(|result| result.status == SpatialLayoutConstraintStatus::Unsupported);
+    match status {
+        SpatialLayoutSolverStatus::Validated
+            if blocked_reasons.is_empty() && !has_violated && !has_unsupported =>
+        {
+            Ok(())
+        }
+        SpatialLayoutSolverStatus::Violated if blocked_reasons.is_empty() && has_violated => Ok(()),
+        SpatialLayoutSolverStatus::Unsupported
+            if blocked_reasons.is_empty() && has_unsupported =>
+        {
+            Ok(())
+        }
+        SpatialLayoutSolverStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        SpatialLayoutSolverStatus::Validated => Err(anyhow!(
+            "spatial layout validated status cannot include blocked, violated, or unsupported results"
+        )),
+        SpatialLayoutSolverStatus::Violated => Err(anyhow!(
+            "spatial layout violated status requires at least one violated result and no blockedReasons"
+        )),
+        SpatialLayoutSolverStatus::Unsupported => Err(anyhow!(
+            "spatial layout unsupported status requires at least one unsupported result and no blockedReasons"
+        )),
+        SpatialLayoutSolverStatus::Blocked => Err(anyhow!(
+            "spatial layout blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn evaluate_spatial_layout_constraints(
+    grid: &SpatialLayoutGrid,
+    placements: &[SpatialLayoutPlacement],
+    constraints: &[SpatialLayoutConstraint],
+) -> Result<Vec<SpatialLayoutConstraintResult>> {
+    let placements_by_id = placements
+        .iter()
+        .map(|placement| (placement.placement_id.as_str(), placement))
+        .collect::<BTreeMap<_, _>>();
+    constraints
+        .iter()
+        .map(|constraint| {
+            evaluate_spatial_layout_constraint(grid, placements, &placements_by_id, constraint)
+        })
+        .collect()
+}
+
+fn evaluate_spatial_layout_constraint(
+    grid: &SpatialLayoutGrid,
+    placements: &[SpatialLayoutPlacement],
+    placements_by_id: &BTreeMap<&str, &SpatialLayoutPlacement>,
+    constraint: &SpatialLayoutConstraint,
+) -> Result<SpatialLayoutConstraintResult> {
+    let status = match constraint.kind {
+        SpatialLayoutConstraintKind::Bounds => {
+            let selected =
+                select_spatial_placements(placements, placements_by_id, &constraint.subject_refs)?;
+            if selected.iter().all(|placement| {
+                placement
+                    .rect
+                    .validate("spatial layout bounds", grid)
+                    .is_ok()
+            }) {
+                SpatialLayoutConstraintStatus::Satisfied
+            } else {
+                SpatialLayoutConstraintStatus::Violated
+            }
+        }
+        SpatialLayoutConstraintKind::NoOverlap => {
+            let selected =
+                select_spatial_placements(placements, placements_by_id, &constraint.subject_refs)?;
+            if has_spatial_overlap(&selected) {
+                SpatialLayoutConstraintStatus::Violated
+            } else {
+                SpatialLayoutConstraintStatus::Satisfied
+            }
+        }
+        SpatialLayoutConstraintKind::SpawnSafeZone => {
+            let subjects = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.subject_refs,
+                SpatialLayoutPlacementKind::Spawn,
+            );
+            let targets = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.target_refs,
+                SpatialLayoutPlacementKind::Hazard,
+            );
+            evaluate_min_distance(&subjects, &targets, constraint.min_distance.unwrap_or(1))
+        }
+        SpatialLayoutConstraintKind::GoalReachableZone => {
+            let subjects = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.subject_refs,
+                SpatialLayoutPlacementKind::Spawn,
+            );
+            let targets = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.target_refs,
+                SpatialLayoutPlacementKind::Goal,
+            );
+            evaluate_max_distance(
+                &subjects,
+                &targets,
+                constraint.max_distance.unwrap_or(grid.width + grid.height),
+            )
+        }
+        SpatialLayoutConstraintKind::HazardSpacing => evaluate_same_kind_spacing(
+            placements,
+            placements_by_id,
+            constraint,
+            SpatialLayoutPlacementKind::Hazard,
+        ),
+        SpatialLayoutConstraintKind::PlatformSpacing => evaluate_same_kind_spacing(
+            placements,
+            placements_by_id,
+            constraint,
+            SpatialLayoutPlacementKind::Platform,
+        ),
+        SpatialLayoutConstraintKind::DoorKeyRelation => {
+            let doors = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.subject_refs,
+                SpatialLayoutPlacementKind::Door,
+            );
+            let keys = select_spatial_kind_or_refs(
+                placements,
+                placements_by_id,
+                &constraint.target_refs,
+                SpatialLayoutPlacementKind::Key,
+            );
+            evaluate_door_key_relation(&doors, &keys)
+        }
+        SpatialLayoutConstraintKind::CheckpointSpacing => evaluate_same_kind_spacing(
+            placements,
+            placements_by_id,
+            constraint,
+            SpatialLayoutPlacementKind::Checkpoint,
+        ),
+        SpatialLayoutConstraintKind::Unsupported => SpatialLayoutConstraintStatus::Unsupported,
+    };
+    Ok(SpatialLayoutConstraintResult {
+        constraint_id: constraint.constraint_id.clone(),
+        status,
+        summary: format!(
+            "deterministic spatial layout constraint {} evaluated as {}",
+            constraint.constraint_id,
+            spatial_layout_constraint_status_label(status)
+        ),
+    })
+}
+
+fn select_spatial_placements<'a>(
+    placements: &'a [SpatialLayoutPlacement],
+    placements_by_id: &BTreeMap<&str, &'a SpatialLayoutPlacement>,
+    refs: &[String],
+) -> Result<Vec<&'a SpatialLayoutPlacement>> {
+    if refs.is_empty() {
+        return Ok(placements.iter().collect());
+    }
+    refs.iter()
+        .map(|reference| {
+            placements_by_id
+                .get(reference.as_str())
+                .copied()
+                .ok_or_else(|| anyhow!("spatial layout placement ref is missing: {reference}"))
+        })
+        .collect()
+}
+
+fn select_spatial_kind_or_refs<'a>(
+    placements: &'a [SpatialLayoutPlacement],
+    placements_by_id: &BTreeMap<&str, &'a SpatialLayoutPlacement>,
+    refs: &[String],
+    kind: SpatialLayoutPlacementKind,
+) -> Vec<&'a SpatialLayoutPlacement> {
+    if refs.is_empty() {
+        placements
+            .iter()
+            .filter(|placement| placement.kind == kind)
+            .collect()
+    } else {
+        refs.iter()
+            .filter_map(|reference| placements_by_id.get(reference.as_str()).copied())
+            .collect()
+    }
+}
+
+fn has_spatial_overlap(placements: &[&SpatialLayoutPlacement]) -> bool {
+    for (index, placement) in placements.iter().enumerate() {
+        for other in placements.iter().skip(index + 1) {
+            if placement.rect.overlaps(other.rect) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn evaluate_min_distance(
+    subjects: &[&SpatialLayoutPlacement],
+    targets: &[&SpatialLayoutPlacement],
+    min_distance: u32,
+) -> SpatialLayoutConstraintStatus {
+    if subjects.is_empty() || targets.is_empty() {
+        return SpatialLayoutConstraintStatus::Skipped;
+    }
+    if subjects.iter().any(|subject| {
+        targets.iter().any(|target| {
+            subject.placement_id != target.placement_id
+                && subject.rect.distance_to(target.rect) < min_distance
+        })
+    }) {
+        SpatialLayoutConstraintStatus::Violated
+    } else {
+        SpatialLayoutConstraintStatus::Satisfied
+    }
+}
+
+fn evaluate_max_distance(
+    subjects: &[&SpatialLayoutPlacement],
+    targets: &[&SpatialLayoutPlacement],
+    max_distance: u32,
+) -> SpatialLayoutConstraintStatus {
+    if subjects.is_empty() || targets.is_empty() {
+        return SpatialLayoutConstraintStatus::Skipped;
+    }
+    if subjects.iter().any(|subject| {
+        targets
+            .iter()
+            .any(|target| manhattan_center_distance(subject.rect, target.rect) <= max_distance)
+    }) {
+        SpatialLayoutConstraintStatus::Satisfied
+    } else {
+        SpatialLayoutConstraintStatus::Violated
+    }
+}
+
+fn evaluate_same_kind_spacing(
+    placements: &[SpatialLayoutPlacement],
+    placements_by_id: &BTreeMap<&str, &SpatialLayoutPlacement>,
+    constraint: &SpatialLayoutConstraint,
+    kind: SpatialLayoutPlacementKind,
+) -> SpatialLayoutConstraintStatus {
+    let selected =
+        select_spatial_kind_or_refs(placements, placements_by_id, &constraint.subject_refs, kind);
+    if selected.len() < 2 {
+        return SpatialLayoutConstraintStatus::Skipped;
+    }
+    for (index, placement) in selected.iter().enumerate() {
+        for other in selected.iter().skip(index + 1) {
+            if placement.rect.distance_to(other.rect) < constraint.min_distance.unwrap_or(1) {
+                return SpatialLayoutConstraintStatus::Violated;
+            }
+        }
+    }
+    SpatialLayoutConstraintStatus::Satisfied
+}
+
+fn evaluate_door_key_relation(
+    doors: &[&SpatialLayoutPlacement],
+    keys: &[&SpatialLayoutPlacement],
+) -> SpatialLayoutConstraintStatus {
+    if doors.is_empty() || keys.is_empty() {
+        return SpatialLayoutConstraintStatus::Skipped;
+    }
+    if doors.iter().all(|door| {
+        let (door_x, _) = door.rect.center();
+        keys.iter().any(|key| {
+            let (key_x, _) = key.rect.center();
+            key_x <= door_x && !key.rect.overlaps(door.rect)
+        })
+    }) {
+        SpatialLayoutConstraintStatus::Satisfied
+    } else {
+        SpatialLayoutConstraintStatus::Violated
+    }
+}
+
+fn manhattan_center_distance(left: SpatialLayoutRect, right: SpatialLayoutRect) -> u32 {
+    let (left_x, left_y) = left.center();
+    let (right_x, right_y) = right.center();
+    left_x
+        .abs_diff(right_x)
+        .saturating_add(left_y.abs_diff(right_y))
+}
+
+fn spatial_layout_constraint_status_label(status: SpatialLayoutConstraintStatus) -> &'static str {
+    match status {
+        SpatialLayoutConstraintStatus::Satisfied => "satisfied",
+        SpatialLayoutConstraintStatus::Violated => "violated",
+        SpatialLayoutConstraintStatus::Unsupported => "unsupported",
+        SpatialLayoutConstraintStatus::Skipped => "skipped",
+    }
+}
+
+fn spatial_layout_solver_status_label(status: SpatialLayoutSolverStatus) -> &'static str {
+    match status {
+        SpatialLayoutSolverStatus::Validated => "validated",
+        SpatialLayoutSolverStatus::Violated => "violated",
+        SpatialLayoutSolverStatus::Unsupported => "unsupported",
+        SpatialLayoutSolverStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -58076,6 +58919,138 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("scene-generation-plan-v1.md"));
+    }
+
+    #[test]
+    fn spatial_layout_solver_v1_accepts_valid_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/spatial-layout-constraint-solver-v1/spatial-layout.valid.fixture.json"
+        );
+        let artifact = SpatialLayoutConstraintSolverArtifact::from_json_str(fixture)
+            .expect("valid spatial layout fixture parses");
+        assert_eq!(
+            artifact.schema_version,
+            "spatial-layout-constraint-solver-v1"
+        );
+        assert_eq!(artifact.solver_id, "solver_collect_and_exit_intro");
+        assert_eq!(artifact.status, SpatialLayoutSolverStatus::Validated);
+        assert_eq!(artifact.placements.len(), 7);
+
+        let read_model = spatial_layout_constraint_solver_read_model_from_json_str(fixture)
+            .expect("spatial layout read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "spatial-layout-constraint-solver-read-model-v1"
+        );
+        assert_eq!(read_model.status, "validated");
+        assert_eq!(read_model.grid_width, 32);
+        assert_eq!(read_model.grid_height, 18);
+        assert_eq!(read_model.satisfied_count, 5);
+        assert_eq!(read_model.skipped_count, 1);
+        assert_eq!(read_model.violated_count, 0);
+        assert_eq!(read_model.unsupported_count, 0);
+        assert!(read_model
+            .boundary
+            .contains("deterministic local validation"));
+        assert!(read_model.boundary.contains("no hidden AI judgment"));
+        assert!(read_model.boundary.contains("no scene generation"));
+        assert!(read_model.boundary.contains("no trusted writes"));
+    }
+
+    #[test]
+    fn spatial_layout_solver_v1_accepts_violated_unsupported_and_blocked_fixtures() {
+        for (fixture, expected_status, expected_result) in [
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/spatial-layout.violated.fixture.json"
+                ),
+                SpatialLayoutSolverStatus::Violated,
+                SpatialLayoutConstraintStatus::Violated,
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/spatial-layout.unsupported.fixture.json"
+                ),
+                SpatialLayoutSolverStatus::Unsupported,
+                SpatialLayoutConstraintStatus::Unsupported,
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/spatial-layout.blocked.fixture.json"
+                ),
+                SpatialLayoutSolverStatus::Blocked,
+                SpatialLayoutConstraintStatus::Skipped,
+            ),
+        ] {
+            let artifact = SpatialLayoutConstraintSolverArtifact::from_json_str(fixture)
+                .expect("non-passing spatial layout fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            assert!(artifact
+                .constraint_results
+                .iter()
+                .any(|result| result.status == expected_result));
+            if expected_status == SpatialLayoutSolverStatus::Blocked {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn spatial_layout_solver_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/invalid/oversized-grid.fixture.json"
+                ),
+                "grid",
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/invalid/contradictory-result.fixture.json"
+                ),
+                "status drift",
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/invalid/missing-placement-ref.fixture.json"
+                ),
+                "missing placement",
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/spatial-layout-constraint-solver-v1/invalid/unsupported-without-reason.fixture.json"
+                ),
+                "unsupportedReason",
+            ),
+        ] {
+            let error = SpatialLayoutConstraintSolverArtifact::from_json_str(fixture)
+                .expect_err("invalid spatial layout fixture is rejected");
+            assert!(
+                error.to_string().contains(expected)
+                    || error.to_string().contains("failed to parse"),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn spatial_layout_solver_v1_keeps_deterministic_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/spatial-layout-constraint-solver-v1.md");
+        assert!(doc.contains("deterministic"));
+        assert!(doc.contains("advisory"));
+        assert!(doc.contains("untrusted"));
+        assert!(doc.contains("does not generate"));
+        assert!(doc.contains("does not write trusted files"));
+        assert!(doc.contains("hidden AI judgment"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("spatial-layout-constraint-solver-v1.md"));
     }
 
     #[test]

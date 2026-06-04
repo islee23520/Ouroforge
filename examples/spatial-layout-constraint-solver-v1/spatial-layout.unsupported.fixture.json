@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "spatial-layout-constraint-solver-v1",
+  "solverId": "solver_unsupported_moving_platform",
+  "planId": "plan_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 20, "height": 12, "tileSize": 16 },
+  "placements": [
+    { "placementId": "spawn", "kind": "spawn", "rect": { "x": 1, "y": 5, "width": 2, "height": 2 } },
+    { "placementId": "moving_platform", "kind": "platform", "rect": { "x": 8, "y": 6, "width": 4, "height": 1 } }
+  ],
+  "constraints": [
+    { "constraintId": "moving_platform_path", "kind": "unsupported", "description": "Moving platform path solving is not scoped in v1.", "subjectRefs": ["moving_platform"], "unsupportedReason": "Dynamic platform path solving requires a later draft/evidence artifact." }
+  ],
+  "constraintResults": [
+    { "constraintId": "moving_platform_path", "status": "unsupported", "summary": "Dynamic platform path solving is unsupported in v1." }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "unsupported_report", "kind": "unsupported_report", "pathHint": "evidence/spatial-layout-constraints/solver_unsupported_moving_platform/unsupported-report.json" }
+  ],
+  "status": "unsupported"
+}

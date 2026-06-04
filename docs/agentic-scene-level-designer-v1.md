@@ -71,7 +71,8 @@ proves a safer dependency order:
    ([Level Intent v1](level-intent-v1.md)).
 2. #629 - Scene Generation Plan Artifact v1
    ([Scene Generation Plan v1](scene-generation-plan-v1.md)).
-3. #630 - Spatial Layout and Placement Constraint Solver v1.
+3. #630 - Spatial Layout and Placement Constraint Solver v1
+   ([Spatial Layout Constraint Solver v1](spatial-layout-constraint-solver-v1.md)).
 4. #631 - Tilemap and Terrain Generation Draft v1.
 5. #632 - Entity, Objective, and Encounter Placement Draft v1.
 6. #633 - Reachability and Pathing Evidence v1.

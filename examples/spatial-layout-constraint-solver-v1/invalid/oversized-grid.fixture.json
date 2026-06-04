@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "spatial-layout-constraint-solver-v1",
+  "solverId": "solver_oversized_grid",
+  "planId": "plan_collect_and_exit_intro",
+  "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "grid": { "width": 999, "height": 12, "tileSize": 16 },
+  "placements": [
+    { "placementId": "spawn", "kind": "spawn", "rect": { "x": 1, "y": 5, "width": 2, "height": 2 } }
+  ],
+  "constraints": [
+    { "constraintId": "within_bounds", "kind": "bounds", "description": "Grid is oversized." }
+  ],
+  "constraintResults": [
+    { "constraintId": "within_bounds", "status": "satisfied", "summary": "Invalid oversized grid must reject before results." }
+  ],
+  "expectedEvidence": [
+    { "evidenceId": "report", "kind": "constraint_report", "pathHint": "evidence/spatial-layout-constraints/solver_oversized_grid/report.json" }
+  ],
+  "status": "validated"
+}
