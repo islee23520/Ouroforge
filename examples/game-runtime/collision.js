@@ -238,7 +238,196 @@
     return { events: events.concat(triggers).sort((a, b) => compareCodeUnits(a.pairId, b.pairId) || compareCodeUnits(a.type, b.type)) };
   }
 
-  const api = Object.freeze({ rectForEntity, overlaps, detectAabbCollisions, stepAabbPhysics });
+  function vector3(value = {}, fallback = { x: 0, y: 0, z: 0 }) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      x: Number.isFinite(source.x) ? source.x : fallback.x,
+      y: Number.isFinite(source.y) ? source.y : fallback.y,
+      z: Number.isFinite(source.z) ? source.z : fallback.z,
+    };
+  }
+
+  function positiveVector3(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    if (!Number.isFinite(source.x) || !Number.isFinite(source.y) || !Number.isFinite(source.z)) return null;
+    if (source.x <= 0 || source.y <= 0 || source.z <= 0) return null;
+    return { x: source.x, y: source.y, z: source.z };
+  }
+
+  function nodeColliderRef(node) {
+    if (node && typeof node.colliderRef === 'string') return node.colliderRef;
+    const component = node && Array.isArray(node.components)
+      ? node.components.find((entry) => entry && entry.kind === 'collider' && typeof entry.reference === 'string')
+      : null;
+    return component ? component.reference : null;
+  }
+
+  function scene3dBoxForNode({ node, collider, invalidColliders }) {
+    const nodeId = String(node && node.id || 'node');
+    if (!collider) {
+      invalidColliders.push({ nodeId, colliderRef: nodeColliderRef(node), reason: `missing collider ${nodeColliderRef(node) || 'unreferenced'}` });
+      return null;
+    }
+    if (collider.disabled) return { disabled: true, nodeId, colliderId: collider.id };
+    if (collider.shape !== 'box') {
+      invalidColliders.push({ nodeId, colliderId: collider.id, reason: `unsupported 3d collider shape ${collider.shape || 'unknown'}` });
+      return null;
+    }
+    const size = positiveVector3(collider.size);
+    if (!size) {
+      invalidColliders.push({ nodeId, colliderId: collider.id, reason: '3d collider box size must be positive x/y/z' });
+      return null;
+    }
+    const body = ['static', 'dynamic', 'kinematic', 'trigger'].includes(collider.body) ? collider.body : 'static';
+    const trigger = Boolean(collider.trigger || collider.sensor || body === 'trigger');
+    const transform = node.worldTransform || node.localTransform || {};
+    const translation = vector3(transform.translation);
+    const offset = vector3(collider.offset);
+    return {
+      nodeId,
+      colliderId: collider.id,
+      shape: collider.shape,
+      body,
+      trigger,
+      sensor: Boolean(collider.sensor || body === 'trigger'),
+      collisionGroup: typeof collider.collisionGroup === 'string' ? collider.collisionGroup : null,
+      collisionMask: uniqueStrings(collider.collisionMask),
+      x: translation.x + offset.x,
+      y: translation.y + offset.y,
+      z: translation.z + offset.z,
+      width: size.x,
+      height: size.y,
+      depth: size.z,
+    };
+  }
+
+  function overlaps3d(a, b) {
+    return a.x < b.x + b.width
+      && a.x + a.width > b.x
+      && a.y < b.y + b.height
+      && a.y + a.height > b.y
+      && a.z < b.z + b.depth
+      && a.z + a.depth > b.z;
+  }
+
+  function pairId3d(a, b) {
+    return [a.nodeId, b.nodeId].sort().join(':');
+  }
+
+  function groupFor3d(box) {
+    return box.collisionGroup || 'default';
+  }
+
+  function maskAllows3d(source, target) {
+    return source.collisionMask.length === 0 || source.collisionMask.includes(groupFor3d(target));
+  }
+
+  function pairAllowed3d(a, b) {
+    return maskAllows3d(a, b) && maskAllows3d(b, a);
+  }
+
+  function penetrationNormal3d(a, b) {
+    const overlapsByAxis = [
+      { axis: 'x', amount: Math.min((a.x + a.width) - b.x, (b.x + b.width) - a.x), sign: (a.x + (a.width / 2)) <= (b.x + (b.width / 2)) ? -1 : 1 },
+      { axis: 'y', amount: Math.min((a.y + a.height) - b.y, (b.y + b.height) - a.y), sign: (a.y + (a.height / 2)) <= (b.y + (b.height / 2)) ? -1 : 1 },
+      { axis: 'z', amount: Math.min((a.z + a.depth) - b.z, (b.z + b.depth) - a.z), sign: (a.z + (a.depth / 2)) <= (b.z + (b.depth / 2)) ? -1 : 1 },
+    ].sort((left, right) => left.amount - right.amount || compareCodeUnits(left.axis, right.axis));
+    const winner = overlapsByAxis[0];
+    return {
+      axis: winner.axis,
+      normal: {
+        x: winner.axis === 'x' ? winner.sign : 0,
+        y: winner.axis === 'y' ? winner.sign : 0,
+        z: winner.axis === 'z' ? winner.sign : 0,
+      },
+    };
+  }
+
+  function scene3dCollisionSummary({ world = {}, frameId = `tick-${world.tick ?? 0}` } = {}) {
+    const scene3d = world && world.scene3d && typeof world.scene3d === 'object' && !Array.isArray(world.scene3d)
+      ? world.scene3d
+      : null;
+    if (!scene3d) {
+      return {
+        schemaVersion: 'ouroforge.scene3d-collision-evidence.v1',
+        present: false,
+        frameId: String(frameId),
+        sceneId: String(world.sceneId || 'unknown-scene'),
+        colliderCount: 0,
+        activeColliderCount: 0,
+        disabledColliderCount: 0,
+        contactCount: 0,
+        triggerCount: 0,
+        invalidColliderCount: 0,
+        events: [],
+        invalidColliders: [],
+        boundary: 'Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.',
+      };
+    }
+    const colliders = Array.isArray(scene3d.colliders) ? scene3d.colliders : [];
+    const nodes = Array.isArray(scene3d.nodes) ? scene3d.nodes : [];
+    const colliderById = new Map(colliders.filter((collider) => collider && typeof collider.id === 'string').map((collider) => [collider.id, collider]));
+    const invalidColliders = [];
+    const boxes = [];
+    let disabledColliderCount = 0;
+    for (const node of nodes) {
+      const colliderRef = nodeColliderRef(node);
+      if (!colliderRef) continue;
+      const box = scene3dBoxForNode({ node, collider: colliderById.get(colliderRef), invalidColliders });
+      if (box && box.disabled) {
+        disabledColliderCount += 1;
+      } else if (box) {
+        boxes.push(box);
+      }
+    }
+    const activeBoxes = boxes.filter((box) => box.body === 'dynamic' || box.body === 'kinematic');
+    const events = [];
+    const seen = new Set();
+    for (const active of activeBoxes) {
+      for (const other of boxes) {
+        if (active.nodeId === other.nodeId) continue;
+        const id = pairId3d(active, other);
+        if (seen.has(id) || !pairAllowed3d(active, other) || !overlaps3d(active, other)) continue;
+        seen.add(id);
+        const trigger = active.trigger || other.trigger;
+        const normal = trigger ? { axis: 'none', normal: { x: 0, y: 0, z: 0 } } : penetrationNormal3d(active, other);
+        events.push({
+          tick: Number.isFinite(world.tick) ? world.tick : 0,
+          frameId: String(frameId),
+          type: trigger ? 'runtime.scene3d.collision.trigger' : 'runtime.scene3d.collision.contact',
+          pairId: id,
+          dynamicNodeId: active.nodeId,
+          otherNodeId: other.nodeId,
+          dynamicColliderId: active.colliderId,
+          otherColliderId: other.colliderId,
+          dynamicBody: active.body,
+          otherBody: other.body,
+          trigger,
+          sensor: active.sensor || other.sensor,
+          axis: normal.axis,
+          normal: normal.normal,
+        });
+      }
+    }
+    events.sort((left, right) => compareCodeUnits(left.pairId, right.pairId) || compareCodeUnits(left.type, right.type));
+    return {
+      schemaVersion: 'ouroforge.scene3d-collision-evidence.v1',
+      present: true,
+      frameId: String(frameId),
+      sceneId: String(world.sceneId || 'unknown-scene'),
+      colliderCount: colliders.length,
+      activeColliderCount: boxes.length,
+      disabledColliderCount,
+      contactCount: events.filter((event) => event.type === 'runtime.scene3d.collision.contact').length,
+      triggerCount: events.filter((event) => event.type === 'runtime.scene3d.collision.trigger').length,
+      invalidColliderCount: invalidColliders.length,
+      events,
+      invalidColliders,
+      boundary: 'Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.',
+    };
+  }
+
+  const api = Object.freeze({ rectForEntity, overlaps, detectAabbCollisions, scene3dCollisionSummary, stepAabbPhysics });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeCollision = api;
 })(typeof window !== 'undefined' ? window : globalThis);

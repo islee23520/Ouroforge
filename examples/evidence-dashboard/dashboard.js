@@ -343,6 +343,9 @@ const OuroforgeDashboard = (() => {
     const timings = profiler.timings && typeof profiler.timings === 'object' && !Array.isArray(profiler.timings) ? profiler.timings : {};
     const budget = profiler.budget && typeof profiler.budget === 'object' && !Array.isArray(profiler.budget) ? profiler.budget : {};
     const counts = profiler.counts && typeof profiler.counts === 'object' && !Array.isArray(profiler.counts) ? profiler.counts : {};
+    const scene3dCollision = summary?.scene3d_collision && typeof summary.scene3d_collision === 'object' && !Array.isArray(summary.scene3d_collision)
+      ? summary.scene3d_collision
+      : (summary?.scene3dCollision && typeof summary.scene3dCollision === 'object' && !Array.isArray(summary.scene3dCollision) ? summary.scene3dCollision : null);
     const violations = Array.isArray(profiler.violations) ? profiler.violations : [];
     const boundary = profiler.readOnlyInspection || profiler.read_only_inspection || {};
     const disallowed = Array.isArray(boundary.disallowedActions || boundary.disallowed_actions)
@@ -363,13 +366,17 @@ const OuroforgeDashboard = (() => {
       ['Draw calls', counts.drawCallCount ?? counts.draw_call_count ?? 0],
       ['Layers', counts.layerCount ?? counts.layer_count ?? 0],
       ['Collision pairs', counts.collisionPairCount ?? counts.collision_pair_count ?? 0],
+      ['3D collision', `${scene3dCollision?.contactCount ?? 0} contact / ${scene3dCollision?.triggerCount ?? 0} trigger / ${scene3dCollision?.invalidColliderCount ?? 0} invalid`],
       ['Animations/VFX/Audio', `${counts.activeAnimationCount ?? counts.active_animation_count ?? 0} / ${counts.activeVfxCount ?? counts.active_vfx_count ?? 0} / ${counts.audioEventCount ?? counts.audio_event_count ?? 0}`],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const violationRows = violations.length
       ? violations.map((violation) => `<li><strong>${escapeText(violation?.field || 'metric')}</strong>: actual ${escapeText(violation?.actualMs ?? violation?.actual_ms ?? 'missing')}ms / budget ${escapeText(violation?.budgetMs ?? violation?.budget_ms ?? 'missing')}ms</li>`).join('')
       : '<li>No frame-budget violations recorded.</li>';
+    const invalidColliderRows = Array.isArray(scene3dCollision?.invalidColliders) && scene3dCollision.invalidColliders.length
+      ? scene3dCollision.invalidColliders.map((entry) => `<li><strong>${escapeText(entry?.colliderId || entry?.colliderRef || entry?.nodeId || 'invalid 3D collider')}</strong>: ${escapeText(JSON.stringify(entry))}</li>`).join('')
+      : '<li>No invalid 3D collider evidence recorded.</li>';
     const authority = profiler.authority || 'browser_runtime_evidence_input_not_profiler_truth';
-    return `<div class="field-grid">${rows}</div><h4>Budget violations</h4><ul class="run-meta-list">${violationRows}</ul><p class="run-meta">Read-only runtime profiler evidence only; browser observations are evidence inputs, not trusted authority. Authority: ${escapeText(authority)}. Disallowed actions: ${escapeText(disallowed)}.</p>`;
+    return `<div class="field-grid">${rows}</div><h4>Budget violations</h4><ul class="run-meta-list">${violationRows}</ul><h4>Invalid 3D colliders</h4><ul class="run-meta-list">${invalidColliderRows}</ul><p class="run-meta">Read-only runtime profiler evidence only; browser observations are evidence inputs, not trusted authority. Authority: ${escapeText(authority)}. Disallowed actions: ${escapeText(disallowed)}. ${escapeText(scene3dCollision?.boundary || '')}</p>`;
   }
 
   function renderInputActionSummary(summary = {}) {

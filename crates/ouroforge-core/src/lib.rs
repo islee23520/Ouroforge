@@ -35057,6 +35057,8 @@ pub struct Scene3dGraph {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub materials: Vec<Scene3dMaterialRef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub colliders: Vec<Scene3dCollider>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cameras: Vec<Scene3dCamera>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
@@ -35148,6 +35150,39 @@ pub struct Scene3dMaterialRef {
         skip_serializing_if = "Option::is_none"
     )]
     pub texture_ref: Option<String>,
+    #[serde(default = "empty_json_object")]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Scene3dCollider {
+    pub id: String,
+    #[serde(default = "scene_3d_box_collider_shape")]
+    pub shape: String,
+    #[serde(default = "static_collider_body")]
+    pub body: String,
+    pub size: Scene3dVector,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<Scene3dVector>,
+    #[serde(default)]
+    pub sensor: bool,
+    #[serde(default)]
+    pub trigger: bool,
+    #[serde(default)]
+    pub disabled: bool,
+    #[serde(
+        default,
+        rename = "collisionGroup",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub collision_group: Option<String>,
+    #[serde(
+        default,
+        rename = "collisionMask",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub collision_mask: Vec<String>,
     #[serde(default = "empty_json_object")]
     pub metadata: serde_json::Value,
 }
@@ -35825,6 +35860,10 @@ pub struct SceneHudValue {
 
 fn default_goal_flag_value() -> bool {
     true
+}
+
+fn scene_3d_box_collider_shape() -> String {
+    "box".to_string()
 }
 
 fn default_camera_target_weight() -> i64 {
@@ -38577,6 +38616,7 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
     }
     let mesh_ids = validate_scene_3d_mesh_refs(graph)?;
     let material_ids = validate_scene_3d_material_refs(graph)?;
+    let collider_ids = validate_scene_3d_colliders(graph)?;
     validate_scene_3d_cameras(graph, &node_ids)?;
     for node in &graph.nodes {
         if let Some(parent) = &node.parent {
@@ -38639,6 +38679,13 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
                 &format!("scene3d node {} colliderRef", node.id),
                 collider_ref,
             )?;
+            if !collider_ids.is_empty() && !collider_ids.contains(collider_ref.as_str()) {
+                return Err(anyhow!(
+                    "scene3d node {} colliderRef references missing collider: {}",
+                    node.id,
+                    collider_ref
+                ));
+            }
         }
         // The 3d-scene-graph-v1 contract documents node components as bounded
         // declarations for small deterministic local scenes, so reject oversized
@@ -38651,7 +38698,13 @@ fn validate_scene_3d(scene: &SceneDocument) -> Result<()> {
             ));
         }
         for component in &node.components {
-            validate_scene_3d_component(&node.id, component, &mesh_ids, &material_ids)?;
+            validate_scene_3d_component(
+                &node.id,
+                component,
+                &mesh_ids,
+                &material_ids,
+                &collider_ids,
+            )?;
         }
         validate_scene_metadata(
             &format!("scene3d node {} metadata", node.id),
@@ -38978,6 +39031,69 @@ fn validate_scene_3d_material_refs(graph: &Scene3dGraph) -> Result<BTreeSet<&str
     Ok(material_ids)
 }
 
+fn validate_scene_3d_colliders(graph: &Scene3dGraph) -> Result<BTreeSet<&str>> {
+    const MAX_3D_COLLIDERS: usize = 64;
+    if graph.colliders.len() > MAX_3D_COLLIDERS {
+        return Err(anyhow!(
+            "scene3d colliders must not exceed {MAX_3D_COLLIDERS}"
+        ));
+    }
+    let mut collider_ids = BTreeSet::new();
+    for collider in &graph.colliders {
+        validate_path_component("scene3d collider id", &collider.id)?;
+        if !collider_ids.insert(collider.id.as_str()) {
+            return Err(anyhow!("duplicate scene3d collider id: {}", collider.id));
+        }
+        if collider.shape != "box" {
+            return Err(anyhow!(
+                "scene3d collider {} has unsupported shape: {}",
+                collider.id,
+                collider.shape
+            ));
+        }
+        match collider.body.as_str() {
+            "static" | "dynamic" | "kinematic" | "trigger" => {}
+            other => {
+                return Err(anyhow!(
+                    "scene3d collider {} has unsupported body: {}",
+                    collider.id,
+                    other
+                ));
+            }
+        }
+        validate_scene_3d_vector(
+            &format!("scene3d collider {} size", collider.id),
+            &collider.size,
+        )?;
+        if collider.size.x <= 0 || collider.size.y <= 0 || collider.size.z <= 0 {
+            return Err(anyhow!(
+                "scene3d collider {} size axes must be positive",
+                collider.id
+            ));
+        }
+        if let Some(offset) = &collider.offset {
+            validate_scene_3d_vector(&format!("scene3d collider {} offset", collider.id), offset)?;
+        }
+        if let Some(group) = &collider.collision_group {
+            validate_path_component(
+                &format!("scene3d collider {} collisionGroup", collider.id),
+                group,
+            )?;
+        }
+        for (index, mask) in collider.collision_mask.iter().enumerate() {
+            validate_path_component(
+                &format!("scene3d collider {} collisionMask[{index}]", collider.id),
+                mask,
+            )?;
+        }
+        validate_scene_metadata(
+            &format!("scene3d collider {} metadata", collider.id),
+            &collider.metadata,
+        )?;
+    }
+    Ok(collider_ids)
+}
+
 fn validate_scene_3d_base_color(field: &str, value: &str) -> Result<()> {
     let Some(hex) = value.strip_prefix('#') else {
         return Err(anyhow!("{field} must use #RRGGBB"));
@@ -38994,6 +39110,7 @@ fn validate_scene_3d_component(
     component: &Scene3dComponent,
     mesh_ids: &BTreeSet<&str>,
     material_ids: &BTreeSet<&str>,
+    collider_ids: &BTreeSet<&str>,
 ) -> Result<()> {
     validate_path_component(
         &format!("scene3d node {node_id} component kind"),
@@ -39026,6 +39143,13 @@ fn validate_scene_3d_component(
             {
                 return Err(anyhow!(
                     "scene3d node {node_id} component material reference missing material: {reference}"
+                ));
+            }
+            "collider"
+                if !collider_ids.is_empty() && !collider_ids.contains(reference.as_str()) =>
+            {
+                return Err(anyhow!(
+                    "scene3d node {node_id} component collider reference missing collider: {reference}"
                 ));
             }
             _ => {}
@@ -41624,6 +41748,7 @@ pub struct RunDashboardEngineSummaries {
     pub render_breakdown: serde_json::Value,
     pub render_queue: serde_json::Value,
     pub scene3d_render: serde_json::Value,
+    pub scene3d_collision: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
@@ -44826,6 +44951,7 @@ fn read_dashboard_engine_summaries(
             render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
             render_queue: json!({ "present": false, "emptyState": "No scene render queue evidence is available." }),
             scene3d_render: json!({ "present": false, "emptyState": "No 3D render smoke evidence is available." }),
+            scene3d_collision: json!({ "present": false, "emptyState": "No 3D collision evidence is available." }),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
@@ -44869,6 +44995,7 @@ fn read_dashboard_engine_summaries(
         render_breakdown: dashboard_render_breakdown_summary(world_state),
         render_queue: dashboard_render_queue_summary(world_state),
         scene3d_render: dashboard_scene3d_render_summary(world_state),
+        scene3d_collision: dashboard_scene3d_collision_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
@@ -45111,6 +45238,62 @@ fn dashboard_scene3d_render_summary(world_state: &serde_json::Value) -> serde_js
         "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
             "trustedEmitter": "browser-runtime-renderer",
             "browserStudioMode": "read-only 3D render smoke evidence inspection",
+            "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+        }))
+    })
+}
+
+fn dashboard_scene3d_collision_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(summary) = world_state
+        .get("scene3dCollision")
+        .or_else(|| world_state.get("scene3d_collision"))
+        .or_else(|| world_state.get("scene3dCollisionSummary"))
+        .or_else(|| world_state.get("scene3d_collision_summary"))
+    else {
+        return json!({
+            "present": false,
+            "emptyState": "No 3D collision evidence is available."
+        });
+    };
+    if !summary.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "3D collision evidence is malformed."
+        });
+    }
+    let events = summary
+        .get("events")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let invalid_colliders = summary
+        .get("invalidColliders")
+        .or_else(|| summary.get("invalid_colliders"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    json!({
+        "present": summary.get("present").and_then(|value| value.as_bool()).unwrap_or(true),
+        "schemaVersion": summary.get("schemaVersion").or_else(|| summary.get("schema_version")).cloned().unwrap_or(json!(null)),
+        "frameId": summary.get("frameId").or_else(|| summary.get("frame_id")).cloned().unwrap_or(json!(null)),
+        "sceneId": summary.get("sceneId").or_else(|| summary.get("scene_id")).cloned().unwrap_or(json!(null)),
+        "colliderCount": summary.get("colliderCount").or_else(|| summary.get("collider_count")).cloned().unwrap_or(json!(0)),
+        "activeColliderCount": summary.get("activeColliderCount").or_else(|| summary.get("active_collider_count")).cloned().unwrap_or(json!(0)),
+        "disabledColliderCount": summary.get("disabledColliderCount").or_else(|| summary.get("disabled_collider_count")).cloned().unwrap_or(json!(0)),
+        "contactCount": summary.get("contactCount").or_else(|| summary.get("contact_count")).cloned().unwrap_or_else(|| {
+            json!(events.iter().filter(|event| event.get("type").and_then(|value| value.as_str()) == Some("runtime.scene3d.collision.contact")).count())
+        }),
+        "triggerCount": summary.get("triggerCount").or_else(|| summary.get("trigger_count")).cloned().unwrap_or_else(|| {
+            json!(events.iter().filter(|event| event.get("type").and_then(|value| value.as_str()) == Some("runtime.scene3d.collision.trigger")).count())
+        }),
+        "invalidColliderCount": summary.get("invalidColliderCount").or_else(|| summary.get("invalid_collider_count")).cloned().unwrap_or_else(|| json!(invalid_colliders.len())),
+        "events": events,
+        "invalidColliders": invalid_colliders,
+        "boundary": summary.get("boundary").cloned().unwrap_or_else(|| json!("Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.")),
+        "readOnlyInspection": summary.get("readOnlyInspection").or_else(|| summary.get("read_only_inspection")).cloned().unwrap_or_else(|| json!({
+            "trustedEmitter": "browser-runtime-collision",
+            "browserStudioMode": "read-only 3D collision evidence inspection",
             "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
         }))
     })
@@ -63528,6 +63711,61 @@ scenarios:
     }
 
     #[test]
+    fn evaluates_3d_collision_trigger_events_through_collision_evidence() {
+        let scenario = Scenario {
+            id: "scene3d-collision-smoke".to_string(),
+            description: "bounded 3D collision evidence".to_string(),
+            steps: Vec::new(),
+            assertions: vec![
+                ScenarioAssertion::CollisionEvidence {
+                    collision_evidence: json_path_equals(
+                        "0.type",
+                        json!("runtime.scene3d.collision.trigger"),
+                    ),
+                },
+                ScenarioAssertion::CollisionEvidence {
+                    collision_evidence: json_path_equals("0.pairId", json!("goal:player")),
+                },
+                ScenarioAssertion::CollisionEvidence {
+                    collision_evidence: json_path_equals("0.trigger", json!(true)),
+                },
+            ],
+        };
+        let world_state = json!({
+            "collisions": [{
+                "type": "runtime.scene3d.collision.trigger",
+                "pairId": "goal:player",
+                "dynamicNodeId": "player",
+                "otherNodeId": "goal",
+                "trigger": true
+            }]
+        });
+        let none = serde_json::Value::Null;
+        let sources = assertion_sources_for_test(
+            &world_state,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &none,
+            &world_state["collisions"],
+            &none,
+            &none,
+            &none,
+            &none,
+        );
+
+        let assertions = evaluate_scenario_assertions(&scenario, &sources);
+
+        assert_eq!(assertions.len(), 3);
+        assert!(assertions
+            .iter()
+            .all(|assertion| assertion["passed"] == true));
+        assert_eq!(assertions[0]["target"], "collision_evidence");
+    }
+
+    #[test]
     fn scenario_steps_call_runtime_probe_api() {
         let mut client = CdpClient::new(RecordingRuntimeTransport { calls: Vec::new() });
 
@@ -67905,6 +68143,71 @@ scenarios:
                 .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
             let error =
                 validate_scene(&scene).expect_err("fixture rejected by mesh/material validation");
+            assert!(
+                error.to_string().contains(expected),
+                "{fixture} error {error:#} contains {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn scene_3d_colliders_v1_accept_bounded_fixture() {
+        let scene: SceneDocument = serde_json::from_str(&read_json_fixture(
+            "examples/3d-capability-gate-v1/scene-3d-collider-valid.scene.json",
+        ))
+        .expect("3D collider fixture parses");
+
+        validate_scene(&scene).expect("3D collider fixture validates");
+        let graph = scene.scene_3d.as_ref().expect("3D graph present");
+        assert_eq!(graph.colliders.len(), 2);
+        assert_eq!(graph.colliders[0].id, "player-box");
+        assert_eq!(graph.colliders[0].shape, "box");
+        assert_eq!(graph.colliders[0].body, "dynamic");
+        assert_eq!(
+            graph.colliders[0].collision_group.as_deref(),
+            Some("actors")
+        );
+        assert_eq!(
+            graph.colliders[0].collision_mask,
+            vec!["triggers".to_string(), "world".to_string()]
+        );
+        assert_eq!(graph.colliders[1].id, "goal-trigger");
+        assert_eq!(graph.colliders[1].shape, "box");
+        assert_eq!(graph.colliders[1].body, "trigger");
+        assert!(graph.colliders[1].trigger);
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.nodes[0].collider_ref.as_deref(), Some("player-box"));
+        assert_eq!(
+            graph.nodes[0].components[0].reference.as_deref(),
+            Some("player-box")
+        );
+        assert_eq!(graph.nodes[1].collider_ref.as_deref(), Some("goal-trigger"));
+        assert_eq!(
+            graph.nodes[1].components[0].reference.as_deref(),
+            Some("goal-trigger")
+        );
+    }
+
+    #[test]
+    fn scene_3d_colliders_v1_reject_missing_refs_unsupported_shapes_and_non_positive_sizes() {
+        for (fixture, expected) in [
+            (
+                "examples/3d-capability-gate-v1/scene-3d-collider-invalid-missing-ref.scene.json",
+                "scene3d node player colliderRef references missing collider: missing-box",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-collider-invalid-shape.scene.json",
+                "scene3d collider capsule-box has unsupported shape: capsule",
+            ),
+            (
+                "examples/3d-capability-gate-v1/scene-3d-collider-invalid-size.scene.json",
+                "scene3d collider flat-box size axes must be positive",
+            ),
+        ] {
+            let scene: SceneDocument = serde_json::from_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} parses before validation: {error:#}"));
+            let error =
+                validate_scene(&scene).expect_err("fixture rejected by collider validation");
             assert!(
                 error.to_string().contains(expected),
                 "{fixture} error {error:#} contains {expected}"

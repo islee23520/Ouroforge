@@ -852,6 +852,9 @@ const OuroforgeCockpit = (() => {
     const physics = summary.physics && typeof summary.physics === 'object' && !Array.isArray(summary.physics)
       ? summary.physics
       : {};
+    const scene3dCollision = summary.scene3d_collision && typeof summary.scene3d_collision === 'object' && !Array.isArray(summary.scene3d_collision)
+      ? summary.scene3d_collision
+      : (summary.scene3dCollision && typeof summary.scene3dCollision === 'object' && !Array.isArray(summary.scene3dCollision) ? summary.scene3dCollision : null);
     const warnings = [];
     if (!collision) warnings.push('collision summary missing or malformed');
     if (!transition) warnings.push('transition summary missing or malformed');
@@ -863,6 +866,12 @@ const OuroforgeCockpit = (() => {
     const collisionRows = Array.isArray(collision?.events) && collision.events.length
       ? collision.events.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'collision event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
       : '<p class="empty compact">No collision event rows exported.</p>';
+    const scene3dCollisionRows = Array.isArray(scene3dCollision?.events) && scene3dCollision.events.length
+      ? scene3dCollision.events.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || '3D collision event')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
+      : '<p class="empty compact">No 3D collision event rows exported.</p>';
+    const invalid3dColliderRows = Array.isArray(scene3dCollision?.invalidColliders) && scene3dCollision.invalidColliders.length
+      ? scene3dCollision.invalidColliders.map((entry) => `<div class="surface-row"><strong>${escapeText(entry?.colliderId || entry?.colliderRef || entry?.nodeId || 'invalid 3D collider')}</strong><br><small>${escapeText(compactJson(entry))}</small></div>`).join('')
+      : '<p class="empty compact">No invalid 3D collider rows exported.</p>';
     const transitionRows = Array.isArray(transition?.transitions) && transition.transitions.length
       ? transition.transitions.map((event) => `<div class="surface-row"><strong>${escapeText(event?.type || event?.kind || 'scene transition')}</strong><br><small>${escapeText(compactJson(event))}</small></div>`).join('')
       : '<p class="empty compact">No transition event rows exported.</p>';
@@ -886,12 +895,16 @@ const OuroforgeCockpit = (() => {
       ${warnings.length ? `<div class="error">${escapeText(warnings.join(' · '))}</div>` : '<div class="hint">Collision/transition/event summaries loaded.</div>'}
       <div class="field-grid">
         <div><strong>Collision</strong><br>${escapeText(collision?.colliderEntityCount ?? 0)} collider(s), ${escapeText(collision?.collisionEventCount ?? 0)} event(s)</div>
+        <div><strong>3D collision</strong><br>${escapeText(scene3dCollision?.contactCount ?? 0)} contact(s), ${escapeText(scene3dCollision?.triggerCount ?? 0)} trigger(s), ${escapeText(scene3dCollision?.invalidColliderCount ?? 0)} invalid</div>
         <div><strong>Physics contacts</strong><br>${escapeText(physics?.contactPairCount ?? 0)} pair(s), pairs ${escapeText(compactJson(physics?.contactPairs || []))}, blocked ${escapeText(compactJson(physics?.blockedMovement || {}))}</div>
         <div><strong>Transition</strong><br>${escapeText(transition?.currentSceneId ?? 'unknown scene')} · ${escapeText(transition?.declaredTransitionCount ?? 0)} declared · ${escapeText(transition?.transitionEventCount ?? 0)} event(s) · last reload ${escapeText(transition?.lastReloadStatus ?? 'none')}</div>
         <div><strong>Runtime events</strong><br>${escapeText(events?.animationEntityCount ?? 0)} animation entit(ies), ${escapeText(events?.audioEventCount ?? 0)} audio event(s), ${escapeText(events?.audioWarningCount ?? 0)} audio warning(s), ${escapeText(events?.collisionEventCount ?? 0)} collision event(s), ${escapeText(events?.vfxEventCount ?? 0)} VFX event(s)</div>
       </div>
       <h3>Collision rules</h3><div class="field-grid">${collisionRules}</div>
       <h3>Collision events</h3>${collisionRows}
+      <h3>3D collision events</h3>${scene3dCollisionRows}
+      <h3>Invalid 3D colliders</h3>${invalid3dColliderRows}
+      <p class="hint">${escapeText(scene3dCollision?.boundary || 'Read-only bounded 3D collision evidence; no full 3D physics engine claim.')}</p>
       <h3>Declared scene transitions</h3>${declaredTransitionRows}
       <h3>Scene transition events</h3>${transitionRows}
       <h3>Animation entities</h3><ul>${animationRows}</ul>

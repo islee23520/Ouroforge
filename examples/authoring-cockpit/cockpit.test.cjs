@@ -585,6 +585,20 @@ const run = {
       fallbackReasons: ['<missing-node>: <missing mesh>'],
       boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
     },
+    scene3d_collision: {
+      present: true,
+      frameId: 12,
+      sceneId: 'trigger-flags-v1-fixture',
+      colliderCount: 3,
+      activeColliderCount: 2,
+      disabledColliderCount: 1,
+      contactCount: 1,
+      triggerCount: 1,
+      invalidColliderCount: 1,
+      events: [{ type: 'runtime.scene3d.collision.trigger', pairId: '<goal:player>' }],
+      invalidColliders: [{ nodeId: '<broken>', colliderRef: '<missing-box>', reason: '<missing collider>' }],
+      boundary: 'Read-only bounded 3D collision evidence; no full 3D physics engine, rigidbody parity, ragdoll, joints, vehicle, or character-controller maturity claim.',
+    },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 1, activeStateCount: 1 },
@@ -988,9 +1002,14 @@ assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /bus sfx/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /VFX events/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /run-dust/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /state run/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /3D collision/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /1 contact\(s\), 1 trigger\(s\), 1 invalid/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /&lt;missing collider&gt;/);
+assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /no full 3D physics engine/);
+assert.doesNotMatch(cockpit.renderRuntimeEventInspectionSurface(run), /<missing/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: '<bad>', transition: null, events: [] } }), /collision summary missing or malformed/);
 assert.match(cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: false, empty_state: '<script>events</script>' } }), /&lt;script&gt;events&lt;\/script&gt;/);
-const xssRuntimeEvents = cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: { present: true, rules: { '<script>': { bad: '<img>' } }, colliderEntityCount: 1, collisionEventCount: 1, events: [{ type: '<script>', payload: '<img>' }] }, transition: { present: true, currentSceneId: '<svg>', declaredTransitionCount: 1, declaredTransitions: [{ id: '<b>', toScene: '<img>' }], transitionEventCount: 1, transitions: [{ type: '<b>', to: '<img>' }], lastReloadStatus: '<i>' }, events: { present: true, animationEntityCount: 1, audioEventCount: 1, audioWarningCount: 1, collisionEventCount: 1, vfxEventCount: 1, animationEntities: [{ entityId: '<img>', mode: '<svg>', activeState: '<b>', currentClip: '<script>', frameIndex: 1 }], audioEvents: [{ name: '<script>', intentKind: '<svg>', busId: '<img>', type: '<b>', clipId: '<i>' }], audioWarnings: [{ warning: '<script>', requestId: '<img>' }], vfxEvents: [{ emitterId: '<script>', kind: '<img>' }] } } });
+const xssRuntimeEvents = cockpit.renderRuntimeEventInspectionSurface({ engine_summaries: { present: true, collision: { present: true, rules: { '<script>': { bad: '<img>' } }, colliderEntityCount: 1, collisionEventCount: 1, events: [{ type: '<script>', payload: '<img>' }] }, scene3d_collision: { present: true, contactCount: 0, triggerCount: 1, invalidColliderCount: 1, events: [{ type: '<script>3d</script>', pairId: '<img>' }], invalidColliders: [{ colliderRef: '<svg>', reason: '<b>' }], boundary: '<i>boundary</i>' }, transition: { present: true, currentSceneId: '<svg>', declaredTransitionCount: 1, declaredTransitions: [{ id: '<b>', toScene: '<img>' }], transitionEventCount: 1, transitions: [{ type: '<b>', to: '<img>' }], lastReloadStatus: '<i>' }, events: { present: true, animationEntityCount: 1, audioEventCount: 1, audioWarningCount: 1, collisionEventCount: 1, vfxEventCount: 1, animationEntities: [{ entityId: '<img>', mode: '<svg>', activeState: '<b>', currentClip: '<script>', frameIndex: 1 }], audioEvents: [{ name: '<script>', intentKind: '<svg>', busId: '<img>', type: '<b>', clipId: '<i>' }], audioWarnings: [{ warning: '<script>', requestId: '<img>' }], vfxEvents: [{ emitterId: '<script>', kind: '<img>' }] } } });
 assert.doesNotMatch(xssRuntimeEvents, /<script>|<img>|<svg>|<b>|<i>/);
 assert.match(xssRuntimeEvents, /&lt;script&gt;/);
 assert.match(cockpit.renderEngineExpansionSurface(run), /Engine Expansion state/);
