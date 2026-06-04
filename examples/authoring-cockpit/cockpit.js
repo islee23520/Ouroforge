@@ -247,6 +247,26 @@ const OuroforgeCockpit = (() => {
     });
   }
 
+
+  function buildEvidenceTimelineDiagnosticSummary(diagnostics = []) {
+    const byKind = diagnostics.reduce((acc, diagnostic) => {
+      const kind = diagnostic?.kind || 'unknown-diagnostic';
+      acc[kind] = (acc[kind] || 0) + 1;
+      return acc;
+    }, {});
+    const affectedRuns = [...new Set(diagnostics.map((diagnostic) => diagnostic?.runId || 'unknown-run'))];
+    return {
+      status: diagnostics.length ? 'attention_required' : 'ready',
+      total: diagnostics.length,
+      byKind,
+      affectedRuns,
+      reviewerActions: diagnostics.length
+        ? ['inspect generated evidence paths outside Studio', 'restore or regenerate missing evidence through trusted local workflows', 'keep Studio browser surface read-only']
+        : ['no missing or broken fixture evidence detected'],
+      forbiddenActions: ['browser_rerun_tests', 'browser_write_evidence', 'browser_apply_source_patch', 'execute_command', 'publish_deploy'],
+    };
+  }
+
   function buildEvidenceTimelineModel(runs = []) {
     const sortedRuns = [...(Array.isArray(runs) ? runs : [])].sort((left, right) => Number(left?.summary?.created_at_unix_ms || left?.summary?.createdAtUnixMs || 0) - Number(right?.summary?.created_at_unix_ms || right?.summary?.createdAtUnixMs || 0));
     const entries = sortedRuns.map((run) => {
@@ -287,6 +307,7 @@ const OuroforgeCockpit = (() => {
       comparisonCandidates,
       comparisonView: buildTimelineComparisonView(sortedRuns, entries, comparisonCandidates),
       diagnostics,
+      diagnosticSummary: buildEvidenceTimelineDiagnosticSummary(diagnostics),
       guardrails: [
         'timeline model is read-only exported evidence',
         'browser Studio does not mutate evidence, run tests, apply source patches, execute commands, publish, deploy, or write trusted files',
@@ -2107,6 +2128,19 @@ const OuroforgeCockpit = (() => {
   }
 
 
+
+  function renderEvidenceDiagnosticsSurface(model) {
+    const summary = model?.diagnosticSummary || buildEvidenceTimelineDiagnosticSummary(model?.diagnostics || []);
+    const diagnostics = Array.isArray(model?.diagnostics) ? model.diagnostics : [];
+    if (!diagnostics.length) {
+      return '<section id="evidence-diagnostics" class="panel"><h2>Evidence diagnostics</h2><p class="hint">No missing or broken fixture evidence was detected. This diagnostic surface is read-only and cannot rerun tests, mutate evidence, apply source patches, execute commands, publish, deploy, or write trusted files.</p></section>';
+    }
+    const kindRows = Object.entries(summary.byKind || {}).map(([kind, count]) => `<li>${escapeText(kind)}: ${escapeText(count)}</li>`).join('');
+    const diagnosticRows = diagnostics.map((diagnostic) => `<li><strong>${escapeText(diagnostic.runId)}</strong> · ${escapeText(diagnostic.kind)} · ${escapeText(diagnostic.artifactId)}<br><small>${escapeText(diagnostic.message)}</small></li>`).join('');
+    const actions = (summary.reviewerActions || []).map((action) => `<li>${escapeText(action)}</li>`).join('');
+    return `<section id="evidence-diagnostics" class="panel"><h2>Evidence diagnostics</h2><p class="artifact-warning">${escapeText(summary.total)} missing/broken fixture evidence diagnostic(s) require reviewer attention.</p><div class="field-grid compact"><div><strong>Status</strong><br>${escapeText(summary.status)}</div><div><strong>Affected runs</strong><br>${escapeText((summary.affectedRuns || []).join(' · '))}</div></div><h3>Diagnostic classes</h3><ul>${kindRows}</ul><h3>Details</h3><ul class="warning-list">${diagnosticRows}</ul><h3>Safe reviewer actions</h3><ul>${actions}</ul><p class="hint">Display-only diagnostics. Studio cannot rerun tests, mutate evidence, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p></section>`;
+  }
+
   function renderEvidenceComparisonView(model) {
     const comparisons = Array.isArray(model?.comparisonView) ? model.comparisonView : [];
     if (!comparisons.length) {
@@ -2152,7 +2186,7 @@ const OuroforgeCockpit = (() => {
     const diagnostics = model.diagnostics.length
       ? `<p class="artifact-warning">${escapeText(model.diagnostics.length)} timeline diagnostic(s) require reviewer attention.</p>`
       : '<p class="hint">All indexed timeline evidence is readable.</p>';
-    return `<section id="evidence-timeline" class="panel"><h2>Evidence timeline</h2><p class="hint">Read-only Studio timeline. The browser cannot mutate evidence, rerun tests, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p>${diagnostics}<ol class="timeline">${rows}</ol>${comparisons}${renderEvidenceComparisonView(model)}</section>`;
+    return `<section id="evidence-timeline" class="panel"><h2>Evidence timeline</h2><p class="hint">Read-only Studio timeline. The browser cannot mutate evidence, rerun tests, apply source patches, execute commands, publish, deploy, merge branches, or write trusted files.</p>${diagnostics}${renderEvidenceDiagnosticsSurface(model)}<ol class="timeline">${rows}</ol>${comparisons}${renderEvidenceComparisonView(model)}</section>`;
   }
 
   function renderEvidencePane(run) {
@@ -2241,7 +2275,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAssetPreviewEvidenceSurface, renderAuthoringProvenanceSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
