@@ -39558,7 +39558,9 @@ scenarios:
         .expect("missing-runId target fixture writes");
         let missing_run_error = validate_qa_worker_assignment_refs(&artifacts.run_dir, &assignment)
             .expect_err("target evidence without runId is rejected");
-        assert!(missing_run_error.to_string().contains("missing a runId/run_id"));
+        assert!(missing_run_error
+            .to_string()
+            .contains("missing a runId/run_id"));
 
         // Fail closed: target evidence missing target identity cannot reject drift.
         write_json(
