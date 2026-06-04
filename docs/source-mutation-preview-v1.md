@@ -336,3 +336,56 @@ blocked reasons, guardrails, and forbidden-action notices. They must not add
 apply controls, merge controls, command execution, browser writes, local server
 bridges, uploads, dependency changes, or any trusted source mutation behavior. A
 complete bundle is audit evidence only; it is not source apply authorization.
+
+## Scenario Coverage v6 / SMP1.11.3 coverage matrix
+
+SMP1.11.3 closes the Scenario Coverage v6 documentation and Node compatibility
+unit by recording the source patch preview coverage matrix. This PR unit is
+documentation and Node-test coverage only: it does not add source patch apply,
+new Studio/dashboard controls, trusted write paths, generated tracked artifacts,
+dependencies, CI/workflow changes, or broader product/public-launch claims.
+
+| Coverage area | Existing source of truth | Studio / dashboard compatibility evidence | Guardrail preserved |
+| --- | --- | --- | --- |
+| Preview artifact schema and evidence refs | `SourcePatchPreviewArtifact` fixtures plus Rust preview validation tests | Dashboard/Studio may render preview id, file-class/diff/sandbox/test/review refs, blocked reasons, and forbidden-action notices as escaped read-only rows. | Preview artifacts remain evidence only and do not create apply, merge, command, browser-write, or auto-accept controls. |
+| File-class and unsafe path rejection | Source file class policy and source patch target validation tests | Surfaces show blocked/review-held targets and missing evidence as diagnostics; they do not infer approval from path text. | Forbidden/generated/dependency/unsafe paths stop before sandbox evaluation or trusted writes. |
+| Diff integrity and malformed diff rejection | Patch diff integrity parser/validation tests, including malformed warning fail-closed coverage | UI copy may show diff validation status and evidence links but must not render unescaped diff content or offer partial apply. | Malformed, binary, mode-change, unsafe, or oversized diffs remain blockers before sandbox/review. |
+| Sandbox dry-run pass/fail evidence | Sandbox evaluator plan/apply/test execution Rust tests and generated temporary smoke evidence | Dashboard/Studio render sandbox report/test summary refs, pass/fail state, blocked reasons, and allowlist policy ids. | Sandbox output stays generated/untracked; browser surfaces never execute commands or write trusted files. |
+| Required test command allowlist | Source patch test command allowlist and sandbox command execution tests | Surfaces display copyable/inert command text and policy ids only. | Shell, network, install, dependency, credential, destructive, apply, merge, rebase, push, and parent-workspace escape commands remain rejected. |
+| Review decision integration | Source patch review decision link tests and review read model | UI may display review status, decision refs, required tests, and blockers as escaped evidence. | A `reviewed` state is not trusted source apply authorization; durable decisions remain Rust/CLI/review-ledger owned. |
+| Evidence bundle links | Source patch evidence bundle tests and dashboard/cockpit Node smokes | Node tests assert bundle refs, linked evidence, forbidden actions, and hostile strings are escaped/read-only in both dashboard and Studio cockpit. | Evidence bundles remain audit links; no browser apply, merge, command bridge, upload, local server bridge, or trusted write is introduced. |
+| Generated-state policy and issue governance | Generated-state audits, ignored sandbox roots, and #365/#1/#23 live checks | PR/issue evidence records generated artifacts as untracked and keeps #1/#23 open. | Generated preview, sandbox, report, dashboard, and run artifacts remain untracked unless explicitly fixture-scoped. |
+
+SMP1.11.3 Node compatibility evidence is the static surface gate:
+
+```bash
+node --check examples/evidence-dashboard/dashboard.js
+node examples/evidence-dashboard/dashboard.test.cjs
+node --check examples/authoring-cockpit/cockpit.js
+node examples/authoring-cockpit/cockpit.test.cjs
+```
+
+The matrix above is intentionally conservative. It documents Scenario Coverage
+v6 regression coverage and keeps Studio/dashboard surfaces read-only while Rust
+validation, sandbox evaluation, review linkage, evidence bundles, and
+generated-state cleanup remain the trusted boundary.
+
+### Known gaps and out-of-scope behavior
+
+Scenario Coverage v6 is a regression suite, not a product-expansion milestone.
+The coverage matrix intentionally does **not** claim:
+
+- source patch apply to the trusted worktree, branch merge/rebase automation, or
+  auto-accept/auto-apply behavior;
+- browser-side trusted file writes, uploads, command execution, local server
+  bridges, dependency/network/install/credential commands, or hidden shell use;
+- secure production sandbox guarantees for arbitrary untrusted content;
+- plugin runtime, native export, hosted/cloud/server/auth, production editor,
+  public launch automation, or Godot replacement capability; or
+- committed generated preview, sandbox, report, dashboard, run, smoke output,
+  screenshot, log, or package artifacts outside explicit source-like fixtures.
+
+Remaining gaps after #365 are roadmap scope, not regressions in this suite:
+trusted source apply, production-grade sandboxing, richer Studio affordances,
+release/export packaging, plugin execution, and public launch readiness all
+require later issue contracts and fresh guardrail reviews.

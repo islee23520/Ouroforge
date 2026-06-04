@@ -826,6 +826,37 @@ assert.match(dashboard.renderSourcePatchEvidenceBundles(run), /Review: reviewed/
 assert.match(dashboard.renderSourcePatchEvidenceBundles(run), /Linked evidence: source-patch-preview:mutation\/preview.json/);
 assert.match(dashboard.renderSourcePatchEvidenceBundles(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchEvidenceBundles(run), /<button|applyCommand|mergeCommand/);
+const sourcePatchBundleXssRun = {
+  mutation_artifacts: [{
+    id: 'source-patch-evidence-bundle',
+    path: 'mutation/source-patch-evidence-bundle.json',
+    value: {
+      bundleId: '<bundle-xss>',
+      patchPreviewId: '<preview-xss>',
+      status: 'complete',
+      patchSummary: { title: '<script>preview</script>', expectedBehaviorChange: '<img src=x>', targetCount: 1, changedLines: 2 },
+      fileClassSummary: { allowed: 0, reviewHeld: 1, blocked: 0, highestRisk: '<risk>' },
+      riskIds: ['<risk-id>'],
+      linkedEvidence: [{ kind: '<script>kind</script>', path: 'sandbox/<bad>/evidence/report.json' }],
+      dryRunSummary: { status: '<passed>', allowlistPolicyId: '<policy>', reportRef: { kind: 'sandbox-dry-run-report', path: 'sandbox/<bad>/evidence/report.json' } },
+      requiredTestSummary: { total: 1, commands: ['cargo fmt --check <script>'], allowlistPolicyId: '<policy>' },
+      reviewSummary: { status: '<reviewed>', decisionRef: { kind: 'review-decision', path: 'mutation/<review>.json' } },
+      blockedReasons: ['<manual review required>'],
+      previewRef: { kind: 'source-patch-preview', path: 'mutation/<preview>.json' },
+      fileClassReportRef: { kind: 'file-class-report', path: 'evidence/<file-class>.json' },
+      diffIntegrityReportRef: { kind: 'diff-integrity-report', path: 'evidence/<diff>.json' },
+      sandboxReportRef: { kind: 'sandbox-dry-run-report', path: 'sandbox/<bad>/evidence/report.json' },
+      testSummaryRef: { kind: 'test-summary', path: 'sandbox/<bad>/evidence/tests.json' },
+      reviewDecisionRef: { kind: 'review-decision', path: 'mutation/<review>.json' },
+      forbiddenActionNotices: [{ action: '<apply_patch>', reason: '<forbidden>' }],
+      guardrails: ['read-only <guardrail>'],
+    },
+  }],
+};
+const sourcePatchBundleXssMarkup = dashboard.renderSourcePatchEvidenceBundles(sourcePatchBundleXssRun);
+assert.match(sourcePatchBundleXssMarkup, /&lt;bundle-xss&gt;/);
+assert.match(sourcePatchBundleXssMarkup, /sandbox\/&lt;bad&gt;\/evidence\/report\.json/);
+assert.doesNotMatch(sourcePatchBundleXssMarkup, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
 assert.match(dashboard.renderSourcePatchApplyTransactions(run), /Source patch apply transaction/);
 assert.match(dashboard.renderSourcePatchApplyTransactions(run), /apply-tx-1/);
 assert.match(dashboard.renderSourcePatchApplyTransactions(run), /ready_metadata_only_no_apply_authority/);
