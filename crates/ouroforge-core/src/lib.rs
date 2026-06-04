@@ -3618,7 +3618,7 @@ pub struct ProductionEvidenceBundleLaneOutput {
     pub blocked_reasons: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProductionEvidenceBundleLane {
     TaskBoard,
@@ -3720,6 +3720,8 @@ impl ProductionEvidenceBundle {
         self.generated_state.validate()?;
         require_text("production evidence bundle boundary", &self.boundary)?;
         self.validate_status_requirements()?;
+        self.validate_reference_integrity()?;
+        self.validate_lane_coherence()?;
         self.validate_guardrail_language()?;
         Ok(())
     }
@@ -3777,6 +3779,246 @@ impl ProductionEvidenceBundle {
         Ok(())
     }
 
+    fn validate_reference_integrity(&self) -> Result<()> {
+        let mut ids = BTreeSet::new();
+        for (field, reference) in self.primary_refs() {
+            validate_unique_bundle_ref_id(field, reference, &mut ids)?;
+        }
+        for (field, refs) in self.ref_groups() {
+            for (index, reference) in refs.iter().enumerate() {
+                validate_unique_bundle_ref_id(&format!("{field}[{index}]"), reference, &mut ids)?;
+            }
+        }
+
+        for missing_ref in &self.missing_refs {
+            if !self.ref_status_target_is_known(missing_ref) {
+                return Err(anyhow!(
+                    "production evidence bundle missingRefs target is unknown: {missing_ref}"
+                ));
+            }
+        }
+        for stale_ref in &self.stale_refs {
+            if !self.ref_status_target_is_known(stale_ref) {
+                return Err(anyhow!(
+                    "production evidence bundle staleRefs target is unknown: {stale_ref}"
+                ));
+            }
+        }
+        for (index, missing_review) in self.missing_reviews.iter().enumerate() {
+            if !self.ref_matches_any(&missing_review.work_package_ref, &self.work_package_refs) {
+                return Err(anyhow!(
+                    "production evidence bundle missingReviews[{index}].workPackageRef must match workPackageRefs"
+                ));
+            }
+        }
+        for (index, conflict) in self.unresolved_conflicts.iter().enumerate() {
+            if !conflict
+                .ownership_refs
+                .iter()
+                .all(|reference| self.ref_matches(reference, &self.ownership_policy_ref))
+            {
+                return Err(anyhow!(
+                    "production evidence bundle unresolvedConflicts[{index}].ownershipRefs must match ownershipPolicyRef"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_lane_coherence(&self) -> Result<()> {
+        let mut lanes = BTreeSet::new();
+        for (index, lane_output) in self.lane_outputs.iter().enumerate() {
+            if !lanes.insert(lane_output.lane) {
+                return Err(anyhow!(
+                    "production evidence bundle duplicate laneOutput lane: {}",
+                    lane_output.lane.as_str()
+                ));
+            }
+            let expected_refs = self.expected_lane_refs(lane_output.lane);
+            for evidence_ref in &lane_output.evidence_refs {
+                if !self.ref_matches_any(evidence_ref, &expected_refs) {
+                    return Err(anyhow!(
+                        "production evidence bundle laneOutputs[{index}].evidenceRefs must match top-level refs for lane {}",
+                        lane_output.lane.as_str()
+                    ));
+                }
+            }
+        }
+        for lane in ProductionEvidenceBundleLane::all() {
+            if !lanes.contains(lane) {
+                return Err(anyhow!(
+                    "production evidence bundle laneOutputs missing lane {}",
+                    lane.as_str()
+                ));
+            }
+        }
+        match self.status {
+            ProductionEvidenceBundleStatus::Complete => {
+                if self
+                    .lane_outputs
+                    .iter()
+                    .any(|lane| lane.status != ProductionEvidenceBundleLaneStatus::Present)
+                {
+                    return Err(anyhow!(
+                        "complete production evidence bundle requires all laneOutputs to be present"
+                    ));
+                }
+            }
+            ProductionEvidenceBundleStatus::Partial => {
+                self.require_lane_status(
+                    ProductionEvidenceBundleLaneStatus::Partial,
+                    "partial production evidence bundle requires at least one partial laneOutput",
+                )?;
+            }
+            ProductionEvidenceBundleStatus::Blocked => {
+                self.require_lane_status(
+                    ProductionEvidenceBundleLaneStatus::Blocked,
+                    "blocked production evidence bundle requires at least one blocked laneOutput",
+                )?;
+            }
+            ProductionEvidenceBundleStatus::Stale => {
+                self.require_lane_status(
+                    ProductionEvidenceBundleLaneStatus::Stale,
+                    "stale production evidence bundle requires at least one stale laneOutput",
+                )?;
+            }
+            ProductionEvidenceBundleStatus::UnresolvedConflict => {
+                self.require_lane_status(
+                    ProductionEvidenceBundleLaneStatus::Blocked,
+                    "unresolved-conflict production evidence bundle requires at least one blocked laneOutput",
+                )?;
+            }
+            ProductionEvidenceBundleStatus::MissingReview => {
+                if self.lane_outputs.iter().all(|lane| {
+                    lane.lane != ProductionEvidenceBundleLane::ReviewCritic
+                        || !matches!(
+                            lane.status,
+                            ProductionEvidenceBundleLaneStatus::Missing
+                                | ProductionEvidenceBundleLaneStatus::Partial
+                                | ProductionEvidenceBundleLaneStatus::Blocked
+                        )
+                }) {
+                    return Err(anyhow!(
+                        "missing-review production evidence bundle requires review-critic laneOutput to be missing, partial, or blocked"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn require_lane_status(
+        &self,
+        status: ProductionEvidenceBundleLaneStatus,
+        message: &'static str,
+    ) -> Result<()> {
+        if self.lane_outputs.iter().any(|lane| lane.status == status) {
+            Ok(())
+        } else {
+            Err(anyhow!(message))
+        }
+    }
+
+    fn primary_refs(&self) -> Vec<(&'static str, &AuthoringLoopArtifactRef)> {
+        vec![
+            ("taskBoardRef", &self.task_board_ref),
+            ("roleModelRef", &self.role_model_ref),
+            ("ownershipPolicyRef", &self.ownership_policy_ref),
+        ]
+    }
+
+    fn ref_groups(&self) -> Vec<(&'static str, &[AuthoringLoopArtifactRef])> {
+        vec![
+            ("workPackageRefs", &self.work_package_refs),
+            ("handoffRefs", &self.handoff_refs),
+            ("stateSnapshotRefs", &self.state_snapshot_refs),
+            ("reviewDecisionRefs", &self.review_decision_refs),
+            ("qaResultRefs", &self.qa_result_refs),
+            (
+                "performanceRegressionRefs",
+                &self.performance_regression_refs,
+            ),
+            ("decisionLedgerRefs", &self.decision_ledger_refs),
+            ("outcomeRefs", &self.outcome_refs),
+        ]
+    }
+
+    fn expected_lane_refs(
+        &self,
+        lane: ProductionEvidenceBundleLane,
+    ) -> Vec<AuthoringLoopArtifactRef> {
+        match lane {
+            ProductionEvidenceBundleLane::TaskBoard => vec![self.task_board_ref.clone()],
+            ProductionEvidenceBundleLane::RoleModel => vec![self.role_model_ref.clone()],
+            ProductionEvidenceBundleLane::Ownership => vec![self.ownership_policy_ref.clone()],
+            ProductionEvidenceBundleLane::WorkPackage => self.work_package_refs.clone(),
+            ProductionEvidenceBundleLane::Handoff => self.handoff_refs.clone(),
+            ProductionEvidenceBundleLane::StateSnapshot => self.state_snapshot_refs.clone(),
+            ProductionEvidenceBundleLane::ReviewCritic => self.review_decision_refs.clone(),
+            ProductionEvidenceBundleLane::Qa => self.qa_result_refs.clone(),
+            ProductionEvidenceBundleLane::PerformanceRegression => {
+                self.performance_regression_refs.clone()
+            }
+            ProductionEvidenceBundleLane::DecisionLedger => self.decision_ledger_refs.clone(),
+            ProductionEvidenceBundleLane::Outcome => self.outcome_refs.clone(),
+        }
+    }
+
+    fn ref_status_target_is_known(&self, target: &str) -> bool {
+        let target = target.to_ascii_lowercase();
+        let known_fields = [
+            "taskboardref",
+            "rolemodelref",
+            "ownershippolicyref",
+            "workpackagerefs",
+            "handoffrefs",
+            "statesnapshotrefs",
+            "reviewdecisionrefs",
+            "qaresultrefs",
+            "performanceregressionrefs",
+            "decisionledgerrefs",
+            "outcomerefs",
+            "laneoutputs",
+        ];
+        known_fields.iter().any(|field| target.contains(field))
+            || self
+                .all_top_level_refs()
+                .iter()
+                .any(|reference| target.contains(&reference.id.to_ascii_lowercase()))
+            || ProductionEvidenceBundleLane::all()
+                .iter()
+                .any(|lane| target.contains(lane.as_str()))
+    }
+
+    fn all_top_level_refs(&self) -> Vec<AuthoringLoopArtifactRef> {
+        let mut refs = self
+            .primary_refs()
+            .into_iter()
+            .map(|(_, reference)| reference.clone())
+            .collect::<Vec<_>>();
+        for (_, group) in self.ref_groups() {
+            refs.extend(group.iter().cloned());
+        }
+        refs
+    }
+
+    fn ref_matches_any(
+        &self,
+        reference: &AuthoringLoopArtifactRef,
+        refs: &[AuthoringLoopArtifactRef],
+    ) -> bool {
+        refs.iter()
+            .any(|candidate| self.ref_matches(reference, candidate))
+    }
+
+    fn ref_matches(
+        &self,
+        reference: &AuthoringLoopArtifactRef,
+        candidate: &AuthoringLoopArtifactRef,
+    ) -> bool {
+        reference.id == candidate.id && reference.path == candidate.path
+    }
+
     fn validate_guardrail_language(&self) -> Result<()> {
         let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
         for phrase in [
@@ -3820,6 +4062,40 @@ impl ProductionEvidenceBundleStatus {
             ProductionEvidenceBundleStatus::Stale => "stale",
             ProductionEvidenceBundleStatus::UnresolvedConflict => "unresolved-conflict",
             ProductionEvidenceBundleStatus::MissingReview => "missing-review",
+        }
+    }
+}
+
+impl ProductionEvidenceBundleLane {
+    fn all() -> &'static [ProductionEvidenceBundleLane] {
+        &[
+            ProductionEvidenceBundleLane::TaskBoard,
+            ProductionEvidenceBundleLane::RoleModel,
+            ProductionEvidenceBundleLane::Ownership,
+            ProductionEvidenceBundleLane::WorkPackage,
+            ProductionEvidenceBundleLane::Handoff,
+            ProductionEvidenceBundleLane::StateSnapshot,
+            ProductionEvidenceBundleLane::ReviewCritic,
+            ProductionEvidenceBundleLane::Qa,
+            ProductionEvidenceBundleLane::PerformanceRegression,
+            ProductionEvidenceBundleLane::DecisionLedger,
+            ProductionEvidenceBundleLane::Outcome,
+        ]
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            ProductionEvidenceBundleLane::TaskBoard => "task-board",
+            ProductionEvidenceBundleLane::RoleModel => "role-model",
+            ProductionEvidenceBundleLane::Ownership => "ownership",
+            ProductionEvidenceBundleLane::WorkPackage => "work-package",
+            ProductionEvidenceBundleLane::Handoff => "handoff",
+            ProductionEvidenceBundleLane::StateSnapshot => "state-snapshot",
+            ProductionEvidenceBundleLane::ReviewCritic => "review-critic",
+            ProductionEvidenceBundleLane::Qa => "qa",
+            ProductionEvidenceBundleLane::PerformanceRegression => "performance-regression",
+            ProductionEvidenceBundleLane::DecisionLedger => "decision-ledger",
+            ProductionEvidenceBundleLane::Outcome => "outcome",
         }
     }
 }
@@ -3892,6 +4168,20 @@ fn validate_nonempty_refs(field: &str, refs: &[AuthoringLoopArtifactRef]) -> Res
     }
     for (index, reference) in refs.iter().enumerate() {
         reference.validate(&format!("{field}[{index}]"))?;
+    }
+    Ok(())
+}
+
+fn validate_unique_bundle_ref_id(
+    field: &str,
+    reference: &AuthoringLoopArtifactRef,
+    ids: &mut BTreeSet<String>,
+) -> Result<()> {
+    if !ids.insert(reference.id.clone()) {
+        return Err(anyhow!(
+            "production evidence bundle duplicate artifact ref id at {field}: {}",
+            reference.id
+        ));
     }
     Ok(())
 }
@@ -43027,6 +43317,82 @@ scenarios:
         let lane_error = ProductionEvidenceBundle::from_json_str(&blocked_lane.to_string())
             .expect_err("blocked lane without blocker rejects");
         assert!(format!("{lane_error:#}").contains("blocked status requires blockedReasons"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_v1_rejects_reference_and_lane_inconsistency() {
+        let complete: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+        ))
+        .expect("complete bundle json");
+
+        let mut duplicate_id = complete.clone();
+        duplicate_id["workPackageRefs"][0]["id"] = duplicate_id["taskBoardRef"]["id"].clone();
+        let duplicate_error = ProductionEvidenceBundle::from_json_str(&duplicate_id.to_string())
+            .expect_err("duplicate ref ids reject");
+        assert!(format!("{duplicate_error:#}").contains("duplicate artifact ref id"));
+
+        let mut mismatched_lane = complete.clone();
+        mismatched_lane["laneOutputs"][0]["evidenceRefs"][0] =
+            mismatched_lane["roleModelRef"].clone();
+        let mismatched_error =
+            ProductionEvidenceBundle::from_json_str(&mismatched_lane.to_string())
+                .expect_err("lane evidence must match lane refs");
+        assert!(format!("{mismatched_error:#}").contains("must match top-level refs"));
+
+        let mut missing_lane = complete.clone();
+        missing_lane["laneOutputs"]
+            .as_array_mut()
+            .expect("lane outputs")
+            .pop();
+        let missing_lane_error = ProductionEvidenceBundle::from_json_str(&missing_lane.to_string())
+            .expect_err("missing lane rejects");
+        assert!(format!("{missing_lane_error:#}").contains("missing lane"));
+
+        let mut complete_with_partial_lane = complete.clone();
+        complete_with_partial_lane["laneOutputs"][0]["status"] = json!("partial");
+        let complete_lane_error =
+            ProductionEvidenceBundle::from_json_str(&complete_with_partial_lane.to_string())
+                .expect_err("complete bundle with partial lane rejects");
+        assert!(format!("{complete_lane_error:#}").contains("requires all laneOutputs"));
+    }
+
+    #[test]
+    fn production_evidence_bundle_v1_rejects_unknown_status_targets_and_review_drift() {
+        let partial: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.partial.fixture.json",
+        ))
+        .expect("partial bundle json");
+
+        let mut unknown_missing = partial.clone();
+        unknown_missing["missingRefs"] = json!(["untracked remote worker result"]);
+        let missing_error = ProductionEvidenceBundle::from_json_str(&unknown_missing.to_string())
+            .expect_err("unknown missing ref target rejects");
+        assert!(format!("{missing_error:#}").contains("missingRefs target is unknown"));
+
+        let mut missing_review: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.missing-review.fixture.json",
+        ))
+        .expect("missing-review bundle json");
+        missing_review["missingReviews"][0]["workPackageRef"] = json!({
+            "id": "untracked-work-package",
+            "path": "runs/multi-agent-pipeline/demo/work-packages/untracked.json"
+        });
+        let review_error = ProductionEvidenceBundle::from_json_str(&missing_review.to_string())
+            .expect_err("missing review must target known work package");
+        assert!(format!("{review_error:#}").contains("must match workPackageRefs"));
+
+        let mut conflict: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/production-evidence-bundle.unresolved-conflict.fixture.json",
+        ))
+        .expect("conflict bundle json");
+        conflict["unresolvedConflicts"][0]["ownershipRefs"][0] = json!({
+            "id": "other-ownership",
+            "path": "runs/multi-agent-pipeline/demo/other-ownership.json"
+        });
+        let conflict_error = ProductionEvidenceBundle::from_json_str(&conflict.to_string())
+            .expect_err("conflict ownership ref must target known policy");
+        assert!(format!("{conflict_error:#}").contains("must match ownershipPolicyRef"));
     }
 
     #[test]
