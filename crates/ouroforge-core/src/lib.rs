@@ -38554,6 +38554,49 @@ scenarios:
     }
 
     #[test]
+    fn multi_agent_pipeline_scope_contract_preserves_v1_boundaries() {
+        let doc = fs::read_to_string(repo_fixture_path(
+            "docs/multi-agent-production-pipeline-v1.md",
+        ))
+        .expect("multi-agent production pipeline scope doc reads");
+
+        for required in [
+            "local-first, evidence-gated collaboration",
+            "Agent outputs are untrusted proposals",
+            "Browser, dashboard, and Studio surfaces are read-only or draft-only",
+            "No self-review, auto-apply, auto-merge",
+            "Generated task boards, handoffs, work packages, snapshots, evidence bundles, runs, traces, screenshots, dashboard exports, temporary projects, and local tool state remain untracked unless explicitly fixture-scoped",
+            "#666",
+            "#680",
+            "#1/#23 remaining open",
+            "current Godot replacement",
+        ] {
+            assert!(
+                doc.contains(required),
+                "scope doc is missing required boundary: {required}"
+            );
+        }
+
+        let non_goal_section = doc
+            .split("## Explicit non-goals")
+            .nth(1)
+            .expect("non-goals section exists");
+        for forbidden in [
+            "hidden background agents",
+            "remote worker pools",
+            "browser command bridges",
+            "dependency mutation",
+            "CI/workflow/build-script mutation",
+            "native export/platform packaging implementation",
+        ] {
+            assert!(
+                non_goal_section.contains(forbidden),
+                "non-goals must keep {forbidden} out of scope"
+            );
+        }
+    }
+
+    #[test]
     fn agent_role_model_v1_rejects_duplicate_and_underbounded_roles() {
         let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
         let mut value: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
