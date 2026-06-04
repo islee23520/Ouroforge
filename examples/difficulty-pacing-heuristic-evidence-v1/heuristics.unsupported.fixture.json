@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "difficulty-pacing-heuristic-evidence-v1",
+  "evidenceId": "heuristics_collect_intro_unsupported",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "placementDraftId": "placement_collect_intro",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-completion/objective_collect_and_exit_complete/read-model.json",
+  "metrics": [
+    {
+      "metricId": "advanced_fun_score",
+      "kind": "unsupported",
+      "target": { "min": 0.5, "max": 1 },
+      "unsupportedReason": "Subjective fun scoring is not supported by heuristic evidence v1."
+    }
+  ],
+  "warnings": [
+    {
+      "metricId": "advanced_fun_score",
+      "kind": "unsupported",
+      "summary": "heuristic metric is unsupported by v1"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "unsupported-report",
+      "kind": "read_model",
+      "pathHint": "evidence/difficulty-pacing/heuristics_collect_intro_unsupported/read-model.json"
+    }
+  ],
+  "status": "unsupported"
+}

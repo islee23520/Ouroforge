@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "difficulty-pacing-heuristic-evidence-v1",
+  "evidenceId": "heuristics_collect_intro_contradictory",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "placementDraftId": "placement_collect_intro",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-completion/objective_collect_and_exit_complete/read-model.json",
+  "metrics": [
+    { "metricId": "route_complexity", "kind": "route_complexity", "target": { "min": 8, "max": 3 }, "value": 4 }
+  ],
+  "warnings": [
+    {
+      "metricId": "route_complexity",
+      "kind": "contradictory_target",
+      "summary": "heuristic target min is greater than max"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "contradictory-report",
+      "kind": "intent_comparison",
+      "pathHint": "evidence/difficulty-pacing/heuristics_collect_intro_contradictory/intent-comparison.json"
+    }
+  ],
+  "status": "warning"
+}

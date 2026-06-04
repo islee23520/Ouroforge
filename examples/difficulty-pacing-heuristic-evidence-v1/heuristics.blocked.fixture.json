@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "difficulty-pacing-heuristic-evidence-v1",
+  "evidenceId": "heuristics_collect_intro_blocked",
+  "intentId": "intent_collect_intro",
+  "planId": "plan_collect_intro",
+  "placementDraftId": "placement_collect_intro",
+  "targetSceneRef": "examples/project-workspace-fixtures/valid/scenes/intro.scene.json",
+  "reachabilityEvidenceRef": "evidence/reachability-pathing/reach_collect_and_exit_intro/read-model.json",
+  "objectiveProofRef": "evidence/objective-completion/objective_collect_and_exit_complete/read-model.json",
+  "metrics": [
+    { "metricId": "level_length", "kind": "level_length", "target": { "min": 4, "max": 12 }, "value": 8 }
+  ],
+  "warnings": [],
+  "expectedEvidence": [
+    {
+      "evidenceId": "blocked-report",
+      "kind": "read_model",
+      "pathHint": "evidence/difficulty-pacing/heuristics_collect_intro_blocked/read-model.json"
+    }
+  ],
+  "status": "blocked",
+  "blockedReasons": [
+    "Reachability evidence is unavailable for this draft."
+  ]
+}

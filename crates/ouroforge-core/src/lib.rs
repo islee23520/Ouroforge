@@ -18191,6 +18191,481 @@ fn objective_completion_result_status_label(
     }
 }
 
+const DIFFICULTY_PACING_HEURISTIC_SCHEMA_VERSION: &str = "difficulty-pacing-heuristic-evidence-v1";
+const DIFFICULTY_PACING_HEURISTIC_READ_MODEL_SCHEMA_VERSION: &str =
+    "difficulty-pacing-heuristic-read-model-v1";
+const MAX_DIFFICULTY_HEURISTIC_METRICS: usize = 64;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyPacingHeuristicEvidenceArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    #[serde(rename = "intentId")]
+    pub intent_id: String,
+    #[serde(rename = "planId")]
+    pub plan_id: String,
+    #[serde(rename = "placementDraftId")]
+    pub placement_draft_id: String,
+    #[serde(rename = "targetSceneRef")]
+    pub target_scene_ref: String,
+    #[serde(rename = "reachabilityEvidenceRef")]
+    pub reachability_evidence_ref: String,
+    #[serde(rename = "objectiveProofRef")]
+    pub objective_proof_ref: String,
+    pub metrics: Vec<DifficultyHeuristicMetric>,
+    pub warnings: Vec<DifficultyHeuristicWarning>,
+    #[serde(rename = "expectedEvidence")]
+    pub expected_evidence: Vec<DifficultyHeuristicExpectedEvidence>,
+    pub status: DifficultyHeuristicEvidenceStatus,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyHeuristicMetric {
+    #[serde(rename = "metricId")]
+    pub metric_id: String,
+    pub kind: DifficultyHeuristicMetricKind,
+    pub target: DifficultyHeuristicTarget,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+    #[serde(
+        rename = "unsupportedReason",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub unsupported_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum DifficultyHeuristicMetricKind {
+    LevelLength,
+    HazardDensity,
+    PickupSpacing,
+    EnemySpacing,
+    CheckpointSpacing,
+    RouteComplexity,
+    TimingBudget,
+    ObjectiveDensity,
+    SafeZoneCoverage,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyHeuristicTarget {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyHeuristicWarning {
+    #[serde(rename = "metricId")]
+    pub metric_id: String,
+    pub kind: DifficultyHeuristicWarningKind,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum DifficultyHeuristicWarningKind {
+    BelowTarget,
+    AboveTarget,
+    MissingInput,
+    MalformedInput,
+    Unsupported,
+    ContradictoryTarget,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyHeuristicExpectedEvidence {
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub kind: DifficultyHeuristicExpectedEvidenceKind,
+    #[serde(rename = "pathHint")]
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum DifficultyHeuristicExpectedEvidenceKind {
+    MetricReport,
+    WarningReport,
+    IntentComparison,
+    ReadModel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum DifficultyHeuristicEvidenceStatus {
+    Computed,
+    Warning,
+    MissingEvidence,
+    Unsupported,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DifficultyPacingHeuristicReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "evidenceId")]
+    pub evidence_id: String,
+    pub status: String,
+    #[serde(rename = "metricCount")]
+    pub metric_count: usize,
+    #[serde(rename = "warningCount")]
+    pub warning_count: usize,
+    #[serde(rename = "missingInputCount")]
+    pub missing_input_count: usize,
+    #[serde(rename = "unsupportedCount")]
+    pub unsupported_count: usize,
+    #[serde(rename = "malformedInputCount")]
+    pub malformed_input_count: usize,
+    #[serde(rename = "linkedEvidenceRefs")]
+    pub linked_evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
+impl DifficultyPacingHeuristicEvidenceArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: DifficultyPacingHeuristicEvidenceArtifact = serde_json::from_str(input)
+            .context("failed to parse Difficulty Pacing Heuristic Evidence JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != DIFFICULTY_PACING_HEURISTIC_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "difficulty pacing heuristic schemaVersion must be {DIFFICULTY_PACING_HEURISTIC_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("difficulty heuristic evidenceId", &self.evidence_id)?;
+        validate_path_component("difficulty heuristic intentId", &self.intent_id)?;
+        validate_path_component("difficulty heuristic planId", &self.plan_id)?;
+        validate_path_component(
+            "difficulty heuristic placementDraftId",
+            &self.placement_draft_id,
+        )?;
+        validate_repo_relative_source_ref(
+            "difficulty heuristic targetSceneRef",
+            &self.target_scene_ref,
+        )?;
+        if !self.target_scene_ref.ends_with(".scene.json") {
+            return Err(anyhow!(
+                "difficulty heuristic targetSceneRef must point to a .scene.json fixture"
+            ));
+        }
+        validate_evidence_artifact_path(&self.reachability_evidence_ref)?;
+        validate_evidence_artifact_path(&self.objective_proof_ref)?;
+        validate_difficulty_heuristic_metrics(&self.metrics)?;
+        validate_difficulty_expected_evidence(&self.evidence_id, &self.expected_evidence)?;
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("difficulty heuristic blockedReasons", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("difficulty heuristic guardrails", guardrail)?;
+        }
+        let expected_warnings = evaluate_difficulty_heuristics(&self.metrics)?;
+        if self.warnings != expected_warnings {
+            return Err(anyhow!("difficulty heuristic warning drift"));
+        }
+        validate_difficulty_status(self.status, &self.warnings, &self.blocked_reasons)
+    }
+}
+
+pub fn difficulty_pacing_heuristic_read_model_from_json_str(
+    input: &str,
+) -> Result<DifficultyPacingHeuristicReadModel> {
+    let artifact = DifficultyPacingHeuristicEvidenceArtifact::from_json_str(input)?;
+    Ok(difficulty_pacing_heuristic_read_model(&artifact))
+}
+
+pub fn difficulty_pacing_heuristic_read_model(
+    artifact: &DifficultyPacingHeuristicEvidenceArtifact,
+) -> DifficultyPacingHeuristicReadModel {
+    let count_warnings = |kind| {
+        artifact
+            .warnings
+            .iter()
+            .filter(|warning| warning.kind == kind)
+            .count()
+    };
+    DifficultyPacingHeuristicReadModel {
+        schema_version: DIFFICULTY_PACING_HEURISTIC_READ_MODEL_SCHEMA_VERSION.to_string(),
+        evidence_id: artifact.evidence_id.clone(),
+        status: difficulty_status_label(artifact.status).to_string(),
+        metric_count: artifact.metrics.len(),
+        warning_count: artifact.warnings.len(),
+        missing_input_count: count_warnings(DifficultyHeuristicWarningKind::MissingInput),
+        unsupported_count: count_warnings(DifficultyHeuristicWarningKind::Unsupported),
+        malformed_input_count: count_warnings(DifficultyHeuristicWarningKind::MalformedInput),
+        linked_evidence_refs: std::iter::once(artifact.reachability_evidence_ref.clone())
+            .chain(std::iter::once(artifact.objective_proof_ref.clone()))
+            .chain(
+                artifact
+                    .expected_evidence
+                    .iter()
+                    .map(|evidence| evidence.path_hint.clone()),
+            )
+            .collect(),
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only difficulty, pacing, and balance heuristic evidence; transparent local metrics only, not a fun score, not a quality guarantee, no scene writes, no trusted apply, no browser command bridge, no auto-apply, and no auto-merge.".to_string(),
+    }
+}
+
+fn validate_difficulty_heuristic_metrics(metrics: &[DifficultyHeuristicMetric]) -> Result<()> {
+    if metrics.is_empty() || metrics.len() > MAX_DIFFICULTY_HEURISTIC_METRICS {
+        return Err(anyhow!(
+            "difficulty heuristic metrics must contain between 1 and {MAX_DIFFICULTY_HEURISTIC_METRICS} entries"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for metric in metrics {
+        validate_path_component("difficulty heuristic metrics.metricId", &metric.metric_id)?;
+        if metric.target.min.is_none() && metric.target.max.is_none() {
+            return Err(anyhow!(
+                "difficulty heuristic metric target must set min, max, or both"
+            ));
+        }
+        if let Some(value) = metric.target.min {
+            validate_difficulty_number("difficulty heuristic target.min", value)?;
+        }
+        if let Some(value) = metric.target.max {
+            validate_difficulty_number("difficulty heuristic target.max", value)?;
+        }
+        if let Some(value) = metric.value {
+            validate_difficulty_number("difficulty heuristic value", value)?;
+        }
+        if metric.kind == DifficultyHeuristicMetricKind::Unsupported
+            && metric.unsupported_reason.is_none()
+        {
+            return Err(anyhow!(
+                "difficulty heuristic unsupported metric requires unsupportedReason"
+            ));
+        }
+        if let Some(reason) = &metric.unsupported_reason {
+            require_bounded_display_text("difficulty heuristic unsupportedReason", reason)?;
+        }
+        if !ids.insert(metric.metric_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate difficulty heuristic metrics.metricId: {}",
+                metric.metric_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_difficulty_number(label: &str, value: f64) -> Result<()> {
+    if !value.is_finite() {
+        return Err(anyhow!("{label} must be finite"));
+    }
+    Ok(())
+}
+
+fn validate_difficulty_expected_evidence(
+    evidence_id: &str,
+    values: &[DifficultyHeuristicExpectedEvidence],
+) -> Result<()> {
+    if values.is_empty() {
+        return Err(anyhow!(
+            "difficulty heuristic expectedEvidence must not be empty"
+        ));
+    }
+    let expected_prefix = format!("evidence/difficulty-pacing/{evidence_id}/");
+    let mut ids = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for evidence in values {
+        validate_path_component(
+            "difficulty heuristic expectedEvidence.evidenceId",
+            &evidence.evidence_id,
+        )?;
+        validate_evidence_artifact_path(&evidence.path_hint)?;
+        if !evidence.path_hint.starts_with(&expected_prefix)
+            || !evidence.path_hint.ends_with(".json")
+        {
+            return Err(anyhow!(
+                "difficulty heuristic expectedEvidence.pathHint must be JSON evidence under {expected_prefix}"
+            ));
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate difficulty heuristic expectedEvidence.evidenceId: {}",
+                evidence.evidence_id
+            ));
+        }
+        if !paths.insert(evidence.path_hint.as_str()) {
+            return Err(anyhow!(
+                "duplicate difficulty heuristic expectedEvidence.pathHint: {}",
+                evidence.path_hint
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_difficulty_heuristics(
+    metrics: &[DifficultyHeuristicMetric],
+) -> Result<Vec<DifficultyHeuristicWarning>> {
+    let mut warnings = Vec::new();
+    for metric in metrics {
+        if let (Some(min), Some(max)) = (metric.target.min, metric.target.max) {
+            if min > max {
+                warnings.push(difficulty_warning(
+                    metric,
+                    DifficultyHeuristicWarningKind::ContradictoryTarget,
+                    "heuristic target min is greater than max",
+                ));
+                continue;
+            }
+        }
+        if metric.kind == DifficultyHeuristicMetricKind::Unsupported {
+            warnings.push(difficulty_warning(
+                metric,
+                DifficultyHeuristicWarningKind::Unsupported,
+                "heuristic metric is unsupported by v1",
+            ));
+            continue;
+        }
+        let Some(value) = metric.value else {
+            warnings.push(difficulty_warning(
+                metric,
+                DifficultyHeuristicWarningKind::MissingInput,
+                "heuristic metric is missing input value",
+            ));
+            continue;
+        };
+        if value < 0.0 {
+            warnings.push(difficulty_warning(
+                metric,
+                DifficultyHeuristicWarningKind::MalformedInput,
+                "heuristic metric value must be non-negative",
+            ));
+            continue;
+        }
+        if metric.target.min.is_some_and(|min| value < min) {
+            warnings.push(difficulty_warning(
+                metric,
+                DifficultyHeuristicWarningKind::BelowTarget,
+                "heuristic metric is below target range",
+            ));
+        } else if metric.target.max.is_some_and(|max| value > max) {
+            warnings.push(difficulty_warning(
+                metric,
+                DifficultyHeuristicWarningKind::AboveTarget,
+                "heuristic metric is above target range",
+            ));
+        }
+    }
+    Ok(warnings)
+}
+
+fn difficulty_warning(
+    metric: &DifficultyHeuristicMetric,
+    kind: DifficultyHeuristicWarningKind,
+    summary: &str,
+) -> DifficultyHeuristicWarning {
+    DifficultyHeuristicWarning {
+        metric_id: metric.metric_id.clone(),
+        kind,
+        summary: summary.to_string(),
+    }
+}
+
+fn validate_difficulty_status(
+    status: DifficultyHeuristicEvidenceStatus,
+    warnings: &[DifficultyHeuristicWarning],
+    blocked_reasons: &[String],
+) -> Result<()> {
+    let has_missing = warnings
+        .iter()
+        .any(|warning| warning.kind == DifficultyHeuristicWarningKind::MissingInput);
+    let has_unsupported = warnings
+        .iter()
+        .any(|warning| warning.kind == DifficultyHeuristicWarningKind::Unsupported);
+    match status {
+        DifficultyHeuristicEvidenceStatus::Computed
+            if warnings.is_empty() && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        DifficultyHeuristicEvidenceStatus::Warning
+            if !warnings.is_empty()
+                && !has_missing
+                && !has_unsupported
+                && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        DifficultyHeuristicEvidenceStatus::MissingEvidence
+            if has_missing && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        DifficultyHeuristicEvidenceStatus::Unsupported
+            if has_unsupported && blocked_reasons.is_empty() =>
+        {
+            Ok(())
+        }
+        DifficultyHeuristicEvidenceStatus::Stale if !blocked_reasons.is_empty() => Ok(()),
+        DifficultyHeuristicEvidenceStatus::Blocked if !blocked_reasons.is_empty() => Ok(()),
+        DifficultyHeuristicEvidenceStatus::Computed => Err(anyhow!(
+            "difficulty heuristic computed status requires no warnings or blockedReasons"
+        )),
+        DifficultyHeuristicEvidenceStatus::Warning => Err(anyhow!(
+            "difficulty heuristic warning status requires non-missing non-unsupported warnings and no blockedReasons"
+        )),
+        DifficultyHeuristicEvidenceStatus::MissingEvidence => Err(anyhow!(
+            "difficulty heuristic missing_evidence status requires missing input warning and no blockedReasons"
+        )),
+        DifficultyHeuristicEvidenceStatus::Unsupported => Err(anyhow!(
+            "difficulty heuristic unsupported status requires unsupported warning and no blockedReasons"
+        )),
+        DifficultyHeuristicEvidenceStatus::Stale => Err(anyhow!(
+            "difficulty heuristic stale status requires blockedReasons"
+        )),
+        DifficultyHeuristicEvidenceStatus::Blocked => Err(anyhow!(
+            "difficulty heuristic blocked status requires blockedReasons"
+        )),
+    }
+}
+
+fn difficulty_status_label(status: DifficultyHeuristicEvidenceStatus) -> &'static str {
+    match status {
+        DifficultyHeuristicEvidenceStatus::Computed => "computed",
+        DifficultyHeuristicEvidenceStatus::Warning => "warning",
+        DifficultyHeuristicEvidenceStatus::MissingEvidence => "missing_evidence",
+        DifficultyHeuristicEvidenceStatus::Unsupported => "unsupported",
+        DifficultyHeuristicEvidenceStatus::Stale => "stale",
+        DifficultyHeuristicEvidenceStatus::Blocked => "blocked",
+    }
+}
+
 const ADVERSARIAL_INPUT_FUZZING_PLAN_SCHEMA_VERSION: &str = "adversarial-input-fuzzing-plan-v1";
 const MAX_FUZZ_PLAN_STEPS: u32 = 1_000;
 const MAX_FUZZ_PLAN_RUNS: u32 = 100;
@@ -62698,6 +63173,146 @@ scenarios:
 
         let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
         assert!(scope.contains("objective-completion-proof-v1.md"));
+    }
+
+    #[test]
+    fn difficulty_pacing_heuristic_v1_accepts_within_target_fixture_and_read_model() {
+        let fixture = include_str!(
+            "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.within-target.fixture.json"
+        );
+        let artifact = DifficultyPacingHeuristicEvidenceArtifact::from_json_str(fixture)
+            .expect("within target heuristic fixture parses");
+        assert_eq!(
+            artifact.schema_version,
+            "difficulty-pacing-heuristic-evidence-v1"
+        );
+        assert_eq!(artifact.status, DifficultyHeuristicEvidenceStatus::Computed);
+        assert!(artifact.warnings.is_empty());
+
+        let read_model = difficulty_pacing_heuristic_read_model_from_json_str(fixture)
+            .expect("difficulty heuristic read model builds");
+        assert_eq!(
+            read_model.schema_version,
+            "difficulty-pacing-heuristic-read-model-v1"
+        );
+        assert_eq!(read_model.status, "computed");
+        assert_eq!(read_model.metric_count, 4);
+        assert_eq!(read_model.warning_count, 0);
+        assert!(read_model.boundary.contains("not a fun score"));
+        assert!(read_model.boundary.contains("not a quality guarantee"));
+        assert!(read_model.boundary.contains("no trusted apply"));
+    }
+
+    #[test]
+    fn difficulty_pacing_heuristic_v1_accepts_warning_missing_unsupported_stale_and_blocked() {
+        for (fixture, expected_status, expected_warning_count) in [
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.out-of-target.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Warning,
+                2,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.missing.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::MissingEvidence,
+                1,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.unsupported.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Unsupported,
+                1,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.malformed.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Warning,
+                1,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.contradictory.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Warning,
+                1,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.stale.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Stale,
+                0,
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/heuristics.blocked.fixture.json"
+                ),
+                DifficultyHeuristicEvidenceStatus::Blocked,
+                0,
+            ),
+        ] {
+            let artifact = DifficultyPacingHeuristicEvidenceArtifact::from_json_str(fixture)
+                .expect("heuristic fixture parses");
+            assert_eq!(artifact.status, expected_status);
+            assert_eq!(artifact.warnings.len(), expected_warning_count);
+            if matches!(
+                expected_status,
+                DifficultyHeuristicEvidenceStatus::Stale | DifficultyHeuristicEvidenceStatus::Blocked
+            ) {
+                assert!(!artifact.blocked_reasons.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn difficulty_pacing_heuristic_v1_rejects_invalid_fixtures() {
+        for (fixture, expected) in [
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/invalid/malformed-evidence.fixture.json"
+                ),
+                "expectedEvidence",
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/invalid/warning-drift.fixture.json"
+                ),
+                "warning drift",
+            ),
+            (
+                include_str!(
+                    "../../../examples/difficulty-pacing-heuristic-evidence-v1/invalid/unsafe-ref.fixture.json"
+                ),
+                "must not escape",
+            ),
+        ] {
+            let error = DifficultyPacingHeuristicEvidenceArtifact::from_json_str(fixture)
+                .expect_err("invalid difficulty heuristic fixture is rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "expected error containing {expected}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn difficulty_pacing_heuristic_v1_keeps_advisory_boundary_documented() {
+        let doc = include_str!("../../../docs/difficulty-pacing-heuristic-evidence-v1.md");
+        assert!(doc.contains("evidence inputs, not game-quality truth"));
+        assert!(doc.contains("do not prove"));
+        assert!(doc.contains("no scene write"));
+        assert!(doc.contains("no trusted apply"));
+        assert!(doc.contains("auto-apply"));
+        assert!(doc.contains("auto-merge"));
+        assert!(doc.contains("No ML or AI quality scorer"));
+
+        let scope = include_str!("../../../docs/agentic-scene-level-designer-v1.md");
+        assert!(scope.contains("difficulty-pacing-heuristic-evidence-v1.md"));
     }
 
     #[test]
