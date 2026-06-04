@@ -15985,6 +15985,36 @@ pub fn validate_patch_diff_integrity_report_for_preview(
 
     for warning in &report.warnings {
         match warning.kind {
+            PatchDiffIntegrityWarningKind::MissingFileHeader => blocked_reasons.push(format!(
+                "missing file header at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::MissingHunk => blocked_reasons.push(format!(
+                "missing hunk at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::MalformedGitHeader => blocked_reasons.push(format!(
+                "malformed git header at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::MalformedFileHeader => blocked_reasons.push(format!(
+                "malformed file header at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::MalformedHunkHeader => blocked_reasons.push(format!(
+                "malformed hunk header at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
+            PatchDiffIntegrityWarningKind::HunkLineCountMismatch => blocked_reasons.push(format!(
+                "hunk line count mismatch at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
             PatchDiffIntegrityWarningKind::BinaryPatch => blocked_reasons.push(format!(
                 "binary patch marker at line {} for {}",
                 warning.line_number,
@@ -16005,7 +16035,11 @@ pub fn validate_patch_diff_integrity_report_for_preview(
                 warning.line_number,
                 warning.path.as_deref().unwrap_or("<unknown>")
             )),
-            _ => {}
+            PatchDiffIntegrityWarningKind::UnexpectedContent => blocked_reasons.push(format!(
+                "unexpected diff content at line {} for {}",
+                warning.line_number,
+                warning.path.as_deref().unwrap_or("<unknown>")
+            )),
         }
     }
 

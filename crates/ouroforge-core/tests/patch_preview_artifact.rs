@@ -1,7 +1,8 @@
 use ouroforge_core::{
-    inspect_source_patch_preview_artifact, validate_source_patch_preview_artifact,
-    PatchDiffIntegrityLimits, SourcePatchPreviewApplyStatus, SourcePatchPreviewArtifact,
-    SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
+    classify_source_patch_preview_targets, inspect_source_patch_preview_artifact,
+    validate_source_patch_preview_artifact, validate_source_patch_preview_targets,
+    PatchDiffIntegrityLimits, SourceFileClassDecision, SourcePatchPreviewApplyStatus,
+    SourcePatchPreviewArtifact, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
 };
 
 #[test]
@@ -143,6 +144,42 @@ fn source_patch_preview_validation_blocks_forbidden_required_test_metadata() {
 }
 
 #[test]
+fn source_patch_preview_validation_rejects_apply_and_merge_required_test_metadata() {
+    let cases = [
+        (
+            "git apply patch.diff",
+            vec!["git", "apply", "patch.diff"],
+            "source patch apply",
+        ),
+        (
+            "git merge preview-branch",
+            vec!["git", "merge", "preview-branch"],
+            "merge",
+        ),
+    ];
+
+    for (display, argv, expected_reason) in cases {
+        let mut artifact = fixture_artifact();
+        artifact.required_tests[0].command = display.to_string();
+        artifact.required_tests[0].argv = argv.into_iter().map(String::from).collect();
+        artifact.required_tests[0].allowlist_policy_id =
+            Some("source-patch-preview-safe-local-checks-v1".to_string());
+
+        let validation =
+            inspect_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default());
+        assert_eq!(validation.status, "blocked", "{display} must block");
+        assert!(
+            validation.blocked_reasons.iter().any(|reason| {
+                reason.contains("requiredTests command forbidden")
+                    && reason.contains(expected_reason)
+            }),
+            "{display} expected blocker containing {expected_reason:?}, got {:?}",
+            validation.blocked_reasons
+        );
+    }
+}
+
+#[test]
 fn source_patch_preview_validation_blocks_required_test_command_argv_drift() {
     let mut artifact = fixture_artifact();
     artifact.required_tests[0].command = "cargo test".to_string();
@@ -154,6 +191,43 @@ fn source_patch_preview_validation_blocks_required_test_command_argv_drift() {
         .blocked_reasons
         .iter()
         .any(|reason| reason.contains("must match normalized argv")));
+}
+
+#[test]
+fn source_patch_preview_target_class_matrix_blocks_generated_dependency_and_unsafe_paths() {
+    let validation = classify_source_patch_preview_targets([
+        "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
+        "runs/source-patch-previews/generated.json",
+        "Cargo.lock",
+        "../outside-repo.rs",
+    ]);
+
+    assert_eq!(validation.status, "blocked");
+    assert_eq!(validation.targets.len(), 4);
+    assert_eq!(
+        validation.targets[0].decision,
+        SourceFileClassDecision::Allowed
+    );
+    assert!(validation.blocked_reasons.iter().any(|reason| {
+        reason.contains("runs/source-patch-previews/generated.json") && reason.contains("generated")
+    }));
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("Cargo.lock") && reason.contains("dependency")));
+    assert!(validation.blocked_reasons.iter().any(|reason| {
+        reason.contains("../outside-repo.rs")
+            && reason.contains("absolute, rooted, prefixed, or parent-dir path")
+    }));
+
+    let error = validate_source_patch_preview_targets([
+        "examples/playable-demo-v2/collect-and-exit/scenes/game.scene.json",
+        "Cargo.lock",
+    ])
+    .expect_err("blocked target classes must fail before preview or sandbox");
+    assert!(error
+        .to_string()
+        .contains("source patch preview target class validation blocked"));
 }
 
 #[test]
@@ -179,6 +253,31 @@ fn source_patch_preview_validation_blocks_missing_evidence_and_tests() {
     assert!(error
         .to_string()
         .contains("source patch preview validation blocked"));
+}
+
+#[test]
+fn source_patch_preview_validation_blocks_malformed_diff_text_before_preview() {
+    let mut artifact = fixture_artifact();
+    artifact.diff_summary.diff_text = Some(
+        include_str!("../../../examples/patch-diff-integrity-v1/invalid/orphan_hunk.diff")
+            .to_string(),
+    );
+
+    let validation =
+        inspect_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default());
+    assert_eq!(validation.status, "blocked");
+    assert!(validation
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("diff integrity blocked") && reason.contains("file header")));
+    assert_eq!(
+        validation
+            .diff_integrity_validation
+            .as_ref()
+            .expect("malformed diff still yields read-only integrity evidence")
+            .status,
+        "blocked"
+    );
 }
 
 #[test]
