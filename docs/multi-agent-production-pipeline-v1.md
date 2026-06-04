@@ -89,6 +89,12 @@ Each issue and PR unit must record evidence for its own boundary:
 
 A closure gate passes only when the issue-specific acceptance criteria are met without broadening authority beyond this document.
 
+## Studio inspection read-model fields
+
+`studio-multi-agent-pipeline-inspection-read-model-v1` normalizes the read-only Studio inspection inputs for issue #677. It reports section status, item counts, blockers, and malformed reasons for task boards, role models, ownership policies, work packages, handoffs, review/critic lanes, QA queues, performance/regression lanes, decision ledgers, and production evidence bundles.
+
+The normalized model is display evidence only. It must not execute copyable command text, spawn agents, create hidden/background workers, write trusted browser state, bridge Studio to local commands, use cloud orchestration, auto-apply, auto-merge, or self-approve. Missing and malformed sections remain visible instead of being repaired or persisted by the browser.
+
 ## Compatibility policy
 
 Multi-agent v1 must preserve existing project, scaffold, scene, tilemap, asset, behavior, level, GDD, scenario, dashboard, and Studio contracts unless a PR includes an explicit migration note and targeted compatibility tests. Source-like fixtures may be added only when deterministic and issue-scoped.
