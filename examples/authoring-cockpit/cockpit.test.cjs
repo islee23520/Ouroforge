@@ -102,6 +102,37 @@ const run = {
       nextSafeAction: 'Restore <comparison> artifact',
     }],
   },
+
+  qa_agent_work_queues: {
+    present: true,
+    status: 'blocked',
+    boundary: 'Read-only QA queue model; Studio does not execute commands.',
+    queues: [{
+      schemaVersion: 'qa-agent-work-queue-v1',
+      queueId: '<qa-queue>',
+      milestone: 'multi-agent-production-pipeline-v1',
+      items: [{
+        queueItemId: '<qa-item>',
+        scenarioTarget: { scenarioId: '<scenario>', scenarioPackRef: { id: 'scenario-pack', path: 'examples/scenario-packs/project-smoke.scenarios.json' } },
+        riskArea: { riskId: '<risk>', category: 'scenario-regression', summary: 'Escaped <risk> summary.' },
+        runCommandContext: { command: 'cargo run -p ouroforge-cli -- run <seed> --scenario-pack smoke', boundary: 'Inert command text only; does not execute.' },
+        expectedEvidence: [{ id: 'scenario-result', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }, { id: 'evaluator-summary', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        priority: 'high',
+        assignedRole: 'qa-agent',
+        assignedAgent: '<agent>',
+        status: 'blocked',
+        taskRef: { id: 'task-board', path: 'examples/multi-agent-pipeline-v1/production-task-board.fixture.json' },
+        workPackageRef: { id: 'work-package', path: 'examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json' },
+        reviewGateRef: { id: 'review-gate', path: 'examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json' },
+        runEvidenceRefs: [{ id: 'run', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }],
+        evaluatorEvidenceRefs: [{ id: 'evaluator', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        blockedReasons: ['review <gate> missing'],
+        staleRunRefs: ['runs/multi-agent-pipeline/demo/qa/old-scenario-result.json'],
+      }],
+      forbiddenActions: ['browser command bridge', 'auto-merge'],
+      boundary: 'QA agent work queue is inert local evidence; it does not execute commands.',
+    }],
+  },
   agent_handoffs: [{
     schemaVersion: 'agent-handoff-contract-v1',
     loopId: '<handoff-loop>',
@@ -1719,6 +1750,15 @@ assert.match(multiAgentDemoDoc, /Issues #1 and #23 must remain open/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Source patch evidence bundle/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /bundle-1/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Review docs patch preview/);
+
+assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /QA agent work queue/);
+assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /&lt;qa-item&gt;/);
+assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /review &lt;gate&gt; missing/);
+assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /runs\/multi-agent-pipeline\/demo\/qa\/old-scenario-result\.json/);
+assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /Inert command text/);
+assert.doesNotMatch(cockpit.renderQaAgentWorkQueueSurface(run), /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
+assert.match(cockpit.renderQaAgentWorkQueueSurface(null), /No QA agent work queue/);
+assert.match(cockpit.renderIntegration(run), /QA agent work queue/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review-held:1/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /review_held_target/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /manual review required/);

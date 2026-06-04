@@ -684,6 +684,39 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(model.boundary || 'Read-only QA worker assignment evidence; dashboard surfaces do not spawn workers, execute commands, write trusted state, auto-fix, auto-apply, or auto-merge.')}</p>`;
   }
 
+  function renderQaAgentWorkQueues(run = {}) {
+    const model = run.qa_agent_work_queues || run.qaAgentWorkQueues || {};
+    if (!model.present) {
+      return `<p class="empty-state">${escapeText(model.empty_state || 'No QA agent work queues are available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(model.evidence_refs || model.evidenceRefs) ? (model.evidence_refs || model.evidenceRefs) : [];
+    const queues = Array.isArray(model.queues) ? model.queues : [];
+    const rows = [
+      ['Status', model.status || 'unknown'],
+      ['Queues/items', `${model.queue_count ?? model.queueCount ?? queues.length}/${model.item_count ?? model.itemCount ?? 0}`],
+      ['Passed/failed', `${model.passed_count ?? model.passedCount ?? 0}/${model.failed_count ?? model.failedCount ?? 0}`],
+      ['Deferred/blocked', `${model.deferred_count ?? model.deferredCount ?? 0}/${model.blocked_count ?? model.blockedCount ?? 0}`],
+      ['Flaky/needs-rerun', `${model.flaky_count ?? model.flakyCount ?? 0}/${model.needs_rerun_count ?? model.needsRerunCount ?? 0}`],
+      ['Malformed', model.malformed_count ?? model.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const itemRows = queues.flatMap((queue) => Array.isArray(queue.items) ? queue.items.map((item) => ({ queue, item })) : []).slice(0, 12).map(({ queue, item }) => {
+      const target = item.scenarioTarget || item.scenario_target || {};
+      const risk = item.riskArea || item.risk_area || {};
+      const command = item.runCommandContext || item.run_command_context || {};
+      const expected = Array.isArray(item.expectedEvidence || item.expected_evidence) ? (item.expectedEvidence || item.expected_evidence) : [];
+      const runRefs = Array.isArray(item.runEvidenceRefs || item.run_evidence_refs) ? (item.runEvidenceRefs || item.run_evidence_refs) : [];
+      const evaluatorRefs = Array.isArray(item.evaluatorEvidenceRefs || item.evaluator_evidence_refs) ? (item.evaluatorEvidenceRefs || item.evaluator_evidence_refs) : [];
+      const blocked = Array.isArray(item.blockedReasons || item.blocked_reasons) ? (item.blockedReasons || item.blocked_reasons) : [];
+      const stale = Array.isArray(item.staleRunRefs || item.stale_run_refs) ? (item.staleRunRefs || item.stale_run_refs) : [];
+      const review = item.reviewGateRef || item.review_gate_ref || {};
+      return `<li><strong>${escapeText(item.queueItemId || item.queue_item_id || 'qa item')}</strong>: <span class="${statusClass(item.status)}">${escapeText(item.status || 'unknown')}</span> · ${escapeText(item.priority || 'priority')} · ${escapeText(item.assignedRole || item.assigned_role || 'role')}<br><small>queue ${escapeText(queue.queueId || queue.queue_id || 'queue')} · scenario ${escapeText(target.scenarioId || target.scenario_id || 'scenario')} · risk ${escapeText(risk.riskId || risk.risk_id || 'risk')} · expected ${escapeText(expected.length)} · run/evaluator refs ${escapeText(runRefs.length)}/${escapeText(evaluatorRefs.length)} · review ${escapeText(review.path || review.id || 'missing')}</small><br><small>Inert command text: ${escapeText(command.command || 'missing')}</small>${blocked.length || stale.length ? `<br><small>Blockers/stale: ${escapeText([...blocked, ...stale].join(' · '))}</small>` : ''}</li>`;
+    }).join('') || '<li>No parseable QA queue items are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>QA queue items</h4><ul class="run-meta-list">${itemRows}</ul>
+      ${renderRefLinks('QA queue linked refs', refs, run)}
+      <p class="run-meta">${escapeText(model.boundary || 'Read-only QA agent work queues; dashboard surfaces do not execute queue commands, spawn agents, write trusted state, auto-fix, auto-apply, auto-merge, or self-approve.')}</p>`;
+  }
+
   function renderRuntimeInvariants(run = {}) {
     const invariants = run.runtime_invariants || run.runtimeInvariants || {};
     if (!invariants.present) {
@@ -1966,6 +1999,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>QA scenario candidates</h3>${renderQaScenarioCandidates(run)}</section>
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
+      <section class="panel"><h3>QA agent work queues</h3>${renderQaAgentWorkQueues(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
@@ -2062,7 +2096,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

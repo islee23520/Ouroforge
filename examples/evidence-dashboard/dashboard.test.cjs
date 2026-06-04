@@ -174,6 +174,53 @@ const run = {
       expectedEvidence: [{ evidenceId: 'scenario-result' }, { evidenceId: 'world-state' }],
     }],
   },
+
+  qa_agent_work_queues: {
+    present: true,
+    status: 'needs-rerun',
+    queue_count: 1,
+    item_count: 1,
+    passed_count: 0,
+    failed_count: 0,
+    deferred_count: 0,
+    blocked_count: 0,
+    flaky_count: 0,
+    needs_rerun_count: 1,
+    malformed_count: 0,
+    evidence_refs: [
+      'evidence/qa-agent-work-queue/queue.json',
+      'examples/scenario-packs/project-smoke.scenarios.json',
+      'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json',
+      'runs/multi-agent-pipeline/demo/qa/old-scenario-result.json',
+    ],
+    boundary: 'Read-only QA agent work queues; dashboard must not execute queue commands.',
+    queues: [{
+      schemaVersion: 'qa-agent-work-queue-v1',
+      queueId: '<qa-queue>',
+      milestone: 'multi-agent-production-pipeline-v1',
+      items: [{
+        queueItemId: '<qa-item>',
+        scenarioTarget: { scenarioId: '<scenario>', scenarioPackRef: { id: 'scenario-pack', path: 'examples/scenario-packs/project-smoke.scenarios.json' } },
+        riskArea: { riskId: '<risk>', category: 'scenario-regression', summary: 'Escaped <risk> summary.' },
+        runCommandContext: { command: 'cargo run -p ouroforge-cli -- run <seed> --scenario-pack smoke', argv: [], boundary: 'Inert command text only; does not execute.' },
+        expectedEvidence: [{ id: 'scenario-result', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }, { id: 'evaluator-summary', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        priority: 'high',
+        assignedRole: 'qa-agent',
+        assignedAgent: '<agent>',
+        status: 'needs-rerun',
+        failureClassification: 'stale-run-ref',
+        taskRef: { id: 'task-board', path: 'examples/multi-agent-pipeline-v1/production-task-board.fixture.json' },
+        workPackageRef: { id: 'work-package', path: 'examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json' },
+        reviewGateRef: { id: 'review-gate', path: 'examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json' },
+        runEvidenceRefs: [{ id: 'run', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }],
+        evaluatorEvidenceRefs: [{ id: 'evaluator', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        blockedReasons: ['refresh <stale> run evidence'],
+        staleRunRefs: ['runs/multi-agent-pipeline/demo/qa/old-scenario-result.json'],
+      }],
+      forbiddenActions: ['browser command bridge', 'auto-merge'],
+      boundary: 'QA agent work queue is inert local evidence; it does not execute commands.',
+    }],
+  },
   fuzzing_plans: {
     present: true,
     status: 'planned',
@@ -1146,6 +1193,53 @@ const xssRun = {
       expectedEvidence: [{ evidenceId: '<script>evidence</script>' }],
     }],
   },
+
+  qa_agent_work_queues: {
+    present: true,
+    status: 'needs-rerun',
+    queue_count: 1,
+    item_count: 1,
+    passed_count: 0,
+    failed_count: 0,
+    deferred_count: 0,
+    blocked_count: 0,
+    flaky_count: 0,
+    needs_rerun_count: 1,
+    malformed_count: 0,
+    evidence_refs: [
+      'evidence/qa-agent-work-queue/queue.json',
+      'examples/scenario-packs/project-smoke.scenarios.json',
+      'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json',
+      'runs/multi-agent-pipeline/demo/qa/old-scenario-result.json',
+    ],
+    boundary: 'Read-only QA agent work queues; dashboard must not execute queue commands.',
+    queues: [{
+      schemaVersion: 'qa-agent-work-queue-v1',
+      queueId: '<qa-queue>',
+      milestone: 'multi-agent-production-pipeline-v1',
+      items: [{
+        queueItemId: '<qa-item>',
+        scenarioTarget: { scenarioId: '<scenario>', scenarioPackRef: { id: 'scenario-pack', path: 'examples/scenario-packs/project-smoke.scenarios.json' } },
+        riskArea: { riskId: '<risk>', category: 'scenario-regression', summary: 'Escaped <risk> summary.' },
+        runCommandContext: { command: 'cargo run -p ouroforge-cli -- run <seed> --scenario-pack smoke', argv: [], boundary: 'Inert command text only; does not execute.' },
+        expectedEvidence: [{ id: 'scenario-result', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }, { id: 'evaluator-summary', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        priority: 'high',
+        assignedRole: 'qa-agent',
+        assignedAgent: '<agent>',
+        status: 'needs-rerun',
+        failureClassification: 'stale-run-ref',
+        taskRef: { id: 'task-board', path: 'examples/multi-agent-pipeline-v1/production-task-board.fixture.json' },
+        workPackageRef: { id: 'work-package', path: 'examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json' },
+        reviewGateRef: { id: 'review-gate', path: 'examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json' },
+        runEvidenceRefs: [{ id: 'run', path: 'runs/multi-agent-pipeline/demo/qa/scenario-result.json' }],
+        evaluatorEvidenceRefs: [{ id: 'evaluator', path: 'runs/multi-agent-pipeline/demo/qa/evaluator-summary.json' }],
+        blockedReasons: ['refresh <stale> run evidence'],
+        staleRunRefs: ['runs/multi-agent-pipeline/demo/qa/old-scenario-result.json'],
+      }],
+      forbiddenActions: ['browser command bridge', 'auto-merge'],
+      boundary: 'QA agent work queue is inert local evidence; it does not execute commands.',
+    }],
+  },
   fuzzing_plans: {
     present: true,
     status: '<script>planned</script>',
@@ -1474,6 +1568,15 @@ assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /stale-guard-1/)
 assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /fresh_guard_metadata_only_no_apply_authority/);
 assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchStaleTargetGuards(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
+
+assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
+assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);
+assert.match(dashboard.renderQaAgentWorkQueues(run), /needs-rerun/);
+assert.match(dashboard.renderQaAgentWorkQueues(run), /runs\/multi-agent-pipeline\/demo\/qa\/evaluator-summary\.json/);
+assert.match(dashboard.renderQaAgentWorkQueues(run), /Inert command text/);
+assert.doesNotMatch(dashboard.renderQaAgentWorkQueues(run), /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
+assert.match(dashboard.renderQaAgentWorkQueues({ qaAgentWorkQueues: { present: false, empty_state: 'No queues.' } }), /No queues/);
+assert.match(dashboard.renderRunDetail(run), /QA agent work queues/);
 assert.match(dashboard.renderRunDetail(run), /Source patch evidence bundle/);
 
 

@@ -70,6 +70,27 @@ evidence:
   must match the item `status`, and invalid terminal or mutation-shaped jumps
   such as `pass -> fail` are rejected.
 
+## MAP13.9.3 dashboard and Studio linkage
+
+Dashboard export indexes `qa-agent-work-queue` / `qa_agent_work_queue` artifacts
+as `qa_agent_work_queues`. The read model reports queue/item counts, status
+counts, malformed artifact count, and linked refs. Linked refs include:
+
+- scenario pack targets;
+- expected scenario/evaluator evidence;
+- observed run and evaluator evidence;
+- task board, work-package, and review-gate refs;
+- stale run refs that force visible `needs-rerun`/blocked states.
+
+Studio multi-agent pipeline inspection reads `qaAgentWorkQueue` /
+`qaAgentWorkQueues` inputs directly for the `qa-queue` section instead of only
+inferring queue readiness from task-board text. The section reports present,
+blocked, missing, empty, or malformed status from the validated queue artifact.
+The evidence dashboard and authoring cockpit render escaped, read-only QA queue
+panels. They show inert command text as copyable/display data only and do not
+create command buttons, browser command bridges, trusted writes, auto-apply,
+auto-merge, self-approval, hidden workers, or agent spawning controls.
+
 ## Generated-state policy
 
 Generated QA queue output lives under local generated roots such as

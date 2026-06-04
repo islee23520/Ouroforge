@@ -6386,6 +6386,20 @@ impl StudioMultiAgentPipelineInspectionReadModel {
             ],
             &mut malformed_reasons,
         );
+        let qa_agent_work_queues = pipeline_values(
+            value,
+            &[
+                "qa_agent_work_queues",
+                "qaAgentWorkQueues",
+                "qa_agent_work_queue",
+                "qaAgentWorkQueue",
+                "qa_work_queues",
+                "qaWorkQueues",
+                "qa_queue",
+                "qaQueue",
+            ],
+            &mut malformed_reasons,
+        );
 
         let mut sections = vec![
             pipeline_collection_section(
@@ -6431,9 +6445,7 @@ impl StudioMultiAgentPipelineInspectionReadModel {
                 |task| pipeline_text_contains_any(task, &["review", "critic"]),
             ),
             pipeline_review_critic_gate_section(&review_critic_gates, &mut malformed_reasons),
-            pipeline_lane_section("qa-queue", "QA queue", &task_boards, |task| {
-                pipeline_text_contains_any(task, &["qa", "playtest"])
-            }),
+            pipeline_qa_queue_section(&task_boards, &qa_agent_work_queues, &mut malformed_reasons),
             pipeline_lane_section(
                 "performance-regression",
                 "Performance and regression lane",
@@ -6736,6 +6748,67 @@ fn pipeline_review_critic_gate_section(
         }
         .to_string(),
         item_count: gates.len(),
+        blockers,
+        malformed_reasons: section_malformed,
+    }
+}
+
+fn pipeline_qa_queue_section(
+    task_boards: &[&serde_json::Value],
+    queues: &[&serde_json::Value],
+    malformed_reasons: &mut Vec<String>,
+) -> StudioMultiAgentPipelineInspectionSection {
+    let task_lane = pipeline_lane_section("qa-queue", "QA queue", task_boards, |task| {
+        pipeline_text_contains_any(task, &["qa", "playtest"])
+    });
+    let mut item_count = task_lane.item_count;
+    let mut blockers = task_lane.blockers;
+    let mut section_malformed = Vec::new();
+
+    for (index, queue_value) in queues.iter().enumerate() {
+        match serde_json::from_value::<QaAgentWorkQueueArtifact>((*queue_value).clone()) {
+            Ok(queue) if queue.validate().is_ok() => {
+                item_count += queue.items.len();
+                for item in &queue.items {
+                    blockers.extend(item.blocked_reasons.clone());
+                    blockers.extend(item.stale_run_refs.iter().map(|reference| {
+                        format!("{} stale run ref: {reference}", item.queue_item_id)
+                    }));
+                    if !matches!(item.status, QaAgentQueueStatus::Pass) {
+                        blockers.push(format!(
+                            "{} status {}",
+                            item.queue_item_id,
+                            item.status.as_str()
+                        ));
+                    }
+                }
+            }
+            Ok(_) => section_malformed.push(format!(
+                "qa-agent-work-queue[{index}] failed QA queue validation"
+            )),
+            Err(error) => {
+                section_malformed.push(format!("qa-agent-work-queue[{index}] malformed: {error:#}"))
+            }
+        }
+    }
+
+    malformed_reasons.extend(section_malformed.iter().cloned());
+    let status = if !section_malformed.is_empty() {
+        "malformed"
+    } else if !blockers.is_empty() {
+        "blocked"
+    } else if item_count == 0 && task_boards.is_empty() && queues.is_empty() {
+        "missing"
+    } else if item_count == 0 {
+        "empty"
+    } else {
+        "present"
+    };
+    StudioMultiAgentPipelineInspectionSection {
+        id: "qa-queue".to_string(),
+        label: "QA queue".to_string(),
+        status: status.to_string(),
+        item_count,
         blockers,
         malformed_reasons: section_malformed,
     }
@@ -14573,6 +14646,17 @@ impl QaAgentRiskArea {
 }
 
 impl QaAgentQueueStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            QaAgentQueueStatus::Pass => "pass",
+            QaAgentQueueStatus::Fail => "fail",
+            QaAgentQueueStatus::Deferred => "deferred",
+            QaAgentQueueStatus::Blocked => "blocked",
+            QaAgentQueueStatus::Flaky => "flaky",
+            QaAgentQueueStatus::NeedsRerun => "needs-rerun",
+        }
+    }
+
     fn can_transition_to(self, next: Self) -> bool {
         match (self, next) {
             (current, next) if current == next => true,
@@ -41384,6 +41468,7 @@ pub struct RunDashboardReadModel {
     pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
     pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
+    pub qa_agent_work_queues: RunDashboardQaAgentWorkQueues,
     pub fuzzing_plans: RunDashboardFuzzingPlans,
     pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
     pub route_attempts: RunDashboardRouteAttempts,
@@ -41698,6 +41783,26 @@ pub struct RunDashboardQaWorkerAssignments {
     pub malformed_count: usize,
     pub evidence_refs: Vec<String>,
     pub plans: Vec<QaWorkerAssignmentArtifact>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardQaAgentWorkQueues {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub queue_count: usize,
+    pub item_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub deferred_count: usize,
+    pub blocked_count: usize,
+    pub flaky_count: usize,
+    pub needs_rerun_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub queues: Vec<QaAgentWorkQueueArtifact>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -42113,6 +42218,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
     let qa_worker_assignments = read_dashboard_qa_worker_assignments(run_dir, &evidence)?;
+    let qa_agent_work_queues = read_dashboard_qa_agent_work_queues(run_dir, &evidence)?;
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
     let route_attempts = read_dashboard_route_attempts(run_dir, &evidence)?;
@@ -42174,6 +42280,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         source_apply_worktree_context,
         runtime_invariants,
         qa_worker_assignments,
+        qa_agent_work_queues,
         fuzzing_plans,
         qa_scenario_candidates,
         route_attempts,
@@ -42706,6 +42813,18 @@ fn dashboard_artifact_is_qa_worker_assignment(artifact: &EvidenceArtifact) -> bo
         || artifact.path.contains("worker-assignment")
 }
 
+fn dashboard_artifact_is_qa_agent_work_queue(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("qa_agent_work_queue")
+        || artifact.id.contains("qa-agent-work-queue")
+        || artifact.id.contains("qa-work-queue")
+        || artifact.path.contains("qa-agent-work-queue")
+        || artifact.path.contains("qa-work-queue")
+}
+
 fn dashboard_artifact_is_route_attempt(artifact: &EvidenceArtifact) -> bool {
     artifact
         .metadata
@@ -43039,6 +43158,150 @@ fn visual_comparison_failure_classification(outcome: VisualComparisonOutcome) ->
         VisualComparisonOutcome::Unsupported => "visual_unsupported",
         VisualComparisonOutcome::Blocked => "visual_blocked",
     }
+}
+
+fn read_dashboard_qa_agent_work_queues(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardQaAgentWorkQueues> {
+    let artifacts =
+        select_dashboard_artifacts(run_dir, evidence, dashboard_artifact_is_qa_agent_work_queue)?;
+    let boundary = "Read-only QA agent work queues; dashboard/Studio surfaces may display linked scenario, evaluator, run, task, work-package, review-gate, stale-ref, and expected-evidence refs but must not execute queue commands, spawn agents, write trusted state, auto-fix, auto-apply, auto-merge, self-approve, or claim quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardQaAgentWorkQueues {
+            present: false,
+            empty_state: "No QA agent work queues are indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            queue_count: 0,
+            item_count: 0,
+            passed_count: 0,
+            failed_count: 0,
+            deferred_count: 0,
+            blocked_count: 0,
+            flaky_count: 0,
+            needs_rerun_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            queues: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut queues = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<QaAgentWorkQueueArtifact>(value.clone()) {
+            Ok(queue) if queue.validate().is_ok() => {
+                evidence_refs.extend(qa_agent_work_queue_evidence_refs(&queue));
+                queues.push(queue);
+            }
+            _ => malformed_count += 1,
+        }
+    }
+    queues.sort_by(|left, right| left.queue_id.cmp(&right.queue_id));
+    evidence_refs.sort();
+    evidence_refs.dedup();
+
+    let queue_count = queues.len();
+    let mut item_count = 0usize;
+    let mut passed_count = 0usize;
+    let mut failed_count = 0usize;
+    let mut deferred_count = 0usize;
+    let mut blocked_count = 0usize;
+    let mut flaky_count = 0usize;
+    let mut needs_rerun_count = 0usize;
+    for queue in &queues {
+        item_count += queue.items.len();
+        for item in &queue.items {
+            match item.status {
+                QaAgentQueueStatus::Pass => passed_count += 1,
+                QaAgentQueueStatus::Fail => failed_count += 1,
+                QaAgentQueueStatus::Deferred => deferred_count += 1,
+                QaAgentQueueStatus::Blocked => blocked_count += 1,
+                QaAgentQueueStatus::Flaky => flaky_count += 1,
+                QaAgentQueueStatus::NeedsRerun => needs_rerun_count += 1,
+            }
+        }
+    }
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if needs_rerun_count > 0 {
+        "needs-rerun"
+    } else if flaky_count > 0 {
+        "flaky"
+    } else if failed_count > 0 {
+        "failed"
+    } else if deferred_count > 0 {
+        "deferred"
+    } else if item_count > 0 && passed_count == item_count {
+        "passed"
+    } else if item_count > 0 {
+        "queued"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardQaAgentWorkQueues {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        queue_count,
+        item_count,
+        passed_count,
+        failed_count,
+        deferred_count,
+        blocked_count,
+        flaky_count,
+        needs_rerun_count,
+        malformed_count,
+        evidence_refs,
+        queues,
+        artifacts,
+        boundary,
+    })
+}
+
+fn qa_agent_work_queue_evidence_refs(queue: &QaAgentWorkQueueArtifact) -> Vec<String> {
+    let mut refs = Vec::new();
+    for item in &queue.items {
+        refs.push(item.scenario_target.scenario_pack_ref.path.clone());
+        refs.extend(
+            item.expected_evidence
+                .iter()
+                .map(|reference| reference.path.clone()),
+        );
+        refs.push(item.task_ref.path.clone());
+        refs.push(item.work_package_ref.path.clone());
+        if let Some(reference) = &item.review_gate_ref {
+            refs.push(reference.path.clone());
+        }
+        refs.extend(
+            item.run_evidence_refs
+                .iter()
+                .map(|reference| reference.path.clone()),
+        );
+        refs.extend(
+            item.evaluator_evidence_refs
+                .iter()
+                .map(|reference| reference.path.clone()),
+        );
+        refs.extend(item.stale_run_refs.clone());
+    }
+    refs.sort();
+    refs.dedup();
+    refs
 }
 
 fn read_dashboard_qa_worker_assignments(
@@ -55275,6 +55538,143 @@ scenarios:
             QaAgentWorkQueueArtifact::from_json_str(&mismatched_transition.to_string())
                 .expect_err("transition target must match status");
         assert!(format!("{mismatch_error:#}").contains("must match status"));
+    }
+
+    #[test]
+    fn qa_agent_work_queue_dashboard_links_scenario_run_evaluator_and_review_refs() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("qa-agent-work-queue-dashboard-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.qa_agent_work_queues.present);
+        assert_eq!(missing.qa_agent_work_queues.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("qa-agent-work-queue-dashboard-present");
+        let queue = QaAgentWorkQueueArtifact::from_json_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+        ))
+        .expect("queue fixture validates");
+        let path = "evidence/qa-agent-work-queue/queue.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/qa-agent-work-queue"))
+            .expect("qa queue evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(queue)).expect("queue writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "qa-agent-work-queue",
+            "application/json",
+            path,
+            json!({ "artifact": "qa_agent_work_queue" }),
+        )
+        .expect("queue indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.qa_agent_work_queues.present);
+        assert_eq!(dashboard.qa_agent_work_queues.status, "passed");
+        assert_eq!(dashboard.qa_agent_work_queues.queue_count, 1);
+        assert_eq!(dashboard.qa_agent_work_queues.item_count, 1);
+        assert_eq!(dashboard.qa_agent_work_queues.passed_count, 1);
+        assert_eq!(dashboard.qa_agent_work_queues.evidence_refs[0], path);
+        for expected_ref in [
+            "examples/scenario-packs/project-smoke.scenarios.json",
+            "examples/multi-agent-pipeline-v1/production-task-board.fixture.json",
+            "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+            "runs/multi-agent-pipeline/demo/qa/scenario-result.json",
+            "runs/multi-agent-pipeline/demo/qa/evaluator-summary.json",
+        ] {
+            assert!(
+                dashboard
+                    .qa_agent_work_queues
+                    .evidence_refs
+                    .iter()
+                    .any(|reference| reference == expected_ref),
+                "missing linked QA queue ref {expected_ref}"
+            );
+        }
+        assert!(dashboard
+            .qa_agent_work_queues
+            .boundary
+            .contains("Read-only QA agent work queues"));
+        fs::remove_dir_all(root).expect("fixture removed");
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("qa-agent-work-queue-dashboard-malformed");
+        let malformed_path = "evidence/qa-agent-work-queue/queue-malformed.json";
+        fs::create_dir_all(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/qa-agent-work-queue"),
+        )
+        .expect("qa queue evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed queue writes");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "qa-agent-work-queue-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "qa_agent_work_queue" }),
+        )
+        .expect("malformed queue indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.qa_agent_work_queues.present);
+        assert_eq!(malformed.qa_agent_work_queues.status, "malformed");
+        assert_eq!(malformed.qa_agent_work_queues.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
+    }
+
+    #[test]
+    fn qa_agent_work_queue_is_studio_inspection_compatible() {
+        let queue: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.valid.fixture.json",
+        ))
+        .expect("queue json");
+        let model = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "qaAgentWorkQueue": queue }).to_string(),
+        );
+        let qa_section = model
+            .sections
+            .iter()
+            .find(|section| section.id == "qa-queue")
+            .expect("qa queue section");
+        assert_eq!(qa_section.status, "present");
+        assert_eq!(qa_section.item_count, 1);
+        assert!(qa_section.blockers.is_empty());
+
+        let stale: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/qa-agent-work-queue.stale.fixture.json",
+        ))
+        .expect("stale queue json");
+        let blocked = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "qaAgentWorkQueues": [stale] }).to_string(),
+        );
+        let blocked_qa = blocked
+            .sections
+            .iter()
+            .find(|section| section.id == "qa-queue")
+            .expect("qa queue section");
+        assert_eq!(blocked_qa.status, "blocked");
+        assert!(blocked_qa
+            .blockers
+            .iter()
+            .any(|blocker| blocker.contains("stale run ref")));
+
+        let malformed = studio_multi_agent_pipeline_inspection_read_model_from_json_str(
+            &json!({ "qaAgentWorkQueue": { "queueId": "malformed" } }).to_string(),
+        );
+        assert_eq!(malformed.status, "malformed");
+        let malformed_qa = malformed
+            .sections
+            .iter()
+            .find(|section| section.id == "qa-queue")
+            .expect("qa queue section");
+        assert_eq!(malformed_qa.status, "malformed");
+        assert!(malformed_qa
+            .malformed_reasons
+            .iter()
+            .any(|reason| reason.contains("qa-agent-work-queue")));
     }
 
     #[test]
