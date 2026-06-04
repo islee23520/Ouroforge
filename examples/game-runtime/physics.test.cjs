@@ -62,6 +62,7 @@ function assertGroundedJump(api, scene, message) {
 }
 
 const platformerScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'physics-rules-v2.json'), 'utf8'));
+const actionMapScene = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'action-map-v1.json'), 'utf8'));
 const floorCollider = platformerScene.entities.find((entity) => entity.id === 'floor').components.collider;
 const worldLayer = platformerScene.collisionRules.layers.find((layer) => layer.id === 'world');
 assert.deepEqual(floorCollider.collisionMask, ['actors'], 'floor collider must not rely on wildcard masks');
@@ -167,6 +168,22 @@ assert.equal(state.physics.grounded.player, true);
 assert.equal(api.getEvents().filter((event) => event.type === 'runtime.physics.jump').length, jumpEventCount);
 
 api.setInput({ left: false, right: false, up: false, down: false });
+
+state = api.loadScene(actionMapScene);
+api.setInput({ keys: { a: true } });
+state = api.step(1);
+player = state.entities.find((entity) => entity.id === 'player');
+assert.equal(player.components.transform.x, 29, 'actionMap keyboard binding resolves move_left from raw key state');
+assert.equal(state.rawInput.keys.a, true);
+assert.equal(state.actionState.move_left, true);
+assert.equal(state.actionState.move_right, false);
+api.setInput({ keys: { a: false }, actions: { move_right: true } });
+state = api.step(1);
+player = state.entities.find((entity) => entity.id === 'player');
+assert.equal(player.components.transform.x, 32, 'scenario/runtime action override resolves move_right without a raw direction');
+assert.equal(state.actionState.move_right, true);
+assert.equal(state.input.right, false, 'legacy raw direction remains separate from resolved action state');
+
 state = api.loadScene(defaultLayerScene);
 api.setInput({ right: true });
 state = api.step(1);
