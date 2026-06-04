@@ -111,3 +111,38 @@ fn source_patch_test_command_allowlist_reports_forbidden_commands_before_sandbox
         .iter()
         .any(|guardrail| guardrail.contains("does not execute commands")));
 }
+
+#[test]
+fn source_patch_test_command_allowlist_blocks_cargo_workspace_escape_overrides() {
+    for blocked_arg in [
+        "--manifest-path=../../../../Cargo.toml",
+        "--config=build.target-dir=../../target",
+        "--target-dir=../../target",
+        "../../Cargo.toml",
+    ] {
+        let mut artifact = fixture_policy();
+        let command = &mut artifact.commands[0];
+        command.id = format!("cargo-escape-{blocked_arg}");
+        command.argv = vec![
+            "cargo".to_string(),
+            "test".to_string(),
+            "-p".to_string(),
+            "ouroforge-core".to_string(),
+            blocked_arg.to_string(),
+            "--test".to_string(),
+            "patch_preview_artifact".to_string(),
+        ];
+        command.command = normalize_source_patch_test_command(&command.argv);
+
+        let validation = inspect_source_patch_test_command_allowlist(&artifact);
+        assert_eq!(validation.status, "blocked", "{blocked_arg} must block");
+        assert!(
+            validation.blocked_reasons.iter().any(|reason| {
+                reason.contains("cargo")
+                    && (reason.contains("override") || reason.contains("parent-relative"))
+            }),
+            "blocked reasons should mention cargo workspace/path escape for {blocked_arg}: {:?}",
+            validation.blocked_reasons
+        );
+    }
+}

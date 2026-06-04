@@ -415,6 +415,55 @@ fn source_patch_sandbox_cargo_tests_require_sandbox_manifest_not_parent_workspac
 }
 
 #[test]
+fn source_patch_sandbox_cargo_tests_reject_explicit_parent_manifest_override() {
+    let temp = sandbox_test_dir("cargo-rejects-parent-manifest-override");
+    let repo_root = temp.join("repo");
+    let run_dir = repo_root.join("sandbox-parent-manifest-override");
+    let worktree = run_dir.join("sandbox/patch-preview-1/worktree");
+    fs::create_dir_all(&worktree).expect("create worktree");
+    fs::write(repo_root.join("Cargo.toml"), "[workspace]\n").expect("write parent manifest");
+    fs::write(worktree.join("Cargo.toml"), "[workspace]\n").expect("write sandbox manifest");
+
+    let required_tests = vec![SourcePatchPreviewRequiredTest {
+        command: "cargo test -p ouroforge-core --manifest-path ../../../../Cargo.toml --test patch_preview_artifact -- --nocapture".to_string(),
+        argv: vec![
+            "cargo".to_string(),
+            "test".to_string(),
+            "-p".to_string(),
+            "ouroforge-core".to_string(),
+            "--manifest-path".to_string(),
+            "../../../../Cargo.toml".to_string(),
+            "--test".to_string(),
+            "patch_preview_artifact".to_string(),
+            "--".to_string(),
+            "--nocapture".to_string(),
+        ],
+        allowlist_policy_id: Some("source-patch-preview-safe-local-checks-v1".to_string()),
+        execution_authority: "sandbox_allowlisted_execution".to_string(),
+    }];
+
+    let error =
+        run_source_patch_sandbox_allowlisted_tests(&fixture_plan(), &required_tests, &run_dir)
+            .expect_err("explicit parent manifest override is blocked before execution");
+
+    assert!(error.to_string().contains("may not override workspace"));
+    let report_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            run_dir.join("sandbox/patch-preview-1/evidence/test-execution-report.json"),
+        )
+        .expect("blocked report written"),
+    )
+    .expect("blocked report parses");
+    assert_eq!(report_json["commandsRun"], json!([]));
+    assert!(report_json["blockedReasons"][0]
+        .as_str()
+        .expect("blocked reason")
+        .contains("may not override workspace"));
+
+    fs::remove_dir_all(temp).expect("cleanup temp");
+}
+
+#[test]
 fn source_patch_sandbox_root_is_documented_generated_state() {
     reject_generated_artifact_source_collision(
         Path::new("sandbox/patch-preview-1/worktree/crates/ouroforge-core/src/lib.rs"),
