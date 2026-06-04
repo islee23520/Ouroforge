@@ -882,6 +882,10 @@ assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /brow
 assert.match(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /remote telemetry/);
 assert.doesNotMatch(dashboard.renderRuntimeProfilerSummary(run.engine_summaries), /<frame-0003>|<renderMs>/);
 assert.match(dashboard.renderRuntimeProfilerSummary({}), /No runtime profiler\/frame-budget read model/);
+// present engine summaries without any profiler read model must still render the
+// absence state, not a default within-budget grid.
+assert.match(dashboard.renderRuntimeProfilerSummary({ present: true }), /No runtime profiler\/frame-budget read model/);
+assert.doesNotMatch(dashboard.renderRuntimeProfilerSummary({ present: true }), /within-budget|Budget violations/);
 const xssProfilerSummary = dashboard.renderRuntimeProfilerSummary({ present: true, runtime_frame_budget: { frameId: '<script>frame</script>', sceneId: '<img>', scenarioId: '<svg>', timings: { renderMs: '<b>' }, budget: { renderMs: '<i>' }, counts: { entityCount: '<p>' }, status: '<script>bad</script>', violations: [{ field: '<script>render</script>', actualMs: '<img>', budgetMs: '<svg>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, authority: '<b>authority</b>' } });
 assert.doesNotMatch(xssProfilerSummary, /<script>|<img>|<svg>|<b>|<i>|<p>/);
 assert.match(xssProfilerSummary, /&lt;script&gt;render&lt;\/script&gt;/);

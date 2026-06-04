@@ -321,7 +321,7 @@ const OuroforgeDashboard = (() => {
 
 
   function renderRuntimeProfilerSummary(summary = {}) {
-    const profiler = summary?.runtime_frame_budget || summary?.runtimeFrameBudget || summary?.runtime_profiler || summary?.runtimeProfiler || {};
+    const profiler = summary?.runtime_frame_budget || summary?.runtimeFrameBudget || summary?.runtime_profiler || summary?.runtimeProfiler || null;
     if (!summary?.present || !profiler || typeof profiler !== 'object' || Array.isArray(profiler)) {
       return '<p class="empty-state">No runtime profiler/frame-budget read model is available.</p>';
     }
