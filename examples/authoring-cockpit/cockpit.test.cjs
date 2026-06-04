@@ -475,6 +475,23 @@ const run = {
       },
       boundary: 'Render breakdown inspection is read-only evidence from runtime world state.',
     },
+    render_queue: {
+      present: true,
+      frameId: 12,
+      sceneId: 'trigger-flags-v1-fixture',
+      layerCount: 1,
+      renderableCount: 2,
+      drawCallCount: 1,
+      skippedRenderableCount: 1,
+      validation: { status: 'ready', blockedReasons: [], warnings: [] },
+      renderables: [
+        { id: 'entity-player', sourceKind: 'entity', sourceId: 'player', drawOrder: 4, layer: 'actors', primitiveKind: 'sprite', visible: true },
+        { id: 'entity-hidden', sourceKind: 'entity', sourceId: 'hidden', drawOrder: 5, layer: 'actors', primitiveKind: 'rect', visible: false, fallbackReason: 'sprite hidden' },
+      ],
+      readOnlyInspection: {
+        disallowedActions: ['writes', 'commands', 'scene mutation', 'browser runtime control'],
+      },
+    },
     tilemaps: { tilemapCount: 0, layerCount: 0 },
     assets: { manifestId: null, assetCount: 0 },
     animation: { animatedEntityCount: 0 },
@@ -754,13 +771,20 @@ assert.match(cockpit.renderEngineExpansionSurface(run), /3 flag\(s\), 2 true, 1 
 assert.match(cockpit.renderEngineExpansionSurface({ engine_summaries: { present: false, empty_state: '<script>x</script>' } }), /&lt;script&gt;x&lt;\/script&gt;/);
 assert.match(cockpit.renderStudioNavigation(run), /Render breakdown inspection/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Renderable draw order/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Render queue/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /Queue status/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity:player/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /entity-hidden/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite\.visible=false/);
+assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /sprite hidden/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface(run), /browser runtime control/);
 assert.match(cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: '<bad>' } }), /missing or malformed/);
 const xssRenderBreakdown = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: '<script>frame</script>', sceneId: '<img>', elements: [{ renderableId: '<script>renderable</script>', entityId: '<img src=x onerror=alert(1)>', frameId: '<svg>', drawOrder: '<b>', layer: '<i>', primitiveCategory: '<p>', debugLabel: '<script>label</script>' }], absenceDiagnostics: [{ entityId: '<script>hidden</script>', reason: '<img>', layer: '<svg>', detail: '<b>detail</b>' }], readOnlyInspection: { disallowedActions: ['<script>write</script>'] }, boundary: '<script>boundary</script>' } } });
 assert.doesNotMatch(xssRenderBreakdown, /<script>|<img|<svg>|<b>|<i>|<p>/);
 assert.match(xssRenderBreakdown, /&lt;script&gt;renderable&lt;\/script&gt;/);
+const xssRenderQueue = cockpit.renderRenderBreakdownInspectionSurface({ engine_summaries: { present: true, render_breakdown: { present: true, frameId: 'frame', elements: [] }, render_queue: { present: true, validation: { status: '<script>ready</script>' }, renderables: [{ id: '<script>queue</script>', sourceKind: '<img>', sourceId: '<svg>', drawOrder: '<b>', layer: '<i>', primitiveKind: '<p>', visible: false, fallbackReason: '<script>skip</script>' }] } } });
+assert.doesNotMatch(xssRenderQueue, /<script>|<img|<svg>|<b>|<i>|<p>/);
+assert.match(xssRenderQueue, /&lt;script&gt;queue&lt;\/script&gt;/);
 assert.match(cockpit.renderComparisonSurface(run), /\.\.\/\.\.\/runs\/before\/verdict\.json/);
 assert.match(cockpit.renderStudioGaps(), /No production editor/);
 assert.match(cockpit.renderIntegration(run), /Live browser preview/);

@@ -131,6 +131,21 @@ const run = {
       absenceDiagnostics: [{ entityId: '<hidden>', reason: 'hidden', detail: 'sprite.visible=false' }],
       readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
     },
+    render_queue: {
+      present: true,
+      frameId: 'frame-0003',
+      sceneId: '<scene-render-test>',
+      layerCount: 1,
+      renderableCount: 2,
+      drawCallCount: 1,
+      skippedRenderableCount: 1,
+      validation: { status: 'ready', blockedReasons: [], warnings: [] },
+      renderables: [
+        { id: '<queue:player>', sourceKind: 'entity', sourceId: 'player', drawOrder: 0, layer: 'actors', primitiveKind: 'sprite', visible: true },
+        { id: '<queue:hidden>', sourceKind: 'entity', sourceId: 'hidden', drawOrder: 1, layer: 'actors', primitiveKind: 'rect', visible: false, fallbackReason: 'sprite hidden' },
+      ],
+      readOnlyInspection: { disallowedActions: ['trusted writes', 'command bridge', 'live mutation'] },
+    },
     gameplay: {
       present: true,
       declaredFlagCount: 2,
@@ -588,9 +603,13 @@ assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /3 collision 
 assert.match(dashboard.renderTilemapSummary(run.engine_summaries), /&lt;platformer-ground&gt;/);
 assert.match(dashboard.renderTilemapSummary({}), /No tilemap world-state summary/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Renderable elements/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Render queue/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /Queue status/);
+assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;queue:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /&lt;entity:player&gt;/);
 assert.match(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /trusted writes, command bridge, live mutation/);
 assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<entity:player>/);
+assert.doesNotMatch(dashboard.renderRenderBreakdownSummary(run.engine_summaries), /<queue:player>/);
 assert.match(dashboard.renderRenderBreakdownSummary({}), /No scene render breakdown evidence/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /Declared flags/);
 assert.match(dashboard.renderGameplaySummary(run.engine_summaries), /2 true \/ 1 false/);

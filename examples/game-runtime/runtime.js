@@ -894,6 +894,9 @@
       const frameId = `tick-${world.tick}`;
       state.renderer = renderer.debugState(rendererState, world.entities);
       state.renderBreakdown = renderer.renderBreakdown({ world: state, renderer: rendererState, frameId });
+      state.renderQueue = typeof renderer.renderQueue === 'function'
+        ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })
+        : null;
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
       state.componentModel = componentModelDebugState(world.entities);
@@ -909,7 +912,24 @@
       return state;
     },
     getFrameStats() {
-      return clone({ tick: world.tick, fixedDeltaMs, entityCount: world.entities.length, eventCount: events.length, renderBreakdownFrameId: `tick-${world.tick}` });
+      const frameId = `tick-${world.tick}`;
+      const renderQueue = typeof renderer.renderQueue === 'function'
+        ? renderer.renderQueue({ world, renderer: rendererState, tilemap, frameId })
+        : { layers: [], renderables: [], validation: { status: 'unreported', blockedReasons: [], warnings: [] } };
+      return clone({
+        tick: world.tick,
+        fixedDeltaMs,
+        entityCount: world.entities.length,
+        eventCount: events.length,
+        renderBreakdownFrameId: frameId,
+        renderQueueFrameId: frameId,
+        renderQueueLayerCount: renderQueue.layers.length,
+        renderQueueRenderableCount: renderQueue.renderables.length,
+        renderQueueDrawCallCount: renderQueue.renderables.filter((renderable) => renderable.visible !== false).length,
+        renderQueueSkippedCount: renderQueue.renderables.filter((renderable) => renderable.visible === false).length,
+        renderQueueBlockedReasonCount: Array.isArray(renderQueue.validation.blockedReasons) ? renderQueue.validation.blockedReasons.length : 0,
+        renderQueueWarningCount: Array.isArray(renderQueue.validation.warnings) ? renderQueue.validation.warnings.length : 0,
+      });
     },
     getEvents() {
       return clone(events);

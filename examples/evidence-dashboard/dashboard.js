@@ -199,14 +199,18 @@ const OuroforgeDashboard = (() => {
   function renderRenderBreakdownSummary(summary = {}) {
     const breakdown = summary?.render_breakdown || summary?.renderBreakdown || {};
     if (!summary?.present || !breakdown.present) return '<p class="empty-state">No scene render breakdown evidence is available.</p>';
+    const queue = summary?.render_queue || summary?.renderQueue || {};
     const elements = Array.isArray(breakdown.elements) ? breakdown.elements : [];
     const absence = Array.isArray(breakdown.absenceDiagnostics || breakdown.absence_diagnostics) ? (breakdown.absenceDiagnostics || breakdown.absence_diagnostics) : [];
     const boundary = breakdown.readOnlyInspection || breakdown.read_only_inspection || {};
     const disallowed = Array.isArray(boundary.disallowedActions || boundary.disallowed_actions) ? (boundary.disallowedActions || boundary.disallowed_actions).join(', ') : 'trusted writes, command bridge, live mutation';
-    const rows = [['Frame', breakdown.frameId || breakdown.frame_id || 'unknown'], ['Scene', breakdown.sceneId || breakdown.scene_id || 'unknown'], ['Renderable elements', elements.length], ['Absence diagnostics', absence.length]].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const queueRenderables = Array.isArray(queue.renderables) ? queue.renderables : [];
+    const queueValidation = queue.validation || {};
+    const rows = [['Frame', breakdown.frameId || breakdown.frame_id || 'unknown'], ['Scene', breakdown.sceneId || breakdown.scene_id || 'unknown'], ['Renderable elements', elements.length], ['Absence diagnostics', absence.length], ['Queue layers', queue.layerCount ?? queue.layer_count ?? 0], ['Queue renderables', queue.renderableCount ?? queue.renderable_count ?? queueRenderables.length], ['Draw calls', queue.drawCallCount ?? queue.draw_call_count ?? 0], ['Queue status', queueValidation.status || 'unreported']].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const elementRows = elements.slice(0, 6).map((element) => `<li><strong>${escapeText(element?.renderableId || element?.entityId || 'renderable')}</strong>: draw ${escapeText(element?.drawOrder ?? '?')} · ${escapeText(element?.layer || 'default')} · ${escapeText(element?.primitiveCategory || 'unknown')}</li>`).join('') || '<li>No renderable elements recorded.</li>';
     const absenceRows = absence.slice(0, 6).map((diag) => `<li><strong>${escapeText(diag?.entityId || diag?.renderableId || 'renderable')}</strong>: ${escapeText(diag?.reason || 'unknown')} · ${escapeText(diag?.detail || '')}</li>`).join('') || '<li>No hidden, skipped, fallback, or malformed diagnostics recorded.</li>';
-    return `<div class="field-grid">${rows}</div><h4>Renderables</h4><ul class="run-meta-list">${elementRows}</ul><h4>Absence diagnostics</h4><ul class="run-meta-list">${absenceRows}</ul><p class="run-meta">Read-only inspection only; disallowed actions: ${escapeText(disallowed)}.</p>`;
+    const queueRows = queueRenderables.slice(0, 6).map((renderable) => `<li><strong>${escapeText(renderable?.id || 'queue-renderable')}</strong>: draw ${escapeText(renderable?.drawOrder ?? '?')} · ${escapeText(renderable?.layer || 'default')} · ${escapeText(renderable?.primitiveKind || 'unknown')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')}</li>`).join('') || '<li>No render queue renderables recorded.</li>';
+    return `<div class="field-grid">${rows}</div><h4>Renderables</h4><ul class="run-meta-list">${elementRows}</ul><h4>Render queue</h4><ul class="run-meta-list">${queueRows}</ul><h4>Absence diagnostics</h4><ul class="run-meta-list">${absenceRows}</ul><p class="run-meta">Read-only inspection only; disallowed actions: ${escapeText(disallowed)}.</p>`;
   }
 
   function renderGameplaySummary(summary = {}) {

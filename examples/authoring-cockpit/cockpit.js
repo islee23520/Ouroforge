@@ -376,6 +376,7 @@ const OuroforgeCockpit = (() => {
   function renderRenderBreakdownInspectionSurface(run) {
     const summary = run?.engine_summaries;
     const breakdown = summary?.render_breakdown || summary?.renderBreakdown || null;
+    const queue = summary?.render_queue || summary?.renderQueue || {};
     if (!summary?.present || !breakdown || typeof breakdown !== 'object' || Array.isArray(breakdown)) {
       return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2><p class="empty">Render breakdown evidence is missing or malformed for this run.</p><p class="hint">Read-only inspection only: this panel does not write files, execute commands, mutate scenes, or control the browser runtime.</p></section>`;
     }
@@ -387,11 +388,16 @@ const OuroforgeCockpit = (() => {
     const disallowedActions = Array.isArray(readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
       ? (readOnlyInspection.disallowedActions || readOnlyInspection.disallowed_actions)
       : ['writes', 'commands', 'scene mutation', 'browser runtime control'];
+    const queueRenderables = Array.isArray(queue.renderables) ? queue.renderables : [];
+    const queueValidation = queue.validation || {};
     const cards = [
       ['Frame', renderBreakdownValue(breakdown, 'frame_id', 'frameId', 'unrecorded')],
       ['Scene', renderBreakdownValue(breakdown, 'scene_id', 'sceneId', summary?.scene?.sceneId || 'unrecorded')],
       ['Element count', breakdown.element_count ?? breakdown.elementCount ?? elements.length],
       ['Absence diagnostics', breakdown.absence_diagnostic_count ?? breakdown.absenceDiagnosticCount ?? absenceDiagnostics.length],
+      ['Queue renderables', queue.renderable_count ?? queue.renderableCount ?? queueRenderables.length],
+      ['Draw calls', queue.draw_call_count ?? queue.drawCallCount ?? 0],
+      ['Queue status', queueValidation.status || 'unreported'],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const elementRows = elements.slice(0, 24).map((element) => {
       const renderableId = renderBreakdownValue(element, 'renderable_id', 'renderableId', renderBreakdownValue(element, 'entity_id', 'entityId', 'unknown renderable'));
@@ -408,10 +414,12 @@ const OuroforgeCockpit = (() => {
       const detail = renderBreakdownValue(diagnostic, 'detail', 'detail', 'no detail');
       return `<div class="surface-row"><strong>${escapeText(target)}</strong> ${surfaceState(true, reason)}<br><small>layer ${escapeText(renderBreakdownValue(diagnostic, 'layer', 'layer', 'default'))} · detail ${escapeText(detail)}</small></div>`;
     }).join('') || '<div class="surface-row">No absence diagnostics exported.</div>';
+    const queueRows = queueRenderables.slice(0, 24).map((renderable) => `<div class="surface-row"><strong>${escapeText(renderable?.id || 'queue-renderable')}</strong> ${surfaceState(renderable?.visible !== false, renderable?.primitiveKind || 'unknown')}<br><small>draw order ${escapeText(renderable?.drawOrder ?? '?')} · layer ${escapeText(renderable?.layer || 'default')} · source ${escapeText(renderable?.sourceKind || 'unknown')}:${escapeText(renderable?.sourceId || 'unknown')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')}</small></div>`).join('') || '<div class="surface-row">No render queue rows exported.</div>';
     return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2>
       <p class="hint">Read-only render breakdown from runtime world-state evidence. This surface performs no writes, no commands, no scene mutation, and no browser runtime control.</p>
       <div class="field-grid">${cards}</div>
       <h3>Renderable draw order</h3>${elementRows}
+      <h3>Render queue</h3>${queueRows}
       <h3>Absence diagnostics</h3>${absenceRows}
       <p class="hint">Disallowed actions: ${escapeText(disallowedActions.join(' · '))}</p>
       <p class="hint">${escapeText(breakdown.boundary || readOnlyInspection.boundary || 'Display-only render breakdown inspection.')}</p>

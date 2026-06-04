@@ -28475,6 +28475,7 @@ pub struct RunDashboardEngineSummaries {
     pub components: serde_json::Value,
     pub renderer: serde_json::Value,
     pub render_breakdown: serde_json::Value,
+    pub render_queue: serde_json::Value,
     pub tilemaps: serde_json::Value,
     pub assets: serde_json::Value,
     pub animation: serde_json::Value,
@@ -30371,6 +30372,7 @@ fn read_dashboard_engine_summaries(
             components: json!({}),
             renderer: json!({}),
             render_breakdown: json!({ "present": false, "emptyState": "No scene render breakdown evidence is available." }),
+            render_queue: json!({ "present": false, "emptyState": "No scene render queue evidence is available." }),
             tilemaps: json!({}),
             assets: json!({}),
             animation: json!({}),
@@ -30406,6 +30408,7 @@ fn read_dashboard_engine_summaries(
             "camera": world_state.pointer("/renderer/camera").cloned().unwrap_or(json!(null))
         }),
         render_breakdown: dashboard_render_breakdown_summary(world_state),
+        render_queue: dashboard_render_queue_summary(world_state),
         tilemaps: dashboard_tilemap_summary(world_state),
         assets: json!({
             "manifestId": world_state.pointer("/assetManifest/id").cloned().unwrap_or(json!(null)),
@@ -30496,6 +30499,83 @@ fn dashboard_render_breakdown_summary(world_state: &serde_json::Value) -> serde_
         "absenceDiagnosticCount": absence.len(),
         "elements": elements,
         "absenceDiagnostics": absence,
+        "readOnlyInspection": read_only
+    })
+}
+
+fn dashboard_render_queue_summary(world_state: &serde_json::Value) -> serde_json::Value {
+    let Some(queue) = world_state.get("renderQueue") else {
+        return json!({
+            "present": false,
+            "emptyState": "No scene render queue evidence is available."
+        });
+    };
+    if !queue.is_object() {
+        return json!({
+            "present": false,
+            "malformed": true,
+            "emptyState": "Scene render queue evidence is malformed."
+        });
+    }
+    let layers = queue
+        .get("layers")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let renderables = queue
+        .get("renderables")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let validation = queue.get("validation").cloned().unwrap_or_else(|| {
+        json!({
+            "status": "unknown",
+            "blockedReasons": [],
+            "warnings": []
+        })
+    });
+    let blocked_count = validation
+        .get("blockedReasons")
+        .or_else(|| validation.get("blocked_reasons"))
+        .and_then(|value| value.as_array())
+        .map(Vec::len)
+        .unwrap_or(0);
+    let warning_count = validation
+        .get("warnings")
+        .and_then(|value| value.as_array())
+        .map(Vec::len)
+        .unwrap_or(0);
+    let skipped_count = renderables
+        .iter()
+        .filter(|renderable| {
+            renderable.get("visible").and_then(|value| value.as_bool()) == Some(false)
+        })
+        .count();
+    let read_only = queue
+        .get("readOnlyInspection")
+        .or_else(|| queue.get("read_only_inspection"))
+        .cloned()
+        .unwrap_or_else(|| {
+            json!({
+                "trustedEmitter": "unknown",
+                "browserStudioMode": "read-only evidence inspection",
+                "disallowedActions": ["trusted writes", "command bridge", "live mutation"]
+            })
+        });
+    json!({
+        "present": true,
+        "schemaVersion": queue.get("schemaVersion").cloned().unwrap_or(json!(null)),
+        "frameId": queue.get("frameId").or_else(|| queue.get("frame_id")).cloned().unwrap_or(json!(null)),
+        "sceneId": queue.get("sceneId").or_else(|| queue.get("scene_id")).cloned().unwrap_or(json!(null)),
+        "layerCount": layers.len(),
+        "renderableCount": renderables.len(),
+        "drawCallCount": renderables.iter().filter(|renderable| renderable.get("visible").and_then(|value| value.as_bool()) != Some(false)).count(),
+        "skippedRenderableCount": skipped_count,
+        "blockedReasonCount": blocked_count,
+        "warningCount": warning_count,
+        "validation": validation,
+        "layers": layers,
+        "renderables": renderables,
         "readOnlyInspection": read_only
     })
 }
@@ -48530,6 +48610,18 @@ scenarios:
                     "absenceDiagnostics": [{ "renderableId": "entity:hidden", "entityId": "hidden", "reason": "hidden", "detail": "sprite.visible=false" }],
                     "readOnlyInspection": { "trustedEmitter": "browser-runtime-evidence-helper", "browserStudioMode": "read-only evidence inspection", "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
                 },
+                "renderQueue": {
+                    "schemaVersion": "ouroforge.scene-render-queue.v1",
+                    "frameId": "tick-4",
+                    "sceneId": "foundation-scene",
+                    "layers": [{ "id": "actors", "order": 0, "visible": true, "kind": "scene" }],
+                    "renderables": [
+                        { "id": "entity-player", "sourceKind": "entity", "sourceId": "player", "layer": "actors", "layerOrder": 0, "localOrder": 0, "stableKey": "player", "drawOrder": 0, "primitiveKind": "sprite", "visible": true },
+                        { "id": "entity-hidden", "sourceKind": "entity", "sourceId": "hidden", "layer": "actors", "layerOrder": 0, "localOrder": 1, "stableKey": "hidden", "drawOrder": 1, "primitiveKind": "rect", "visible": false, "fallbackReason": "sprite hidden" }
+                    ],
+                    "validation": { "status": "ready", "blockedReasons": [], "warnings": [] },
+                    "readOnlyInspection": { "trustedEmitter": "browser-runtime-renderer", "browserStudioMode": "read-only evidence inspection", "disallowedActions": ["trusted writes", "command bridge", "live mutation"] }
+                },
                 "tilemaps": {
                     "tilemaps": [{
                         "id": "platformer-ground",
@@ -48609,6 +48701,36 @@ scenarios:
         );
         assert_eq!(
             model.engine_summaries.render_breakdown["readOnlyInspection"]["disallowedActions"],
+            json!(["trusted writes", "command bridge", "live mutation"])
+        );
+        assert_eq!(model.engine_summaries.render_queue["present"], json!(true));
+        assert_eq!(
+            model.engine_summaries.render_queue["schemaVersion"],
+            json!("ouroforge.scene-render-queue.v1")
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["frameId"],
+            json!("tick-4")
+        );
+        assert_eq!(model.engine_summaries.render_queue["layerCount"], json!(1));
+        assert_eq!(
+            model.engine_summaries.render_queue["renderableCount"],
+            json!(2)
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["drawCallCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["skippedRenderableCount"],
+            json!(1)
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["validation"]["status"],
+            json!("ready")
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["readOnlyInspection"]["disallowedActions"],
             json!(["trusted writes", "command bridge", "live mutation"])
         );
         assert_eq!(
@@ -48736,7 +48858,8 @@ scenarios:
                 "sceneId": "malformed-breakdown-scene",
                 "tick": 1,
                 "entities": [],
-                "renderBreakdown": "not-an-object"
+                "renderBreakdown": "not-an-object",
+                "renderQueue": "not-an-object"
             }))
             .expect("world-state serializes"),
         )
@@ -48762,6 +48885,15 @@ scenarios:
         assert_eq!(
             model.engine_summaries.render_breakdown["emptyState"],
             json!("Scene render breakdown evidence is malformed.")
+        );
+        assert_eq!(model.engine_summaries.render_queue["present"], json!(false));
+        assert_eq!(
+            model.engine_summaries.render_queue["malformed"],
+            json!(true)
+        );
+        assert_eq!(
+            model.engine_summaries.render_queue["emptyState"],
+            json!("Scene render queue evidence is malformed.")
         );
 
         fs::remove_dir_all(root).expect("fixture removed");
