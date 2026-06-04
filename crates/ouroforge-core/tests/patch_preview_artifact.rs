@@ -223,3 +223,62 @@ fn source_patch_preview_validation_blocks_unsafe_diff_targets_before_preview() {
         .iter()
         .any(|reason| reason.contains("diff integrity blocked")));
 }
+
+#[test]
+fn source_mutation_preview_demo_fixture_validates_without_apply_authority() {
+    let artifact: SourcePatchPreviewArtifact = serde_json::from_str(include_str!(
+        "../../../examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json"
+    ))
+    .expect("demo patch preview fixture parses");
+
+    assert_eq!(artifact.patch_preview_id, "smp1-10-demo-preview-001");
+    assert_eq!(
+        artifact.source_mutation_apply_status,
+        SourcePatchPreviewApplyStatus::Blocked
+    );
+    assert_eq!(
+        artifact.risk_level,
+        ouroforge_core::SourcePatchPreviewRiskLevel::Medium
+    );
+    assert_eq!(artifact.targets.len(), 1);
+    assert_eq!(
+        artifact.targets[0].path,
+        "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+    );
+    assert!(artifact
+        .diff_summary
+        .diff_text
+        .as_deref()
+        .expect("demo diff text present")
+        .contains("generated sandbox"));
+    assert!(artifact
+        .read_model_prototype
+        .as_ref()
+        .expect("read model prototype")
+        .forbidden_actions
+        .contains(&"apply_patch".to_string()));
+
+    let validation =
+        validate_source_patch_preview_artifact(&artifact, PatchDiffIntegrityLimits::default())
+            .expect("demo preview fixture should validate");
+    assert_eq!(validation.status, "passed");
+    assert!(validation
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("no source patch apply")));
+
+    let demo_note =
+        include_str!("../../../examples/source-mutation-preview-demo-v1/demo-behavior-copy.md");
+    assert_eq!(demo_note.trim(), "Preview demo copy stays unchanged.");
+
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("core crate lives under crates/ouroforge-core");
+    let trusted_target = std::fs::read_to_string(workspace_root.join(&artifact.targets[0].path))
+        .expect("classified preview target remains readable");
+    assert!(
+        !trusted_target.contains("Preview demo copy would change only inside a generated sandbox."),
+        "preview after-text must not be applied to the trusted target"
+    );
+}

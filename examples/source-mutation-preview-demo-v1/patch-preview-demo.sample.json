@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "patch-preview.v1",
+  "patchPreviewId": "smp1-10-demo-preview-001",
+  "proposalId": "proposal-demo-readme-copy-boundary",
+  "createdAt": "2026-06-04T00:00:00Z",
+  "producer": {
+    "name": "source-mutation-preview-demo-fixture",
+    "version": "smp1.10.1",
+    "trustedBoundary": "fixture-only-no-apply"
+  },
+  "sourceMutationApplyStatus": "blocked",
+  "baseRef": {
+    "branch": "main",
+    "commit": "fixture-base-ref-not-live",
+    "targetFreshness": "fixture_requires_regeneration_before_any_future_review"
+  },
+  "staleTargetPolicy": "regenerate_preview_before_any_future_review_if_target_hash_or_latest_main_changes",
+  "artifactHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "targets": [
+    {
+      "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "beforeHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "afterHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "fileClass": "runtime_demo_config",
+      "reviewLevel": "elevated_source_like_data_review",
+      "classificationStatus": "potentially_allowed_later",
+      "classificationRationale": "Tracked deterministic runtime demo config; preview-only fixture still requires sandbox, review, rollback, evidence bundle, and stale-target controls before any future apply path.",
+      "blockedReasons": [
+        "source_mutation_apply_not_authorized_by_issue_364"
+      ]
+    }
+  ],
+  "diffSummary": {
+    "summary": "Fixture-only preview of a one-line documentation copy change for the Source Mutation Preview demo.",
+    "diffText": "diff --git a/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json b/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json\n--- a/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json\n+++ b/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json\n@@ -1 +1 @@\n-Preview demo copy stays unchanged.\n+Preview demo copy would change only inside a generated sandbox.\n",
+    "diffStats": {
+      "filesChanged": 1,
+      "additions": 1,
+      "deletions": 1,
+      "binaryOrOpaque": false,
+      "generatedOrigin": false,
+      "truncated": false
+    },
+    "hunks": [
+      {
+        "path": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+        "summary": "Would update deterministic demo scene copy inside a sandbox-only preview if later dry-run evidence is generated."
+      }
+    ],
+    "largeDiffWarning": null,
+    "binaryOrOpaqueWarning": null
+  },
+  "riskLevel": "medium",
+  "riskIds": [
+    "STM-07",
+    "STM-09",
+    "STM-11",
+    "STM-13"
+  ],
+  "linkedEvidence": [
+    {
+      "kind": "workflow-doc",
+      "path": "examples/source-mutation-preview-demo-v1/README.md"
+    },
+    {
+      "kind": "source-patch-review-surface-doc",
+      "path": "docs/studio-source-patch-review-surface-v1.md"
+    },
+    {
+      "kind": "file-class-policy",
+      "path": "docs/source-mutation-file-classes-v1.md"
+    }
+  ],
+  "expectedBehaviorChange": "No trusted worktree behavior changes. A later sandbox dry-run may demonstrate the copy change only inside generated sandbox evidence.",
+  "requiredTests": [
+    {
+      "command": "cargo test -p ouroforge-core source_mutation_preview_demo_fixture_validates_without_apply_authority -- --nocapture",
+      "executionAuthority": "copyable_only_not_executed_by_preview",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-core",
+        "source_mutation_preview_demo_fixture_validates_without_apply_authority",
+        "--",
+        "--nocapture"
+      ],
+      "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1"
+    }
+  ],
+  "reviewerChecklist": [
+    "Confirm sourceMutationApplyStatus remains blocked.",
+    "Confirm the target is a source-like fixture, not generated local state.",
+    "Confirm this PR did not apply the diff to the trusted worktree.",
+    "Confirm later sandbox evidence, if generated, remains untracked unless fixture-scoped.",
+    "Confirm #1 and #23 remain open."
+  ],
+  "rollbackExpectations": {
+    "requiredBeforeApply": true,
+    "minimumFields": [
+      "pre_change_ref",
+      "target_before_hash",
+      "review_decision_ref",
+      "cleanup_expectations"
+    ]
+  },
+  "readModelPrototype": {
+    "status": "blocked",
+    "displayLabel": "Demo preview only: apply not authorized",
+    "fileClassSummary": "1 runtime demo config target; generated sandbox evidence only",
+    "riskSummary": "medium risk fixture; apply remains blocked",
+    "primaryBlockedReason": "source_mutation_apply_not_authorized_by_issue_364",
+    "allowedActions": [
+      "inspect_preview_fixture",
+      "copy_test_commands"
+    ],
+    "forbiddenActions": [
+      "apply_patch",
+      "merge_branch",
+      "execute_command",
+      "write_trusted_file",
+      "browser_command_bridge"
+    ]
+  }
+}
