@@ -1197,3 +1197,13 @@ assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /fresh_guard
 assert.match(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /apply_patch/);
 assert.doesNotMatch(cockpit.renderSourcePatchStaleTargetGuardSurface(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(cockpit.renderEvidencePane(run), /Source patch evidence bundle/);
+
+const demoDisplayAudit = JSON.parse(fs.readFileSync('examples/source-mutation-preview-demo-v1/display-audit.sample.json', 'utf8'));
+const demoDisplayAuditDoc = fs.readFileSync('docs/source-mutation-preview-demo-v1-audit.md', 'utf8');
+assert.equal(demoDisplayAudit.prUnitId, 'SMP1.10.3');
+assert.ok(demoDisplayAudit.allowedDisplay.includes('sandbox dry-run status'));
+assert.ok(demoDisplayAudit.forbiddenControls.includes('merge_branch'));
+assert.ok(demoDisplayAudit.wordingGuardrails.includes('read-only display'));
+assert.match(demoDisplayAuditDoc, /Studio and dashboard surfaces must not provide/);
+assert.match(demoDisplayAuditDoc, /#1 and #23 remain open/);
+assert.doesNotMatch(demoDisplayAuditDoc, /can apply patches|can merge branches|trusted file write control/i);

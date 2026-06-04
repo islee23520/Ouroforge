@@ -822,3 +822,13 @@ assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /fresh_guard_met
 assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchStaleTargetGuards(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 assert.match(dashboard.renderRunDetail(run), /Source patch evidence bundle/);
+
+const demoDisplayAudit = JSON.parse(fs.readFileSync('examples/source-mutation-preview-demo-v1/display-audit.sample.json', 'utf8'));
+const demoDisplayAuditDoc = fs.readFileSync('docs/source-mutation-preview-demo-v1-audit.md', 'utf8');
+assert.equal(demoDisplayAudit.status, 'read-only-display-audited');
+assert.ok(demoDisplayAudit.displayRefs.includes('docs/source-mutation-preview-demo-v1-audit.md'));
+assert.ok(demoDisplayAudit.forbiddenControls.includes('apply_patch'));
+assert.ok(demoDisplayAudit.forbiddenControls.includes('browser_command_bridge'));
+assert.match(demoDisplayAuditDoc, /read-only display/i);
+assert.match(demoDisplayAuditDoc, /Generated reports remain untracked/);
+assert.doesNotMatch(demoDisplayAuditDoc, /can apply patches|can merge branches|trusted file write control|executes commands from the browser/i);

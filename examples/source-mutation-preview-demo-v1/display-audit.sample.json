@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "source-mutation-preview-demo-display-audit-v1",
+  "issue": 364,
+  "prUnitId": "SMP1.10.3",
+  "status": "read-only-display-audited",
+  "displayRefs": [
+    "examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json",
+    "examples/source-mutation-preview-demo-v1/sandbox-dry-run-plan.sample.json",
+    "examples/source-mutation-preview-demo-v1/sandbox-dry-run-evidence-summary.sample.json",
+    "docs/source-mutation-preview-demo-v1-audit.md"
+  ],
+  "allowedDisplay": [
+    "preview id",
+    "risk and file-class summary",
+    "sandbox dry-run status",
+    "allowlisted command text",
+    "generated evidence refs",
+    "forbidden action notices"
+  ],
+  "forbiddenControls": [
+    "apply_patch",
+    "merge_branch",
+    "execute_command",
+    "write_trusted_file",
+    "browser_command_bridge",
+    "local_server_bridge"
+  ],
+  "wordingGuardrails": [
+    "preview-only",
+    "read-only display",
+    "sandbox dry-run evidence",
+    "generated local evidence remains untracked",
+    "no public launch automation or production isolation claims"
+  ]
+}
