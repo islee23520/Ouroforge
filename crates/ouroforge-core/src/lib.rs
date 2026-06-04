@@ -26265,6 +26265,34 @@ fn source_apply_git_stdout(worktree_root: &Path, args: &[&str]) -> Result<String
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
+/// True when the leaf `worktree_root/<relative>` or any intermediate directory
+/// component from `worktree_root` down to it is a symlink. Inspecting only the leaf
+/// (`candidate.symlink_metadata()`) misses a target reached through a symlinked
+/// parent directory (e.g. `link/file` where `link` is a symlink), which can escape
+/// the worktree boundary while keeping a non-symlink leaf.
+fn target_path_traverses_symlink(worktree_root: &Path, relative: &str) -> bool {
+    let mut current = worktree_root.to_path_buf();
+    for component in Path::new(relative).components() {
+        match component {
+            std::path::Component::Normal(part) => {
+                current.push(part);
+                if current
+                    .symlink_metadata()
+                    .map(|metadata| metadata.file_type().is_symlink())
+                    .unwrap_or(false)
+                {
+                    return true;
+                }
+            }
+            std::path::Component::CurDir => {}
+            // Absolute/parent components are rejected by the path-traversal guard;
+            // they cannot themselves be a symlink target here.
+            _ => return false,
+        }
+    }
+    false
+}
+
 fn inspect_source_apply_worktree_target(
     target: &SourceApplyWorktreeContextTargetInput,
     worktree_root: &Path,
@@ -26323,11 +26351,7 @@ fn inspect_source_apply_worktree_target(
 
     let candidate = worktree_root.join(&target.path);
     let exists = roots_exist && candidate.exists();
-    let is_symlink = roots_exist
-        && candidate
-            .symlink_metadata()
-            .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false);
+    let is_symlink = roots_exist && target_path_traverses_symlink(worktree_root, &target.path);
     if roots_exist {
         if let Err(error) = ensure_path_inside(worktree_root, &candidate) {
             blocked_reasons.push(format!(
@@ -38748,6 +38772,39 @@ scenarios:
             reasons.contains("path-traversal") || reasons.contains("file-class blocked"),
             "{reasons}"
         );
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn source_apply_worktree_context_blocks_symlinked_parent_directory_targets() {
+        // A target whose LEAF is a regular file but whose PARENT directory is a
+        // symlink must still fail closed: the parent symlink can redirect trusted
+        // writes outside the worktree even though the leaf is not itself a symlink.
+        let root = unique_temp_dir("source-apply-context-symlink-parent");
+        fs::create_dir_all(root.join("real")).expect("real dir");
+        fs::write(root.join("real/data.yaml"), "id: data\n").expect("data file");
+        let linked_dir = root.join("linked");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(root.join("real"), &linked_dir).expect("dir symlink created");
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(root.join("real"), &linked_dir)
+            .expect("dir symlink created");
+        let input = clean_source_apply_worktree_context_input(
+            &root,
+            vec![SourceApplyWorktreeContextTargetInput {
+                path: "linked/data.yaml".to_string(),
+                git_status: "clean".to_string(),
+                expected_file_class_decision: SourceFileClassDecision::Allowed,
+                authorized_creation: false,
+            }],
+        );
+        let report = inspect_source_apply_worktree_context(&input);
+        assert!(
+            report.is_blocked(),
+            "symlinked parent target must fail closed"
+        );
+        let reasons = report.blocked_reasons.join(" | ");
+        assert!(reasons.contains("symlink-target"), "{reasons}");
         fs::remove_dir_all(root).expect("fixture removed");
     }
 
