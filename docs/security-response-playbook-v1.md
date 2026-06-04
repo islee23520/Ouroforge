@@ -122,3 +122,90 @@ Avoid public wording that promises:
 - browser trusted writes are safe;
 - source patch apply is authorized;
 - native export, plugin marketplace, hosted/cloud, or release security support.
+
+## Severity triage model
+
+Use severity labels for coordination and prioritization only. They are not a
+promise of response time, support coverage, public advisory timing, or production
+security posture.
+
+| Severity | Use when | Default coordination stance | Public wording |
+| --- | --- | --- | --- |
+| Critical | A report plausibly allows unexpected trusted file writes outside documented roots, secret exposure, arbitrary command execution, or bypass of source preview/sandbox/review boundaries with meaningful local impact | Keep details private, identify an owner, reproduce in a clean worktree, and prepare a minimal mitigation PR before public details | "Critical suspected local boundary issue under private triage" |
+| High | A report shows a credible local boundary bypass, unsafe generated-state leak, dependency/build-script risk, or browser automation issue with limited preconditions | Keep exploit detail private, reproduce, and decide whether a sanitized public issue can track remediation | "High-severity alpha security report under maintainer triage" |
+| Medium | A report affects conservative public wording, generated-state hygiene, dashboard/cockpit read-only assumptions, or hardening gaps without a direct trusted-write/command path | Public tracking may be acceptable after removing sensitive details | "Security hardening or governance follow-up" |
+| Low | A report is documentation ambiguity, missing caveat, non-sensitive local path mention, or defense-in-depth wording improvement | Public issue/PR is usually acceptable if no exploit details or private data are included | "Security documentation or defense-in-depth cleanup" |
+| Not applicable | The report describes expected generated local state, documented local Chrome requirements, or behavior outside supported alpha scope | Close or redirect with conservative explanation | "Not a security issue under the current local-first MVP boundary" |
+
+If severity is unclear, start private and downgrade only after a maintainer has
+reviewed whether public details could expose users, secrets, or local paths.
+
+## Advisory and disclosure flow
+
+This flow is manual and maintainer-owned. It does not create or trigger GitHub
+Security Advisories, releases, repository setting changes, publication, or
+notification automation.
+
+1. **Receive privately** — acknowledge receipt when practical, without promising
+   a response-time SLA.
+2. **Scope and sanitize** — identify affected commit, command, artifact, or doc;
+   remove secrets, local paths, screenshots, tokens, private issue links, and
+   exploit details from any public record.
+3. **Classify severity** — use the severity triage model above and record the
+   least-sensitive classification publicly only when safe.
+4. **Reproduce safely** — use a clean worktree and ignored/generated paths; do
+   not commit repro outputs unless a separate sanitized fixture-scoped issue
+   authorizes them.
+5. **Mitigate in a scoped PR** — keep changes narrow, reviewable, and aligned to
+   the affected boundary; do not use the security response issue to add product
+   features or release automation.
+6. **Decide disclosure** — after mitigation, decide whether a public issue,
+   release note, advisory draft, or documentation note is appropriate. If a
+   GitHub Security Advisory is warranted, create it manually as a separate
+   maintainer decision with sanitized details.
+7. **Close with evidence** — record PRs, verification, residual gaps, generated
+   state audit, and whether public disclosure remains deferred.
+
+Disclosure can stay private when public details would expose a still-unfixed
+trusted-write path, command bridge, secret, local path, private screenshot, or
+source preview/sandbox bypass.
+
+## No bounty, no SLA, no production guarantee
+
+Ouroforge alpha security handling is best-effort. Public wording must not imply:
+
+- a bug bounty or monetary reward;
+- guaranteed response, remediation, disclosure, or advisory timelines;
+- production security support;
+- compatibility-stable security commitments;
+- secure sandboxing for arbitrary untrusted content;
+- hosted/cloud security operations;
+- safe browser trusted writes;
+- authorized source patch apply or source merge;
+- release, package, native export, or plugin marketplace security coverage.
+
+Acceptable wording:
+
+- "Maintainers triage alpha security reports on a best-effort basis.";
+- "Please avoid posting exploit details publicly.";
+- "A public advisory, if needed, is a separate maintainer decision.";
+- "No bounty, response-time SLA, or production security guarantee is offered for
+  the current MVP."
+
+## Closure checklist for security-response PRs
+
+Before closing a security-response governance issue, confirm:
+
+- [ ] Fixed PR units were merged in the issue-defined order.
+- [ ] No repository visibility, release, publication, advisory, or settings
+      automation was added.
+- [ ] No product feature, browser trusted write, command bridge, source apply,
+      native export, plugin runtime, hosted/cloud, credentialed workflow, or
+      marketplace behavior was introduced.
+- [ ] Wording scan shows bounty/SLA/production/security guarantee terms only in
+      explicit no/avoid/boundary contexts.
+- [ ] Generated run, dashboard, screenshot, local tool, and private coordination
+      artifacts remain untracked unless separately fixture-scoped.
+- [ ] `cargo audit` and broad repository verification passed, or any unavailable
+      check is explicitly documented.
+- [ ] #1 and #23 remain open.
