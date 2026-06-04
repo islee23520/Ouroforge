@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Ouroforge is a local pre-release MVP. Please include evidence and avoid posting secrets, private paths, or generated files that contain sensitive data. Public issue intake categories, labels, and required triage fields are defined in `docs/public-issue-intake-triage-v1.md`. The template label is provisional; the selected public intake category is authoritative for maintainer triage.
+        Thanks for reporting a bug. Ouroforge is a local pre-release MVP. Please include evidence and avoid posting secrets, private paths, or generated files that contain sensitive data. Public issue intake categories, labels, and required triage fields are defined in `docs/public-issue-intake-triage-v1.md`. The template label is provisional; the selected public intake category is authoritative for maintainer triage. Bug reports should describe local MVP behavior only; they do not authorize source apply, browser command execution, hosted/cloud/auth behavior, or launch/release work.
   - type: dropdown
     id: intake_category
     attributes:
@@ -67,4 +67,8 @@ body:
         - label: I did not include secrets, tokens, private screenshots, or sensitive local paths.
           required: true
         - label: This report is about the local MVP, not hosted/cloud/auth behavior.
+          required: true
+        - label: I did not attach generated run/dashboard/screenshot output unless it is intentionally sanitized and relevant.
+          required: true
+        - label: This report does not request source apply, browser trusted writes, command bridges, release publication, or visibility changes.
           required: true

@@ -1,0 +1,60 @@
+name: Security-sensitive report routing
+description: Request safe maintainer contact for security-sensitive Ouroforge reports
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not post exploit details, secrets, tokens, private screenshots, private paths, or sensitive generated artifacts in a public issue. This template is only for safe routing and minimal impact summary until `SECURITY.md` lists a dedicated private channel.
+
+        Ouroforge is a local-first, pre-release MVP. A public security-routing issue does not authorize source patch apply, browser trusted writes, command bridges, hosted/cloud/auth behavior, release publication, repository visibility changes, or security-guarantee claims.
+  - type: dropdown
+    id: intake_category
+    attributes:
+      label: Public intake category
+      description: Choose the closest category from docs/public-issue-intake-triage-v1.md.
+      options:
+        - Security
+        - Forbidden scope request
+        - Bug
+        - Support question
+        - Unsure / needs maintainer triage
+    validations:
+      required: true
+  - type: textarea
+    id: safe_summary
+    attributes:
+      label: Safe summary
+      description: Describe the affected area without exploit steps, secrets, private paths, or sensitive artifacts.
+      placeholder: |
+        Example: I found a possible issue in local generated artifact handling. I can provide private details to a maintainer through an approved channel.
+    validations:
+      required: true
+  - type: textarea
+    id: affected_area
+    attributes:
+      label: Affected local area
+      description: Name the local command, doc, template, or generated-artifact class at a high level only.
+    validations:
+      required: true
+  - type: dropdown
+    id: contact_need
+    attributes:
+      label: Contact need
+      description: What kind of maintainer response is needed?
+      options:
+        - Private maintainer contact needed before details
+        - Public documentation/security guidance is unclear
+        - Public issue can remain high-level only
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety_boundaries
+    attributes:
+      label: Public safety boundaries
+      options:
+        - label: I did not include exploit steps, secrets, tokens, credentials, private screenshots, or sensitive local paths.
+          required: true
+        - label: I did not attach unsanitized generated run/dashboard/screenshot/local-tool artifacts.
+          required: true
+        - label: I understand this public issue is only a routing request and does not authorize source apply, command execution, release, publication, visibility, or security-guarantee claims.
+          required: true

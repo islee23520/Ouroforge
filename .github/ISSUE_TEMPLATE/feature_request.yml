@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Ouroforge accepts narrowly scoped feature requests that preserve the evidence-native loop. First classify the public issue using `docs/public-issue-intake-triage-v1.md`, then route requests through `docs/post-launch-roadmap-triage-v1.md`; design-gate buckets do not authorize implementation by themselves. The template label is provisional; the selected public intake category is authoritative for maintainer triage. Avoid broad editor/engine/platform requests unless they include concrete MVP evidence and non-goals.
+        Ouroforge accepts narrowly scoped feature requests that preserve the evidence-native loop. First classify the public issue using `docs/public-issue-intake-triage-v1.md`, then route requests through `docs/post-launch-roadmap-triage-v1.md`; design-gate buckets do not authorize implementation by themselves. The template label is provisional; the selected public intake category is authoritative for maintainer triage. Avoid broad editor/engine/platform requests unless they include concrete MVP evidence and non-goals. Requests for dependencies, source apply, native export, plugin runtime, release/publication, visibility changes, hosted/cloud/auth behavior, or browser command execution require explicit maintainer triage before implementation.
   - type: dropdown
     id: intake_category
     attributes:
@@ -88,4 +88,8 @@ body:
         - label: This request names a roadmap bucket or explicitly asks for maintainer triage.
           required: true
         - label: This request does not rely on generated local state being committed unless a separate fixture-scoped issue authorizes it.
+          required: true
+        - label: This request does not ask for release publication, repository visibility changes, browser trusted writes, command bridges, auto-merge, or auto-apply without an explicit design/governance issue.
+          required: true
+        - label: This request does not claim Ouroforge is production-ready, compatibility-stable, or a secure sandbox.
           required: true

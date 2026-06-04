@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Public readiness tasks must not change repository visibility or publish announcements. They should improve evidence, docs, governance, or demo reproducibility. Classify public intake with `docs/public-issue-intake-triage-v1.md`. The template label is provisional; the selected public intake category is authoritative for maintainer triage. For post-launch docs and roadmap communication, use `docs/post-launch-roadmap-triage-v1.md` and `docs/post-launch-roadmap-response-snippets-v1.md`.
+        Public readiness tasks must not change repository visibility or publish announcements. They should improve evidence, docs, governance, templates, security-contact guidance, or demo reproducibility. Classify public intake with `docs/public-issue-intake-triage-v1.md`. The template label is provisional; the selected public intake category is authoritative for maintainer triage. For post-launch docs and roadmap communication, use `docs/post-launch-roadmap-triage-v1.md` and `docs/post-launch-roadmap-response-snippets-v1.md`. Do not post exploit details, secrets, private paths, or private screenshots in public readiness issues.
   - type: dropdown
     id: intake_category
     attributes:
@@ -71,4 +71,6 @@ body:
         - label: This does not overstate Ouroforge maturity.
           required: true
         - label: This does not close or modify #1 or #23 without a separate explicit governance decision.
+          required: true
+        - label: This does not include exploit details, secrets, private paths, private screenshots, or unsanitized generated artifacts.
           required: true
