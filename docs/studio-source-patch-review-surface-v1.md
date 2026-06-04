@@ -58,6 +58,32 @@ A future surface should fail visible and conservative:
 | Stale base/hash | Show expected and observed refs/hashes when available. | Do not rebase, refresh, regenerate, or patch from Studio. |
 | Unknown risk | Show `unknown`/`hold` state with reviewer action required. | Do not default unknown to low risk. |
 
+
+## Implemented read-only bundle surface
+
+SMP1.9.1 through SMP1.9.3 implemented the first read-only source patch
+evidence-bundle surface for dashboard and authoring cockpit inspection. The
+implemented surface consumes Rust-exported mutation artifact data, including
+patch summary, file-class summary, risk ids, blocked reasons, linked evidence,
+sandbox dry-run summary, required test summary, review summary, refs, guardrails,
+and forbidden-action notices.
+
+The implementation remains display-only:
+
+- dashboard and cockpit render escaped text and artifact refs only;
+- required test commands are displayed as inert text and are not executed;
+- no apply, merge, accept, reject, refresh, rerun, install, export, launch,
+  trusted-write, local-server, or command-bridge controls are present;
+- source patch apply to the trusted worktree remains unimplemented and
+  explicitly forbidden;
+- generated preview, sandbox, report, dashboard, and run artifacts remain
+  untracked unless a separate fixture-scoped issue authorizes them.
+
+The source-like fixture for the implemented bundle shape is
+`examples/source-patch-evidence-bundle-v1/source-patch-evidence-bundle.sample.json`.
+Its README records the focused smoke checks for Rust validation/export and
+dashboard/cockpit rendering.
+
 ## No-apply browser boundary
 
 Studio and dashboard implementations remain browser-read-only for trusted state.
