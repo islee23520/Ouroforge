@@ -102,6 +102,13 @@ surfaces missing, stale, incompatible, malformed, or unsupported 3D references
 without fetching remote assets or treating GLTF/GLB files, PBR material graphs,
 marketplaces, or CDN URLs as supported inputs.
 
+Issue #600 adds the bounded browser runtime 3D render smoke path and
+read-only render evidence. The smoke path projects scoped primitive nodes
+through the active 3D camera into existing canvas markers and exports
+`scene3dRender` / `scene3d_render` summaries for dashboard and cockpit
+inspection. The behavior is documented in
+[`3d-render-smoke-v1.md`](./3d-render-smoke-v1.md).
+
 Every implementation PR after this scope contract should include the narrow 3D
 test for the behavior it changes and enough existing 2D verification to prove
 backward compatibility for the touched path. Existing runtime/scenario/dashboard
