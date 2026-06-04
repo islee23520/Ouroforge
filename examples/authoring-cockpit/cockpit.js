@@ -588,6 +588,7 @@ const OuroforgeCockpit = (() => {
       : ['writes', 'commands', 'scene mutation', 'browser runtime control'];
     const queueRenderables = Array.isArray(queue.renderables) ? queue.renderables : [];
     const queueValidation = queue.validation || {};
+    const tilemapStats = queue.tilemapStats || queue.tilemap_stats || {};
     const cards = [
       ['Frame', renderBreakdownValue(breakdown, 'frame_id', 'frameId', 'unrecorded')],
       ['Scene', renderBreakdownValue(breakdown, 'scene_id', 'sceneId', summary?.scene?.sceneId || 'unrecorded')],
@@ -596,6 +597,9 @@ const OuroforgeCockpit = (() => {
       ['Queue renderables', queue.renderable_count ?? queue.renderableCount ?? queueRenderables.length],
       ['Draw calls', queue.draw_call_count ?? queue.drawCallCount ?? 0],
       ['Queue status', queueValidation.status || 'unreported'],
+      ['Tilemap draw tiles', tilemapStats.drawnTileCount ?? tilemapStats.drawn_tile_count ?? 0],
+      ['Asset-backed tiles', tilemapStats.assetTileCount ?? tilemapStats.asset_tile_count ?? 0],
+      ['Missing tile refs', tilemapStats.missingTileRefCount ?? tilemapStats.missing_tile_ref_count ?? 0],
     ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
     const elementRows = elements.slice(0, 24).map((element) => {
       const renderableId = renderBreakdownValue(element, 'renderable_id', 'renderableId', renderBreakdownValue(element, 'entity_id', 'entityId', 'unknown renderable'));
@@ -612,7 +616,7 @@ const OuroforgeCockpit = (() => {
       const detail = renderBreakdownValue(diagnostic, 'detail', 'detail', 'no detail');
       return `<div class="surface-row"><strong>${escapeText(target)}</strong> ${surfaceState(true, reason)}<br><small>layer ${escapeText(renderBreakdownValue(diagnostic, 'layer', 'layer', 'default'))} · detail ${escapeText(detail)}</small></div>`;
     }).join('') || '<div class="surface-row">No absence diagnostics exported.</div>';
-    const queueRows = queueRenderables.slice(0, 24).map((renderable) => `<div class="surface-row"><strong>${escapeText(renderable?.id || 'queue-renderable')}</strong> ${surfaceState(renderable?.visible !== false, renderable?.primitiveKind || 'unknown')}<br><small>draw order ${escapeText(renderable?.drawOrder ?? '?')} · layer ${escapeText(renderable?.layer || 'default')} · source ${escapeText(renderable?.sourceKind || 'unknown')}:${escapeText(renderable?.sourceId || 'unknown')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')}</small></div>`).join('') || '<div class="surface-row">No render queue rows exported.</div>';
+    const queueRows = queueRenderables.slice(0, 24).map((renderable) => `<div class="surface-row"><strong>${escapeText(renderable?.id || 'queue-renderable')}</strong> ${surfaceState(renderable?.visible !== false, renderable?.primitiveKind || 'unknown')}<br><small>draw order ${escapeText(renderable?.drawOrder ?? '?')} · layer ${escapeText(renderable?.layer || 'default')} · source ${escapeText(renderable?.sourceKind || 'unknown')}:${escapeText(renderable?.sourceId || 'unknown')} · ${escapeText(renderable?.visible === false ? (renderable?.fallbackReason || 'skipped') : 'visible')} · tiles ${escapeText(renderable?.tileCount ?? 0)} · missing ${escapeText(renderable?.missingTileRefCount ?? 0)}</small></div>`).join('') || '<div class="surface-row">No render queue rows exported.</div>';
     return `<section id="render-breakdown-inspection" class="panel"><h2>Render breakdown inspection</h2>
       <p class="hint">Read-only render breakdown from runtime world-state evidence. This surface performs no writes, no commands, no scene mutation, and no browser runtime control.</p>
       <div class="field-grid">${cards}</div>
