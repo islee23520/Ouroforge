@@ -830,6 +830,52 @@ fn edit_draft_apply_requires_accepted_review_and_records_rollback() {
         "visual edit apply must not mutate regression fixtures or scenario packs"
     );
 
+    // Reapplying the same already-applied review decision must be rejected
+    // before the scene is mutated, not after. Restore the scene to the draft's
+    // expected before state, then rerun draft-apply with the same accepted
+    // decision: the duplicate guard must fire before any trusted mutation.
+    let mut restored_scene: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    *restored_scene
+        .pointer_mut("/entities/0/components/transform/x")
+        .unwrap() = serde_json::json!(32);
+    fs::write(
+        &scene_path,
+        serde_json::to_string_pretty(&restored_scene).unwrap(),
+    )
+    .expect("scene restored to before state");
+    let duplicate_transaction = temp.join("runs/draft-apply/duplicate.json");
+    let duplicate = run_cli_expect_failure(
+        &temp,
+        &[
+            "edit",
+            "draft-apply",
+            draft_path.to_str().unwrap(),
+            "--project",
+            temp.to_str().unwrap(),
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--proposal",
+            proposal_id,
+            "--decision",
+            &accepted_decision_id,
+            "--transaction-output",
+            duplicate_transaction.to_str().unwrap(),
+        ],
+    );
+    assert!(duplicate.contains("already has an applied visual edit"));
+    assert!(
+        !duplicate_transaction.exists(),
+        "duplicate apply must be rejected before writing a transaction output"
+    );
+    let scene_after_duplicate: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&scene_path).unwrap()).unwrap();
+    assert_eq!(
+        scene_after_duplicate.pointer("/entities/0/components/transform/x"),
+        Some(&serde_json::json!(32)),
+        "duplicate review decision must be rejected before the scene is mutated"
+    );
+
     fs::remove_dir_all(temp).ok();
 }
 

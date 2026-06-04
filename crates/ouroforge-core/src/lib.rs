@@ -20354,6 +20354,25 @@ fn write_scene_only_mutation_applications(
     write_json(&path, &json!(index))
 }
 
+/// Fail-closed guard rejecting an already-applied review decision. Callers must
+/// run this before any trusted scene mutation so a duplicate `edit draft-apply`
+/// is rejected before it can mutate the scene, not after.
+pub fn reject_already_applied_visual_edit_draft_decision(
+    run_dir: impl AsRef<Path>,
+    review_decision_id: &str,
+) -> Result<()> {
+    let index = read_visual_edit_draft_applications(run_dir)?;
+    if index.applications.iter().any(|application| {
+        application.review_decision_id == review_decision_id && application.status == "applied"
+    }) {
+        return Err(anyhow!(
+            "visual edit draft review decision {} already has an applied visual edit",
+            review_decision_id
+        ));
+    }
+    Ok(())
+}
+
 pub fn append_visual_edit_draft_application(
     run_dir: impl AsRef<Path>,
     draft: &VisualEditDraftArtifact,
@@ -20368,16 +20387,8 @@ pub fn append_visual_edit_draft_application(
         .after_scene_hash
         .clone()
         .ok_or_else(|| anyhow!("visual edit draft application requires afterSceneHash"))?;
+    reject_already_applied_visual_edit_draft_decision(run_dir, &preflight.review_decision_id)?;
     let mut index = read_visual_edit_draft_applications(run_dir)?;
-    if index.applications.iter().any(|application| {
-        application.review_decision_id == preflight.review_decision_id
-            && application.status == "applied"
-    }) {
-        return Err(anyhow!(
-            "visual edit draft review decision {} already has an applied visual edit",
-            preflight.review_decision_id
-        ));
-    }
     let record = VisualEditDraftApplicationRecord {
         id: format!(
             "visual-edit-application-{}-{}",

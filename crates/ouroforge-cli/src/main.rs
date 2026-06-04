@@ -15,10 +15,11 @@ use ouroforge_core::{
     list_evidence_artifacts, list_mutation_proposals, orchestrate_evolve_rerun_from_path,
     preview_scene_edit_transaction, project_run_metadata_from_manifest,
     promote_regression_draft_to_scenario_pack, read_cdp_targets, read_dashboard_run,
-    read_ledger_events, read_scene, reject_generated_artifact_source_collision,
-    reject_transaction_output_target_collision, run_browser_smoke, run_browser_smoke_pool,
-    run_command_context_for_run, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    update_journal, validate_scene_reload, validate_visual_edit_draft_review_preflight,
+    read_ledger_events, read_scene, reject_already_applied_visual_edit_draft_decision,
+    reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
+    run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
+    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal, update_journal,
+    validate_scene_reload, validate_visual_edit_draft_review_preflight,
     write_agent_handoff_contract_from_path, write_regression_promotion_draft,
     write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
     BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
@@ -1358,6 +1359,10 @@ fn apply_visual_edit_draft_cli(
         expected_before_scene_hash: preview.before_scene_hash.clone(),
         validation_required: true,
     };
+    // Fail closed before any trusted scene mutation: reject a duplicate apply of
+    // an already-applied review decision so a rerun cannot mutate the scene and
+    // only then be rejected by the application append.
+    reject_already_applied_visual_edit_draft_decision(run_dir, decision_id)?;
     let transaction = apply_scene_only_mutation_operation(run_dir, &operation, transaction_output)?;
     let command_context = visual_edit_draft_apply_command_context(
         draft_path,
