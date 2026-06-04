@@ -9,6 +9,10 @@ Ouroforge is currently a local-first private MVP moving toward public open-sourc
 | `main` pre-release | Best-effort security review during MVP development |
 | Published releases | None yet |
 
+## Alpha response playbook
+
+For alpha security report classification, temporary private coordination, source preview/sandbox/browser-boundary examples, and conservative public wording, see [`docs/security-response-playbook-v1.md`](docs/security-response-playbook-v1.md). The playbook is governance-only and does not create a bounty, support SLA, production security guarantee, release process, repository visibility change, or automated advisory workflow.
+
 ## Reporting a vulnerability
 
 Until a dedicated security contact is published, please report suspected vulnerabilities through a private maintainer channel rather than a public issue. If only GitHub issues are available, file a minimal issue that says a private security report is needed and avoid posting exploit details, secrets, tokens, local paths, or private screenshots.
