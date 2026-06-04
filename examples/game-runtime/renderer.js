@@ -26,6 +26,8 @@
       id: String(layer.id || `layer-${index}`),
       order: Number.isFinite(layer.order) ? layer.order : 0,
       visible: layer.visible !== false,
+      parallaxFactor: Number.isFinite(layer.parallaxFactor) && layer.parallaxFactor > 0 ? layer.parallaxFactor : 100,
+      cameraParticipation: layer.cameraParticipation !== false,
     };
   }
 
@@ -55,6 +57,33 @@
   function layerVisibilityMap(renderer) {
     const entries = renderer && Array.isArray(renderer.layers) ? renderer.layers : [];
     return new Map(entries.map((layer) => [layer.id, layer.visible !== false]));
+  }
+
+  function layerById(renderer, layerId) {
+    const entries = renderer && Array.isArray(renderer.layers) ? renderer.layers : [];
+    return entries.find((layer) => layer.id === layerId) || null;
+  }
+
+  function cameraOffsetForLayer(renderer = normalizeRenderer(), layerId = 'default') {
+    const camera = renderer && renderer.camera ? point(renderer.camera) : { x: 0, y: 0 };
+    const layer = layerById(renderer, layerId);
+    if (layer && layer.cameraParticipation === false) return { x: 0, y: 0 };
+    const factor = layer && Number.isFinite(layer.parallaxFactor) ? layer.parallaxFactor : 100;
+    return {
+      x: (camera.x * factor) / 100,
+      y: (camera.y * factor) / 100,
+    };
+  }
+
+  function worldToScreen(pointValue = {}, renderer = normalizeRenderer(), layerId = 'default') {
+    const worldPoint = point(pointValue);
+    const offset = cameraOffsetForLayer(renderer, layerId);
+    return {
+      x: worldPoint.x - offset.x,
+      y: worldPoint.y - offset.y,
+      layer: String(layerId || 'default'),
+      cameraOffset: offset,
+    };
   }
 
   function renderOrder(entities = [], renderer = normalizeRenderer()) {
@@ -279,7 +308,7 @@
 
   function drawTilemapLayer({ context, renderer, item, assets }) {
     if (!context || !item || !item.tilemap || !item.layer) return [];
-    const camera = renderer && renderer.camera ? renderer.camera : { x: 0, y: 0 };
+    const offset = cameraOffsetForLayer(renderer, item.layer.id);
     const { tilemap: tilemapModel, layer } = item;
     const drawn = [];
     for (let cell = 0; cell < layer.data.length; cell += 1) {
@@ -289,8 +318,8 @@
       if (!tile) continue;
       const column = cell % tilemapModel.grid.width;
       const row = Math.floor(cell / tilemapModel.grid.width);
-      const x = (column * tilemapModel.tileSize.width) - camera.x;
-      const y = (row * tilemapModel.tileSize.height) - camera.y;
+      const x = (column * tilemapModel.tileSize.width) - offset.x;
+      const y = (row * tilemapModel.tileSize.height) - offset.y;
       const image = tile.asset && assets && typeof assets.imageFor === 'function' ? assets.imageFor(tile.asset) : null;
       if (image) {
         context.drawImage(image, x, y, tilemapModel.tileSize.width, tilemapModel.tileSize.height);
@@ -307,8 +336,10 @@
     const components = entity.components || {};
     const transform = point(components.transform);
     const entitySize = size(components.size, { width: 16, height: 16 });
-    const x = transform.x - renderer.camera.x;
-    const y = transform.y - renderer.camera.y;
+    const layer = entity.sprite && entity.sprite.layer ? entity.sprite.layer : 'default';
+    const screen = worldToScreen(transform, renderer, layer);
+    const x = screen.x;
+    const y = screen.y;
     const activeFrame = animation && typeof animation.activeSpriteFrame === 'function'
       ? animation.activeSpriteFrame(components.animation)
       : null;
@@ -353,8 +384,10 @@
     const components = entity.components || {};
     const transform = point(components.transform);
     const entitySize = size(components.size, { width: 16, height: 16 });
-    const x = transform.x - renderer.camera.x;
-    const y = transform.y - renderer.camera.y;
+    const layer = entity && entity.sprite && entity.sprite.layer ? entity.sprite.layer : 'default';
+    const screen = worldToScreen(transform, renderer, layer);
+    const x = screen.x;
+    const y = screen.y;
     if (primitiveKind === 'debug_bounds') {
       if (typeof context.strokeRect === 'function') {
         context.strokeStyle = '#f2f6f8';
@@ -400,7 +433,7 @@
       .map((renderable) => ({ entityId: renderable.sourceId, layer: renderable.layer, layerOrder: renderable.layerOrder, spriteOrder: renderable.localOrder }));
   }
 
-  const api = Object.freeze({ normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, clone });
+  const api = Object.freeze({ normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer, clone });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OuroforgeRenderer = api;
 })(typeof window !== 'undefined' ? window : globalThis);

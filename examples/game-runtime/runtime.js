@@ -115,6 +115,8 @@
     audioEvents: [],
     reloads: [],
     tilemaps: [],
+    cameras: [],
+    activeCameraId: null,
     assetManifest: null,
     goalFlags: {},
     physics: {
@@ -410,11 +412,14 @@
       : defaultScene.entities;
     const bounds = size(scene.bounds, defaultScene.bounds);
     const componentDefaults = normalizeComponentDefaults(scene.componentDefaults);
+    const normalizedRenderer = renderer.normalizeRenderer(scene.renderer, bounds);
     return {
       schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
       id: String(scene.id || 'unnamed-scene'),
       bounds,
-      renderer: renderer.normalizeRenderer(scene.renderer, bounds),
+      renderer: normalizedRenderer,
+      activeCameraId: typeof scene.activeCameraId === 'string' ? scene.activeCameraId : null,
+      cameras: normalizeCameras(scene.cameras, scene.activeCameraId, bounds, normalizedRenderer),
       tilemaps: tilemap.normalizeTilemaps(scene.tilemaps),
       collisionRules: normalizeCollisionRules(scene.collisionRules),
       gameplayRules: normalizeGameplayRules(scene.gameplayRules),
@@ -424,6 +429,37 @@
       componentDefaults,
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
     };
+  }
+
+  function normalizeCamera(camera = {}, index = 0, activeCameraId = null, bounds = defaultScene.bounds, fallbackRenderer = rendererState) {
+    const viewport = size(camera.viewport, fallbackRenderer.viewport || bounds);
+    const id = String(camera.id || `camera-${index}`);
+    const clamp = camera.clampBounds && typeof camera.clampBounds === 'object'
+      ? {
+        x: Number.isFinite(camera.clampBounds.x) ? camera.clampBounds.x : 0,
+        y: Number.isFinite(camera.clampBounds.y) ? camera.clampBounds.y : 0,
+        width: Number.isFinite(camera.clampBounds.width) && camera.clampBounds.width > 0 ? camera.clampBounds.width : bounds.width,
+        height: Number.isFinite(camera.clampBounds.height) && camera.clampBounds.height > 0 ? camera.clampBounds.height : bounds.height,
+      }
+      : null;
+    return {
+      id,
+      active: activeCameraId ? id === activeCameraId : index === 0,
+      position: point(camera.position, fallbackRenderer.camera || { x: 0, y: 0 }),
+      viewport,
+      followTarget: typeof camera.followTarget === 'string' ? camera.followTarget : null,
+      clampBounds: clamp,
+      deadZone: camera.deadZone && typeof camera.deadZone === 'object' ? size(camera.deadZone, { width: 1, height: 1 }) : null,
+      zoom: Number.isFinite(camera.zoom) && camera.zoom > 0 ? camera.zoom : 100,
+    };
+  }
+
+  function normalizeCameras(cameras, activeCameraId, bounds, fallbackRenderer) {
+    const list = Array.isArray(cameras) && cameras.length > 0
+      ? cameras.map((camera, index) => normalizeCamera(camera, index, activeCameraId, bounds, fallbackRenderer))
+      : [normalizeCamera({ id: 'default', position: fallbackRenderer.camera, viewport: fallbackRenderer.viewport }, 0, 'default', bounds, fallbackRenderer)];
+    if (!list.some((camera) => camera.active)) list[0].active = true;
+    return list;
   }
 
 
@@ -494,6 +530,64 @@
     return world.entities.find((entity) => entity.id === entityId)
       || (typeof tilemap.entityById === 'function' ? tilemap.entityById(world.tilemaps, entityId) : null)
       || null;
+  }
+
+  function activeCamera() {
+    return world.cameras.find((camera) => camera.active) || world.cameras[0] || null;
+  }
+
+  function clampCameraPosition(position, camera) {
+    const viewport = camera && camera.viewport ? camera.viewport : rendererState.viewport;
+    const clamp = camera && camera.clampBounds;
+    if (!clamp) {
+      return {
+        x: Math.max(0, Math.min(world.bounds.width - viewport.width, position.x)),
+        y: Math.max(0, Math.min(world.bounds.height - viewport.height, position.y)),
+      };
+    }
+    return {
+      x: Math.max(clamp.x, Math.min(clamp.x + clamp.width - viewport.width, position.x)),
+      y: Math.max(clamp.y, Math.min(clamp.y + clamp.height - viewport.height, position.y)),
+    };
+  }
+
+  function updateCameraState() {
+    const camera = activeCamera();
+    if (!camera) return;
+    let next = point(camera.position, rendererState.camera);
+    const target = camera.followTarget ? entityById(camera.followTarget) : null;
+    if (target && target.components) {
+      const transform = point(target.components.transform);
+      const targetSize = size(target.components.size);
+      next = {
+        x: transform.x + (targetSize.width / 2) - (camera.viewport.width / 2),
+        y: transform.y + (targetSize.height / 2) - (camera.viewport.height / 2),
+      };
+    }
+    next = clampCameraPosition(next, camera);
+    camera.position = clone(next);
+    rendererState.camera = clone(next);
+    rendererState.viewport = clone(camera.viewport);
+  }
+
+  function cameraEvidence() {
+    const active = activeCamera();
+    const worldToScreen = {};
+    for (const entity of world.entities) {
+      const layer = entity.sprite && entity.sprite.layer ? entity.sprite.layer : 'default';
+      worldToScreen[entity.id || `entity-${Object.keys(worldToScreen).length}`] = renderer.worldToScreen(
+        entity.components && entity.components.transform ? entity.components.transform : { x: 0, y: 0 },
+        rendererState,
+        layer,
+      );
+    }
+    return {
+      activeCameraId: active ? active.id : null,
+      cameras: clone(world.cameras),
+      rendererCamera: clone(rendererState.camera),
+      viewport: clone(rendererState.viewport),
+      worldToScreen,
+    };
   }
 
   function setGoalFlag(flag, value) {
@@ -614,6 +708,7 @@
     }
     refreshGroundedState(world.collisions);
     processTriggerEvents(world.collisions);
+    updateCameraState();
   }
 
   function renderCanvas() {
@@ -638,6 +733,8 @@
     world.entities = clone(normalized.entities);
     world.componentDefaults = clone(normalized.componentDefaults);
     world.tilemaps = clone(normalized.tilemaps);
+    world.cameras = clone(normalized.cameras);
+    world.activeCameraId = normalized.activeCameraId || (world.cameras[0] && world.cameras[0].id) || null;
     world.collisionRules = clone(normalized.collisionRules);
     world.gameplayRules = normalized.gameplayRules ? clone(normalized.gameplayRules) : { version: '1', flags: [] };
     world.sceneTransitions = clone(normalized.sceneTransitions);
@@ -664,6 +761,7 @@
       }
     }
     rendererState = clone(normalized.renderer);
+    updateCameraState();
     world.metadata = clone(normalized.metadata);
     world.collisions = [];
     world.collisionEvents = [];
@@ -893,6 +991,7 @@
       state.input = clone(input);
       const frameId = `tick-${world.tick}`;
       state.renderer = renderer.debugState(rendererState, world.entities);
+      state.camera = cameraEvidence();
       state.renderBreakdown = renderer.renderBreakdown({ world: state, renderer: rendererState, frameId });
       state.renderQueue = typeof renderer.renderQueue === 'function'
         ? renderer.renderQueue({ world: state, renderer: rendererState, tilemap, frameId })

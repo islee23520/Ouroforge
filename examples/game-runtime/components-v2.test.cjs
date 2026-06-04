@@ -56,6 +56,42 @@ assert.deepEqual(JSON.parse(JSON.stringify(state.componentModel.counts)), {
 assert.equal(state.componentModel.goalFlags.alive, true);
 assert.equal(state.componentModel.goalFlags.coin_collected, false);
 
+const cameraScene = structuredClone(scene);
+cameraScene.bounds = { width: 640, height: 360 };
+cameraScene.activeCameraId = 'follow-player';
+cameraScene.cameras = [{
+  id: 'follow-player',
+  viewport: { width: 160, height: 90 },
+  followTarget: 'player',
+  clampBounds: { x: 0, y: 0, width: 640, height: 360 },
+  deadZone: { width: 32, height: 24 },
+  zoom: 100,
+}];
+cameraScene.renderer = {
+  version: '1',
+  camera: { x: 0, y: 0 },
+  viewport: { width: 160, height: 90 },
+  background: '#172532',
+  layers: [
+    { id: 'background', order: -10, parallaxFactor: 50 },
+    { id: 'actors', order: 0 },
+    { id: 'hud', order: 10, cameraParticipation: false },
+  ],
+};
+cameraScene.entities.find((entity) => entity.id === 'player').sprite.layer = 'actors';
+cameraScene.entities.find((entity) => entity.id === 'hud_coin').sprite.layer = 'hud';
+state = api.loadScene(cameraScene);
+assert.equal(state.camera.activeCameraId, 'follow-player');
+assert.deepEqual(JSON.parse(JSON.stringify(state.camera.rendererCamera)), { x: 0, y: 35 });
+assert.deepEqual(JSON.parse(JSON.stringify(state.camera.worldToScreen.player.cameraOffset)), { x: 0, y: 35 });
+assert.equal(state.camera.worldToScreen.hud_coin.cameraOffset.x, 0);
+assert.equal(state.camera.worldToScreen.hud_coin.cameraOffset.y, 0);
+api.setInput({ right: true });
+state = api.step(20);
+assert.ok(state.camera.rendererCamera.x > 0, 'follow camera should move after player moves right');
+assert.ok(state.camera.rendererCamera.x <= 480, 'follow camera remains clamped to scene width minus viewport');
+assert.deepEqual(JSON.parse(JSON.stringify(state.camera.viewport)), { width: 160, height: 90 });
+
 const presetFlagScene = structuredClone(scene);
 presetFlagScene.entities.push({
   id: 'gate_state',

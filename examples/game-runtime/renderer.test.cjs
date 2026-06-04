@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime } = require('./renderer.js');
+const { normalizeRenderer, renderOrder, renderQueue, renderBreakdown, compareBreakdowns, debugState, drawRuntime, worldToScreen, cameraOffsetForLayer } = require('./renderer.js');
 const tilemap = require('./tilemap.js');
 
 function createContext() {
@@ -24,9 +24,9 @@ const renderer = normalizeRenderer({
   viewport: { width: 160, height: 90 },
   background: '#101827',
   layers: [
-    { id: 'background', order: -10 },
+    { id: 'background', order: -10, parallaxFactor: 50 },
     { id: 'actors', order: 0 },
-    { id: 'debug', order: 10, visible: false },
+    { id: 'debug', order: 10, visible: false, cameraParticipation: false },
   ],
   debug: { showEntityIds: true },
 }, { width: 320, height: 180 });
@@ -72,9 +72,9 @@ assert.deepEqual(debugState(renderer, entities), {
   viewport: { width: 160, height: 90 },
   background: '#101827',
   layers: [
-    { id: 'background', order: -10, visible: true },
-    { id: 'actors', order: 0, visible: true },
-    { id: 'debug', order: 10, visible: false },
+    { id: 'background', order: -10, visible: true, parallaxFactor: 50, cameraParticipation: true },
+    { id: 'actors', order: 0, visible: true, parallaxFactor: 100, cameraParticipation: true },
+    { id: 'debug', order: 10, visible: false, parallaxFactor: 100, cameraParticipation: false },
   ],
   debug: { showBounds: false, showCamera: false, showEntityIds: true },
   renderedEntities: ordered,
@@ -93,10 +93,14 @@ const drawOrder = drawRuntime({
 assert.deepEqual(drawOrder, ordered);
 assert.deepEqual(context.calls.filter((call) => call[0] === 'fillRect').slice(0, 4), [
   ['fillRect', '#101827', 0, 0, 320, 180],
-  ['fillRect', '#0f172a', -8, -4, 320, 180],
+  ['fillRect', '#0f172a', -4, -2, 320, 180],
   ['fillRect', '#5eead4', 16, 16, 16, 16],
   ['fillRect', '#facc15', 32, 16, 8, 8],
 ]);
+assert.deepEqual(cameraOffsetForLayer(renderer, 'background'), { x: 4, y: 2 });
+assert.deepEqual(cameraOffsetForLayer(renderer, 'debug'), { x: 0, y: 0 });
+assert.deepEqual(worldToScreen({ x: 24, y: 20 }, renderer, 'actors'), { x: 16, y: 16, layer: 'actors', cameraOffset: { x: 8, y: 4 } });
+assert.deepEqual(worldToScreen({ x: 0, y: 0 }, renderer, 'background'), { x: -4, y: -2, layer: 'background', cameraOffset: { x: 4, y: 2 } });
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'player'));
 assert.ok(context.calls.some((call) => call[0] === 'fillText' && call[2] === 'scene=renderer-test tick=3'));
 
