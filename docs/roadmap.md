@@ -207,8 +207,6 @@ automated launch or roadmap-acceptance paths:
 - `docs/public-alpha-launch-governance-v1.md`
 - `docs/public-alpha-communication-pack-v1.md`
 - `docs/post-launch-roadmap-triage-v1.md`
-- `docs/public-alpha-communication-pack-v1.md`
-- `docs/public-alpha-launch-governance-v1.md`
 
 Maintainers should use those documents for separate manual repository visibility
 and post-launch roadmap decisions. Public launch and future milestone acceptance
