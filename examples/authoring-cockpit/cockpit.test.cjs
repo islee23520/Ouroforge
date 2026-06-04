@@ -888,6 +888,24 @@ assert.match(cockpit.renderStudioDraftAuthoringSurface({}), /No Studio draft aut
 const xssStudioDraft = { studio_draft_authoring: { present: true, boundary: '<script>boundary</script>', drafts: [{ draftId: '<img src=x onerror=alert(1)>', target: { type: '<script>scene</script>', path: '<b>path</b>' }, proposedOperations: [{ id: '<script>op</script>', kind: '<b>update</b>', path: '<i>path</i>', summary: '<script>summary</script>' }], expectedAfterSummary: '<script>after</script>', validationStatus: '<script>status</script>', blockedReasons: ['<script>blocked</script>'] }] } };
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<script>summary</script>'), 'studio draft summaries must be escaped');
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<img src=x onerror=alert(1)>'), 'studio draft ids must be escaped');
+// Attribute-boundary XSS evidence: untrusted draft fields rendered into HTML
+// attribute sinks (value="...", data-draft-field="...") must escape quotes so a
+// crafted field cannot break out of the attribute and inject an event handler.
+const draftAttrBreakout = '" onmouseover="alert(1)';
+const draftTagBreakout = '"><img src=x onerror=alert(1)>';
+const xssSceneControlRun = { studio_draft_authoring: { present: true, drafts: [{ draftId: 'studio-draft-scene-attr', target: { type: 'scene', path: 'scenes/main.scene.json', id: 'main' }, proposedOperations: [{ id: 'op-attr', kind: 'update', path: draftAttrBreakout, value: draftTagBreakout, summary: 'attribute boundary probe' }], validationStatus: 'unvalidated', blockedReasons: [] }] } };
+const xssSceneControlMarkup = cockpit.renderStudioDraftAuthoringSurface(xssSceneControlRun);
+assert.ok(!xssSceneControlMarkup.includes('onmouseover="'), 'scene draft control must not allow attribute breakout via unescaped quotes');
+assert.ok(!xssSceneControlMarkup.includes('"><img src=x onerror'), 'scene draft control must escape quote+tag breakout');
+assert.ok(xssSceneControlMarkup.includes('&quot;'), 'scene draft control must escape double quotes in attribute values');
+const xssTilemapControlMarkup = cockpit.renderTilemapDraftControl({ operationId: 'op-attr', layerId: draftAttrBreakout, tileId: draftTagBreakout, validationStatus: 'preview-only', collisionCells: [], triggerCells: [] });
+assert.ok(!xssTilemapControlMarkup.includes('onmouseover="'), 'tilemap draft control must not allow attribute breakout via unescaped quotes');
+assert.ok(!xssTilemapControlMarkup.includes('"><img src=x onerror'), 'tilemap draft control must escape quote+tag breakout');
+assert.ok(xssTilemapControlMarkup.includes('&quot;'), 'tilemap draft control must escape double quotes in attribute values');
+const xssAssetRefControlRun = { studio_draft_authoring: { present: true, drafts: [{ draftId: 'studio-draft-asset-ref-attr', target: { type: 'asset-reference', path: 'assets/manifest.json', id: 'player_sprite' }, proposedOperations: [{ id: 'op-attr', kind: 'reference-preview', path: draftAttrBreakout, assetId: draftTagBreakout, summary: 'attribute boundary probe' }], validationStatus: 'unvalidated', blockedReasons: [] }] } };
+const xssAssetRefControlMarkup = cockpit.renderStudioDraftAuthoringSurface(xssAssetRefControlRun);
+assert.ok(!xssAssetRefControlMarkup.includes('onmouseover="'), 'asset-reference draft control must not allow attribute breakout via unescaped quotes');
+assert.ok(xssAssetRefControlMarkup.includes('&quot;'), 'asset-reference draft control must escape double quotes in attribute values');
 const assetInspectorMarkup = cockpit.renderStudioAssetInspectorSurface(run);
 assert.match(assetInspectorMarkup, /Asset inspector/);
 assert.match(assetInspectorMarkup, /player_sprite/);
