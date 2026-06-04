@@ -18,7 +18,7 @@ Options:
   -h, --help       Show this help.
 
 Environment:
-  OUROFORGE_DEMO_WORKERS   Worker count for run commands (default: 4).
+  OUROFORGE_DEMO_WORKERS   Worker count for run commands (default: 4; use 2+ for browser/scenario evidence).
   CARGO_TARGET_DIR         Optional Cargo target dir. Defaults to repo target/.
 USAGE
 }
@@ -58,6 +58,10 @@ WORKERS="${OUROFORGE_DEMO_WORKERS:-4}"
 
 if [[ ! "$WORKERS" =~ ^[1-9][0-9]*$ ]]; then
   echo "error: OUROFORGE_DEMO_WORKERS must be a positive integer" >&2
+  exit 2
+fi
+if (( WORKERS < 2 )); then
+  echo "error: OUROFORGE_DEMO_WORKERS must be at least 2 so browser/scenario evidence is generated" >&2
   exit 2
 fi
 
