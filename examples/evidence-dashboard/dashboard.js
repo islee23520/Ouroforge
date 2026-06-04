@@ -378,6 +378,37 @@ const OuroforgeDashboard = (() => {
       <div class="lifecycle-grid">${reportRows}</div>`;
   }
 
+
+  function renderRuntimeInvariants(run = {}) {
+    const invariants = run.runtime_invariants || run.runtimeInvariants || {};
+    if (!invariants.present) {
+      return `<p class="empty-state">${escapeText(invariants.empty_state || 'No runtime invariant evidence is available for this run.')}</p>`;
+    }
+    const refs = Array.isArray(invariants.evidence_refs || invariants.evidenceRefs) ? (invariants.evidence_refs || invariants.evidenceRefs) : [];
+    const summaries = Array.isArray(invariants.summaries) ? invariants.summaries : [];
+    const evidence = Array.isArray(invariants.evidence) ? invariants.evidence : [];
+    const rows = [
+      ['Status', invariants.status || 'unknown'],
+      ['Checks', invariants.check_count ?? invariants.checkCount ?? 0],
+      ['Passed', invariants.passed_count ?? invariants.passedCount ?? 0],
+      ['Failed', invariants.failed_count ?? invariants.failedCount ?? 0],
+      ['Unsupported/missing', `${invariants.unsupported_count ?? invariants.unsupportedCount ?? 0}/${invariants.missing_count ?? invariants.missingCount ?? 0}`],
+      ['Malformed/stale', `${invariants.malformed_count ?? invariants.malformedCount ?? 0}/${invariants.stale_count ?? invariants.staleCount ?? 0}`],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br><span class="${label === 'Status' ? statusClass(value) : ''}">${escapeText(value)}</span></div>`).join('');
+    const summaryRows = summaries.length
+      ? summaries.slice(0, 8).map((summary) => `<li><strong>${escapeText(summary.modelId || summary.model_id || 'runtime invariant model')}</strong>: ${escapeText(summary.checkCount ?? summary.check_count ?? 0)} check(s), ${escapeText(summary.failedCount ?? summary.failed_count ?? 0)} failed, ${escapeText(summary.malformedCount ?? summary.malformed_count ?? 0)} malformed, ${escapeText(summary.staleCount ?? summary.stale_count ?? 0)} stale<br><small>${escapeText(summary.runId || summary.run_id || 'unknown run')}${summary.scenarioId || summary.scenario_id ? ` · ${escapeText(summary.scenarioId || summary.scenario_id)}` : ''}</small></li>`).join('')
+      : '<li>No parseable runtime invariant summaries are available.</li>';
+    const checkRows = evidence.flatMap((item) => Array.isArray(item.checks) ? item.checks : []).slice(0, 12).map((check) => {
+      const refs = Array.isArray(check.evidenceRefs || check.evidence_refs) ? (check.evidenceRefs || check.evidence_refs) : [];
+      return `<li><strong>${escapeText(check.invariantId || check.invariant_id || 'invariant')}</strong>: <span class="${statusClass(check.status)}">${escapeText(check.status || 'unknown')}</span> · ${escapeText(check.invariantType || check.invariant_type || 'unknown type')} · ${escapeText(check.targetPath || check.target_path || 'unknown target')}<br><small>${escapeText(check.message || refs.join(' · ') || 'linked to scenario/runtime evidence')}</small></li>`;
+    }).join('') || '<li>No parsed runtime invariant checks are available.</li>';
+    return `<div class="field-grid">${rows}</div>
+      <h4>Invariant evidence summaries</h4><ul class="run-meta-list">${summaryRows}</ul>
+      <h4>Checks</h4><ul class="run-meta-list">${checkRows}</ul>
+      ${renderRefLinks('Runtime invariant evidence refs', refs, run)}
+      <p class="run-meta">${escapeText(invariants.boundary || 'Read-only runtime invariant evidence; dashboard surfaces do not mutate source, execute commands, auto-fix, auto-apply, or auto-merge.')}</p>`;
+  }
+
   function artifactRefHref(ref, run) {
     const text = String(ref ?? '');
     if (!text) return null;
@@ -1342,6 +1373,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
+      <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
@@ -1422,7 +1454,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderAgentRoleModels, renderAgentHandoffs, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

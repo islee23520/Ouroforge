@@ -7029,6 +7029,57 @@ fn validate_runtime_invariant_evidence_ref(reference: &str) -> Result<()> {
     ))
 }
 
+pub fn write_runtime_invariant_evidence(
+    run_dir: impl AsRef<Path>,
+    evidence: &RuntimeInvariantEvidence,
+) -> Result<EvidenceArtifact> {
+    let run_dir = run_dir.as_ref();
+    evidence.validate()?;
+    let run = read_json_value(run_dir.join("run.json"))?;
+    let current_run_id = json_string(&run, "id").unwrap_or_else(|| run_id_from_run_dir(run_dir));
+    if evidence.run_id != current_run_id {
+        return Err(anyhow!(
+            "runtime invariant evidence runId {} is stale for current run {current_run_id}",
+            evidence.run_id
+        ));
+    }
+    let scenario_dir = evidence
+        .scenario_id
+        .as_deref()
+        .map(|scenario_id| format!("scenarios/{scenario_id}"))
+        .unwrap_or_else(|| "run".to_string());
+    let artifact_path = format!(
+        "evidence/{scenario_dir}/runtime-invariant-evidence-{}.json",
+        evidence.model_id
+    );
+    if let Some(parent) = run_dir.join(&artifact_path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    write_json(&run_dir.join(&artifact_path), &json!(evidence))?;
+    let summary = evidence.summary();
+    add_evidence_artifact(
+        run_dir,
+        &format!("runtime-invariant-evidence-{}", evidence.model_id),
+        "application/json",
+        &artifact_path,
+        json!({
+            "artifact": "runtime_invariant_evidence",
+            "schemaVersion": evidence.schema_version,
+            "modelId": evidence.model_id,
+            "runId": evidence.run_id,
+            "scenarioId": evidence.scenario_id,
+            "checkCount": summary.check_count,
+            "passedCount": summary.passed_count,
+            "failedCount": summary.failed_count,
+            "unsupportedCount": summary.unsupported_count,
+            "missingCount": summary.missing_count,
+            "malformedCount": summary.malformed_count,
+            "staleCount": summary.stale_count,
+            "boundary": "runtime invariant evidence is Rust-written validation evidence only; it does not mutate source, launch workers, execute browser commands, auto-fix, auto-apply, or auto-merge"
+        }),
+    )
+}
+
 pub fn evaluate_runtime_invariants(
     model: &RuntimeInvariantModel,
     world_state: &serde_json::Value,
@@ -30502,6 +30553,7 @@ pub struct RunDashboardReadModel {
     pub asset_preview: RunDashboardAssetPreview,
     pub asset_inspector: RunDashboardAssetInspector,
     pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
+    pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -30739,6 +30791,25 @@ pub struct RunDashboardSourceApplyWorktreeContext {
     pub blocked_count: usize,
     pub evidence_refs: Vec<String>,
     pub reports: Vec<SourceApplyWorktreeContextReport>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardRuntimeInvariants {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub check_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub unsupported_count: usize,
+    pub missing_count: usize,
+    pub malformed_count: usize,
+    pub stale_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub summaries: Vec<RuntimeInvariantEvidenceSummary>,
+    pub evidence: Vec<RuntimeInvariantEvidence>,
     pub artifacts: Vec<RunDashboardArtifact>,
     pub boundary: String,
 }
@@ -31097,6 +31168,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         dashboard_asset_inspector(&asset_integrity, &asset_loading, &asset_preview);
     let source_apply_worktree_context =
         read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
+    let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
     let probe_contract_status = dashboard_probe_contract_status(
         &evidence,
         &world_states,
@@ -31152,6 +31224,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         asset_preview,
         asset_inspector,
         source_apply_worktree_context,
+        runtime_invariants,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -31469,6 +31542,154 @@ fn dashboard_artifact_is_asset_preview_evidence(artifact: &EvidenceArtifact) -> 
         == Some("asset_preview_evidence")
         || artifact.id.contains("asset-preview-evidence")
         || artifact.path.contains("asset-preview-evidence")
+}
+
+fn dashboard_artifact_is_runtime_invariant_evidence(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("runtime_invariant_evidence")
+        || artifact.id.contains("runtime-invariant")
+        || artifact.id.contains("invariant-evidence")
+        || artifact.path.contains("runtime-invariant")
+        || artifact.path.contains("invariant-evidence")
+}
+
+fn read_dashboard_runtime_invariants(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+    run: &serde_json::Value,
+) -> Result<RunDashboardRuntimeInvariants> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_runtime_invariant_evidence,
+    )?;
+    let boundary = "Read-only runtime invariant evidence linked from Rust validation; dashboard/Studio surfaces must not mutate source, execute commands, launch workers, auto-fix, auto-apply, auto-merge, or claim gameplay quality guarantees.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardRuntimeInvariants {
+            present: false,
+            empty_state: "No runtime invariant evidence is indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            check_count: 0,
+            passed_count: 0,
+            failed_count: 0,
+            unsupported_count: 0,
+            missing_count: 0,
+            malformed_count: 0,
+            stale_count: 0,
+            evidence_refs: Vec::new(),
+            summaries: Vec::new(),
+            evidence: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let current_run_id = json_string(run, "id").unwrap_or_else(|| run_id_from_run_dir(run_dir));
+    let mut evidence_refs = Vec::new();
+    let mut parsed_evidence = Vec::new();
+    let mut summaries = Vec::new();
+    let mut malformed_artifact_count = 0usize;
+    let mut stale_artifact_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_artifact_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_artifact_count += 1;
+            continue;
+        };
+        match serde_json::from_value::<RuntimeInvariantEvidence>(value.clone()) {
+            Ok(runtime_evidence) if runtime_evidence.validate().is_ok() => {
+                let summary = runtime_evidence.summary();
+                if runtime_evidence.run_id != current_run_id {
+                    stale_artifact_count += 1;
+                }
+                summaries.push(summary);
+                parsed_evidence.push(runtime_evidence);
+            }
+            _ => malformed_artifact_count += 1,
+        }
+    }
+    summaries.sort_by(|left, right| {
+        (
+            left.run_id.as_str(),
+            left.scenario_id.as_deref().unwrap_or_default(),
+            left.model_id.as_str(),
+        )
+            .cmp(&(
+                right.run_id.as_str(),
+                right.scenario_id.as_deref().unwrap_or_default(),
+                right.model_id.as_str(),
+            ))
+    });
+    parsed_evidence.sort_by(|left, right| {
+        (
+            left.run_id.as_str(),
+            left.scenario_id.as_deref().unwrap_or_default(),
+            left.model_id.as_str(),
+        )
+            .cmp(&(
+                right.run_id.as_str(),
+                right.scenario_id.as_deref().unwrap_or_default(),
+                right.model_id.as_str(),
+            ))
+    });
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let check_count = summaries.iter().map(|summary| summary.check_count).sum();
+    let passed_count = summaries.iter().map(|summary| summary.passed_count).sum();
+    let failed_count = summaries.iter().map(|summary| summary.failed_count).sum();
+    let unsupported_count = summaries
+        .iter()
+        .map(|summary| summary.unsupported_count)
+        .sum();
+    let missing_count = summaries.iter().map(|summary| summary.missing_count).sum();
+    let malformed_count = summaries
+        .iter()
+        .map(|summary| summary.malformed_count)
+        .sum::<usize>()
+        + malformed_artifact_count;
+    let stale_count = summaries
+        .iter()
+        .map(|summary| summary.stale_count)
+        .sum::<usize>()
+        + stale_artifact_count;
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if stale_count > 0 {
+        "stale"
+    } else if failed_count > 0 {
+        "failed"
+    } else if unsupported_count > 0 || missing_count > 0 {
+        "attention"
+    } else if check_count > 0 {
+        "passed"
+    } else {
+        "missing"
+    };
+
+    Ok(RunDashboardRuntimeInvariants {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        check_count,
+        passed_count,
+        failed_count,
+        unsupported_count,
+        missing_count,
+        malformed_count,
+        stale_count,
+        evidence_refs,
+        summaries,
+        evidence: parsed_evidence,
+        artifacts,
+        boundary,
+    })
 }
 
 fn dashboard_artifact_is_source_apply_worktree_context(artifact: &EvidenceArtifact) -> bool {
@@ -38896,6 +39117,148 @@ scenarios:
 
         assert_eq!(evidence.checks[0].status, RuntimeInvariantStatus::Missing);
         assert_eq!(evidence.checks[1].status, RuntimeInvariantStatus::Malformed);
+    }
+
+    fn runtime_invariant_single_check_evidence(
+        run_id: &str,
+        model_id: &str,
+        status: RuntimeInvariantStatus,
+    ) -> RuntimeInvariantEvidence {
+        RuntimeInvariantEvidence {
+            schema_version: "runtime-invariant-evidence-v1".to_string(),
+            model_id: model_id.to_string(),
+            run_id: run_id.to_string(),
+            scenario_id: Some("collect-and-exit".to_string()),
+            world_state_path: "evidence/scenarios/collect-and-exit/world-state.json".to_string(),
+            scenario_result_path: Some(
+                "evidence/scenarios/collect-and-exit/scenario-result.json".to_string(),
+            ),
+            recorded_at_unix_ms: 1700000000100,
+            checks: vec![RuntimeInvariantCheck {
+                invariant_id: "health-non-negative".to_string(),
+                invariant_type: RuntimeInvariantType::HealthNonNegative,
+                status,
+                target_path: "player.health".to_string(),
+                evidence_refs: vec![
+                    "evidence/scenarios/collect-and-exit/world-state.json".to_string(),
+                    "evidence/scenarios/collect-and-exit/scenario-result.json".to_string(),
+                ],
+                observed: Some(json!(5)),
+                message: (status != RuntimeInvariantStatus::Passed)
+                    .then(|| "runtime invariant requires attention".to_string()),
+            }],
+        }
+    }
+
+    #[test]
+    fn runtime_invariant_evidence_writer_indexes_dashboard_read_model_links() {
+        let (root, artifacts) = create_test_run("runtime-invariant-dashboard-links");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        let run_id = json_string(&run, "id").expect("run id present");
+        let evidence = runtime_invariant_single_check_evidence(
+            &run_id,
+            "qa14_5_runtime_dashboard",
+            RuntimeInvariantStatus::Passed,
+        );
+
+        let artifact = write_runtime_invariant_evidence(&artifacts.run_dir, &evidence)
+            .expect("runtime invariant evidence writes and indexes");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+
+        assert_eq!(artifact.metadata["artifact"], "runtime_invariant_evidence");
+        assert!(dashboard.runtime_invariants.present);
+        assert_eq!(dashboard.runtime_invariants.status, "passed");
+        assert_eq!(dashboard.runtime_invariants.check_count, 1);
+        assert_eq!(dashboard.runtime_invariants.passed_count, 1);
+        assert_eq!(dashboard.runtime_invariants.failed_count, 0);
+        assert_eq!(
+            dashboard.runtime_invariants.evidence_refs,
+            vec![artifact.path]
+        );
+        assert_eq!(
+            dashboard.runtime_invariants.summaries[0].model_id,
+            "qa14_5_runtime_dashboard"
+        );
+        assert!(dashboard
+            .runtime_invariants
+            .boundary
+            .contains("must not mutate source"));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn runtime_invariant_dashboard_reports_missing_malformed_and_stale_refs() {
+        let (missing_root, missing_artifacts) = create_test_run("runtime-invariant-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.runtime_invariants.present);
+        assert_eq!(missing.runtime_invariants.status, "missing");
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (malformed_root, malformed_artifacts) = create_test_run("runtime-invariant-malformed");
+        let malformed_path =
+            "evidence/scenarios/collect-and-exit/runtime-invariant-evidence-malformed.json";
+        fs::create_dir_all(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/scenarios/collect-and-exit"),
+        )
+        .expect("scenario evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed invariant evidence written");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "runtime-invariant-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "runtime_invariant_evidence" }),
+        )
+        .expect("malformed artifact indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.runtime_invariants.present);
+        assert_eq!(malformed.runtime_invariants.status, "malformed");
+        assert_eq!(malformed.runtime_invariants.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
+
+        let (stale_root, stale_artifacts) = create_test_run("runtime-invariant-stale");
+        let stale_evidence = runtime_invariant_single_check_evidence(
+            "stale-run-id",
+            "qa14_5_runtime_stale",
+            RuntimeInvariantStatus::Passed,
+        );
+        let stale_reject =
+            write_runtime_invariant_evidence(&stale_artifacts.run_dir, &stale_evidence)
+                .expect_err("trusted writer rejects stale run refs");
+        assert!(stale_reject.to_string().contains("stale"));
+        let stale_path =
+            "evidence/scenarios/collect-and-exit/runtime-invariant-evidence-stale.json";
+        fs::create_dir_all(
+            stale_artifacts
+                .run_dir
+                .join("evidence/scenarios/collect-and-exit"),
+        )
+        .expect("scenario evidence dir exists");
+        write_json(
+            &stale_artifacts.run_dir.join(stale_path),
+            &json!(stale_evidence),
+        )
+        .expect("stale fixture evidence written");
+        add_evidence_artifact(
+            &stale_artifacts.run_dir,
+            "runtime-invariant-stale",
+            "application/json",
+            stale_path,
+            json!({ "artifact": "runtime_invariant_evidence", "runId": "stale-run-id" }),
+        )
+        .expect("stale artifact indexed");
+        let stale = read_dashboard_run(&stale_artifacts.run_dir).expect("dashboard reads");
+        assert!(stale.runtime_invariants.present);
+        assert_eq!(stale.runtime_invariants.status, "stale");
+        assert_eq!(stale.runtime_invariants.stale_count, 1);
+        fs::remove_dir_all(stale_root).expect("stale fixture removed");
     }
 
     #[test]

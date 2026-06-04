@@ -83,6 +83,24 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  runtime_invariants: {
+    present: true,
+    status: 'failed',
+    check_count: 3,
+    passed_count: 1,
+    failed_count: 1,
+    unsupported_count: 1,
+    missing_count: 0,
+    malformed_count: 0,
+    stale_count: 0,
+    evidence_refs: ['evidence/scenarios/scaffold-smoke/runtime-invariant-evidence-qa.json'],
+    boundary: 'Read-only runtime invariant evidence; dashboard never mutates source or executes commands.',
+    summaries: [{ modelId: 'qa14_5_runtime_dashboard', runId: 'run-1', scenarioId: 'scaffold-smoke', checkCount: 3, passedCount: 1, failedCount: 1, unsupportedCount: 1, missingCount: 0, malformedCount: 0, staleCount: 0 }],
+    evidence: [{ checks: [
+      { invariantId: 'health-non-negative', invariantType: 'health_non_negative', status: 'failed', targetPath: 'player.health', message: 'health was negative', evidenceRefs: ['evidence/scenarios/scaffold-smoke/world-state.json'] },
+      { invariantId: '<script>bad</script>', invariantType: 'finite_transform', status: 'passed', targetPath: 'player.transform', evidenceRefs: ['evidence/scenarios/scaffold-smoke/world-state.json'] },
+    ] }],
+  },
   source_apply_worktree_context: {
     present: true,
     status: 'blocked',
@@ -698,17 +716,23 @@ assert.match(dashboard.renderSourceApplyWorktreeContext(run), /Source apply cont
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /source-apply-worktree-boundary-v1/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /dirty-target/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /browser\/dashboard\/Studio surfaces remain read-only/);
+assert.match(dashboard.renderRuntimeInvariants(run), /Runtime invariant evidence refs/);
+assert.match(dashboard.renderRuntimeInvariants(run), /health was negative/);
+assert.match(dashboard.renderRuntimeInvariants(run), /qa14_5_runtime_dashboard/);
+assert.doesNotMatch(dashboard.renderRuntimeInvariants(run), /<script>bad<\/script>/);
 assert.doesNotMatch(dashboard.renderSourceApplyWorktreeContext(run), /<script>bad<\/script>/);
 assert.doesNotMatch(dashboard.renderSourceApplyWorktreeContext(run), /<button|onclick|fetch\(/i);
 assert.match(dashboard.renderRunDetail(run), /Asset reference integrity/);
 assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
+assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
 assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
 assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, empty_state: 'No loading evidence' } }), /No loading evidence/);
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
+assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
 
 const visualAuthoringDoc = fs.readFileSync(require.resolve('../../docs/visual-authoring-v1.md'), 'utf8');
 assert.match(visualAuthoringDoc, /Scenario Coverage v5 \/ VA1\.11\.3 coverage matrix/);
@@ -752,6 +776,9 @@ assert.ok(!dashboard.renderRunList([xssRun], null).includes('<img src=x onerror'
 const sourceApplyXss = dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], reports: [{ policyId: '<img src=x onerror=alert(1)>', status: '<script>bad</script>', branch: '<script>branch</script>', headCommit: '<script>head</script>', worktreeRoot: '<script>root</script>', lockStatus: { active: true, attemptId: '<script>lock</script>' }, blockedReasons: ['<script>blocked</script>'], guardrails: ['<script>guardrail</script>'], targets: [{ path: '<img src=x onerror=alert(1)>', gitStatus: '<script>dirty</script>', rootZone: '<script>root</script>', fileClassDecision: '<script>decision</script>', blockedReasons: ['<script>target</script>'] }] }] } });
 assert.ok(!sourceApplyXss.includes('<script>blocked</script>'), 'source apply blocked reasons must be escaped');
 assert.ok(!sourceApplyXss.includes('<img src=x onerror=alert(1)>'), 'source apply target paths must be escaped');
+const invariantXss = dashboard.renderRuntimeInvariants({ runtime_invariants: { present: true, status: '<script>bad</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], summaries: [{ modelId: '<script>model</script>', runId: '<script>run</script>' }], evidence: [{ checks: [{ invariantId: '<script>check</script>', invariantType: '<script>type</script>', status: '<script>status</script>', targetPath: '<script>target</script>', message: '<script>message</script>' }] }] } });
+assert.ok(!invariantXss.includes('<script>check</script>'), 'runtime invariant check ids must be escaped');
+assert.ok(!invariantXss.includes('<script>boundary</script>'), 'runtime invariant boundary must be escaped');
 assert.match(sourceApplyXss, /&lt;script&gt;blocked&lt;\/script&gt;/);
 
 const rawMalformedCommandContextRun = {
