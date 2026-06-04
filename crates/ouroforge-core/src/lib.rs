@@ -4025,6 +4025,256 @@ impl AgentSharedStateSnapshotReadModel {
     }
 }
 
+pub const REVIEW_CRITIC_GATE_SCHEMA_VERSION: &str = "review-critic-gate-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewCriticGate {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "gateId")]
+    pub gate_id: String,
+    pub milestone: String,
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    pub decision: ReviewCriticGateDecision,
+    pub implementer: ReviewCriticGateActor,
+    pub reviewer: ReviewCriticGateActor,
+    pub critic: ReviewCriticGateActor,
+    #[serde(rename = "workPackageRef")]
+    pub work_package_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "handoffRef")]
+    pub handoff_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "stateSnapshotRefs")]
+    pub state_snapshot_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "qaEvidenceRefs")]
+    pub qa_evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "regressionEvidenceRefs")]
+    pub regression_evidence_refs: Vec<AuthoringLoopArtifactRef>,
+    #[serde(rename = "decisionLedgerRef")]
+    pub decision_ledger_ref: AuthoringLoopArtifactRef,
+    #[serde(rename = "evidenceReviewed")]
+    pub evidence_reviewed: Vec<AuthoringLoopArtifactRef>,
+    pub risks: Vec<String>,
+    #[serde(rename = "requiredFixes")]
+    pub required_fixes: Vec<String>,
+    #[serde(rename = "promotionRecommendation")]
+    pub promotion_recommendation: ReviewCriticGatePromotionRecommendation,
+    pub confidence: AgentDecisionConfidence,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(
+        rename = "staleStateIndicators",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub stale_state_indicators: Vec<String>,
+    #[serde(rename = "generatedState")]
+    pub generated_state: AuthoringLoopGeneratedStatePolicy,
+    pub guardrails: Vec<String>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewCriticGateActor {
+    pub role: String,
+    #[serde(rename = "actorId")]
+    pub actor_id: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReviewCriticGateDecision {
+    Accepted,
+    Rejected,
+    Deferred,
+    NeedsFix,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReviewCriticGatePromotionRecommendation {
+    Promote,
+    Reject,
+    Defer,
+    FixRequired,
+    Block,
+}
+
+impl ReviewCriticGate {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let gate: ReviewCriticGate =
+            serde_json::from_str(input).context("failed to parse Review/Critic Gate JSON")?;
+        gate.validate_schema()?;
+        Ok(gate)
+    }
+
+    pub fn validate_schema(&self) -> Result<()> {
+        if self.schema_version != REVIEW_CRITIC_GATE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "review/critic gate schemaVersion must be {REVIEW_CRITIC_GATE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("review/critic gate gateId", &self.gate_id)?;
+        require_text("review/critic gate milestone", &self.milestone)?;
+        validate_path_component("review/critic gate taskId", &self.task_id)?;
+        self.implementer
+            .validate("review/critic gate implementer")?;
+        self.reviewer.validate("review/critic gate reviewer")?;
+        self.critic.validate("review/critic gate critic")?;
+        self.work_package_ref
+            .validate("review/critic gate workPackageRef")?;
+        self.handoff_ref.validate("review/critic gate handoffRef")?;
+        validate_nonempty_refs(
+            "review/critic gate stateSnapshotRefs",
+            &self.state_snapshot_refs,
+        )?;
+        validate_optional_refs("review/critic gate qaEvidenceRefs", &self.qa_evidence_refs)?;
+        validate_optional_refs(
+            "review/critic gate regressionEvidenceRefs",
+            &self.regression_evidence_refs,
+        )?;
+        self.decision_ledger_ref
+            .validate("review/critic gate decisionLedgerRef")?;
+        validate_nonempty_refs(
+            "review/critic gate evidenceReviewed",
+            &self.evidence_reviewed,
+        )?;
+        validate_optional_text_list("review/critic gate risks", &self.risks)?;
+        validate_optional_text_list("review/critic gate requiredFixes", &self.required_fixes)?;
+        validate_optional_text_list("review/critic gate blockedReasons", &self.blocked_reasons)?;
+        validate_optional_text_list(
+            "review/critic gate staleStateIndicators",
+            &self.stale_state_indicators,
+        )?;
+        self.generated_state.validate()?;
+        validate_nonempty_text_list("review/critic gate guardrails", &self.guardrails)?;
+        validate_nonempty_text_list(
+            "review/critic gate forbiddenActions",
+            &self.forbidden_actions,
+        )?;
+        require_text("review/critic gate boundary", &self.boundary)?;
+        self.validate_status_shape()?;
+        self.validate_guardrails()
+    }
+
+    fn validate_status_shape(&self) -> Result<()> {
+        match self.decision {
+            ReviewCriticGateDecision::Accepted => {
+                if self.promotion_recommendation != ReviewCriticGatePromotionRecommendation::Promote
+                {
+                    return Err(anyhow!(
+                        "accepted review/critic gate requires promote recommendation"
+                    ));
+                }
+                if !self.blocked_reasons.is_empty() || !self.required_fixes.is_empty() {
+                    return Err(anyhow!(
+                        "accepted review/critic gate must not include blockedReasons or requiredFixes"
+                    ));
+                }
+            }
+            ReviewCriticGateDecision::Rejected => {
+                if self.promotion_recommendation != ReviewCriticGatePromotionRecommendation::Reject
+                {
+                    return Err(anyhow!(
+                        "rejected review/critic gate requires reject recommendation"
+                    ));
+                }
+                if self.risks.is_empty() {
+                    return Err(anyhow!("rejected review/critic gate requires risks"));
+                }
+            }
+            ReviewCriticGateDecision::Deferred => {
+                if self.promotion_recommendation != ReviewCriticGatePromotionRecommendation::Defer {
+                    return Err(anyhow!(
+                        "deferred review/critic gate requires defer recommendation"
+                    ));
+                }
+            }
+            ReviewCriticGateDecision::NeedsFix => {
+                if self.promotion_recommendation
+                    != ReviewCriticGatePromotionRecommendation::FixRequired
+                {
+                    return Err(anyhow!(
+                        "needs-fix review/critic gate requires fix-required recommendation"
+                    ));
+                }
+                if self.required_fixes.is_empty() {
+                    return Err(anyhow!(
+                        "needs-fix review/critic gate requires requiredFixes"
+                    ));
+                }
+            }
+            ReviewCriticGateDecision::Blocked => {
+                if self.promotion_recommendation != ReviewCriticGatePromotionRecommendation::Block {
+                    return Err(anyhow!(
+                        "blocked review/critic gate requires block recommendation"
+                    ));
+                }
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "blocked review/critic gate requires blockedReasons"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_guardrails(&self) -> Result<()> {
+        let forbidden = self.forbidden_actions.join(" ").to_ascii_lowercase();
+        for phrase in [
+            "hidden background agents",
+            "auto-apply",
+            "auto-merge",
+            "self-approval",
+            "reviewer bypass",
+            "browser command bridge",
+            "trusted browser writes",
+            "production readiness",
+            "Godot replacement",
+        ] {
+            if !forbidden.contains(&phrase.to_ascii_lowercase()) {
+                return Err(anyhow!(
+                    "review/critic gate forbiddenActions must include {phrase} boundary"
+                ));
+            }
+        }
+        let boundary = self.boundary.to_ascii_lowercase();
+        for phrase in [
+            "does not execute commands",
+            "does not spawn agents",
+            "does not apply changes",
+            "does not merge",
+            "does not write trusted browser state",
+            "does not claim production readiness",
+            "does not claim godot replacement",
+        ] {
+            if !boundary.contains(phrase) {
+                return Err(anyhow!(
+                    "review/critic gate boundary must state it {phrase}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ReviewCriticGateActor {
+    fn validate(&self, field: &str) -> Result<()> {
+        validate_path_component(&format!("{field}.role"), &self.role)?;
+        validate_path_component(&format!("{field}.actorId"), &self.actor_id)
+    }
+}
+
 impl AgentSharedStateSnapshotCurrentState {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let current: AgentSharedStateSnapshotCurrentState = serde_json::from_str(input)
@@ -5633,6 +5883,13 @@ fn validate_nonempty_refs(field: &str, refs: &[AuthoringLoopArtifactRef]) -> Res
     if refs.is_empty() {
         return Err(anyhow!("{field} must not be empty"));
     }
+    for (index, reference) in refs.iter().enumerate() {
+        reference.validate(&format!("{field}[{index}]"))?;
+    }
+    Ok(())
+}
+
+fn validate_optional_refs(field: &str, refs: &[AuthoringLoopArtifactRef]) -> Result<()> {
     for (index, reference) in refs.iter().enumerate() {
         reference.validate(&format!("{field}[{index}]"))?;
     }
@@ -45907,6 +46164,162 @@ scenarios:
             assert!(
                 doc.contains(required),
                 "agent shared state snapshot doc missing {required}"
+            );
+        }
+        for forbidden in [
+            "autonomously complete arbitrary games",
+            "production-ready game engine",
+            "replace Godot",
+            "browser command bridge controls are allowed",
+            "self approval is allowed",
+        ] {
+            assert!(
+                !doc.to_ascii_lowercase()
+                    .contains(&forbidden.to_ascii_lowercase()),
+                "doc must not contain forbidden claim: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn review_critic_gate_v1_accepts_fixture_states_and_boundaries() {
+        for (fixture, expected_decision) in [
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+                ReviewCriticGateDecision::Accepted,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.rejected.fixture.json",
+                ReviewCriticGateDecision::Rejected,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.deferred.fixture.json",
+                ReviewCriticGateDecision::Deferred,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.self-review-blocked.fixture.json",
+                ReviewCriticGateDecision::Blocked,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.missing-evidence.fixture.json",
+                ReviewCriticGateDecision::Blocked,
+            ),
+            (
+                "examples/multi-agent-pipeline-v1/review-critic-gate.stale.fixture.json",
+                ReviewCriticGateDecision::Blocked,
+            ),
+        ] {
+            let gate = ReviewCriticGate::from_json_str(&read_json_fixture(fixture))
+                .unwrap_or_else(|error| panic!("{fixture} validates: {error:#}"));
+            assert_eq!(gate.schema_version, REVIEW_CRITIC_GATE_SCHEMA_VERSION);
+            assert_eq!(gate.decision, expected_decision);
+            assert_eq!(gate.reviewer.role, "reviewer");
+            assert_eq!(gate.critic.role, "critic");
+            assert!(!gate.evidence_reviewed.is_empty());
+            assert!(!gate.state_snapshot_refs.is_empty());
+            assert!(gate.generated_state.tracked_fixture_only);
+            assert!(gate
+                .generated_state
+                .roots
+                .iter()
+                .any(|root| root == "runs/multi-agent-pipeline"));
+            assert!(gate.boundary.contains("does not execute commands"));
+            assert!(gate.boundary.contains("does not spawn agents"));
+            assert!(gate.boundary.contains("does not apply changes"));
+            assert!(gate.boundary.contains("does not merge"));
+            assert!(gate
+                .boundary
+                .contains("does not write trusted browser state"));
+            assert!(gate
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "hidden background agents"));
+            assert!(gate
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-apply"));
+            assert!(gate
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "auto-merge"));
+            assert!(gate
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "self-approval"));
+            assert!(gate
+                .forbidden_actions
+                .iter()
+                .any(|action| action == "reviewer bypass"));
+        }
+    }
+
+    #[test]
+    fn review_critic_gate_v1_rejects_invalid_status_and_boundary_drift() {
+        let mut accepted_with_fix: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ))
+        .expect("review gate json");
+        accepted_with_fix["requiredFixes"] = json!(["unresolved fix"]);
+        let fix_error = ReviewCriticGate::from_json_str(&accepted_with_fix.to_string())
+            .expect_err("accepted gate with fixes rejects");
+        assert!(format!("{fix_error:#}").contains("accepted review/critic gate"));
+
+        let mut needs_fix_without_fix = accepted_with_fix.clone();
+        needs_fix_without_fix["decision"] = json!("needs-fix");
+        needs_fix_without_fix["promotionRecommendation"] = json!("fix-required");
+        needs_fix_without_fix["requiredFixes"] = json!([]);
+        let needs_fix_error = ReviewCriticGate::from_json_str(&needs_fix_without_fix.to_string())
+            .expect_err("needs-fix gate requires fixes");
+        assert!(format!("{needs_fix_error:#}").contains("requires requiredFixes"));
+
+        let mut blocked_without_reason: serde_json::Value =
+            serde_json::from_str(&read_json_fixture(
+                "examples/multi-agent-pipeline-v1/review-critic-gate.self-review-blocked.fixture.json",
+            ))
+            .expect("blocked review gate json");
+        blocked_without_reason["blockedReasons"] = json!([]);
+        let blocked_error = ReviewCriticGate::from_json_str(&blocked_without_reason.to_string())
+            .expect_err("blocked gate requires reasons");
+        assert!(format!("{blocked_error:#}").contains("requires blockedReasons"));
+
+        let mut unsafe_boundary: serde_json::Value = serde_json::from_str(&read_json_fixture(
+            "examples/multi-agent-pipeline-v1/review-critic-gate.valid.fixture.json",
+        ))
+        .expect("review gate json");
+        unsafe_boundary["boundary"] = json!("Review gate can apply and merge changes.");
+        let boundary_error = ReviewCriticGate::from_json_str(&unsafe_boundary.to_string())
+            .expect_err("unsafe review gate boundary rejects");
+        assert!(format!("{boundary_error:#}").contains("does not execute commands"));
+    }
+
+    #[test]
+    fn review_critic_gate_doc_audits_generated_state_and_governance() {
+        let doc = read_repo_text("docs/review-critic-gate-v1.md");
+        for required in [
+            "schemaVersion: review-critic-gate-v1",
+            "accepted",
+            "rejected",
+            "deferred",
+            "needs-fix",
+            "blocked",
+            "does not execute commands",
+            "does not spawn agents",
+            "does not apply changes",
+            "does not merge",
+            "does not write trusted browser state",
+            "auto-apply",
+            "auto-merge",
+            "self-approve",
+            "reviewer bypass",
+            "hidden/background workers",
+            "Generated",
+            "MAP13.8.2",
+            "MAP13.8.3",
+            "Issues #1 and #23 must remain open",
+        ] {
+            assert!(
+                doc.contains(required),
+                "review/critic gate doc missing {required}"
             );
         }
         for forbidden in [

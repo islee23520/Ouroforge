@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "review-critic-gate-v1",
+  "gateId": "demo-review-critic-gate-deferred",
+  "milestone": "multi-agent-production-pipeline-v1",
+  "taskId": "task-review-qa-handoff",
+  "decision": "deferred",
+  "implementer": {
+    "role": "gameplay-engineer",
+    "actorId": "agent-implementer-1"
+  },
+  "reviewer": {
+    "role": "reviewer",
+    "actorId": "agent-reviewer-1"
+  },
+  "critic": {
+    "role": "critic",
+    "actorId": "agent-critic-1"
+  },
+  "workPackageRef": {
+    "id": "work-package",
+    "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+    "description": "fixture work package"
+  },
+  "handoffRef": {
+    "id": "handoff",
+    "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+    "description": "fixture handoff"
+  },
+  "stateSnapshotRefs": [
+    {
+      "id": "state-snapshot",
+      "path": "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+      "description": "fresh shared state snapshot"
+    }
+  ],
+  "qaEvidenceRefs": [
+    {
+      "id": "qa-assignment",
+      "path": "examples/multi-agent-pipeline-v1/qa-worker-assignment.valid.fixture.json",
+      "description": "fixture QA evidence"
+    }
+  ],
+  "regressionEvidenceRefs": [
+    {
+      "id": "regression-matrix",
+      "path": "examples/multi-agent-pipeline-v1/production-evidence-bundle.complete.fixture.json",
+      "description": "fixture regression/evidence bundle"
+    }
+  ],
+  "decisionLedgerRef": {
+    "id": "decision-ledger",
+    "path": "examples/multi-agent-pipeline-v1/agent-decision-ledger.valid.fixture.json",
+    "description": "fixture decision ledger"
+  },
+  "evidenceReviewed": [
+    {
+      "id": "work-package",
+      "path": "examples/multi-agent-pipeline-v1/agent-work-package.valid.fixture.json",
+      "description": "reviewed work package"
+    },
+    {
+      "id": "handoff",
+      "path": "examples/multi-agent-pipeline-v1/agent-handoff-v2.valid.fixture.json",
+      "description": "reviewed handoff"
+    },
+    {
+      "id": "state-snapshot",
+      "path": "examples/multi-agent-pipeline-v1/agent-shared-state-snapshot.fresh.fixture.json",
+      "description": "reviewed state snapshot"
+    }
+  ],
+  "risks": [
+    "review waits for refreshed QA evidence"
+  ],
+  "requiredFixes": [],
+  "promotionRecommendation": "defer",
+  "confidence": "medium",
+  "blockedReasons": [],
+  "staleStateIndicators": [],
+  "generatedState": {
+    "roots": [
+      "runs/multi-agent-pipeline",
+      "dashboard-data"
+    ],
+    "trackedFixtureOnly": true
+  },
+  "guardrails": [
+    "review gate is inert local evidence",
+    "critic risks are recorded before promotion",
+    "agent outputs remain untrusted until accepted review",
+    "generated roots remain ignored unless fixture scoped"
+  ],
+  "forbiddenActions": [
+    "hidden background agents",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "reviewer bypass",
+    "browser command bridge",
+    "trusted browser writes",
+    "credentialed commands",
+    "network/install commands",
+    "release automation",
+    "production readiness",
+    "Godot replacement"
+  ],
+  "boundary": "Review/critic gate is inert local evidence; it does not execute commands, does not spawn agents, does not apply changes, does not merge changes, does not write trusted browser state, does not claim production readiness, and does not claim Godot replacement capability."
+}
