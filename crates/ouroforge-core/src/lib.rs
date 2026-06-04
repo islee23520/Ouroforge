@@ -11744,9 +11744,9 @@ pub fn generate_visual_diff_summary_from_asset_reference_draft_previews(
             asset_id: asset_operation.replacement_asset_id.clone(),
             asset_type: preview.asset_type,
             reference_path: preview.target_reference_path.clone(),
-            change: VisualDiffChangeKind::Unchanged,
+            change: VisualDiffChangeKind::Unlinked,
             summary: format!(
-                "Reference `{}` before replacement asset `{}` is linked.",
+                "Reference `{}` does not yet link replacement asset `{}` before apply.",
                 preview.target_reference_path, preview.replacement_asset_id
             ),
             content_hash: None,
@@ -26247,6 +26247,19 @@ scenarios:
             .asset_summaries
             .iter()
             .any(|asset| { asset.asset_id == "player_sprite" && asset.content_hash.is_some() }));
+        // The before snapshot must not claim the replacement asset is already
+        // linked; it reports the reference as not-yet-linked so the before/after
+        // contract shows a real change.
+        let before_asset = summary
+            .before
+            .asset_summaries
+            .iter()
+            .find(|asset| asset.asset_id == "player_sprite")
+            .expect("before snapshot lists the replacement asset reference");
+        assert_eq!(before_asset.change, VisualDiffChangeKind::Unlinked);
+        assert!(before_asset.content_hash.is_none());
+        assert!(before_asset.summary.contains("does not yet link"));
+        assert!(!before_asset.summary.contains("is linked"));
         fs::remove_dir_all(base_dir).expect("fixture removed");
     }
 
