@@ -1,10 +1,10 @@
 # Canonical Demo Script v1
 
-Status: **demo flow contract** for issue #369 PA1.3.1.
+Status: **demo flow contract and smoke script contract** for issue #369 PA1.3.1/PA1.3.2.
 
 This document defines the canonical non-destructive Ouroforge demo command
-sequence. It is a contract for later PA1.3.2 script/smoke implementation and
-PA1.3.3 final evidence docs. It does not add automation that applies source
+sequence. PA1.3.2 implements the local smoke wrapper at
+`scripts/canonical-demo-smoke.sh`; PA1.3.3 owns final evidence docs. It does not add automation that applies source
 patches, writes trusted browser state, publishes packages, merges branches,
 changes repository visibility, or claims production readiness.
 
@@ -76,8 +76,9 @@ Expected output:
 
 ### 2. Local run/evidence generation
 
-PA1.3.2 should wrap this step with explicit logging and failure handling. The
-contract uses two runs so the comparison command has a before/after pair:
+The PA1.3.2 smoke wrapper runs this step with explicit logging and failure
+handling. The contract uses two runs so the comparison command has a before/after
+pair:
 
 ```bash
 cargo run -p ouroforge-cli -- run seeds/platformer.yaml --workers 4
@@ -137,7 +138,7 @@ decision against the generated run or draft path. The canonical public demo uses
 cargo run -p ouroforge-cli -- mutation review \
   --defer \
   --reason "canonical demo records review decision only; no apply" \
-  --evidence verdict.json \
+  --evidence mutation/patch-drafts.json \
   runs/<run-id>
 ```
 
@@ -219,6 +220,37 @@ Optional local build cleanup:
 rm -rf target
 ```
 
+
+## PA1.3.2 smoke wrapper
+
+Run the non-destructive local smoke wrapper from the repository root:
+
+```bash
+scripts/canonical-demo-smoke.sh --keep
+```
+
+The wrapper calls the Rust CLI through this repository's `Cargo.toml`. Run
+evidence is created from the repository root so repo-relative browser targets
+resolve correctly, then newly generated `runs/run-*` directories are moved into
+an isolated generated work directory such as `/tmp/ouroforge-canonical-demo-*`.
+Dashboard data, comparison outputs, visual previews, source patch preview
+validation output, logs, and the summary file also stay under that generated
+work directory. Without `--keep`, the work directory is removed on exit; with
+`--keep`, the script prints the path for manual inspection.
+
+The wrapper records failed run verdicts honestly and still proceeds through
+read-only dashboard, compare, deferred mutation review, visual preview, source
+patch preview validation, and static Node surface checks. It never calls
+`mutation apply-scene`, `edit draft-apply`, source patch apply, merge, publish,
+release, visibility, browser trusted-write, or command-bridge operations.
+
+Tunable local-only options:
+
+```bash
+OUROFORGE_DEMO_WORKERS=4 scripts/canonical-demo-smoke.sh --keep
+scripts/canonical-demo-smoke.sh --work-dir /tmp/ouroforge-canonical-demo-manual --keep
+```
+
 ## Command audit
 
 Allowed command categories for the canonical demo:
@@ -249,7 +281,7 @@ Forbidden for the canonical demo:
   export;
 - dependency installation workflows or credential/network publishing commands.
 
-## PA1.3.1 verification commands
+## PA1.3.1/PA1.3.2 verification commands
 
 ```bash
 gh issue view 369 --repo shaun0927/Ouroforge
@@ -259,6 +291,8 @@ cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/collect
 cargo run -p ouroforge-cli -- edit draft-preview --project examples/playable-demo-v2/collect-and-exit/ouroforge.project.json examples/visual-edit-draft-v1/valid/collect-and-exit-scene-demo.visual-edit-draft.json
 cargo run -p ouroforge-cli -- edit draft-preview --project examples/playable-demo-v2/collect-and-exit/ouroforge.project.json examples/visual-edit-draft-v1/valid/collect-and-exit-asset-frame-demo.visual-edit-draft.json
 cargo run -p ouroforge-cli -- patch-preview validate examples/source-mutation-preview-demo-v1/patch-preview-demo.sample.json
+bash -n scripts/canonical-demo-smoke.sh
+OUROFORGE_DEMO_WORKERS=1 CARGO_TARGET_DIR=/tmp/ouroforge-canonical-demo-target scripts/canonical-demo-smoke.sh --keep
 cargo fmt --check
 node --check examples/evidence-dashboard/dashboard.js
 node examples/evidence-dashboard/dashboard.test.cjs
