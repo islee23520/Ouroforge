@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "source-patch-stale-target-guard-v1",
+  "guardId": "stale-target-guard-703-sa15-5-1",
+  "createdAt": "2026-06-04T00:00:00Z",
+  "status": "fresh",
+  "transactionId": "apply-transaction-702-sa15-4-1",
+  "transactionRef": "mutation/source-patch-apply-transaction.json",
+  "baseRef": {
+    "branch": "main",
+    "expectedHead": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
+    "observedHead": "5ceebf77f0753f0b73707776c2776bb59beeb7e4",
+    "headStatus": "matches_expected_head"
+  },
+  "evidenceFreshness": {
+    "patchPreviewRef": "mutation/source-patch-previews/patch-preview-702-sa15-4-1.json",
+    "fileClassReportRef": "evidence/source-file-class-report-702-sa15-4-1.json",
+    "diffIntegrityReportRef": "evidence/patch-diff-integrity-report-702-sa15-4-1.json",
+    "sandboxReportRef": "sandbox/patch-preview-702-sa15-4-1/evidence/report.json",
+    "reviewDecisionRef": "reviews/source-patch/review-decision-702-sa15-4-1.json",
+    "applyTransactionRef": "mutation/source-patch-apply-transaction.json",
+    "maxAgePolicy": "all linked reports must be generated from the expected head before any future trusted apply",
+    "staleReasons": []
+  },
+  "targets": [
+    {
+      "path": "examples/source-patch-apply-transaction-v1/scenario-regression.json",
+      "fileClass": "scenario_regression_fixture",
+      "expectedBeforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "observedHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "fileStatus": "exists_and_matches_expected_before_hash",
+      "modeStatus": "mode_check_not_required_for_fixture"
+    }
+  ],
+  "worktreeContextRef": "evidence/source-apply-worktree-context-703-sa15-5-1.json",
+  "guardResults": [
+    {
+      "kind": "target_hash",
+      "status": "passed",
+      "summary": "Observed target hash matches expected before hash; no trusted write is authorized by this guard.",
+      "evidenceRef": "evidence/source-apply-worktree-context-703-sa15-5-1.json"
+    },
+    {
+      "kind": "linked_report_freshness",
+      "status": "passed",
+      "summary": "Linked preview, file-class, diff-integrity, sandbox, review, and transaction refs are recorded for later validation.",
+      "evidenceRef": "mutation/source-patch-apply-transaction.json"
+    }
+  ],
+  "guardrails": [
+    "stale target guard artifacts do not apply patches, merge branches, or write trusted files",
+    "fresh status is guard evidence only and still requires a separately scoped trusted apply implementation",
+    "browser/dashboard/Studio surfaces remain read-only and cannot run commands or trusted writes",
+    "dependency manifests, CI/workflows, build scripts, generated state, and credentials remain blocked unless separately authorized"
+  ]
+}

@@ -11679,6 +11679,108 @@ pub struct SourcePatchSandboxTestExecutionReport {
     pub guardrails: Vec<String>,
 }
 
+pub const SOURCE_PATCH_STALE_TARGET_GUARD_SCHEMA_VERSION: &str =
+    "source-patch-stale-target-guard-v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourcePatchStaleTargetGuardStatus {
+    Fresh,
+    Stale,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardBaseRef {
+    pub branch: String,
+    #[serde(rename = "expectedHead")]
+    pub expected_head: String,
+    #[serde(rename = "observedHead")]
+    pub observed_head: String,
+    #[serde(rename = "headStatus")]
+    pub head_status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardEvidenceFreshness {
+    #[serde(rename = "patchPreviewRef")]
+    pub patch_preview_ref: String,
+    #[serde(rename = "fileClassReportRef")]
+    pub file_class_report_ref: String,
+    #[serde(rename = "diffIntegrityReportRef")]
+    pub diff_integrity_report_ref: String,
+    #[serde(rename = "sandboxReportRef")]
+    pub sandbox_report_ref: String,
+    #[serde(rename = "reviewDecisionRef")]
+    pub review_decision_ref: String,
+    #[serde(rename = "applyTransactionRef")]
+    pub apply_transaction_ref: String,
+    #[serde(rename = "maxAgePolicy")]
+    pub max_age_policy: String,
+    #[serde(rename = "staleReasons")]
+    pub stale_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardTarget {
+    pub path: String,
+    #[serde(rename = "fileClass")]
+    pub file_class: String,
+    #[serde(rename = "expectedBeforeHash")]
+    pub expected_before_hash: String,
+    #[serde(rename = "observedHash")]
+    pub observed_hash: String,
+    #[serde(rename = "fileStatus")]
+    pub file_status: String,
+    #[serde(rename = "modeStatus")]
+    pub mode_status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardResult {
+    pub kind: String,
+    pub status: String,
+    pub summary: String,
+    #[serde(rename = "evidenceRef")]
+    pub evidence_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePatchStaleTargetGuardArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "guardId")]
+    pub guard_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    pub status: SourcePatchStaleTargetGuardStatus,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "transactionRef")]
+    pub transaction_ref: String,
+    #[serde(rename = "baseRef")]
+    pub base_ref: SourcePatchStaleTargetGuardBaseRef,
+    #[serde(rename = "evidenceFreshness")]
+    pub evidence_freshness: SourcePatchStaleTargetGuardEvidenceFreshness,
+    pub targets: Vec<SourcePatchStaleTargetGuardTarget>,
+    #[serde(rename = "worktreeContextRef")]
+    pub worktree_context_ref: String,
+    #[serde(rename = "guardResults")]
+    pub guard_results: Vec<SourcePatchStaleTargetGuardResult>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    pub guardrails: Vec<String>,
+}
+
 pub const SOURCE_PATCH_APPLY_TRANSACTION_SCHEMA_VERSION: &str = "source-patch-apply-transaction-v1";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
