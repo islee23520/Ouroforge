@@ -34388,6 +34388,10 @@ fn render_journal(
         }
     }
 
+    out.push_str(&render_scene3d_scenario_assertions_journal_section(
+        run_dir, evidence,
+    ));
+
     out.push_str("## Evidence\n\n");
     if evidence.artifacts.is_empty() {
         out.push_str("- No evidence artifacts indexed.\n");
@@ -34457,6 +34461,160 @@ fn render_journal(
         }
     }
     out
+}
+
+fn render_scene3d_scenario_assertions_journal_section(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+) -> String {
+    let mut out = String::new();
+    out.push_str("## 3D Scenario Assertion Evidence\n\n");
+    let scenario_results = match select_dashboard_artifacts(
+        run_dir,
+        &evidence.artifacts,
+        dashboard_artifact_is_scenario_result,
+    ) {
+        Ok(results) => results,
+        Err(error) => {
+            out.push_str(&format!(
+                "- Scenario assertion evidence could not be read: {error}\n\n"
+            ));
+            return out;
+        }
+    };
+    let assertions = read_dashboard_scenario_assertions(&scenario_results);
+    if assertions.scene3d_count == 0 {
+        out.push_str("- No `scene3d_*` scenario assertion results were recorded.\n\n");
+        return out;
+    }
+    out.push_str("- Boundary: bounded local 3D scenario QA evidence only; no production 3D engine or Godot replacement claim.\n");
+    out.push_str(&format!(
+        "- Scene3D assertions: `{}` total (`{}` passed, `{}` failed).\n",
+        assertions.scene3d_count,
+        assertions.scene3d_count - assertions.scene3d_failed_count,
+        assertions.scene3d_failed_count
+    ));
+    out.push_str("- Targets:\n");
+    for target in assertions
+        .targets
+        .iter()
+        .filter(|target| target.id.starts_with("scene3d_"))
+    {
+        out.push_str(&format!(
+            "  - `{}`: `{}` total (`{}` passed, `{}` failed); evidence refs: {}\n",
+            target.id,
+            target.total_count,
+            target.passed_count,
+            target.failed_count,
+            join_or_none(&target.evidence_refs)
+        ));
+    }
+    out.push_str(&format!(
+        "- 3D assertion evidence refs: {}\n\n",
+        join_or_none(&assertions.evidence_refs)
+    ));
+    out
+}
+
+fn read_dashboard_scenario_assertions(
+    scenario_results: &[RunDashboardArtifact],
+) -> RunDashboardScenarioAssertions {
+    #[derive(Default)]
+    struct TargetBuilder {
+        total_count: usize,
+        passed_count: usize,
+        failed_count: usize,
+        evidence_refs: Vec<String>,
+    }
+
+    let mut total_count = 0usize;
+    let mut passed_count = 0usize;
+    let mut failed_count = 0usize;
+    let mut scene3d_count = 0usize;
+    let mut scene3d_failed_count = 0usize;
+    let mut evidence_refs = Vec::new();
+    let mut targets: BTreeMap<String, TargetBuilder> = BTreeMap::new();
+
+    for result in scenario_results
+        .iter()
+        .filter_map(|artifact| artifact.value.as_ref())
+    {
+        let Some(assertions) = result.get("assertions").and_then(|value| value.as_array()) else {
+            continue;
+        };
+        for assertion in assertions {
+            let target = assertion
+                .get("target")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let passed = assertion.get("passed").and_then(|value| value.as_bool()) == Some(true);
+            total_count += 1;
+            if passed {
+                passed_count += 1;
+            } else {
+                failed_count += 1;
+            }
+            if target.starts_with("scene3d_") {
+                scene3d_count += 1;
+                if !passed {
+                    scene3d_failed_count += 1;
+                }
+            }
+            let builder = targets.entry(target).or_default();
+            builder.total_count += 1;
+            if passed {
+                builder.passed_count += 1;
+            } else {
+                builder.failed_count += 1;
+            }
+            if let Some(reference) = assertion
+                .get("evidence_ref")
+                .and_then(|value| value.as_str())
+            {
+                builder.evidence_refs.push(reference.to_string());
+                if assertion
+                    .get("target")
+                    .and_then(|value| value.as_str())
+                    .is_some_and(|target| target.starts_with("scene3d_"))
+                {
+                    evidence_refs.push(reference.to_string());
+                }
+            }
+        }
+    }
+
+    dedupe_sorted(&mut evidence_refs);
+    let targets = targets
+        .into_iter()
+        .map(|(id, mut target)| {
+            dedupe_sorted(&mut target.evidence_refs);
+            RunDashboardScenarioAssertionTarget {
+                id,
+                total_count: target.total_count,
+                passed_count: target.passed_count,
+                failed_count: target.failed_count,
+                evidence_refs: target.evidence_refs,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    RunDashboardScenarioAssertions {
+        present: total_count > 0,
+        empty_state: if total_count > 0 {
+            String::new()
+        } else {
+            "No scenario assertion results were found in scenario-result artifacts.".to_string()
+        },
+        total_count,
+        passed_count,
+        failed_count,
+        scene3d_count,
+        scene3d_failed_count,
+        evidence_refs,
+        targets,
+        boundary: "Display-only assertion summary; browser/dashboard surfaces do not perform trusted writes or production 3D engine validation.".to_string(),
+    }
 }
 
 fn journal_gameplay_summary(
@@ -45480,6 +45638,7 @@ pub struct RunDashboardReadModel {
     pub frame_metrics: Vec<RunDashboardArtifact>,
     pub performance_metrics: Vec<RunDashboardArtifact>,
     pub scenario_results: Vec<RunDashboardArtifact>,
+    pub scenario_assertions: RunDashboardScenarioAssertions,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub review_cockpit: RunDashboardReviewCockpit,
@@ -45529,6 +45688,29 @@ pub struct RunDashboardJournalEntry {
     pub evidence_refs: Vec<String>,
     pub verdict_refs: Vec<String>,
     pub mutation_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardScenarioAssertions {
+    pub present: bool,
+    pub empty_state: String,
+    pub total_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub scene3d_count: usize,
+    pub scene3d_failed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub targets: Vec<RunDashboardScenarioAssertionTarget>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardScenarioAssertionTarget {
+    pub id: String,
+    pub total_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub evidence_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -46248,6 +46430,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_performance_metric)?;
     let scenario_results =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
+    let scenario_assertions = read_dashboard_scenario_assertions(&scenario_results);
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let regression_promotions = read_regression_promotion_records(run_dir);
@@ -46316,6 +46499,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         frame_metrics,
         performance_metrics,
         scenario_results,
+        scenario_assertions,
         mutation_artifacts,
         mutation_lifecycle,
         review_cockpit,
@@ -77883,6 +78067,129 @@ scenarios:
             .verdict_refs
             .contains(&"verdict.json".to_string()));
         assert!(model.journal_view.mutation_refs.contains(&proposal.id));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_and_journal_summarize_scene3d_assertion_evidence_refs() {
+        let (root, artifacts) = create_test_run("dashboard-scene3d-assertion-summary");
+        write_scenario_result_fixture(&artifacts.run_dir, "failed");
+        let probe_path = "evidence/scenarios/bootstrap-smoke/scene3d-probe-evidence.json";
+        let render_path = "evidence/scenarios/bootstrap-smoke/scene3d-render-evidence.json";
+        fs::write(
+            artifacts.run_dir.join(probe_path),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "ouroforge.scene3d-runtime-probe.v1",
+                "present": true,
+                "status": "present",
+                "nodeCount": 2
+            }))
+            .expect("probe evidence serializes"),
+        )
+        .expect("probe evidence written");
+        fs::write(
+            artifacts.run_dir.join(render_path),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "ouroforge.scene3d-render-smoke.v1",
+                "present": true,
+                "visibleObjectCount": 0,
+                "failedObjectCount": 1
+            }))
+            .expect("render evidence serializes"),
+        )
+        .expect("render evidence written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-scene3d-probe",
+            "application/json",
+            probe_path,
+            json!({ "artifact": "scene3d_probe", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("probe indexed");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "fixture-scene3d-render",
+            "application/json",
+            render_path,
+            json!({ "artifact": "scene3d_render", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("render indexed");
+        let result_path = artifacts
+            .run_dir
+            .join("evidence/scenarios/bootstrap-smoke/scenario-result.json");
+        let mut result = read_json_value(&result_path).expect("scenario result reads");
+        result["evidence"]["scene3d_probe"] = json!(probe_path);
+        result["evidence"]["scene3d_render"] = json!(render_path);
+        result["assertions"] = json!([
+            {
+                "target": "world_state",
+                "path": "tick",
+                "operator": "exists",
+                "expected": false,
+                "actual": null,
+                "passed": true,
+                "evidence_ref": "evidence/scenarios/bootstrap-smoke/world-state.json"
+            },
+            {
+                "target": "scene3d_probe",
+                "path": "status",
+                "operator": "equals",
+                "expected": "present",
+                "actual": "present",
+                "passed": true,
+                "evidence_ref": probe_path
+            },
+            {
+                "target": "scene3d_render",
+                "path": "visibleObjectCount",
+                "operator": "greaterThan",
+                "expected": 0,
+                "actual": 0,
+                "passed": false,
+                "evidence_ref": render_path
+            }
+        ]);
+        fs::write(
+            &result_path,
+            serde_json::to_string_pretty(&result).expect("scenario result serializes"),
+        )
+        .expect("scenario result updated");
+        evaluate_run(&artifacts.run_dir).expect("verdict evaluates");
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+
+        assert!(journal.contains("## 3D Scenario Assertion Evidence"));
+        assert!(journal.contains("bounded local 3D scenario QA evidence only"));
+        assert!(journal.contains("`scene3d_probe`"));
+        assert!(journal.contains("`scene3d_render`"));
+        assert!(journal.contains(render_path));
+        assert_eq!(model.scenario_assertions.total_count, 3);
+        assert_eq!(model.scenario_assertions.scene3d_count, 2);
+        assert_eq!(model.scenario_assertions.scene3d_failed_count, 1);
+        assert!(model
+            .scenario_assertions
+            .evidence_refs
+            .contains(&probe_path.to_string()));
+        assert!(model
+            .scenario_assertions
+            .evidence_refs
+            .contains(&render_path.to_string()));
+        assert!(model.scenario_assertions.targets.iter().any(|target| {
+            target.id == "world_state" && target.total_count == 1 && target.passed_count == 1
+        }));
+        assert!(model.scenario_assertions.targets.iter().any(|target| {
+            target.id == "scene3d_render"
+                && target.failed_count == 1
+                && target.evidence_refs.contains(&render_path.to_string())
+        }));
+        assert!(model
+            .journal_view
+            .entries
+            .iter()
+            .any(|entry| entry.heading == "3D Scenario Assertion Evidence"
+                && entry.evidence_refs.contains(&render_path.to_string())));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
