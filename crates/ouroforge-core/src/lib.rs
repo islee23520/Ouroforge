@@ -10324,6 +10324,12 @@ pub struct VisualEditDraftArtifact {
     pub proposed_operations: Vec<VisualEditDraftOperation>,
     #[serde(rename = "beforeHash")]
     pub before_hash: String,
+    #[serde(
+        rename = "reviewGate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub review_gate: Option<VisualEditDraftReviewGate>,
     #[serde(rename = "expectedAfterSummary")]
     pub expected_after_summary: String,
     #[serde(
@@ -10341,6 +10347,30 @@ pub struct VisualEditDraftArtifact {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualEditDraftReviewGate {
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "patchDraftId")]
+    pub patch_draft_id: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct VisualEditDraftReviewPreflight {
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "patchDraftId")]
+    pub patch_draft_id: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10844,6 +10874,9 @@ impl VisualEditDraftArtifact {
         validate_path_component("visual edit draft draftId", &self.draft_id)?;
         self.target.validate()?;
         validate_visual_edit_draft_hash("visual edit draft beforeHash", &self.before_hash)?;
+        if let Some(review_gate) = &self.review_gate {
+            review_gate.validate()?;
+        }
         require_text(
             "visual edit draft expectedAfterSummary",
             &self.expected_after_summary,
@@ -13059,6 +13092,30 @@ impl VisualEditSceneDraftOperation {
             path: self.scene_edit_path.clone(),
             value,
         })
+    }
+}
+
+impl VisualEditDraftReviewGate {
+    pub fn validate(&self) -> Result<()> {
+        require_text("visual edit draft reviewGate.proposalId", &self.proposal_id)?;
+        validate_path_component("visual edit draft reviewGate.proposalId", &self.proposal_id)?;
+        require_text(
+            "visual edit draft reviewGate.patchDraftId",
+            &self.patch_draft_id,
+        )?;
+        validate_path_component(
+            "visual edit draft reviewGate.patchDraftId",
+            &self.patch_draft_id,
+        )?;
+        require_text(
+            "visual edit draft reviewGate.reviewDecisionId",
+            &self.review_decision_id,
+        )?;
+        validate_path_component(
+            "visual edit draft reviewGate.reviewDecisionId",
+            &self.review_decision_id,
+        )?;
+        Ok(())
     }
 }
 
@@ -19430,6 +19487,184 @@ fn canonical_json_digest(value: serde_json::Value) -> Result<String> {
     let bytes = serde_json::to_vec(&canonical_json_value(value))
         .context("failed to serialize canonical JSON for digest")?;
     Ok(format!("{:016x}", fnv1a64(&bytes)))
+}
+
+pub fn validate_visual_edit_draft_review_preflight(
+    run_dir: impl AsRef<Path>,
+    draft: &VisualEditDraftArtifact,
+) -> Result<VisualEditDraftReviewPreflight> {
+    let run_dir = run_dir.as_ref();
+    draft.validate()?;
+    let review_gate = draft
+        .review_gate
+        .as_ref()
+        .ok_or_else(|| anyhow!("visual edit draft review preflight requires reviewGate linkage"))?;
+    review_gate.validate()?;
+
+    let proposals = read_mutation_proposals(run_dir)?;
+    let proposal = proposals
+        .proposals
+        .iter()
+        .find(|proposal| proposal.id == review_gate.proposal_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "visual edit draft review preflight proposal id not found: {}",
+                review_gate.proposal_id
+            )
+        })?;
+    if proposal.status != "proposed" {
+        return Err(anyhow!(
+            "visual edit draft review preflight proposal {} must remain proposed; found {}",
+            proposal.id,
+            proposal.status
+        ));
+    }
+
+    let patch_drafts = read_patch_draft_artifact(run_dir)?;
+    let patch_draft = patch_drafts
+        .drafts
+        .iter()
+        .find(|patch_draft| patch_draft.id == review_gate.patch_draft_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "visual edit draft review preflight patch draft id not found: {}",
+                review_gate.patch_draft_id
+            )
+        })?;
+    if patch_draft.proposal_id != review_gate.proposal_id {
+        return Err(anyhow!(
+            "visual edit draft review preflight patch draft {} is linked to proposal {}, not {}",
+            patch_draft.id,
+            patch_draft.proposal_id,
+            review_gate.proposal_id
+        ));
+    }
+
+    let review = read_mutation_review_artifact(run_dir)?;
+    let decision = review
+        .decisions
+        .iter()
+        .find(|decision| decision.id == review_gate.review_decision_id)
+        .ok_or_else(|| {
+            anyhow!(
+                "visual edit draft review preflight decision id not found: {}",
+                review_gate.review_decision_id
+            )
+        })?;
+    validate_accepted_mutation_review_decision(
+        run_dir,
+        decision,
+        &review_gate.proposal_id,
+        Some(&review_gate.patch_draft_id),
+        true,
+    )?;
+
+    Ok(VisualEditDraftReviewPreflight {
+        draft_id: draft.draft_id.clone(),
+        proposal_id: review_gate.proposal_id.clone(),
+        patch_draft_id: review_gate.patch_draft_id.clone(),
+        review_decision_id: review_gate.review_decision_id.clone(),
+        status: "review_preflight_passed".to_string(),
+    })
+}
+
+fn validate_accepted_mutation_review_decision(
+    run_dir: &Path,
+    decision: &MutationReviewDecision,
+    expected_proposal_id: &str,
+    expected_patch_draft_id: Option<&str>,
+    require_expected_hashes: bool,
+) -> Result<()> {
+    if decision.state != MutationReviewState::Accepted
+        || decision.decision_status.as_ref() != Some(&MutationReviewState::Accepted)
+    {
+        return Err(anyhow!(
+            "review-gated preflight requires an accepted decision; found {:?}",
+            decision.decision_status.as_ref().unwrap_or(&decision.state)
+        ));
+    }
+    if decision.proposal_id.as_deref() != Some(expected_proposal_id) {
+        return Err(anyhow!(
+            "review-gated preflight decision {} is not linked to proposal {}",
+            decision.id,
+            expected_proposal_id
+        ));
+    }
+    if let Some(expected_patch_draft_id) = expected_patch_draft_id {
+        if decision.patch_draft_id != expected_patch_draft_id {
+            return Err(anyhow!(
+                "review-gated preflight decision {} is linked to patch draft {}, not {}",
+                decision.id,
+                decision.patch_draft_id,
+                expected_patch_draft_id
+            ));
+        }
+    }
+    if decision.evidence_refs.is_empty() {
+        return Err(anyhow!(
+            "review-gated preflight decision {} requires evidence refs",
+            decision.id
+        ));
+    }
+    let checklist = decision.guardrail_checklist.as_ref().ok_or_else(|| {
+        anyhow!(
+            "review-gated preflight decision {} requires a guardrail checklist",
+            decision.id
+        )
+    })?;
+    checklist.validate()?;
+    let Some(expected_hashes) = decision.expected_hashes.as_ref() else {
+        if require_expected_hashes {
+            return Err(anyhow!(
+                "review-gated preflight decision {} requires expected proposal, patch draft, and evidence hashes",
+                decision.id
+            ));
+        }
+        return Ok(());
+    };
+    if let Some(expected) = expected_hashes.proposal_index_hash.as_deref() {
+        let actual = canonical_json_digest(json!(read_mutation_proposals(run_dir)?))?;
+        if expected != actual {
+            return Err(anyhow!(
+                "review-gated preflight decision {} proposal index hash mismatch; expected {}, found {}",
+                decision.id, expected, actual
+            ));
+        }
+    } else if require_expected_hashes {
+        return Err(anyhow!(
+            "review-gated preflight decision {} requires proposal index hash",
+            decision.id
+        ));
+    }
+    if let Some(expected) = expected_hashes.patch_draft_hash.as_deref() {
+        let actual = canonical_json_digest(json!(read_patch_draft_artifact(run_dir)?))?;
+        if expected != actual {
+            return Err(anyhow!(
+                "review-gated preflight decision {} patch draft hash mismatch; expected {}, found {}",
+                decision.id, expected, actual
+            ));
+        }
+    } else if require_expected_hashes {
+        return Err(anyhow!(
+            "review-gated preflight decision {} requires patch draft hash",
+            decision.id
+        ));
+    }
+    if let Some(expected) = expected_hashes.evidence_index_hash.as_deref() {
+        let actual = canonical_json_digest(json!(read_evidence_index(run_dir)?))?;
+        if expected != actual {
+            return Err(anyhow!(
+                "review-gated preflight decision {} evidence index hash mismatch; expected {}, found {}",
+                decision.id, expected, actual
+            ));
+        }
+    } else if require_expected_hashes {
+        return Err(anyhow!(
+            "review-gated preflight decision {} requires evidence index hash",
+            decision.id
+        ));
+    }
+    Ok(())
 }
 
 fn validate_review_gated_scene_apply_decision(
@@ -26353,6 +26588,7 @@ scenarios:
                 },
             ],
             before_hash: format!("{}:{}", before_hash.algorithm, before_hash.value),
+            review_gate: None,
             expected_after_summary: "Scene preflight returns scene edits without applying them."
                 .to_string(),
             linked_evidence: vec![
@@ -36781,6 +37017,291 @@ scenarios:
         assert!(duplicate.to_string().contains("already used"));
         assert!(!duplicate_transaction.exists());
         assert_eq!(fs::read_to_string(&scene_path).unwrap(), after_first);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn review_gated_scene_apply_rejects_deferred_and_stale_source_hashes_before_write() {
+        let (root, artifacts, proposal, scene_path, before_hash) =
+            create_scene_only_mutation_fixture("review-gated-scene-apply-source-hashes");
+        let draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let before_contents = fs::read_to_string(&scene_path).expect("scene before reads");
+
+        let deferred = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: draft.drafts[0].id.clone(),
+                proposal_id: Some(proposal.id.clone()),
+                state: MutationReviewState::Deferred,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "manual review deferred scene-only mutation".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect("deferred decision appends");
+        let deferred_transaction = root.join("transactions/deferred-decision.json");
+        let deferred_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash.clone(),
+            Some(deferred.id),
+        );
+        let deferred_error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &deferred_operation,
+            &deferred_transaction,
+        )
+        .expect_err("deferred decision rejects");
+        assert!(deferred_error
+            .to_string()
+            .contains("requires an accepted decision"));
+        assert!(!deferred_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+
+        let stale_patch = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &draft,
+            &proposal,
+            Some(MutationReviewExpectedHashes {
+                proposal_index_hash: None,
+                patch_draft_hash: Some("stale-patch-draft".to_string()),
+                evidence_index_hash: None,
+            }),
+        );
+        let stale_patch_transaction = root.join("transactions/stale-patch-draft.json");
+        let stale_patch_operation = scene_apply_operation(
+            &proposal,
+            &scene_path,
+            before_hash.clone(),
+            Some(stale_patch.id),
+        );
+        let stale_patch_error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &stale_patch_operation,
+            &stale_patch_transaction,
+        )
+        .expect_err("stale patch draft rejects");
+        assert!(stale_patch_error
+            .to_string()
+            .contains("patch draft hash mismatch"));
+        assert!(!stale_patch_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+
+        let stale_evidence = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &draft,
+            &proposal,
+            Some(MutationReviewExpectedHashes {
+                proposal_index_hash: None,
+                patch_draft_hash: None,
+                evidence_index_hash: Some("stale-evidence-index".to_string()),
+            }),
+        );
+        let stale_evidence_transaction = root.join("transactions/stale-evidence-index.json");
+        let stale_evidence_operation =
+            scene_apply_operation(&proposal, &scene_path, before_hash, Some(stale_evidence.id));
+        let stale_evidence_error = apply_scene_only_mutation_operation(
+            &artifacts.run_dir,
+            &stale_evidence_operation,
+            &stale_evidence_transaction,
+        )
+        .expect_err("stale evidence index rejects");
+        assert!(stale_evidence_error
+            .to_string()
+            .contains("evidence index hash mismatch"));
+        assert!(!stale_evidence_transaction.exists());
+        assert_eq!(fs::read_to_string(&scene_path).unwrap(), before_contents);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn mutation_review_rejects_proposal_id_that_does_not_match_patch_draft() {
+        let (root, artifacts, proposal, _scene_path, _before_hash) =
+            create_scene_only_mutation_fixture("review-gated-scene-apply-draft-link");
+        let draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let other_proposal = create_mutation_proposal(
+            &artifacts.run_dir,
+            MutationProposalInput {
+                reason: "second scene-only mutation fixture".to_string(),
+                evidence_id: "scene-only-mutation-evidence".to_string(),
+                target: proposal.target.clone(),
+                path: proposal.path.clone(),
+                from: proposal.from.clone(),
+                to: "64".to_string(),
+            },
+        )
+        .expect("second proposal created");
+
+        let mismatch = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: draft.drafts[0].id.clone(),
+                proposal_id: Some(other_proposal.id.clone()),
+                state: MutationReviewState::Accepted,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "manual review attempts mismatched draft/proposal linkage".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect_err("mismatched proposal/draft id rejected");
+        assert!(mismatch.to_string().contains("does not match patch draft"));
+
+        let review = read_mutation_review_artifact(&artifacts.run_dir).expect("review reads");
+        assert!(review.decisions.is_empty());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn visual_edit_draft_review_preflight_requires_linked_accepted_decision() {
+        let (root, artifacts, proposal, scene_path, _before_hash) =
+            create_scene_only_mutation_fixture("visual-edit-review-preflight");
+        let patch_draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let mut visual_draft = valid_scene_visual_edit_draft_for_scene(&scene);
+
+        let missing_gate =
+            validate_visual_edit_draft_review_preflight(&artifacts.run_dir, &visual_draft)
+                .expect_err("missing review gate rejects");
+        assert!(missing_gate.to_string().contains("requires reviewGate"));
+
+        let expected_hashes = MutationReviewExpectedHashes {
+            proposal_index_hash: Some(
+                canonical_json_digest(json!(read_mutation_proposals(&artifacts.run_dir).unwrap()))
+                    .unwrap(),
+            ),
+            patch_draft_hash: Some(
+                canonical_json_digest(
+                    json!(read_patch_draft_artifact(&artifacts.run_dir).unwrap()),
+                )
+                .unwrap(),
+            ),
+            evidence_index_hash: Some(
+                canonical_json_digest(json!(read_evidence_index(&artifacts.run_dir).unwrap()))
+                    .unwrap(),
+            ),
+        };
+        let decision = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &patch_draft,
+            &proposal,
+            Some(expected_hashes),
+        );
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: patch_draft.drafts[0].id.clone(),
+            review_decision_id: decision.id.clone(),
+        });
+
+        let preflight =
+            validate_visual_edit_draft_review_preflight(&artifacts.run_dir, &visual_draft)
+                .expect("accepted linked decision passes preflight");
+        assert_eq!(preflight.draft_id, visual_draft.draft_id);
+        assert_eq!(preflight.proposal_id, proposal.id);
+        assert_eq!(preflight.patch_draft_id, patch_draft.drafts[0].id);
+        assert_eq!(preflight.review_decision_id, decision.id);
+        assert_eq!(preflight.status, "review_preflight_passed");
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn visual_edit_draft_review_preflight_rejects_rejected_mismatched_and_stale_decisions() {
+        let (root, artifacts, proposal, scene_path, _before_hash) =
+            create_scene_only_mutation_fixture("visual-edit-review-preflight-rejects");
+        let patch_draft = write_scene_mutation_patch_draft(&artifacts.run_dir, &proposal);
+        let scene = read_scene(&scene_path).expect("scene reads");
+        let mut visual_draft = valid_scene_visual_edit_draft_for_scene(&scene);
+
+        let rejected = append_mutation_review_decision(
+            &artifacts.run_dir,
+            MutationReviewDecisionInput {
+                patch_draft_id: patch_draft.drafts[0].id.clone(),
+                proposal_id: Some(proposal.id.clone()),
+                state: MutationReviewState::Rejected,
+                reviewer_type: Some(MutationReviewReviewerType::Human),
+                reason: "manual review rejected visual edit draft".to_string(),
+                evidence_refs: vec!["evidence/scene-only-mutation.json".to_string()],
+                reviewer: "test-reviewer".to_string(),
+                expected_hashes: None,
+                guardrail_checklist: Some(Default::default()),
+            },
+        )
+        .expect("rejected decision appends");
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: patch_draft.drafts[0].id.clone(),
+            review_decision_id: rejected.id,
+        });
+        let rejected_error =
+            validate_visual_edit_draft_review_preflight(&artifacts.run_dir, &visual_draft)
+                .expect_err("rejected decision fails preflight");
+        assert!(rejected_error
+            .to_string()
+            .contains("requires an accepted decision"));
+
+        let stale = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &patch_draft,
+            &proposal,
+            Some(MutationReviewExpectedHashes {
+                proposal_index_hash: Some("stale-proposal-index".to_string()),
+                patch_draft_hash: Some("stale-patch-draft".to_string()),
+                evidence_index_hash: Some("stale-evidence-index".to_string()),
+            }),
+        );
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: patch_draft.drafts[0].id.clone(),
+            review_decision_id: stale.id,
+        });
+        let stale_error =
+            validate_visual_edit_draft_review_preflight(&artifacts.run_dir, &visual_draft)
+                .expect_err("stale expected hashes fail preflight");
+        assert!(stale_error
+            .to_string()
+            .contains("proposal index hash mismatch"));
+
+        let accepted = accepted_scene_apply_decision(
+            &artifacts.run_dir,
+            &patch_draft,
+            &proposal,
+            Some(MutationReviewExpectedHashes {
+                proposal_index_hash: Some(
+                    canonical_json_digest(json!(
+                        read_mutation_proposals(&artifacts.run_dir).unwrap()
+                    ))
+                    .unwrap(),
+                ),
+                patch_draft_hash: Some(
+                    canonical_json_digest(json!(
+                        read_patch_draft_artifact(&artifacts.run_dir).unwrap()
+                    ))
+                    .unwrap(),
+                ),
+                evidence_index_hash: Some(
+                    canonical_json_digest(json!(read_evidence_index(&artifacts.run_dir).unwrap()))
+                        .unwrap(),
+                ),
+            }),
+        );
+        visual_draft.review_gate = Some(VisualEditDraftReviewGate {
+            proposal_id: proposal.id.clone(),
+            patch_draft_id: "missing-patch-draft".to_string(),
+            review_decision_id: accepted.id,
+        });
+        let mismatch_error =
+            validate_visual_edit_draft_review_preflight(&artifacts.run_dir, &visual_draft)
+                .expect_err("mismatched patch draft linkage fails preflight");
+        assert!(mismatch_error
+            .to_string()
+            .contains("patch draft id not found"));
+
         fs::remove_dir_all(root).ok();
     }
 
