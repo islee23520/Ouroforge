@@ -2,10 +2,12 @@
 
 Status: **governance-only maintainer response aid**. These snippets and
 criteria help maintainers answer, convert, or close public alpha issues after
-using `docs/public-issue-intake-triage-v1.md`. They do not create support SLAs,
-accept work automatically, change repository visibility, configure GitHub
-automation, publish a release, mutate labels/settings, or implement product
-behavior.
+using `docs/public-issue-intake-triage-v1.md`. For security-sensitive and
+forbidden-scope handling, use
+`docs/public-issue-security-forbidden-escalation-v1.md` before posting final
+conversion or closure wording. These snippets do not create support SLAs, accept
+work automatically, change repository visibility, configure GitHub automation,
+publish a release, mutate labels/settings, or implement product behavior.
 
 Use snippets as starting text only. Replace bracketed fields with concrete issue
 numbers, evidence refs, affected files, verification commands, and safe next
@@ -158,10 +160,11 @@ This may be security-sensitive. Please do not post exploit details, secrets,
 tokens, private screenshots, private issue links, or sensitive local paths in
 this public issue.
 
-Use the public-safe summary and private coordination guidance in
-`docs/security-response-playbook-v1.md`. Public tracking should include only the
-least-sensitive category/status and sanitized follow-up issue or PR links when a
-maintainer decides that is safe.
+Use the escalation path in
+`docs/public-issue-security-forbidden-escalation-v1.md` and the private
+coordination guidance in `docs/security-response-playbook-v1.md`. Public tracking
+should include only the least-sensitive category/status and sanitized follow-up
+issue or PR links when a maintainer decides that is safe.
 ```
 
 ## Close/convert criteria
