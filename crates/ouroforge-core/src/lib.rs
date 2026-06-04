@@ -30964,7 +30964,24 @@ pub struct SceneVfxEmitter {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SceneAudio {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buses: Vec<SceneAudioBus>,
     pub events: Vec<SceneAudioEvent>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SceneAudioBus {
+    pub id: String,
+    pub kind: String,
+    #[serde(default = "default_audio_bus_volume")]
+    pub volume: u32,
+    #[serde(default)]
+    pub muted: bool,
+}
+
+fn default_audio_bus_volume() -> u32 {
+    100
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -30974,12 +30991,20 @@ pub struct SceneAudioEvent {
     pub trigger: String,
     #[serde(default = "default_audio_action")]
     pub action: String,
+    #[serde(default = "default_audio_event_kind")]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bus: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
 }
 
 fn default_audio_action() -> String {
     "play".to_string()
+}
+
+fn default_audio_event_kind() -> String {
+    "sound".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -35239,7 +35264,39 @@ fn validate_scene_audio(
             "scene entity {entity_id} audio events must not be empty"
         ));
     }
+    if audio.buses.len() > 8 {
+        return Err(anyhow!(
+            "scene entity {entity_id} audio buses must contain at most 8 buses"
+        ));
+    }
+    let mut bus_ids = std::collections::BTreeSet::new();
+    for bus in &audio.buses {
+        validate_path_component(&format!("scene entity {entity_id} audio bus id"), &bus.id)?;
+        if !bus_ids.insert(bus.id.clone()) {
+            return Err(anyhow!(
+                "duplicate scene entity {entity_id} audio bus: {}",
+                bus.id
+            ));
+        }
+        if !matches!(bus.kind.as_str(), "sound" | "music" | "ambient" | "ui") {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio bus {} kind must be sound, music, ambient, or ui",
+                bus.id
+            ));
+        }
+        if bus.volume > 100 {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio bus {} volume must be between 0 and 100",
+                bus.id
+            ));
+        }
+    }
     let mut names = std::collections::BTreeSet::new();
+    if audio.events.len() > 32 {
+        return Err(anyhow!(
+            "scene entity {entity_id} audio events must contain at most 32 events"
+        ));
+    }
     for event in &audio.events {
         validate_path_component(
             &format!("scene entity {entity_id} audio event name"),
@@ -35251,9 +35308,19 @@ fn validate_scene_audio(
                 event.name
             ));
         }
-        if event.trigger != "scene_loaded" {
+        if !matches!(
+            event.trigger.as_str(),
+            "scene_loaded"
+                | "jump"
+                | "collect"
+                | "hit"
+                | "menu_select"
+                | "music_start"
+                | "music_stop"
+                | "collision"
+        ) {
             return Err(anyhow!(
-                "scene entity {entity_id} audio trigger must be scene_loaded"
+                "scene entity {entity_id} audio trigger must be scene_loaded, jump, collect, hit, menu_select, music_start, music_stop, or collision"
             ));
         }
         if !matches!(event.action.as_str(), "play" | "stop") {
@@ -35261,6 +35328,24 @@ fn validate_scene_audio(
                 "scene entity {entity_id} audio event {} action must be play or stop",
                 event.name
             ));
+        }
+        if !matches!(event.kind.as_str(), "sound" | "music" | "ambient" | "ui") {
+            return Err(anyhow!(
+                "scene entity {entity_id} audio event {} kind must be sound, music, ambient, or ui",
+                event.name
+            ));
+        }
+        if let Some(bus) = &event.bus {
+            validate_path_component(
+                &format!("scene entity {entity_id} audio event {} bus", event.name),
+                bus,
+            )?;
+            if !bus_ids.is_empty() && !bus_ids.contains(bus) {
+                return Err(anyhow!(
+                    "scene entity {entity_id} audio event {} references unknown audio bus: {bus}",
+                    event.name
+                ));
+            }
         }
         if event.action == "play" && event.asset.is_none() {
             return Err(anyhow!(
@@ -59173,12 +59258,27 @@ scenarios:
                     "velocity": { "x": 0, "y": 0 },
                     "size": { "width": 16, "height": 16 },
                     "controllable": true,
-                    "audio": { "events": [{ "name": "player_spawn", "trigger": "scene_loaded", "action": "play", "asset": "spawn-audio" }] }
+                    "audio": {
+                        "buses": [
+                            { "id": "sfx", "kind": "sound", "volume": 80, "muted": false },
+                            { "id": "music", "kind": "music", "volume": 60, "muted": true }
+                        ],
+                        "events": [
+                            { "name": "player_spawn", "trigger": "scene_loaded", "action": "play", "kind": "sound", "bus": "sfx", "asset": "spawn-audio" },
+                            { "name": "music_stop", "trigger": "music_stop", "action": "stop", "kind": "music", "bus": "music" }
+                        ]
+                    }
                 }
             }]
         }))
         .expect("audio scene parses");
         validate_scene(&scene).expect("audio intent validates");
+        let audio = scene.entities[0].components.audio.as_ref().expect("audio");
+        assert_eq!(audio.buses[0].id, "sfx");
+        assert_eq!(audio.buses[0].volume, 80);
+        assert!(!audio.buses[0].muted);
+        assert_eq!(audio.events[0].kind, "sound");
+        assert_eq!(audio.events[0].bus.as_deref(), Some("sfx"));
 
         let mut missing_asset = scene.clone();
         missing_asset.entities[0]
@@ -59192,6 +59292,60 @@ scenarios:
         assert!(rejected
             .to_string()
             .contains("play action requires an asset ref"));
+
+        let mut invalid_bus_kind = scene.clone();
+        invalid_bus_kind.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .buses[0]
+            .kind = "spatial".to_string();
+        let rejected =
+            validate_scene(&invalid_bus_kind).expect_err("invalid audio bus kind rejected");
+        assert!(rejected
+            .to_string()
+            .contains("kind must be sound, music, ambient, or ui"));
+
+        let mut invalid_volume = scene.clone();
+        invalid_volume.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .buses[0]
+            .volume = 101;
+        let rejected = validate_scene(&invalid_volume).expect_err("audio volume rejected");
+        assert!(rejected
+            .to_string()
+            .contains("volume must be between 0 and 100"));
+
+        let mut unknown_bus = scene.clone();
+        unknown_bus.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .events[0]
+            .bus = Some("missing-bus".to_string());
+        let rejected = validate_scene(&unknown_bus).expect_err("unknown audio bus rejected");
+        assert!(rejected
+            .to_string()
+            .contains("references unknown audio bus"));
+
+        let mut invalid_event_kind = scene.clone();
+        invalid_event_kind.entities[0]
+            .components
+            .audio
+            .as_mut()
+            .expect("audio")
+            .events[0]
+            .kind = "spatial".to_string();
+        let rejected =
+            validate_scene(&invalid_event_kind).expect_err("invalid audio event kind rejected");
+        assert!(rejected
+            .to_string()
+            .contains("kind must be sound, music, ambient, or ui"));
 
         let mut invalid_action = scene.clone();
         invalid_action.entities[0]
