@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "source-apply-worktree-boundary-policy-v1",
+  "policyId": "source-apply-worktree-boundary-v1",
+  "status": "policy-only",
+  "trustedWorktree": {
+    "requiredGitContext": true,
+    "requiresCurrentHead": true,
+    "requiresTargetClean": true,
+    "requiresNoUntrackedTargetCollision": true,
+    "requiresNoActiveApplyLock": true,
+    "writeAuthority": "none-from-policy"
+  },
+  "sandboxWorktree": {
+    "allowedRootPatterns": [
+      "runs/**/sandbox/**/worktree",
+      "sandbox/**/worktree"
+    ],
+    "purpose": "generated dry-run evidence only",
+    "trustedWriteAuthority": false
+  },
+  "allowedTargetRoots": [
+    "seeds/*.yaml",
+    "examples/**/scene*.json",
+    "examples/**/scenario*.json",
+    "docs/*.md",
+    "crates/**",
+    "examples/evidence-dashboard/**",
+    "examples/authoring-cockpit/**"
+  ],
+  "blockedRootPrefixes": [
+    ".git/",
+    ".omx/",
+    ".omc/",
+    ".claude/",
+    ".openchrome/",
+    "runs/",
+    "target/",
+    "dashboard-data/",
+    "sandbox/"
+  ],
+  "blockedTargetClasses": [
+    "dependency-manifest",
+    "ci-workflow",
+    "build-script",
+    "shell-install-script",
+    "credential-auth-network-cloud",
+    "release-export-publish",
+    "generated-local-state",
+    "hidden-root",
+    "opaque-binary",
+    "unknown"
+  ],
+  "blockedContextStates": [
+    "missing-git-context",
+    "dirty-target",
+    "staged-target",
+    "unmerged-target",
+    "untracked-target-collision",
+    "generated-root-target",
+    "hidden-root-target",
+    "path-traversal",
+    "symlink-target",
+    "hardlink-alias",
+    "active-apply-lock",
+    "branch-head-mismatch",
+    "ambiguous-context"
+  ],
+  "requiredEvidenceFields": [
+    "repositoryRoot",
+    "worktreeRoot",
+    "branch",
+    "headCommit",
+    "policyId",
+    "targets",
+    "generatedRootSummary",
+    "lockStatus",
+    "blockedReasons",
+    "guardrails"
+  ],
+  "guardrails": [
+    "policy-only; no trusted source apply is implemented",
+    "sandbox worktrees are generated evidence roots, not trusted write targets",
+    "target dirtiness and untracked target collisions fail closed before trusted writes",
+    "browser, dashboard, and Studio surfaces remain read-only or draft-only",
+    "no auto-apply, auto-merge, command bridge, dependency mutation, CI mutation, build-script mutation, or production-ready claim",
+    "#1 and #23 remain open"
+  ]
+}
