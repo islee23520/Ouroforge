@@ -566,6 +566,23 @@ const run = {
   },
 };
 
+run.route_attempts = {
+  present: true,
+  status: 'passed',
+  attempt_count: 1,
+  malformed_count: 0,
+  evidence_refs: ['evidence/route-attempts/route-attempt.json'],
+  boundary: 'Read-only route attempt evidence; Studio must not run solvers.',
+  attempts: [{
+    attemptId: 'qa14_6_collect_goal_route',
+    objectiveId: 'collect-goal-then-exit',
+    scenarioId: 'collect-and-exit',
+    outcome: 'passed',
+    startState: { stateId: 'start-left-of-goal' },
+    budgetUsed: { actionsUsed: 2, maxActions: 8 },
+  }],
+};
+
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
   kind: 'application/json',
@@ -607,8 +624,10 @@ assert.equal(cockpit.latestRun([{ summary: { id: 'old', created_at_unix_ms: 1 } 
 assert.match(cockpit.renderPreview(), /runtime-preview/);
 assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
+assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goal_route/);
+assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 22);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 23);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
