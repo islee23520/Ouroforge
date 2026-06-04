@@ -162,3 +162,36 @@ Milestone 8 does not authorize:
 - This document may be revised only by an explicit follow-up governance issue or
   roadmap refresh. Implementation issues should cite it rather than weakening its
   boundaries locally.
+
+
+## Completion status after #594
+
+Production 2D Engine Core v1 is recorded complete after issues #581-#593 closed
+with merged implementation, demo, regression, Studio inspection, and generated-
+state evidence. The completed evidence chain covers:
+
+- scope/contract (#581);
+- renderer architecture and render graph (#582);
+- camera, layers, parallax, and viewport behavior (#583);
+- sprite, atlas, and tilemap rendering integration (#584);
+- 2D physics/collision and trigger evidence (#585);
+- input abstraction and action mapping (#586);
+- runtime state save/load and deterministic replay digest evidence (#587);
+- animation, particles, lightweight VFX, audio runtime, and bus evidence (#588,
+  #589);
+- runtime debug/profiling/frame-budget evidence (#590);
+- bounded Production 2D vertical-slice demo (#591);
+- Scenario Coverage v7 regression suite (#592);
+- escaped read-only Studio 2D inspection surfaces (#593).
+
+This completion remains a bounded engineering milestone for local, evidence-
+native 2D vertical-slice games. It does not revise the non-goals above: no 3D
+implementation, native export, plugin runtime, hosted/cloud/server/auth behavior,
+browser trusted writes, command bridges, unrestricted source apply, auto-merge,
+public launch automation, production-ready claim, broad compatibility-stable API,
+secure-sandbox guarantee, shipped-game maturity claim, or Godot replacement
+positioning is authorized.
+
+The recommended next dependency-ordered technical branch is 3D Capability Gate v1
+(#596-#608), starting with a scoped capability contract and preserving the same
+live issue checks, generated-state audit, and #1/#23 anchor requirements.

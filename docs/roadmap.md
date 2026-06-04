@@ -19,10 +19,15 @@ loading evidence, preview/read-model evidence, Studio asset inspection, demo ass
 refresh, and asset regression coverage, and a completed Visual Authoring v1 safe
 local edit-draft cockpit for source-like drafts, Rust validation/preflight,
 transaction previews, visual diff previews, review-gated apply evidence, demo
-smoke ids, Scenario Coverage v5, and read-only Studio/dashboard wording:
+smoke ids, Scenario Coverage v5, read-only Studio/dashboard wording, and a
+completed Production 2D Engine Core v1 milestone for bounded local 2D engine
+evidence: render queue/camera/layers/tilemap integration, collision/physics,
+input actions/replay, save-load/runtime-state digests, animation/VFX/audio
+evidence, frame-budget profiling, a vertical-slice demo, Scenario Coverage v7,
+and read-only Studio inspection:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> journal/Studio inspection
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> journal/Studio inspection
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -101,6 +106,13 @@ The current implementation has completed these documented milestone surfaces:
   `docs/edit-draft-transaction-cli-v1.md`,
   `docs/playable-demo-v2-collect-and-exit.md`,
   `docs/visual-authoring-v1-governance-handoff.md`)
+- Production 2D Engine Core v1 / bounded local 2D vertical-slice core
+  (`docs/production-2d-engine-core-v1.md`,
+  `docs/runtime-state-save-v1.md`,
+  `docs/runtime-frame-budget-v1.md`,
+  `docs/playable-demo-v2-collect-and-exit.md`,
+  `docs/scenario-coverage-v3.md`,
+  `docs/production-2d-studio-inspection-v1.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -128,6 +140,20 @@ wording. It remains a bounded Safe Local Edit Cockpit milestone: it does not add
 browser trusted writes, command bridges, production editor behavior, visual
 scripting, source mutation apply, plugin runtime, native export, hosted/cloud
 services, public launch automation, or Godot replacement claims.
+
+Production 2D Engine Core v1 completion covers the #581-#593 evidence chain:
+scope/contract, renderer architecture, camera/layer/viewport behavior,
+sprite/atlas/tilemap rendering, 2D physics/collision, input actions/replay,
+runtime state save/load and deterministic replay digests, animation/VFX, audio
+runtime evidence, frame-budget profiling, a bounded vertical-slice demo,
+Scenario Coverage v7, and read-only Studio inspection. It remains local-first
+and Rust-trusted for validation, persistence, generated evidence, source-like
+fixture validation, save/load artifacts, and CLI behavior. Browser/dashboard/
+Studio surfaces remain read-only or draft-only for trusted state. This completion
+does not add 3D implementation, native export, plugin runtime, hosted/cloud
+behavior, unrestricted source apply, command bridges, public launch automation,
+production-ready status, broad compatibility-stable API promises, shipped-game
+claims, secure-sandbox guarantees, or Godot replacement positioning.
 
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
@@ -184,13 +210,15 @@ announce launch, add support commitments, or implement product behavior.
 The current governance outcome is **manual hold / ready for separate maintainer
 decision**. Maintainers can either rerun the visibility checklist and decision
 record on a chosen date, or continue technical roadmap work while keeping launch
-actions manual. The conservative next technical milestone candidate is
-Production 2D Engine Core v1 (#583-#594): camera/layering, rendering, physics,
-input, runtime state/replay, animation/VFX, audio, profiling, vertical slice,
-regression coverage, Studio inspection, and a follow-up roadmap/#1 refresh. That
+actions manual. Production 2D Engine Core v1 (#581-#593) is now recorded as
+complete, with this #594 roadmap/#1 refresh preserving the evidence chain and
+conservative wording.
+The conservative next technical milestone candidate is the 3D Capability Gate v1
+sequence (#596-#608) because it is the next live dependency-ordered branch and
+is framed as a capability gate rather than a broad engine-parity promise. That
 candidate must remain issue-scoped and evidence-backed; it is not a production,
-public-launch, native-export, plugin-runtime, source-apply, or Godot replacement
-claim.
+public-launch, native-export, plugin-runtime, source-apply, broad 3D parity, or
+Godot replacement claim.
 
 Other possible later governance topics remain Native Export Design Gate, Plugin
 Design Gate, Source Mutation Apply Design Gate, and Visual Authoring v2. None is
@@ -222,15 +250,25 @@ publication, and support boundaries described above.
 
 Recommended next milestone candidates after this governance refresh are:
 
-1. **Production 2D Engine Core v1 (#583-#594)** — the next dependency-ordered
-   technical milestone, starting with camera/layer/viewport work and later
-   renderer, physics, input, runtime-state, audio/VFX, debug/profiling, demo,
-   regression, Studio inspection, and roadmap refresh issues.
-2. **Manual public visibility review** — only if maintainers separately choose
+1. **3D Capability Gate v1 (#596-#608)** — the next dependency-ordered technical
+   branch, starting with the #596 scope/contract and then scene graph, camera,
+   mesh/material local references, render smoke evidence, physics, animation,
+   runtime probe, scenario compatibility, demo, Studio inspection, regression,
+   and roadmap refresh issues. Keep it a scoped capability gate, not a broad 3D
+   parity, production-engine, native-export, plugin-runtime, or Godot replacement
+   claim.
+2. **Gameplay Scripting / Logic System v1 (#611-#625)** — a later candidate for
+   bounded behavior models and safe script/logic boundaries after the 3D gate or
+   by explicit maintainer resequencing.
+3. **Agentic Scene and Level Designer v1 (#627-#642)** or **GDD-to-Playable
+   Prototype v1 (#644-#661)** — later agentic authoring candidates that require
+   their own scoped contracts, review gates, generated-state audits, and
+   conservative wording.
+4. **Manual public visibility review** — only if maintainers separately choose
    it, using the launch checklist, visibility decision records, communication
    pack, hold/rollback criteria, issue/PR intake policy, security-response
    routing, and fresh verification on the intended decision date.
-3. **Deferral/hold** — if any launch-governance blocker or generated-state,
+5. **Deferral/hold** — if any launch-governance blocker or generated-state,
    wording, demo-stability, security-reporting, or #1/#23 anchor concern is
    found during a future manual review.
 
@@ -271,6 +309,11 @@ remain separate maintainer actions.
   artifacts are decision/checklist/response inputs, not authority to toggle
   visibility, publish announcements, release packages, accept public roadmap
   scope automatically, promise support/security response times, or close #1/#23.
+- Treat Production 2D Engine Core v1 as complete but bounded. Its artifacts are
+  local evidence contracts for a small 2D vertical-slice class, not authority to
+  claim production readiness, shipped-game maturity, secure sandboxing, broad
+  compatibility stability, native export, plugin runtime, hosted/cloud behavior,
+  source apply, public launch, or Godot replacement status.
 
 ## Active anchors
 

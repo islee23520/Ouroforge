@@ -197,7 +197,14 @@ visibility, release packages, or approve public-launch execution. Source
 Mutation Preview v1 is also recorded there as complete but preview-only; it does
 not authorize trusted source apply, branch merge/rebase automation, browser
 command bridges, dependency/CI mutation, native export, plugin runtime, public
-launch automation, or Godot replacement claims.
+launch automation, or Godot replacement claims. Production 2D Engine Core v1 is
+recorded as complete in `docs/roadmap.md` and
+`docs/production-2d-engine-core-v1.md` as a bounded local 2D vertical-slice
+evidence milestone; it is not a production-ready, shipped-game, broad
+compatibility, secure-sandbox, native-export, plugin-runtime, hosted/cloud,
+source-apply, public-launch, or Godot replacement claim. The next recommended
+technical branch is the scoped 3D Capability Gate v1 issue sequence, not broad
+engine parity.
 
 ## Contributor guide
 
