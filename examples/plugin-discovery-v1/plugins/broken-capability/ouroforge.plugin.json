@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "broken-capability-plugin",
+  "name": "Broken Capability Plugin",
+  "version": "1.0.0",
+  "description": "Well-formed JSON that fails manifest validation and is reported as invalid.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["executeScript"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}
