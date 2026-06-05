@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "export-profile-v1",
+  "profileId": "profile_export_bundle_fixture",
+  "projectId": "proj_export_bundle_fixture",
+  "title": "Collect and Exit (Export Bundle Fixture)",
+  "version": "0.1.0",
+  "exportTarget": "web-static-bundle",
+  "entryScene": "examples/export-bundle-v1/fixture-game/scene/main.json",
+  "assetRoots": [
+    "examples/export-bundle-v1/fixture-game/assets"
+  ],
+  "outputDir": "dist/export/fixture-game",
+  "runtimeProbeMode": "preserve",
+  "verificationScenarioIds": [
+    "scenario_reach_exit"
+  ],
+  "packageMetadataRef": "examples/export-bundle-v1/package-metadata.fixture.json",
+  "boundary": "Local, evidence-backed export profile only; no publish, deploy, sign, or upload. Validation is fail closed against the export target matrix."
+}

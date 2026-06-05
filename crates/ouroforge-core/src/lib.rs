@@ -29,6 +29,7 @@ mod behavior_draft_validation;
 pub mod source_apply_verification_runner;
 pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
+pub mod export_bundle;
 pub mod source_apply_post_apply_rerun;
 pub use source_apply_post_apply_rerun::*;
 pub mod export_plan;
