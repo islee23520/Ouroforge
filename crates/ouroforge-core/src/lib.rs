@@ -68235,6 +68235,36 @@ scenarios:
     }
 
     #[test]
+    fn safe_script_sandbox_trust_boundary_v1_audits_no_runtime_boundary() {
+        let doc = include_str!("../../../docs/safe-script-sandbox-trust-boundary-v1.md");
+        assert!(doc.contains("Issue: #616"));
+        assert!(doc.contains("design-gate only"));
+        assert!(doc.contains("Policy-level operation matrix"));
+        assert!(doc.contains("Deterministic execution expectations"));
+        assert!(doc.contains("Resource limits and timeout behavior"));
+        assert!(doc.contains("Input/output contract"));
+        assert!(doc.contains("filesystem reads/writes outside an explicit sandbox/generated root"));
+        assert!(doc.contains("network access, local server bridges"));
+        assert!(doc.contains("process spawning, shell execution, command execution"));
+        assert!(doc.contains("environment/secrets/credentials/tokens"));
+        assert!(doc.contains("dependency, CI, workflow, build-script"));
+        assert!(doc.contains("eval"));
+        assert!(doc.contains("dynamic import"));
+        assert!(doc.contains("runtime plugin loading"));
+        assert!(doc.contains("Review, rollback, sandbox dry-run"));
+        assert!(doc.contains("Future behavior evidence path"));
+        assert!(doc.contains("structured failure evidence"));
+        assert!(doc.contains("#1 remains the roadmap/final-goal anchor"));
+        assert!(doc.contains("#23 remains the"));
+        assert!(!doc.contains("script runtime is implemented"));
+        assert!(!doc.contains("trusted browser write enabled"));
+        assert!(!doc.contains("secure sandbox guaranteed"));
+
+        let scope = include_str!("../../../docs/gameplay-scripting-logic-system-v1.md");
+        assert!(scope.contains("#616 sandbox/trust-boundary design gate"));
+    }
+
+    #[test]
     fn agent_generated_level_draft_v1_accepts_drafted_fixture_and_read_model() {
         let fixture = include_str!(
             "../../../examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json"
