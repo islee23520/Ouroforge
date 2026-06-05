@@ -44,6 +44,7 @@ pub enum PluginRegistryCompatibility {
     Compatible,
     Incompatible,
     Unknown,
+    FutureVersion,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -319,17 +320,54 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
     }
 
     match PluginManifest::from_json_str(&contents) {
-        Ok(manifest) => Ok(PluginRegistryEntry {
-            plugin_id: manifest.plugin_id.clone(),
-            manifest_path,
-            validation_status: PluginRegistryStatus::Valid,
-            validation_errors: Vec::new(),
-            declared_capabilities: manifest.declared_capabilities.clone(),
-            extension_points: manifest.extension_points.clone(),
-            permissions: manifest.permissions.clone(),
-            compatibility_status: PluginRegistryCompatibility::Compatible,
-            manifest_hash,
-        }),
+        Ok(manifest) => {
+            // A structurally valid manifest may still target an incompatible or
+            // future engine version (#743). Such plugins are reported but blocked
+            // from extension contribution.
+            let report = crate::plugin_compatibility::evaluate(
+                &manifest.schema_version,
+                &manifest.compatibility.min_ouroforge_version,
+                &manifest.compatibility.max_ouroforge_version,
+            );
+            let (validation_status, compatibility_status) = match report.status {
+                crate::plugin_compatibility::PluginCompatibilityStatus::Compatible => (
+                    PluginRegistryStatus::Valid,
+                    PluginRegistryCompatibility::Compatible,
+                ),
+                crate::plugin_compatibility::PluginCompatibilityStatus::Incompatible => (
+                    PluginRegistryStatus::Incompatible,
+                    PluginRegistryCompatibility::Incompatible,
+                ),
+                crate::plugin_compatibility::PluginCompatibilityStatus::FutureVersion => (
+                    PluginRegistryStatus::Incompatible,
+                    PluginRegistryCompatibility::FutureVersion,
+                ),
+                crate::plugin_compatibility::PluginCompatibilityStatus::Unknown => (
+                    PluginRegistryStatus::Incompatible,
+                    PluginRegistryCompatibility::Unknown,
+                ),
+            };
+            let contributes = report.may_contribute();
+            Ok(PluginRegistryEntry {
+                plugin_id: manifest.plugin_id.clone(),
+                manifest_path,
+                validation_status,
+                validation_errors: report.diagnostics,
+                declared_capabilities: if contributes {
+                    manifest.declared_capabilities.clone()
+                } else {
+                    Vec::new()
+                },
+                extension_points: if contributes {
+                    manifest.extension_points.clone()
+                } else {
+                    Vec::new()
+                },
+                permissions: manifest.permissions.clone(),
+                compatibility_status,
+                manifest_hash,
+            })
+        }
         Err(error) => Ok(PluginRegistryEntry {
             plugin_id,
             manifest_path,

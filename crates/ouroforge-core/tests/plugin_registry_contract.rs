@@ -6,7 +6,8 @@
 //! no unsafe paths are followed.
 
 use ouroforge_core::plugin_registry::{
-    discover_plugin_registry, discover_plugins_in_dir, PluginRegistryStatus,
+    discover_plugin_registry, discover_plugins_in_dir, PluginRegistryCompatibility,
+    PluginRegistryStatus,
 };
 use std::path::PathBuf;
 
@@ -68,4 +69,22 @@ fn fixture_tree_reports_expected_states() {
         .expect("invalid fixture present");
     assert_eq!(invalid.validation_status, PluginRegistryStatus::Invalid);
     assert!(!invalid.validation_errors.is_empty());
+
+    // A structurally valid manifest that requires a newer engine is reported as
+    // future-version and blocked from extension contribution (#743).
+    let future = registry
+        .entries
+        .iter()
+        .find(|entry| entry.plugin_id == "future-engine-plugin")
+        .expect("future-version fixture present");
+    assert_eq!(future.validation_status, PluginRegistryStatus::Incompatible);
+    assert_eq!(
+        future.compatibility_status,
+        PluginRegistryCompatibility::FutureVersion
+    );
+    assert!(future.extension_points.is_empty());
+    assert!(future
+        .validation_errors
+        .iter()
+        .any(|d| d.contains("upgrade Ouroforge")));
 }

@@ -12,5 +12,8 @@ The tree exercises the registry's reported states:
   JSON that fails manifest validation)
 - `plugins/legacy-schema/ouroforge.plugin.json` — **incompatible** (unsupported
   manifest schema version)
+- `plugins/future-engine/ouroforge.plugin.json` — **future-version** (structurally
+  valid but requires a newer Ouroforge engine; reported and blocked from
+  extension contribution)
 
 These manifests are declarative descriptors only and contain no executable code.
