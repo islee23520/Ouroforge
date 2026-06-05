@@ -1677,6 +1677,14 @@ assert.match(cockpitReadmeBehaviorBoundary, /studio-behavior-inspection-surface-
 assert.doesNotMatch(cockpitReadmeBehaviorBoundary, /browser command bridge enabled|auto-apply enabled|self-approval enabled|production editor behavior is implemented|Godot replacement behavior is implemented/);
 assert.match(docsReadme, /gameplay-scripting-logic-system-v1\.md/);
 assert.match(docsReadme, /no arbitrary script execution, plugin loader, command bridge, or production-stable scripting API claim/);
+assert.match(docsReadme, /gameplay-scripting-logic-system-governance-handoff\.md/);
+const gameplayLogicGovernanceHandoff = fs.readFileSync(require.resolve('../../docs/gameplay-scripting-logic-system-governance-handoff.md'), 'utf8');
+assert.match(gameplayLogicGovernanceHandoff, /#611-#625/);
+assert.match(gameplayLogicGovernanceHandoff, /GDD-to-Playable Prototype v1/);
+assert.match(gameplayLogicGovernanceHandoff, /#611-#625 do not authorize arbitrary executable scripts/);
+assert.match(gameplayLogicGovernanceHandoff, /#1 remains open/);
+assert.match(gameplayLogicGovernanceHandoff, /#23 remains open/);
+assert.doesNotMatch(gameplayLogicGovernanceHandoff, /arbitrary script execution is authorized|command bridge enabled|trusted browser write enabled|production-stable scripting API is implemented|Godot replacement is implemented/);
 assert.match(docsReadme, /studio-behavior-inspection-surface-v1\.md/);
 assert.match(docsReadme, /escaped read-only Studio behavior\/event\/state\/ability\/draft\/review-apply inspection/);
 assert.match(docsReadme, /no arbitrary script execution, command bridge, browser trusted writes, auto-apply,\s+self-approval, plugin runtime, or production-stable scripting API claim/);
