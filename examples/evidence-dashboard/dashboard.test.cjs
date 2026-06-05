@@ -709,6 +709,13 @@ const run = {
           before_run_id: 'before-run',
           after_run_id: 'after-run',
           classification: 'improved',
+          fourGate: {
+            schemaVersion: 'run-four-gate-comparison-v1',
+            gates: [
+              { gate: 'visual', before: 'fail', after: 'pass', transition: 'improved', evidenceRefs: ['evidence/visual-before.json', 'evidence/visual-after.json'], comparability: 'comparable' },
+              { gate: 'semantic', before: 'fail', after: 'pass', transition: 'improved', evidenceRefs: ['evidence/semantic-before.json', 'evidence/semantic-after.json'], comparability: 'comparable' },
+            ],
+          },
           evidence_refs: ['runs/before-run/verdict.json', 'runs/after-run/verdict.json'],
           semantic: {
             schemaVersion: 'run-semantic-diff-v1',
@@ -1125,6 +1132,12 @@ assert.match(dashboard.renderRegressionMatrix({ projects: [{ projectId: '<script
 assert.match(dashboard.renderRegressionMatrix(null), /No regression matrix export/);
 assert.match(dashboard.renderReplayControls({ replay: { present: false, empty_state: 'no replay fixture', sequences: [] } }), /no replay fixture/);
 assert.match(dashboard.renderRunComparison({ comparison: { present: false, empty_state: 'no comparison fixture', artifacts: [] } }), /no comparison fixture/);
+const evolveDepthDashboard = dashboard.renderRunComparison(run);
+assert.match(evolveDepthDashboard, /Four-gate before\/after delta/);
+assert.match(evolveDepthDashboard, /visual/);
+assert.match(evolveDepthDashboard, /fail → pass \(improved\)/);
+assert.match(evolveDepthDashboard, /Read-only exported JSON only/);
+assert.doesNotMatch(evolveDepthDashboard, /<button|<form|<input/i);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);

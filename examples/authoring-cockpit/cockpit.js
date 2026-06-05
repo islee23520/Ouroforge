@@ -2372,6 +2372,17 @@ const OuroforgeCockpit = (() => {
     return merged;
   }
 
+  function renderEvolveDepthInspectionSurface(run) {
+    const proposals = mergeProposalRationaleRecords(Array.isArray(run?.mutations) ? run.mutations : [], Array.isArray(mutationStage(run?.mutation_lifecycle, 'proposed')?.records) ? mutationStage(run?.mutation_lifecycle, 'proposed').records : []);
+    const comparisons = Array.isArray(run?.comparison?.artifacts) ? run.comparison.artifacts : [];
+    if (!proposals.length && !comparisons.length) {
+      return '<div class="proposal-rationale"><h3>Evolve depth inspection</h3><p class="empty compact">No proposal rationale or four-gate rerun delta records loaded.</p></div>';
+    }
+    const proposalRows = proposals.map((proposal) => `<li class="surface-row"><strong>${escapeText(proposal.id || 'unknown proposal')}</strong><br>${renderProposalRationale(proposal)}</li>`).join('') || '<li class="surface-row">No proposal rationale records loaded.</li>';
+    const comparisonRows = comparisons.map((artifact) => `<li class="surface-row"><strong>${escapeText(artifact.path || 'comparison')}</strong>${renderFourGateDeltaRows(artifact, run)}</li>`).join('') || '<li class="surface-row">No four-gate rerun deltas loaded.</li>';
+    return `<div class="proposal-rationale"><h3>Evolve depth inspection</h3><p class="hint">Read-only exported JSON only. Confidence is bounded evidence metadata; Studio does not accept, apply, merge, execute commands, or write trusted state.</p><h4>Proposal rationale and confidence</h4><ul>${proposalRows}</ul><h4>Four-gate before/after delta</h4><ul>${comparisonRows}</ul></div>`;
+  }
+
   function renderProposalRationaleSurface(run) {
     const direct = Array.isArray(run?.mutations) ? run.mutations : [];
     const proposed = mutationStage(run?.mutation_lifecycle, 'proposed');
@@ -2458,6 +2469,7 @@ const OuroforgeCockpit = (() => {
       ${renderStudioReviewCockpitCards(run)}
       <div class="surface-list">${stages}</div>
       ${renderProposalRationaleSurface(run)}
+      ${renderEvolveDepthInspectionSurface(run)}
       ${renderReviewDecisionSurface(lifecycle, run)}
       ${renderSceneMutationLifecycleSurface(run)}
       <h3>Command hints</h3><div class="command-list">${hints}</div>
@@ -2582,12 +2594,28 @@ const OuroforgeCockpit = (() => {
     </div>`;
   }
 
+  function comparisonGateDeltas(artifact) {
+    const value = artifact?.value || {};
+    const fourGate = value.fourGate || value.four_gate || artifact?.fourGate || artifact?.four_gate || null;
+    if (Array.isArray(fourGate?.gates)) {
+      return fourGate.gates.map((gate) => ({ gate: gate.gate || 'unknown', before: gate.before || gate.beforeStatus || gate.before_status || 'unknown', after: gate.after || gate.afterStatus || gate.after_status || 'unknown', transition: gate.transition || 'unknown', evidenceRefs: gate.evidenceRefs || gate.evidence_refs || [], comparability: gate.comparability || gate.comparabilityState || gate.comparability_state || 'unknown' }));
+    }
+    const deltas = value.fourGateDeltas || value.four_gate_deltas || artifact?.fourGateDeltas || artifact?.four_gate_deltas || [];
+    return Array.isArray(deltas) ? deltas.map((delta) => ({ gate: delta.gate || 'unknown', before: delta.beforeStatus || delta.before_status || delta.before || 'unknown', after: delta.afterStatus || delta.after_status || delta.after || 'unknown', transition: delta.transition || 'unknown', evidenceRefs: [...(delta.beforeEvidenceRefs || delta.before_evidence_refs || []), ...(delta.afterEvidenceRefs || delta.after_evidence_refs || [])], comparability: delta.comparabilityState || delta.comparability_state || 'unknown' })) : [];
+  }
+
+  function renderFourGateDeltaRows(artifact, run) {
+    const gates = comparisonGateDeltas(artifact);
+    if (!gates.length) return '<p class="empty compact">No four-gate rerun delta exported.</p>';
+    return `<ul>${gates.map((gate) => `<li class="surface-row"><strong>${escapeText(gate.gate)}</strong> ${surfaceState(true, gate.transition)}<br><small>${escapeText(gate.before)} → ${escapeText(gate.after)} · comparability ${escapeText(gate.comparability)}</small>${renderRefLinks(gate.evidenceRefs || [], run)}</li>`).join('')}</ul>`;
+  }
+
   function renderComparisonSurface(run) {
     const comparison = run?.comparison;
     if (!comparison?.present) {
       return `<section id="run-comparison" class="panel"><h2>Run comparison</h2><p class="empty">${escapeText(comparison?.empty_state || 'No run comparison artifacts are available for this run.')}</p></section>`;
     }
-    const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderSemanticComparisonSummary(artifact)}${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
+    const artifacts = (comparison.artifacts || []).map((artifact) => `<div class="surface-row"><strong>${escapeText(artifact.before_run_id || 'unknown')}</strong> → <strong>${escapeText(artifact.after_run_id || 'unknown')}</strong> ${surfaceState(true, artifact.classification || 'unknown')}<br><small>${escapeText(artifact.path)}</small>${renderSemanticComparisonSummary(artifact)}<div><strong>Four-gate before/after delta</strong>${renderFourGateDeltaRows(artifact, run)}</div>${renderRefLinks(artifact.evidence_refs, run)}</div>`).join('');
     const first = (comparison.artifacts || [])[0] || {};
     const beforeRun = first.before_run_id ? `runs/${first.before_run_id}` : 'runs/before';
     const afterRun = first.after_run_id ? `runs/${first.after_run_id}` : run?.summary?.run_dir || 'runs/after';
@@ -3496,7 +3524,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

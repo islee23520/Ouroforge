@@ -657,7 +657,7 @@ const run = {
     recordPath: 'regression-promotions/regression-promotion-1.json',
   }],
   replay: { present: true, sequences: [{ id: 'replay-1', event_count: 2, frames: [0, 4], evidence_refs: ['evidence/replay.json'] }] },
-  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, project: { relation: 'same_project', changed: true, changes: [{ kind: 'scene_hash', summary: 'scene hash changed for scenes/main.scene.json', before: 'before-scene', after: 'after-scene' }], warnings: ['project fixture warning'] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
+  comparison: { present: true, artifacts: [{ before_run_id: 'before', after_run_id: 'after', classification: 'improved', path: 'mutation/run-comparison-before--after.json', evidence_refs: ['runs/before/verdict.json', 'runs/after/verdict.json'], value: { fourGate: { schemaVersion: 'run-four-gate-comparison-v1', gates: [{ gate: 'visual', before: 'fail', after: 'pass', transition: 'improved', evidenceRefs: ['evidence/visual-before.json', 'evidence/visual-after.json'], comparability: 'comparable' }, { gate: 'semantic', before: 'fail', after: 'pass', transition: 'improved', evidenceRefs: ['evidence/semantic-before.json', 'evidence/semantic-after.json'], comparability: 'comparable' }] } }, semantic: { schemaVersion: 'run-semantic-diff-v1', reasons: [{ kind: 'transaction_provenance', severity: 'changed', summary: 'scene edit transaction provenance changed' }], scenarios: [], worldState: { changed: [] }, project: { relation: 'same_project', changed: true, changes: [{ kind: 'scene_hash', summary: 'scene hash changed for scenes/main.scene.json', before: 'before-scene', after: 'after-scene' }], warnings: ['project fixture warning'] }, transactionProvenance: { changed: true }, warnings: ['fixture warning'] } }] },
   engine_summaries: {
     present: true,
     source_world_state: 'evidence/world.json',
@@ -1982,6 +1982,14 @@ assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
 assert.match(cockpit.renderMutationReviewSurface(run), /review-decision-1/);
 assert.match(cockpit.renderMutationReviewSurface(run), /manual-reviewer/);
 assert.ok(!cockpit.renderMutationReviewSurface(run).includes('<b>accepted</b>'));
+const evolveDepthCockpit = cockpit.renderEvolveDepthInspectionSurface(run);
+assert.match(evolveDepthCockpit, /Evolve depth inspection/);
+assert.match(evolveDepthCockpit, /Proposal rationale and confidence/);
+assert.match(evolveDepthCockpit, /Four-gate before\/after delta/);
+assert.match(evolveDepthCockpit, /visual/);
+assert.match(evolveDepthCockpit, /fail → pass/);
+assert.match(evolveDepthCockpit, /Read-only exported JSON only/);
+assert.doesNotMatch(evolveDepthCockpit, /<button|<form|<input/i);
 assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No review decisions recorded/);
 
 assert.match(cockpit.renderLoopDryRunSurface(run), /Authoring loop dry-run/);

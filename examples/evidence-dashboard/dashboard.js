@@ -1029,6 +1029,42 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function comparisonGateDeltas(artifact) {
+    const value = artifact?.value || {};
+    const fourGate = value.fourGate || value.four_gate || artifact?.fourGate || artifact?.four_gate || null;
+    if (Array.isArray(fourGate?.gates)) {
+      return fourGate.gates.map((gate) => ({
+        gate: gate.gate || 'unknown',
+        before: gate.before || gate.beforeStatus || gate.before_status || 'unknown',
+        after: gate.after || gate.afterStatus || gate.after_status || 'unknown',
+        transition: gate.transition || 'unknown',
+        evidenceRefs: gate.evidenceRefs || gate.evidence_refs || [],
+        comparability: gate.comparability || gate.comparabilityState || gate.comparability_state || 'unknown',
+      }));
+    }
+    const deltas = value.fourGateDeltas || value.four_gate_deltas || artifact?.fourGateDeltas || artifact?.four_gate_deltas || [];
+    return Array.isArray(deltas) ? deltas.map((delta) => ({
+      gate: delta.gate || 'unknown',
+      before: delta.beforeStatus || delta.before_status || delta.before || 'unknown',
+      after: delta.afterStatus || delta.after_status || delta.after || 'unknown',
+      transition: delta.transition || 'unknown',
+      evidenceRefs: [...(delta.beforeEvidenceRefs || delta.before_evidence_refs || []), ...(delta.afterEvidenceRefs || delta.after_evidence_refs || [])],
+      comparability: delta.comparabilityState || delta.comparability_state || 'unknown',
+    })) : [];
+  }
+
+  function renderFourGateDeltaSummary(artifact, run) {
+    const gates = comparisonGateDeltas(artifact);
+    if (!gates.length) {
+      return '<section class="panel"><h5>Four-gate before/after delta</h5><p class="empty-state compact">No four-gate rerun delta was exported for this comparison.</p></section>';
+    }
+    const rows = gates.map((gate) => {
+      const refs = Array.isArray(gate.evidenceRefs) ? gate.evidenceRefs.filter(Boolean) : [];
+      return `<li><strong>${escapeText(gate.gate)}</strong>: <span class="${statusClass(gate.transition)}">${escapeText(gate.before)} → ${escapeText(gate.after)} (${escapeText(gate.transition)})</span><br><small>comparability ${escapeText(gate.comparability)}</small>${renderComparisonRefLinks('Gate evidence refs', refs, run)}</li>`;
+    }).join('');
+    return `<section class="panel"><h5>Four-gate before/after delta</h5><p class="run-meta">Read-only exported JSON only; no accept/apply/write/merge controls or browser-side trusted comparison logic.</p><ul class="run-meta-list">${rows}</ul></section>`;
+  }
+
   function renderRunComparison(run) {
     const comparison = run?.comparison;
     if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
@@ -1054,6 +1090,7 @@ const OuroforgeDashboard = (() => {
         ${artifact.read_error ? `<div class="artifact-warning">${escapeText(artifact.read_error)}</div>` : ''}
         ${artifact.exists === false ? '<div class="artifact-warning">Missing comparison artifact file</div>' : ''}
         <section class="panel"><h5>Scenario, verdict, performance, assertion, and evidence deltas</h5>${renderDeltaCards(artifact.deltas)}</section>
+        ${renderFourGateDeltaSummary(artifact, run)}
         ${renderSemanticDiffSummary(artifact)}
         ${renderComparisonRefLinks('Before/after evidence refs', artifact.evidence_refs, run)}
         ${unsupported}
