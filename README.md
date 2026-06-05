@@ -234,9 +234,17 @@ and `examples/gameplay-logic-regression-v9/` as a structured data-only behavior
 and evidence milestone; it is not arbitrary script execution, a production-stable
 scripting API, plugin runtime, browser trusted write path, command bridge,
 unrestricted source apply, public-launch approval, or Godot replacement scope.
-The next recommended technical branch is GDD-to-Playable Prototype v1 (#644-#661)
-so the completed behavior/evidence contracts can be exercised in a bounded
-prototype flow rather than expanded into arbitrary third-party scripting.
+GDD-to-Playable Prototype v1 is now recorded as complete in `docs/roadmap.md`,
+`docs/gdd-to-playable-prototype-v1.md`,
+`docs/gdd-to-prototype-governance-handoff.md`, the GDD prototype fixture/docs
+chain, and `examples/gdd-to-prototype-demo-v1/` as a bounded evidence-gated
+prototype path. It is not autonomous unrestricted game creation, uncontrolled asset generation,
+arbitrary source/script mutation, browser trusted writes, auto-apply/auto-merge,
+native export, plugin runtime, hosted/cloud behavior, production readiness, or a
+current Godot replacement claim. The next recommended technical sequence is to finish Autonomous QA /
+Playtest Swarm v1 (#690-#698), with live handoff focus on the remaining
+Scenario Coverage v13 and governance slices, so prototype/evidence outputs can be
+exercised by bounded local QA scenarios without weakening review or apply gates.
 
 ## Contributor guide
 

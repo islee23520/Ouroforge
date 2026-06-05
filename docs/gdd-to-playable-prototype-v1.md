@@ -2,13 +2,35 @@
 
 Issue: #644  
 Milestone: #1 Milestone 12 — Game Design Document to Playable Prototype  
-Status: scope contract only
+Status: implementation/demo/coverage evidence complete through #660; #661 records the roadmap and #1 governance refresh
 
 ## Purpose
 
 GDD to Playable Prototype v1 defines how a bounded game design brief can become a validated, reviewable, evidence-backed playable prototype. The v1 target is a small scoped 2D prototype first. Optional 3D compatibility is limited to prior 3D gate surfaces and must not imply a full 3D editor, production renderer, native export, or Godot replacement.
 
 This document is a control contract for #644-#661. It does not add product behavior, GDD parsing, generation, prototype apply, Studio UI, command bridges, source/script mutation, asset generation, or runtime plugin behavior.
+
+## Completion evidence
+
+GDD to Playable Prototype v1 is complete as a bounded evidence-gated prototype
+path after the merged issue/PR chain #644-#660. The completed slices added the
+scope contract, GDD/design-brief schema, requirement extraction, mechanics/core
+loop mapping, feasibility gate, scaffold plan, scene/level plan, behavior plan,
+asset placeholder/reference plan, scenario/acceptance plan, prototype task graph,
+draft bundle, review-gated apply contract, run/evidence/journal bundle,
+read-only Studio planning inspection, deterministic demo manifest, and Scenario
+Coverage v11 regression matrix.
+
+The milestone remains intentionally narrow: generated GDD-derived output is
+untrusted until Rust/local validation and review-gated apply; browser/dashboard/
+Studio surfaces remain read-only or draft-only; generated prototype plans,
+drafts, reviews, applies, runs, evidence, screenshots, dashboard exports, temp
+projects, and local tool state stay ignored unless explicitly fixture-scoped.
+Completion does not authorize autonomous unrestricted game creation, arbitrary
+source/script mutation, browser trusted writes, command bridges, auto-apply,
+auto-merge, uncontrolled/generated proprietary assets, production-game or
+production-ready claims, current Godot replacement claims, native export, plugin
+runtime, hosted/cloud behavior, public launch, or release automation.
 
 ## Bounded v1 target
 

@@ -47,6 +47,12 @@ event/signal contracts, state-machine and ability/action contracts, script and
 sandbox design gates, runtime integration, scenario assertions, behavior drafts,
 review-gated apply records, evidence/journal integration, escaped read-only
 Studio/dashboard inspection, a deterministic demo, Scenario Coverage v9, and a
+conservative governance refresh, a completed GDD-to-Playable Prototype v1
+milestone for bounded evidence-gated prototype generation from a GDD: design
+brief validation, requirement extraction, mechanics/core-loop mapping,
+feasibility, scaffold/scene/behavior/asset/scenario plans, prototype task graph,
+review-gated draft/apply records, run/evidence/journal bundles, read-only Studio
+planning inspection, deterministic demo evidence, Scenario Coverage v11, and a
 conservative governance refresh, a completed Evaluator Depth v1 milestone
 that adds bounded visual and semantic evaluator gates, additive four-category
 verdict/Journals, read-only inspection, deterministic demo evidence, Scenario
@@ -66,7 +72,7 @@ architecture hygiene milestone that extracted `ouroforge-ledger`,
 `ouroforge-core` public facade while preserving golden verdict parity:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -395,6 +401,27 @@ third-party code loading, plugin runtime, browser command bridge, hosted
 execution, production scripting, source-apply authority, public-launch approval,
 or Godot replacement scope.
 
+
+GDD-to-Playable Prototype v1 (#644-#661) is complete after the merged evidence
+chain: #644 defined the scope contract, #645 added the design-brief schema, #646
+added requirement extraction, #647 added mechanics/core-loop mapping, #648 added
+the feasibility gate, #649 added scaffold planning, #650 added scene/level
+planning, #651 added behavior planning, #652 added asset placeholder/reference
+planning, #653 added scenario/acceptance planning, #654 added the prototype task
+graph, #655 added the draft bundle, #656 added review-gated apply, #657 added
+run/evidence/journal bundles, #658 added read-only Studio planning inspection,
+#659 added the deterministic demo, #660 added Scenario Coverage v11, and #661
+records this roadmap/#1 governance refresh. This completion enables a bounded,
+evidence-gated GDD-to-prototype path only. It does not authorize autonomous
+unrestricted game creation, arbitrary source/script mutation, browser trusted
+writes, command bridges, auto-apply, auto-merge, uncontrolled asset generation,
+generated proprietary assets, native export, plugin runtime, hosted/cloud
+behavior, public launch, production-ready or shipped-game claims, or current
+Godot replacement positioning. GDD-derived outputs remain untrusted until
+Rust/local validation and review-gated apply; browser/dashboard/Studio surfaces
+remain read-only or draft-only for trusted state; generated prototype outputs and
+local tool state remain ignored unless explicitly fixture-scoped.
+
 Evaluator Depth v1 (#1279/#1283-#1288) is complete after the merged evidence
 chain: #1300 defined the scope contract, #1308 added Visual Evaluator Gate v1,
 #1311 added Semantic Evaluator Gate v1, #1318 added four-category verdict and
@@ -583,20 +610,23 @@ publication, and support boundaries described above.
 
 Recommended next milestone candidates after this governance refresh are:
 
-1. **GDD-to-Playable Prototype v1 (#644-#661)** — the next dependency-ordered
-   technical branch because Gameplay Scripting / Logic System v1 is now
-   reconciled and can feed a bounded prototype flow. Keep it scoped to design
-   requirement extraction, mechanics/core-loop mapping, project scaffold, scene
-   and gameplay plans, scenario criteria, placeholder assets, implementation
-   task graph, review-gated prototype apply, evidence/journal bundles, Studio
-   planning inspection, demo, Scenario Coverage v11, generated-state audits, and
-   conservative wording.
+1. **Finish Autonomous QA / Playtest Swarm v1 (#690-#698)** — the next
+   dependency-ordered technical sequence now that GDD-to-Playable Prototype v1 is
+   complete. As of this handoff, #690-#696 are already closed, so the remaining
+   live focus is Scenario Coverage v13 and the QA-swarm governance refresh. Keep
+   the sequence scoped to local deterministic QA/playtest scenarios, runtime/
+   console/crash classification, flaky/rerun policy, failure classification,
+   mutation backlog, run matrix, evidence bundle, demo, Scenario Coverage v13,
+   generated-state audits, and conservative wording. It must not become
+   autonomous repair, browser trusted writes, command bridges, auto-apply,
+   auto-merge, self-approval, production QA certification, public-launch
+   approval, or a Godot replacement claim.
 2. **Safe Executable Script Implementation Gate** — defer until maintainers open
    a separate governance issue with threat model, test matrix, rollback story,
    review-gate story, generated-state policy, and public wording; #611-#625 do
    not authorize arbitrary executable scripts.
-3. **Autonomous QA / Playtest Swarm, Safe Source Mutation Apply, Build/Export/
-   Packaging, Plugin/Extension System, Full Studio Editor, and demo game tracks**
+3. **Safe Source Mutation Apply, Build/Export/Packaging, Plugin/Extension
+   System, Full Studio Editor, and demo game tracks**
    — later candidates only when opened by their own fixed issue sequences with
    explicit trust boundaries and non-goals.
 4. **Bounded Production 3D expansion** — defer unless maintainers open a new
