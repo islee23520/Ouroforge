@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use ouroforge_evidence::{
-    add_evidence_artifact, validate_evidence_artifact_path, EvidenceArtifact,
+    add_evidence_artifact, read_evidence_index, validate_evidence_artifact_path, EvidenceArtifact,
+    EvidenceIndex,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -1107,4 +1108,849 @@ fn write_json(path: &Path, value: &serde_json::Value) -> Result<()> {
     let body = serde_json::to_string_pretty(value).context("failed to serialize JSON")?;
     fs::write(path, format!("{body}\n"))
         .with_context(|| format!("failed to write {}", path.display()))
+}
+
+pub const VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION: &str = "visual-comparison-evidence-v1";
+const MAX_VISUAL_COMPARISON_DIMENSION: u32 = 16_384;
+const MAX_VISUAL_COMPARISON_CHANGED_REGIONS: usize = 256;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonEvidenceArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "comparisonId")]
+    pub comparison_id: String,
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "checkpointId")]
+    pub checkpoint_id: String,
+    pub before: VisualComparisonScreenshotRef,
+    pub after: VisualComparisonScreenshotRef,
+    pub outcome: VisualComparisonOutcome,
+    #[serde(rename = "pixelDiffSummary", skip_serializing_if = "Option::is_none")]
+    pub pixel_diff_summary: Option<VisualComparisonPixelDiffSummary>,
+    #[serde(
+        rename = "changedRegions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub changed_regions: Vec<VisualComparisonChangedRegion>,
+    pub thresholds: Vec<VisualComparisonThreshold>,
+    #[serde(
+        rename = "metadataRefs",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub metadata_refs: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "unsupportedReason", skip_serializing_if = "Option::is_none")]
+    pub unsupported_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonScreenshotRef {
+    #[serde(rename = "screenshotRef", skip_serializing_if = "Option::is_none")]
+    pub screenshot_ref: Option<String>,
+    #[serde(rename = "metadataRef", skip_serializing_if = "Option::is_none")]
+    pub metadata_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<VisualComparisonImageFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(rename = "missingReason", skip_serializing_if = "Option::is_none")]
+    pub missing_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualComparisonImageFormat {
+    Png,
+    Jpeg,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualComparisonOutcome {
+    Unchanged,
+    Changed,
+    MissingScreenshot,
+    MalformedScreenshot,
+    MismatchedDimensions,
+    Unsupported,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonPixelDiffSummary {
+    #[serde(rename = "totalPixels")]
+    pub total_pixels: u64,
+    #[serde(rename = "changedPixels")]
+    pub changed_pixels: u64,
+    #[serde(rename = "changedPercentX1000")]
+    pub changed_percent_x1000: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonChangedRegion {
+    #[serde(rename = "regionId")]
+    pub region_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "changedPixels")]
+    pub changed_pixels: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VisualComparisonThreshold {
+    #[serde(rename = "thresholdId")]
+    pub threshold_id: String,
+    #[serde(rename = "maxChangedPixels")]
+    pub max_changed_pixels: u64,
+    #[serde(rename = "maxChangedPercentX1000")]
+    pub max_changed_percent_x1000: u32,
+}
+
+impl VisualComparisonEvidenceArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: VisualComparisonEvidenceArtifact = serde_json::from_str(input)
+            .context("failed to parse Visual Comparison Evidence JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "visual comparison evidence schemaVersion must be {VISUAL_COMPARISON_EVIDENCE_SCHEMA_VERSION}"
+            ));
+        }
+        validate_path_component("visual comparison comparisonId", &self.comparison_id)?;
+        validate_path_component("visual comparison runId", &self.run_id)?;
+        validate_path_component("visual comparison scenarioId", &self.scenario_id)?;
+        validate_path_component("visual comparison checkpointId", &self.checkpoint_id)?;
+        self.before.validate("visual comparison before")?;
+        self.after.validate("visual comparison after")?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("visual comparison evidenceRefs must not be empty"));
+        }
+        for reference in &self.evidence_refs {
+            validate_evidence_artifact_path(reference)?;
+        }
+        for reference in &self.metadata_refs {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.ends_with(".json") {
+                return Err(anyhow!(
+                    "visual comparison metadataRefs must be JSON evidence"
+                ));
+            }
+        }
+        if self.thresholds.is_empty()
+            && !matches!(
+                self.outcome,
+                VisualComparisonOutcome::MissingScreenshot
+                    | VisualComparisonOutcome::Unsupported
+                    | VisualComparisonOutcome::Blocked
+            )
+        {
+            return Err(anyhow!(
+                "visual comparison thresholds are required for comparable outcomes"
+            ));
+        }
+        let mut threshold_ids = BTreeSet::new();
+        for threshold in &self.thresholds {
+            threshold.validate()?;
+            if !threshold_ids.insert(threshold.threshold_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual comparison thresholdId: {}",
+                    threshold.threshold_id
+                ));
+            }
+        }
+        if self.changed_regions.len() > MAX_VISUAL_COMPARISON_CHANGED_REGIONS {
+            return Err(anyhow!(
+                "visual comparison changedRegions exceeds limit of {MAX_VISUAL_COMPARISON_CHANGED_REGIONS}"
+            ));
+        }
+        let mut region_ids = BTreeSet::new();
+        for region in &self.changed_regions {
+            region.validate()?;
+            if !region_ids.insert(region.region_id.as_str()) {
+                return Err(anyhow!(
+                    "duplicate visual comparison changed regionId: {}",
+                    region.region_id
+                ));
+            }
+        }
+        if let Some(summary) = &self.pixel_diff_summary {
+            summary.validate()?;
+        }
+        for reason in &self.blocked_reasons {
+            require_bounded_display_text("visual comparison blockedReasons", reason)?;
+        }
+        if let Some(reason) = &self.unsupported_reason {
+            require_bounded_display_text("visual comparison unsupportedReason", reason)?;
+        }
+        for guardrail in &self.guardrails {
+            require_bounded_display_text("visual comparison guardrail", guardrail)?;
+        }
+        self.validate_outcome_consistency()
+    }
+
+    fn validate_threshold_result(&self) -> Result<()> {
+        let Some(summary) = &self.pixel_diff_summary else {
+            return Ok(());
+        };
+        if self.thresholds.is_empty() {
+            return Ok(());
+        }
+        let threshold_passed = self.thresholds.iter().all(|threshold| {
+            summary.changed_pixels <= threshold.max_changed_pixels
+                && summary.changed_percent_x1000 <= threshold.max_changed_percent_x1000
+        });
+        match self.outcome {
+            VisualComparisonOutcome::Unchanged if !threshold_passed => Err(anyhow!(
+                "visual comparison unchanged outcome exceeds configured thresholds"
+            )),
+            VisualComparisonOutcome::Changed if threshold_passed => Err(anyhow!(
+                "visual comparison changed outcome must exceed at least one configured threshold"
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_outcome_consistency(&self) -> Result<()> {
+        match self.outcome {
+            VisualComparisonOutcome::Unchanged => {
+                let summary = self.pixel_diff_summary.as_ref().ok_or_else(|| {
+                    anyhow!("visual comparison unchanged outcome requires pixelDiffSummary")
+                })?;
+                if summary.changed_pixels != 0 || !self.changed_regions.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison unchanged outcome must not include changed pixels or regions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Changed => {
+                let summary = self.pixel_diff_summary.as_ref().ok_or_else(|| {
+                    anyhow!("visual comparison changed outcome requires pixelDiffSummary")
+                })?;
+                if summary.changed_pixels == 0 || self.changed_regions.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison changed outcome requires changed pixels and changedRegions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MissingScreenshot => {
+                if !self.before.is_missing() && !self.after.is_missing() {
+                    return Err(anyhow!(
+                        "visual comparison missing_screenshot outcome requires a missing screenshot ref"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MismatchedDimensions => {
+                if self.before.dimensions() == self.after.dimensions() {
+                    return Err(anyhow!(
+                        "visual comparison mismatched_dimensions outcome requires differing dimensions"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Unsupported => {
+                if self.unsupported_reason.is_none() {
+                    return Err(anyhow!(
+                        "visual comparison unsupported outcome requires unsupportedReason"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "visual comparison blocked outcome requires blockedReasons"
+                    ));
+                }
+            }
+            VisualComparisonOutcome::MalformedScreenshot => {}
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_visual_comparison_evidence_refs(
+    run_dir: impl AsRef<Path>,
+    comparison: &VisualComparisonEvidenceArtifact,
+) -> Result<()> {
+    let run_dir = run_dir.as_ref();
+    comparison.validate()?;
+    comparison.validate_threshold_result()?;
+    let index = read_evidence_index(run_dir)?;
+    let indexed_paths = index
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut references = Vec::new();
+    references.extend(comparison.evidence_refs.iter().map(String::as_str));
+    references.extend(comparison.metadata_refs.iter().map(String::as_str));
+    references.extend(comparison.before.screenshot_ref.as_deref());
+    references.extend(comparison.after.screenshot_ref.as_deref());
+    references.extend(comparison.before.metadata_ref.as_deref());
+    references.extend(comparison.after.metadata_ref.as_deref());
+    references.sort();
+    references.dedup();
+    for reference in references {
+        if !indexed_paths.contains(reference) {
+            return Err(anyhow!(
+                "visual comparison reference is missing from evidence index: {reference}"
+            ));
+        }
+        validate_visual_comparison_indexed_reference(run_dir, comparison, reference)?;
+    }
+    Ok(())
+}
+
+fn validate_visual_comparison_indexed_reference(
+    run_dir: &Path,
+    comparison: &VisualComparisonEvidenceArtifact,
+    reference: &str,
+) -> Result<()> {
+    if reference.ends_with(".json") {
+        let value = read_json_value(run_dir.join(reference)).with_context(|| {
+            format!("visual comparison metadata reference is unreadable: {reference}")
+        })?;
+        validate_visual_comparison_reference_freshness(comparison, reference, &value)?;
+        if Some(reference) == comparison.before.metadata_ref.as_deref() {
+            comparison.before.validate_metadata_dimensions(
+                "visual comparison before",
+                reference,
+                &value,
+            )?;
+        }
+        if Some(reference) == comparison.after.metadata_ref.as_deref() {
+            comparison.after.validate_metadata_dimensions(
+                "visual comparison after",
+                reference,
+                &value,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_visual_comparison_reference_freshness(
+    comparison: &VisualComparisonEvidenceArtifact,
+    reference: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    if let Some(run_id) = json_string(value, "runId").or_else(|| json_string(value, "run_id")) {
+        if run_id != comparison.run_id {
+            return Err(anyhow!(
+                "visual comparison reference is stale for runId {run_id}; expected {} at {reference}",
+                comparison.run_id
+            ));
+        }
+    }
+    if let Some(scenario_id) =
+        json_string(value, "scenarioId").or_else(|| json_string(value, "scenario_id"))
+    {
+        if scenario_id != comparison.scenario_id {
+            return Err(anyhow!(
+                "visual comparison reference scenarioId drift at {reference}: {scenario_id} != {}",
+                comparison.scenario_id
+            ));
+        }
+    }
+    if let Some(checkpoint_id) =
+        json_string(value, "checkpointId").or_else(|| json_string(value, "checkpoint_id"))
+    {
+        if checkpoint_id != comparison.checkpoint_id {
+            return Err(anyhow!(
+                "visual comparison reference checkpointId drift at {reference}: {checkpoint_id} != {}",
+                comparison.checkpoint_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+impl VisualComparisonScreenshotRef {
+    fn validate(&self, field: &str) -> Result<()> {
+        match (&self.screenshot_ref, &self.missing_reason) {
+            (Some(reference), None) => {
+                validate_evidence_artifact_path(reference)?;
+                if !(reference.ends_with(".png")
+                    || reference.ends_with(".jpg")
+                    || reference.ends_with(".jpeg"))
+                {
+                    return Err(anyhow!(
+                        "{field}.screenshotRef must be PNG or JPEG evidence"
+                    ));
+                }
+                if self.format.is_none() || self.width.is_none() || self.height.is_none() {
+                    return Err(anyhow!(
+                        "{field} present screenshot requires format, width, and height"
+                    ));
+                }
+                let (width, height) = self.dimensions().unwrap_or_default();
+                if width == 0
+                    || height == 0
+                    || width > MAX_VISUAL_COMPARISON_DIMENSION
+                    || height > MAX_VISUAL_COMPARISON_DIMENSION
+                {
+                    return Err(anyhow!(
+                        "{field} dimensions must be between 1 and {MAX_VISUAL_COMPARISON_DIMENSION}"
+                    ));
+                }
+            }
+            (None, Some(reason)) => {
+                require_bounded_display_text(&format!("{field}.missingReason"), reason)?;
+            }
+            (Some(_), Some(_)) => {
+                return Err(anyhow!(
+                    "{field} must not include missingReason when screenshotRef is present"
+                ));
+            }
+            (None, None) => {
+                return Err(anyhow!("{field} requires screenshotRef or missingReason"));
+            }
+        }
+        if let Some(reference) = &self.metadata_ref {
+            validate_evidence_artifact_path(reference)?;
+            if !reference.ends_with(".json") {
+                return Err(anyhow!("{field}.metadataRef must be JSON evidence"));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_metadata_dimensions(
+        &self,
+        field: &str,
+        reference: &str,
+        value: &serde_json::Value,
+    ) -> Result<()> {
+        let width = value
+            .get("width")
+            .or_else(|| value.get("imageWidth"))
+            .or_else(|| value.get("image_width"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        let height = value
+            .get("height")
+            .or_else(|| value.get("imageHeight"))
+            .or_else(|| value.get("image_height"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        if let Some((expected_width, expected_height)) = self.dimensions() {
+            if width != Some(expected_width) || height != Some(expected_height) {
+                return Err(anyhow!(
+                    "{field}.metadataRef dimensions are stale at {reference}"
+                ));
+            }
+        }
+        if let Some(format) = value
+            .get("format")
+            .or_else(|| value.get("imageFormat"))
+            .or_else(|| value.get("image_format"))
+            .and_then(|value| value.as_str())
+        {
+            let expected = match self.format {
+                Some(VisualComparisonImageFormat::Png) => "png",
+                Some(VisualComparisonImageFormat::Jpeg) => "jpeg",
+                None => format,
+            };
+            let normalized = format.trim().to_ascii_lowercase();
+            if normalized != expected && !(expected == "jpeg" && normalized == "jpg") {
+                return Err(anyhow!(
+                    "{field}.metadataRef format is stale at {reference}: {format} != {expected}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn is_missing(&self) -> bool {
+        self.screenshot_ref.is_none() && self.missing_reason.is_some()
+    }
+
+    pub fn dimensions(&self) -> Option<(u32, u32)> {
+        Some((self.width?, self.height?))
+    }
+}
+
+impl VisualComparisonPixelDiffSummary {
+    fn validate(&self) -> Result<()> {
+        if self.total_pixels == 0 || self.changed_pixels > self.total_pixels {
+            return Err(anyhow!(
+                "visual comparison pixelDiffSummary changedPixels must be <= totalPixels"
+            ));
+        }
+        if self.changed_percent_x1000 > 100_000 {
+            return Err(anyhow!(
+                "visual comparison pixelDiffSummary changedPercentX1000 must be <= 100000"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualComparisonChangedRegion {
+    fn validate(&self) -> Result<()> {
+        validate_path_component("visual comparison changedRegions.regionId", &self.region_id)?;
+        if self.width == 0 || self.height == 0 || self.changed_pixels == 0 {
+            return Err(anyhow!(
+                "visual comparison changedRegions must have nonzero width, height, and changedPixels"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl VisualComparisonThreshold {
+    fn validate(&self) -> Result<()> {
+        validate_path_component(
+            "visual comparison thresholds.thresholdId",
+            &self.threshold_id,
+        )?;
+        if self.max_changed_percent_x1000 > 100_000 {
+            return Err(anyhow!(
+                "visual comparison thresholds.maxChangedPercentX1000 must be <= 100000"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub fn evaluate_visual_gate(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    failures: &mut Vec<serde_json::Value>,
+    evidence_refs: &mut Vec<String>,
+) -> Result<Vec<VisualGateVerdict>> {
+    let mut verdicts = Vec::new();
+    for artifact in evidence.artifacts.iter().filter(|artifact| {
+        artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("visual_comparison_evidence")
+            && (artifact
+                .metadata
+                .get("declaredAcceptance")
+                .or_else(|| artifact.metadata.get("declared_acceptance"))
+                .and_then(|value| value.as_bool())
+                == Some(true)
+                || artifact
+                    .metadata
+                    .get("gate")
+                    .and_then(|value| value.as_str())
+                    == Some("visual"))
+    }) {
+        let verdict = evaluate_declared_visual_comparison(run_dir, artifact)?;
+        if !matches!(verdict.state, VisualGateState::Pass) {
+            failures.push(json!({
+                "kind": "visual_gate_failed",
+                "scenario_id": verdict.scenario_id,
+                "checkpoint_id": verdict.checkpoint_id,
+                "state": verdict.state,
+                "path": verdict.comparison_ref,
+                "reason": verdict.reason,
+                "changed_pixels": verdict.changed_pixels,
+                "changed_percent_x1000": verdict.changed_percent_x1000,
+                "changed_region_count": verdict.changed_region_count,
+                "threshold_summary": verdict.threshold_summary
+            }));
+        }
+        if !evidence_refs
+            .iter()
+            .any(|reference| reference == &verdict.comparison_ref)
+        {
+            evidence_refs.push(verdict.comparison_ref.clone());
+        }
+        verdicts.push(verdict);
+    }
+    Ok(verdicts)
+}
+
+pub fn evaluate_declared_visual_comparison(
+    run_dir: &Path,
+    artifact: &EvidenceArtifact,
+) -> Result<VisualGateVerdict> {
+    let path = artifact.path.clone();
+    let value = read_json_value(run_dir.join(&path)).with_context(|| {
+        format!(
+            "failed to read declared visual comparison {}",
+            artifact.path
+        )
+    })?;
+    let scenario_id = json_string(&value, "scenarioId")
+        .or_else(|| json_string(&value, "scenario_id"))
+        .unwrap_or_else(|| {
+            artifact
+                .metadata
+                .get("scenarioId")
+                .or_else(|| artifact.metadata.get("scenario_id"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown-scenario")
+                .to_string()
+        });
+    let checkpoint_id = json_string(&value, "checkpointId")
+        .or_else(|| json_string(&value, "checkpoint_id"))
+        .unwrap_or_else(|| {
+            artifact
+                .metadata
+                .get("checkpointId")
+                .or_else(|| artifact.metadata.get("checkpoint_id"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown-checkpoint")
+                .to_string()
+        });
+
+    let comparison = match serde_json::from_value::<VisualComparisonEvidenceArtifact>(value.clone())
+        .context("failed to parse Visual Comparison Evidence JSON")
+        .and_then(|comparison| {
+            comparison.validate()?;
+            Ok(comparison)
+        }) {
+        Ok(comparison) => comparison,
+        Err(error) => {
+            let reason = error.to_string();
+            let state = classify_visual_gate_parse_error(&reason);
+            return Ok(VisualGateVerdictParts {
+                scenario_id,
+                checkpoint_id,
+                state,
+                reason,
+                comparison_ref: path,
+                changed_pixels: None,
+                changed_percent_x1000: None,
+                changed_region_count: 0,
+                threshold_summary: Vec::new(),
+                evidence_refs: Vec::new(),
+            }
+            .into_verdict());
+        }
+    };
+
+    let summary = comparison.pixel_diff_summary.as_ref();
+    let changed_pixels = summary.map(|summary| summary.changed_pixels);
+    let changed_percent_x1000 = summary.map(|summary| summary.changed_percent_x1000);
+    let threshold_summary = comparison
+        .thresholds
+        .iter()
+        .map(|threshold| {
+            format!(
+                "{} <= {} px and {} x1000",
+                threshold.threshold_id,
+                threshold.max_changed_pixels,
+                threshold.max_changed_percent_x1000
+            )
+        })
+        .collect::<Vec<_>>();
+    let evidence_refs = visual_gate_evidence_refs(&comparison);
+    let changed_region_count = comparison.changed_regions.len();
+
+    let (state, reason) = if comparison.before.is_missing() {
+        (
+            VisualGateState::MissingBaseline,
+            format!("baseline screenshot missing for declared visual gate at {path}"),
+        )
+    } else if comparison.after.is_missing() {
+        (
+            VisualGateState::MissingScreenshot,
+            format!("actual screenshot missing for declared visual gate at {path}"),
+        )
+    } else if comparison.thresholds.is_empty() {
+        (
+            VisualGateState::ThresholdNotDeclared,
+            format!("declared visual gate at {path} does not declare a threshold"),
+        )
+    } else if let Err(error) = validate_visual_comparison_evidence_refs(run_dir, &comparison) {
+        let reason = error.to_string();
+        if reason.contains("changed outcome must exceed") {
+            (
+                VisualGateState::Pass,
+                visual_gate_threshold_reason("visual gate passed", &path, &comparison),
+            )
+        } else {
+            let state = if reason.contains("threshold") {
+                VisualGateState::ThresholdNotDeclared
+            } else if reason.contains("format") || reason.contains("PNG") || reason.contains("JPEG")
+            {
+                VisualGateState::UnsupportedFormat
+            } else {
+                VisualGateState::StaleRef
+            };
+            (state, reason)
+        }
+    } else {
+        match comparison.outcome {
+            VisualComparisonOutcome::Unchanged => (
+                VisualGateState::Pass,
+                visual_gate_threshold_reason("visual gate passed", &path, &comparison),
+            ),
+            VisualComparisonOutcome::Changed | VisualComparisonOutcome::MismatchedDimensions => (
+                VisualGateState::Fail,
+                visual_gate_threshold_reason("visual gate failed", &path, &comparison),
+            ),
+            VisualComparisonOutcome::MissingScreenshot => {
+                if comparison.before.is_missing() {
+                    (
+                        VisualGateState::MissingBaseline,
+                        format!("baseline screenshot missing for declared visual gate at {path}"),
+                    )
+                } else {
+                    (
+                        VisualGateState::MissingScreenshot,
+                        format!("actual screenshot missing for declared visual gate at {path}"),
+                    )
+                }
+            }
+            VisualComparisonOutcome::MalformedScreenshot | VisualComparisonOutcome::Unsupported => (
+                VisualGateState::UnsupportedFormat,
+                format!("declared visual gate at {path} has unsupported or malformed screenshot evidence"),
+            ),
+            VisualComparisonOutcome::Blocked => (
+                VisualGateState::Fail,
+                format!("declared visual gate at {path} is blocked: {}", comparison.blocked_reasons.join("; ")),
+            ),
+        }
+    };
+
+    Ok(VisualGateVerdictParts {
+        scenario_id: comparison.scenario_id.clone(),
+        checkpoint_id: comparison.checkpoint_id.clone(),
+        state,
+        reason,
+        comparison_ref: path,
+        changed_pixels,
+        changed_percent_x1000,
+        changed_region_count,
+        threshold_summary,
+        evidence_refs,
+    }
+    .into_verdict())
+}
+
+fn classify_visual_gate_parse_error(reason: &str) -> VisualGateState {
+    if reason.contains("threshold") {
+        VisualGateState::ThresholdNotDeclared
+    } else if reason.contains("screenshot")
+        || reason.contains("PNG")
+        || reason.contains("JPEG")
+        || reason.contains("format")
+        || reason.contains("dimensions")
+    {
+        VisualGateState::UnsupportedFormat
+    } else {
+        VisualGateState::StaleRef
+    }
+}
+
+struct VisualGateVerdictParts {
+    scenario_id: String,
+    checkpoint_id: String,
+    reason: String,
+    state: VisualGateState,
+    comparison_ref: String,
+    changed_pixels: Option<u64>,
+    changed_percent_x1000: Option<u32>,
+    changed_region_count: usize,
+    threshold_summary: Vec<String>,
+    evidence_refs: Vec<String>,
+}
+
+impl VisualGateVerdictParts {
+    fn into_verdict(self) -> VisualGateVerdict {
+        VisualGateVerdict {
+            scenario_id: self.scenario_id,
+            checkpoint_id: self.checkpoint_id,
+            state: self.state,
+            reason: self.reason,
+            output_root: visual_gate_output_root(&self.comparison_ref),
+            comparison_ref: self.comparison_ref,
+            changed_pixels: self.changed_pixels,
+            changed_percent_x1000: self.changed_percent_x1000,
+            changed_region_count: self.changed_region_count,
+            threshold_summary: self.threshold_summary,
+            evidence_refs: self.evidence_refs,
+        }
+    }
+}
+
+fn visual_gate_output_root(path: &str) -> String {
+    let parent = Path::new(path)
+        .parent()
+        .map(|parent| parent.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|| "evidence/visual".to_string());
+    if parent.starts_with("evidence/") {
+        parent
+    } else {
+        "evidence/visual".to_string()
+    }
+}
+
+fn visual_gate_threshold_reason(
+    prefix: &str,
+    path: &str,
+    comparison: &VisualComparisonEvidenceArtifact,
+) -> String {
+    let summary = comparison
+        .pixel_diff_summary
+        .as_ref()
+        .map(|summary| {
+            format!(
+                "{} changed pixels ({} x1000)",
+                summary.changed_pixels, summary.changed_percent_x1000
+            )
+        })
+        .unwrap_or_else(|| "no pixel diff summary".to_string());
+    let threshold = comparison
+        .thresholds
+        .iter()
+        .map(|threshold| {
+            format!(
+                "{} <= {} px/{} x1000",
+                threshold.threshold_id,
+                threshold.max_changed_pixels,
+                threshold.max_changed_percent_x1000
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "{prefix}: {path}; {summary}; {} changed region(s); threshold(s): {threshold}",
+        comparison.changed_regions.len()
+    )
+}
+
+fn visual_gate_evidence_refs(comparison: &VisualComparisonEvidenceArtifact) -> Vec<String> {
+    let mut refs = Vec::new();
+    refs.extend(comparison.evidence_refs.iter().cloned());
+    refs.extend(comparison.metadata_refs.iter().cloned());
+    refs.extend(comparison.before.screenshot_ref.iter().cloned());
+    refs.extend(comparison.after.screenshot_ref.iter().cloned());
+    refs.extend(comparison.before.metadata_ref.iter().cloned());
+    refs.extend(comparison.after.metadata_ref.iter().cloned());
+    refs.sort();
+    refs.dedup();
+    refs
 }
