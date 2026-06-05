@@ -1,6 +1,6 @@
 use ouroforge_core::behavior_runtime::{
-    BehaviorApplyTransactionArtifact, BehaviorArtifact, BehaviorDraftArtifact,
-    BehaviorRuntimeStatus,
+    behavior_apply_transaction_read_model_from_json_str, BehaviorApplyTransactionArtifact,
+    BehaviorArtifact, BehaviorDraftArtifact, BehaviorRuntimeStatus,
 };
 
 fn valid_fixture() -> &'static str {
@@ -840,4 +840,68 @@ fn behavior_apply_transaction_rejects_missing_review_blocker_and_guardrail_drift
         let error = parse_behavior_apply(value).expect_err(expected);
         assert!(format!("{error:?}").contains(expected), "{error:?}");
     }
+}
+
+#[test]
+fn behavior_apply_transaction_read_model_preserves_rollback_rerun_and_evidence_refs() {
+    let read_model =
+        behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("ready"))
+            .expect("ready transaction read model");
+
+    assert_eq!(
+        read_model.schema_version,
+        "ouroforge.behavior-apply-transaction-read-model.v1"
+    );
+    assert_eq!(read_model.transaction_id, "behavior-apply-jump-boost");
+    assert_eq!(read_model.status, "ready_for_trusted_apply");
+    assert!(read_model.trusted_apply_ready);
+    assert!(read_model.target_hash_fresh);
+    assert!(read_model
+        .rollback_ref
+        .ends_with("behavior-apply-jump-boost/rollback.json"));
+    assert!(read_model
+        .rerun_command
+        .contains("behavior apply transaction validate"));
+    assert_eq!(read_model.evidence_ref_count, 1);
+    assert!(read_model
+        .evidence_summary
+        .iter()
+        .any(|summary| summary.starts_with("review:")));
+    assert!(read_model
+        .evidence_summary
+        .iter()
+        .any(|summary| summary.starts_with("rollback:")));
+    assert!(read_model
+        .evidence_summary
+        .iter()
+        .any(|summary| summary.starts_with("rerun:")));
+    assert!(read_model
+        .evidence_summary
+        .iter()
+        .any(|summary| summary.starts_with("scenario-result:")));
+    assert!(read_model.boundary.contains("Read-only"));
+    assert!(read_model
+        .boundary
+        .contains("without writing trusted files"));
+    assert!(read_model.boundary.contains("executing commands"));
+    assert!(read_model.boundary.contains("self-approval"));
+}
+
+#[test]
+fn behavior_apply_transaction_read_model_keeps_blocked_state_visible() {
+    let read_model =
+        behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("stale"))
+            .expect("stale transaction read model");
+
+    assert_eq!(read_model.status, "stale");
+    assert!(!read_model.trusted_apply_ready);
+    assert!(!read_model.target_hash_fresh);
+    assert!(read_model
+        .blocked_reasons
+        .join(" ")
+        .contains("stale target hash"));
+    assert!(read_model
+        .evidence_summary
+        .iter()
+        .any(|summary| summary.starts_with("transaction-output:")));
 }

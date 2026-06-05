@@ -165,6 +165,35 @@ pub struct BehaviorApplyRerunCommand {
     pub allowlist_policy_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyTransactionReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    pub status: String,
+    #[serde(rename = "trustedApplyReady")]
+    pub trusted_apply_ready: bool,
+    #[serde(rename = "targetHashFresh")]
+    pub target_hash_fresh: bool,
+    #[serde(rename = "rollbackRef")]
+    pub rollback_ref: String,
+    #[serde(rename = "rerunCommand")]
+    pub rerun_command: String,
+    #[serde(rename = "evidenceRefCount")]
+    pub evidence_ref_count: usize,
+    #[serde(rename = "evidenceSummary")]
+    pub evidence_summary: Vec<String>,
+    #[serde(rename = "blockedReasons")]
+    pub blocked_reasons: Vec<String>,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum BehaviorApplyTransactionStatus {
@@ -1032,6 +1061,66 @@ impl BehaviorApplyTransactionArtifact {
             }
         }
         Ok(())
+    }
+}
+
+pub fn behavior_apply_transaction_read_model_from_json_str(
+    input: &str,
+) -> Result<BehaviorApplyTransactionReadModel> {
+    let artifact = BehaviorApplyTransactionArtifact::from_json_str(input)?;
+    Ok(behavior_apply_transaction_read_model(&artifact))
+}
+
+pub fn behavior_apply_transaction_read_model(
+    artifact: &BehaviorApplyTransactionArtifact,
+) -> BehaviorApplyTransactionReadModel {
+    let target_hash_fresh =
+        artifact.target_hashes.expected_before_hash == artifact.target_hashes.observed_before_hash;
+    let trusted_apply_ready = artifact.status
+        == BehaviorApplyTransactionStatus::ReadyForTrustedApply
+        && artifact.review_decision.status == BehaviorApplyReviewDecisionStatus::Accepted
+        && artifact.review_decision.reviewer_id != artifact.review_decision.draft_author_id
+        && target_hash_fresh;
+    let mut evidence_summary = vec![
+        format!("review:{}", artifact.review_decision.decision_ref),
+        format!("rollback:{}", artifact.rollback_metadata.rollback_ref),
+        format!(
+            "rerun:{}:{}",
+            artifact.rerun_command.allowlist_policy_id, artifact.rerun_command.command
+        ),
+        format!("transaction-output:{}", artifact.transaction_output_ref),
+    ];
+    evidence_summary.extend(
+        artifact
+            .evidence_refs
+            .iter()
+            .map(|evidence| format!("{}:{}:{}", evidence.kind, evidence.id, evidence.path)),
+    );
+
+    BehaviorApplyTransactionReadModel {
+        schema_version: "ouroforge.behavior-apply-transaction-read-model.v1".to_string(),
+        transaction_id: artifact.transaction_id.clone(),
+        draft_id: artifact.draft_id.clone(),
+        review_decision_id: artifact.review_decision.review_decision_id.clone(),
+        status: behavior_apply_transaction_status_label(artifact.status).to_string(),
+        trusted_apply_ready,
+        target_hash_fresh,
+        rollback_ref: artifact.rollback_metadata.rollback_ref.clone(),
+        rerun_command: artifact.rerun_command.command.clone(),
+        evidence_ref_count: artifact.evidence_refs.len(),
+        evidence_summary,
+        blocked_reasons: artifact.blocked_reasons.clone(),
+        boundary: "Read-only behavior apply transaction read model; records review, target hash, rollback, rerun, generated evidence, and blocker state without writing trusted files, executing commands, granting browser writes, auto-applying, auto-merging, or allowing self-approval.".to_string(),
+    }
+}
+
+fn behavior_apply_transaction_status_label(status: BehaviorApplyTransactionStatus) -> &'static str {
+    match status {
+        BehaviorApplyTransactionStatus::ReadyForTrustedApply => "ready_for_trusted_apply",
+        BehaviorApplyTransactionStatus::MissingReview => "missing_review",
+        BehaviorApplyTransactionStatus::Rejected => "rejected",
+        BehaviorApplyTransactionStatus::Blocked => "blocked",
+        BehaviorApplyTransactionStatus::Stale => "stale",
     }
 }
 
