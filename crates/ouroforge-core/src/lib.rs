@@ -41,6 +41,8 @@ pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,
     validate_evidence_artifact_path, write_evidence_index, EvidenceArtifact, EvidenceIndex,
 };
+pub mod source_apply_evidence_bundle;
+pub use source_apply_evidence_bundle::*;
 pub use ouroforge_ledger::{append_ledger_event, read_ledger_events, write_ledger_created};
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
 
