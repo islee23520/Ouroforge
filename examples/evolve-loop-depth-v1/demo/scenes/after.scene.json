@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1",
+  "id": "evolve-depth-demo-scene",
+  "bounds": {
+    "width": 320,
+    "height": 180
+  },
+  "metadata": {
+    "issue": "#1296",
+    "fixtureScoped": true,
+    "purpose": "Visual gate failure fixture for Evolve Loop Depth v1 demo"
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": {
+        "color": "#5eead4"
+      },
+      "components": {
+        "transform": {
+          "x": 96,
+          "y": 88
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "controllable": true,
+        "status": {
+          "hitPoints": 3,
+          "maxHitPoints": 3
+        },
+        "input": {
+          "scheme": "keyboard",
+          "moveSpeed": 3
+        }
+      },
+      "tags": [
+        "player"
+      ]
+    },
+    {
+      "id": "goal_marker",
+      "sprite": {
+        "color": "#22c55e"
+      },
+      "components": {
+        "transform": {
+          "x": 96,
+          "y": 88
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        }
+      },
+      "tags": [
+        "goal"
+      ]
+    }
+  ]
+}

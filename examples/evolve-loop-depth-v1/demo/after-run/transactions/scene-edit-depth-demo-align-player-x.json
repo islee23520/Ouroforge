@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "ouroforge.scene-edit-transaction.v1",
+  "id": "scene-edit-depth-demo-align-player-x",
+  "scenePath": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+  "edit": {
+    "entityId": "player",
+    "path": "components.transform.x",
+    "value": 96
+  },
+  "beforeSceneHash": {
+    "algorithm": "fnv1a64-canonical-json-v1",
+    "value": "af52306a7d5bdd4e"
+  },
+  "afterSceneHash": {
+    "algorithm": "fnv1a64-canonical-json-v1",
+    "value": "3fe3617ffab2c683"
+  },
+  "validationResult": {
+    "status": "passed",
+    "errors": []
+  },
+  "rollback": {
+    "scenePath": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+    "restoreHash": {
+      "algorithm": "fnv1a64-canonical-json-v1",
+      "value": "af52306a7d5bdd4e"
+    },
+    "strategy": "restore scene file content matching beforeSceneHash"
+  }
+}

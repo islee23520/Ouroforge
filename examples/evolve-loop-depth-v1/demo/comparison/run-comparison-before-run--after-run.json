@@ -1,0 +1,163 @@
+{
+  "before_run_id": "before-run",
+  "after_run_id": "after-run",
+  "classification": "improved",
+  "before": {
+    "run_id": "before-run",
+    "status": "failed",
+    "verdict_status": "failed"
+  },
+  "after": {
+    "run_id": "after-run",
+    "status": "passed",
+    "verdict_status": "passed"
+  },
+  "deltas": {
+    "summary": "visual gate improved from fail to pass; mechanical, runtime, and semantic remained pass"
+  },
+  "fourGate": {
+    "schemaVersion": "run-four-gate-comparison-v1",
+    "gates": [
+      {
+        "gate": "mechanical",
+        "before": "pass",
+        "after": "pass",
+        "transition": "unchanged",
+        "evidenceRefs": [
+          "evidence/scenarios/visual-depth-demo/scenario-result.json"
+        ],
+        "comparability": "comparable",
+        "nonComparableReasons": []
+      },
+      {
+        "gate": "runtime",
+        "before": "pass",
+        "after": "pass",
+        "transition": "unchanged",
+        "evidenceRefs": [
+          "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json"
+        ],
+        "comparability": "comparable",
+        "nonComparableReasons": []
+      },
+      {
+        "gate": "visual",
+        "before": "fail",
+        "after": "pass",
+        "transition": "improved",
+        "evidenceRefs": [
+          "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json"
+        ],
+        "comparability": "comparable",
+        "nonComparableReasons": []
+      },
+      {
+        "gate": "semantic",
+        "before": "pass",
+        "after": "pass",
+        "transition": "unchanged",
+        "evidenceRefs": [
+          "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json"
+        ],
+        "comparability": "comparable",
+        "nonComparableReasons": []
+      }
+    ],
+    "nonComparable": [],
+    "boundary": "Rust/local read-only rerun comparison; reports bounded per-gate deltas and never performs unattended trusted writes, repairs, integrations, or maturity claims."
+  },
+  "fourGateDeltas": [
+    {
+      "gate": "mechanical",
+      "transition": "unchanged_pass",
+      "before_status": "pass",
+      "after_status": "pass",
+      "before_declared": true,
+      "after_declared": true,
+      "before_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/scenario-result.json"
+      ],
+      "after_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/scenario-result.json"
+      ],
+      "comparability_state": "comparable",
+      "non_comparable_reasons": []
+    },
+    {
+      "gate": "runtime",
+      "transition": "unchanged_pass",
+      "before_status": "pass",
+      "after_status": "pass",
+      "before_declared": true,
+      "after_declared": true,
+      "before_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json"
+      ],
+      "after_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json"
+      ],
+      "comparability_state": "comparable",
+      "non_comparable_reasons": []
+    },
+    {
+      "gate": "visual",
+      "transition": "fail_to_pass",
+      "before_status": "fail",
+      "after_status": "pass",
+      "before_declared": true,
+      "after_declared": true,
+      "before_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json"
+      ],
+      "after_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json"
+      ],
+      "comparability_state": "comparable",
+      "non_comparable_reasons": []
+    },
+    {
+      "gate": "semantic",
+      "transition": "unchanged_pass",
+      "before_status": "pass",
+      "after_status": "pass",
+      "before_declared": true,
+      "after_declared": true,
+      "before_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json"
+      ],
+      "after_evidence_refs": [
+        "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json"
+      ],
+      "comparability_state": "comparable",
+      "non_comparable_reasons": []
+    }
+  ],
+  "comparability": {
+    "state": "comparable",
+    "reasons": []
+  },
+  "semantic": {
+    "schemaVersion": "run-semantic-diff-v1",
+    "reasons": [
+      {
+        "kind": "visual_gate_transition",
+        "severity": "info",
+        "summary": "visual gate transitioned fail_to_pass after scene-only mutation fixture",
+        "evidenceRefs": [
+          "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json"
+        ]
+      }
+    ],
+    "transactionProvenance": {
+      "changed": true,
+      "transactionId": "scene-edit-depth-demo-align-player-x",
+      "transactionArtifactPath": "after-run/transactions/scene-edit-depth-demo-align-player-x.json"
+    }
+  },
+  "evidence_refs": [
+    "before-run/verdict.json",
+    "after-run/verdict.json",
+    "comparison/run-comparison-before-run--after-run.json"
+  ],
+  "unsupported": []
+}

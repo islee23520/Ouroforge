@@ -1,0 +1,10 @@
+{
+  "player": {
+    "x": 96,
+    "health": 3
+  },
+  "goal": {
+    "x": 96
+  },
+  "fixtureScoped": true
+}

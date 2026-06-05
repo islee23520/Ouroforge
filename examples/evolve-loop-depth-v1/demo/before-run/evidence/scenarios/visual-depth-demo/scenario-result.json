@@ -1,0 +1,15 @@
+{
+  "scenario_id": "visual-depth-demo",
+  "status": "passed",
+  "assertions": [
+    {
+      "kind": "fixture",
+      "passed": true,
+      "message": "mechanical scenario completed deterministically"
+    }
+  ],
+  "evidence": {
+    "sceneRef": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+    "playerX": 24
+  }
+}

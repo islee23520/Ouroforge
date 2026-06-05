@@ -1,0 +1,17 @@
+{
+  "id": "visual-depth-demo-comparison",
+  "gate": "visual",
+  "state": "fail",
+  "artifact": "visual_comparison_evidence",
+  "scenarioId": "visual-depth-demo",
+  "checkpointId": "player-goal-alignment",
+  "changedPixels": 1,
+  "changedPercentX1000": 1000,
+  "changedRegionCount": 1,
+  "thresholdSummary": [
+    "demo-alignment-threshold <= 0 px and 0 x1000"
+  ],
+  "baselineRef": "evidence/scenarios/visual-depth-demo/visual/baseline.png",
+  "actualRef": "evidence/scenarios/visual-depth-demo/visual/actual.png",
+  "reason": "player x position is misaligned with the expected goal marker"
+}

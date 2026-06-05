@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "mutation-backlog-v1",
+  "items": [
+    {
+      "id": "backlog-visual-depth-demo",
+      "classificationId": "classification-visual-depth-demo",
+      "category": "visual_mismatch",
+      "severity": "medium",
+      "boundedMutationType": "scene",
+      "evidenceRefs": [
+        "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json"
+      ],
+      "status": "ready_for_manual_review"
+    }
+  ]
+}

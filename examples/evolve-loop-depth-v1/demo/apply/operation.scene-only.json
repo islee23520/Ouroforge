@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "scene-only-mutation-v1",
+  "proposalId": "mutation-depth-demo-align-player-x",
+  "targetScenePath": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+  "edit": {
+    "entityId": "player",
+    "path": "components.transform.x",
+    "value": 96
+  },
+  "expectedBeforeSceneHash": {
+    "algorithm": "fnv1a64-canonical-json-v1",
+    "value": "af52306a7d5bdd4e"
+  },
+  "validationRequired": true
+}

@@ -1,0 +1,97 @@
+{
+  "status": "failed",
+  "summary": "visual gate failed; mechanical, runtime, and semantic gates passed",
+  "failures": [
+    {
+      "kind": "visual_gate_failed",
+      "scenario_id": "visual-depth-demo",
+      "checkpoint_id": "player-goal-alignment",
+      "state": "fail",
+      "path": "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+      "reason": "player x position is misaligned with the expected goal marker",
+      "changed_pixels": 1,
+      "changed_percent_x1000": 1000,
+      "changed_region_count": 1,
+      "threshold_summary": [
+        "demo-alignment-threshold <= 0 px and 0 x1000"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence/scenarios/visual-depth-demo/scenario-result.json",
+    "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json",
+    "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+    "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json"
+  ],
+  "metadata": {
+    "fixture_scope": "examples/evolve-loop-depth-v1/demo/before-run",
+    "network": "none",
+    "live_browser_required": false
+  },
+  "gateCategories": {
+    "mechanical": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "runtime": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "visual": {
+      "declared": true,
+      "status": "fail",
+      "resultCount": 1,
+      "failureCount": 1
+    },
+    "semantic": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    }
+  },
+  "visual": [
+    {
+      "scenarioId": "visual-depth-demo",
+      "checkpointId": "player-goal-alignment",
+      "state": "fail",
+      "reason": "player x position is misaligned with the expected goal marker",
+      "comparisonRef": "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+      "changedPixels": 1,
+      "changedPercentX1000": 1000,
+      "changedRegionCount": 1,
+      "thresholdSummary": [
+        "demo-alignment-threshold <= 0 px and 0 x1000"
+      ],
+      "evidenceRefs": [
+        "evidence/scenarios/visual-depth-demo/visual/baseline.png",
+        "evidence/scenarios/visual-depth-demo/visual/actual.png"
+      ],
+      "outputRoot": "evidence/scenarios/visual-depth-demo/visual"
+    }
+  ],
+  "semantic": [
+    {
+      "scenarioId": "visual-depth-demo",
+      "modelId": "evolve_depth_demo_semantic_pass",
+      "invariantId": "player-health-non-negative",
+      "invariantType": "health_non_negative",
+      "state": "pass",
+      "reason": "player.health remains non-negative in fixture world state",
+      "modelRef": "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json",
+      "worldStateRef": "evidence/scenarios/visual-depth-demo/world-state.json",
+      "targetPath": "player.health",
+      "evidenceRefs": [
+        "evidence/scenarios/visual-depth-demo/world-state.json"
+      ]
+    }
+  ]
+}

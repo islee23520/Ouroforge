@@ -1,0 +1,11 @@
+{
+  "id": "semantic-depth-demo-model",
+  "gate": "semantic",
+  "state": "pass",
+  "artifact": "runtime_invariant_model",
+  "modelId": "evolve_depth_demo_semantic_pass",
+  "invariantId": "player-health-non-negative",
+  "invariantType": "health_non_negative",
+  "reason": "player.health remains non-negative in fixture world state",
+  "worldStateRef": "evidence/scenarios/visual-depth-demo/world-state.json"
+}

@@ -1,0 +1,53 @@
+{
+  "runId": "after-run",
+  "fixtureScoped": true,
+  "refs": [
+    "evidence/scenarios/visual-depth-demo/scenario-result.json",
+    "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json",
+    "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+    "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json",
+    "evidence/scenarios/visual-depth-demo/world-state.json",
+    "evidence/scenarios/visual-depth-demo/visual/baseline.png",
+    "evidence/scenarios/visual-depth-demo/visual/actual.png"
+  ],
+  "artifacts": [
+    {
+      "id": "scenario-result",
+      "contentType": "application/json",
+      "path": "evidence/scenarios/visual-depth-demo/scenario-result.json",
+      "metadata": {
+        "artifact": "scenario_result",
+        "gate": "mechanical"
+      }
+    },
+    {
+      "id": "runtime-pass",
+      "contentType": "application/json",
+      "path": "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json",
+      "metadata": {
+        "artifact": "runtime_probe",
+        "gate": "runtime"
+      }
+    },
+    {
+      "id": "visual-comparison",
+      "contentType": "application/json",
+      "path": "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+      "metadata": {
+        "artifact": "visual_comparison_evidence",
+        "gate": "visual",
+        "declaredAcceptance": true
+      }
+    },
+    {
+      "id": "semantic-model",
+      "contentType": "application/json",
+      "path": "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json",
+      "metadata": {
+        "artifact": "runtime_invariant_model",
+        "gate": "semantic",
+        "declaredAcceptance": true
+      }
+    }
+  ]
+}

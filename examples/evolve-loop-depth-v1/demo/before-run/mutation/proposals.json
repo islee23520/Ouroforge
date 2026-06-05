@@ -1,0 +1,43 @@
+{
+  "proposals": [
+    {
+      "id": "mutation-depth-demo-align-player-x",
+      "reason": "Move player x position to the expected goal marker to address visual alignment evidence.",
+      "evidence_id": "visual-comparison",
+      "target": "scene:evolve-depth-demo-scene",
+      "path": "components.transform.x",
+      "from": "24",
+      "to": "96",
+      "confidence": "high",
+      "status": "proposed",
+      "verdict_status": "failed",
+      "created_at_unix_ms": 1780650000000,
+      "rationale": {
+        "schema_version": "2",
+        "failure_classification": "visual_mismatch",
+        "evidence_artifact_ids": [
+          "visual-comparison"
+        ],
+        "scenario_result_refs": [
+          "evidence/scenarios/visual-depth-demo/scenario-result.json"
+        ],
+        "verdict_refs": [
+          "verdict.json"
+        ],
+        "expected_effect": "Align player visual position with goal marker so the visual gate can transition from fail to pass on rerun.",
+        "confidence": "high",
+        "reasoning_summary": "The proposal is derived from fixture-scoped visual comparison evidence and remains a manual-review scene-only mutation candidate.",
+        "allowed_mutation_type": "scene_only",
+        "failing_gate_category": "visual",
+        "justifying_evidence_ref": "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+        "evidence_state": "linked",
+        "confidence_basis": "visual comparison artifact is present in evidence/index.json and directly reports the failing declared visual gate",
+        "bounded_mutation_type": "scene",
+        "selection_backlog_item_id": "backlog-visual-depth-demo",
+        "selection_source": "mutation/backlog.json",
+        "selection_reason": "visual_mismatch maps to a bounded scene mutation; backlog is read-only selection evidence",
+        "backlog_read_only": true
+      }
+    }
+  ]
+}

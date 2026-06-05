@@ -1,0 +1,13 @@
+{
+  "id": "before-run",
+  "seed": "seeds/evolve-loop-depth-v1-demo.yaml",
+  "status": "completed",
+  "fixtureScoped": true,
+  "network": "none",
+  "liveBrowserRequired": false,
+  "sceneRef": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+  "sceneHash": {
+    "algorithm": "fnv1a64-canonical-json-v1",
+    "value": "af52306a7d5bdd4e"
+  }
+}

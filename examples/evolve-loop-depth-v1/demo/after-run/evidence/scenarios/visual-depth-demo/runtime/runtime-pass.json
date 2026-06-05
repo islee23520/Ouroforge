@@ -1,0 +1,7 @@
+{
+  "id": "runtime-pass",
+  "gate": "runtime",
+  "state": "pass",
+  "artifact": "runtime_probe",
+  "reason": "fixture runtime probe completed without errors"
+}

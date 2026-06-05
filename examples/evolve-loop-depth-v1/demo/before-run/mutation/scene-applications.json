@@ -1,0 +1,29 @@
+{
+  "applications": [
+    {
+      "id": "scene-application-depth-demo-align-player-x",
+      "proposalId": "mutation-depth-demo-align-player-x",
+      "transactionId": "scene-edit-depth-demo-align-player-x",
+      "targetScenePath": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+      "transactionArtifactPath": "../after-run/transactions/scene-edit-depth-demo-align-player-x.json",
+      "beforeSceneHash": {
+        "algorithm": "fnv1a64-canonical-json-v1",
+        "value": "af52306a7d5bdd4e"
+      },
+      "afterSceneHash": {
+        "algorithm": "fnv1a64-canonical-json-v1",
+        "value": "3fe3617ffab2c683"
+      },
+      "rollback": {
+        "scenePath": "examples/evolve-loop-depth-v1/demo/scenes/before.scene.json",
+        "restoreHash": {
+          "algorithm": "fnv1a64-canonical-json-v1",
+          "value": "af52306a7d5bdd4e"
+        },
+        "strategy": "restore scene file content matching beforeSceneHash"
+      },
+      "status": "applied",
+      "createdAtUnixMs": 1780650000001
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+id: evolve-loop-depth-v1-demo
+title: Evolve Loop Depth v1 Demo
+goal: Demonstrate a deterministic visual gate failure, evidence-linked scene-only proposal, manual scene-only apply fixture, and four-gate rerun delta.
+constraints:
+  target: local-fixture
+  fixtureScope: examples/evolve-loop-depth-v1/demo
+  network: none
+  liveBrowserRequired: false
+acceptance:
+  - Visual gate fails before the bounded scene-only mutation.
+  - Proposal cites the failing visual gate and fixture-scoped evidence.
+  - Scene-only apply operation uses the #215 operation shape and manual review boundary.
+  - Four-gate comparison reports visual fail_to_pass with other gates unchanged_pass.
+scenarios:
+  - id: visual-depth-demo
+    description: Player starts misaligned with the goal marker, then the scene-only mutation aligns the player x position.

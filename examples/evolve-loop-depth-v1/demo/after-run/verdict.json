@@ -1,0 +1,82 @@
+{
+  "status": "passed",
+  "summary": "all four declared gates passed after bounded scene-only mutation fixture",
+  "failures": [],
+  "evidence_refs": [
+    "evidence/scenarios/visual-depth-demo/scenario-result.json",
+    "evidence/scenarios/visual-depth-demo/runtime/runtime-pass.json",
+    "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+    "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json"
+  ],
+  "metadata": {
+    "fixture_scope": "examples/evolve-loop-depth-v1/demo/after-run",
+    "network": "none",
+    "live_browser_required": false
+  },
+  "gateCategories": {
+    "mechanical": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "runtime": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "visual": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "semantic": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    }
+  },
+  "visual": [
+    {
+      "scenarioId": "visual-depth-demo",
+      "checkpointId": "player-goal-alignment",
+      "state": "pass",
+      "reason": "player x position is aligned with the expected goal marker",
+      "comparisonRef": "evidence/scenarios/visual-depth-demo/visual/visual-comparison.json",
+      "changedPixels": 0,
+      "changedPercentX1000": 0,
+      "changedRegionCount": 0,
+      "thresholdSummary": [
+        "demo-alignment-threshold <= 0 px and 0 x1000"
+      ],
+      "evidenceRefs": [
+        "evidence/scenarios/visual-depth-demo/visual/baseline.png",
+        "evidence/scenarios/visual-depth-demo/visual/actual.png"
+      ],
+      "outputRoot": "evidence/scenarios/visual-depth-demo/visual"
+    }
+  ],
+  "semantic": [
+    {
+      "scenarioId": "visual-depth-demo",
+      "modelId": "evolve_depth_demo_semantic_pass",
+      "invariantId": "player-health-non-negative",
+      "invariantType": "health_non_negative",
+      "state": "pass",
+      "reason": "player.health remains non-negative in fixture world state",
+      "modelRef": "evidence/scenarios/visual-depth-demo/semantic/runtime-invariant-model.json",
+      "worldStateRef": "evidence/scenarios/visual-depth-demo/world-state.json",
+      "targetPath": "player.health",
+      "evidenceRefs": [
+        "evidence/scenarios/visual-depth-demo/world-state.json"
+      ]
+    }
+  ]
+}
