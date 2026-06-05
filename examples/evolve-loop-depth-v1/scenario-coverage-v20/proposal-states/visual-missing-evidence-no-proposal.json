@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "evolve-depth-proposal-regression-v20",
+  "caseId": "visual-missing-evidence-no-proposal",
+  "failure": {
+    "kind": "visual_gate_failed",
+    "gate": "visual",
+    "ref": "evidence/scenarios/depth-loop/visual/missing-comparison.json"
+  },
+  "rationale": {
+    "failing_gate_category": "visual",
+    "evidence_state": "missing",
+    "confidence": "none",
+    "bounded_mutation_type": "scene",
+    "allowed_mutation_type": "scene_only",
+    "justifying_evidence_ref": "evidence/scenarios/depth-loop/visual/missing-comparison.json",
+    "evidence_artifact_ids": [],
+    "backlog_only": true
+  },
+  "expect": {
+    "proposalCreated": false,
+    "status": "missing-evidence"
+  },
+  "blockedReasons": [],
+  "boundary": "Fixture assertion only; no mutation is applied, accepted, merged, or trusted by this artifact."
+}

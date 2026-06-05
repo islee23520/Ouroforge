@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "evolve-depth-proposal-regression-v20",
+  "caseId": "mechanical-linked-high-confidence-scenario",
+  "failure": {
+    "kind": "scenario_failed",
+    "gate": "mechanical",
+    "ref": "evidence/scenarios/depth-loop/scenario-result.json"
+  },
+  "rationale": {
+    "failing_gate_category": "mechanical",
+    "evidence_state": "linked",
+    "confidence": "high",
+    "bounded_mutation_type": "scenario",
+    "allowed_mutation_type": "scenario_only",
+    "justifying_evidence_ref": "evidence/scenarios/depth-loop/scenario-result.json",
+    "evidence_artifact_ids": [
+      "scenario-result"
+    ],
+    "backlog_only": false
+  },
+  "expect": {
+    "proposalCreated": true,
+    "status": "linked"
+  },
+  "blockedReasons": [],
+  "boundary": "Fixture assertion only; no mutation is applied, accepted, merged, or trusted by this artifact."
+}

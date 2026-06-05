@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "evolve-depth-proposal-regression-v20",
+  "caseId": "semantic-stale-ref-no-proposal",
+  "failure": {
+    "kind": "semantic_gate_failed",
+    "gate": "semantic",
+    "ref": "evidence/scenarios/depth-loop/semantic/stale-model.json"
+  },
+  "rationale": {
+    "failing_gate_category": "semantic",
+    "evidence_state": "stale",
+    "confidence": "none",
+    "bounded_mutation_type": "data",
+    "allowed_mutation_type": "data_only",
+    "justifying_evidence_ref": "evidence/scenarios/depth-loop/semantic/stale-model.json",
+    "evidence_artifact_ids": [
+      "semantic-model-stale"
+    ],
+    "backlog_only": true
+  },
+  "expect": {
+    "proposalCreated": false,
+    "status": "stale-ref"
+  },
+  "blockedReasons": [],
+  "boundary": "Fixture assertion only; no mutation is applied, accepted, merged, or trusted by this artifact."
+}

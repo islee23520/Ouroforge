@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "evolve-depth-rerun-delta-regression-v20",
+  "caseId": "non-comparable-missing-after-verdict",
+  "classification": "not_comparable",
+  "comparability": {
+    "state": "non-comparable",
+    "reason": "missing-after-verdict"
+  },
+  "fourGateDeltas": [],
+  "semantic": {
+    "reasons": [
+      {
+        "summary": "missing-after-verdict"
+      }
+    ]
+  },
+  "boundary": "Fixture-scoped comparison only; no rerun is launched by this artifact."
+}

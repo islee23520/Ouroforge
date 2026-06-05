@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "evolve-v0-golden",
+  "proposalArtifact": {
+    "status": "proposed",
+    "proposal": {
+      "id": "legacy-proposal-v0",
+      "evidence_id": "scenario-result",
+      "mutation_type": "scenario",
+      "summary": "Legacy evolve v0 proposal shape remains readable."
+    }
+  },
+  "comparisonArtifact": {
+    "classification": "unchanged",
+    "status": "passed",
+    "summary": "Legacy evolve v0 comparison omits fourGateDeltas and gateCategories."
+  },
+  "absentFields": [
+    "rationale.failing_gate_category",
+    "rationale.bounded_mutation_type",
+    "fourGateDeltas",
+    "gateCategories"
+  ],
+  "boundary": "Backward-compatibility golden; no migration or trusted write authority is implied."
+}

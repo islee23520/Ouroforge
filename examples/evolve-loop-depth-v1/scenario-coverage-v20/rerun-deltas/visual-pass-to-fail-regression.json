@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "evolve-depth-rerun-delta-regression-v20",
+  "caseId": "visual-pass-to-fail-regression",
+  "classification": "regressed",
+  "comparability": {
+    "state": "comparable"
+  },
+  "fourGateDeltas": [
+    {
+      "gate": "mechanical",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    },
+    {
+      "gate": "runtime",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    },
+    {
+      "gate": "visual",
+      "before_status": "pass",
+      "after_status": "fail",
+      "transition": "pass_to_fail"
+    },
+    {
+      "gate": "semantic",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    }
+  ],
+  "semantic": {
+    "reasons": [
+      {
+        "summary": "unchanged_pass, unchanged_pass, pass_to_fail, unchanged_pass"
+      }
+    ]
+  },
+  "boundary": "Fixture-scoped comparison only; no rerun is launched by this artifact."
+}

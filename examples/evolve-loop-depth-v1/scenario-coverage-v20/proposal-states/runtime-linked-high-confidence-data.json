@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "evolve-depth-proposal-regression-v20",
+  "caseId": "runtime-linked-high-confidence-data",
+  "failure": {
+    "kind": "behavior_assertion_failed",
+    "gate": "runtime",
+    "ref": "evidence/scenarios/depth-loop/runtime/runtime-probe.json"
+  },
+  "rationale": {
+    "failing_gate_category": "runtime",
+    "evidence_state": "linked",
+    "confidence": "high",
+    "bounded_mutation_type": "data",
+    "allowed_mutation_type": "data_only",
+    "justifying_evidence_ref": "evidence/scenarios/depth-loop/runtime/runtime-probe.json",
+    "evidence_artifact_ids": [
+      "runtime-probe"
+    ],
+    "backlog_only": false
+  },
+  "expect": {
+    "proposalCreated": true,
+    "status": "linked"
+  },
+  "blockedReasons": [],
+  "boundary": "Fixture assertion only; no mutation is applied, accepted, merged, or trusted by this artifact."
+}

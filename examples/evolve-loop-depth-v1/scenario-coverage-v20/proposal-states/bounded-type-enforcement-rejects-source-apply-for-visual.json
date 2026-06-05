@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "evolve-depth-proposal-regression-v20",
+  "caseId": "bounded-type-enforcement-rejects-source-apply-for-visual",
+  "failure": {
+    "kind": "visual_gate_failed",
+    "gate": "visual",
+    "ref": "evidence/scenarios/depth-loop/visual/visual-comparison.json"
+  },
+  "rationale": {
+    "failing_gate_category": "visual",
+    "evidence_state": "linked",
+    "confidence": "high",
+    "bounded_mutation_type": "source_patch",
+    "allowed_mutation_type": "scene_only",
+    "justifying_evidence_ref": "evidence/scenarios/depth-loop/visual/visual-comparison.json",
+    "evidence_artifact_ids": [
+      "visual-comparison"
+    ],
+    "backlog_only": true
+  },
+  "expect": {
+    "proposalCreated": false,
+    "status": "blocked-bounded-type"
+  },
+  "blockedReasons": [
+    "visual gate may only produce scene-only bounded mutations in this coverage lane"
+  ],
+  "boundary": "Fixture assertion only; no mutation is applied, accepted, merged, or trusted by this artifact."
+}

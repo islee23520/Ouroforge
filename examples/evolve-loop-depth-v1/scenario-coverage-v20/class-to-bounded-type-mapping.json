@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "evolve-depth-class-mapping-v20",
+  "mappings": [
+    {
+      "failureClass": "scenario_failed",
+      "gate": "mechanical",
+      "boundedMutationType": "scenario",
+      "allowedMutationType": "scenario_only",
+      "backlogOnly": false
+    },
+    {
+      "failureClass": "behavior_assertion_failed",
+      "gate": "runtime",
+      "boundedMutationType": "data",
+      "allowedMutationType": "data_only",
+      "backlogOnly": false
+    },
+    {
+      "failureClass": "visual_gate_failed",
+      "gate": "visual",
+      "boundedMutationType": "scene",
+      "allowedMutationType": "scene_only",
+      "backlogOnly": false
+    },
+    {
+      "failureClass": "semantic_gate_failed",
+      "gate": "semantic",
+      "boundedMutationType": "data",
+      "allowedMutationType": "data_only",
+      "backlogOnly": false
+    },
+    {
+      "failureClass": "unsupported_gate_failure",
+      "gate": "unknown",
+      "boundedMutationType": "none",
+      "allowedMutationType": "backlog_only",
+      "backlogOnly": true
+    },
+    {
+      "failureClass": "unknown_failure",
+      "gate": "unknown",
+      "boundedMutationType": "none",
+      "allowedMutationType": "backlog_only",
+      "backlogOnly": true
+    },
+    {
+      "failureClass": "flaky_evidence",
+      "gate": "unknown",
+      "boundedMutationType": "none",
+      "allowedMutationType": "backlog_only",
+      "backlogOnly": true
+    }
+  ],
+  "boundary": "Unsupported, unknown, and flaky classes are backlog-only and cannot fabricate a bounded mutation proposal."
+}

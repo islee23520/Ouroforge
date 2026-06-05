@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "scenario-coverage-v20-evolve-depth-v1",
+  "issue": 1297,
+  "fixtureScoped": true,
+  "boundary": "Deterministic fixture coverage only; asserts artifact states and shapes, no subjective quality assertions, no timing, no network, no live browser, no auto-fix, no auto-apply, no auto-merge, no trusted browser writes, no reviewer bypass.",
+  "proposalStateRefs": [
+    "proposal-states/visual-linked-high-confidence-scene.json",
+    "proposal-states/semantic-linked-high-confidence-data.json",
+    "proposal-states/runtime-linked-high-confidence-data.json",
+    "proposal-states/mechanical-linked-high-confidence-scenario.json",
+    "proposal-states/visual-missing-evidence-no-proposal.json",
+    "proposal-states/semantic-stale-ref-no-proposal.json",
+    "proposal-states/bounded-type-enforcement-rejects-source-apply-for-visual.json"
+  ],
+  "classMappingRef": "class-to-bounded-type-mapping.json",
+  "rerunDeltaRefs": [
+    "rerun-deltas/visual-fail-to-pass.json",
+    "rerun-deltas/semantic-fail-to-pass.json",
+    "rerun-deltas/visual-pass-to-fail-regression.json",
+    "rerun-deltas/non-comparable-different-scenario.json",
+    "rerun-deltas/non-comparable-missing-after-verdict.json"
+  ],
+  "legacyGoldenRef": "legacy-evolve-v0-proposal-comparison.golden.json",
+  "requiredFourGates": [
+    "mechanical",
+    "runtime",
+    "visual",
+    "semantic"
+  ],
+  "generatedStatePolicy": "Generated runs and artifacts remain ignored unless explicitly fixture-scoped under examples/evolve-loop-depth-v1/scenario-coverage-v20/."
+}

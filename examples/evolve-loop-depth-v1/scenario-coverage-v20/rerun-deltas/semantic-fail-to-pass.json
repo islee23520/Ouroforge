@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "evolve-depth-rerun-delta-regression-v20",
+  "caseId": "semantic-fail-to-pass",
+  "classification": "improved",
+  "comparability": {
+    "state": "comparable"
+  },
+  "fourGateDeltas": [
+    {
+      "gate": "mechanical",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    },
+    {
+      "gate": "runtime",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    },
+    {
+      "gate": "visual",
+      "before_status": "pass",
+      "after_status": "pass",
+      "transition": "unchanged_pass"
+    },
+    {
+      "gate": "semantic",
+      "before_status": "fail",
+      "after_status": "pass",
+      "transition": "fail_to_pass"
+    }
+  ],
+  "semantic": {
+    "reasons": [
+      {
+        "summary": "unchanged_pass, unchanged_pass, unchanged_pass, fail_to_pass"
+      }
+    ]
+  },
+  "boundary": "Fixture-scoped comparison only; no rerun is launched by this artifact."
+}
