@@ -1,7 +1,7 @@
 # Godot-Plus Demo Game v1 Design Pillars
 
 Issue: #779  
-Status: **GPD12.2.2 playable-success contract**. This document chooses the bounded demo genre, mechanics, objective, feel, difficulty ramp, playable success criteria, and implementation boundaries for the Godot-Plus Demonstration Game v1 track. It does not implement gameplay, add assets, run QA, export/package builds, mutate source through Studio, create executable plugins, publish a release, or change #1/#23 governance anchors.
+Status: **GPD12.2.3 capability-mapping contract**. This document chooses the bounded demo genre, mechanics, objective, feel, difficulty ramp, playable success criteria, Godot-plus capability mapping, and implementation boundaries for the Godot-Plus Demonstration Game v1 track. It does not implement gameplay, add assets, run QA, export/package builds, mutate source through Studio, create executable plugins, publish a release, or change #1/#23 governance anchors.
 
 ## Genre choice
 
@@ -89,15 +89,24 @@ The vertical slice is not accepted by screenshots alone, a broad design document
 
 ## Godot-plus capability mapping
 
-| Demo moment | Evidence-native proof point | Boundary |
-| --- | --- | --- |
-| Draft a level or behavior tweak | Generated draft/preview artifact links to source fixture and expected scenario impact | Draft-only; no browser trusted write or auto-apply |
-| QA catches a blocked gate or hazard regression | Scenario result, assertion failure, journal entry, and dashboard read model identify the failure | Deterministic local evidence only; no hosted QA service |
-| Review approves a safe fix | Review decision and source-apply transaction record reviewer, target hashes, and rollback metadata | Explicit review gate; no self-approval or reviewer bypass |
-| Rerun proves improvement | Before/after run comparison links scenario verdicts and evidence refs | Local generated evidence; no public deployment |
-| Studio walkthrough explains the loop | Studio renders source, evidence, draft, review, and comparison surfaces | Read-only/draft-only browser UI; no command bridge |
-| Plugin descriptor appears in demo | Plugin registry/descriptor evidence is displayed as inert metadata | No executable plugin runtime, marketplace, install/update, or dynamic loading |
-| Package verification is recorded | Later local web package smoke proves reproducibility | No native/mobile/console/store export or commercial release claim |
+GPD12.2.3 maps Signal Gate moments to evidence-native workflow proof points. The mapping is a local acceptance contract, not a broad engine comparison or superiority claim. Each row names the future artifact family that must prove the claim before later demo issues can call the moment complete.
+
+| Capability moment | Signal Gate example | Required future evidence | Pass signal | Boundary |
+| --- | --- | --- | --- | --- |
+| Agent creates a bounded draft | Agent proposes a tile, gate, hazard route, or behavior-parameter tweak for the single-screen arena | Generated draft/preview artifact linked to source fixture, expected scenario impact, target hashes, and generated-state policy | Draft is inspectable and reproducible before any trusted write | Draft-only; no browser trusted write, auto-apply, self-approval, or hidden command execution |
+| QA/playtest finds a regression | Scenario catches a blocked gate, missing key flag, hazard contact, stale behavior, or unsafe draft/apply attempt | Scenario result, assertion failure, input replay, runtime probe, journal entry, and dashboard read model | Failure explains the blocker and points at evidence refs, not a screenshot-only note | Deterministic local evidence only; no hosted QA service, credentialed run, or public telemetry |
+| Review gates source mutation | Reviewer accepts a narrowly scoped safe fix after draft and failure evidence exist | Review decision plus source-apply transaction with reviewer identity, target hashes, rollback metadata, and allowed file classes | Independent review precedes trusted apply and rejects self-approval/reviewer bypass | Existing Safe Source Mutation Apply boundary only; no direct Studio writes or auto-merge |
+| Rerun proves improvement | Before/after run shows the key-gate-exit path now passes while the failure case is understood | Rerun comparison, scenario verdicts, journal/dashboard refs, and changed artifact links | Improvement is linked to before/after evidence and remains reproducible locally | Local generated evidence; no public deployment, hosted service, or opaque manual play claim |
+| Studio explains the workflow | Studio walkthrough shows source fixture, scenario evidence, draft, review, apply, comparison, and final state | Read-only/draft-only Studio surfaces with linked evidence refs | User can inspect what happened without granting browser write or command authority | Browser/Studio remains read-only or draft-only; no command bridge, local server bridge, or trusted write path |
+| Plugin metadata participates safely | Demo references an inert plugin/extension descriptor for a read-only panel or scenario template | Plugin registry/descriptor evidence displayed by dashboard/Studio as escaped metadata | Descriptor is visible and validated without executing plugin code | No executable plugin runtime, marketplace, install/update, dynamic loading, remote asset loading, or arbitrary JavaScript |
+| Package verification records reproducibility | Local web bundle smoke/checksum proves the demo can be packaged for local inspection | Export/package verification artifact, checksum/fingerprint, and no-publish evidence | Local package smoke passes and links back to source/run evidence | No native/mobile/console/store export, signing, upload, publishing, deployment, or commercial release claim |
+| Scoped comparison remains honest | Docs summarize what this slice demonstrates versus Godot-like workflows | Comparison matrix with explicit supported/unsupported/local-only rows and issue evidence refs | Claims stay tied to the Signal Gate workflow and name unsupported areas | No full Godot parity, replacement, production readiness, secure sandbox, or broad superiority claim |
+
+### Capability claim wording
+
+Allowed wording for later issues: **"Signal Gate demonstrates a scoped evidence-native agentic workflow for a small local 2D vertical slice."**
+
+Forbidden wording for later issues includes: **"Ouroforge replaces Godot,"** **"full Godot parity,"** **"production-ready editor/engine,"** **"secure plugin sandbox,"** **"commercial release ready,"** or **"autonomous source mutation is safe without review."**
 
 ## Explicit boundaries
 
@@ -115,6 +124,6 @@ This document does **not** authorize:
 - #780 should turn these pillars and playable success criteria into a concise GDD and acceptance criteria.
 - #781 should scaffold the project without expanding the trusted boundary.
 - #782–#787 should implement mechanics, level, behavior, UI, assets, and scenario matrix in small verifiable PR units.
-- #788–#797 should demonstrate QA, agentic iteration, Studio walkthrough, package/export evidence, plugin descriptor usage, comparison matrix, performance budget, docs, regression coverage, and roadmap refresh.
+- #788–#797 should demonstrate QA, agentic iteration, Studio walkthrough, package/export evidence, plugin descriptor usage, scoped comparison matrix, performance budget, docs, regression coverage, and roadmap refresh.
 
 If later implementation finds the loop too large, prefer deleting scope before adding systems. The vertical slice is complete when the evidence-backed workflow is reproducible, not when it resembles a full commercial game or full Godot replacement.
