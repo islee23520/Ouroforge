@@ -877,6 +877,15 @@ run.scene_canvas = {
     { id: 'enemy', name: 'Enemy', x: 160, y: 96, w: 24, h: 24, rotation: 45, authored: false },
   ],
 };
+run.asset_browser = {
+  present: true,
+  assets: [
+    { id: 'textures/player.png', type: 'texture', source_path: 'assets/player.png', output_path: 'build/player.png', hash: 'fnv1a64:aaa', status: 'ready', metadata: [{ descriptor_type: 'texture-metadata', plugin: 'core-textures' }, { descriptor_type: 'executable-hook', plugin: 'evil' }] },
+    { id: 'audio/jump.wav', type: 'audio', source_path: 'assets/jump.wav', output_path: '', hash: 'fnv1a64:bbb', status: 'missing' },
+    { id: 'textures/dup-a.png', type: 'texture', source_path: 'assets/dup.png', output_path: 'build/dup-a.png', hash: 'fnv1a64:dup', status: 'ready' },
+    { id: 'textures/dup-b.png', type: 'texture', source_path: 'assets/dup.png', output_path: 'build/dup-b.png', hash: 'fnv1a64:dup', status: 'ready' },
+  ],
+};
 
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
@@ -1982,6 +1991,18 @@ assert.match(sceneCanvasMarkup, /canvas-node-runtime/);
 assert.match(sceneCanvasMarkup, /Safe Source Apply handoff/);
 assert.doesNotMatch(sceneCanvasMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
 assert.match(dashboard.renderSceneCanvas({}), /No scene canvas inputs/);
+// #764 Asset browser + metadata inspector
+const assetBrowserMarkup = dashboard.renderAssetBrowser(run);
+assert.match(assetBrowserMarkup, /Asset browser/);
+assert.match(assetBrowserMarkup, /textures\/player\.png/);
+assert.match(assetBrowserMarkup, /Missing output artifact/);
+assert.match(assetBrowserMarkup, /Duplicate asset hash/);
+assert.match(assetBrowserMarkup, /texture-metadata/);
+assert.match(assetBrowserMarkup, /not allowlisted/);
+assert.doesNotMatch(assetBrowserMarkup, /<button|<form|onclick|showOpenFilePicker|FileReader|XMLHttpRequest|fetch\(/i);
+assert.strictEqual(typeof dashboard.importAsset, 'undefined');
+assert.strictEqual(typeof dashboard.uploadAsset, 'undefined');
+assert.match(dashboard.renderAssetBrowser({}), /No asset browser inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);

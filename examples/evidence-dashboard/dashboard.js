@@ -2465,6 +2465,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
+      ${renderAssetBrowser(run)}
       ${renderSceneCanvas(run)}
       ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
@@ -3022,7 +3023,55 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  function renderAssetBrowser(run) {
+    const ALLOWED = ['asset-metadata', 'asset_metadata', 'texture-metadata', 'audio-metadata', 'model-metadata', 'generic-metadata'];
+    const source = run?.asset_browser || run?.assetBrowser || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No asset browser inputs are exported for this run.';
+      return `<section class="panel asset-browser"><h3>Asset browser</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only. Studio inspects asset manifests and plugin metadata; the browser does not import, generate, upload, fetch, or mutate assets.</p></section>`;
+    }
+    const pathUnsafe = (value) => {
+      const text = String(value == null ? '' : value);
+      if (!text) return false;
+      return /(^|[\\/])\.\.([\\/]|$)/.test(text) || text.startsWith('/') || /^[A-Za-z]:[\\/]/.test(text) || /[;&|`$<>]/.test(text);
+    };
+    const rawAssets = Array.isArray(source.assets) ? source.assets : [];
+    const hashCounts = {};
+    rawAssets.forEach((asset) => { if (asset?.hash) hashCounts[asset.hash] = (hashCounts[asset.hash] || 0) + 1; });
+    const cards = rawAssets.map((asset, index) => {
+      const id = asset?.id || asset?.asset_id || `asset-${index + 1}`;
+      const sourcePath = asset?.source_path || asset?.sourcePath || 'unknown';
+      const outputPath = asset?.output_path || asset?.outputPath || 'unknown';
+      const status = asset?.status || 'unknown';
+      const warnings = [];
+      if (status === 'missing' || (outputPath === 'unknown' && status !== 'source-only')) warnings.push('Missing output artifact');
+      if (asset?.hash && hashCounts[asset.hash] > 1) warnings.push('Duplicate asset hash');
+      if (pathUnsafe(asset?.source_path || asset?.sourcePath)) warnings.push('Unsafe source path');
+      if (pathUnsafe(asset?.output_path || asset?.outputPath)) warnings.push('Unsafe output path');
+      const metadataRaw = Array.isArray(asset?.metadata) ? asset.metadata : (asset?.metadata ? [asset.metadata] : []);
+      const metaRows = metadataRaw.length
+        ? metadataRaw.map((descriptor) => {
+            const type = String(descriptor?.descriptor_type || descriptor?.descriptorType || descriptor?.type || 'unknown');
+            const allowed = ALLOWED.includes(type);
+            const plugin = descriptor?.plugin || descriptor?.plugin_id || 'unknown';
+            return `<li><span class="${statusClass(allowed ? 'passed' : 'blocked')}">${escapeText(type)}</span> ${escapeText(plugin)}${allowed ? '' : ' — descriptor type not allowlisted'}</li>`;
+          }).join('')
+        : '<li>No metadata descriptors.</li>';
+      const warnRows = warnings.length ? warnings.map((w) => `<li><span class="${statusClass('blocked')}">${escapeText(w)}</span></li>`).join('') : '<li>No diagnostics.</li>';
+      return `<article class="artifact asset-card" data-asset-type="${escapeText(asset?.type || 'unknown')}"><h4>${escapeText(id)}</h4>
+        <div class="run-meta">${escapeText(asset?.type || 'unknown')} · ${escapeText(status)} · hash ${escapeText(asset?.hash || 'unknown')}</div>
+        <div class="run-meta">source ${escapeText(sourcePath)} → output ${escapeText(outputPath)}</div>
+        <ul class="run-meta-list">${warnRows}</ul>
+        <div class="run-meta">Plugin metadata (read-only):</div><ul class="run-meta-list">${metaRows}</ul>
+      </article>`;
+    }).join('') || '<div class="run-meta">No assets recorded.</div>';
+    return `<section class="panel asset-browser"><h3>Asset browser</h3>
+      <p class="run-meta">Read-only inspection of asset manifests and plugin-provided metadata. The browser does not import, generate, upload, fetch remote assets, write manifests, run commands, or apply edits.</p>
+      ${cards}
+    </section>`;
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -4566,7 +4566,7 @@ const OuroforgeCockpit = (() => {
 
   function renderEvidencePane(run) {
 
-    return `${renderStudioDiagnosticsSurface(run)}${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderPrototypePlanningInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderStudioDraftOperationModelSurface(run)}${renderStudioSourceApplyHandoffSurface(run)}${renderEntityComponentInspectorSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderStudioDiagnosticsSurface(run)}${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderPrototypePlanningInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderStudioDraftOperationModelSurface(run)}${renderStudioSourceApplyHandoffSurface(run)}${renderEntityComponentInspectorSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderStudioAssetBrowserSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -4971,7 +4971,122 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  const ASSET_BROWSER_ALLOWED_DESCRIPTOR_TYPES = ['asset-metadata', 'asset_metadata', 'texture-metadata', 'audio-metadata', 'model-metadata', 'generic-metadata'];
+
+  function assetBrowserPathUnsafe(value) {
+    const text = String(value == null ? '' : value);
+    if (!text) return false;
+    return /(^|[\\/])\.\.([\\/]|$)/.test(text) || text.startsWith('/') || /^[A-Za-z]:[\\/]/.test(text) || /[;&|`$<>]/.test(text);
+  }
+
+  function studioAssetBrowserModel(run) {
+    const source = run?.asset_browser || run?.assetBrowser || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      return {
+        present: false,
+        empty_state: source?.empty_state || source?.emptyState || 'No asset browser read model is available for this run.',
+        boundary: 'Read-only asset manifest and plugin metadata inspection; Studio does not import, generate, upload, fetch, or mutate assets.',
+        assets: [],
+        types: [],
+      };
+    }
+    const rawAssets = Array.isArray(source.assets) ? source.assets : [];
+    const hashCounts = {};
+    const idCounts = {};
+    rawAssets.forEach((asset) => {
+      const hash = asset?.hash;
+      if (hash) hashCounts[hash] = (hashCounts[hash] || 0) + 1;
+      const id = asset?.id || asset?.asset_id;
+      if (id) idCounts[id] = (idCounts[id] || 0) + 1;
+    });
+    const assets = rawAssets.map((asset, index) => {
+      const id = asset?.id || asset?.asset_id || `asset-${index + 1}`;
+      const sourcePath = asset?.source_path || asset?.sourcePath || '';
+      const outputPath = asset?.output_path || asset?.outputPath || '';
+      const status = asset?.status || 'unknown';
+      const warnings = [];
+      if (status === 'missing' || (!outputPath && status !== 'source-only')) warnings.push('Missing output artifact');
+      if (asset?.hash && hashCounts[asset.hash] > 1) warnings.push('Duplicate asset hash');
+      if (idCounts[id] > 1) warnings.push('Duplicate asset id');
+      if (assetBrowserPathUnsafe(sourcePath)) warnings.push('Unsafe source path');
+      if (assetBrowserPathUnsafe(outputPath)) warnings.push('Unsafe output path');
+      const metadataRaw = Array.isArray(asset?.metadata) ? asset.metadata : (asset?.metadata ? [asset.metadata] : []);
+      const metadata = metadataRaw.map((descriptor) => {
+        const type = descriptor?.descriptor_type || descriptor?.descriptorType || descriptor?.type || 'unknown';
+        const allowed = ASSET_BROWSER_ALLOWED_DESCRIPTOR_TYPES.includes(String(type));
+        return {
+          type: String(type),
+          allowed,
+          plugin: descriptor?.plugin || descriptor?.plugin_id || descriptor?.pluginId || 'unknown',
+          fields: descriptor && typeof descriptor.fields === 'object' && !Array.isArray(descriptor.fields) ? descriptor.fields : {},
+          blockedReason: allowed ? '' : `Descriptor type "${type}" is not allowlisted for read-only rendering.`,
+        };
+      });
+      return {
+        id,
+        type: asset?.type || 'unknown',
+        sourcePath: sourcePath || 'unknown',
+        outputPath: outputPath || 'unknown',
+        hash: asset?.hash || 'unknown',
+        size: typeof asset?.size === 'number' ? asset.size : null,
+        status,
+        warnings,
+        metadata,
+      };
+    });
+    const types = Array.from(new Set(assets.map((asset) => asset.type))).sort();
+    return {
+      present: true,
+      empty_state: source.empty_state || source.emptyState || 'No asset browser read model is available for this run.',
+      boundary: source.boundary || 'Read-only asset manifest and plugin metadata inspection; Studio does not import, generate, upload, fetch, or mutate assets.',
+      assets,
+      types,
+    };
+  }
+
+  function filterStudioAssets(assets, options) {
+    const list = Array.isArray(assets) ? assets : [];
+    const type = options && options.type ? String(options.type) : '';
+    const query = options && options.query ? String(options.query).trim().toLowerCase() : '';
+    return list.filter((asset) => {
+      if (type && type !== 'all' && String(asset.type) !== type) return false;
+      if (query && !`${asset.id} ${asset.type} ${asset.sourcePath} ${asset.outputPath}`.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }
+
+  function renderStudioAssetBrowserSurface(run) {
+    const model = studioAssetBrowserModel(run);
+    if (!model.present) {
+      return `<section id="studio-asset-browser" class="panel"><h2>Asset browser</h2><p class="empty">${escapeText(model.empty_state)}</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const cards = model.assets.map((asset) => {
+      const metaRows = asset.metadata.length
+        ? asset.metadata.map((descriptor) => {
+            if (!descriptor.allowed) return `<li>${surfaceState(false, escapeText(descriptor.blockedReason))}</li>`;
+            const fieldText = Object.entries(descriptor.fields).map(([key, value]) => `${escapeText(key)}: ${escapeText(typeof value === 'object' ? JSON.stringify(value) : String(value))}`).join(' · ');
+            return `<li>${surfaceState(true, escapeText(`${descriptor.type} (${descriptor.plugin})`))}<br><small>${fieldText || 'no fields'}</small></li>`;
+          }).join('')
+        : '<li>No metadata descriptors.</li>';
+      const warnRows = asset.warnings.length
+        ? `<ul class="asset-warnings">${asset.warnings.map((warning) => `<li>${surfaceState(false, escapeText(warning))}</li>`).join('')}</ul>`
+        : '<p class="hint">No diagnostics.</p>';
+      return `<article class="surface-row asset-card" data-asset-type="${escapeText(asset.type)}"><strong>${escapeText(asset.id)}</strong> <small>${escapeText(asset.type)} · ${escapeText(asset.status)}</small>
+        <br><small>source ${escapeText(asset.sourcePath)} → output ${escapeText(asset.outputPath)}</small>
+        <br><small>hash ${escapeText(asset.hash)}${asset.size != null ? ` · ${escapeText(String(asset.size))} bytes` : ''}</small>
+        ${warnRows}
+        <h4>Plugin metadata (read-only)</h4><ul>${metaRows}</ul>
+      </article>`;
+    }).join('') || '<p class="empty compact">No assets recorded.</p>';
+    const filterNote = model.types.length ? `Types: ${model.types.join(', ')}. Use filterStudioAssets({ type, query }) for read-only filtering/search.` : 'No asset types recorded.';
+    return `<section id="studio-asset-browser" class="panel"><h2>Asset browser</h2>
+      <p class="hint">${escapeText(model.boundary)} This surface inspects asset manifests and plugin-provided metadata read-only. It does not import, generate, upload, fetch remote assets, write manifests, run commands, or apply edits.</p>
+      <p class="hint">${escapeText(filterNote)}</p>
+      ${cards}
+    </section>`;
+  }
+
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioAssetBrowserModel, renderStudioAssetBrowserSurface, filterStudioAssets, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

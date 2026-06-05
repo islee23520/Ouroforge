@@ -1001,6 +1001,23 @@ run.scene_canvas = {
     { id: 'enemy', name: 'Enemy', x: 160, y: 96, w: 24, h: 24, rotation: 45, scaleX: 2, scaleY: 1, authored: false },
   ],
 };
+run.asset_browser = {
+  present: true,
+  assets: [
+    {
+      id: 'textures/player.png', type: 'texture', source_path: 'assets/player.png', output_path: 'build/textures/player.png',
+      hash: 'fnv1a64:aaa', size: 2048, status: 'ready',
+      metadata: [
+        { descriptor_type: 'texture-metadata', plugin: 'core-textures', fields: { width: 64, height: 64, format: 'png' } },
+        { descriptor_type: 'executable-hook', plugin: 'evil-plugin', fields: {} },
+      ],
+    },
+    { id: 'audio/jump.wav', type: 'audio', source_path: 'assets/jump.wav', output_path: '', hash: 'fnv1a64:bbb', size: 512, status: 'missing' },
+    { id: 'textures/dup-a.png', type: 'texture', source_path: 'assets/dup.png', output_path: 'build/dup-a.png', hash: 'fnv1a64:dup', status: 'ready' },
+    { id: 'textures/dup-b.png', type: 'texture', source_path: 'assets/dup.png', output_path: 'build/dup-b.png', hash: 'fnv1a64:dup', status: 'ready' },
+    { id: 'bad/path.png', type: 'texture', source_path: '../../etc/passwd', output_path: 'build/bad.png', hash: 'fnv1a64:ccc', status: 'ready' },
+  ],
+};
 
 run.route_attempts = {
   present: true,
@@ -2654,6 +2671,33 @@ assert.strictEqual(badTransform.proposedOperations.length, 0);
 const traversalTransform = cockpit.studioCanvasTransformDraft({ id: 'player', path: '../../etc/passwd' }, { rotation: 1 });
 assert.strictEqual(traversalTransform.validationStatus, 'blocked');
 assert.ok(traversalTransform.blockedReasons.some((r) => /allowlisted in-project source path/.test(r)));
+// #764 Asset browser + metadata inspector
+const assetBrowserModel = cockpit.studioAssetBrowserModel(run);
+assert.strictEqual(assetBrowserModel.present, true);
+assert.strictEqual(assetBrowserModel.assets.length, 5);
+assert.ok(assetBrowserModel.assets.find((a) => a.id === 'audio/jump.wav').warnings.includes('Missing output artifact'));
+assert.ok(assetBrowserModel.assets.find((a) => a.id === 'textures/dup-a.png').warnings.includes('Duplicate asset hash'));
+assert.ok(assetBrowserModel.assets.find((a) => a.id === 'bad/path.png').warnings.includes('Unsafe source path'));
+const playerAsset = assetBrowserModel.assets.find((a) => a.id === 'textures/player.png');
+assert.strictEqual(playerAsset.metadata.find((m) => m.type === 'texture-metadata').allowed, true);
+assert.strictEqual(playerAsset.metadata.find((m) => m.type === 'executable-hook').allowed, false);
+// Read-only filtering/search
+assert.strictEqual(cockpit.filterStudioAssets(assetBrowserModel.assets, { type: 'audio' }).length, 1);
+assert.strictEqual(cockpit.filterStudioAssets(assetBrowserModel.assets, { query: 'dup' }).length, 2);
+const assetBrowserMarkup = cockpit.renderStudioAssetBrowserSurface(run);
+assert.match(assetBrowserMarkup, /Asset browser/);
+assert.match(assetBrowserMarkup, /textures\/player\.png/);
+assert.match(assetBrowserMarkup, /Missing output artifact/);
+assert.match(assetBrowserMarkup, /Duplicate asset hash/);
+assert.match(assetBrowserMarkup, /Unsafe source path/);
+assert.match(assetBrowserMarkup, /texture-metadata/);
+assert.match(assetBrowserMarkup, /not allowlisted/);
+// No import/generation/upload controls or capability
+assert.doesNotMatch(assetBrowserMarkup, /<button|<form|onclick|localStorage|fetch\(|showOpenFilePicker|FileReader|XMLHttpRequest/i);
+assert.strictEqual(typeof cockpit.importAsset, 'undefined');
+assert.strictEqual(typeof cockpit.uploadAsset, 'undefined');
+assert.strictEqual(typeof cockpit.generateAsset, 'undefined');
+assert.match(cockpit.renderStudioAssetBrowserSurface({}), /No asset browser read model/);
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);
