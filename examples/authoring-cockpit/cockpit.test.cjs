@@ -2206,6 +2206,13 @@ const mutationStaleCockpit = mutationArtifactDiagCockpit.diagnostics.find((d) =>
 assert.ok(mutationStaleCockpit, 'diagnostics must detect stale source-patch target guards from mutation_artifacts');
 assert.match(mutationStaleCockpit.summary, /stale_source_apply_target/);
 
+// A guard reporting the canonical `blocked` status (trusted-apply readiness not satisfied)
+// must still surface a stale-source-apply-target diagnostic, not be silently dropped.
+const blockedGuardRunCockpit = { mutation_artifacts: [{ id: 'source-patch-stale-target-guard', path: 'mutation/source-patch-stale-target-guard.json', value: { guardId: 'stale-guard-blocked', status: 'blocked', blockedReasons: ['trusted-apply readiness not satisfied'] } }] };
+const blockedGuardDiagCockpit = cockpit.studioDiagnosticsModel(blockedGuardRunCockpit).diagnostics.find((d) => d.kind === 'stale-source-apply-target');
+assert.ok(blockedGuardDiagCockpit, 'a blocked source-patch stale-target guard must still produce a stale-source-apply-target diagnostic');
+assert.match(blockedGuardDiagCockpit.summary, /blocked/);
+
 const diagSurfaceCockpit = cockpit.renderStudioDiagnosticsSurface(diagRichCockpitRun);
 assert.match(diagSurfaceCockpit, /Studio diagnostics/);
 assert.match(diagSurfaceCockpit, /blocked-operation/);

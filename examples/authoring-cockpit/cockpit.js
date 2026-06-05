@@ -4108,9 +4108,12 @@ const OuroforgeCockpit = (() => {
         list.forEach((guard) => {
           if (!guard || typeof guard !== 'object') return;
           const candidates = diagnosticObjectCandidates(guard);
-          const status = diagnosticStatuses(candidates).find(staleDiagnosticStatus);
+          const statuses = diagnosticStatuses(candidates);
+          const staleStatus = statuses.find(staleDiagnosticStatus);
+          const status = staleStatus || statuses.find(blockedDiagnosticStatus);
           if (status) {
-            record('stale-source-apply-target', 'warning', `Source-apply target is stale (${status}); apply must be re-validated against the current base before trusting it.`, 'stale-target-guard');
+            const descriptor = staleStatus ? 'stale' : 'blocked';
+            record('stale-source-apply-target', 'warning', `Source-apply target is ${descriptor} (${status}); apply must be re-validated against the current base before trusting it.`, 'stale-target-guard');
           }
         });
       });
