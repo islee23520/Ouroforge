@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "gdd-scenario-acceptance-plan-v1",
+  "planId": "gdd-scenario-collect-exit-ready",
+  "status": "ready",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.valid.fixture.json",
+  "requirementIds": [
+    "req:collect-key",
+    "req:reach-exit"
+  ],
+  "mechanicsMappingIds": [
+    "map:collect",
+    "map:exit"
+  ],
+  "scenarioDrafts": [
+    {
+      "acceptanceId": "accept:collect-key-before-exit",
+      "requirementId": "req:collect-key",
+      "mechanicsMappingId": "map:collect",
+      "scenarioId": "scenario:collect-key-smoke",
+      "scenarioRef": "examples/gdd-scenario-acceptance-plan-v1/drafts/collect-key.scenario-draft.json",
+      "requiredSetup": [
+        "collect-and-exit fixture world is loaded",
+        "key and exit entities are present"
+      ],
+      "steps": [
+        {
+          "stepId": "start-near-key",
+          "actionKind": "execute-script",
+          "description": "Place the player near the key in the fixture scenario draft."
+        },
+        {
+          "stepId": "move-to-key",
+          "actionKind": "input",
+          "description": "Move right until the player overlaps the key."
+        },
+        {
+          "stepId": "observe-key-flag",
+          "actionKind": "assertion-note",
+          "description": "Record expected key_collected flag evidence as a draft expectation."
+        }
+      ],
+      "expectedOutcomes": [
+        {
+          "outcomeId": "flag-key-collected",
+          "kind": "flag",
+          "value": "key_collected",
+          "expectation": "Key collection flag should appear in run evidence."
+        },
+        {
+          "outcomeId": "event-key-picked",
+          "kind": "event",
+          "value": "key_picked_up",
+          "expectation": "Key pickup event should be visible in scenario evidence."
+        }
+      ],
+      "evidenceNeeded": [
+        {
+          "evidenceId": "collect-key-run-proof",
+          "pathHint": "evidence/gdd-scenario-acceptance-plan-v1/collect-key-run.json",
+          "description": "Run evidence showing key collection before exit."
+        }
+      ],
+      "unsupportedChecks": [],
+      "blockedReasons": [],
+      "staleTarget": false
+    },
+    {
+      "acceptanceId": "accept:reach-exit-after-key",
+      "requirementId": "req:reach-exit",
+      "mechanicsMappingId": "map:exit",
+      "scenarioId": "scenario:exit-after-key-smoke",
+      "scenarioRef": "examples/gdd-scenario-acceptance-plan-v1/drafts/exit-after-key.scenario-draft.json",
+      "requiredSetup": [
+        "collect-and-exit fixture world is loaded",
+        "key_collected flag is available after collection"
+      ],
+      "steps": [
+        {
+          "stepId": "collect-key-first",
+          "actionKind": "setup",
+          "description": "Use the key-collected setup from the previous draft."
+        },
+        {
+          "stepId": "move-to-exit",
+          "actionKind": "input",
+          "description": "Move to the exit tile after key collection."
+        },
+        {
+          "stepId": "observe-win-state",
+          "actionKind": "assertion-note",
+          "description": "Record expected exit_unlocked state evidence as a draft expectation."
+        }
+      ],
+      "expectedOutcomes": [
+        {
+          "outcomeId": "state-exit-unlocked",
+          "kind": "state",
+          "value": "exit_unlocked",
+          "expectation": "Exit state should unlock after key collection."
+        }
+      ],
+      "evidenceNeeded": [
+        {
+          "evidenceId": "exit-after-key-proof",
+          "pathHint": "evidence/gdd-scenario-acceptance-plan-v1/exit-after-key-run.json",
+          "description": "Run evidence showing exit reached after key collection."
+        }
+      ],
+      "unsupportedChecks": [],
+      "blockedReasons": [],
+      "staleTarget": false
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "scenario-plan-preview",
+      "pathHint": "evidence/gdd-scenario-acceptance-plan-v1/scenario-plan-preview.json",
+      "description": "Read-only preview of requirement coverage, scenario drafts, expected outcomes, and evidence needs."
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Scenario drafts are untrusted planning artifacts, not trusted tests; untrusted until Rust/local validation; review-gated apply only; no autonomous unrestricted game creation; browser read-only or draft-only"
+}

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "gdd-scenario-acceptance-plan-v1",
+  "planId": "demo-gdd-scenario-plan-unsupported",
+  "status": "blocked",
+  "feasibilityGateRef": "docs/gdd-feasibility-gate-v1.md",
+  "requirementIds": [
+    "REQ-collect",
+    "REQ-exit"
+  ],
+  "mechanicsMappingIds": [
+    "MAP-collect",
+    "MAP-exit"
+  ],
+  "feasibilityOutcomeRefs": [
+    "docs/gdd-feasibility-gate-v1.md#collect-and-exit-outcome"
+  ],
+  "scenarioDrafts": [
+    {
+      "acceptanceId": "AC-collect",
+      "requirementId": "REQ-collect",
+      "mechanicsMappingId": "MAP-collect",
+      "scenarioId": "SCN-collect-keycard",
+      "scenarioRef": "examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.scenario-pack.json",
+      "feasibilityOutcomeRef": "docs/gdd-feasibility-gate-v1.md#collect-and-exit-outcome",
+      "requiredSetup": [
+        "player starts before keycard",
+        "keycard fixture is present"
+      ],
+      "inputActionSteps": [
+        {
+          "stepId": "STEP-move",
+          "action": "move player to keycard",
+          "rationale": "exercise collect requirement"
+        },
+        {
+          "stepId": "STEP-collect",
+          "action": "collect keycard",
+          "rationale": "trigger collect behavior"
+        }
+      ],
+      "expectedFlagsEventsStates": [
+        {
+          "assertionId": "AST-has-keycard",
+          "kind": "flag",
+          "name": "has_blue_keycard",
+          "expected": "true"
+        }
+      ],
+      "evidenceNeeded": [
+        "evidence/scenarios/collect-keycard-result.json"
+      ],
+      "unsupportedChecks": [],
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "acceptanceId": "AC-exit",
+      "requirementId": "REQ-exit",
+      "mechanicsMappingId": "MAP-exit",
+      "scenarioId": "SCN-reach-exit",
+      "scenarioRef": "examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.scenario-pack.json",
+      "feasibilityOutcomeRef": "docs/gdd-feasibility-gate-v1.md#collect-and-exit-outcome",
+      "requiredSetup": [
+        "player has keycard flag",
+        "exit zone fixture is present"
+      ],
+      "inputActionSteps": [
+        {
+          "stepId": "STEP-exit",
+          "action": "move player to exit zone",
+          "rationale": "exercise exit requirement"
+        }
+      ],
+      "expectedFlagsEventsStates": [
+        {
+          "assertionId": "AST-objective-complete",
+          "kind": "state",
+          "name": "wall_run_state",
+          "expected": "complete"
+        }
+      ],
+      "evidenceNeeded": [
+        "evidence/scenarios/reach-exit-result.json"
+      ],
+      "unsupportedChecks": [
+        "requires unsupported physics invariant"
+      ],
+      "staleTarget": false,
+      "blockedReasons": [
+        "Unsupported mechanics must remain visibly blocked."
+      ]
+    }
+  ],
+  "requirementCoverage": [
+    {
+      "requirementId": "REQ-collect",
+      "scenarioIds": [
+        "SCN-collect-keycard"
+      ],
+      "coverageStatus": "covered",
+      "blockedReasons": []
+    },
+    {
+      "requirementId": "REQ-exit",
+      "scenarioIds": [
+        "SCN-reach-exit"
+      ],
+      "coverageStatus": "covered",
+      "blockedReasons": []
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "EVD-scenario-plan",
+      "pathHint": "evidence/scenarios/gdd-scenario-plan-audit.json",
+      "description": "Scenario plan evidence records requirement coverage and draft-only assertions."
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Scenario drafts only; not trusted tests. GDD-derived output remains untrusted until Rust/local validation and review-gated apply; no autonomous unrestricted game creation, no hidden implementation of unsupported checks; browser read-only or draft-only surfaces only."
+}
