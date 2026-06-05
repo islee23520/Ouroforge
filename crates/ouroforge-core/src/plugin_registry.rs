@@ -11,10 +11,10 @@
 //! the read model exposed here.
 
 use crate::plugin_manifest::{PluginManifest, SUPPORTED_MANIFEST_SCHEMA_VERSIONS};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 
 /// Directories that may contain local plugins, relative to the repository root.
 /// `plugins/` is the canonical author directory; the manifest example tree is
@@ -196,11 +196,70 @@ pub fn discover_plugin_registry(repo_root: impl AsRef<Path>) -> Result<PluginReg
 /// that directory. Used for fixture trees and tests.
 pub fn discover_plugins_in_dir(root: impl AsRef<Path>) -> Result<PluginRegistry> {
     let root = root.as_ref();
+    // A generated/evidence root used directly as the scan base would strip its own
+    // name from every reported manifest path, defeating the generated-root
+    // classification in `manifest_entry` (e.g. `plugin validate evidence` would
+    // report `child/x.plugin.json` instead of `evidence/child/x.plugin.json`). Refuse
+    // to discover plugins when the base is, or descends from, a generated root.
+    if let Some(generated) = generated_root_in_path(root) {
+        return Err(anyhow!(
+            "plugin discovery refuses generated/evidence root `{generated}`: generated state never hosts discovered plugin manifests"
+        ));
+    }
     let mut entries = Vec::new();
     if root.exists() {
         scan_directory(root, root, 0, &mut entries)?;
     }
     finalize(root, entries)
+}
+
+/// Returns the generated/evidence root component if `dir` is, or repo-relatively
+/// descends from, one of the [`GENERATED_ROOTS`]. Used to refuse plugin discovery over
+/// generated state where manifests are never authored.
+///
+/// Two cases are classified as generated state:
+/// - The scan base *is* a generated root (its final component matches), e.g. `evidence`
+///   or `.../evidence`. Pointing discovery directly at generated state would strip the
+///   root name from every reported manifest path.
+/// - The scan base is a *relative* path whose first repo-relative component is a
+///   generated root, e.g. `evidence/nested`. A relative base is interpreted relative to
+///   the repository root, so a leading generated component means discovery is descending
+///   into generated state.
+///
+/// Generated roots are defined relative to the repository root, so an unrelated
+/// *absolute* ancestor such as `/tmp/evidence/work` must not disqualify a legitimate
+/// plugins directory nested beneath it.
+fn generated_root_in_path(dir: &Path) -> Option<&'static str> {
+    fn match_generated(name: &std::ffi::OsStr) -> Option<&'static str> {
+        let name = name.to_str()?;
+        GENERATED_ROOTS
+            .iter()
+            .map(|root| root.trim_end_matches('/'))
+            .find(|root| *root == name)
+    }
+
+    // The scan base is itself a generated root (e.g. `.../evidence`).
+    if let Some(Component::Normal(name)) = dir.components().next_back() {
+        if let Some(root) = match_generated(name) {
+            return Some(root);
+        }
+    }
+
+    // A relative scan base descends from a generated root (e.g. `evidence/nested`).
+    // Absolute paths carry filesystem ancestors that are not repo-relative and are
+    // intentionally not classified here.
+    if dir.is_relative() {
+        if let Some(name) = dir.components().find_map(|component| match component {
+            Component::Normal(name) => Some(name),
+            _ => None,
+        }) {
+            if let Some(root) = match_generated(name) {
+                return Some(root);
+            }
+        }
+    }
+
+    None
 }
 
 fn finalize(root: &Path, mut entries: Vec<PluginRegistryEntry>) -> Result<PluginRegistry> {

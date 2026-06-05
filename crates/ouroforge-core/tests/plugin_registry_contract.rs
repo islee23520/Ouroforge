@@ -99,3 +99,87 @@ fn fixture_tree_reports_expected_states() {
         .iter()
         .any(|d| d.contains("upgrade Ouroforge")));
 }
+
+#[test]
+fn discovery_refuses_generated_or_evidence_scan_root() {
+    // A generated/evidence root used as the scan base would strip its own name from
+    // every reported manifest path, so a plugin manifest under generated state could be
+    // reported as valid/ok. Discovery must fail closed for such roots. (#752)
+    let base = std::env::temp_dir().join(format!(
+        "ouroforge-plugin-generated-root-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    for generated in ["evidence", "runs", "dashboard-data", ".omx"] {
+        let scan_root = base.join(generated);
+        let nested = scan_root.join("nested");
+        std::fs::create_dir_all(&nested).expect("create nested dir");
+        std::fs::write(
+            nested.join("sneaky.plugin.json"),
+            r#"{"schemaVersion":"ouroforge.plugin-manifest.v1","id":"sneaky","kind":"dashboardPanel"}"#,
+        )
+        .expect("write manifest");
+
+        let err = discover_plugins_in_dir(&scan_root)
+            .expect_err("generated/evidence scan root is rejected");
+        assert!(
+            err.to_string().contains(generated) && err.to_string().contains("generated"),
+            "expected generated-root rejection for `{generated}`, got: {err}"
+        );
+    }
+    std::fs::remove_dir_all(&base).ok();
+}
+
+#[test]
+fn discovery_refuses_relative_descendant_of_generated_root() {
+    // A relative scan base whose first repo-relative component is a generated root
+    // (e.g. `evidence/nested`) descends into generated state and must fail closed,
+    // even though the base's final component is an ordinary name. The refusal fires
+    // before any filesystem access, so no fixture tree is required. (#1378)
+    for generated in ["evidence", "runs", "dashboard-data", ".omx"] {
+        let scan_root = std::path::Path::new(generated).join("nested");
+        let err = discover_plugins_in_dir(&scan_root)
+            .expect_err("relative descendant of a generated root is rejected");
+        assert!(
+            err.to_string().contains(generated) && err.to_string().contains("generated"),
+            "expected generated-root rejection for `{generated}/nested`, got: {err}"
+        );
+    }
+}
+
+#[test]
+fn discovery_allows_plugins_dir_under_generated_named_ancestor() {
+    // Generated roots are defined relative to the repository root, so an unrelated
+    // absolute ancestor whose name happens to be `evidence` must not disqualify a
+    // legitimate plugins directory nested beneath it. (#752 follow-up)
+    let scan_root = std::env::temp_dir()
+        .join(format!(
+            "ouroforge-evidence-ancestor-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ))
+        .join("evidence")
+        .join("work")
+        .join("plugins");
+    std::fs::create_dir_all(&scan_root).expect("create nested plugins dir");
+    std::fs::write(
+        scan_root.join("panel.plugin.json"),
+        r#"{"schemaVersion":"ouroforge.plugin-manifest.v1","id":"panel","kind":"dashboardPanel"}"#,
+    )
+    .expect("write manifest");
+
+    let registry = discover_plugins_in_dir(&scan_root)
+        .expect("plugins dir under a generated-named ancestor is allowed");
+    assert_eq!(registry.entries.len(), 1);
+
+    // Clean up the unique top-level temp dir.
+    if let Some(top) = scan_root.ancestors().nth(3) {
+        std::fs::remove_dir_all(top).ok();
+    }
+}
