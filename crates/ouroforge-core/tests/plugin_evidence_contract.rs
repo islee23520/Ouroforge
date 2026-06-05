@@ -28,6 +28,30 @@ fn unsafe_scenario_template_fixture() -> &'static str {
     include_str!("../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-network.json")
 }
 
+fn unsafe_scenario_template_executable_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-executable-script.json"
+    )
+}
+
+fn unsafe_scenario_template_command_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-command-hook.json"
+    )
+}
+
+fn unsafe_scenario_template_source_mutation_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-source-mutation.json"
+    )
+}
+
+fn unsafe_scenario_template_parameter_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-parameter-escape.json"
+    )
+}
+
 fn fixture_value() -> serde_json::Value {
     serde_json::from_str(valid_fixture()).expect("plugin registry fixture parses")
 }
@@ -320,6 +344,22 @@ fn plugin_registry_scenario_template_descriptor_rejects_unsafe_shapes() {
     let error = PluginRegistryEvidenceArtifact::from_json_str(unsafe_scenario_template_fixture())
         .expect_err("network scenario template hint is blocked");
     assert!(format!("{error:?}").contains("https://"), "{error:?}");
+
+    for (fixture, expected) in [
+        (unsafe_scenario_template_executable_fixture(), "<script"),
+        (unsafe_scenario_template_command_fixture(), "shell command"),
+        (
+            unsafe_scenario_template_source_mutation_fixture(),
+            "boundary must state `no source mutation`",
+        ),
+        (
+            unsafe_scenario_template_parameter_fixture(),
+            "bounded local id",
+        ),
+    ] {
+        let error = PluginRegistryEvidenceArtifact::from_json_str(fixture).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
 
     let base: serde_json::Value =
         serde_json::from_str(scenario_template_fixture()).expect("scenario fixture parses");
