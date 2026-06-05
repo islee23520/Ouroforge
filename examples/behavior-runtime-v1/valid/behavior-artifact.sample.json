@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "behavior-runtime-demo",
+  "sceneId": "scene-runtime-demo",
+  "validatedBy": {
+    "authority": "ouroforge-rust-local-validator",
+    "validationStatus": "passed",
+    "reviewDecisionId": "review-gl10-7-1"
+  },
+  "behaviors": [
+    {
+      "id": "player-startup",
+      "entityId": "player",
+      "triggers": [
+        { "id": "start", "kind": "onStart" },
+        { "id": "jump-input", "kind": "onInputAction", "event": "jump" }
+      ],
+      "conditions": [
+        { "id": "can-jump", "kind": "flagEquals", "field": "grounded", "value": "true" }
+      ],
+      "actions": [
+        { "id": "mark-started", "kind": "setFlag", "effectKind": "flag", "value": "started" },
+        { "id": "jump-motion", "kind": "moveEntity", "effectKind": "movement", "targetEntityId": "player", "value": "up-1" }
+      ],
+      "stateMachine": {
+        "initialState": "idle",
+        "states": [
+          { "id": "idle", "transitions": [{ "id": "start-run", "to": "running", "onEvent": "move" }] },
+          { "id": "running", "transitions": [{ "id": "stop-run", "to": "idle", "onEvent": "stop" }] }
+        ]
+      },
+      "abilities": [
+        {
+          "id": "starter-ability",
+          "actions": [
+            { "id": "sound", "kind": "startAudioIntent", "effectKind": "audioIntent", "value": "jump" }
+          ]
+        }
+      ]
+    }
+  ]
+}

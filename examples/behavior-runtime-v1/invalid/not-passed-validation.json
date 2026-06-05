@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "behavior-runtime-invalid",
+  "sceneId": "scene-runtime-demo",
+  "validatedBy": {
+    "authority": "ouroforge-rust-local-validator",
+    "validationStatus": "failed"
+  },
+  "behaviors": [
+    { "id": "player", "entityId": "player" }
+  ]
+}

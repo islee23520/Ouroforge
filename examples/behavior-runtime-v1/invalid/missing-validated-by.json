@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "behavior-runtime-invalid",
+  "sceneId": "scene-runtime-demo",
+  "behaviors": [
+    { "id": "player", "entityId": "player" }
+  ]
+}

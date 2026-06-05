@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "behavior-runtime-unsupported-demo",
+  "sceneId": "scene-runtime-demo",
+  "validatedBy": {
+    "authority": "ouroforge-rust-local-validator",
+    "validationStatus": "passed"
+  },
+  "behaviors": [
+    {
+      "id": "unsupported-demo",
+      "entityId": "npc",
+      "triggers": [{ "id": "script-trigger", "kind": "onScriptHook" }],
+      "conditions": [{ "id": "script-condition", "kind": "jsExpression", "value": "window.secret" }],
+      "actions": [{ "id": "script-action", "kind": "evalScript", "effectKind": "dynamicCode", "value": "alert(1)" }]
+    }
+  ]
+}

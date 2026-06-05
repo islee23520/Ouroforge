@@ -13,6 +13,7 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
+pub mod behavior_runtime;
 pub mod internal_sprite_audit;
 pub mod runtime_frame_budget;
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};

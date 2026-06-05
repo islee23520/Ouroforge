@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "behavior-runtime-invalid",
+  "sceneId": "scene-runtime-demo",
+  "validatedBy": {
+    "authority": "ouroforge-rust-local-validator",
+    "validationStatus": "passed"
+  },
+  "behaviors": [
+    {
+      "id": "player",
+      "entityId": "player",
+      "stateMachine": {
+        "initialState": "idle",
+        "states": [
+          { "id": "idle", "transitions": [{ "id": "bad", "to": "missing" }] }
+        ]
+      }
+    }
+  ]
+}
