@@ -20,6 +20,41 @@ pub enum GddTargetGameClass {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct GddDesignBriefReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "briefId")]
+    pub brief_id: String,
+    pub status: String,
+    #[serde(rename = "gameTitle")]
+    pub game_title: String,
+    #[serde(rename = "targetGameClass")]
+    pub target_game_class: String,
+    #[serde(rename = "coreLoopStepCount")]
+    pub core_loop_step_count: usize,
+    #[serde(rename = "mechanicCount")]
+    pub mechanic_count: usize,
+    #[serde(rename = "controlCount")]
+    pub control_count: usize,
+    #[serde(rename = "sceneLevelCount")]
+    pub scene_level_count: usize,
+    #[serde(rename = "entityCount")]
+    pub entity_count: usize,
+    #[serde(rename = "assetStyleRefCount")]
+    pub asset_style_ref_count: usize,
+    #[serde(rename = "acceptanceGoalCount")]
+    pub acceptance_goal_count: usize,
+    #[serde(rename = "blockedReasonCount")]
+    pub blocked_reason_count: usize,
+    #[serde(rename = "validationSummary")]
+    pub validation_summary: Vec<String>,
+    #[serde(rename = "compatibilityNotes")]
+    pub compatibility_notes: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct GddDesignBriefArtifact {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
@@ -112,6 +147,56 @@ impl GddDesignBriefArtifact {
         artifact.validate()?;
         Ok(artifact)
     }
+
+    pub fn read_model(&self) -> GddDesignBriefReadModel {
+        let status = status_label(&self.status).to_string();
+        let blocked_reason_count = self.blocked_reasons.len();
+        let mut validation_summary = vec![
+            "schemaVersion accepted by Rust/local validation".to_string(),
+            "targetGameClass remains bounded to v1 allowlist".to_string(),
+            "asset/style refs are local fixture references with explicit license evidence"
+                .to_string(),
+            "GDD-derived output remains untrusted until review-gated apply".to_string(),
+        ];
+        if self.status == GddDesignBriefStatus::Ready {
+            validation_summary
+                .push("ready brief has concrete core loop and win/loss conditions".to_string());
+        }
+        if blocked_reason_count > 0 {
+            validation_summary.push(format!(
+                "{blocked_reason_count} blocked reason(s) remain visible for reviewers"
+            ));
+        }
+
+        GddDesignBriefReadModel {
+            schema_version: self.schema_version.clone(),
+            brief_id: self.brief_id.clone(),
+            status,
+            game_title: self.game_title.clone(),
+            target_game_class: target_game_class_label(&self.target_game_class).to_string(),
+            core_loop_step_count: self.core_loop.steps.len(),
+            mechanic_count: self.mechanics.len(),
+            control_count: self.controls.len(),
+            scene_level_count: self.scenes_levels.len(),
+            entity_count: self.entities.len(),
+            asset_style_ref_count: self.asset_style_refs.len(),
+            acceptance_goal_count: self.acceptance_goals.len(),
+            blocked_reason_count,
+            validation_summary,
+            compatibility_notes: vec![
+                "display-only read model; no trusted browser write authority".to_string(),
+                "no prototype generation, command bridge, source mutation, or asset generation authority".to_string(),
+                "compatible with later extraction/planning surfaces through validated summary counts".to_string(),
+            ],
+            boundary: self.boundary.clone(),
+        }
+    }
+
+    pub fn read_model_json(&self) -> Result<String> {
+        serde_json::to_string_pretty(&self.read_model())
+            .context("failed to serialize GDD design brief read model JSON")
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.schema_version != GDD_DESIGN_BRIEF_SCHEMA_VERSION {
             return Err(anyhow!(
@@ -261,6 +346,21 @@ impl GddAssetStyleRef {
             ));
         }
         Ok(())
+    }
+}
+
+fn status_label(status: &GddDesignBriefStatus) -> &'static str {
+    match status {
+        GddDesignBriefStatus::Ready => "ready",
+        GddDesignBriefStatus::Partial => "partial",
+        GddDesignBriefStatus::Blocked => "blocked",
+    }
+}
+
+fn target_game_class_label(target_game_class: &GddTargetGameClass) -> &'static str {
+    match target_game_class {
+        GddTargetGameClass::Small2dPrototype => "small2d-prototype",
+        GddTargetGameClass::Compatibility3dPrototype => "compatibility3d-prototype",
     }
 }
 
