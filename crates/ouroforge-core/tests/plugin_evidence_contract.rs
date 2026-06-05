@@ -52,6 +52,10 @@ fn unsafe_scenario_template_parameter_fixture() -> &'static str {
     )
 }
 
+fn scenario_coverage_v16_doc() -> &'static str {
+    include_str!("../../../docs/scenario-coverage-v16-plugin-extension.md")
+}
+
 fn fixture_value() -> serde_json::Value {
     serde_json::from_str(valid_fixture()).expect("plugin registry fixture parses")
 }
@@ -76,6 +80,74 @@ fn create_run_dir(prefix: &str) -> PathBuf {
     fs::write(run_dir.join("evidence/index.json"), r#"{"artifacts":[]}"#)
         .expect("evidence index written");
     run_dir
+}
+
+#[test]
+fn scenario_coverage_v16_defines_plugin_extension_regression_matrix() {
+    let doc = scenario_coverage_v16_doc();
+
+    for required in [
+        "Issue: #753",
+        "PES10.16.valid-manifest",
+        "PES10.16.registry-discovery",
+        "PES10.16.dashboard-panel",
+        "PES10.16.studio-display",
+        "PES10.16.scenario-template",
+        "PES10.16.asset-metadata-descriptor",
+        "PES10.16.compatible-version",
+        "PES10.16.evidence-bundle",
+        "PES10.16.block-arbitrary-js",
+        "PES10.16.block-command-execution",
+        "PES10.16.block-dependency-install",
+        "PES10.16.block-network-install-update",
+        "PES10.16.block-credential-access",
+        "PES10.16.block-source-mutation",
+        "PES10.16.block-export-publish-deploy",
+        "PES10.16.block-path-traversal",
+        "PES10.16.block-duplicate-ids",
+        "PES10.16.block-incompatible-version",
+        "PES10.16.block-native-extension",
+        "PES10.16.block-ci-mutation",
+        "generated-state",
+        "no-executable-plugin",
+        "no-network-install",
+        "no-command-execution",
+        "no-publish/deploy",
+        "#1 remains the broad roadmap/governance anchor",
+        "#23 remains the protected",
+    ] {
+        assert!(
+            doc.contains(required),
+            "Scenario Coverage v16 doc missing required scenario/boundary: {required}"
+        );
+    }
+
+    let non_goals = doc
+        .split("## Explicit non-goals")
+        .nth(1)
+        .expect("Scenario Coverage v16 non-goals section exists");
+    for forbidden_scope in [
+        "executable plugins",
+        "arbitrary JavaScript",
+        "native extensions",
+        "plugin install/update from network",
+        "dependency installation",
+        "credential access",
+        "shell command execution",
+        "browser command bridges",
+        "source mutation",
+        "CI/workflow mutation",
+        "export/publish/deploy mutation",
+        "production-ready plugin ecosystem claims",
+        "secure plugin sandbox claims",
+        "Godot-equivalent extension parity",
+        "current Godot replacement claims",
+    ] {
+        assert!(
+            non_goals.contains(forbidden_scope),
+            "Scenario Coverage v16 non-goals must retain {forbidden_scope}"
+        );
+    }
 }
 
 #[test]
