@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "demo-level-set-v1",
+  "id": "collect-and-exit-level-set",
+  "baseScene": "scenes/collect-and-exit.scene.json",
+  "description": "Deterministic Signal Gate / Collect-and-Exit level set: four bounded one-screen rooms that ramp approach distance and frame pressure over the same arena. Each level is a deterministic configuration over the base scene; generated run evidence stays untracked.",
+  "difficultyRamp": "Tier 1 -> 4 increases the spawn-to-key-to-gate travel distance and (tier 4) tightens the frame budget, while keeping every level winnable from deterministic source inputs.",
+  "levels": [
+    {
+      "id": "L1-first-contact",
+      "title": "First Contact",
+      "objective": "Collect the signal key and exit the gate (tutorial spacing).",
+      "difficultyTier": 1,
+      "spawn": { "x": 32, "y": 80 },
+      "key": { "x": 96, "y": 80 },
+      "door": { "x": 224, "y": 80 },
+      "scenario": {
+        "id": "level-l1-win",
+        "assertions": [
+          { "path": "goalFlags.key_collected", "equals": true },
+          { "path": "goalFlags.exit_reached", "equals": true },
+          { "path": "goalFlags.player_alive", "equals": true }
+        ]
+      }
+    },
+    {
+      "id": "L2-longer-approach",
+      "title": "Longer Approach",
+      "objective": "Collect the key after a longer approach, then exit.",
+      "difficultyTier": 2,
+      "spawn": { "x": 32, "y": 80 },
+      "key": { "x": 144, "y": 80 },
+      "door": { "x": 248, "y": 80 },
+      "scenario": {
+        "id": "level-l2-win",
+        "assertions": [
+          { "path": "goalFlags.key_collected", "equals": true },
+          { "path": "goalFlags.exit_reached", "equals": true },
+          { "path": "goalFlags.player_alive", "equals": true }
+        ]
+      }
+    },
+    {
+      "id": "L3-tight-window",
+      "title": "Tight Window",
+      "objective": "Reach the far key and gate before the run ends.",
+      "difficultyTier": 3,
+      "spawn": { "x": 24, "y": 80 },
+      "key": { "x": 176, "y": 80 },
+      "door": { "x": 272, "y": 80 },
+      "scenario": {
+        "id": "level-l3-win",
+        "assertions": [
+          { "path": "goalFlags.key_collected", "equals": true },
+          { "path": "goalFlags.exit_reached", "equals": true },
+          { "path": "goalFlags.player_alive", "equals": true }
+        ]
+      }
+    },
+    {
+      "id": "L4-final-gate",
+      "title": "Final Gate",
+      "objective": "Traverse the full arena to the key and final gate under a tighter frame budget.",
+      "difficultyTier": 4,
+      "spawn": { "x": 24, "y": 80 },
+      "key": { "x": 192, "y": 80 },
+      "door": { "x": 288, "y": 80 },
+      "frameBudget": { "updateMs": 6, "renderMs": 14, "evidenceMs": 3, "totalMs": 18 },
+      "scenario": {
+        "id": "level-l4-win",
+        "assertions": [
+          { "path": "goalFlags.key_collected", "equals": true },
+          { "path": "goalFlags.exit_reached", "equals": true },
+          { "path": "goalFlags.player_alive", "equals": true }
+        ]
+      }
+    }
+  ],
+  "boundary": "Source-like deterministic level configurations only; no generated run/dashboard output is committed. Levels reuse the existing runtime/scene contract and add no engine surface, no trusted browser write, no production/native/store export, and no full Godot parity or replacement claim."
+}
