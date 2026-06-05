@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "ouroforge.behavior-draft.v1",
+  "draftId": "draft-jump-boost",
+  "target": {
+    "projectId": "demo_project",
+    "scenePath": "scenes/main.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:abcdef1234567890"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "behavior-runtime-execution-demo",
+    "sceneId": "scene-runtime-demo",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed",
+      "reviewDecisionId": "review-gl10-7-2"
+    },
+    "behaviors": [
+      {
+        "id": "player-jump",
+        "entityId": "player",
+        "triggers": [
+          {
+            "id": "jump-input",
+            "kind": "onInputAction",
+            "event": "jump"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "grounded",
+            "kind": "flagEquals",
+            "field": "grounded",
+            "value": "true"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-jumped",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "jumped"
+          },
+          {
+            "id": "jump-motion",
+            "kind": "moveEntity",
+            "effectKind": "movement",
+            "targetEntityId": "player",
+            "dx": 0,
+            "dy": -2
+          },
+          {
+            "id": "jump-audio",
+            "kind": "startAudioIntent",
+            "effectKind": "audioIntent",
+            "value": "jump"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "idle",
+          "states": [
+            {
+              "id": "idle",
+              "transitions": [
+                {
+                  "id": "begin-jump",
+                  "to": "airborne",
+                  "onEvent": "jumped"
+                }
+              ]
+            },
+            {
+              "id": "airborne",
+              "transitions": [
+                {
+                  "id": "land",
+                  "to": "idle",
+                  "onEvent": "landed"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "goal-finish",
+        "entityId": "goal",
+        "triggers": [
+          {
+            "id": "goal-event",
+            "kind": "onEvent",
+            "event": "goalReached"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "has-key",
+            "kind": "hasItem",
+            "value": "key"
+          }
+        ],
+        "actions": [
+          {
+            "id": "win",
+            "kind": "markWinState",
+            "effectKind": "terminalState"
+          },
+          {
+            "id": "victory-event",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "victory"
+          }
+        ]
+      }
+    ]
+  },
+  "rationale": "Add a bounded jump response as an untrusted behavior draft for reviewer inspection.",
+  "linkedEvidence": [
+    {
+      "id": "scenario-failure",
+      "kind": "scenario-result",
+      "path": "evidence/scenarios/bootstrap-smoke/scenario-result.json",
+      "summary": "Scenario evidence shows jump behavior was missing."
+    }
+  ],
+  "expectedScenarioImpact": [
+    {
+      "scenarioId": "bootstrap-smoke",
+      "summary": "The scenario should pass after accepted review-gated behavior apply.",
+      "expectedVerdict": "passed"
+    }
+  ],
+  "author": {
+    "source": "agent",
+    "actor": "codex"
+  },
+  "validationStatus": "drafted",
+  "blockedReasons": [],
+  "untrustedBoundary": "Untrusted behavior draft; does not apply trusted files; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, browser trusted write, or local server bridge."
+}
