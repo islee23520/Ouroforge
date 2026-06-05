@@ -33,7 +33,14 @@ fn gdd_design_brief_rejects_unsafe_refs_and_unknown_fields() {
         "../../../examples/gdd-design-brief-v1/invalid/design-brief.unsafe-ref.fixture.json"
     ))
     .expect_err("remote asset/style refs are rejected");
-    assert!(unsafe_ref.to_string().contains("https://"));
+    assert!(
+        unsafe_ref
+            .to_string()
+            .contains("forbidden GDD/prototype authority text")
+            || unsafe_ref
+                .to_string()
+                .contains("local fixture/reference roots")
+    );
     let mut value: serde_json::Value = serde_json::from_str(valid_fixture()).expect("fixture json");
     value["generationPrompt"] = serde_json::json!("make a full game");
     let unknown = GddDesignBriefArtifact::from_json_str(&value.to_string())
@@ -42,6 +49,83 @@ fn gdd_design_brief_rejects_unsafe_refs_and_unknown_fields() {
         .to_string()
         .contains("failed to parse GDD Design Brief JSON"));
 }
+#[test]
+fn gdd_design_brief_rejects_validation_drift_for_ready_briefs() {
+    for (fixture, expected) in [
+        (
+            include_str!("../../../examples/gdd-design-brief-v1/invalid/design-brief.overbroad-scope.fixture.json"),
+            "overbroad or out-of-scope",
+        ),
+        (
+            include_str!("../../../examples/gdd-design-brief-v1/invalid/design-brief.contradictory.fixture.json"),
+            "contradictory requirements",
+        ),
+        (
+            include_str!("../../../examples/gdd-design-brief-v1/invalid/design-brief.unclear-win-loss.fixture.json"),
+            "must be concrete for ready design briefs",
+        ),
+        (
+            include_str!("../../../examples/gdd-design-brief-v1/invalid/design-brief.unsupported-asset-kind.fixture.json"),
+            "is not supported in v1",
+        ),
+    ] {
+        let error = GddDesignBriefArtifact::from_json_str(fixture).expect_err(expected);
+        assert!(error.to_string().contains(expected), "{error:?}");
+    }
+}
+
+#[test]
+fn gdd_design_brief_rejects_missing_core_loop_acceptance_and_target_class_drift() {
+    let base: serde_json::Value = serde_json::from_str(valid_fixture()).expect("fixture json");
+    let cases = [
+        (
+            {
+                let mut value = base.clone();
+                value["coreLoop"]["steps"] = serde_json::json!([]);
+                value
+            },
+            "coreLoop.steps must not be empty",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["coreLoop"]["steps"] = serde_json::json!(["move"]);
+                value
+            },
+            "at least two concrete steps",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["targetGameClass"] = serde_json::json!("autonomous-full-game");
+                value
+            },
+            "failed to parse GDD Design Brief JSON",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["acceptanceGoals"] = serde_json::json!([]);
+                value
+            },
+            "acceptanceGoals must not be empty",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["assetStyleRefs"][0]["license"] = serde_json::json!("unknown");
+                value
+            },
+            "license must be explicit",
+        ),
+    ];
+
+    for (value, expected) in cases {
+        let error = GddDesignBriefArtifact::from_json_str(&value.to_string()).expect_err(expected);
+        assert!(error.to_string().contains(expected), "{error:?}");
+    }
+}
+
 #[test]
 fn gdd_design_brief_docs_audit_generation_boundary() {
     let doc = include_str!("../../../docs/gdd-design-brief-v1.md");
