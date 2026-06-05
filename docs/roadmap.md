@@ -610,25 +610,26 @@ publication, and support boundaries described above.
 
 Recommended next milestone candidates after this governance refresh are:
 
-1. **Finish Autonomous QA / Playtest Swarm v1 (#690-#698)** — the next
-   dependency-ordered technical sequence now that GDD-to-Playable Prototype v1 is
-   complete. As of this handoff, #690-#696 are already closed, so the remaining
-   live focus is Scenario Coverage v13 and the QA-swarm governance refresh. Keep
-   the sequence scoped to local deterministic QA/playtest scenarios, runtime/
-   console/crash classification, flaky/rerun policy, failure classification,
-   mutation backlog, run matrix, evidence bundle, demo, Scenario Coverage v13,
-   generated-state audits, and conservative wording. It must not become
-   autonomous repair, browser trusted writes, command bridges, auto-apply,
+1. **Autonomous QA / Playtest Swarm v1 (#682-#698) is complete as bounded
+   evidence-gated QA/playtest infrastructure**. The completed scope includes
+   scenario candidates, adversarial fuzz plans, worker/budget policy, runtime
+   invariants, route attempts, visual/performance/error evidence,
+   flake/rerun policy, failure classification, backlog, run matrix, evidence
+   bundle, Studio inspection, demo, Scenario Coverage v13, generated-state
+   audits, and conservative wording. It remains evidence/backlog-only and must
+   not become hidden workers, remote/cloud swarm orchestration, autonomous
+   repair, browser trusted writes, command bridges, auto-fix, auto-apply,
    auto-merge, self-approval, production QA certification, public-launch
-   approval, or a Godot replacement claim.
-2. **Safe Executable Script Implementation Gate** — defer until maintainers open
+   approval, current Godot replacement, or production-ready claims.
+2. **Resolve Safe Source Mutation Apply governance refresh #716 if it remains
+   open**, then continue only through fixed scoped issue sequences for Full
+   Studio Editor and Godot-Plus Demo. Preserve Rust/local trusted persistence,
+   independent review, rollback, stale-target, sandbox, and allowlisted
+   verification gates.
+3. **Safe Executable Script Implementation Gate** — defer until maintainers open
    a separate governance issue with threat model, test matrix, rollback story,
    review-gate story, generated-state policy, and public wording; #611-#625 do
    not authorize arbitrary executable scripts.
-3. **Safe Source Mutation Apply, Build/Export/Packaging, Plugin/Extension
-   System, Full Studio Editor, and demo game tracks**
-   — later candidates only when opened by their own fixed issue sequences with
-   explicit trust boundaries and non-goals.
 4. **Bounded Production 3D expansion** — defer unless maintainers open a new
    evidence-backed scope contract after the 3D gate. The completed gate is not
    proof of broad 3D engine parity, advanced rendering, import pipelines, native
@@ -710,6 +711,15 @@ remain separate maintainer actions.
   auto-merge, self-approval, reviewer bypass, command bridges, browser trusted
   writes, native export, plugin runtime, hosted/cloud behavior, production
   readiness, or current Godot replacement positioning.
+- Treat Autonomous QA / Playtest Swarm v1 as complete but bounded. Its artifacts
+  authorize deterministic local QA/playtest evidence, fixture-scoped fuzzing,
+  explicit worker/rerun/time/output budgets, failure classification, backlog
+  inputs, run matrices, evidence bundles, and read-only Studio/dashboard
+  inspection; they do not authorize hidden workers, remote/cloud swarm
+  orchestration, unbounded spawning, browser command bridges, browser trusted
+  writes, auto-fix, auto-apply, auto-merge, self-approval, production QA
+  certification, quality/fun/market/production safety guarantees, current Godot
+  replacement positioning, or production-ready claims.
 - Treat Build / Export / Packaging v1 as complete but local-only. Its artifacts
   authorize fixture-scoped local web package evidence, deterministic staging,
   profile/plan validation, asset manifests, runtime probe preservation,

@@ -2,11 +2,11 @@
 
 Issue: #682
 Roadmap anchor: #1 Milestone 14 (Autonomous QA and Playtest Swarm).
-Status: scope contract only; no executable behavior.
+Status: complete as bounded local QA/playtest evidence contracts after #698 governance refresh; no hidden workers, remote/cloud swarm, auto-fix/apply/merge, browser trusted writes, quality guarantee, current Godot replacement, or production-ready claim.
 
-Autonomous QA / Playtest Swarm v1 enables bounded, local-first QA/playtest workers to generate, run, classify, and report adversarial gameplay evidence. It does not authorize hidden workers, unbounded autonomous agents, remote/cloud swarms, browser command bridges, auto-fix, auto-apply, auto-merge, or any quality guarantee. QA/playtest outputs are evidence and backlog inputs only until reviewed.
+Autonomous QA / Playtest Swarm v1 enables bounded, local-first QA/playtest workers to generate, run, classify, and report adversarial gameplay evidence. It does not authorize hidden workers, unbounded autonomous agents, remote/cloud swarms, browser command bridges, auto-fix, auto-apply, auto-merge, or any quality guarantee. QA/playtest outputs are evidence/backlog inputs only until reviewed.
 
-This document is the canonical contract for all follow-up QA/playtest swarm issues. It adds no product behavior; each follow-up issue implements one bounded slice against the boundaries defined here.
+This document is the canonical contract for the completed QA/playtest swarm issues. Each completed slice remains bounded by the trust and wording boundaries defined here.
 
 ## Bounded target
 
@@ -28,7 +28,7 @@ The milestone covers the following bounded capabilities, each implemented and ve
 
 ## Trusted boundary
 
-- QA/playtest outputs are evidence and backlog inputs only until reviewed. They never perform trusted mutation, auto-fix, auto-apply, or auto-merge.
+- QA/playtest outputs are evidence/backlog inputs only until reviewed. They never perform trusted mutation, auto-fix, auto-apply, or auto-merge.
 - Rust/local validation owns trusted persistence, QA artifact validation, generated-evidence writing, run/project binding, and CLI contracts.
 - Browser, dashboard, and Studio surfaces remain read-only or draft-only for trusted state unless a later explicitly scoped Rust/local trusted API owns persistence. They cannot run commands, bridge to a local server, write trusted files, install dependencies, or reach the network.
 - Heuristic route/visual/performance/failure classifiers are bounded evidence signals, not proof of fun, subjective quality, market readiness, production safety, accessibility compliance, or shipped-game readiness.

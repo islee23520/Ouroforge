@@ -234,17 +234,22 @@ and `examples/gameplay-logic-regression-v9/` as a structured data-only behavior
 and evidence milestone; it is not arbitrary script execution, a production-stable
 scripting API, plugin runtime, browser trusted write path, command bridge,
 unrestricted source apply, public-launch approval, or Godot replacement scope.
-GDD-to-Playable Prototype v1 is now recorded as complete in `docs/roadmap.md`,
+GDD-to-Playable Prototype v1 is recorded as complete in `docs/roadmap.md`,
 `docs/gdd-to-playable-prototype-v1.md`,
 `docs/gdd-to-prototype-governance-handoff.md`, the GDD prototype fixture/docs
 chain, and `examples/gdd-to-prototype-demo-v1/` as a bounded evidence-gated
-prototype path. It is not autonomous unrestricted game creation, uncontrolled asset generation,
-arbitrary source/script mutation, browser trusted writes, auto-apply/auto-merge,
-native export, plugin runtime, hosted/cloud behavior, production readiness, or a
-current Godot replacement claim. The next recommended technical sequence is to finish Autonomous QA /
-Playtest Swarm v1 (#690-#698), with live handoff focus on the remaining
-Scenario Coverage v13 and governance slices, so prototype/evidence outputs can be
-exercised by bounded local QA scenarios without weakening review or apply gates.
+prototype path. Autonomous QA / Playtest Swarm v1 is now recorded as complete in
+`docs/roadmap.md`, `docs/autonomous-qa-playtest-swarm-v1.md`,
+`docs/autonomous-qa-playtest-swarm-governance-handoff.md`, the QA swarm fixture/docs
+chain, and `examples/qa-swarm-regression-suite-v13/` as bounded local QA/playtest
+evidence and backlog inputs. These milestones do not authorize autonomous
+unrestricted game creation, uncontrolled asset generation, hidden workers,
+remote/cloud swarm orchestration, arbitrary source/script mutation, browser
+trusted writes, command bridges, auto-fix, auto-apply, auto-merge, native export,
+plugin runtime, hosted/cloud behavior, production readiness, public launch, or a
+current Godot replacement claim. The next recommended governance step is Safe
+Source Mutation Apply refresh #716 if still open, then the remaining bounded Full
+Studio Editor and Godot-Plus Demo sequences.
 
 ## Contributor guide
 
