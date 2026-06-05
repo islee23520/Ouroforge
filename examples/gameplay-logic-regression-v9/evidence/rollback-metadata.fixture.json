@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "gameplay-logic-regression-v9-rollback-metadata-v1",
+  "transactionId": "behavior-apply-gameplay-logic-regression-v9-routing",
+  "beforeHash": "fnv1a64-canonical-json-v1:1111222233334444",
+  "rollbackRef": "runs/behavior-applies/gameplay-logic-regression-v9/rollback.json",
+  "strategy": "restore fixture-scoped behavior target from beforeHash after manual review"
+}

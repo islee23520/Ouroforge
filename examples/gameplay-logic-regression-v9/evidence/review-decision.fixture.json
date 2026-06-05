@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "gameplay-logic-regression-v9-review-decision-v1",
+  "reviewDecisionId": "review-gameplay-logic-regression-v9-accepted",
+  "status": "accepted",
+  "reviewerId": "human-reviewer",
+  "draftAuthorId": "agent-author",
+  "draftRef": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json",
+  "decision": "Accepted for fixture-scoped trusted Rust/local apply transaction validation only; not browser write authority."
+}

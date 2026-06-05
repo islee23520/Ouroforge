@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "gameplay-logic-regression-v9-rerun-comparison-v1",
+  "transactionId": "behavior-apply-gameplay-logic-regression-v9-routing",
+  "beforeScenarioOutcomeRef": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json",
+  "afterScenarioOutcomeRef": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json",
+  "status": "unchanged-pass",
+  "summary": "Fixture-scoped rerun comparison preserves passing behavior assertions after review-gated apply validation."
+}

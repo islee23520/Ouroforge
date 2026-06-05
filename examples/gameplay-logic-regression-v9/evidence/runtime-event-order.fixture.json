@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "gameplay-logic-regression-v9-runtime-event-order-v1",
+  "scenarioId": "behavior-model-runtime-regression",
+  "reportIndex": 0,
+  "events": [
+    "platePressed",
+    "gateSignal"
+  ],
+  "ordering": "input-before-emitted-signal",
+  "trustedBoundary": "read-only fixture evidence; no command execution or browser trusted writes"
+}

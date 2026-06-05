@@ -97,3 +97,45 @@ fn behavior_evidence_bundle_rejects_missing_refs_unsafe_paths_and_forbidden_runt
         .iter()
         .any(|reason| reason.contains("arbitrary executable scripting")));
 }
+
+#[test]
+fn gameplay_logic_regression_v9_evidence_bundle_covers_gl10_14_2_lifecycle_refs() {
+    let bundle = BehaviorEvidenceBundleArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.gl10.14.2.fixture.json"
+    ))
+    .expect("GL10.14.2 evidence bundle fixture parses");
+
+    assert_eq!(
+        bundle.bundle_id,
+        "gameplay-logic-regression-v9-draft-apply-evidence"
+    );
+    assert_eq!(bundle.status, BehaviorEvidenceBundleStatus::Complete);
+    assert_eq!(bundle.behavior_definition_refs.len(), 1);
+    assert_eq!(bundle.runtime_event_refs.len(), 1);
+    assert_eq!(bundle.scenario_outcome_refs.len(), 1);
+    assert_eq!(bundle.draft_refs.len(), 1);
+    assert_eq!(bundle.review_decision_refs.len(), 1);
+    assert_eq!(bundle.apply_transaction_refs.len(), 1);
+    assert_eq!(bundle.rollback_metadata_refs.len(), 1);
+    assert_eq!(bundle.rerun_comparison_refs.len(), 1);
+
+    let validation =
+        validate_behavior_evidence_bundle(&bundle).expect("GL10.14.2 evidence bundle validates");
+    assert_eq!(validation.status, "passed");
+    assert_eq!(validation.lifecycle_ref_count, 8);
+    assert!(bundle
+        .guardrails
+        .iter()
+        .any(|guardrail| guardrail.contains("no arbitrary script execution")));
+
+    let stale = BehaviorEvidenceBundleArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.stale.fixture.json"
+    ))
+    .expect("GL10.14.2 stale evidence bundle fixture parses");
+    assert_eq!(stale.status, BehaviorEvidenceBundleStatus::Stale);
+    assert!(stale
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("stale")));
+    validate_behavior_evidence_bundle(&stale).expect("stale bundle explains stale state");
+}

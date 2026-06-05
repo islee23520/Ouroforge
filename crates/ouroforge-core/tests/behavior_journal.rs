@@ -116,6 +116,30 @@ fn update_journal_includes_indexed_behavior_evidence_bundle_section() {
     std::fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn gameplay_logic_regression_v9_journal_renders_gl10_14_2_lifecycle_fixture() {
+    let root = unique_temp_dir("gameplay-logic-regression-v9-journal");
+    let evidence_path = "evidence/behavior-evidence-bundle.gl10.14.2.fixture.json";
+    std::fs::create_dir_all(root.join("evidence")).expect("evidence dir");
+    std::fs::write(
+        root.join(evidence_path),
+        include_str!(
+            "../../../examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.gl10.14.2.fixture.json"
+        ),
+    )
+    .expect("gl10.14.2 bundle fixture written");
+
+    let journal = render_behavior_evidence_journal_section(&root, &evidence_index(evidence_path));
+
+    assert!(journal.contains("## Behavior Evidence Lifecycle"));
+    assert!(journal.contains("gameplay-logic-regression-v9-draft-apply-evidence"));
+    assert!(journal.contains("Lifecycle refs: definitions `1`"));
+    assert!(journal.contains("Observed failure `behavior-model-runtime-regression`"));
+    assert!(journal.contains("inspect-read-model-next"));
+    assert!(journal.contains("no arbitrary script execution"));
+    std::fs::remove_dir_all(root).ok();
+}
+
 fn unique_temp_dir(prefix: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "ouroforge-{prefix}-{}-{}",

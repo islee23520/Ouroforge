@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "gameplay-logic-regression-v9-scenario-outcome-v1",
+  "scenarioId": "behavior-model-runtime-regression",
+  "status": "passed",
+  "assertionSuiteRef": "examples/gameplay-logic-regression-v9/scenarios/gameplay-logic-regression-v9.behavior-assertions.json",
+  "behaviorArtifactRef": "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+  "passedAssertionCount": 12,
+  "failedAssertionCount": 0,
+  "trustedBoundary": "structured behavior evidence only; no arbitrary executable scripting"
+}

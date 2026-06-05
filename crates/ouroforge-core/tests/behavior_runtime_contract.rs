@@ -1084,6 +1084,73 @@ fn gameplay_logic_regression_v9_behavior_model_runtime_fixture_covers_gl10_14_1(
 }
 
 #[test]
+fn gameplay_logic_regression_v9_draft_apply_fixtures_cover_gl10_14_2() {
+    use ouroforge_core::behavior_runtime::{
+        BehaviorApplyTransactionStatus, BehaviorDraftValidationStatus,
+    };
+
+    let draft = BehaviorDraftArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json"
+    ))
+    .expect("GL10.14.2 behavior draft fixture validates");
+    assert_eq!(draft.draft_id, "draft-gameplay-logic-regression-v9-routing");
+    assert_eq!(
+        draft.validation_status,
+        BehaviorDraftValidationStatus::Drafted
+    );
+    assert_eq!(
+        draft.target.scene_path,
+        "scenes/gameplay-logic-regression-v9.scene.json"
+    );
+    assert_eq!(
+        draft.proposed_behavior.artifact_id,
+        "gameplay-logic-regression-v9"
+    );
+    assert_eq!(draft.linked_evidence.len(), 2);
+    assert!(draft
+        .untrusted_boundary
+        .contains("does not apply trusted files"));
+    assert!(draft
+        .untrusted_boundary
+        .contains("no arbitrary script execution"));
+
+    let apply = BehaviorApplyTransactionArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+    ))
+    .expect("GL10.14.2 behavior apply transaction fixture validates");
+    assert_eq!(
+        apply.transaction_id,
+        "behavior-apply-gameplay-logic-regression-v9-routing"
+    );
+    assert_eq!(apply.draft_id, draft.draft_id);
+    assert_eq!(
+        apply.status,
+        BehaviorApplyTransactionStatus::ReadyForTrustedApply
+    );
+    assert_ne!(
+        apply.review_decision.reviewer_id, apply.review_decision.draft_author_id,
+        "review-gated apply forbids self-approval"
+    );
+    assert_eq!(
+        apply.target_hashes.expected_before_hash,
+        apply.target.scene_hash
+    );
+    assert_eq!(
+        apply.target_hashes.observed_before_hash,
+        apply.rollback_metadata.before_hash
+    );
+    assert!(apply
+        .transaction_output_ref
+        .starts_with("runs/behavior-applies/gameplay-logic-regression-v9/"));
+    assert!(apply
+        .trusted_boundary
+        .contains("Accepted review and rollback metadata"));
+    assert!(apply
+        .trusted_boundary
+        .contains("no arbitrary script execution"));
+}
+
+#[test]
 fn behavior_apply_transaction_read_model_preserves_rollback_rerun_and_evidence_refs() {
     let read_model =
         behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("ready"))

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "behavior-evidence-bundle-v1",
+  "bundleId": "gameplay-logic-regression-v9-draft-apply-evidence",
+  "status": "complete",
+  "behaviorDefinitionRefs": [
+    {
+      "kind": "behavior-definition",
+      "path": "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+      "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "runtimeEventRefs": [
+    {
+      "kind": "runtime-event-log",
+      "path": "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json"
+    }
+  ],
+  "scenarioOutcomeRefs": [
+    {
+      "kind": "scenario-outcome",
+      "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+    }
+  ],
+  "draftRefs": [
+    {
+      "kind": "behavior-draft",
+      "path": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json"
+    }
+  ],
+  "reviewDecisionRefs": [
+    {
+      "kind": "behavior-review-decision",
+      "path": "examples/gameplay-logic-regression-v9/evidence/review-decision.fixture.json"
+    }
+  ],
+  "applyTransactionRefs": [
+    {
+      "kind": "behavior-apply-transaction",
+      "path": "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+    }
+  ],
+  "rollbackMetadataRefs": [
+    {
+      "kind": "behavior-rollback-metadata",
+      "path": "examples/gameplay-logic-regression-v9/evidence/rollback-metadata.fixture.json"
+    }
+  ],
+  "rerunComparisonRefs": [
+    {
+      "kind": "behavior-rerun-comparison",
+      "path": "examples/gameplay-logic-regression-v9/evidence/rerun-comparison.fixture.json"
+    }
+  ],
+  "observedFailures": [
+    {
+      "scenarioId": "behavior-model-runtime-regression",
+      "summary": "No current failure; fixture records the regression signal that would fail if event ordering, cooldown evidence, or state transitions drift.",
+      "evidenceRef": {
+        "kind": "scenario-outcome",
+        "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+      }
+    }
+  ],
+  "nextStepHypotheses": [
+    {
+      "id": "inspect-read-model-next",
+      "summary": "Use GL10.14.3 to inspect this draft/apply/evidence lifecycle in dashboard and Studio read models."
+    }
+  ],
+  "linkedEvidence": [
+    {
+      "kind": "behavior-definition",
+      "path": "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+      "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "kind": "runtime-event-log",
+      "path": "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json"
+    },
+    {
+      "kind": "scenario-outcome",
+      "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+    },
+    {
+      "kind": "behavior-draft",
+      "path": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json"
+    },
+    {
+      "kind": "behavior-review-decision",
+      "path": "examples/gameplay-logic-regression-v9/evidence/review-decision.fixture.json"
+    },
+    {
+      "kind": "behavior-apply-transaction",
+      "path": "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+    },
+    {
+      "kind": "behavior-rollback-metadata",
+      "path": "examples/gameplay-logic-regression-v9/evidence/rollback-metadata.fixture.json"
+    },
+    {
+      "kind": "behavior-rerun-comparison",
+      "path": "examples/gameplay-logic-regression-v9/evidence/rerun-comparison.fixture.json"
+    }
+  ],
+  "blockedReasons": [],
+  "guardrails": [
+    "behavior evidence bundle is read-only lifecycle audit data",
+    "no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, or browser trusted write",
+    "Rust/local validation owns trusted behavior draft/apply and generated evidence contracts",
+    "generated behavior evidence remains untracked unless fixture-scoped",
+    "#1 and #23 remain open"
+  ]
+}

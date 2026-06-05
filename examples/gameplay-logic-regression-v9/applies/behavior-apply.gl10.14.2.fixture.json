@@ -1,0 +1,252 @@
+{
+  "schemaVersion": "ouroforge.behavior-apply-transaction.v1",
+  "transactionId": "behavior-apply-gameplay-logic-regression-v9-routing",
+  "draftId": "draft-gameplay-logic-regression-v9-routing",
+  "reviewDecision": {
+    "reviewDecisionId": "review-gameplay-logic-regression-v9-accepted",
+    "status": "accepted",
+    "reviewerId": "human-reviewer",
+    "draftAuthorId": "agent-author",
+    "decisionRef": "runs/behavior-applies/gameplay-logic-regression-v9/review-decision.json"
+  },
+  "target": {
+    "projectId": "scenario_coverage_v9_gameplay_logic",
+    "scenePath": "scenes/gameplay-logic-regression-v9.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:1111222233334444"
+  },
+  "targetHashes": {
+    "expectedBeforeHash": "fnv1a64-canonical-json-v1:1111222233334444",
+    "observedBeforeHash": "fnv1a64-canonical-json-v1:1111222233334444",
+    "afterHash": "fnv1a64-canonical-json-v1:5555666677778888"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "gameplay-logic-regression-v9",
+    "sceneId": "gameplay-logic-regression-v9-scene",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed",
+      "reviewDecisionId": "review-gl10-14-1-fixture"
+    },
+    "behaviors": [
+      {
+        "id": "pressure-plate-signal",
+        "entityId": "pressure-plate",
+        "triggers": [
+          {
+            "id": "plate-collision",
+            "kind": "onCollision",
+            "event": "platePressed"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "player-on-plate",
+            "kind": "flagEquals",
+            "field": "playerOnPlate",
+            "value": "true"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-plate-primed",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "platePrimed"
+          },
+          {
+            "id": "route-gate-signal",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "gateSignal"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "idle",
+          "states": [
+            {
+              "id": "idle",
+              "transitions": [
+                {
+                  "id": "plate-enters-pressed",
+                  "to": "pressed",
+                  "onEvent": "platePressed"
+                }
+              ]
+            },
+            {
+              "id": "pressed",
+              "transitions": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "dash-ability-regression",
+        "entityId": "player",
+        "triggers": [
+          {
+            "id": "dash-input",
+            "kind": "onInputAction",
+            "event": "dash"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "dash-cooldown-ready",
+            "kind": "cooldownReady"
+          }
+        ],
+        "actions": [
+          {
+            "id": "dash-forward",
+            "kind": "moveEntity",
+            "effectKind": "movement",
+            "targetEntityId": "player",
+            "dx": 4,
+            "dy": 0
+          },
+          {
+            "id": "dash-flag",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "dashExecuted"
+          },
+          {
+            "id": "dash-sound",
+            "kind": "startAudioIntent",
+            "effectKind": "audioIntent",
+            "targetEntityId": "player",
+            "value": "dash"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "dash-vfx",
+            "actions": [
+              {
+                "id": "dash-vfx-intent",
+                "kind": "startAnimationIntent",
+                "effectKind": "animationIntent",
+                "targetEntityId": "player",
+                "value": "dash-vfx"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hazard-state-pulse",
+        "entityId": "hazard",
+        "triggers": [
+          {
+            "id": "hazard-pulse",
+            "kind": "onEvent",
+            "event": "hazardPulse"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "hazard-armed",
+            "kind": "stateEquals",
+            "value": "armed"
+          }
+        ],
+        "actions": [
+          {
+            "id": "damage-player",
+            "kind": "damage",
+            "effectKind": "health",
+            "targetEntityId": "player",
+            "amount": 2
+          },
+          {
+            "id": "emit-hazard-fired",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "hazardFired"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "armed",
+          "states": [
+            {
+              "id": "armed",
+              "transitions": [
+                {
+                  "id": "hazard-enters-cooldown",
+                  "to": "cooldown",
+                  "onEvent": "hazardPulse"
+                }
+              ]
+            },
+            {
+              "id": "cooldown",
+              "transitions": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "exit-terminal-check",
+        "entityId": "exit",
+        "triggers": [
+          {
+            "id": "exit-event",
+            "kind": "onEvent",
+            "event": "exitReached"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "has-regression-key",
+            "kind": "hasItem",
+            "value": "regressionKey"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-regression-win",
+            "kind": "markWinState",
+            "effectKind": "terminalState"
+          },
+          {
+            "id": "emit-regression-victory",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "regressionVictory"
+          }
+        ]
+      }
+    ]
+  },
+  "transactionOutputRef": "runs/behavior-applies/gameplay-logic-regression-v9/transaction.json",
+  "rollbackMetadata": {
+    "beforeHash": "fnv1a64-canonical-json-v1:1111222233334444",
+    "rollbackRef": "runs/behavior-applies/gameplay-logic-regression-v9/rollback.json",
+    "strategy": "restore fixture-scoped behavior target from beforeHash after manual review"
+  },
+  "rerunCommand": {
+    "command": "cargo run -p ouroforge-cli -- behavior apply transaction validate examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json",
+    "argv": [
+      "ouroforge",
+      "behavior",
+      "apply",
+      "transaction",
+      "validate",
+      "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+    ],
+    "allowlistPolicyId": "behavior-apply-local-rust-validation-v1"
+  },
+  "evidenceRefs": [
+    {
+      "id": "scenario-coverage-v9-runtime",
+      "kind": "scenario-result",
+      "path": "runs/behavior-applies/gameplay-logic-regression-v9/evidence/scenario-result.json",
+      "summary": "Reviewed Scenario Coverage v9 behavior runtime result before trusted apply."
+    }
+  ],
+  "status": "readyForTrustedApply",
+  "blockedReasons": [],
+  "trustedBoundary": "Accepted review and rollback metadata are required before trusted Rust/local behavior apply; no arbitrary script execution, no auto-apply, no auto-merge, no self-approval, no browser trusted writes, no command bridge, no eval, no dynamic import, no plugin loader, and no local server bridge."
+}

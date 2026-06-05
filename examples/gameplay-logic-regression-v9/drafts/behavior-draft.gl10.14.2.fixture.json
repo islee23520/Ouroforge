@@ -1,0 +1,239 @@
+{
+  "schemaVersion": "ouroforge.behavior-draft.v1",
+  "draftId": "draft-gameplay-logic-regression-v9-routing",
+  "target": {
+    "projectId": "scenario_coverage_v9_gameplay_logic",
+    "scenePath": "scenes/gameplay-logic-regression-v9.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:1111222233334444"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "gameplay-logic-regression-v9",
+    "sceneId": "gameplay-logic-regression-v9-scene",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed",
+      "reviewDecisionId": "review-gl10-14-1-fixture"
+    },
+    "behaviors": [
+      {
+        "id": "pressure-plate-signal",
+        "entityId": "pressure-plate",
+        "triggers": [
+          {
+            "id": "plate-collision",
+            "kind": "onCollision",
+            "event": "platePressed"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "player-on-plate",
+            "kind": "flagEquals",
+            "field": "playerOnPlate",
+            "value": "true"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-plate-primed",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "platePrimed"
+          },
+          {
+            "id": "route-gate-signal",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "gateSignal"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "idle",
+          "states": [
+            {
+              "id": "idle",
+              "transitions": [
+                {
+                  "id": "plate-enters-pressed",
+                  "to": "pressed",
+                  "onEvent": "platePressed"
+                }
+              ]
+            },
+            {
+              "id": "pressed",
+              "transitions": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "dash-ability-regression",
+        "entityId": "player",
+        "triggers": [
+          {
+            "id": "dash-input",
+            "kind": "onInputAction",
+            "event": "dash"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "dash-cooldown-ready",
+            "kind": "cooldownReady"
+          }
+        ],
+        "actions": [
+          {
+            "id": "dash-forward",
+            "kind": "moveEntity",
+            "effectKind": "movement",
+            "targetEntityId": "player",
+            "dx": 4,
+            "dy": 0
+          },
+          {
+            "id": "dash-flag",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "dashExecuted"
+          },
+          {
+            "id": "dash-sound",
+            "kind": "startAudioIntent",
+            "effectKind": "audioIntent",
+            "targetEntityId": "player",
+            "value": "dash"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "dash-vfx",
+            "actions": [
+              {
+                "id": "dash-vfx-intent",
+                "kind": "startAnimationIntent",
+                "effectKind": "animationIntent",
+                "targetEntityId": "player",
+                "value": "dash-vfx"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hazard-state-pulse",
+        "entityId": "hazard",
+        "triggers": [
+          {
+            "id": "hazard-pulse",
+            "kind": "onEvent",
+            "event": "hazardPulse"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "hazard-armed",
+            "kind": "stateEquals",
+            "value": "armed"
+          }
+        ],
+        "actions": [
+          {
+            "id": "damage-player",
+            "kind": "damage",
+            "effectKind": "health",
+            "targetEntityId": "player",
+            "amount": 2
+          },
+          {
+            "id": "emit-hazard-fired",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "hazardFired"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "armed",
+          "states": [
+            {
+              "id": "armed",
+              "transitions": [
+                {
+                  "id": "hazard-enters-cooldown",
+                  "to": "cooldown",
+                  "onEvent": "hazardPulse"
+                }
+              ]
+            },
+            {
+              "id": "cooldown",
+              "transitions": []
+            }
+          ]
+        }
+      },
+      {
+        "id": "exit-terminal-check",
+        "entityId": "exit",
+        "triggers": [
+          {
+            "id": "exit-event",
+            "kind": "onEvent",
+            "event": "exitReached"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "has-regression-key",
+            "kind": "hasItem",
+            "value": "regressionKey"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-regression-win",
+            "kind": "markWinState",
+            "effectKind": "terminalState"
+          },
+          {
+            "id": "emit-regression-victory",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "regressionVictory"
+          }
+        ]
+      }
+    ]
+  },
+  "rationale": "Add fixture-scoped structured gameplay behavior regression coverage for event routing, state transitions, ability/cooldown effects, and runtime evidence review.",
+  "linkedEvidence": [
+    {
+      "id": "runtime-event-order",
+      "kind": "runtime-event-log",
+      "path": "evidence/gameplay-logic-regression-v9/runtime-event-order.fixture.json",
+      "summary": "Runtime event ordering proves input event precedes emitted signal."
+    },
+    {
+      "id": "scenario-outcome",
+      "kind": "scenario-result",
+      "path": "evidence/gameplay-logic-regression-v9/scenario-outcome.fixture.json",
+      "summary": "Scenario assertion evidence passes for GL10.14.1 behavior runtime coverage."
+    }
+  ],
+  "expectedScenarioImpact": [
+    {
+      "scenarioId": "behavior-model-runtime-regression",
+      "summary": "Regression scenario remains passing after accepted review-gated behavior apply evidence is linked.",
+      "expectedVerdict": "passed"
+    }
+  ],
+  "author": {
+    "source": "agent",
+    "actor": "codex"
+  },
+  "validationStatus": "drafted",
+  "blockedReasons": [],
+  "untrustedBoundary": "Untrusted behavior draft for Scenario Coverage v9; does not apply trusted files; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, browser trusted write, local server bridge, auto-apply, auto-merge, or self-approval."
+}
