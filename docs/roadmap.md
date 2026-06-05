@@ -47,13 +47,19 @@ event/signal contracts, state-machine and ability/action contracts, script and
 sandbox design gates, runtime integration, scenario assertions, behavior drafts,
 review-gated apply records, evidence/journal integration, escaped read-only
 Studio/dashboard inspection, a deterministic demo, Scenario Coverage v9, and a
-conservative governance refresh, and a completed Evaluator Depth v1 milestone
+conservative governance refresh, a completed Evaluator Depth v1 milestone
 that adds bounded visual and semantic evaluator gates, additive four-category
 verdict/Journals, read-only inspection, deterministic demo evidence, Scenario
-Coverage v19, and conservative governance:
+Coverage v19, and conservative governance, and a completed Build / Export /
+Packaging v1 local export foundation: export target matrix, export profile,
+dry-run export plan, deterministic staging, local web bundle assembly, asset
+manifest/path rewriting,
+runtime probe preservation, checksums/provenance, export verification evidence,
+fixture-scoped Scenario Coverage v15, read-only inspection, and explicit
+release/publish blockers:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> local web export/package evidence
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -71,6 +77,20 @@ evidence rather than aesthetic quality, semantic judgment is over declared
 invariants rather than general AI correctness, and no auto-fix/apply/merge,
 trusted mutation, command bridge, release-readiness claim, or engine-replacement
 claim is introduced.
+
+Build / Export / Packaging v1 (#720-#736) is now complete as a local-only export
+foundation. The merged evidence chain added the export target matrix, export
+profile schema, dry-run export plan, deterministic generated-state staging,
+local web bundle assembly, asset manifest/path rewriting, runtime probe
+preservation, checksum/provenance primitives, package metadata, verification
+coverage, read-only inspection contracts, release/publish blockers, and Scenario
+Coverage v15. This completion means a bounded local web package can be assembled
+and inspected as evidence; it does not mean public release, deployment, signing,
+store publishing, desktop/mobile/native export, production distribution,
+commercial readiness, secure distribution, multi-platform parity, or Godot
+replacement status. Generated package outputs, checksums, verification logs,
+screenshots, temp servers, dashboard exports, and local tool state remain
+ignored unless a future issue explicitly scopes a source-like fixture.
 
 ## Completed evidence-native milestones
 
@@ -208,6 +228,16 @@ The current implementation has completed these documented milestone surfaces:
   `docs/studio-behavior-inspection-surface-v1.md`,
   `examples/gameplay-logic-demo-v1/README.md`,
   `examples/gameplay-logic-regression-v9/README.md`)
+- Build / Export / Packaging v1 / local export package foundation
+  (`docs/build-export-packaging-v1.md`,
+  `docs/export-target-matrix-v1.md`,
+  `docs/export-staging-policy-v1.md`,
+  `docs/scenario-coverage-v15-build-export-packaging.md`,
+  `examples/build-export-packaging-regression-v15/coverage-matrix.fixture.json`,
+  `examples/export-profile-v1/export-profile.valid.fixture.json`,
+  `examples/export-bundle-v1/export-profile.fixture.json`,
+  `examples/export-asset-manifest-v1/asset-manifest.valid.fixture.json`,
+  `examples/export-probe-v1/`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -529,6 +559,14 @@ remain separate maintainer actions.
   readiness, or engine-replacement status. Use Milestone 5.1 to consume these
   verdicts for evidence-linked mutation proposals rather than weakening the
   evaluator boundary.
+- Treat Build / Export / Packaging v1 as complete but local-only. Its artifacts
+  authorize fixture-scoped local web package evidence, deterministic staging,
+  profile/plan validation, asset manifests, runtime probe preservation,
+  checksums/provenance, verification evidence, and read-only inspection; they do
+  not authorize public release, deployment, signing, upload, app-store/Steam/itch
+  publishing, desktop/mobile/native export, credentialed release flow,
+  production-ready export claims, commercial distribution, secure distribution,
+  multi-platform parity, or Godot replacement status.
 
 ## Active anchors
 

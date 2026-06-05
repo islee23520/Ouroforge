@@ -67,3 +67,25 @@ Every follow-up PR must pass the standard repository gates (`cargo fmt --check`,
 ## Governance anchors
 
 #1 remains the broad roadmap/final-goal anchor. #23 remains the repo-memory/design context anchor. Both remain open through this contract issue; this milestone does not close or modify either without a separate explicit governance decision.
+
+## Completion and governance refresh (#736)
+
+Build / Export / Packaging v1 is complete as a local evidence-backed export
+foundation after #720-#736. Completed capability includes the local export target
+matrix, export profile validation, dry-run export planning, deterministic
+staging under ignored generated roots, local web bundle assembly, asset
+manifest/path rewriting, runtime probe preservation, checksum/provenance
+primitives, package metadata/descriptor coverage, export verification coverage,
+fixture-scoped Scenario Coverage v15, read-only dashboard/Studio inspection
+contracts, and explicit release/publish blockers.
+
+Remaining work is intentionally separate: Plugin / Extension System v1, Full
+Studio Editor v1, native/desktop/mobile/store export design gates, signing,
+release/publish workflows, and the Godot-plus demonstration game each require
+their own scoped issues and evidence. This completion does not authorize public
+release, deployment, upload, signing, app-store/Steam/itch publishing,
+credential use, CI release automation, production distribution, commercial
+release readiness, secure distribution, multi-platform parity, current Godot
+replacement status, or closing #1/#23.
+
+#1 remains open. #23 remains open.
