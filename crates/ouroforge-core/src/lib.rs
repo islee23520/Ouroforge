@@ -29,6 +29,7 @@ mod behavior_draft_validation;
 pub mod source_apply_verification_runner;
 pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
+pub mod export_plan;
 pub mod export_profile;
 pub mod internal_sprite_audit;
 pub mod source_apply_highrisk_blocker;
