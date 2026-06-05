@@ -8,6 +8,9 @@ const godotPlusDesignPillarsDoc = fs.readFileSync('docs/godot-plus-demo-design-p
 const godotPlusDocsReadme = fs.readFileSync('docs/README.md', 'utf8');
 const studioQaSwarmInspectionDoc = fs.readFileSync('docs/studio-qa-swarm-inspection-surface-v1.md', 'utf8');
 const cockpitQaSwarmReadme = fs.readFileSync('examples/authoring-cockpit/README.md', 'utf8');
+const fullStudioDemoDoc = fs.readFileSync('docs/full-studio-editor-integrated-demo-v1.md', 'utf8');
+const fullStudioDemoReadme = fs.readFileSync('examples/full-studio-editor-demo-v1/README.md', 'utf8');
+const fullStudioDemoFixture = require('../full-studio-editor-demo-v1/demo.fixture.json');
 
 assert.match(behaviorDraftDocs, /untrusted data/i);
 assert.match(behaviorDraftDocs, /does not apply trusted files/i);
@@ -60,6 +63,58 @@ assert.match(cockpitQaSwarmReadme, /never spawns workers, executes copyable comm
 assert.match(cockpitQaSwarmReadme, /Generated QA\/playtest runs, fuzz inputs, screenshots, videos, traces, dashboard exports, temp projects, browser profiles, and local tool state remain ignored/);
 assert.match(cockpitQaSwarmReadme, /issues #1 and #23 remain governance anchors/);
 assert.doesNotMatch(studioQaSwarmInspectionDoc, /QA swarm autonomously guarantees|fun is proven|production-ready engine is available|current Godot replacement is implemented|browser command bridge enabled|auto-fix enabled|cloud runner enabled/);
+
+
+assert.match(fullStudioDemoDoc, /Issue: #774/);
+assert.match(fullStudioDemoDoc, /project overview/);
+assert.match(fullStudioDemoDoc, /scene tree and entity\/component inspector/);
+assert.match(fullStudioDemoDoc, /visual scene canvas/);
+assert.match(fullStudioDemoDoc, /asset browser and metadata inspector/);
+assert.match(fullStudioDemoDoc, /scenario\/playtest evidence panel/);
+assert.match(fullStudioDemoDoc, /export\/package inspection panel/);
+assert.match(fullStudioDemoDoc, /plugin\/extension descriptor panel/);
+assert.match(fullStudioDemoDoc, /draft edit preview/);
+assert.match(fullStudioDemoDoc, /Safe Source Apply handoff preview/);
+assert.match(fullStudioDemoDoc, /#1/);
+assert.match(fullStudioDemoDoc, /#23/);
+assert.match(fullStudioDemoReadme, /fixture-scoped/);
+assert.match(fullStudioDemoReadme, /does \*\*not\*\* write/);
+assert.doesNotMatch(fullStudioDemoDoc, /production-ready editor is available|current Godot replacement is implemented|auto-apply enabled|auto-merge enabled|plugin runtime enabled|native export ready/);
+
+const fullStudioModel = cockpit.fullStudioEditorDemoModel(fullStudioDemoFixture);
+assert.equal(fullStudioModel.present, true);
+assert.equal(fullStudioModel.issue, 774);
+assert.equal(fullStudioModel.missingPanels.length, 0);
+assert.deepEqual(fullStudioModel.panels.map((panel) => panel.id), [
+  'project-overview',
+  'studio-scene-tree-inspector',
+  'studio-scene-canvas',
+  'studio-asset-browser',
+  'studio-scenario-panel',
+  'studio-export-package-panel',
+  'studio-plugin-panel',
+  'studio-draft-authoring',
+  'studio-source-apply-handoff',
+  'command-palette',
+]);
+assert.match(cockpit.renderFullStudioEditorDemoSurface(fullStudioDemoFixture), /Full Studio Editor integrated demo/);
+assert.match(cockpit.renderFullStudioEditorDemoSurface(fullStudioDemoFixture), /All required integrated demo panels/);
+assert.match(cockpit.renderProjectOverviewSurface(fullStudioDemoFixture), /Full Studio Editor fixture/);
+assert.match(cockpit.renderStudioSceneTreeInspectorSurface(fullStudioDemoFixture), /scene tree/);
+assert.match(cockpit.renderEntityComponentInspectorSurface(fullStudioDemoFixture), /Entity/);
+assert.match(cockpit.renderStudioSceneCanvasSurface(fullStudioDemoFixture), /Visual scene canvas/);
+assert.match(cockpit.renderStudioAssetBrowserSurface(fullStudioDemoFixture), /Asset browser/);
+assert.match(cockpit.renderStudioScenarioPanelSurface(fullStudioDemoFixture), /Scenario and playtest panel/);
+assert.match(cockpit.renderStudioExportPackageInspectionSurface(fullStudioDemoFixture), /Export \/ package inspection/);
+assert.match(cockpit.renderStudioPluginPanelSurface(fullStudioDemoFixture), /Plugin \/ extension panel/);
+assert.match(cockpit.renderStudioDraftAuthoringSurface(fullStudioDemoFixture), /demo-player-color-draft/);
+assert.match(cockpit.renderStudioSourceApplyHandoffSurface(fullStudioDemoFixture), /player-color\.preview\.json/);
+assert.match(cockpit.renderStudioCommandPaletteSurface(fullStudioDemoFixture), /Command palette/);
+assert.match(cockpit.renderEvidencePane(fullStudioDemoFixture), /Full Studio Editor integrated demo/);
+assert.match(cockpit.renderEvidencePane(fullStudioDemoFixture), /Safe Source Apply handoff/);
+assert.equal(cockpit.resolveStudioCommand('apply-source').allowed, false);
+assert.equal(cockpit.resolveStudioCommand('execute-plugin').allowed, false);
+assert.equal(cockpit.resolveStudioCommand('publish').allowed, false);
 
 const moved = cockpit.applyEdit(scene, 'player', 'components.transform.x', '48');
 assert.equal(cockpit.getValue(moved.entities[0], 'components.transform.x'), 48);

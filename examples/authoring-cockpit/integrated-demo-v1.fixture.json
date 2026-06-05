@@ -1,0 +1,1000 @@
+{
+  "schemaVersion": "full-studio-integrated-demo-v1",
+  "issue": 774,
+  "fixtureId": "full-studio-integrated-demo-v1",
+  "selectedEntity": "player",
+  "scenePath": "examples/full-studio/scenes/demo.scene.json",
+  "scene": {
+    "scene_id": "full-studio-integrated-demo",
+    "entities": [
+      {
+        "id": "player",
+        "sprite": {
+          "color": "#8bd3ff",
+          "layer": "actors"
+        },
+        "components": {
+          "transform": {
+            "x": 32,
+            "y": 48
+          },
+          "velocity": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 24
+          },
+          "controllable": true,
+          "collider": {
+            "kind": "box",
+            "width": 16,
+            "height": 24
+          },
+          "animation": {
+            "state": "idle"
+          }
+        }
+      },
+      {
+        "id": "gate",
+        "sprite": {
+          "color": "#facc15",
+          "layer": "props"
+        },
+        "components": {
+          "transform": {
+            "x": 160,
+            "y": 48
+          },
+          "velocity": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 28
+          },
+          "controllable": false,
+          "collider": {
+            "kind": "box",
+            "width": 20,
+            "height": 28
+          }
+        }
+      }
+    ]
+  },
+  "run": {
+    "summary": {
+      "id": "full-studio-demo-run-1",
+      "run_dir": "runs/generated/full-studio-integrated-demo/run-1",
+      "verdict_status": "passed",
+      "scenario_status": "passed"
+    },
+    "project": {
+      "id": "full-studio-demo-project",
+      "name": "Full Studio Fixture",
+      "projectRoot": "examples/full-studio",
+      "manifestPath": "examples/full-studio/ouroforge.project.json",
+      "manifestHash": {
+        "algorithm": "fnv1a64",
+        "value": "demo-manifest-hash"
+      },
+      "seedPath": "examples/full-studio/seeds/integrated-demo.yaml",
+      "scenes": [
+        {
+          "id": "demo-scene",
+          "path": "examples/full-studio/scenes/demo.scene.json",
+          "hash": {
+            "algorithm": "fnv1a64",
+            "value": "demo-scene-hash"
+          }
+        }
+      ],
+      "scenarioPack": {
+        "id": "full-studio-demo-scenarios",
+        "path": "examples/full-studio/scenarios/integrated-demo.scenario-pack.json",
+        "scenarioIds": [
+          "inspect-draft-export-plugin-handoff"
+        ]
+      }
+    },
+    "command_context": {
+      "schemaVersion": "run-command-context-v1",
+      "command": "cargo run -p ouroforge-cli -- run examples/full-studio/seeds/integrated-demo.yaml --project examples/full-studio/ouroforge.project.json --scenario-pack full-studio-demo-scenarios",
+      "seedPath": "examples/full-studio/seeds/integrated-demo.yaml",
+      "workers": 1,
+      "runsRoot": "runs/generated/full-studio-integrated-demo",
+      "projectRoot": "examples/full-studio",
+      "manifestPath": "examples/full-studio/ouroforge.project.json",
+      "scenarioPackId": "full-studio-demo-scenarios",
+      "runtimeTarget": "local-static-browser",
+      "environmentHints": [
+        "The cockpit displays this command as inert text only."
+      ]
+    },
+    "evidence": [
+      {
+        "id": "scenario-report",
+        "kind": "application/json",
+        "path": "runs/generated/full-studio-integrated-demo/evidence/scenario-report.json",
+        "value": {
+          "status": "passed"
+        }
+      }
+    ],
+    "screenshots": [
+      {
+        "id": "demo-cockpit-screenshot",
+        "kind": "image/png",
+        "path": "runs/generated/full-studio-integrated-demo/screenshots/cockpit.png"
+      }
+    ],
+    "scenarioPlaytestPanel": {
+      "schemaVersion": "studio-scenario-playtest-panel-v1",
+      "status": "passed",
+      "boundary": "Read-only scenario and playtest evidence panel; Studio does not launch runs or execute commands.",
+      "scenarios": [
+        {
+          "scenarioId": "inspect-draft-export-plugin-handoff",
+          "title": "Inspect, draft, export, plugin, and handoff preview",
+          "verdict": "passed",
+          "runStatus": "completed",
+          "failureClassification": "none",
+          "templateSource": {
+            "id": "full-studio-template",
+            "path": "examples/full-studio/scenarios/integrated-demo.scenario.json"
+          },
+          "screenshots": [
+            {
+              "id": "cockpit",
+              "path": "runs/generated/full-studio-integrated-demo/screenshots/cockpit.png"
+            }
+          ],
+          "worldState": [
+            {
+              "id": "post-draft-preview",
+              "path": "runs/generated/full-studio-integrated-demo/world-state.json",
+              "summary": "draft preview visible; trusted scene unchanged"
+            }
+          ],
+          "logs": [
+            {
+              "id": "demo-log",
+              "path": "runs/generated/full-studio-integrated-demo/log.txt",
+              "level": "info",
+              "message": "integrated demo inspected without command execution"
+            }
+          ],
+          "evidenceLinks": [
+            {
+              "id": "demo-report",
+              "path": "runs/generated/full-studio-integrated-demo/evidence/report.json"
+            }
+          ],
+          "diagnostics": [
+            "No failure diagnostics recorded."
+          ]
+        }
+      ],
+      "forbiddenControls": [
+        "run-start-button",
+        "browser-command-bridge",
+        "arbitrary-shell-command",
+        "publish-deploy"
+      ],
+      "generatedState": {
+        "roots": [
+          "runs/generated/full-studio-integrated-demo"
+        ],
+        "trackedFixtureOnly": true
+      }
+    },
+    "exportPackagePanel": {
+      "schemaVersion": "studio-export-package-panel-v1",
+      "status": "blocked-release",
+      "boundary": "Read-only export/package inspection panel; Studio cannot export, publish, deploy, sign, upload, or execute commands.",
+      "profile": {
+        "id": "web-local",
+        "path": "examples/full-studio/export/web-local.export-profile.json",
+        "target": "web-local"
+      },
+      "plan": {
+        "id": "full-studio-integrated-export-plan",
+        "path": "runs/generated/full-studio-integrated-demo/export/plan.json",
+        "summary": "Local static fixture package evidence only."
+      },
+      "packageStatus": {
+        "packageId": "full-studio-integrated-web-local",
+        "status": "verified",
+        "packagePath": "runs/generated/full-studio-integrated-demo/package/web-local.zip"
+      },
+      "checksums": [
+        {
+          "artifactId": "index-html",
+          "path": "runs/generated/full-studio-integrated-demo/package/index.html",
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        }
+      ],
+      "verification": {
+        "verdict": "passed",
+        "evidenceRef": "runs/generated/full-studio-integrated-demo/export/verification.json",
+        "summary": "Local fixture package evidence verified."
+      },
+      "generatedStateWarnings": [
+        "runs/generated/full-studio-integrated-demo remains ignored"
+      ],
+      "blockedReleaseActions": [
+        {
+          "action": "publish/deploy/sign/upload",
+          "status": "blocked",
+          "reason": "release automation is out of scope for this demo"
+        }
+      ]
+    },
+    "pluginExtensionPanel": {
+      "schemaVersion": "studio-plugin-extension-panel-v1",
+      "status": "ready-read-only",
+      "boundary": "Read-only plugin/extension inspection panel; Studio does not install, update, delete, enable, run, browse marketplaces, bridge browser commands, or write trusted sources.",
+      "registry": {
+        "id": "full-studio-local-registry",
+        "path": "examples/full-studio/plugins/registry.json",
+        "validationStatus": "passed",
+        "compatibility": "fixture-only"
+      },
+      "plugins": [
+        {
+          "pluginId": "panel.quest-log",
+          "name": "Quest Log Panel",
+          "descriptorPath": "examples/full-studio/plugins/panel.quest-log/plugin.json",
+          "version": "0.3.1",
+          "validationStatus": "passed",
+          "compatibility": "fixture-only",
+          "capabilities": [
+            "panel-read",
+            "evidence-browse"
+          ],
+          "extensionPoints": [
+            "studio.sidebar.quest-log"
+          ],
+          "blockedReasons": [
+            "interactive execution is disabled in browser"
+          ],
+          "contributedPanels": [
+            {
+              "panelId": "quest-log-summary",
+              "title": "Quest Log Summary",
+              "surface": "sidebar",
+              "mode": "read-only",
+              "evidencePath": "examples/full-studio/plugins/panel.quest-log/quest-log-summary.json"
+            }
+          ]
+        }
+      ],
+      "generatedStateWarnings": [
+        "plugin registry snapshots are fixture-only evidence"
+      ],
+      "forbiddenControls": [
+        "installCommand",
+        "runCommand",
+        "marketplaceCommand",
+        "browserCommandBridge",
+        "trustedWriteCommand"
+      ]
+    },
+    "commandPalette": {
+      "selectedEntity": "player",
+      "selectedScene": "examples/full-studio/scenes/demo.scene.json",
+      "evidencePath": "runs/generated/full-studio-integrated-demo/evidence/report.json"
+    },
+    "asset_inspector": {
+      "present": true,
+      "status": "ready",
+      "asset_count": 2,
+      "warning_count": 0,
+      "assets": [
+        {
+          "assetId": "player_sprite",
+          "assetType": "sprite",
+          "sourcePath": "examples/full-studio/assets/player.svg",
+          "contentHash": "sha256:player",
+          "runtimeStatuses": [
+            "loaded"
+          ],
+          "atlasFrameCount": 1,
+          "warnings": []
+        },
+        {
+          "assetId": "gate_sprite",
+          "assetType": "sprite",
+          "sourcePath": "examples/full-studio/assets/gate.svg",
+          "contentHash": "sha256:gate",
+          "runtimeStatuses": [
+            "loaded"
+          ],
+          "atlasFrameCount": 1,
+          "warnings": []
+        }
+      ],
+      "evidenceRefs": [
+        "runs/generated/full-studio-integrated-demo/assets/asset-inspector.json"
+      ]
+    },
+    "studioDraftAuthoring": {
+      "present": true,
+      "boundary": "Temporary Studio draft preview state; browser cannot write files or execute commands.",
+      "drafts": [
+        {
+          "schemaVersion": "visual-edit-draft-v1",
+          "draftId": "draft-scene-color",
+          "draftPath": "runs/generated/full-studio-integrated-demo/drafts/draft-scene-color.json",
+          "target": {
+            "type": "scene",
+            "path": "examples/full-studio/scenes/demo.scene.json",
+            "id": "player"
+          },
+          "proposedOperations": [
+            {
+              "id": "op-player-color",
+              "kind": "set-field",
+              "path": "entities.player.sprite.color",
+              "value": "#ffffff",
+              "summary": "Preview player sprite recolor only"
+            }
+          ],
+          "beforeHash": "fnv1a64-scene-before",
+          "expectedAfterSummary": "Player sprite color preview is visible; trusted scene remains unchanged.",
+          "linkedEvidence": [
+            "runs/generated/full-studio-integrated-demo/evidence/draft-preview.json"
+          ],
+          "reviewGate": {
+            "proposalId": "source-apply-handoff-preview",
+            "patchDraftId": "patch-draft-preview",
+            "reviewDecisionId": "manual-review-required"
+          },
+          "validationStatus": "blocked",
+          "blockedReasons": [
+            "awaiting Rust preview",
+            "Safe Source Apply handoff review is required"
+          ]
+        }
+      ]
+    },
+    "visualDiffPreview": {
+      "schemaVersion": "visual-diff-summary-v1",
+      "summaryId": "visual-diff-integrated-demo",
+      "status": "preview",
+      "boundary": "Visual diff preview is read-only; browser cannot apply edits, write files, execute commands, or persist drafts.",
+      "operations": [
+        {
+          "id": "op-player-color",
+          "kind": "set-field",
+          "summary": "Preview player sprite recolor only",
+          "sourceRef": "draft draft-scene-color",
+          "collisionImpactCount": 0,
+          "triggerImpactCount": 0,
+          "scenarioImpact": "inspect-draft-export-plugin-handoff"
+        }
+      ],
+      "refs": [
+        "dashboard dashboard-data.json#full-studio-demo-run-1"
+      ]
+    },
+    "mutation_artifacts": [
+      {
+        "id": "source-patch-evidence-bundle",
+        "path": "mutation/source-patch-evidence-bundle.json",
+        "value": {
+          "bundleId": "source-apply-handoff-preview",
+          "patchPreviewId": "patch-draft-preview",
+          "status": "review_required",
+          "patchSummary": {
+            "title": "Full Studio draft handoff preview",
+            "targetCount": 1,
+            "changedLines": 1,
+            "expectedBehaviorChange": "Player sprite color preview only; no trusted write is applied."
+          },
+          "fileClassSummary": {
+            "allowed": 0,
+            "reviewHeld": 1,
+            "blocked": 0,
+            "highestRisk": "trusted-source-review"
+          },
+          "riskIds": [
+            "review_held_target"
+          ],
+          "linkedEvidence": [
+            {
+              "kind": "source-patch-preview",
+              "path": "mutation/preview.json"
+            },
+            {
+              "kind": "draft-preview",
+              "path": "runs/generated/full-studio-integrated-demo/evidence/draft-preview.json"
+            }
+          ],
+          "dryRunSummary": {
+            "status": "passed",
+            "allowlistPolicyId": "safe-source-apply-preview-v1",
+            "reportRef": {
+              "kind": "sandbox-dry-run-report",
+              "path": "runs/generated/full-studio-integrated-demo/sandbox/report.json"
+            }
+          },
+          "requiredTestSummary": {
+            "total": 2,
+            "commands": [
+              "cargo fmt --check",
+              "cargo test"
+            ],
+            "allowlistPolicyId": "safe-source-apply-preview-v1"
+          },
+          "reviewSummary": {
+            "status": "required",
+            "decisionRef": {
+              "kind": "review-decision",
+              "path": "mutation/review-required.json"
+            }
+          },
+          "blockedReasons": [
+            "manual review required",
+            "trusted source mutation must use Safe Source Apply handoff"
+          ],
+          "previewRef": {
+            "kind": "source-patch-preview",
+            "path": "mutation/preview.json"
+          },
+          "fileClassReportRef": {
+            "kind": "file-class-report",
+            "path": "evidence/file-class.json"
+          },
+          "diffIntegrityReportRef": {
+            "kind": "diff-integrity-report",
+            "path": "evidence/diff.json"
+          },
+          "sandboxReportRef": {
+            "kind": "sandbox-dry-run-report",
+            "path": "runs/generated/full-studio-integrated-demo/sandbox/report.json"
+          },
+          "testSummaryRef": {
+            "kind": "test-summary",
+            "path": "runs/generated/full-studio-integrated-demo/sandbox/tests.json"
+          },
+          "reviewDecisionRef": {
+            "kind": "review-decision",
+            "path": "mutation/review-required.json"
+          },
+          "forbiddenActionNotices": [
+            {
+              "action": "apply_patch",
+              "reason": "browser cannot apply trusted patches"
+            },
+            {
+              "action": "merge_branch",
+              "reason": "manual review is required"
+            }
+          ]
+        }
+      }
+    ],
+    "project_overview": {
+      "present": true,
+      "project": {
+        "id": "full-studio-demo-project",
+        "title": "Full Studio Fixture",
+        "version": "v1"
+      },
+      "counts": {
+        "scenes": 1,
+        "assets": 2,
+        "scenarios": 1,
+        "evidenceRuns": 1
+      },
+      "exportStatus": "verified",
+      "pluginRegistryStatus": "validated",
+      "validationSummary": [
+        "Fixture-only integrated Studio panels render read-only/draft-only."
+      ],
+      "boundary": "Read-only Full Studio project overview; no trusted writes, command execution, publish/deploy, or plugin execution."
+    },
+    "studio_scene_canvas": {
+      "present": true,
+      "boundary": "Read-only integrated demo canvas; transform handles create drafts only and never write trusted scene files or execute commands.",
+      "width": 240,
+      "height": 120,
+      "grid": {
+        "size": 24,
+        "snap": true
+      },
+      "selectedEntity": "player",
+      "nodes": [
+        {
+          "id": "player",
+          "name": "Player",
+          "x": 32,
+          "y": 48,
+          "w": 16,
+          "h": 24,
+          "authored": true,
+          "selected": true,
+          "runtime": {
+            "x": 34,
+            "y": 48
+          }
+        },
+        {
+          "id": "gate",
+          "name": "Gate",
+          "x": 160,
+          "y": 48,
+          "w": 20,
+          "h": 28,
+          "authored": true
+        }
+      ]
+    },
+    "asset_browser": {
+      "present": true,
+      "boundary": "Read-only integrated demo asset browser; no import, generation, upload, fetch, manifest write, command execution, or apply.",
+      "assets": [
+        {
+          "id": "player_sprite",
+          "type": "sprite",
+          "sourcePath": "examples/full-studio/assets/player.svg",
+          "outputPath": "runs/generated/full-studio-integrated-demo/assets/player.svg",
+          "hash": "sha256:player",
+          "status": "verified",
+          "size": 512,
+          "metadata": [
+            {
+              "type": "asset-metadata",
+              "plugin": "panel.quest-log",
+              "fields": {
+                "layer": "actors",
+                "fixture": "true"
+              }
+            }
+          ]
+        },
+        {
+          "id": "gate_sprite",
+          "type": "sprite",
+          "sourcePath": "examples/full-studio/assets/gate.svg",
+          "outputPath": "runs/generated/full-studio-integrated-demo/assets/gate.svg",
+          "hash": "sha256:gate",
+          "status": "verified",
+          "size": 448,
+          "metadata": [
+            {
+              "type": "asset-metadata",
+              "plugin": "panel.quest-log",
+              "fields": {
+                "layer": "props",
+                "fixture": "true"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "scenario_panel": {
+      "schemaVersion": "studio-scenario-playtest-panel-v1",
+      "status": "passed",
+      "boundary": "Read-only scenario and playtest evidence panel; Studio does not launch runs or execute commands.",
+      "scenarios": [
+        {
+          "scenarioId": "inspect-draft-export-plugin-handoff",
+          "title": "Inspect, draft, export, plugin, and handoff preview",
+          "verdict": "passed",
+          "runStatus": "completed",
+          "failureClassification": "none",
+          "templateSource": {
+            "id": "full-studio-template",
+            "path": "examples/full-studio/scenarios/integrated-demo.scenario.json"
+          },
+          "screenshots": [
+            {
+              "id": "cockpit",
+              "path": "runs/generated/full-studio-integrated-demo/screenshots/cockpit.png"
+            }
+          ],
+          "worldState": [
+            {
+              "id": "post-draft-preview",
+              "path": "runs/generated/full-studio-integrated-demo/world-state.json",
+              "summary": "draft preview visible; trusted scene unchanged"
+            }
+          ],
+          "logs": [
+            {
+              "id": "demo-log",
+              "path": "runs/generated/full-studio-integrated-demo/log.txt",
+              "level": "info",
+              "message": "integrated demo inspected without command execution"
+            }
+          ],
+          "evidenceLinks": [
+            {
+              "id": "demo-report",
+              "path": "runs/generated/full-studio-integrated-demo/evidence/report.json"
+            }
+          ],
+          "diagnostics": [
+            "No failure diagnostics recorded."
+          ]
+        }
+      ],
+      "forbiddenControls": [
+        "run-start-button",
+        "browser-command-bridge",
+        "arbitrary-shell-command",
+        "publish-deploy"
+      ],
+      "generatedState": {
+        "roots": [
+          "runs/generated/full-studio-integrated-demo"
+        ],
+        "trackedFixtureOnly": true
+      }
+    },
+    "export_package_panel": {
+      "schemaVersion": "studio-export-package-panel-v1",
+      "status": "blocked-release",
+      "boundary": "Read-only export/package inspection panel; Studio cannot export, publish, deploy, sign, upload, or execute commands.",
+      "profile": {
+        "id": "web-local",
+        "path": "examples/full-studio/export/web-local.export-profile.json",
+        "target": "web-local"
+      },
+      "plan": [
+        "Collect fixture descriptors",
+        "Render read-only package evidence",
+        "Block publish/deploy/sign/upload controls"
+      ],
+      "packageStatus": "verified",
+      "checksums": [
+        {
+          "artifactId": "index-html",
+          "path": "runs/generated/full-studio-integrated-demo/package/index.html",
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        }
+      ],
+      "verification": {
+        "verdict": "passed",
+        "evidenceRef": "runs/generated/full-studio-integrated-demo/export/verification.json",
+        "summary": "Local fixture package evidence verified."
+      },
+      "generatedStateWarnings": [
+        "runs/generated/full-studio-integrated-demo remains ignored"
+      ],
+      "blockedReleaseActions": [
+        {
+          "action": "publish/deploy/sign/upload",
+          "status": "blocked",
+          "reason": "release automation is out of scope for this demo"
+        }
+      ],
+      "artifacts": [
+        {
+          "name": "web-local.zip",
+          "checksum": "sha256:demo",
+          "size": 2048,
+          "status": "verified"
+        }
+      ],
+      "verificationVerdict": "passed",
+      "publishBlocked": true
+    },
+    "plugin_panel": {
+      "present": true,
+      "status": "ready-read-only",
+      "boundary": "Read-only plugin/extension inspection panel; Studio does not install, update, delete, enable, run, browse marketplaces, bridge browser commands, or write trusted sources.",
+      "plugins": [
+        {
+          "id": "panel.quest-log",
+          "name": "Quest Log Panel",
+          "validationStatus": "passed",
+          "compatible": true,
+          "compatibility": "fixture-only compatible",
+          "capabilities": [
+            "panel-read",
+            "evidence-browse"
+          ],
+          "extensionPoints": [
+            "studio.sidebar.quest-log"
+          ],
+          "blockedReasons": [
+            "interactive execution is disabled in browser"
+          ],
+          "contributedPanels": [
+            {
+              "type": "info-panel",
+              "title": "Quest Log Summary",
+              "fields": {
+                "mode": "read-only",
+                "evidence": "quest-log-summary.json"
+              },
+              "text": "Fixture descriptor text only; no plugin code executes."
+            }
+          ]
+        }
+      ]
+    },
+    "visual_diff_preview": {
+      "schemaVersion": "visual-diff-summary-v1",
+      "summaryId": "visual-diff-integrated-demo",
+      "status": "preview",
+      "boundary": "Visual diff preview is read-only; browser cannot apply edits, write files, execute commands, or persist drafts.",
+      "operations": [
+        {
+          "id": "op-player-color",
+          "kind": "set-field",
+          "summary": "Preview player sprite recolor only",
+          "sourceRef": "draft draft-scene-color",
+          "collisionImpactCount": 0,
+          "triggerImpactCount": 0,
+          "scenarioImpact": "inspect-draft-export-plugin-handoff"
+        }
+      ],
+      "refs": [
+        "dashboard dashboard-data.json#full-studio-demo-run-1"
+      ],
+      "present": true,
+      "summaryCount": 1,
+      "operationCount": 1,
+      "summaries": [
+        {
+          "summaryId": "visual-diff-integrated-demo",
+          "target": {
+            "type": "scene",
+            "id": "player",
+            "path": "examples/full-studio/scenes/demo.scene.json"
+          },
+          "sourceRefs": {
+            "draftId": "draft-scene-color",
+            "proposalId": "source-apply-handoff-preview",
+            "dashboardRef": "dashboard-data.json#full-studio-demo-run-1"
+          },
+          "before": {
+            "summaryText": "Player sprite color #8bd3ff"
+          },
+          "after": {
+            "summaryText": "Preview player sprite color #ffffff; trusted scene unchanged",
+            "entitySummaries": [
+              {
+                "id": "player"
+              }
+            ],
+            "assetSummaries": []
+          },
+          "operationSummaries": [
+            {
+              "operationId": "op-player-color",
+              "change": "preview",
+              "path": "entities.player.sprite.color",
+              "summary": "Preview player sprite recolor only",
+              "affectedEntityIds": [
+                "player"
+              ]
+            }
+          ],
+          "expectedScenarioImpact": {
+            "status": "preview-only",
+            "summary": "Scenario evidence remains read-only until Safe Source Apply review."
+          }
+        }
+      ]
+    },
+    "full_studio_editor_demo": {
+      "present": true,
+      "issue": 774,
+      "status": "ready",
+      "fixture_root": "examples/authoring-cockpit/integrated-demo-v1.fixture.json",
+      "panels": [
+        {
+          "id": "project-overview",
+          "label": "Project overview",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-scene-tree-inspector",
+          "label": "Scene tree",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-scene-canvas",
+          "label": "Visual canvas",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-asset-browser",
+          "label": "Asset browser",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-scenario-panel",
+          "label": "Scenario and playtest panel",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-export-package-panel",
+          "label": "Export / package inspection",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-plugin-panel",
+          "label": "Plugin / extension panel",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-draft-authoring",
+          "label": "Studio draft authoring",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "studio-source-apply-handoff",
+          "label": "Studio source apply handoff",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "command-palette",
+          "label": "Studio command palette",
+          "required": true,
+          "present": true
+        }
+      ],
+      "draft_preview_ref": "draft-scene-color",
+      "handoff_preview_ref": "source-apply-handoff-preview",
+      "forbidden_actions": [
+        "trusted browser writes: blocked",
+        "command execution: blocked",
+        "publish/deploy/sign/upload: blocked",
+        "plugin execution: blocked",
+        "auto-apply/auto-merge: blocked"
+      ],
+      "generated_state": {
+        "roots": [
+          "runs/generated/full-studio-integrated-demo"
+        ],
+        "trackedFixtureOnly": true,
+        "trustedProjectMutation": false
+      },
+      "boundary": "Fixture-scoped Full Studio Editor demo; read-only inspection plus draft-only authoring and Safe Source Apply handoff preview."
+    },
+    "scene_canvas": {
+      "present": true,
+      "boundary": "Read-only integrated demo canvas; transform handles create drafts only and never write trusted scene files or execute commands.",
+      "width": 240,
+      "height": 120,
+      "grid": {
+        "size": 24,
+        "snap": true
+      },
+      "selectedEntity": "player",
+      "nodes": [
+        {
+          "id": "player",
+          "name": "Player",
+          "x": 32,
+          "y": 48,
+          "w": 16,
+          "h": 24,
+          "authored": true,
+          "selected": true,
+          "runtime": {
+            "x": 34,
+            "y": 48
+          }
+        },
+        {
+          "id": "gate",
+          "name": "Gate",
+          "x": 160,
+          "y": 48,
+          "w": 20,
+          "h": 28,
+          "authored": true
+        }
+      ]
+    },
+    "scene_tree_inspector": {
+      "present": true,
+      "selected_scene": "demo-scene",
+      "scenes": [
+        {
+          "id": "demo-scene",
+          "name": "Integrated demo scene",
+          "selected": true
+        }
+      ],
+      "nodes": [
+        {
+          "id": "player",
+          "name": "Player",
+          "type": "entity",
+          "authored": true,
+          "component_summary": "transform, sprite, collider, animation"
+        },
+        {
+          "id": "gate",
+          "name": "Gate",
+          "type": "entity",
+          "authored": true,
+          "component_summary": "transform, sprite, collider"
+        }
+      ]
+    },
+    "entity_component_inspector": {
+      "present": true,
+      "selected_entity": "player",
+      "entities": [
+        {
+          "id": "player",
+          "name": "Player",
+          "selected": true
+        },
+        {
+          "id": "gate",
+          "name": "Gate"
+        }
+      ],
+      "components": [
+        {
+          "entityId": "player",
+          "name": "sprite",
+          "fields": [
+            {
+              "name": "color",
+              "type": "string",
+              "value": "#8bd3ff",
+              "editable": true
+            }
+          ]
+        },
+        {
+          "entityId": "player",
+          "name": "transform",
+          "fields": [
+            {
+              "name": "x",
+              "type": "number",
+              "value": 32,
+              "editable": true
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "value": 48,
+              "editable": true
+            }
+          ]
+        }
+      ],
+      "boundary": "Read-only entity/component inspection; draft controls only, no trusted writes or commands."
+    }
+  },
+  "generatedState": {
+    "root": "runs/generated/full-studio-integrated-demo",
+    "trackedFixtureOnly": true,
+    "trustedProjectMutation": false
+  },
+  "guardrails": {
+    "directTrustedWrites": false,
+    "commandExecution": false,
+    "browserPersistence": false,
+    "publishDeploySignUpload": false,
+    "pluginExecution": false
+  },
+  "boundary": "Fixture-scoped integrated demo only; all outputs are read-only or generated-state evidence and no trusted write, command execution, release action, plugin execution, marketplace behavior, or Godot parity claim is introduced."
+}

@@ -1,0 +1,471 @@
+{
+  "summary": {
+    "id": "full-studio-editor-demo-v1",
+    "run_dir": "examples/full-studio-editor-demo-v1",
+    "verdict_status": "passed",
+    "scenario_status": "passed",
+    "created_at_unix_ms": 1780711200000
+  },
+  "full_studio_editor_demo": {
+    "present": true,
+    "issue": 774,
+    "status": "ready",
+    "fixture_root": "examples/full-studio-editor-demo-v1",
+    "boundary": "Fixture-scoped local static integrated demo; read-only inspection plus draft-only authoring and Safe Source Apply handoff preview. No trusted writes, command execution, publish/deploy/sign/upload, plugin execution, or Godot parity claim.",
+    "panels": [
+      {
+        "id": "project-overview",
+        "label": "Project overview",
+        "required": true
+      },
+      {
+        "id": "studio-scene-tree-inspector",
+        "label": "Scene tree and entity inspector",
+        "required": true
+      },
+      {
+        "id": "studio-scene-canvas",
+        "label": "Visual scene canvas",
+        "required": true
+      },
+      {
+        "id": "studio-asset-browser",
+        "label": "Asset browser and metadata",
+        "required": true
+      },
+      {
+        "id": "studio-scenario-panel",
+        "label": "Scenario/playtest panel",
+        "required": true
+      },
+      {
+        "id": "studio-export-package-panel",
+        "label": "Export/package inspection",
+        "required": true
+      },
+      {
+        "id": "studio-plugin-panel",
+        "label": "Plugin/extension panel",
+        "required": true
+      },
+      {
+        "id": "studio-draft-authoring",
+        "label": "Draft edit preview",
+        "required": true
+      },
+      {
+        "id": "studio-source-apply-handoff",
+        "label": "Safe Source Apply handoff preview",
+        "required": true
+      },
+      {
+        "id": "command-palette",
+        "label": "Read-only command palette",
+        "required": true
+      }
+    ],
+    "draft_preview_ref": "examples/full-studio-editor-demo-v1/drafts/player-color.preview.json",
+    "handoff_preview_ref": "examples/full-studio-editor-demo-v1/handoff/safe-source-apply.preview.json",
+    "generated_state": {
+      "tracked_fixture_only": true,
+      "ignored_roots": [
+        "runs/",
+        "target/",
+        ".omx/",
+        ".omc/",
+        ".openchrome/"
+      ]
+    },
+    "forbidden_actions": [
+      "trusted browser writes",
+      "command execution",
+      "publish/deploy/sign/upload",
+      "plugin code execution",
+      "auto-apply",
+      "auto-merge",
+      "Godot replacement claim"
+    ]
+  },
+  "project_overview": {
+    "present": true,
+    "project": {
+      "id": "full-studio-editor-demo",
+      "title": "Full Studio Editor fixture",
+      "version": "1.0.0"
+    },
+    "scene_count": 1,
+    "entity_count": 3,
+    "asset_count": 3,
+    "scenario_count": 1,
+    "evidence_count": 2,
+    "export_status": "verified",
+    "plugin_registry_status": "validated",
+    "validation_summary": [
+      "Fixture-scoped data only",
+      "Generated outputs remain ignored",
+      "#1 and #23 remain governance anchors"
+    ],
+    "boundary": "Read-only Studio project overview; no trusted writes or command execution."
+  },
+  "studio_scene_canvas": {
+    "present": true,
+    "width": 320,
+    "height": 180,
+    "selected_entity": "player",
+    "grid": {
+      "size": 16,
+      "snap": true
+    },
+    "nodes": [
+      {
+        "id": "player",
+        "name": "Player",
+        "x": 48,
+        "y": 64,
+        "w": 24,
+        "h": 24,
+        "authored": true,
+        "selected": true,
+        "runtime": {
+          "x": 50,
+          "y": 64
+        }
+      },
+      {
+        "id": "gate",
+        "name": "Gate",
+        "x": 240,
+        "y": 64,
+        "w": 24,
+        "h": 48,
+        "authored": true
+      },
+      {
+        "id": "npc-guide",
+        "name": "Guide",
+        "x": 112,
+        "y": 96,
+        "w": 24,
+        "h": 24,
+        "authored": false
+      }
+    ],
+    "boundary": "Read-only visual canvas with draft-only transform output; trusted apply requires Safe Source Apply handoff."
+  },
+  "asset_browser": {
+    "present": true,
+    "assets": [
+      {
+        "id": "player-sprite",
+        "type": "texture",
+        "source_path": "examples/full-studio-editor-demo-v1/assets/player.png",
+        "output_path": "generated/assets/player.atlas.json",
+        "hash": "sha256:111111",
+        "size": 512,
+        "status": "verified",
+        "metadata": [
+          {
+            "descriptor_type": "asset-metadata",
+            "plugin": "metadata-fixture",
+            "fields": {
+              "usage": "player",
+              "license": "fixture-only"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-sprite",
+        "type": "texture",
+        "source_path": "examples/full-studio-editor-demo-v1/assets/gate.png",
+        "output_path": "generated/assets/gate.atlas.json",
+        "hash": "sha256:222222",
+        "size": 384,
+        "status": "verified"
+      },
+      {
+        "id": "cue-tone",
+        "type": "audio",
+        "source_path": "examples/full-studio-editor-demo-v1/assets/cue.wav",
+        "output_path": "generated/assets/cue.audio.json",
+        "hash": "sha256:333333",
+        "size": 128,
+        "status": "verified",
+        "metadata": [
+          {
+            "descriptor_type": "audio-metadata",
+            "plugin": "metadata-fixture",
+            "fields": {
+              "duration_ms": 250
+            }
+          }
+        ]
+      }
+    ],
+    "boundary": "Read-only asset manifest and plugin metadata inspection; Studio does not import, generate, upload, fetch, or mutate assets."
+  },
+  "scenario_panel": {
+    "present": true,
+    "scenarios": [
+      {
+        "id": "studio-demo-smoke",
+        "template_source": "examples/full-studio-editor-demo-v1/scenarios/studio-demo-smoke.scenario.json",
+        "run_status": "completed",
+        "verdict": "passed",
+        "evidence_links": [
+          {
+            "ref": "evidence/studio-demo-smoke.json"
+          }
+        ],
+        "screenshots": [
+          "evidence/studio-demo-smoke.png"
+        ],
+        "logs": [
+          "Fixture smoke rendered core panels"
+        ]
+      }
+    ],
+    "boundary": "Read-only scenario/playtest evidence inspection; Studio does not launch runs, start scenarios, or execute commands."
+  },
+  "export_package_panel": {
+    "present": true,
+    "profile": "local-fixture-inspection",
+    "package_status": "ready",
+    "verification_verdict": "passed",
+    "publish_blocked": true,
+    "plan": [
+      "Inspect local bundle manifest",
+      "Verify checksums",
+      "Keep publish/deploy disabled"
+    ],
+    "artifacts": [
+      {
+        "name": "demo-bundle-manifest.json",
+        "checksum": "sha256:444444",
+        "size": 256,
+        "status": "verified"
+      }
+    ],
+    "generated_state_warnings": [],
+    "boundary": "Read-only export/package evidence inspection; Studio does not execute export, publish, deploy, sign, upload, or arbitrary commands."
+  },
+  "plugin_panel": {
+    "present": true,
+    "plugins": [
+      {
+        "id": "metadata-fixture",
+        "name": "Fixture Metadata Panels",
+        "validation_status": "valid",
+        "compatible": true,
+        "compatibility": "compatible",
+        "capabilities": [
+          "asset-metadata"
+        ],
+        "extension_points": [
+          "studio.asset.metadata.readonly"
+        ],
+        "blocked_reasons": [],
+        "contributed_panels": [
+          {
+            "descriptor_type": "key-value-panel",
+            "title": "Fixture asset metadata",
+            "fields": {
+              "mode": "read-only",
+              "runtime": "not-executed"
+            }
+          }
+        ]
+      }
+    ],
+    "boundary": "Read-only plugin registry and descriptor inspection; Studio does not install, update, delete, enable, or run plugins."
+  },
+  "studio_draft_authoring": {
+    "present": true,
+    "drafts": [
+      {
+        "draftId": "demo-player-color-draft",
+        "draftPath": "examples/full-studio-editor-demo-v1/drafts/player-color.preview.json",
+        "target": {
+          "type": "scene",
+          "path": "examples/full-studio-editor-demo-v1/scenes/demo.scene.json",
+          "id": "player"
+        },
+        "validationStatus": "validated",
+        "proposedOperations": [
+          {
+            "id": "set-player-color",
+            "kind": "set_component_field",
+            "path": "sprite.color",
+            "value": "#70d6ff",
+            "summary": "Preview player color update"
+          }
+        ],
+        "expectedAfterSummary": "Draft-only player color preview; no trusted write.",
+        "linkedEvidence": [
+          {
+            "id": "visual-diff",
+            "path": "evidence/player-color-diff.json"
+          }
+        ],
+        "reviewGate": {
+          "status": "required",
+          "reason": "Safe Source Apply gates required before trusted writes"
+        }
+      }
+    ],
+    "boundary": "Studio draft authoring state is temporary read-model data only; copy JSON/commands manually and run trusted CLI outside the browser."
+  },
+  "studio_source_apply_handoff": {
+    "present": true,
+    "status": "ready_for_review",
+    "handoffs": [
+      {
+        "id": "demo-safe-source-apply-handoff",
+        "draft_id": "demo-player-color-draft",
+        "preview_ref": "examples/full-studio-editor-demo-v1/handoff/safe-source-apply.preview.json",
+        "required_gates": [
+          "validated preview",
+          "sandbox evidence",
+          "accepted independent review",
+          "stale-target check",
+          "rollback metadata",
+          "allowlisted verification",
+          "post-apply comparison"
+        ],
+        "blocked_actions": [
+          "auto-apply",
+          "self-approval",
+          "auto-merge",
+          "browser trusted write"
+        ],
+        "boundary": "Preview metadata only; no apply authority."
+      }
+    ],
+    "boundary": "Safe Source Apply handoff preview is read-only and does not apply, merge, execute commands, or bypass review gates."
+  },
+  "scene_tree_inspector": {
+    "present": true,
+    "selected_scene": "demo-scene",
+    "scenes": [
+      {
+        "id": "demo-scene",
+        "name": "Demo Scene",
+        "selected": true
+      }
+    ],
+    "nodes": [
+      {
+        "id": "root",
+        "name": "Root",
+        "type": "scene",
+        "authored": true,
+        "component_summary": "3 children"
+      },
+      {
+        "id": "player",
+        "parent_id": "root",
+        "name": "Player",
+        "type": "entity",
+        "authored": true,
+        "component_summary": "transform, sprite, controller"
+      },
+      {
+        "id": "gate",
+        "parent_id": "root",
+        "name": "Gate",
+        "type": "entity",
+        "authored": true,
+        "component_summary": "transform, trigger"
+      },
+      {
+        "id": "npc-guide",
+        "parent_id": "root",
+        "name": "Guide",
+        "type": "entity",
+        "authored": false,
+        "component_summary": "runtime hint state"
+      }
+    ]
+  },
+  "entity_component_inspector": {
+    "present": true,
+    "selected_entity": "player",
+    "entities": [
+      {
+        "id": "player",
+        "name": "Player",
+        "selected": true
+      },
+      {
+        "id": "gate",
+        "name": "Gate"
+      },
+      {
+        "id": "npc-guide",
+        "name": "Guide"
+      }
+    ],
+    "components": [
+      {
+        "entity_id": "player",
+        "component": "Transform",
+        "path": "examples/full-studio-editor-demo-v1/scenes/demo.scene.json",
+        "before_hash": "sha256:scene111",
+        "fields": [
+          {
+            "name": "x",
+            "type": "number",
+            "value": 48
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "value": 64
+          },
+          {
+            "name": "rotation",
+            "type": "number",
+            "value": 0
+          }
+        ]
+      },
+      {
+        "entity_id": "player",
+        "component": "Sprite",
+        "path": "examples/full-studio-editor-demo-v1/scenes/demo.scene.json",
+        "before_hash": "sha256:scene111",
+        "fields": [
+          {
+            "name": "color",
+            "type": "string",
+            "value": "#ffffff"
+          },
+          {
+            "name": "asset",
+            "type": "string",
+            "value": "player-sprite",
+            "editable": false,
+            "reason": "Asset bindings are inspected read-only in this demo."
+          }
+        ]
+      },
+      {
+        "entity_id": "player",
+        "component": "ScriptHook",
+        "path": "examples/full-studio-editor-demo-v1/scenes/demo.scene.json",
+        "before_hash": "sha256:scene111",
+        "fields": [
+          {
+            "name": "onUpdate",
+            "type": "function",
+            "value": "blocked",
+            "editable": false,
+            "unsafe": true,
+            "reason": "Executable hooks are not supported by the Studio demo."
+          }
+        ]
+      }
+    ],
+    "boundary": "Read-only entity/component inspection from exported JSON; Studio produces draft-only primitive edits and does not write trusted component files, execute commands, or apply edits."
+  }
+}
