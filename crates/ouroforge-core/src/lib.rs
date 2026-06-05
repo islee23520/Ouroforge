@@ -21,6 +21,8 @@ use behavior_runtime::{
 pub mod behavior_draft;
 mod behavior_draft_validation;
 pub mod behavior_evidence;
+pub mod source_apply_post_apply_rerun;
+pub use source_apply_post_apply_rerun::*;
 pub mod internal_sprite_audit;
 pub mod plugin_evidence;
 pub mod runtime_frame_budget;
