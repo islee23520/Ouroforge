@@ -101,6 +101,18 @@ fn plugin_validate_fails_for_invalid_pack() {
 }
 
 #[test]
+fn rejects_generated_root_as_discovery_base() {
+    // A user must not be able to point discovery at a generated/evidence root,
+    // which would otherwise be treated as a clean base and bypass the
+    // registry's generated-root guard (#752).
+    let root = repo_root();
+    for generated in ["evidence", "runs", "dashboard-data", ".omx"] {
+        run_cli_expect_failure(&root, &["plugin", "validate", generated]);
+        run_cli_expect_failure(&root, &["plugin", "list", generated]);
+    }
+}
+
+#[test]
 fn no_install_or_run_commands_exist() {
     let root = repo_root();
     for forbidden in [

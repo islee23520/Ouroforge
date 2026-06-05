@@ -158,12 +158,24 @@ pub fn verify_export_bundle(
             detail: "no verification scenarios declared".to_string(),
         });
     } else {
+        // This static runner cannot execute the declared scenarios, so it must
+        // not report `scenario-smoke` as Pass merely because the bundle surface
+        // exists — that would let a bundle with a broken declared scenario pass
+        // verification (#728). Record it as Skipped until a runtime-capable
+        // source can prove the scenario outcome.
         let declared = scenario_steps.join(", ");
-        checks.push(check(
-            "scenario-smoke",
-            bundle_present,
-            format!("declared scenario smokes: {declared}"),
-        ));
+        let detail = if bundle_present {
+            format!(
+                "declared scenario smokes not validated by the static runner (requires runtime execution): {declared}"
+            )
+        } else {
+            format!("bundle surface missing; declared scenario smokes not validated: {declared}")
+        };
+        checks.push(VerificationCheck {
+            id: "scenario-smoke".to_string(),
+            status: CheckStatus::Skipped,
+            detail,
+        });
     }
 
     let verdict = if checks.iter().any(|c| c.status == CheckStatus::Fail) {

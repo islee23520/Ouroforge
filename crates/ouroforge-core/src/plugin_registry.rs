@@ -24,6 +24,25 @@ pub const ALLOWED_PLUGIN_DIRS: &[&str] = &["plugins", "examples/plugin-discovery
 /// Generated/evidence roots that must never host a discovered plugin manifest.
 const GENERATED_ROOTS: &[&str] = &["runs/", "evidence/", "dashboard-data/", ".omx/"];
 
+/// Generated/evidence root directory names (without trailing slash) that must
+/// never be used as, or contained in, a plugin discovery base. Mirrors
+/// [`GENERATED_ROOTS`] for callers that classify a user-supplied scan directory.
+pub const GENERATED_ROOT_NAMES: &[&str] = &["runs", "evidence", "dashboard-data", ".omx"];
+
+/// True if `path` is, or lies within, a generated/evidence root that must never
+/// seed plugin discovery. Used to reject user-supplied scan directories (e.g.
+/// `ouroforge plugin validate evidence`) before discovery treats the generated
+/// root as a clean base whose relative paths bypass the generated-root guard.
+pub fn is_generated_discovery_root(path: impl AsRef<Path>) -> bool {
+    use std::path::Component;
+    path.as_ref().components().any(|component| {
+        matches!(component, Component::Normal(name)
+            if GENERATED_ROOT_NAMES
+                .iter()
+                .any(|root| name.eq_ignore_ascii_case(root)))
+    })
+}
+
 /// Maximum directory depth the scan descends, as a runaway guard.
 const MAX_SCAN_DEPTH: usize = 8;
 
@@ -279,6 +298,16 @@ fn scan_directory(
 ) -> Result<()> {
     if depth > MAX_SCAN_DEPTH {
         return Ok(());
+    }
+    // Fail closed on a symlinked discovery root: child-level symlinks are
+    // rejected below, but the scan root itself is never followed, so a root
+    // such as `plugins -> /tmp/outside` cannot leak external manifests.
+    if depth == 0 {
+        let root_metadata = fs::symlink_metadata(dir)
+            .with_context(|| format!("failed to stat {}", dir.display()))?;
+        if root_metadata.file_type().is_symlink() {
+            return Ok(());
+        }
     }
     let read_dir = fs::read_dir(dir)
         .with_context(|| format!("failed to read plugin directory {}", dir.display()))?;
@@ -620,6 +649,44 @@ mod tests {
         );
         assert!(registry.entries[0].validation_errors[0].contains("symlink"));
         let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn does_not_follow_symlinked_scan_root() {
+        // The threat model claims discovery never follows symlinks, but a scan
+        // root that is itself a symlink must not leak external manifests (#750).
+        use std::os::unix::fs::symlink;
+        let temp = std::env::temp_dir().join(format!(
+            "ouro-plugin-registry-rootlink-{}",
+            crate::fnv1a64(b"root-symlink-test")
+        ));
+        let _ = fs::remove_dir_all(&temp);
+        let outside = temp.join("outside");
+        write_manifest(
+            &outside.join("evil.plugin.json"),
+            "ouroforge.plugin-manifest.v1",
+            "outside-plugin",
+        );
+        let link_root = temp.join("plugins");
+        symlink(&outside, &link_root).unwrap();
+        let registry = discover_plugins_in_dir(&link_root).expect("discovery succeeds");
+        assert!(
+            registry.entries.is_empty(),
+            "a symlinked scan root must not be followed: {:?}",
+            registry.entries
+        );
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn flags_generated_discovery_roots() {
+        assert!(is_generated_discovery_root("evidence"));
+        assert!(is_generated_discovery_root("./runs"));
+        assert!(is_generated_discovery_root("some/path/dashboard-data"));
+        assert!(is_generated_discovery_root(".omx/sub"));
+        assert!(!is_generated_discovery_root("plugins"));
+        assert!(!is_generated_discovery_root("examples/plugin-discovery-v1"));
     }
 
     #[test]

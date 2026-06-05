@@ -81,6 +81,48 @@ fn absent_probe_global_fails_closed() {
 }
 
 #[test]
+fn comment_mention_does_not_satisfy_missing_hook() {
+    // `getEvents` appears only in a comment; the real probe object lacks it, so
+    // detection must scope to the installed probe object and fail closed (#725).
+    let source = "\
+'use strict';
+(function () {
+  // The probe global window.__OUROFORGE__ should expose getEvents() per #725.
+  const probe = Object.freeze({
+    getWorldState() { return {}; },
+    getFrameStats() { return {}; },
+    snapshot() { return {}; },
+    step() {},
+    pause() {},
+    resume() {},
+    setInput() {},
+    restore() {},
+  });
+  const globalScope = typeof window !== 'undefined' ? window : globalThis;
+  globalScope.__OUROFORGE__ = probe;
+})();
+";
+    let report = check_probe_source(source, ExportProbeMode::DevProbeEnabled);
+    assert!(report.global_present, "global is genuinely installed");
+    assert!(!report.passed, "getEvents only in a comment must not pass");
+    assert!(report.missing_methods.contains(&"getEvents".to_string()));
+}
+
+#[test]
+fn global_mentioned_only_in_comment_is_absent() {
+    // A stray `__OUROFORGE__` mention with no real assignment must report the
+    // probe global as absent rather than present (#725).
+    let source = "\
+'use strict';
+// Note: window.__OUROFORGE__ is intentionally NOT installed in this bundle.
+(function () { let tick = 0; tick += 1; })();
+";
+    let report = check_probe_source(source, ExportProbeMode::PackagedProbeLimited);
+    assert!(!report.global_present, "comment mention is not an installation");
+    assert!(!report.passed);
+}
+
+#[test]
 fn ensure_returns_actionable_error_for_missing_bundle() {
     let missing =
         std::env::temp_dir().join(format!("ouroforge-probe-missing-{}", std::process::id()));

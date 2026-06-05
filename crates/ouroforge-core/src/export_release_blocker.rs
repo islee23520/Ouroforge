@@ -50,6 +50,7 @@ const FORBIDDEN_WORDING: &[&str] = &[
     "commercial release",
     "ready to publish",
     "deploy to",
+    "deploy-to",
 ];
 
 /// Scan a JSON value and return the dotted paths of any publish/release fields.
@@ -146,5 +147,12 @@ mod tests {
     fn wording_audit_blocks_release_claims() {
         assert!(audit_local_export_wording("A production-ready public release.").is_err());
         audit_local_export_wording("A local web export for inspection.").unwrap();
+    }
+
+    #[test]
+    fn wording_audit_blocks_hyphenated_deploy_to() {
+        // #733 requires rejecting `deploy-to` claims, not just `deploy to`.
+        assert!(audit_local_export_wording("deploy-to production").is_err());
+        assert!(audit_local_export_wording("Click to deploy to prod").is_err());
     }
 }

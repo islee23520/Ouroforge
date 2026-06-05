@@ -2196,6 +2196,7 @@ fn print_semantic_compare_summary(comparison_json: &str) -> Result<()> {
 fn handle_plugin_command(command: PluginCommand) -> Result<()> {
     match command {
         PluginCommand::List { dir } => {
+            reject_generated_discovery_root(&dir)?;
             let registry = ouroforge_core::plugin_registry::discover_plugins_in_dir(&dir)?;
             let read_model = registry.read_model();
             println!(
@@ -2210,6 +2211,7 @@ fn handle_plugin_command(command: PluginCommand) -> Result<()> {
             );
         }
         PluginCommand::Validate { dir } => {
+            reject_generated_discovery_root(&dir)?;
             let registry = ouroforge_core::plugin_registry::discover_plugins_in_dir(&dir)?;
             let read_model = registry.read_model();
             let conflicts = ouroforge_core::plugin_conflicts::detect_conflicts(&registry);
@@ -2235,6 +2237,21 @@ fn handle_plugin_command(command: PluginCommand) -> Result<()> {
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+/// Reject a user-supplied plugin discovery directory that is, or lies within, a
+/// generated/evidence root. Discovery treats the supplied directory as its base,
+/// so relative manifest paths never carry the generated-root prefix and the
+/// registry's generated-root guard cannot fire; rejecting up front preserves the
+/// contract that generated/evidence roots never host discovered plugin manifests.
+fn reject_generated_discovery_root(dir: &Path) -> Result<()> {
+    if ouroforge_core::plugin_registry::is_generated_discovery_root(dir) {
+        return Err(anyhow!(
+            "refusing to scan plugins under a generated/evidence root `{}`: generated roots (runs, evidence, dashboard-data, .omx) must never host discovered plugin manifests",
+            dir.display()
+        ));
     }
     Ok(())
 }

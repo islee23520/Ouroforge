@@ -63,11 +63,18 @@ impl ProbeCheckReport {
 
 /// Check a runtime bootstrap source for the probe surface required by `mode`.
 pub fn check_probe_source(bootstrap_js: &str, mode: ExportProbeMode) -> ProbeCheckReport {
-    let global_present = bootstrap_js.contains(PROBE_GLOBAL);
+    // Constrain detection to the object literal actually installed as the probe
+    // global. A bare `bootstrap_js.contains(PROBE_GLOBAL)` or whole-file method
+    // substring search would accept a stripped export that merely mentions
+    // `__OUROFORGE__` or `getEvents` in a comment, string, or unrelated object
+    // while the real probe global lacks the hook (#725).
+    let probe_object = probe_object_literal(bootstrap_js);
+    let global_present = probe_object.is_some();
+    let scope = probe_object.unwrap_or("");
     let mut present_methods = Vec::new();
     let mut missing_methods = Vec::new();
     for method in mode.required_methods() {
-        if method_is_exposed(bootstrap_js, method) {
+        if method_is_exposed(scope, method) {
             present_methods.push(method.to_string());
         } else {
             missing_methods.push(method.to_string());
@@ -112,10 +119,168 @@ pub fn ensure_bundle_probe_compatible(bundle_root: &Path, mode: ExportProbeMode)
     ))
 }
 
-/// A method is exposed if its name appears as an object-literal member: a
-/// shorthand method `name(`, a property `name:`, or a value shorthand `name,`.
+/// A method is exposed if its name appears as an object-literal member within
+/// the resolved probe object: a shorthand method `name(`, a property `name:`,
+/// or a value shorthand `name,`.
 fn method_is_exposed(source: &str, method: &str) -> bool {
     source.contains(&format!("{method}("))
         || source.contains(&format!("{method}:"))
         || source.contains(&format!("{method},"))
+}
+
+/// Locate the source of the object literal installed as the runtime probe
+/// global, resolving one level of `const NAME = ...` and `Object.freeze(...)`
+/// indirection. Returns `None` when the global is never assigned or its value
+/// cannot be resolved to an object literal, so probe detection can no longer be
+/// satisfied by a stray `__OUROFORGE__`/method mention in a comment, string, or
+/// unrelated object elsewhere in the bundle.
+fn probe_object_literal(source: &str) -> Option<&str> {
+    let rhs = global_assignment_rhs(source)?;
+    resolve_object_literal(source, rhs)
+}
+
+/// Return the right-hand side of a real `<...>.__OUROFORGE__ = <rhs>` assignment
+/// (a single `=`, not `==`/`===`/`=>`), as the remainder of the source after the
+/// `=`. e.g. `probe;\n  ...` for `globalScope.__OUROFORGE__ = probe;`.
+fn global_assignment_rhs(source: &str) -> Option<&str> {
+    let mut from = 0;
+    while let Some(rel) = source[from..].find(PROBE_GLOBAL) {
+        let idx = from + rel;
+        let after = &source[idx + PROBE_GLOBAL.len()..];
+        let trimmed = after.trim_start();
+        if let Some(rest) = trimmed.strip_prefix('=') {
+            if !rest.starts_with('=') && !rest.starts_with('>') {
+                return Some(rest.trim_start());
+            }
+        }
+        from = idx + PROBE_GLOBAL.len();
+    }
+    None
+}
+
+/// Resolve an expression to the source of an object literal: an inline `{...}`,
+/// an `Object.freeze({...})` wrapper, or a single identifier bound to one via a
+/// `const`/`let`/`var` declaration. Brace matching is string- and
+/// comment-aware. Only the value's leading token is inspected, so trailing
+/// source after the expression is ignored.
+fn resolve_object_literal<'a>(source: &'a str, expr: &'a str) -> Option<&'a str> {
+    let expr = expr.trim_start();
+    if let Some(inner) = expr.strip_prefix("Object.freeze(") {
+        let inner = inner.trim_start();
+        if inner.starts_with('{') {
+            return balanced_object(inner);
+        }
+        // Object.freeze(identifier)
+        return resolve_object_literal(source, inner);
+    }
+    if expr.starts_with('{') {
+        return balanced_object(expr);
+    }
+    // Treat as an identifier referencing a binding elsewhere in the source.
+    let ident: String = expr
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '$')
+        .collect();
+    if ident.is_empty() {
+        return None;
+    }
+    for kw in ["const ", "let ", "var "] {
+        let needle = format!("{kw}{ident}");
+        let mut from = 0;
+        while let Some(rel) = source[from..].find(&needle) {
+            let idx = from + rel;
+            let after = &source[idx + needle.len()..];
+            // Reject a longer identifier match (e.g. `const probeVersion`).
+            let boundary_ok = after
+                .chars()
+                .next()
+                .map(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '$'))
+                .unwrap_or(true);
+            if boundary_ok {
+                let trimmed = after.trim_start();
+                if let Some(rest) = trimmed.strip_prefix('=') {
+                    if !rest.starts_with('=') && !rest.starts_with('>') {
+                        let rhs = rest.trim_start();
+                        if rhs.starts_with('{') {
+                            return balanced_object(rhs);
+                        }
+                        if let Some(inner) = rhs.strip_prefix("Object.freeze(") {
+                            let inner = inner.trim_start();
+                            if inner.starts_with('{') {
+                                return balanced_object(inner);
+                            }
+                        }
+                    }
+                }
+            }
+            from = idx + needle.len();
+        }
+    }
+    None
+}
+
+/// Return the `{...}` slice beginning at the first `{` in `s`, matching braces
+/// while skipping string literals (`'`, `"`, `` ` ``) and `//`/`/* */` comments
+/// so braces inside strings or comments do not unbalance the scan.
+fn balanced_object(s: &str) -> Option<&str> {
+    let bytes = s.as_bytes();
+    let start = s.find('{')?;
+    let mut depth = 0usize;
+    let mut i = start;
+    let mut in_str: Option<u8> = None;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_line_comment {
+            if b == b'\n' {
+                in_line_comment = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_block_comment {
+            if b == b'*' && i + 1 < bytes.len() && bytes[i + 1] == b'/' {
+                in_block_comment = false;
+                i += 2;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if let Some(quote) = in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == quote {
+                in_str = None;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' | b'\'' | b'`' => in_str = Some(b),
+            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'/' => {
+                in_line_comment = true;
+                i += 2;
+                continue;
+            }
+            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => {
+                in_block_comment = true;
+                i += 2;
+                continue;
+            }
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&s[start..=i]);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }

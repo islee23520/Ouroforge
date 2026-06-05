@@ -110,6 +110,7 @@ impl PluginAssetMetadataDescriptor {
         }
         for hint in &self.validation_hints {
             require_local_text("plugin asset metadata validationHints", hint)?;
+            reject_blocked_token("plugin asset metadata validationHints", hint)?;
         }
         require_local_text("plugin asset metadata boundary", &self.boundary)?;
         let boundary = self.boundary.to_ascii_lowercase();
@@ -161,6 +162,10 @@ impl PluginAssetMetadataField {
         }
         if !self.validation_hint.is_empty() {
             require_local_text(
+                "plugin asset metadata field validationHint",
+                &self.validation_hint,
+            )?;
+            reject_blocked_token(
                 "plugin asset metadata field validationHint",
                 &self.validation_hint,
             )?;
@@ -254,6 +259,31 @@ mod tests {
         let mut value = valid_descriptor();
         value["validationHints"] = serde_json::json!(["see https://example.com/spec"]);
         assert!(parse(value).is_err());
+    }
+
+    #[test]
+    fn rejects_blocked_token_in_top_level_hint() {
+        // Network-style hints were already rejected; bare executable/import/
+        // export/command tokens must also fail closed (#748).
+        for hint in ["run import command before use", "export the asset", "download payload"] {
+            let mut value = valid_descriptor();
+            value["validationHints"] = serde_json::json!([hint]);
+            let err = format!("{:#}", parse(value).expect_err("blocked hint token"));
+            assert!(err.contains("blocked"), "hint `{hint}` => {err}");
+        }
+    }
+
+    #[test]
+    fn rejects_blocked_token_in_field_hint() {
+        let mut value = valid_descriptor();
+        value["fields"] = serde_json::json!([{
+            "name": "pivot",
+            "type": "string",
+            "label": "Pivot",
+            "validationHint": "import the converter then run command"
+        }]);
+        let err = format!("{:#}", parse(value).expect_err("blocked field hint token"));
+        assert!(err.contains("blocked"), "{err}");
     }
 
     #[test]

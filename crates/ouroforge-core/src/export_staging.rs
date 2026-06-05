@@ -38,8 +38,19 @@ pub fn staging_dir_for_run(run_id: &str) -> Result<String> {
 }
 
 /// True if `path` is staged under the export staging root.
+///
+/// Fails closed before the prefix decision: absolute paths, backslash
+/// separators, and `..` traversal components are rejected so a path that merely
+/// begins with the staging prefix but resolves outside it (e.g.
+/// `target/ouroforge/exports/../leak`) is never approved.
 pub fn is_within_staging_root(path: &str) -> bool {
     let normalized = path.trim_start_matches("./");
+    if normalized.starts_with('/')
+        || normalized.contains('\\')
+        || normalized.split('/').any(|component| component == "..")
+    {
+        return false;
+    }
     normalized == EXPORT_STAGING_ROOT || normalized.starts_with(&format!("{EXPORT_STAGING_ROOT}/"))
 }
 
@@ -100,6 +111,18 @@ mod tests {
         for bad in ["", "..", ".", "a/b", "a\\b", "with space"] {
             assert!(staging_dir_for_run(bad).is_err(), "accepted `{bad}`");
         }
+    }
+
+    #[test]
+    fn staging_root_membership_fails_closed_on_traversal() {
+        // Paths that begin with the staging prefix but escape it must be rejected.
+        assert!(!is_within_staging_root("target/ouroforge/exports/../leak"));
+        assert!(!is_within_staging_root("target/ouroforge/exports/run/../../leak"));
+        assert!(!is_within_staging_root("/target/ouroforge/exports/run"));
+        assert!(!is_within_staging_root("target/ouroforge/exports\\..\\leak"));
+        // Legitimate staged paths still pass.
+        assert!(is_within_staging_root("target/ouroforge/exports"));
+        assert!(is_within_staging_root("./target/ouroforge/exports/run_demo/index.html"));
     }
 
     #[test]

@@ -62,6 +62,27 @@ fn assembled_bundle_passes_verification() {
 }
 
 #[test]
+fn scenario_smoke_is_skipped_not_passed_by_static_runner() {
+    // The static runner cannot execute declared scenarios, so it must not
+    // report scenario-smoke as a Pass derived only from bundle presence (#728).
+    let bundle = assembled("scenario-skip");
+    let report = verify_export_bundle(&plan(), &bundle, ExportProbeMode::DevProbeEnabled);
+    let scenario = report
+        .checks
+        .iter()
+        .find(|c| c.id == "scenario-smoke")
+        .expect("scenario-smoke check present");
+    assert_eq!(
+        scenario.status,
+        CheckStatus::Skipped,
+        "scenario-smoke must not assert Pass without a validated scenario result: {scenario:?}"
+    );
+    // The overall report is still not a Fail (Skipped does not fail closed).
+    assert!(report.checks.iter().all(|c| c.status != CheckStatus::Fail));
+    std::fs::remove_dir_all(&bundle).ok();
+}
+
+#[test]
 fn missing_bundle_fails_closed() {
     let missing = staging("missing");
     let report = verify_export_bundle(&plan(), &missing, ExportProbeMode::DevProbeEnabled);
