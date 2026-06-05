@@ -295,6 +295,94 @@ fn backlog_selection_is_read_only_and_prefers_severity_with_repro_context() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn backlog_selection_prefers_higher_severity_across_later_classifications() {
+    let (root, run_dir) = create_fixture_run("evolve-selection-global-severity");
+    write_indexed_evidence(
+        &run_dir,
+        "probe-evidence",
+        "evidence/scenarios/collect-and-exit/runtime/runtime-probe.json",
+        json!({"artifact":"runtime_probe"}),
+    );
+    write_indexed_evidence(
+        &run_dir,
+        "gameplay-evidence",
+        "evidence/scenarios/collect-and-exit/gameplay/gameplay-failure.json",
+        json!({"artifact":"gameplay_failure"}),
+    );
+    write_indexed_evidence(
+        &run_dir,
+        "scenario-result",
+        "evidence/scenarios/collect-and-exit/scenario-result.json",
+        json!({"artifact":"scenario_result"}),
+    );
+    // A verdict with TWO failures yields classification-1 (probe) and classification-2
+    // (gameplay), in that order.
+    fs::write(
+        run_dir.join("verdict.json"),
+        serde_json::to_vec_pretty(&json!({
+            "status": "failed",
+            "summary": "two distinct classified failures",
+            "failures": [
+                {
+                    "kind": "probe_failed",
+                    "classification_category": "probe_failure",
+                    "path": "evidence/scenarios/collect-and-exit/runtime/runtime-probe.json"
+                },
+                {
+                    "kind": "gameplay_logic_failed",
+                    "classification_category": "gameplay_logic",
+                    "path": "evidence/scenarios/collect-and-exit/gameplay/gameplay-failure.json"
+                }
+            ],
+            "evidence_refs": [
+                "evidence/scenarios/collect-and-exit/runtime/runtime-probe.json",
+                "evidence/scenarios/collect-and-exit/gameplay/gameplay-failure.json"
+            ],
+            "metadata": {}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    // classification-1 (probe) carries only a Medium backlog item, while the LATER
+    // classification-2 (gameplay) carries a higher-severity Critical item.
+    write_backlog_items(
+        &run_dir,
+        vec![
+            backlog_item(
+                "probe-medium",
+                "classification-1",
+                MutationClassificationCategory::ProbeFailure,
+                MutationProposalBoundedMutationType::Data,
+                MutationBacklogSeverity::Medium,
+                vec!["evidence/scenarios/collect-and-exit/runtime/runtime-probe.json"],
+            ),
+            backlog_item(
+                "gameplay-critical",
+                "classification-2",
+                MutationClassificationCategory::GameplayLogic,
+                MutationProposalBoundedMutationType::Data,
+                MutationBacklogSeverity::Critical,
+                vec!["evidence/scenarios/collect-and-exit/gameplay/gameplay-failure.json"],
+            ),
+        ],
+    );
+
+    let summary = evolve_run(&run_dir).expect("multi-classification backlog selects a proposal");
+    assert_eq!(summary.status, "proposed");
+
+    let proposals = list_mutation_proposals(&run_dir).expect("proposal list");
+    let rationale = proposals[0].rationale.as_ref().expect("rationale");
+    // The globally highest-severity backlog item must win even though it belongs to the
+    // later classification-2 rather than the first classification.
+    assert_eq!(
+        rationale.selection_backlog_item_id.as_deref(),
+        Some("gameplay-critical")
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[derive(Clone)]
 struct MappedCase {
     name: &'static str,

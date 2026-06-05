@@ -29176,6 +29176,68 @@ pub struct EvolveSummary {
     pub reason: String,
 }
 
+/// Parse a `classification-{N}` id into its zero-based failure index (defaults to 0).
+fn classification_failure_index(classification_id: &str) -> usize {
+    classification_id
+        .rsplit('-')
+        .next()
+        .and_then(|suffix| suffix.parse::<usize>().ok())
+        .and_then(|ordinal| ordinal.checked_sub(1))
+        .unwrap_or(0)
+}
+
+/// Returns true when `candidate` should be selected ahead of `current`, using the same
+/// ordering as the within-classification backlog selection: higher severity first, then
+/// broader evidence, then lower id.
+fn backlog_candidate_is_better(
+    candidate: &MutationBacklogItem,
+    current: &MutationBacklogItem,
+) -> bool {
+    severity_rank(&current.severity)
+        .cmp(&severity_rank(&candidate.severity))
+        .then_with(|| current.evidence_refs.len().cmp(&candidate.evidence_refs.len()))
+        .then_with(|| candidate.id.cmp(&current.id))
+        .is_lt()
+}
+
+/// Choose the classification whose backlog item has the globally highest severity
+/// across ALL current classifications, so a later classification's higher-severity
+/// backlog item is not starved by always taking the first. Falls back to the first
+/// classification when no backlog item applies (or no backlog exists), preserving the
+/// prior classification-only behavior. #1293
+fn select_primary_classification<'a>(
+    run_dir: &Path,
+    classifications: &'a [MutationClassification],
+) -> Option<&'a MutationClassification> {
+    let first = classifications.first()?;
+    if !run_dir.join("mutation/backlog.json").exists() {
+        return Some(first);
+    }
+    let Ok(backlog) = read_mutation_backlog_artifact(run_dir) else {
+        return Some(first);
+    };
+    let mut best: Option<&MutationBacklogItem> = None;
+    for classification in classifications {
+        for item in &backlog.items {
+            if item.classification_id != classification.id
+                && item.failure_class != classification.category
+            {
+                continue;
+            }
+            if best.is_none_or(|current| backlog_candidate_is_better(item, current)) {
+                best = Some(item);
+            }
+        }
+    }
+    match best {
+        Some(item) => classifications
+            .iter()
+            .find(|classification| classification.id == item.classification_id)
+            .or(Some(first)),
+        None => Some(first),
+    }
+}
+
 pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     let run_dir = run_dir.as_ref();
     append_ledger_event(run_dir, "evolve.started", "evolve-cli", json!({}))?;
@@ -29208,8 +29270,26 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     let evidence = read_evidence_index(run_dir)?;
     let failures = verdict["failures"].as_array().cloned().unwrap_or_default();
     let mut proposal_ids = Vec::new();
+    // Classify every failure first, then choose the primary classification by backlog
+    // severity across ALL classifications (not just the first). Selecting the first
+    // classification before consulting the backlog starves a later classification's
+    // higher-severity backlog item. #1293
+    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+    let Some(classification) =
+        select_primary_classification(run_dir, &classification_artifact.classifications)
+    else {
+        return complete_evolve_without_proposal(
+            run_dir,
+            "missing-classification",
+            "failed verdict did not produce a mutation classification; no mutation proposal was fabricated".to_string(),
+        );
+    };
+    // Use the failure that produced the selected classification (classification-{N}
+    // maps to failures[N-1]) so the proposal's evidence and rationale stay coherent
+    // with the chosen backlog item.
     let failure = failures
-        .first()
+        .get(classification_failure_index(&classification.id))
+        .or_else(|| failures.first())
         .cloned()
         .unwrap_or_else(|| json!({ "kind": "failed_verdict" }));
     let evidence_refs = collect_classification_evidence_refs(&failure, &verdict);
@@ -29233,14 +29313,6 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
                 "failed verdict has {} justifying evidence; no mutation proposal was fabricated",
                 mutation_proposal_evidence_state_label(&evidence_state)
             ),
-        );
-    };
-    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
-    let Some(classification) = classification_artifact.classifications.first() else {
-        return complete_evolve_without_proposal(
-            run_dir,
-            "missing-classification",
-            "failed verdict did not produce a mutation classification; no mutation proposal was fabricated".to_string(),
         );
     };
     let selection = select_mutation_proposal_strategy(run_dir, classification, &evidence)?;
