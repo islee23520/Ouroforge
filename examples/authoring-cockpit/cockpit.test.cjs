@@ -2567,6 +2567,52 @@ assert.strictEqual(blockedUnsafe.proposedOperations.length, 0);
 const traversal = cockpit.entityComponentDraftEdit({ id: 'player', component: 'Transform', path: '../../etc/passwd' }, numField, 1);
 assert.strictEqual(traversal.validationStatus, 'blocked');
 assert.ok(traversal.blockedReasons.some((r) => /allowlisted in-project source path/.test(r)));
+// #761 Draft authoring model
+const validDraftOps = {
+  schemaVersion: 'visual-edit-draft-v1',
+  draftId: 'draft-ops-valid',
+  target: { type: 'component', path: 'scenes/main.scene.json', id: 'player' },
+  proposedOperations: [
+    { kind: 'set_component_field', path: 'speed', beforeValue: 4, value: 6 },
+    { kind: 'add_component', component: 'Sprite' },
+    { kind: 'remove_component', component: 'Debug' },
+    { kind: 'rename_entity', from: 'player', to: 'hero' },
+    { kind: 'reorder_child', child: 'hud', toIndex: 0 },
+  ],
+};
+const draftOpModel = cockpit.studioDraftOperationModel(validDraftOps);
+assert.strictEqual(draftOpModel.valid, true);
+assert.strictEqual(draftOpModel.schemaSupported, true);
+assert.strictEqual(draftOpModel.operations.length, 5);
+assert.ok(draftOpModel.operations.every((op) => op.valid));
+assert.match(draftOpModel.previewDiff, /set_component_field|speed/);
+assert.match(draftOpModel.previewDiff, /\+ component Sprite/);
+assert.match(draftOpModel.previewDiff, /- component Debug/);
+assert.match(draftOpModel.previewDiff, /entity name/);
+assert.match(draftOpModel.previewDiff, /reorder child hud/);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'frobnicate' }).valid, false);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'apply_patch' }).valid, false);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'merge_branch' }).valid, false);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'publish' }).valid, false);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'self_approve' }).valid, false);
+const pathOp = cockpit.validateStudioDraftOperation({ kind: 'set_component_field', path: '../../etc/passwd', value: 1 });
+assert.strictEqual(pathOp.valid, false);
+assert.ok(pathOp.reasons.some((r) => /unsafe path|shell/.test(r)));
+const cmdOp = cockpit.validateStudioDraftOperation({ kind: 'add_component', component: 'X', command: 'rm -rf /' });
+assert.strictEqual(cmdOp.valid, false);
+const badSchema = cockpit.studioDraftOperationModel({ schemaVersion: 'evil-v9', proposedOperations: [{ kind: 'add_component', component: 'X' }] });
+assert.strictEqual(badSchema.valid, false);
+assert.ok(badSchema.blockedReasons.some((r) => /Unsupported draft schema/.test(r)));
+assert.match(badSchema.previewDiff, /no preview diff/);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'rename_entity' }).valid, false);
+assert.strictEqual(cockpit.validateStudioDraftOperation({ kind: 'reorder_child', child: 'a' }).valid, false);
+const draftOpRun = { studio_draft_authoring: { present: true, drafts: [validDraftOps] } };
+const draftOpMarkup = cockpit.renderStudioDraftOperationModelSurface(draftOpRun);
+assert.match(draftOpMarkup, /Studio draft operation model/);
+assert.match(draftOpMarkup, /validated/);
+assert.match(draftOpMarkup, /Safe Source Apply preview handoff/);
+assert.doesNotMatch(draftOpMarkup, /<button|<form|onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
+assert.match(cockpit.renderStudioDraftOperationModelSurface({}), /No Studio draft operation model/);
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);

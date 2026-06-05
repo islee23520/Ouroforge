@@ -2281,6 +2281,47 @@ const OuroforgeDashboard = (() => {
       ${componentRows}
     </section>`;
   }
+  function renderDraftOperationModel(run) {
+    const KINDS = ['set_component_field', 'add_component', 'remove_component', 'rename_entity', 'reorder_child'];
+    const FORBIDDEN = ['apply', 'apply_patch', 'merge', 'merge_branch', 'write_file', 'write_trusted_file', 'self_approve', 'bypass_review_gate', 'execute_command', 'run_command', 'publish', 'deploy', 'sign', 'upload', 'install', 'network_install'];
+    const SCHEMAS = ['visual-edit-draft-v1'];
+    const source = run?.studio_draft_authoring || run?.studioDraftAuthoring || null;
+    const drafts = source && Array.isArray(source.drafts) ? source.drafts : (source && Array.isArray(source.records) ? source.records : []);
+    if (!source || !drafts.length) {
+      return '<section class="panel draft-operation-model"><h3>Draft operation model</h3><p class="empty-state">No draft operation model is exported for this run.</p><p class="run-meta">Read-only. Draft operations are review-only; the browser cannot write trusted files, execute commands, merge, self-approve, publish/deploy, or apply edits.</p></section>';
+    }
+    const pathUnsafe = (value) => {
+      const text = String(value == null ? '' : value);
+      return /(^|[\\/])\.\.([\\/]|$)/.test(text) || text.startsWith('/') || /^[A-Za-z]:[\\/]/.test(text) || /[;&|`$<>]/.test(text);
+    };
+    const validateOp = (operation) => {
+      const reasons = [];
+      if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return { kind: 'unknown', valid: false, reasons: ['Malformed draft operation entry.'] };
+      const kind = String(operation.kind || operation.type || 'unknown');
+      if (FORBIDDEN.includes(kind)) return { kind, valid: false, reasons: [`Operation kind "${kind}" is a source-mutation/publish bypass and is refused.`] };
+      if (!KINDS.includes(kind)) return { kind, valid: false, reasons: [`Unsupported draft operation kind "${kind}".`] };
+      for (const [key, value] of Object.entries(operation)) {
+        if (/^(command|cmd|exec|shell|hook|script|url|href)$/i.test(key)) reasons.push(`Operation field "${key}" implies command/network execution and is refused.`);
+        if (typeof value === 'string' && pathUnsafe(value)) reasons.push(`Operation field "${key}" contains an unsafe path or shell metacharacter.`);
+      }
+      return { kind, valid: reasons.length === 0, reasons };
+    };
+    const rows = drafts.map((draft, index) => {
+      const draftId = (draft && (draft.draftId || draft.draft_id)) || `draft-${index + 1}`;
+      const schemaVersion = (draft && (draft.schemaVersion || draft.schema_version)) || 'visual-edit-draft-v1';
+      const schemaSupported = SCHEMAS.includes(String(schemaVersion));
+      const ops = (draft && (Array.isArray(draft.proposedOperations) ? draft.proposedOperations : (Array.isArray(draft.proposed_operations) ? draft.proposed_operations : []))) || [];
+      const results = ops.map(validateOp);
+      const valid = schemaSupported && results.length > 0 && results.every((r) => r.valid);
+      const opItems = results.map((r) => `<li><span class="${statusClass(r.valid ? 'passed' : 'blocked')}">${escapeText(r.kind)}</span>${r.reasons.length ? ` — ${escapeText(r.reasons.join('; '))}` : ''}</li>`).join('') || '<li>No proposed operations recorded.</li>';
+      const diff = valid ? `<pre>${escapeText(`# Draft preview diff (review-only)\n${results.map((r, i) => `~ op#${i + 1} ${r.kind}`).join('\n')}`)}</pre>` : '<p class="run-meta">Draft is blocked; no preview diff until all operations validate.</p>';
+      return `<article class="artifact draft-operation"><h4>${escapeText(draftId)}</h4><div class="run-meta"><span class="${statusClass(valid ? 'passed' : 'blocked')}">${valid ? 'validated' : 'blocked'}</span> · schema ${escapeText(String(schemaVersion))} ${schemaSupported ? '(supported)' : '(unsupported)'}</div><ul class="run-meta-list">${opItems}</ul>${diff}</article>`;
+    }).join('');
+    return `<section class="panel draft-operation-model"><h3>Draft operation model</h3>
+      <p class="run-meta">Read-only preview of neutral draft operations (${escapeText(KINDS.join(', '))}). Drafts are suitable for Safe Source Apply preview handoff; the browser cannot write trusted files, execute commands, merge, self-approve, publish/deploy, or apply edits.</p>
+      ${rows}
+    </section>`;
+  }
 
   function studioKeyboardNavModel(run = null) {
     const hasRun = Boolean(run);
@@ -2424,7 +2465,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
-      ${renderEntityComponentInspector(run)}
+      ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -2933,7 +2974,7 @@ const OuroforgeDashboard = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -1940,6 +1940,25 @@ assert.match(entityInspectorMarkup, /unsafe · blocked|unsupported type · block
 assert.match(entityInspectorMarkup, /Safe Source Apply handoff/);
 assert.doesNotMatch(entityInspectorMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
 assert.match(dashboard.renderEntityComponentInspector({}), /No entity\/component inspector inputs/);
+// #761 Draft operation model
+const draftOpModelRun = { studio_draft_authoring: { present: true, drafts: [
+  { schemaVersion: 'visual-edit-draft-v1', draftId: 'd-valid', proposedOperations: [
+    { kind: 'set_component_field', path: 'speed', value: 6 },
+    { kind: 'add_component', component: 'Sprite' },
+  ] },
+  { schemaVersion: 'visual-edit-draft-v1', draftId: 'd-blocked', proposedOperations: [
+    { kind: 'apply_patch' },
+    { kind: 'set_component_field', path: '../../etc/passwd', value: 1 },
+  ] },
+] } };
+const draftOpModelMarkup = dashboard.renderDraftOperationModel(draftOpModelRun);
+assert.match(draftOpModelMarkup, /Draft operation model/);
+assert.match(draftOpModelMarkup, /d-valid/);
+assert.match(draftOpModelMarkup, /validated/);
+assert.match(draftOpModelMarkup, /blocked/);
+assert.match(draftOpModelMarkup, /Safe Source Apply preview handoff/);
+assert.doesNotMatch(draftOpModelMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
+assert.match(dashboard.renderDraftOperationModel({}), /No draft operation model/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);
