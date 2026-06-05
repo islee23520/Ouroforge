@@ -118,7 +118,10 @@ fn global_mentioned_only_in_comment_is_absent() {
 (function () { let tick = 0; tick += 1; })();
 ";
     let report = check_probe_source(source, ExportProbeMode::PackagedProbeLimited);
-    assert!(!report.global_present, "comment mention is not an installation");
+    assert!(
+        !report.global_present,
+        "comment mention is not an installation"
+    );
     assert!(!report.passed);
 }
 

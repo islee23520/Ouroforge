@@ -117,12 +117,18 @@ mod tests {
     fn staging_root_membership_fails_closed_on_traversal() {
         // Paths that begin with the staging prefix but escape it must be rejected.
         assert!(!is_within_staging_root("target/ouroforge/exports/../leak"));
-        assert!(!is_within_staging_root("target/ouroforge/exports/run/../../leak"));
+        assert!(!is_within_staging_root(
+            "target/ouroforge/exports/run/../../leak"
+        ));
         assert!(!is_within_staging_root("/target/ouroforge/exports/run"));
-        assert!(!is_within_staging_root("target/ouroforge/exports\\..\\leak"));
+        assert!(!is_within_staging_root(
+            "target/ouroforge/exports\\..\\leak"
+        ));
         // Legitimate staged paths still pass.
         assert!(is_within_staging_root("target/ouroforge/exports"));
-        assert!(is_within_staging_root("./target/ouroforge/exports/run_demo/index.html"));
+        assert!(is_within_staging_root(
+            "./target/ouroforge/exports/run_demo/index.html"
+        ));
     }
 
     #[test]
