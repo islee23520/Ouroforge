@@ -485,6 +485,11 @@ const OuroforgeCockpit = (() => {
       { id: 'visual-comparison-evidence', label: 'Visual comparison evidence', present: Boolean(run?.visual_comparisons?.present || run?.visualComparisons?.present), detail: `${run?.visual_comparisons?.comparison_count ?? run?.visualComparisons?.comparisonCount ?? 0} comparison row(s)` },
       { id: 'studio-level-design-inspection', label: 'Level design inspection', present: Boolean(normalizeStudioLevelDesignInspection(run).present), detail: `${normalizeStudioLevelDesignInspection(run).panels.length} read-only panel(s)` },
       { id: 'behavior-draft-status', label: 'Behavior draft status', present: Boolean(behaviorDraftReadModel(run).present), detail: `${behaviorDraftReadModel(run).drafts.length} behavior draft(s)` },
+      { id: 'behavior-list-panel', label: 'Behavior list panel', present: Boolean(behaviorInspectionModel(run).behaviors.length), detail: `${behaviorInspectionModel(run).behaviors.length} behavior row(s)` },
+      { id: 'behavior-event-signal-panel', label: 'Event/signal panel', present: Boolean(behaviorInspectionModel(run).events.length), detail: `${behaviorInspectionModel(run).events.length} event row(s)` },
+      { id: 'behavior-state-machine-panel', label: 'State machine panel', present: Boolean(behaviorInspectionModel(run).stateMachines.length), detail: `${behaviorInspectionModel(run).stateMachines.length} machine row(s)` },
+      { id: 'behavior-ability-action-panel', label: 'Ability/action panel', present: Boolean(behaviorInspectionModel(run).abilities.length), detail: `${behaviorInspectionModel(run).abilities.length} ability/action row(s)` },
+      { id: 'behavior-review-apply-status', label: 'Review/apply status', present: Boolean(behaviorInspectionModel(run).reviews.length || behaviorInspectionModel(run).applies.length), detail: `${behaviorInspectionModel(run).reviews.length} review(s), ${behaviorInspectionModel(run).applies.length} apply row(s)` },
       { id: 'studio-draft-authoring', label: 'Studio draft authoring', present: Boolean(studioDraftAuthoringState(run).present), detail: `${studioDraftAuthoringState(run).drafts.length} temporary draft(s)` },
       { id: 'visual-diff-preview', label: 'Visual diff preview', present: Boolean(run?.visual_diff_preview?.present || run?.visualDiffPreview?.present), detail: `${run?.visual_diff_preview?.summary_count ?? run?.visualDiffPreview?.summaryCount ?? (run?.visual_diff_preview?.summaries || run?.visualDiffPreview?.summaries || []).length ?? 0} summary row(s)` },
       { id: 'studio-asset-inspector', label: 'Asset inspector', present: Boolean(run?.asset_inspector?.present || run?.assetInspector?.present), detail: `${run?.asset_inspector?.asset_count ?? run?.assetInspector?.assetCount ?? 0} asset row(s)` },
@@ -1661,6 +1666,183 @@ const OuroforgeCockpit = (() => {
       <p class="hint">${escapeText(state.boundary)} The cockpit renders temporary draft data and inert copyable text only; it does not write trusted files, persist browser draft state, execute commands, upload assets, or apply edits.</p>
       ${readError}
       ${rows}
+    </section>`;
+  }
+
+
+
+  function arrayField(value, ...keys) {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object') return [];
+    for (const key of keys) {
+      if (Array.isArray(value[key])) return value[key];
+    }
+    return [];
+  }
+
+  function refText(ref) {
+    if (!ref || typeof ref !== 'object') return String(ref ?? '');
+    return ref.path || ref.pathHint || ref.id || ref.kind || JSON.stringify(ref);
+  }
+
+  function summarizeObjectRef(value) {
+    if (!value || typeof value !== 'object') return 'none';
+    return Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined && entryValue !== null && entryValue !== '')
+      .map(([key, entryValue]) => `${key}:${typeof entryValue === 'object' ? JSON.stringify(entryValue) : entryValue}`)
+      .join(' · ') || 'none';
+  }
+
+  function behaviorInspectionModel(run) {
+    const source = run?.behavior_inspection || run?.behaviorInspection || {};
+    const behaviorSource = source.behaviors || source.behavior_model || source.behaviorModel || run?.behavior_model || run?.behaviorModel || run?.gameplay_behavior_model || run?.gameplayBehaviorModel || {};
+    const eventSource = source.eventSignals || source.event_signals || source.event_signal_model || source.eventSignalModel || run?.event_signals || run?.eventSignals || run?.gameplay_event_signals || run?.gameplayEventSignals || {};
+    const stateSource = source.stateMachines || source.state_machines || source.state_machine_model || source.stateMachineModel || run?.state_machines || run?.stateMachines || run?.gameplay_state_machines || run?.gameplayStateMachines || {};
+    const abilitySource = source.abilities || source.ability_actions || source.abilityActionModel || source.ability_action_model || run?.ability_actions || run?.abilityActions || run?.gameplay_ability_actions || run?.gameplayAbilityActions || {};
+    const reviewApplySource = source.reviewApply || source.review_apply || run?.behavior_review_apply || run?.behaviorReviewApply || {};
+    const behaviors = arrayField(behaviorSource, 'behaviors', 'records', 'rows');
+    const events = arrayField(eventSource, 'events', 'records', 'rows');
+    const stateMachines = arrayField(stateSource, 'stateMachines', 'state_machines', 'machines', 'records', 'rows');
+    const abilities = arrayField(abilitySource, 'abilities', 'actions', 'records', 'rows');
+    const reviews = arrayField(reviewApplySource, 'reviews', 'reviewDecisions', 'review_decisions', 'records');
+    const applies = arrayField(reviewApplySource, 'applies', 'applyTransactions', 'apply_transactions', 'transactions');
+    const malformedReasons = [source, behaviorSource, eventSource, stateSource, abilitySource, reviewApplySource]
+      .flatMap((item) => arrayField(item, 'malformedReasons', 'malformed_reasons'));
+    return {
+      present: Boolean(source.present ?? (behaviors.length || events.length || stateMachines.length || abilities.length || reviews.length || applies.length)),
+      status: source.status || behaviorSource.status || eventSource.status || stateSource.status || abilitySource.status || reviewApplySource.status || 'missing',
+      boundary: source.boundary || 'Studio behavior inspection is escaped read-only local evidence. It does not execute scripts, eval, dynamic import, load plugins, run a command bridge, write trusted files, mutate source, auto-apply, auto-merge, self-approve, or persist browser state.',
+      behaviorSource,
+      eventSource,
+      stateSource,
+      abilitySource,
+      reviewApplySource,
+      behaviors,
+      events,
+      stateMachines,
+      abilities,
+      reviews,
+      applies,
+      malformedReasons,
+    };
+  }
+
+  function renderBehaviorListPanel(run) {
+    const model = behaviorInspectionModel(run);
+    if (!model.present && model.behaviors.length === 0) {
+      return `<section id="behavior-list-panel" class="panel"><h2>Behavior list panel</h2><p class="empty">No structured behavior list read model is available for this run.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const rows = model.behaviors.slice(0, 12).map((behavior, index) => {
+      const trigger = behavior.trigger || behavior.triggers?.[0] || {};
+      const conditions = arrayField(behavior, 'conditions', 'guards');
+      const actions = arrayField(behavior, 'actions', 'effects');
+      const blockers = arrayField(behavior, 'blockedReasons', 'blocked_reasons');
+      const refs = arrayField(behavior, 'evidenceRefs', 'evidence_refs').map(refText);
+      return `<article class="surface-row"><strong>${escapeText(behavior.id || behavior.behaviorId || `behavior-${index + 1}`)}</strong> ${surfaceState((behavior.status || model.status) !== 'blocked', behavior.status || model.status || 'unknown')}<br>
+        <small>${escapeText(behavior.label || behavior.summary || 'structured behavior row')} · target ${escapeText(summarizeObjectRef(behavior.target || behavior.targetRef || behavior.target_ref))}</small><br>
+        <small>Trigger: ${escapeText(summarizeObjectRef(trigger))}</small><br>
+        <small>Conditions ${escapeText(conditions.length)} · actions ${escapeText(actions.length)}</small><br>
+        ${blockers.length ? `<small>Blocked: ${escapeText(blockers.join(' · '))}</small><br>` : ''}
+        <small>Evidence refs: ${escapeText(refs.join(' · ') || 'none')}</small>
+      </article>`;
+    }).join('') || '<div class="surface-row">No behavior rows exported.</div>';
+    return `<section id="behavior-list-panel" class="panel"><h2>Behavior list panel</h2>
+      <p class="hint">Status ${escapeText(model.behaviorSource.status || model.status)} · behaviors ${escapeText(model.behaviors.length)}. ${escapeText(model.boundary)}</p>
+      ${rows}
+    </section>`;
+  }
+
+  function renderBehaviorEventSignalPanel(run) {
+    const model = behaviorInspectionModel(run);
+    const ordered = [...model.events].sort((left, right) => Number(left.tick ?? 0) - Number(right.tick ?? 0) || Number(left.orderingIndex ?? left.ordering_index ?? 0) - Number(right.orderingIndex ?? right.ordering_index ?? 0) || String(left.id || '').localeCompare(String(right.id || '')));
+    if (!model.present && ordered.length === 0) {
+      return `<section id="behavior-event-signal-panel" class="panel"><h2>Event/signal panel</h2><p class="empty">No gameplay event/signal read model is available for this run.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const consumedCount = ordered.filter((event) => event.consumed === true).length;
+    const rows = ordered.slice(0, 12).map((event, index) => {
+      const blockers = [event.blockedReason || event.blocked_reason].filter(Boolean).concat(arrayField(event, 'blockedReasons', 'blocked_reasons'));
+      const refs = arrayField(event, 'evidenceRefs', 'evidence_refs').map(refText);
+      return `<article class="surface-row"><strong>${escapeText(event.id || `event-${index + 1}`)}</strong> ${surfaceState(event.consumed === true, event.consumed === true ? 'consumed' : 'visible-unconsumed')}<br>
+        <small>${escapeText(event.eventType || event.event_type || 'unknown-event')} · signal ${escapeText(event.signalName || event.signal_name || 'none')} · tick ${escapeText(event.tick ?? 'unknown')}</small><br>
+        <small>Source ${escapeText(summarizeObjectRef(event.source))} · target ${escapeText(summarizeObjectRef(event.target))}</small><br>
+        ${blockers.length ? `<small>Blocked: ${escapeText(blockers.join(' · '))}</small><br>` : ''}
+        <small>Consumed by: ${escapeText(arrayField(event, 'consumedBy', 'consumed_by').join(' · ') || 'none')} · evidence ${escapeText(refs.join(' · ') || 'none')}</small>
+      </article>`;
+    }).join('') || '<div class="surface-row">No event/signal rows exported.</div>';
+    return `<section id="behavior-event-signal-panel" class="panel"><h2>Event/signal panel</h2>
+      <p class="hint">Status ${escapeText(model.eventSource.status || model.status)} · events ${escapeText(ordered.length)} · consumed ${escapeText(consumedCount)} · unconsumed ${escapeText(ordered.length - consumedCount)}. Read-only queue inspection; the browser does not dispatch events or signals.</p>
+      ${rows}
+    </section>`;
+  }
+
+  function renderBehaviorStateMachinePanel(run) {
+    const model = behaviorInspectionModel(run);
+    if (!model.present && model.stateMachines.length === 0) {
+      return `<section id="behavior-state-machine-panel" class="panel"><h2>State machine panel</h2><p class="empty">No gameplay state machine read model is available for this run.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const rows = model.stateMachines.slice(0, 10).map((machine, index) => {
+      const states = arrayField(machine, 'states');
+      const transitions = arrayField(machine, 'transitions');
+      const blockers = arrayField(machine, 'blockedReasons', 'blocked_reasons');
+      const refs = arrayField(machine, 'evidenceRefs', 'evidence_refs').map(refText);
+      const transitionText = transitions.slice(0, 4).map((transition) => `${transition.id || 'transition'}:${transition.from || '?'}→${transition.to || '?'}:${transition.trigger?.kind || 'trigger'}`).join(' · ');
+      return `<article class="surface-row"><strong>${escapeText(machine.id || machine.machineId || `state-machine-${index + 1}`)}</strong> ${surfaceState((machine.status || model.status) !== 'blocked', machine.status || model.status || 'unknown')}<br>
+        <small>${escapeText(machine.label || 'structured state machine')} · target ${escapeText(summarizeObjectRef(machine.target))} · initial ${escapeText(machine.initialStateId || machine.initial_state_id || 'unknown')}</small><br>
+        <small>States: ${escapeText(states.map((state) => state.id || state.label || 'state').join(' · ') || 'none')}</small><br>
+        <small>Transitions: ${escapeText(transitionText || 'none')}</small><br>
+        ${blockers.length ? `<small>Blocked: ${escapeText(blockers.join(' · '))}</small><br>` : ''}
+        <small>Evidence refs: ${escapeText(refs.join(' · ') || 'none')}</small>
+      </article>`;
+    }).join('') || '<div class="surface-row">No state machine rows exported.</div>';
+    return `<section id="behavior-state-machine-panel" class="panel"><h2>State machine panel</h2>
+      <p class="hint">Status ${escapeText(model.stateSource.status || model.status)} · state machines ${escapeText(model.stateMachines.length)}. Display-only transitions; no runtime state changes are dispatched.</p>
+      ${rows}
+    </section>`;
+  }
+
+  function renderBehaviorAbilityActionPanel(run) {
+    const model = behaviorInspectionModel(run);
+    if (!model.present && model.abilities.length === 0) {
+      return `<section id="behavior-ability-action-panel" class="panel"><h2>Ability/action panel</h2><p class="empty">No gameplay ability/action read model is available for this run.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const rows = model.abilities.slice(0, 12).map((ability, index) => {
+      const blockers = arrayField(ability, 'blockedReasons', 'blocked_reasons');
+      const refs = arrayField(ability, 'evidenceRefs', 'evidence_refs').map(refText);
+      const costs = arrayField(ability, 'costs').map((cost) => summarizeObjectRef(cost)).join(' · ');
+      return `<article class="surface-row"><strong>${escapeText(ability.id || ability.abilityId || `ability-${index + 1}`)}</strong> ${surfaceState((ability.status || model.status) !== 'blocked', ability.runtimeStatus || ability.runtime_status || ability.status || model.status || 'unknown')}<br>
+        <small>${escapeText(ability.label || ability.actionId || ability.action_id || 'structured ability/action')} · target ${escapeText(summarizeObjectRef(ability.target))}</small><br>
+        <small>Trigger: ${escapeText(summarizeObjectRef(ability.trigger))}</small><br>
+        <small>Effect: ${escapeText(summarizeObjectRef(ability.effect))} · costs ${escapeText(costs || 'none')}</small><br>
+        ${blockers.length ? `<small>Blocked: ${escapeText(blockers.join(' · '))}</small><br>` : ''}
+        <small>Evidence refs: ${escapeText(refs.join(' · ') || 'none')}</small>
+      </article>`;
+    }).join('') || '<div class="surface-row">No ability/action rows exported.</div>';
+    return `<section id="behavior-ability-action-panel" class="panel"><h2>Ability/action panel</h2>
+      <p class="hint">Status ${escapeText(model.abilitySource.status || model.status)} · abilities/actions ${escapeText(model.abilities.length)}. Display-only action metadata; no ability is executed from Studio.</p>
+      ${rows}
+    </section>`;
+  }
+
+  function renderBehaviorReviewApplyStatusSurface(run) {
+    const model = behaviorInspectionModel(run);
+    if (!model.present && model.reviews.length === 0 && model.applies.length === 0) {
+      return `<section id="behavior-review-apply-status" class="panel"><h2>Review/apply status panel</h2><p class="empty">No behavior review/apply status read model is available for this run.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const reviewRows = model.reviews.slice(0, 8).map((review, index) => {
+      const refs = arrayField(review, 'evidenceRefs', 'evidence_refs', 'linkedEvidence', 'linked_evidence').map(refText);
+      return `<li><strong>${escapeText(review.id || review.decisionId || review.decision_id || `review-${index + 1}`)}</strong> ${escapeText(review.status || review.decision || 'unknown')} · reviewer ${escapeText(review.reviewer || review.reviewerId || review.reviewer_id || 'unrecorded')} · evidence ${escapeText(refs.join(' · ') || 'none')}</li>`;
+    }).join('') || '<li>No review decision rows exported.</li>';
+    const applyRows = model.applies.slice(0, 8).map((apply, index) => {
+      const blockers = arrayField(apply, 'blockedReasons', 'blocked_reasons');
+      const refs = arrayField(apply, 'evidenceRefs', 'evidence_refs', 'linkedEvidence', 'linked_evidence').map(refText);
+      return `<li><strong>${escapeText(apply.id || apply.transactionId || apply.transaction_id || `apply-${index + 1}`)}</strong> ${escapeText(apply.status || 'unknown')} · rollback ${escapeText(refText(apply.rollbackRef || apply.rollback_ref) || 'not recorded')} · blockers ${escapeText(blockers.join(' · ') || 'none')} · evidence ${escapeText(refs.join(' · ') || 'none')}</li>`;
+    }).join('') || '<li>No apply transaction rows exported.</li>';
+    const malformed = model.malformedReasons.length ? `<p class="warn">Malformed behavior inspection input: ${escapeText(model.malformedReasons.join(' · '))}</p>` : '<p class="hint">No malformed behavior inspection rows reported.</p>';
+    return `<section id="behavior-review-apply-status" class="panel"><h2>Review/apply status panel</h2>
+      <p class="hint">${escapeText(model.reviewApplySource.boundary || model.boundary)} Review/apply status is read-only; Studio does not approve, apply, merge, execute commands, or write trusted files.</p>
+      ${malformed}
+      <h3>Review decisions</h3><ul>${reviewRows}</ul>
+      <h3>Apply transactions</h3><ul>${applyRows}</ul>
     </section>`;
   }
 
@@ -3141,7 +3323,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -3230,7 +3412,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, renderBehaviorDraftStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

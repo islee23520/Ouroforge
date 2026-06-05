@@ -2336,6 +2336,7 @@ const sourcePatchBundleXssMarkup = cockpit.renderSourcePatchEvidenceBundleSurfac
 assert.match(sourcePatchBundleXssMarkup, /&lt;bundle-xss&gt;/);
 assert.match(sourcePatchBundleXssMarkup, /sandbox\/&lt;bad&gt;\/evidence\/report\.json/);
 assert.doesNotMatch(sourcePatchBundleXssMarkup, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
+
 const behaviorEvidenceRun = {
   behavior_evidence: {
     present: true,
@@ -2387,6 +2388,66 @@ assert.match(behaviorEvidenceXssSurface, /&lt;img src=x onerror=alert\(1\)&gt;/)
 assert.match(behaviorEvidenceXssSurface, /evidence\/&lt;bad&gt;\/result\.json/);
 assert.doesNotMatch(behaviorEvidenceXssSurface, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
 assert.match(cockpit.renderEvidencePane({ ...run, ...behaviorEvidenceRun }), /Behavior evidence lifecycle/);
+
+const behaviorInspectionRun = {
+  behavior_inspection: {
+    present: true,
+    status: 'ready',
+    boundary: 'Read-only behavior inspection; no command bridge, no eval, no dynamic import, no plugin loader, no browser trusted writes, no auto-apply.',
+    behaviors: JSON.parse(fs.readFileSync(require.resolve('../gameplay-behavior-model-v1/behavior-model.valid.fixture.json'), 'utf8')),
+    event_signals: JSON.parse(fs.readFileSync(require.resolve('../gameplay-event-signal-system-v1/event-signal.valid.fixture.json'), 'utf8')),
+    state_machines: JSON.parse(fs.readFileSync(require.resolve('../gameplay-state-machine-v1/state-machine.valid.fixture.json'), 'utf8')),
+    ability_actions: JSON.parse(fs.readFileSync(require.resolve('../gameplay-ability-action-v1/ability-action.valid.fixture.json'), 'utf8')),
+    review_apply: {
+      status: 'ready_for_trusted_rust_apply',
+      boundary: 'Review/apply rows are status-only; no auto-apply, self-approval, command execution, or browser trusted writes.',
+      reviews: [{ decision_id: 'review-jump-boost', status: 'accepted', reviewer: 'human-reviewer', evidence_refs: ['runs/behavior/review.json'] }],
+      applies: [{ transaction_id: 'behavior-apply-jump-boost', status: 'ready_for_trusted_apply', rollback_ref: { path: 'runs/behavior/rollback.json' }, blocked_reasons: [], evidence_refs: ['runs/behavior/apply.json'] }],
+    },
+  },
+};
+const behaviorInspectionModel = cockpit.behaviorInspectionModel(behaviorInspectionRun);
+assert.equal(behaviorInspectionModel.behaviors.length, 7);
+assert.equal(behaviorInspectionModel.events.length, 6);
+assert.equal(behaviorInspectionModel.stateMachines.length, 3);
+assert.equal(behaviorInspectionModel.abilities.length, 5);
+assert.match(cockpit.renderBehaviorListPanel(behaviorInspectionRun), /Behavior list panel/);
+assert.match(cockpit.renderBehaviorListPanel(behaviorInspectionRun), /patrol-guard-route-a/);
+assert.match(cockpit.renderBehaviorEventSignalPanel(behaviorInspectionRun), /Event\/signal panel/);
+assert.match(cockpit.renderBehaviorEventSignalPanel(behaviorInspectionRun), /player-spike-contact/);
+assert.match(cockpit.renderBehaviorStateMachinePanel(behaviorInspectionRun), /State machine panel/);
+assert.match(cockpit.renderBehaviorStateMachinePanel(behaviorInspectionRun), /player-dash-state/);
+assert.match(cockpit.renderBehaviorAbilityActionPanel(behaviorInspectionRun), /Ability\/action panel/);
+assert.match(cockpit.renderBehaviorAbilityActionPanel(behaviorInspectionRun), /player-dash/);
+assert.match(cockpit.renderBehaviorReviewApplyStatusSurface(behaviorInspectionRun), /Review\/apply status panel/);
+assert.match(cockpit.renderBehaviorReviewApplyStatusSurface(behaviorInspectionRun), /review-jump-boost/);
+assert.match(cockpit.renderBehaviorReviewApplyStatusSurface(behaviorInspectionRun), /behavior-apply-jump-boost/);
+assert.ok(cockpit.studioSurfaceSummary({ ...run, ...behaviorInspectionRun }).some((surface) => surface.id === 'behavior-event-signal-panel' && surface.present), 'Studio surface summary should include behavior event/signal panel');
+assert.match(cockpit.renderEvidencePane({ ...run, ...behaviorInspectionRun }), /Behavior list panel/);
+assert.match(cockpit.renderEvidencePane({ ...run, ...behaviorInspectionRun }), /Review\/apply status panel/);
+const behaviorInspectionXssRun = {
+  behavior_inspection: {
+    present: true,
+    status: '<script>ready</script>',
+    boundary: '<script>boundary</script>',
+    behaviors: { status: '<img src=x>', behaviors: [{ id: '<img src=x onerror=alert(1)>', status: '<script>blocked</script>', label: '<script>label</script>', target: { entityId: '<b>player</b>' }, trigger: { kind: '<script>trigger</script>' }, conditions: [{ kind: '<img src=x>' }], actions: [{ kind: '<script>action</script>' }], blockedReasons: ['<script>blocked</script>'], evidenceRefs: ['evidence/<bad>/behavior.json'] }] },
+    event_signals: { events: [{ id: '<script>event</script>', eventType: '<img src=x>', signalName: '<script>signal</script>', source: { entityId: '<b>source</b>' }, target: { entityId: '<i>target</i>' }, tick: 1, orderingIndex: 0, consumed: false, blockedReason: '<script>blocked</script>', consumedBy: ['<script>consumer</script>'], evidenceRefs: ['evidence/<bad>/event.json'] }] },
+    state_machines: { stateMachines: [{ id: '<script>machine</script>', label: '<img src=x>', status: '<script>status</script>', target: { entityId: '<b>entity</b>' }, initialStateId: '<script>state</script>', states: [{ id: '<script>idle</script>' }], transitions: [{ id: '<script>transition</script>', from: '<b>a</b>', to: '<i>b</i>', trigger: { kind: '<script>trigger</script>' } }], evidenceRefs: ['evidence/<bad>/state.json'] }] },
+    ability_actions: { abilities: [{ id: '<script>ability</script>', label: '<img src=x>', runtimeStatus: '<script>runtime</script>', target: { entityId: '<b>player</b>' }, trigger: { kind: '<script>input</script>' }, effect: { kind: '<script>effect</script>' }, costs: [{ kind: '<script>cost</script>' }], evidenceRefs: ['evidence/<bad>/ability.json'] }] },
+    review_apply: { reviews: [{ decision_id: '<script>review</script>', status: '<img src=x>', reviewer: '<script>reviewer</script>', evidence_refs: ['evidence/<bad>/review.json'] }], applies: [{ transaction_id: '<script>apply</script>', status: '<img src=x>', rollback_ref: { path: 'rollback/<bad>.json' }, blocked_reasons: ['<script>blocked</script>'], evidence_refs: ['evidence/<bad>/apply.json'] }] },
+  },
+};
+const behaviorInspectionXssMarkup = [
+  cockpit.renderBehaviorListPanel(behaviorInspectionXssRun),
+  cockpit.renderBehaviorEventSignalPanel(behaviorInspectionXssRun),
+  cockpit.renderBehaviorStateMachinePanel(behaviorInspectionXssRun),
+  cockpit.renderBehaviorAbilityActionPanel(behaviorInspectionXssRun),
+  cockpit.renderBehaviorReviewApplyStatusSurface(behaviorInspectionXssRun),
+].join('\n');
+assert.match(behaviorInspectionXssMarkup, /&lt;img src=x onerror=alert\(1\)&gt;/);
+assert.match(behaviorInspectionXssMarkup, /evidence\/&lt;bad&gt;\/apply\.json/);
+assert.doesNotMatch(behaviorInspectionXssMarkup, /<script>|<img|<button|onclick|localStorage|fetch\(|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
+
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /Source patch apply transaction/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply-tx-1/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /ready_metadata_only_no_apply_authority/);
