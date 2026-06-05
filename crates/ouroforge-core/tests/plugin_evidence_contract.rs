@@ -212,12 +212,60 @@ fn plugin_registry_evidence_rejects_executable_or_unsafe_descriptors() {
 
     let error = PluginRegistryEvidenceArtifact::from_json_str(unsafe_dashboard_panel_fixture())
         .expect_err("remote template ref is blocked");
-    assert!(
-        format!("{error:?}").contains(
-            "templateRef value `https://example.com/remote.js` is not in the v1 allowlist"
+    assert!(format!("{error:?}").contains("https://"), "{error:?}");
+
+    let hostile_panel_cases = [
+        (
+            {
+                let mut value = fixture_value();
+                value["plugins"][0]["dashboardPanels"][0]["title"] =
+                    serde_json::json!("<script>alert(1)</script>");
+                value
+            },
+            "<script",
         ),
-        "{error:?}"
-    );
+        (
+            {
+                let mut value = fixture_value();
+                value["plugins"][0]["dashboardPanels"][0]["dataSourceKey"] =
+                    serde_json::json!("javascript:alert(1)");
+                value
+            },
+            "javascript:",
+        ),
+        (
+            {
+                let mut value = fixture_value();
+                value["plugins"][0]["dashboardPanels"][0]["templateRef"] =
+                    serde_json::json!("https://example.com/remote-panel.js");
+                value
+            },
+            "https://",
+        ),
+        (
+            {
+                let mut value = fixture_value();
+                value["plugins"][0]["dashboardPanels"][0]["layoutHint"] =
+                    serde_json::json!("onclick=alert(1)");
+                value
+            },
+            "onclick=",
+        ),
+        (
+            {
+                let mut value = fixture_value();
+                value["plugins"][0]["dashboardPanels"][0]["templateRef"] =
+                    serde_json::json!("commandHook");
+                value
+            },
+            "templateRef value `commandHook` is not in the v1 allowlist",
+        ),
+    ];
+
+    for (value, expected) in hostile_panel_cases {
+        let error = parse_value(value).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
 
     let mut missing_panel = fixture_value();
     missing_panel["plugins"][0]["dashboardPanels"] = serde_json::json!([]);

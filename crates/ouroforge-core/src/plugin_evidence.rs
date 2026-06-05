@@ -516,6 +516,15 @@ fn require_local_text(field: &str, value: &str) -> Result<()> {
     }
     let lower = value.to_ascii_lowercase();
     for forbidden in [
+        "<script",
+        "</script",
+        "javascript:",
+        "http://",
+        "https://",
+        "onerror=",
+        "onclick=",
+        "onload=",
+        "srcdoc=",
         "eval(",
         "dynamic import",
         "command bridge",

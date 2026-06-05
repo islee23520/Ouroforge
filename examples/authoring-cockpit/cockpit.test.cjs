@@ -2510,6 +2510,16 @@ const pluginRegistrySurfaceXss = cockpit.renderPluginRegistryBrowserSurface({ pl
 assert.ok(!pluginRegistrySurfaceXss.includes('<script>blocked</script>'), 'plugin registry Studio status must be escaped');
 assert.ok(!pluginRegistrySurfaceXss.includes('<img src=x onerror=alert(1)>'), 'plugin registry Studio rows must be escaped');
 
+
+const pluginDashboardPanelXss = cockpit.renderPluginRegistryBrowserSurface({ plugin_registry: { present: true, status: 'ready', registries: [{ registryId: 'xss-registry', plugins: [{ pluginId: 'xss-plugin', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], dashboardPanels: [{ panelId: '<img src=x onerror=alert(1)>', title: '<script>alert(1)</script>', dataSourceKey: 'javascript:alert(1)', templateRef: 'https://example.com/remote.js', layoutHint: 'onclick=alert(1)', displayHints: ['<script>hint</script>'], boundary: '<script>boundary</script>' }] }] }] } });
+assert.doesNotMatch(pluginDashboardPanelXss, /<script>alert\(1\)<\/script>/);
+assert.doesNotMatch(pluginDashboardPanelXss, /<img src=x onerror=alert\(1\)>/);
+assert.doesNotMatch(pluginDashboardPanelXss, /<button/i);
+assert.doesNotMatch(pluginDashboardPanelXss, /data-action=/i);
+assert.doesNotMatch(pluginDashboardPanelXss, /href="javascript:/i);
+assert.match(pluginDashboardPanelXss, /javascript:alert\(1\)/);
+assert.match(pluginDashboardPanelXss, /&lt;script&gt;boundary&lt;\/script&gt;/);
+
 const pluginRegistryBrowserSmokeMarkup = cockpit.renderPluginRegistryBrowserSurface(run);
 assert.match(pluginRegistryBrowserSmokeMarkup, /Plugin registry browser/);
 assert.match(pluginRegistryBrowserSmokeMarkup, /plugin-registry-summary/);
