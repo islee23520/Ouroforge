@@ -155,6 +155,62 @@ fn conditions_block_actions_and_unsupported_actions_remain_warning_only() {
 }
 
 #[test]
+fn evidence_bundle_exposes_runtime_reports_replay_keys_and_boundary() {
+    use ouroforge_core::behavior_runtime::{BehaviorExecutionInput, BehaviorWorldState};
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let first = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_position("player", 2, 5),
+    );
+    let replay = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_position("player", 2, 5),
+    );
+    let goal = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("goalReached"),
+        BehaviorWorldState::default().with_item("key"),
+    );
+
+    let bundle = artifact.evidence_bundle(vec![first, replay, goal]);
+
+    assert_eq!(
+        bundle.schema_version,
+        "ouroforge.behavior-runtime-evidence.v1"
+    );
+    assert_eq!(bundle.summary.report_count, 3);
+    assert_eq!(bundle.summary.applied_action_count, 8);
+    assert_eq!(bundle.summary.diagnostic_count, 0);
+    assert_eq!(bundle.summary.terminal_state_count, 1);
+    assert_eq!(bundle.reports[0].replay_key, bundle.reports[1].replay_key);
+    assert_ne!(bundle.reports[1].replay_key, bundle.reports[2].replay_key);
+    assert_eq!(
+        bundle.reports[0].applied_action_ids,
+        vec!["mark-jumped", "jump-motion", "jump-audio"]
+    );
+    assert_eq!(
+        bundle.reports[2].applied_action_ids,
+        vec!["win", "victory-event"]
+    );
+    assert!(bundle
+        .trusted_boundary
+        .execution_mode
+        .contains("structured-data-only"));
+    assert!(bundle
+        .trusted_boundary
+        .disallowed_actions
+        .iter()
+        .any(|action| action == "dynamic import"));
+}
+
+#[test]
 fn rejects_malformed_or_untrusted_behavior_artifacts_at_loader_boundary() {
     let invalid_cases = [
         (

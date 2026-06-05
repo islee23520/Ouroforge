@@ -257,6 +257,58 @@ pub struct BehaviorExecutionReport {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct BehaviorRuntimeEvidenceBundle {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "artifactId")]
+    pub artifact_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub summary: BehaviorRuntimeEvidenceSummary,
+    pub reports: Vec<BehaviorExecutionEvidence>,
+    #[serde(rename = "trustedBoundary")]
+    pub trusted_boundary: BehaviorRuntimeBoundary,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorRuntimeEvidenceSummary {
+    #[serde(rename = "reportCount")]
+    pub report_count: u64,
+    #[serde(rename = "appliedActionCount")]
+    pub applied_action_count: u64,
+    #[serde(rename = "diagnosticCount")]
+    pub diagnostic_count: u64,
+    #[serde(rename = "terminalStateCount")]
+    pub terminal_state_count: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorExecutionEvidence {
+    #[serde(rename = "reportIndex")]
+    pub report_index: u64,
+    #[serde(rename = "replayKey")]
+    pub replay_key: String,
+    #[serde(rename = "triggerKind")]
+    pub trigger_kind: String,
+    #[serde(rename = "event", default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(
+        rename = "inputAction",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub input_action: Option<String>,
+    #[serde(rename = "appliedActionIds")]
+    pub applied_action_ids: Vec<String>,
+    pub diagnostics: Vec<BehaviorRuntimeDiagnostic>,
+    #[serde(rename = "worldState")]
+    pub world_state: BehaviorWorldState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BehaviorAppliedAction {
     #[serde(rename = "behaviorId")]
     pub behavior_id: String,
@@ -546,6 +598,52 @@ impl BehaviorArtifact {
             applied_actions,
             diagnostics,
             world_state,
+        }
+    }
+
+    pub fn evidence_bundle(
+        &self,
+        reports: Vec<BehaviorExecutionReport>,
+    ) -> BehaviorRuntimeEvidenceBundle {
+        let runtime_state = self.runtime_state();
+        let mut summary = BehaviorRuntimeEvidenceSummary {
+            report_count: reports.len() as u64,
+            applied_action_count: 0,
+            diagnostic_count: 0,
+            terminal_state_count: 0,
+        };
+        let evidence_reports = reports
+            .into_iter()
+            .enumerate()
+            .map(|(index, report)| {
+                summary.applied_action_count += report.applied_actions.len() as u64;
+                summary.diagnostic_count += report.diagnostics.len() as u64;
+                summary.terminal_state_count +=
+                    u64::from(report.world_state.terminal_state.is_some());
+                BehaviorExecutionEvidence {
+                    report_index: index as u64,
+                    replay_key: replay_key_for_report(&report),
+                    trigger_kind: report.input.trigger_kind,
+                    event: report.input.event,
+                    input_action: report.input.input_action,
+                    applied_action_ids: report
+                        .applied_actions
+                        .into_iter()
+                        .map(|action| action.action_id)
+                        .collect(),
+                    diagnostics: report.diagnostics,
+                    world_state: report.world_state,
+                }
+            })
+            .collect();
+
+        BehaviorRuntimeEvidenceBundle {
+            schema_version: "ouroforge.behavior-runtime-evidence.v1".to_string(),
+            artifact_id: self.artifact_id.clone(),
+            scene_id: self.scene_id.clone(),
+            summary,
+            reports: evidence_reports,
+            trusted_boundary: runtime_state.trusted_boundary,
         }
     }
 }
@@ -1045,6 +1143,16 @@ fn bool_string(value: bool) -> &'static str {
     } else {
         "false"
     }
+}
+
+fn replay_key_for_report(report: &BehaviorExecutionReport) -> String {
+    let canonical = serde_json::to_vec(report).unwrap_or_else(|_| Vec::new());
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in canonical {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("behavior-replay-{hash:016x}")
 }
 
 pub fn read_behavior_artifact(path: impl AsRef<Path>) -> Result<BehaviorArtifact> {
