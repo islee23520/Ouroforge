@@ -30571,17 +30571,18 @@ fn classify_failure_category(
             MutationClassificationCategory::ConsoleError,
             "failure references console evidence".to_string(),
         )
-    } else if haystack.contains("probe_failure")
-        || (haystack.contains("probe failure") && !haystack.contains("runtime probe failure"))
+    } else if haystack.contains("runtime_probe_failure")
+        || haystack.contains("runtime probe failure")
+        || haystack.contains("runtime_probe")
     {
-        (
-            MutationClassificationCategory::ProbeFailure,
-            "failure references probe failure evidence".to_string(),
-        )
-    } else if haystack.contains("runtime") || haystack.contains("runtime_probe") {
         (
             MutationClassificationCategory::RuntimeProbeFailure,
             "failure references runtime probe evidence".to_string(),
+        )
+    } else if haystack.contains("probe_failure") || haystack.contains("probe failure") {
+        (
+            MutationClassificationCategory::ProbeFailure,
+            "failure references probe failure evidence".to_string(),
         )
     } else if haystack.contains("input") || haystack.contains("control") {
         (
