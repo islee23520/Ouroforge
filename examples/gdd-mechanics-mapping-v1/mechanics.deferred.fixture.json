@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "gdd-mechanics-mapping-v1",
+  "mappingId": "mapping-deferred",
+  "status": "blocked",
+  "sourceExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "requirementRefs": [
+    {
+      "id": "REQ-dialogue-tree",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.partial.fixture.json#REQ-dialogue-tree"
+    }
+  ],
+  "capabilityRefs": [
+    {
+      "id": "CAP-production-2d-scene",
+      "kind": "production-2d",
+      "docsRef": "docs/production-2d-engine-core-v1.md",
+      "supportStatus": "supported",
+      "summary": "2D scene graph, components, collision, triggers, and deterministic local evidence refs."
+    },
+    {
+      "id": "CAP-gameplay-behavior-model",
+      "kind": "gameplay-logic",
+      "docsRef": "docs/gameplay-behavior-model-v1.md",
+      "supportStatus": "supported",
+      "summary": "Data-first behavior model refs for patrol, collect, contact damage, door, win, hazard, and ability examples."
+    },
+    {
+      "id": "CAP-level-designer",
+      "kind": "level-designer",
+      "docsRef": "docs/agentic-scene-level-designer-v1.md",
+      "supportStatus": "supported",
+      "summary": "Evidence-gated level and scene planning with placeholders and reviewer-visible needs."
+    },
+    {
+      "id": "CAP-asset-manifest",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-manifest-v1.md",
+      "supportStatus": "supported",
+      "summary": "Manifest references existing placeholders or fixture-scoped assets with source and license metadata."
+    },
+    {
+      "id": "CAP-scenario-evidence",
+      "kind": "scenario-evidence",
+      "docsRef": "docs/scenario-evaluator-v1.md",
+      "supportStatus": "supported",
+      "summary": "Scenario and evidence contracts for deterministic local checks and read-only dashboard export."
+    },
+    {
+      "id": "CAP-3d-gate",
+      "kind": "three-d-gate",
+      "docsRef": "docs/3d-capability-gate-v1.md",
+      "supportStatus": "partial",
+      "summary": "3D capability gate refs exist but do not imply broad 3D prototype behavior."
+    },
+    {
+      "id": "CAP-procedural-assets",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-pipeline-v1.md",
+      "supportStatus": "unsupported",
+      "summary": "Procedural creation remains outside this mapping; references may only record unsupported gaps."
+    }
+  ],
+  "coreLoops": [
+    {
+      "id": "LOOP-main",
+      "title": "Move, collect, and prove outcome",
+      "requirementRefs": [
+        "REQ-dialogue-tree"
+      ],
+      "mappingRefs": [
+        "MAP-dialogue-tree"
+      ],
+      "scopeBoundary": "bounded mechanic slice, not a full-game generator, review required before later planning."
+    }
+  ],
+  "mappings": [
+    {
+      "id": "MAP-dialogue-tree",
+      "requirementId": "REQ-dialogue-tree",
+      "supportStatus": "deferred",
+      "engineCapabilityRefs": [],
+      "behaviorModelRefs": [],
+      "sceneLevelNeeds": [
+        "dialogue review placeholder need only"
+      ],
+      "assetNeeds": [
+        "no new dialogue portrait assets; manifest placeholder refs only"
+      ],
+      "scenarioNeeds": [
+        "scenario marks dialogue tree as deferred and excluded from prototype slice"
+      ],
+      "dependencies": [],
+      "conflictsWith": [],
+      "unsupportedGaps": [
+        "dialogue tree behavior is outside current bounded gameplay mapping"
+      ],
+      "blockedReasons": [
+        "needs separately scoped structured dialogue capability before planning"
+      ],
+      "recommendations": [
+        "defer dialogue tree and keep a placeholder interaction note"
+      ],
+      "coreLoopRefs": [
+        "LOOP-main"
+      ],
+      "evidenceBoundary": "requirement-linked advisory mapping; not generation authority; review required before any later prototype planning."
+    }
+  ],
+  "boundary": "Evidence-gated prototype planning only; GDD mechanics remain untrusted until Rust/local validation and review-gated apply. This mapping provides no autonomous unrestricted game creation, no source or script mutation, no asset generation, and browser read-only or draft-only inspection."
+}

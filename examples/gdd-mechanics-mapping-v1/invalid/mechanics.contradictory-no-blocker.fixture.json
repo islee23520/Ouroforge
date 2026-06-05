@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "gdd-mechanics-mapping-v1",
+  "mappingId": "mapping-invalid-contradiction-no-blocker",
+  "status": "partial",
+  "sourceExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "requirementRefs": [
+    {
+      "id": "REQ-move",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-move"
+    },
+    {
+      "id": "REQ-one-button",
+      "category": "control",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-one-button"
+    }
+  ],
+  "capabilityRefs": [
+    {
+      "id": "CAP-production-2d-scene",
+      "kind": "production-2d",
+      "docsRef": "docs/production-2d-engine-core-v1.md",
+      "supportStatus": "supported",
+      "summary": "2D scene graph, components, collision, triggers, and deterministic local evidence refs."
+    },
+    {
+      "id": "CAP-gameplay-behavior-model",
+      "kind": "gameplay-logic",
+      "docsRef": "docs/gameplay-behavior-model-v1.md",
+      "supportStatus": "supported",
+      "summary": "Data-first behavior model refs for patrol, collect, contact damage, door, win, hazard, and ability examples."
+    },
+    {
+      "id": "CAP-level-designer",
+      "kind": "level-designer",
+      "docsRef": "docs/agentic-scene-level-designer-v1.md",
+      "supportStatus": "supported",
+      "summary": "Evidence-gated level and scene planning with placeholders and reviewer-visible needs."
+    },
+    {
+      "id": "CAP-asset-manifest",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-manifest-v1.md",
+      "supportStatus": "supported",
+      "summary": "Manifest references existing placeholders or fixture-scoped assets with source and license metadata."
+    },
+    {
+      "id": "CAP-scenario-evidence",
+      "kind": "scenario-evidence",
+      "docsRef": "docs/scenario-evaluator-v1.md",
+      "supportStatus": "supported",
+      "summary": "Scenario and evidence contracts for deterministic local checks and read-only dashboard export."
+    },
+    {
+      "id": "CAP-3d-gate",
+      "kind": "three-d-gate",
+      "docsRef": "docs/3d-capability-gate-v1.md",
+      "supportStatus": "partial",
+      "summary": "3D capability gate refs exist but do not imply broad 3D prototype behavior."
+    },
+    {
+      "id": "CAP-procedural-assets",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-pipeline-v1.md",
+      "supportStatus": "unsupported",
+      "summary": "Procedural creation remains outside this mapping; references may only record unsupported gaps."
+    }
+  ],
+  "coreLoops": [
+    {
+      "id": "LOOP-main",
+      "title": "Resolve control loop before planning",
+      "requirementRefs": [
+        "REQ-one-button",
+        "REQ-move"
+      ],
+      "mappingRefs": [
+        "MAP-one-button",
+        "MAP-combo-controls"
+      ],
+      "scopeBoundary": "bounded mechanic slice, not a full-game generator, review required before later planning."
+    }
+  ],
+  "mappings": [
+    {
+      "id": "MAP-one-button",
+      "requirementId": "REQ-one-button",
+      "supportStatus": "supported",
+      "engineCapabilityRefs": [
+        "CAP-production-2d-scene"
+      ],
+      "behaviorModelRefs": [
+        "CAP-gameplay-behavior-model"
+      ],
+      "sceneLevelNeeds": [
+        "spawn area, collision bounds, and collectible placement refs"
+      ],
+      "assetNeeds": [
+        "placeholder sprite refs from manifest with source/license metadata"
+      ],
+      "scenarioNeeds": [
+        "scenario asserts movement input, collect event, and evidence artifact binding"
+      ],
+      "dependencies": [],
+      "conflictsWith": [],
+      "unsupportedGaps": [],
+      "blockedReasons": [],
+      "recommendations": [],
+      "coreLoopRefs": [
+        "LOOP-main"
+      ],
+      "evidenceBoundary": "requirement-linked advisory mapping; not generation authority; review required before any later prototype planning."
+    },
+    {
+      "id": "MAP-combo-controls",
+      "requirementId": "REQ-move",
+      "supportStatus": "partial",
+      "engineCapabilityRefs": [
+        "CAP-production-2d-scene"
+      ],
+      "behaviorModelRefs": [
+        "CAP-gameplay-behavior-model"
+      ],
+      "sceneLevelNeeds": [
+        "control prompt scene notes for reviewer"
+      ],
+      "assetNeeds": [
+        "placeholder input icon manifest refs"
+      ],
+      "scenarioNeeds": [
+        "scenario demonstrates conflict with one-button requirement"
+      ],
+      "dependencies": [],
+      "conflictsWith": [
+        "MAP-one-button"
+      ],
+      "unsupportedGaps": [
+        "combo controls contradict one-button control requirement"
+      ],
+      "blockedReasons": [],
+      "recommendations": [
+        "downgrade combo controls to one-button variant or defer combo behavior"
+      ],
+      "coreLoopRefs": [
+        "LOOP-main"
+      ],
+      "evidenceBoundary": "requirement-linked advisory mapping; not generation authority; review required before any later prototype planning."
+    }
+  ],
+  "boundary": "Evidence-gated prototype planning only; GDD mechanics remain untrusted until Rust/local validation and review-gated apply. This mapping provides no autonomous unrestricted game creation, no source or script mutation, no asset generation, and browser read-only or draft-only inspection."
+}

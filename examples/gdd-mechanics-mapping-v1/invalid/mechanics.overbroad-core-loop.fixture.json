@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "gdd-mechanics-mapping-v1",
+  "mappingId": "mapping-invalid-overbroad-core-loop",
+  "status": "partial",
+  "sourceExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "requirementRefs": [
+    {
+      "id": "REQ-move",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-move"
+    },
+    {
+      "id": "REQ-collect",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-collect"
+    },
+    {
+      "id": "REQ-dialogue-tree",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.partial.fixture.json#REQ-dialogue-tree"
+    },
+    {
+      "id": "REQ-procedural-asset",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.blocked.fixture.json#REQ-procedural-asset"
+    },
+    {
+      "id": "REQ-3d-platforming",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.partial.fixture.json#REQ-3d-platforming"
+    },
+    {
+      "id": "REQ-one-button",
+      "category": "control",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-one-button"
+    },
+    {
+      "id": "REQ-sixth",
+      "category": "mechanic",
+      "sourceRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json#REQ-sixth"
+    }
+  ],
+  "capabilityRefs": [
+    {
+      "id": "CAP-production-2d-scene",
+      "kind": "production-2d",
+      "docsRef": "docs/production-2d-engine-core-v1.md",
+      "supportStatus": "supported",
+      "summary": "2D scene graph, components, collision, triggers, and deterministic local evidence refs."
+    },
+    {
+      "id": "CAP-gameplay-behavior-model",
+      "kind": "gameplay-logic",
+      "docsRef": "docs/gameplay-behavior-model-v1.md",
+      "supportStatus": "supported",
+      "summary": "Data-first behavior model refs for patrol, collect, contact damage, door, win, hazard, and ability examples."
+    },
+    {
+      "id": "CAP-level-designer",
+      "kind": "level-designer",
+      "docsRef": "docs/agentic-scene-level-designer-v1.md",
+      "supportStatus": "supported",
+      "summary": "Evidence-gated level and scene planning with placeholders and reviewer-visible needs."
+    },
+    {
+      "id": "CAP-asset-manifest",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-manifest-v1.md",
+      "supportStatus": "supported",
+      "summary": "Manifest references existing placeholders or fixture-scoped assets with source and license metadata."
+    },
+    {
+      "id": "CAP-scenario-evidence",
+      "kind": "scenario-evidence",
+      "docsRef": "docs/scenario-evaluator-v1.md",
+      "supportStatus": "supported",
+      "summary": "Scenario and evidence contracts for deterministic local checks and read-only dashboard export."
+    },
+    {
+      "id": "CAP-3d-gate",
+      "kind": "three-d-gate",
+      "docsRef": "docs/3d-capability-gate-v1.md",
+      "supportStatus": "partial",
+      "summary": "3D capability gate refs exist but do not imply broad 3D prototype behavior."
+    },
+    {
+      "id": "CAP-procedural-assets",
+      "kind": "asset-manifest",
+      "docsRef": "docs/asset-pipeline-v1.md",
+      "supportStatus": "unsupported",
+      "summary": "Procedural creation remains outside this mapping; references may only record unsupported gaps."
+    }
+  ],
+  "coreLoops": [
+    {
+      "id": "LOOP-too-broad",
+      "title": "Everything loop",
+      "requirementRefs": [
+        "REQ-move",
+        "REQ-collect",
+        "REQ-dialogue-tree",
+        "REQ-procedural-asset",
+        "REQ-3d-platforming",
+        "REQ-one-button",
+        "REQ-sixth"
+      ],
+      "mappingRefs": [
+        "MAP-move"
+      ],
+      "scopeBoundary": "bounded mechanic slice, not a full-game generator, review required before later planning."
+    }
+  ],
+  "mappings": [
+    {
+      "id": "MAP-move",
+      "requirementId": "REQ-move",
+      "supportStatus": "supported",
+      "engineCapabilityRefs": [
+        "CAP-production-2d-scene"
+      ],
+      "behaviorModelRefs": [
+        "CAP-gameplay-behavior-model"
+      ],
+      "sceneLevelNeeds": [
+        "spawn area, collision bounds, and collectible placement refs"
+      ],
+      "assetNeeds": [
+        "placeholder sprite refs from manifest with source/license metadata"
+      ],
+      "scenarioNeeds": [
+        "scenario asserts movement input, collect event, and evidence artifact binding"
+      ],
+      "dependencies": [],
+      "conflictsWith": [],
+      "unsupportedGaps": [],
+      "blockedReasons": [],
+      "recommendations": [],
+      "coreLoopRefs": [
+        "LOOP-too-broad"
+      ],
+      "evidenceBoundary": "requirement-linked advisory mapping; not generation authority; review required before any later prototype planning."
+    }
+  ],
+  "boundary": "Evidence-gated prototype planning only; GDD mechanics remain untrusted until Rust/local validation and review-gated apply. This mapping provides no autonomous unrestricted game creation, no source or script mutation, no asset generation, and browser read-only or draft-only inspection."
+}
