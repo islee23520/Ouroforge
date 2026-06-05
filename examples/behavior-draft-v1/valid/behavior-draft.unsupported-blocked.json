@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "ouroforge.behavior-draft.v1",
+  "draftId": "draft-unsupported-behavior-blocked",
+  "target": {
+    "projectId": "demo_project",
+    "scenePath": "scenes/main.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:abcdef1234567890"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "behavior-runtime-unsupported-demo",
+    "sceneId": "scene-runtime-demo",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed"
+    },
+    "behaviors": [
+      {
+        "id": "unsupported-demo",
+        "entityId": "npc",
+        "triggers": [
+          {
+            "id": "script-trigger",
+            "kind": "onScriptHook"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "script-condition",
+            "kind": "jsExpression",
+            "value": "window.secret"
+          }
+        ],
+        "actions": [
+          {
+            "id": "script-action",
+            "kind": "evalScript",
+            "effectKind": "dynamicCode",
+            "value": "alert(1)"
+          }
+        ]
+      }
+    ]
+  },
+  "rationale": "Add a bounded jump response as an untrusted behavior draft for reviewer inspection.",
+  "linkedEvidence": [
+    {
+      "id": "scenario-failure",
+      "kind": "scenario-result",
+      "path": "evidence/scenarios/bootstrap-smoke/scenario-result.json",
+      "summary": "Scenario evidence shows jump behavior was missing."
+    }
+  ],
+  "expectedScenarioImpact": [
+    {
+      "scenarioId": "bootstrap-smoke",
+      "summary": "The scenario should pass after accepted review-gated behavior apply.",
+      "expectedVerdict": "passed"
+    }
+  ],
+  "author": {
+    "source": "agent",
+    "actor": "codex"
+  },
+  "validationStatus": "blocked",
+  "blockedReasons": [
+    "unsupported behavior action requires review"
+  ],
+  "untrustedBoundary": "Untrusted behavior draft; does not apply trusted files; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, browser trusted write, or local server bridge."
+}

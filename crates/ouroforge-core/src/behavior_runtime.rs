@@ -6,6 +6,79 @@ use std::path::Path;
 
 pub const BEHAVIOR_ARTIFACT_SCHEMA_VERSION: &str = "ouroforge.behavior-artifact.v1";
 
+pub const BEHAVIOR_DRAFT_SCHEMA_VERSION: &str = "ouroforge.behavior-draft.v1";
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    pub target: BehaviorDraftTarget,
+    #[serde(rename = "proposedBehavior")]
+    pub proposed_behavior: BehaviorArtifact,
+    pub rationale: String,
+    #[serde(rename = "linkedEvidence", default)]
+    pub linked_evidence: Vec<BehaviorDraftEvidenceRef>,
+    #[serde(rename = "expectedScenarioImpact", default)]
+    pub expected_scenario_impact: Vec<BehaviorDraftScenarioImpact>,
+    pub author: BehaviorDraftAuthor,
+    #[serde(rename = "validationStatus")]
+    pub validation_status: BehaviorDraftValidationStatus,
+    #[serde(rename = "blockedReasons", default)]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "untrustedBoundary")]
+    pub untrusted_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorDraftTarget {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "scenePath")]
+    pub scene_path: String,
+    #[serde(rename = "sceneHash")]
+    pub scene_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorDraftEvidenceRef {
+    pub id: String,
+    pub kind: String,
+    pub path: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorDraftScenarioImpact {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub summary: String,
+    #[serde(rename = "expectedVerdict")]
+    pub expected_verdict: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorDraftAuthor {
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorDraftValidationStatus {
+    Drafted,
+    Valid,
+    Blocked,
+    Stale,
+}
+
 const SUPPORTED_TRIGGERS: &[&str] = &[
     "onStart",
     "onTick",
@@ -551,6 +624,173 @@ pub struct BehaviorRuntimeBoundary {
     pub execution_mode: String,
     #[serde(rename = "disallowedActions")]
     pub disallowed_actions: Vec<String>,
+}
+
+impl BehaviorDraftArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: Self =
+            serde_json::from_str(input).context("failed to parse Behavior Draft Artifact JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != BEHAVIOR_DRAFT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "behavior draft schemaVersion must be {BEHAVIOR_DRAFT_SCHEMA_VERSION}"
+            ));
+        }
+        require_local_id("behavior draft draftId", &self.draft_id)?;
+        self.target.validate()?;
+        self.proposed_behavior
+            .validate()
+            .context("behavior draft proposedBehavior is invalid")?;
+        require_local_text("behavior draft rationale", &self.rationale)?;
+        self.author.validate()?;
+        require_local_text("behavior draft untrustedBoundary", &self.untrusted_boundary)?;
+        let boundary = self.untrusted_boundary.to_ascii_lowercase();
+        for required in ["untrusted", "does not apply", "no arbitrary"] {
+            if !boundary.contains(required) {
+                return Err(anyhow!(
+                    "behavior draft untrustedBoundary must state `{required}`"
+                ));
+            }
+        }
+
+        require_unique_ids(
+            "behavior draft linkedEvidence.id",
+            self.linked_evidence.iter().map(|evidence| &evidence.id),
+        )?;
+        for evidence in &self.linked_evidence {
+            evidence.validate()?;
+        }
+        require_unique_ids(
+            "behavior draft expectedScenarioImpact.scenarioId",
+            self.expected_scenario_impact
+                .iter()
+                .map(|impact| &impact.scenario_id),
+        )?;
+        for impact in &self.expected_scenario_impact {
+            impact.validate()?;
+        }
+        for reason in &self.blocked_reasons {
+            require_local_text("behavior draft blockedReasons", reason)?;
+        }
+
+        let diagnostics = self.proposed_behavior.runtime_state().diagnostics;
+        let has_unsupported = !diagnostics.is_empty();
+        match self.validation_status {
+            BehaviorDraftValidationStatus::Valid | BehaviorDraftValidationStatus::Drafted => {
+                if self.linked_evidence.is_empty() {
+                    return Err(anyhow!(
+                        "behavior draft linkedEvidence is required before valid or drafted status"
+                    ));
+                }
+                if has_unsupported {
+                    return Err(anyhow!(
+                        "behavior draft unsupported behavior must be blocked before validation"
+                    ));
+                }
+                if !self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior draft valid/drafted status must not include blockedReasons"
+                    ));
+                }
+            }
+            BehaviorDraftValidationStatus::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior draft blocked status requires blockedReasons"
+                    ));
+                }
+                if has_unsupported && !blocked_reasons_contain(&self.blocked_reasons, "unsupported")
+                {
+                    return Err(anyhow!(
+                        "behavior draft unsupported behavior must be visible in blockedReasons"
+                    ));
+                }
+                if self.linked_evidence.is_empty()
+                    && !blocked_reasons_contain(&self.blocked_reasons, "evidence")
+                {
+                    return Err(anyhow!(
+                        "behavior draft missing evidence must be visible in blockedReasons"
+                    ));
+                }
+            }
+            BehaviorDraftValidationStatus::Stale => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior draft stale status requires blockedReasons"
+                    ));
+                }
+                if !blocked_reasons_contain(&self.blocked_reasons, "stale")
+                    && !blocked_reasons_contain(&self.blocked_reasons, "hash")
+                {
+                    return Err(anyhow!(
+                        "behavior draft stale status blockedReasons must mention stale target or hash drift"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl BehaviorDraftTarget {
+    fn validate(&self) -> Result<()> {
+        require_local_id("behavior draft target.projectId", &self.project_id)?;
+        require_relative_json_path(
+            "behavior draft target.scenePath",
+            &self.scene_path,
+            ".scene.json",
+        )?;
+        require_hash_text("behavior draft target.sceneHash", &self.scene_hash)
+    }
+}
+
+impl BehaviorDraftEvidenceRef {
+    fn validate(&self) -> Result<()> {
+        require_local_id("behavior draft linkedEvidence.id", &self.id)?;
+        require_local_id("behavior draft linkedEvidence.kind", &self.kind)?;
+        require_relative_json_path("behavior draft linkedEvidence.path", &self.path, ".json")?;
+        require_local_text("behavior draft linkedEvidence.summary", &self.summary)
+    }
+}
+
+impl BehaviorDraftScenarioImpact {
+    fn validate(&self) -> Result<()> {
+        require_local_id(
+            "behavior draft expectedScenarioImpact.scenarioId",
+            &self.scenario_id,
+        )?;
+        require_local_text(
+            "behavior draft expectedScenarioImpact.summary",
+            &self.summary,
+        )?;
+        match self.expected_verdict.as_str() {
+            "passed" | "failed" | "blocked" | "unknown" => Ok(()),
+            _ => Err(anyhow!(
+                "behavior draft expectedScenarioImpact.expectedVerdict must be passed, failed, blocked, or unknown"
+            )),
+        }
+    }
+}
+
+impl BehaviorDraftAuthor {
+    fn validate(&self) -> Result<()> {
+        match self.source.as_str() {
+            "agent" | "human" | "fixture" => {}
+            _ => {
+                return Err(anyhow!(
+                    "behavior draft author.source must be agent, human, or fixture"
+                ))
+            }
+        }
+        if let Some(actor) = &self.actor {
+            require_local_id("behavior draft author.actor", actor)?;
+        }
+        Ok(())
+    }
 }
 
 impl BehaviorArtifact {
@@ -1581,6 +1821,46 @@ fn unsupported_diagnostic(
         behavior_id: Some(behavior_id.to_string()),
         item_id: Some(item_id.to_string()),
     }
+}
+
+fn blocked_reasons_contain(reasons: &[String], needle: &str) -> bool {
+    reasons
+        .iter()
+        .any(|reason| reason.to_ascii_lowercase().contains(needle))
+}
+
+fn require_hash_text(field: &str, value: &str) -> Result<()> {
+    require_local_text(field, value)?;
+    let Some((algorithm, digest)) = value.split_once(':') else {
+        return Err(anyhow!("{field} must include algorithm:digest"));
+    };
+    require_local_id(&format!("{field}.algorithm"), algorithm)?;
+    if digest.trim().is_empty()
+        || !digest
+            .chars()
+            .all(|ch| ch.is_ascii_hexdigit() || ch == '-' || ch == '_')
+    {
+        return Err(anyhow!("{field}.digest must be a bounded local digest"));
+    }
+    Ok(())
+}
+
+fn require_relative_json_path(field: &str, value: &str, suffix: &str) -> Result<()> {
+    require_local_text(field, value)?;
+    let path = Path::new(value);
+    if path.is_absolute() || value.contains('\\') || value.contains("://") {
+        return Err(anyhow!("{field} must be a relative local path"));
+    }
+    for component in path.components() {
+        match component {
+            std::path::Component::Normal(_) | std::path::Component::CurDir => {}
+            _ => return Err(anyhow!("{field} must stay inside the local project tree")),
+        }
+    }
+    if !value.ends_with(suffix) {
+        return Err(anyhow!("{field} must end with {suffix}"));
+    }
+    Ok(())
 }
 
 fn require_unique_ids<'a>(field: &str, ids: impl Iterator<Item = &'a String>) -> Result<()> {

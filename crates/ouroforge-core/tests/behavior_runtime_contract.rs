@@ -1,4 +1,6 @@
-use ouroforge_core::behavior_runtime::{BehaviorArtifact, BehaviorRuntimeStatus};
+use ouroforge_core::behavior_runtime::{
+    BehaviorArtifact, BehaviorDraftArtifact, BehaviorRuntimeStatus,
+};
 
 fn valid_fixture() -> &'static str {
     include_str!("../../../examples/behavior-runtime-v1/valid/behavior-artifact.sample.json")
@@ -496,4 +498,168 @@ fn replay_key_distinguishes_initial_world_states_that_converge() {
         .initial_world_state
         .flags
         .contains_key("jumped"));
+}
+
+fn behavior_draft_fixture_str(name: &str) -> &'static str {
+    match name {
+        "valid" => {
+            include_str!("../../../examples/behavior-draft-v1/valid/behavior-draft.valid.json")
+        }
+        "stale" => {
+            include_str!("../../../examples/behavior-draft-v1/valid/behavior-draft.stale.json")
+        }
+        "missing-evidence-blocked" => include_str!(
+            "../../../examples/behavior-draft-v1/valid/behavior-draft.missing-evidence-blocked.json"
+        ),
+        "unsupported-blocked" => include_str!(
+            "../../../examples/behavior-draft-v1/valid/behavior-draft.unsupported-blocked.json"
+        ),
+        "unsafe-target" => include_str!(
+            "../../../examples/behavior-draft-v1/invalid/behavior-draft.unsafe-target.json"
+        ),
+        "malformed-operation" => include_str!(
+            "../../../examples/behavior-draft-v1/invalid/behavior-draft.malformed-operation.json"
+        ),
+        _ => panic!("unknown behavior draft fixture {name}"),
+    }
+}
+
+fn behavior_draft_fixture_value() -> serde_json::Value {
+    serde_json::from_str(behavior_draft_fixture_str("valid")).expect("behavior draft fixture json")
+}
+
+fn parse_behavior_draft_str(input: &str) -> Result<BehaviorDraftArtifact, anyhow::Error> {
+    BehaviorDraftArtifact::from_json_str(input)
+}
+
+fn parse_behavior_draft(value: serde_json::Value) -> Result<BehaviorDraftArtifact, anyhow::Error> {
+    BehaviorDraftArtifact::from_json_str(
+        &serde_json::to_string_pretty(&value).expect("draft fixture serializes"),
+    )
+}
+
+#[test]
+fn behavior_draft_artifact_accepts_valid_stale_and_blocked_fixtures() {
+    use ouroforge_core::behavior_runtime::BehaviorDraftValidationStatus;
+
+    let draft =
+        parse_behavior_draft_str(behavior_draft_fixture_str("valid")).expect("draft validates");
+    assert_eq!(draft.draft_id, "draft-jump-boost");
+    assert_eq!(
+        draft.validation_status,
+        BehaviorDraftValidationStatus::Drafted
+    );
+    assert!(draft.untrusted_boundary.contains("does not apply"));
+
+    let stale = parse_behavior_draft_str(behavior_draft_fixture_str("stale"))
+        .expect("stale draft validates visibly");
+    assert_eq!(
+        stale.validation_status,
+        BehaviorDraftValidationStatus::Stale
+    );
+
+    let blocked = parse_behavior_draft_str(behavior_draft_fixture_str("missing-evidence-blocked"))
+        .expect("blocked missing evidence draft validates");
+    assert_eq!(
+        blocked.validation_status,
+        BehaviorDraftValidationStatus::Blocked
+    );
+
+    let unsupported = parse_behavior_draft_str(behavior_draft_fixture_str("unsupported-blocked"))
+        .expect("blocked unsupported behavior draft validates");
+    assert_eq!(
+        unsupported.validation_status,
+        BehaviorDraftValidationStatus::Blocked
+    );
+}
+
+#[test]
+fn behavior_draft_artifact_rejects_unsafe_duplicate_missing_and_stale_drift() {
+    let cases = [
+        (
+            serde_json::from_str(behavior_draft_fixture_str("unsafe-target"))
+                .expect("unsafe target fixture json"),
+            "scenePath must stay inside the local project tree",
+        ),
+        (
+            {
+                let mut value = behavior_draft_fixture_value();
+                value["linkedEvidence"] = serde_json::json!([
+                    {"id":"dup","kind":"scenario-result","path":"evidence/a.json","summary":"A"},
+                    {"id":"dup","kind":"scenario-result","path":"evidence/b.json","summary":"B"}
+                ]);
+                value
+            },
+            "linkedEvidence.id must be unique",
+        ),
+        (
+            {
+                let mut value = behavior_draft_fixture_value();
+                value["linkedEvidence"] = serde_json::json!([]);
+                value
+            },
+            "linkedEvidence is required",
+        ),
+        (
+            {
+                let mut value = behavior_draft_fixture_value();
+                value["validationStatus"] = serde_json::json!("stale");
+                value["blockedReasons"] = serde_json::json!(["needs review"]);
+                value
+            },
+            "stale status blockedReasons must mention stale target or hash drift",
+        ),
+    ];
+
+    for (value, expected) in cases {
+        let error = parse_behavior_draft(value).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
+}
+
+#[test]
+fn behavior_draft_artifact_blocks_unsupported_behavior_and_malformed_operations() {
+    let unsupported_behavior: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.unsupported.json"
+    ))
+    .expect("unsupported behavior fixture json");
+    let mut unsupported = behavior_draft_fixture_value();
+    unsupported["proposedBehavior"] = unsupported_behavior.clone();
+    let error = parse_behavior_draft(unsupported).expect_err("unsupported must be blocked");
+    assert!(format!("{error:?}").contains("unsupported behavior must be blocked"));
+
+    let mut blocked = behavior_draft_fixture_value();
+    blocked["proposedBehavior"] = unsupported_behavior;
+    blocked["validationStatus"] = serde_json::json!("blocked");
+    blocked["blockedReasons"] = serde_json::json!(["unsupported behavior action requires review"]);
+    parse_behavior_draft(blocked).expect("unsupported behavior can be visible and blocked");
+
+    let malformed = serde_json::from_str(behavior_draft_fixture_str("malformed-operation"))
+        .expect("malformed operation fixture json");
+    let error = parse_behavior_draft(malformed).expect_err("malformed operation rejected");
+    assert!(format!("{error:?}").contains("action id must not be empty"));
+}
+
+#[test]
+fn behavior_draft_fixture_files_cover_valid_invalid_stale_missing_and_blocked() {
+    for name in [
+        "valid",
+        "stale",
+        "missing-evidence-blocked",
+        "unsupported-blocked",
+    ] {
+        parse_behavior_draft_str(behavior_draft_fixture_str(name))
+            .expect("valid behavior draft fixture");
+    }
+
+    for (name, expected) in [
+        (
+            "unsafe-target",
+            "scenePath must stay inside the local project tree",
+        ),
+        ("malformed-operation", "action id must not be empty"),
+    ] {
+        let error = parse_behavior_draft_str(behavior_draft_fixture_str(name)).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
 }
