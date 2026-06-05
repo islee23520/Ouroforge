@@ -48,3 +48,21 @@ node examples/gameplay-logic-regression-v9/draft-apply-evidence-smoke.test.cjs
 cargo test -p ouroforge-core --test behavior_runtime_contract gameplay_logic_regression_v9_draft_apply_fixtures_cover_gl10_14_2
 cargo test -p ouroforge-core --test behavior_evidence_bundle gameplay_logic_regression_v9_evidence_bundle_covers_gl10_14_2_lifecycle_refs
 ```
+
+## GL10.14.3 coverage matrix and read-model compatibility
+
+`coverage-matrix.json`, `read-model-compatibility.fixture.json`,
+`read-model-compatibility.md`, and
+`coverage-read-model-compatibility.test.cjs` cover the final #624 matrix, known
+gaps, dashboard behavior evidence lifecycle rendering, Studio behavior draft and
+inspection panels, escaped malformed display input, generated-state hygiene, and
+the no-arbitrary-script/no-command/no-write/no-auto-apply boundary. The core
+dashboard read-model contract is also locked by
+`crates/ouroforge-core/tests/behavior_dashboard.rs`.
+
+Run:
+
+```bash
+node examples/gameplay-logic-regression-v9/coverage-read-model-compatibility.test.cjs
+cargo test -p ouroforge-core --test behavior_dashboard dashboard_read_model_exposes_gameplay_logic_regression_v9_compatibility
+```
