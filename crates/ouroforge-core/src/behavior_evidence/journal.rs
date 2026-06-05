@@ -26,6 +26,17 @@ pub fn render_behavior_evidence_journal_section(
     out.push_str("- Boundary: read-only structured behavior lifecycle evidence; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, browser trusted write, or auto-apply.\n");
     for artifact in bundle_artifacts {
         out.push_str(&format!("- Bundle artifact: `{}`\n", artifact.path));
+        // Validate the indexed bundle path against the safe run-relative evidence
+        // rules before touching the filesystem. A crafted or hostile evidence
+        // index could otherwise carry an absolute path or `..` segment and make
+        // this read escape `run_dir`; reject those entries as unsafe instead of
+        // following them.
+        if let Err(error) = crate::validate_evidence_artifact_path(&artifact.path) {
+            out.push_str(&format!(
+                "  - Unsafe behavior evidence bundle path rejected: {error}\n"
+            ));
+            continue;
+        }
         let path = run_dir.join(&artifact.path);
         match std::fs::read_to_string(&path)
             .map_err(|error| error.to_string())

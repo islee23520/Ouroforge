@@ -55,6 +55,36 @@ fn behavior_evidence_journal_keeps_malformed_bundle_visible() {
 }
 
 #[test]
+fn behavior_evidence_journal_rejects_unsafe_bundle_path_traversal() {
+    let root = unique_temp_dir("behavior-evidence-journal-traversal");
+    // The evidence subtree must exist so that an unfixed renderer could actually
+    // traverse `..` out of it on disk.
+    std::fs::create_dir_all(root.join("evidence/behavior")).expect("evidence dir");
+    // Plant a *valid* bundle outside the evidence tree (but still inside run_dir)
+    // at exactly the location the traversal ref resolves to.
+    let planted = "planted-behavior-evidence-bundle.json";
+    std::fs::write(
+        root.join(planted),
+        include_str!(
+            "../../../examples/behavior-evidence-bundle-v1/behavior-evidence-bundle.complete.json"
+        ),
+    )
+    .expect("planted bundle written");
+
+    // `evidence/behavior/../../planted-...json` resolves to `<run_dir>/planted-...json`,
+    // escaping the evidence tree the index is supposed to scope reads to.
+    let unsafe_path = "evidence/behavior/../../planted-behavior-evidence-bundle.json";
+    let journal = render_behavior_evidence_journal_section(&root, &evidence_index(unsafe_path));
+
+    assert!(journal.contains("## Behavior Evidence Lifecycle"));
+    assert!(journal.contains("Unsafe behavior evidence bundle path rejected"));
+    // The out-of-tree bundle must never be parsed or rendered.
+    assert!(!journal.contains("Lifecycle refs"));
+    assert!(!journal.contains("Observed failure"));
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn update_journal_includes_indexed_behavior_evidence_bundle_section() {
     let root = unique_temp_dir("behavior-evidence-update-journal");
     let seed_path = root.join("seed.yaml");
