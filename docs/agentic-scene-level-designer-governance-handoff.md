@@ -37,7 +37,7 @@ records the roadmap/#1 governance refresh and final conservative handoff.
   the top-level `README.md`.
 - #636 was verified and closed before this handoff because its implementation
   had already merged in PR #1181 but the issue still remained open.
-- #1 handoff URL will be recorded here after the governance comment is posted.
+- #1 handoff comment URL is recorded at the top of this document.
 
 ## Merged implementation evidence
 
