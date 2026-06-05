@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "agent-generated-behavior-draft-v1",
+  "draftId": "behavior_draft_forbidden_runtime_text",
+  "target": {
+    "projectManifestRef": "examples/playable-demo-v2/collect-and-exit/project.json",
+    "sceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+  },
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "proposedBehaviors": [
+    {
+      "operationId": "op_dynamic_import",
+      "kind": "flag_change",
+      "behaviorId": "dynamic_import_behavior",
+      "summary": "Pretend this is a normal flag change while asking for dynamic import.",
+      "expectedScenarioImpact": "browser Studio would import code",
+      "status": "proposed"
+    }
+  ],
+  "rationale": "Forbidden runtime wording must not hide inside supported operation shapes.",
+  "linkedEvidence": [
+    "evidence/behavior-drafts/behavior_draft_forbidden_runtime_text/report.json"
+  ],
+  "author": {
+    "authorId": "agent_behavior_designer",
+    "source": "agent",
+    "generatedBy": "local deterministic fixture generator",
+    "untrusted": true
+  },
+  "validationStatus": "drafted"
+}

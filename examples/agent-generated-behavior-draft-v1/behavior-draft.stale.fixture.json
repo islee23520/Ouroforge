@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "agent-generated-behavior-draft-v1",
+  "draftId": "behavior_draft_collect_key_stale",
+  "target": {
+    "projectManifestRef": "examples/playable-demo-v2/collect-and-exit/project.json",
+    "sceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+  },
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "proposedBehaviors": [
+    {
+      "operationId": "op_collect_key_stale",
+      "kind": "flag_change",
+      "behaviorId": "collect_key_sets_flag",
+      "summary": "Stale draft cannot be trusted until hashes refresh.",
+      "expectedScenarioImpact": "blocked until refreshed",
+      "status": "blocked"
+    }
+  ],
+  "rationale": "Target hash was computed before the current scene revision.",
+  "linkedEvidence": [
+    "evidence/behavior-drafts/behavior_draft_collect_key_stale/stale-report.json"
+  ],
+  "author": {
+    "authorId": "agent_behavior_designer",
+    "source": "agent",
+    "generatedBy": "local deterministic fixture generator",
+    "untrusted": true
+  },
+  "validationStatus": "stale_target",
+  "blockedReasons": [
+    "Target hash must be refreshed before review."
+  ]
+}
