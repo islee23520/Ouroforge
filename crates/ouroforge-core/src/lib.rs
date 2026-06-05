@@ -19,6 +19,7 @@ pub use source_apply_review_enforcement::*;
 pub mod gdd_design_brief;
 pub mod gdd_feasibility_gate;
 pub mod gdd_mechanics_mapping;
+pub mod gdd_project_scaffold_plan;
 pub mod gdd_requirement_extraction;
 pub mod source_apply_sandbox_promotion;
 use behavior_runtime::{

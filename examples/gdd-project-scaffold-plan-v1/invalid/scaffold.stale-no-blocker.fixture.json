@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "gdd-project-scaffold-plan-v1",
+  "planId": "bad-stale",
+  "status": "ready",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "feasibilityState": "pass",
+  "projectId": "gdd-collect-exit",
+  "projectName": "Collect Exit Prototype Slice",
+  "generatedStateRoots": [
+    "runs/gdd-project-scaffold-plan-v1/"
+  ],
+  "files": [
+    {
+      "path": "examples/gdd-project-scaffold-plan-v1/preview/ouroforge.project.json",
+      "kind": "project-manifest",
+      "templateSupport": "supported",
+      "targetExists": true,
+      "staleTarget": true,
+      "blockedReasons": []
+    },
+    {
+      "path": "examples/gdd-project-scaffold-plan-v1/preview/seed.json",
+      "kind": "seed",
+      "templateSupport": "supported",
+      "targetExists": false,
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "path": "examples/gdd-project-scaffold-plan-v1/preview/scenes/main.scene.json",
+      "kind": "scene",
+      "templateSupport": "supported",
+      "targetExists": false,
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "path": "examples/gdd-project-scaffold-plan-v1/preview/assets/asset-manifest.json",
+      "kind": "asset-manifest",
+      "templateSupport": "supported",
+      "targetExists": false,
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "path": "examples/gdd-project-scaffold-plan-v1/preview/scenarios/scenario-pack.json",
+      "kind": "scenario-pack",
+      "templateSupport": "supported",
+      "targetExists": false,
+      "staleTarget": false,
+      "blockedReasons": []
+    }
+  ],
+  "sourceLikeFixtureRefs": [
+    "examples/gdd-project-scaffold-plan-v1/preview/ouroforge.project.json"
+  ],
+  "expectedCommands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ouroforge-core",
+        "--test",
+        "gdd_project_scaffold_plan_contract"
+      ],
+      "previewOnly": true
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Preview first; untrusted until Rust/local validation; review-gated prototype apply only; no direct trusted writes; no autonomous unrestricted game creation; browser read-only or draft-only"
+}
