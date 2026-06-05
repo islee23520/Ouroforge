@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "demo-agentic-journal-v1",
+  "id": "agentic-iteration-journal",
+  "description": "Journal linking hypothesis, failure evidence, draft mutation, review decision, review-gated apply, rerun comparison, and result for the controlled gate-never-opens iteration.",
+  "entries": [
+    { "stage": "hypothesis", "ref": "gate-never-opens", "note": "Gate never opens because the key trigger omits the door_open setFlag." },
+    { "stage": "failure_evidence", "ref": "before-run", "note": "Key collected but door_open=false and exit_reached=false (reproduced deterministically)." },
+    { "stage": "draft_proposal", "ref": "draft-restore-gate-open", "note": "Agent proposes restoring the door_open setFlag action; not auto-applied." },
+    { "stage": "review_decision", "ref": "review-decision-1", "note": "Independent reviewer accepts; no self-approval." },
+    { "stage": "apply", "ref": "safe-source-mutation-apply", "note": "Applied through the review-gated handoff to the in-memory seed only." },
+    { "stage": "rerun_comparison", "ref": "after-run", "note": "After apply, door_open=true and exit_reached=true." },
+    { "stage": "result", "outcome": "improvement", "note": "exit_reached transitioned false -> true; controlled failure resolved." }
+  ],
+  "boundary": "Read-only journal of the iteration; links evidence to decisions without authorizing auto-apply, self-approval, or committed-source mutation."
+}

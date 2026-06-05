@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "demo-agentic-failure-seed-v1",
+  "id": "gate-never-opens",
+  "hypothesis": "The gate never opens because the key pickup trigger does not set door_open, so the exit stays unreachable even after the key is collected.",
+  "baseScene": "scenes/collect-and-exit.scene.json",
+  "inject": {
+    "kind": "removeTriggerAction",
+    "entityId": "key",
+    "action": { "kind": "setFlag", "flag": "door_open" }
+  },
+  "expectedFailure": {
+    "key_collected": true,
+    "door_open": false,
+    "exit_reached": false
+  },
+  "boundary": "Controlled in-memory failure seed only; it mutates a cloned scene at runtime and never modifies committed source."
+}

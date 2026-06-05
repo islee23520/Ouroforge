@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "demo-agentic-draft-proposal-v1",
+  "id": "draft-restore-gate-open",
+  "author": "agent:collect-and-exit-iteration",
+  "failureSeedId": "gate-never-opens",
+  "target": "scenes/collect-and-exit.scene.json (applied to the in-memory failure seed only)",
+  "rationale": "Restore the door_open setFlag action on the key pickup trigger so collecting the key opens the gate and the exit becomes reachable.",
+  "operation": {
+    "kind": "addTriggerAction",
+    "entityId": "key",
+    "action": { "kind": "setFlag", "flag": "door_open", "value": true }
+  },
+  "reviewRequired": true,
+  "applied": false,
+  "autoApply": false,
+  "boundary": "Draft proposal only. It is not auto-applied; it requires an independent review decision and a Safe Source Mutation Apply handoff. No direct browser trusted write."
+}

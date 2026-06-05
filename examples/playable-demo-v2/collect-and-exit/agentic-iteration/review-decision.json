@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "demo-agentic-review-decision-v1",
+  "id": "review-decision-1",
+  "proposalId": "draft-restore-gate-open",
+  "decision": "accepted",
+  "reviewerId": "reviewer:human-local",
+  "proposalAuthor": "agent:collect-and-exit-iteration",
+  "reviewRequired": true,
+  "selfApproval": false,
+  "appliedThrough": "safe-source-mutation-apply",
+  "rationale": "Independent reviewer confirms the proposed key-trigger fix is narrowly scoped, restores the intended gate behavior, and is safe to apply through the review-gated Safe Source Mutation Apply path.",
+  "boundary": "Review-gated apply only. The reviewer is not the proposal author (no self-approval); there is no auto-apply, no auto-merge, no reviewer bypass, and no direct browser trusted write."
+}
