@@ -113,6 +113,32 @@ pub enum RuntimeInvariantType {
     BehaviorStateConsistent,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub console: Option<ConsoleEvaluatorConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance: Option<PerformanceEvaluatorConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ConsoleEvaluatorConfig {
+    #[serde(rename = "failOnLevels")]
+    pub fail_on_levels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PerformanceEvaluatorConfig {
+    // Thresholds are floating point: Chrome performance metrics are fractional
+    // seconds, so a sub-second threshold like `ScriptDuration: 0.05` must be
+    // representable (a u64 would reject it before evaluation).
+    #[serde(rename = "maxMetrics")]
+    pub max_metrics: std::collections::BTreeMap<String, f64>,
+}
+
 const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1";
 const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
 
@@ -1061,6 +1087,53 @@ fn require_bounded_display_text(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+impl EvaluatorConfig {
+    pub fn validate(&self) -> Result<()> {
+        if let Some(console) = &self.console {
+            console.validate()?;
+        }
+        if let Some(performance) = &self.performance {
+            performance.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl ConsoleEvaluatorConfig {
+    fn validate(&self) -> Result<()> {
+        if self.fail_on_levels.is_empty() {
+            return Err(anyhow!("evaluator.console.failOnLevels must not be empty"));
+        }
+        for level in &self.fail_on_levels {
+            if !matches!(level.as_str(), "debug" | "info" | "log" | "warn" | "error") {
+                return Err(anyhow!(
+                    "evaluator.console.failOnLevels entries must be debug, info, log, warn, or error"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl PerformanceEvaluatorConfig {
+    fn validate(&self) -> Result<()> {
+        if self.max_metrics.is_empty() {
+            return Err(anyhow!(
+                "evaluator.performance.maxMetrics must not be empty"
+            ));
+        }
+        for (metric, threshold) in &self.max_metrics {
+            require_text("evaluator.performance metric name", metric)?;
+            if !threshold.is_finite() || *threshold <= 0.0 {
+                return Err(anyhow!(
+                    "evaluator.performance.maxMetrics thresholds must be greater than 0"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 fn validate_scenario_result_ref(reference: &str) -> Result<()> {
     validate_evidence_artifact_path(reference)?;
     if !is_scenario_result_artifact_path(reference) {
@@ -1650,6 +1723,101 @@ impl VisualComparisonThreshold {
         }
         Ok(())
     }
+}
+
+pub fn apply_explicit_evaluator_checks(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    config: &EvaluatorConfig,
+    failures: &mut Vec<serde_json::Value>,
+) -> Result<()> {
+    if let Some(console) = &config.console {
+        for artifact in evidence.artifacts.iter().filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("console_log")
+        }) {
+            let value = read_json_value(run_dir.join(&artifact.path))?;
+            for entry in console_entries(&value) {
+                let level = entry
+                    .get("level")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
+                if console
+                    .fail_on_levels
+                    .iter()
+                    .any(|expected| expected == level)
+                {
+                    failures.push(json!({
+                        "kind": "console_level_matched",
+                        "level": level,
+                        "path": artifact.path,
+                        "text": entry.get("text").cloned().unwrap_or(serde_json::Value::Null)
+                    }));
+                }
+            }
+        }
+    }
+
+    if let Some(performance) = &config.performance {
+        for artifact in evidence.artifacts.iter().filter(|artifact| {
+            artifact
+                .metadata
+                .get("artifact")
+                .and_then(|value| value.as_str())
+                == Some("performance_metrics")
+        }) {
+            let value = read_json_value(run_dir.join(&artifact.path))?;
+            for (metric, threshold) in &performance.max_metrics {
+                if let Some(actual) = performance_metric_value(&value, metric) {
+                    if actual > *threshold {
+                        failures.push(json!({
+                            "kind": "performance_threshold_exceeded",
+                            "metric": metric,
+                            "threshold": threshold,
+                            "actual": actual,
+                            "path": artifact.path
+                        }));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn console_entries(value: &serde_json::Value) -> Vec<&serde_json::Value> {
+    value
+        .as_array()
+        .or_else(|| value.get("logs").and_then(|logs| logs.as_array()))
+        .map(|entries| entries.iter().collect())
+        .unwrap_or_default()
+}
+
+fn performance_metric_value(value: &serde_json::Value, metric_name: &str) -> Option<f64> {
+    let metrics = value
+        .get("metrics")
+        .or_else(|| value.get("Metrics"))
+        .unwrap_or(value);
+    let metrics = metrics
+        .get("metrics")
+        .or_else(|| metrics.get("Metrics"))
+        .unwrap_or(metrics);
+    metrics.as_array()?.iter().find_map(|metric| {
+        let name = metric
+            .get("name")
+            .or_else(|| metric.get("Name"))
+            .and_then(|value| value.as_str())?;
+        if name != metric_name {
+            return None;
+        }
+        metric
+            .get("value")
+            .or_else(|| metric.get("Value"))
+            .and_then(|value| value.as_f64())
+    })
 }
 
 pub fn evaluation_gate_categories(
