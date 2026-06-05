@@ -893,6 +893,16 @@ run.scenario_panel = {
     { id: 'boss-fight', template_source: 'qa-swarm/boss-fight.json', run_status: 'completed', verdict: 'fail', failure_classification: 'timeout-no-victory', evidence_links: [{ ref: 'evidence/scenario/boss-fight/report.json', broken: true }], stale: true },
   ],
 };
+run.export_package_panel = {
+  present: true,
+  profile: 'web-debug',
+  package_status: 'ready',
+  verification_verdict: 'passed',
+  publish_blocked: true,
+  plan: ['compile-assets', 'bundle', 'checksum'],
+  artifacts: [{ name: 'build/game.wasm', checksum: 'fnv1a64:abc', size: 102400, status: 'verified' }],
+  generated_state_warnings: ['build/ output is generated and ignored unless fixture-scoped'],
+};
 
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
@@ -2020,6 +2030,18 @@ assert.match(scenarioPanelMarkup, /broken\/missing/);
 assert.match(scenarioPanelMarkup, /Run controls are disabled|run controls are disabled/i);
 assert.doesNotMatch(scenarioPanelMarkup, /<button|<form|onclick|run scenario|start run|auto-merge/i);
 assert.match(dashboard.renderScenarioPanel({}), /No scenario\/playtest inputs/);
+// #767 Export / package inspection panel
+const exportPkgMarkup = dashboard.renderExportPackagePanel(run);
+assert.match(exportPkgMarkup, /Export \/ package inspection/);
+assert.match(exportPkgMarkup, /web-debug/);
+assert.match(exportPkgMarkup, /fnv1a64:abc/);
+assert.match(exportPkgMarkup, /Verification verdict/);
+assert.match(exportPkgMarkup, /publish\/deploy not available from Studio/);
+assert.match(exportPkgMarkup, /generated and ignored/);
+assert.doesNotMatch(exportPkgMarkup, /<button|<form|onclick|run export|publish now|deploy now|sign now|upload now/i);
+assert.strictEqual(typeof dashboard.runExport, 'undefined');
+assert.strictEqual(typeof dashboard.publishPackage, 'undefined');
+assert.match(dashboard.renderExportPackagePanel({}), /No export\/package inspection inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);

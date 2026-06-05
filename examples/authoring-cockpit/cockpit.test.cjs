@@ -1036,6 +1036,19 @@ run.scenario_panel = {
     },
   ],
 };
+run.export_package_panel = {
+  present: true,
+  profile: 'web-debug',
+  package_status: 'ready',
+  verification_verdict: 'passed',
+  publish_blocked: true,
+  plan: ['compile-assets', 'bundle', 'checksum'],
+  artifacts: [
+    { name: 'build/game.wasm', checksum: 'fnv1a64:abc', size: 102400, status: 'verified' },
+    { name: 'build/game.js', checksum: 'fnv1a64:def', size: 4096, status: 'verified' },
+  ],
+  generated_state_warnings: ['build/ output is generated and ignored unless fixture-scoped'],
+};
 
 run.route_attempts = {
   present: true,
@@ -2734,6 +2747,24 @@ assert.match(scenarioMarkup, /broken\/missing/);
 assert.match(scenarioMarkup, /no autonomous run\/start/);
 assert.doesNotMatch(scenarioMarkup, /<button|<form|onclick|localStorage|fetch\(|run scenario|start run|auto-merge/i);
 assert.match(cockpit.renderStudioScenarioPanelSurface({}), /No scenario\/playtest read model/);
+// #767 Export / package inspection panel
+const exportPkgModel = cockpit.studioExportPackageInspectionModel(run);
+assert.strictEqual(exportPkgModel.present, true);
+assert.strictEqual(exportPkgModel.profile, 'web-debug');
+assert.strictEqual(exportPkgModel.publishBlocked, true);
+assert.strictEqual(exportPkgModel.artifacts.length, 2);
+const exportPkgMarkup = cockpit.renderStudioExportPackageInspectionSurface(run);
+assert.match(exportPkgMarkup, /Export \/ package inspection/);
+assert.match(exportPkgMarkup, /web-debug/);
+assert.match(exportPkgMarkup, /fnv1a64:abc/);
+assert.match(exportPkgMarkup, /Verification verdict/);
+assert.match(exportPkgMarkup, /publish\/deploy not available from Studio/);
+assert.match(exportPkgMarkup, /generated and ignored/);
+assert.match(exportPkgMarkup, /no execution from Studio/);
+assert.doesNotMatch(exportPkgMarkup, /<button|<form|onclick|localStorage|fetch\(|run export|publish now|deploy now|sign now|upload now/i);
+assert.strictEqual(typeof cockpit.runExport, 'undefined');
+assert.strictEqual(typeof cockpit.publishPackage, 'undefined');
+assert.match(cockpit.renderStudioExportPackageInspectionSurface({}), /No export\/package inspection read model/);
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);

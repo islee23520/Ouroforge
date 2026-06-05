@@ -2465,6 +2465,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
+      ${renderExportPackagePanel(run)}
       ${renderScenarioPanel(run)}
       ${renderAssetBrowser(run)}
       ${renderSceneCanvas(run)}
@@ -3112,7 +3113,43 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  function renderExportPackagePanel(run) {
+    const source = run?.export_package_panel || run?.exportPackagePanel || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No export/package inspection inputs are exported for this run.';
+      return `<section class="panel export-package-panel"><h3>Export / package inspection</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only. Studio inspects export/package evidence; the browser does not execute export, publish, deploy, sign, upload, or arbitrary commands.</p></section>`;
+    }
+    const profile = source.profile || source.export_profile || source.exportProfile || 'unknown';
+    const packageStatus = source.package_status || source.packageStatus || 'unknown';
+    const verdict = source.verification_verdict || source.verificationVerdict || 'unknown';
+    const verdictPass = /^(pass|passed|verified|ok|green)$/i.test(String(verdict));
+    const publishBlocked = source.publish_blocked === false ? false : true;
+    const artifacts = Array.isArray(source.artifacts) ? source.artifacts : [];
+    const warnings = Array.isArray(source.generated_state_warnings) ? source.generated_state_warnings
+      : Array.isArray(source.generatedStateWarnings) ? source.generatedStateWarnings
+      : Array.isArray(source.warnings) ? source.warnings : [];
+    const plan = Array.isArray(source.plan) ? source.plan : [];
+    const artifactRows = artifacts.length
+      ? artifacts.map((artifact, index) => `<li><span class="${statusClass(artifact?.status === 'verified' || artifact?.status === 'ok' ? 'passed' : 'unknown')}">${escapeText(artifact?.status || 'unknown')}</span> ${escapeText(artifact?.name || artifact?.path || `artifact-${index + 1}`)} · checksum ${escapeText(artifact?.checksum || artifact?.hash || 'unknown')}</li>`).join('')
+      : '<li>No artifacts recorded.</li>';
+    const warnRows = warnings.length
+      ? warnings.map((w) => `<li><span class="${statusClass('blocked')}">${escapeText(typeof w === 'string' ? w : JSON.stringify(w))}</span></li>`).join('')
+      : '<li>No generated-state warnings.</li>';
+    const planRows = plan.length
+      ? `<ol class="run-meta-list">${plan.map((step) => `<li>${escapeText(typeof step === 'string' ? step : (step.label || step.id || JSON.stringify(step)))}</li>`).join('')}</ol>`
+      : '<div class="run-meta">No export plan steps recorded.</div>';
+    return `<section class="panel export-package-panel"><h3>Export / package inspection</h3>
+      <p class="run-meta">Read-only inspection of export evidence and package descriptors. Execution stays in trusted CLI/harness paths; the browser cannot execute export, publish, deploy, sign, upload, or arbitrary commands.</p>
+      <div class="run-meta">Profile: ${escapeText(profile)} · Package status: <span class="${statusClass(packageStatus === 'ready' || packageStatus === 'ok' ? 'passed' : 'unknown')}">${escapeText(packageStatus)}</span></div>
+      <div class="run-meta">Verification verdict: <span class="${statusClass(verdictPass ? 'passed' : 'blocked')}">${escapeText(verdict)}</span></div>
+      <div class="run-meta">Publish/release: <span class="${statusClass('blocked')}">${escapeText(publishBlocked ? 'blocked · publish/deploy not available from Studio' : 'reported allowed by trusted evidence (Studio cannot execute it)')}</span></div>
+      <div class="run-meta">Export plan (read-only):</div>${planRows}
+      <div class="run-meta">Artifacts and checksums:</div><ul class="run-meta-list">${artifactRows}</ul>
+      <div class="run-meta">Generated-state warnings:</div><ul class="run-meta-list">${warnRows}</ul>
+    </section>`;
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
