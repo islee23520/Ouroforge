@@ -13,6 +13,10 @@ pub struct RunDashboardBehaviorEvidence {
     pub status: String,
     pub bundle_count: usize,
     pub malformed_count: usize,
+    pub complete_count: usize,
+    pub partial_count: usize,
+    pub blocked_count: usize,
+    pub stale_count: usize,
     pub lifecycle_ref_count: usize,
     pub observed_failure_count: usize,
     pub next_step_hypothesis_count: usize,
@@ -72,6 +76,10 @@ pub fn read_dashboard_behavior_evidence(
             status: "missing".to_string(),
             bundle_count: 0,
             malformed_count: 0,
+            complete_count: 0,
+            partial_count: 0,
+            blocked_count: 0,
+            stale_count: 0,
             lifecycle_ref_count: 0,
             observed_failure_count: 0,
             next_step_hypothesis_count: 0,
@@ -110,6 +118,22 @@ pub fn read_dashboard_behavior_evidence(
         .filter(|bundle| bundle.read_error.is_none())
         .collect::<Vec<_>>();
     let bundle_count = valid_bundles.len();
+    let complete_count = valid_bundles
+        .iter()
+        .filter(|bundle| bundle.status == "complete")
+        .count();
+    let partial_count = valid_bundles
+        .iter()
+        .filter(|bundle| bundle.status == "partial")
+        .count();
+    let blocked_status_count = valid_bundles
+        .iter()
+        .filter(|bundle| bundle.status == "blocked")
+        .count();
+    let stale_count = valid_bundles
+        .iter()
+        .filter(|bundle| bundle.status == "stale")
+        .count();
     let lifecycle_ref_count = valid_bundles
         .iter()
         .map(|bundle| bundle.lifecycle_ref_count)
@@ -144,6 +168,10 @@ pub fn read_dashboard_behavior_evidence(
         status: status.to_string(),
         bundle_count,
         malformed_count,
+        complete_count,
+        partial_count,
+        blocked_count: blocked_status_count,
+        stale_count,
         lifecycle_ref_count,
         observed_failure_count,
         next_step_hypothesis_count,

@@ -29,6 +29,10 @@ fn dashboard_read_model_exposes_behavior_evidence_lifecycle() {
     assert!(model.behavior_evidence.present);
     assert_eq!(model.behavior_evidence.bundle_count, 1);
     assert_eq!(model.behavior_evidence.malformed_count, 0);
+    assert_eq!(model.behavior_evidence.complete_count, 1);
+    assert_eq!(model.behavior_evidence.partial_count, 0);
+    assert_eq!(model.behavior_evidence.blocked_count, 0);
+    assert_eq!(model.behavior_evidence.stale_count, 0);
     assert_eq!(model.behavior_evidence.lifecycle_ref_count, 8);
     assert_eq!(model.behavior_evidence.observed_failure_count, 1);
     assert_eq!(model.behavior_evidence.next_step_hypothesis_count, 1);
@@ -78,6 +82,10 @@ fn dashboard_read_model_keeps_malformed_behavior_evidence_visible() {
     assert!(model.behavior_evidence.present);
     assert_eq!(model.behavior_evidence.bundle_count, 0);
     assert_eq!(model.behavior_evidence.malformed_count, 1);
+    assert_eq!(model.behavior_evidence.complete_count, 0);
+    assert_eq!(model.behavior_evidence.partial_count, 0);
+    assert_eq!(model.behavior_evidence.blocked_count, 0);
+    assert_eq!(model.behavior_evidence.stale_count, 0);
     assert_eq!(model.behavior_evidence.status, "malformed");
     assert_eq!(model.behavior_evidence.bundles.len(), 1);
     assert!(model.behavior_evidence.bundles[0]
