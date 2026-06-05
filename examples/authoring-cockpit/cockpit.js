@@ -1968,6 +1968,90 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function studioSourceApplyHandoffModel(draft, run) {
+    const FORBIDDEN = ['apply_patch', 'merge_branch', 'self_approve_review', 'bypass_review_gate', 'execute_command', 'write_trusted_file', 'browser_command_bridge'];
+    const exported = (run && (run.source_apply_handoff || run.sourceApplyHandoff)) || null;
+    const guard = sourcePatchStaleTargetGuardArtifacts(run)[0]?.value || {};
+    const transaction = sourcePatchApplyTransactionArtifacts(run)[0]?.value || {};
+    const guardTarget = (Array.isArray(guard.targets) ? guard.targets[0] : null) || {};
+    const txTarget = (Array.isArray(transaction.targets) ? transaction.targets[0] : null) || {};
+    const draftTarget = (draft && typeof draft === 'object' && draft.target && typeof draft.target === 'object') ? draft.target : {};
+    const exportedTarget = (exported && typeof exported.target === 'object' && exported.target) ? exported.target : {};
+
+    const path = exportedTarget.path || draftTarget.path || txTarget.path || guardTarget.path || null;
+    const expectedHash = exportedTarget.expected_hash || exportedTarget.expectedHash
+      || (draft && (draft.beforeHash || draft.before_hash))
+      || guardTarget.expectedHash || guardTarget.expected_hash || null;
+    const staleRaw = exportedTarget.stale;
+    const guardStatus = guard.readModel?.status || guard.read_model?.status || guard.status || '';
+    const inferredStale = typeof staleRaw === 'boolean'
+      ? staleRaw
+      : (guardStatus ? !/fresh|current|matches/i.test(String(guardStatus)) : null);
+
+    const operations = (draft && Array.isArray(draft.proposedOperations)) ? draft.proposedOperations
+      : (draft && Array.isArray(draft.proposed_operations)) ? draft.proposed_operations : [];
+    const draftDiffSummary = exported?.draft_diff_summary || exported?.draftDiffSummary
+      || (draft && (draft.expectedAfterSummary || draft.expected_after_summary))
+      || (operations.length ? `${operations.length} proposed operation(s) pending trusted source apply review` : 'No draft diff summary recorded.');
+
+    const verificationHints = Array.isArray(exported?.verification_hints || exported?.verificationHints)
+      ? (exported.verification_hints || exported.verificationHints)
+      : [
+        'Copy the inert preview command and run it via the trusted Rust CLI outside the browser.',
+        'Apply is handled only by the Safe Source Apply review gates, never by Studio.',
+        'A non-self accepted review decision plus rollback and evidence refs are required before any trusted apply.',
+      ];
+
+    const present = Boolean(exported ? (exported.present ?? true) : (path || draft));
+    return {
+      present,
+      empty_state: exported?.empty_state || exported?.emptyState || 'No Studio source apply handoff inputs are available; author a draft or load source apply preview evidence first.',
+      target: {
+        path: path || 'unknown target',
+        expected_hash: expectedHash || 'unknown',
+        stale: inferredStale,
+      },
+      draft_diff_summary: draftDiffSummary,
+      review_required: true,
+      rollback_required: true,
+      evidence_required: true,
+      apply_capability: false,
+      apply_status: 'disabled_no_direct_apply',
+      apply_boundary: 'Studio produces Safe Source Apply preview inputs only. Apply, merge, and self-approve are disabled and handled by the Safe Source Apply review gates outside the browser.',
+      forbidden_actions: FORBIDDEN,
+      verification_hints: verificationHints,
+    };
+  }
+
+  function renderStudioSourceApplyHandoffSurface(run) {
+    const state = studioDraftAuthoringState(run);
+    const draft = state.drafts[0] || null;
+    const exported = (run && (run.source_apply_handoff || run.sourceApplyHandoff)) || null;
+    const model = studioSourceApplyHandoffModel(draft, run);
+    if (!model.present && !exported && !draft) {
+      return `<section id="studio-source-apply-handoff" class="panel"><h2>Studio source apply handoff</h2><p class="empty">${escapeText(model.empty_state)}</p><p class="hint">${escapeText(model.apply_boundary)}</p></section>`;
+    }
+    const previewCommand = studioDraftPreviewCommand(draft, run);
+    const hints = model.verification_hints.map((hint) => `<li>${escapeText(hint)}</li>`).join('') || '<li>No verification hints recorded.</li>';
+    const staleLabel = model.target.stale === true ? 'stale (target drifted; re-preview required)'
+      : model.target.stale === false ? 'fresh (target matches expected before hash)'
+      : 'unknown (no stale-target guard evidence)';
+    return `<section id="studio-source-apply-handoff" class="panel"><h2>Studio source apply handoff</h2>
+      <p class="hint">${escapeText(model.apply_boundary)}</p>
+      <p>Direct apply: ${surfaceState(false, 'disabled · no direct apply')}</p>
+      <div class="surface-row">
+        <strong>${escapeText(model.target.path)}</strong> ${surfaceState(model.target.stale === false, staleLabel)}<br>
+        <small>Expected hash: ${escapeText(model.target.expected_hash)}</small><br>
+        <small>Draft diff: ${escapeText(model.draft_diff_summary)}</small><br>
+        <small>Review required: ${escapeText(String(model.review_required))} · Rollback required: ${escapeText(String(model.rollback_required))} · Evidence required: ${escapeText(String(model.evidence_required))}</small><br>
+        <small>Forbidden: ${escapeText(model.forbidden_actions.join(' · '))}</small>
+      </div>
+      <h4>Verification hints</h4><ul>${hints}</ul>
+      <h4>Copyable inert preview command</h4><code>${escapeText(previewCommand)}</code>
+      <p class="hint">This command is inert text only; Studio does not execute it, apply patches, merge branches, self-approve reviews, or write trusted files.</p>
+    </section>`;
+  }
+
 
 
   function arrayField(value, ...keys) {
@@ -3787,7 +3871,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderStudioSourceApplyHandoffSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -3876,8 +3960,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
-
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {

@@ -1753,6 +1753,23 @@ assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /fresh_guard_met
 assert.match(dashboard.renderSourcePatchStaleTargetGuards(run), /apply_patch/);
 assert.doesNotMatch(dashboard.renderSourcePatchStaleTargetGuards(run), /<button|applyCommand|mergeCommand|browserCommandBridge/);
 
+const sourceApplyHandoffMarkup = dashboard.renderSourceApplyHandoff(run);
+assert.match(sourceApplyHandoffMarkup, /Source apply handoff/);
+assert.match(sourceApplyHandoffMarkup, /no direct apply/i);
+assert.match(sourceApplyHandoffMarkup, /Review required: true/);
+assert.match(sourceApplyHandoffMarkup, /Rollback required: true/);
+assert.match(sourceApplyHandoffMarkup, /Safe Source Apply review gates/);
+assert.match(sourceApplyHandoffMarkup, /apply_patch/);
+assert.match(sourceApplyHandoffMarkup, /self_approve_review/);
+assert.match(sourceApplyHandoffMarkup, /bypass_review_gate/);
+assert.doesNotMatch(sourceApplyHandoffMarkup, /<button|<form|<input/i);
+assert.doesNotMatch(sourceApplyHandoffMarkup, /onclick|applyCommand|mergeCommand|browserCommandBridge|auto-merge/i);
+assert.match(dashboard.renderSourceApplyHandoff({}), /No source apply handoff inputs/);
+const sourceApplyHandoffExported = dashboard.renderSourceApplyHandoff({ source_apply_handoff: { present: true, target: { path: 'docs/example.md', expected_hash: 'fnv1a64:abc', stale: true }, draft_diff_summary: 'Docs preview diff only', verification_hints: ['Run trusted CLI preview outside the browser'] } });
+assert.match(sourceApplyHandoffExported, /docs\/example\.md/);
+assert.match(sourceApplyHandoffExported, /stale \(re-preview required\)/);
+assert.match(sourceApplyHandoffExported, /Docs preview diff only/);
+
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /needs-rerun/);

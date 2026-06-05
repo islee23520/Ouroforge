@@ -2160,6 +2160,41 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderSourceApplyHandoff(run) {
+    const FORBIDDEN = ['apply_patch', 'merge_branch', 'self_approve_review', 'bypass_review_gate', 'execute_command', 'write_trusted_file', 'browser_command_bridge'];
+    const exported = run?.source_apply_handoff || run?.sourceApplyHandoff || null;
+    const guard = sourcePatchStaleTargetGuards(run)[0]?.value || {};
+    const transaction = sourcePatchApplyTransactions(run)[0]?.value || {};
+    const guardTarget = (Array.isArray(guard.targets) ? guard.targets[0] : null) || {};
+    const txTarget = (Array.isArray(transaction.targets) ? transaction.targets[0] : null) || {};
+    const exportedTarget = (exported && typeof exported.target === 'object' && exported.target) ? exported.target : {};
+    if (!exported && !Object.keys(guard).length && !Object.keys(transaction).length) {
+      return '<section class="panel source-apply-handoff"><h3>Source apply handoff</h3><p class="empty-state">No source apply handoff inputs are exported for this run.</p><p class="run-meta">Read-only dashboard surface. Studio produces preview inputs only; the browser cannot apply patches, merge branches, self-approve reviews, bypass review gates, execute commands, or write trusted files.</p></section>';
+    }
+    const path = exportedTarget.path || txTarget.path || guardTarget.path || 'unknown target';
+    const expectedHash = exportedTarget.expected_hash || exportedTarget.expectedHash || guardTarget.expectedHash || guardTarget.expected_hash || 'unknown';
+    const guardStatus = guard.readModel?.status || guard.read_model?.status || guard.status || '';
+    const stale = typeof exportedTarget.stale === 'boolean'
+      ? exportedTarget.stale
+      : (guardStatus ? !/fresh|current|matches/i.test(String(guardStatus)) : null);
+    const staleLabel = stale === true ? 'stale (re-preview required)' : stale === false ? 'fresh (matches expected before hash)' : 'unknown';
+    const diffSummary = exported?.draft_diff_summary || exported?.draftDiffSummary || transaction.readModel?.readinessLabel || transaction.read_model?.readiness_label || 'No draft diff summary recorded.';
+    const hints = Array.isArray(exported?.verification_hints || exported?.verificationHints)
+      ? (exported.verification_hints || exported.verificationHints)
+      : ['Apply is handled only by the Safe Source Apply review gates outside the browser.', 'A non-self accepted review decision plus rollback and evidence refs are required before any trusted apply.'];
+    return `<section class="panel source-apply-handoff"><h3>Source apply handoff</h3>
+      <p class="run-meta">Studio produces Safe Source Apply preview inputs only. Direct apply: <span class="${statusClass('blocked')}">disabled · no direct apply</span>. Apply, merge, and self-approve are handled by the Safe Source Apply review gates, not the browser.</p>
+      <article class="artifact source-apply-handoff-target">
+        <h4>${escapeText(path)}</h4>
+        <div class="run-meta"><span class="${statusClass(stale === false ? 'passed' : 'unknown')}">${escapeText(staleLabel)}</span> · expected hash ${escapeText(expectedHash)}</div>
+        <div class="run-meta">Draft diff: ${escapeText(diffSummary)}</div>
+        <div class="run-meta">Review required: true · Rollback required: true · Evidence required: true</div>
+        <div class="run-meta">Forbidden actions: ${escapeText(FORBIDDEN.join(' · '))}</div>
+        <ul class="run-meta-list">${hints.map((hint) => `<li>${escapeText(hint)}</li>`).join('')}</ul>
+      </article>
+    </section>`;
+  }
+
   function renderRunDetail(run) {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null, run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
   }
@@ -2249,6 +2284,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchEvidenceBundles(run)}
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
+      ${renderSourceApplyHandoff(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -2342,7 +2378,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
