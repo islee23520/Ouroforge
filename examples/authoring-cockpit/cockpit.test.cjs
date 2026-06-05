@@ -2162,6 +2162,50 @@ for (const kind of ['blocked-operation', 'stale-source-apply-target', 'broken-ev
 const blockedDiagCockpit = diagRichCockpit.diagnostics.find((d) => d.kind === 'blocked-operation');
 assert.ok(blockedDiagCockpit.governing_guardrail, 'blocked operation diagnostic must name a governing guardrail');
 
+const mutationArtifactDiagCockpitRun = {
+  summary: { id: 'mutation-artifact-diag-run' },
+  evidence: [],
+  mutations: [],
+  mutation_artifacts: [
+    {
+      id: 'source-patch-apply-transaction',
+      path: 'mutation/source-patch-apply-transaction.json',
+      value: {
+        value: {
+          transactionId: 'apply-tx-blocked',
+          read_model: {
+            status: 'blocked_by_source_patch_guardrail',
+            blockedReasons: ['manual review gate blocks source patch apply'],
+            forbiddenActions: ['apply_patch', 'execute_command'],
+          },
+        },
+      },
+    },
+    {
+      id: 'source-patch-stale-target-guard',
+      path: 'mutation/source-patch-stale-target-guard.json',
+      value: {
+        status: 'fresh',
+        readModel: {
+          status: 'stale_source_apply_target',
+          blockedReasons: ['target hash no longer matches preview'],
+          forbiddenActions: ['apply_patch'],
+        },
+      },
+    },
+  ],
+};
+const mutationArtifactDiagCockpit = cockpit.studioDiagnosticsModel(mutationArtifactDiagCockpitRun);
+const mutationBlockedCockpit = mutationArtifactDiagCockpit.diagnostics.find((d) => d.kind === 'blocked-operation');
+assert.ok(mutationBlockedCockpit, 'diagnostics must detect blocked source-patch apply transactions from mutation_artifacts');
+assert.match(mutationBlockedCockpit.summary, /source-patch-apply-transaction/);
+assert.match(mutationBlockedCockpit.summary, /manual review gate blocks source patch apply/);
+assert.match(mutationBlockedCockpit.summary, /forbidden action: apply_patch/);
+assert.ok(mutationBlockedCockpit.governing_guardrail, 'mutation_artifacts blocked apply diagnostic must surface a governing guardrail');
+const mutationStaleCockpit = mutationArtifactDiagCockpit.diagnostics.find((d) => d.kind === 'stale-source-apply-target');
+assert.ok(mutationStaleCockpit, 'diagnostics must detect stale source-patch target guards from mutation_artifacts');
+assert.match(mutationStaleCockpit.summary, /stale_source_apply_target/);
+
 const diagSurfaceCockpit = cockpit.renderStudioDiagnosticsSurface(diagRichCockpitRun);
 assert.match(diagSurfaceCockpit, /Studio diagnostics/);
 assert.match(diagSurfaceCockpit, /blocked-operation/);
