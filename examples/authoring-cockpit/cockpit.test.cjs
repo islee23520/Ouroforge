@@ -946,6 +946,23 @@ const run = {
   },
 };
 
+run.scene_tree_inspector = {
+  present: true,
+  empty_state: 'No scene tree read model is available for this run.',
+  scenes: [
+    { id: 'scenes/main.scene.json', name: 'Main scene', selected: true },
+    { id: 'scenes/menu.scene.json', name: 'Menu scene', selected: false },
+  ],
+  selected_scene: 'scenes/main.scene.json',
+  nodes: [
+    { id: 'root', name: 'Root', type: 'Node2D', parent_id: null, component_summary: 'Transform', authored: true, warnings: [] },
+    { id: 'player', name: 'Player', type: 'Character', parent_id: 'root', component_summary: 'Transform, Sprite, Collider', authored: true, warnings: [] },
+    { id: 'enemy', name: 'Enemy', type: 'Character', parent_id: 'missing-parent', component_summary: 'Transform', authored: false, warnings: ['Missing parent reference: missing-parent'] },
+    { id: 'pickup', name: 'Pickup', type: 'Item', parent_id: 'pickup', component_summary: 'Transform', authored: true, warnings: ['Hierarchy cycle detected: node references itself as parent'] },
+    { id: 'hud', name: 'HUD', type: 'Control', parent_id: 'root', component_summary: 'broken-component-ref', authored: false, warnings: ['Dangling component reference: broken-component-ref', 'Invalid reference: target node not found'] },
+  ],
+};
+
 run.route_attempts = {
   present: true,
   status: 'passed',
@@ -2132,6 +2149,24 @@ assert.match(evolveDepthCockpit, /visual/);
 assert.match(evolveDepthCockpit, /fail → pass/);
 assert.match(evolveDepthCockpit, /Read-only exported JSON only/);
 assert.doesNotMatch(evolveDepthCockpit, /<button|<form|<input/i);
+const sceneTreeCockpit = cockpit.renderStudioSceneTreeInspectorSurface(run);
+assert.match(sceneTreeCockpit, /Studio scene tree inspector/);
+assert.match(sceneTreeCockpit, /Read-only scene tree inspection from exported JSON/);
+assert.match(sceneTreeCockpit, /Main scene/);
+assert.match(sceneTreeCockpit, /selected/);
+assert.match(sceneTreeCockpit, /Player/);
+assert.match(sceneTreeCockpit, /authored state/);
+assert.match(sceneTreeCockpit, /runtime state/);
+assert.match(sceneTreeCockpit, /Transform, Sprite, Collider/);
+assert.match(sceneTreeCockpit, /Missing parent reference: missing-parent/);
+assert.match(sceneTreeCockpit, /Hierarchy cycle detected/);
+assert.match(sceneTreeCockpit, /Dangling component reference: broken-component-ref/);
+assert.match(sceneTreeCockpit, /Invalid reference: target node not found/);
+assert.doesNotMatch(sceneTreeCockpit, /<button|<form|<input/i);
+const sceneTreeCockpitEmpty = cockpit.renderStudioSceneTreeInspectorSurface({ scene_tree_inspector: { present: false, empty_state: 'no scene tree fixture' } });
+assert.match(sceneTreeCockpitEmpty, /no scene tree fixture/);
+assert.doesNotMatch(sceneTreeCockpitEmpty, /<button|<form|<input/i);
+assert.match(cockpit.renderStudioSceneTreeInspectorSurface({}), /No scene tree read model is available/);
 assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No review decisions recorded/);
 
 assert.match(cockpit.renderLoopDryRunSurface(run), /Authoring loop dry-run/);

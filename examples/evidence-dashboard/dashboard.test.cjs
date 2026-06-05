@@ -829,6 +829,23 @@ const run = {
   journal: '# Journal',
 };
 
+run.scene_tree_inspector = {
+  present: true,
+  empty_state: 'No scene tree read model is exported for this run.',
+  scenes: [
+    { id: 'scenes/main.scene.json', name: 'Main scene', selected: true },
+    { id: 'scenes/menu.scene.json', name: 'Menu scene', selected: false },
+  ],
+  selected_scene: 'scenes/main.scene.json',
+  nodes: [
+    { id: 'root', name: 'Root', type: 'Node2D', parent_id: null, component_summary: 'Transform', authored: true, warnings: [] },
+    { id: 'player', name: 'Player', type: 'Character', parent_id: 'root', component_summary: 'Transform, Sprite, Collider', authored: true, warnings: [] },
+    { id: 'enemy', name: 'Enemy', type: 'Character', parent_id: 'missing-parent', component_summary: 'Transform', authored: false, warnings: ['Missing parent reference: missing-parent'] },
+    { id: 'pickup', name: 'Pickup', type: 'Item', parent_id: 'pickup', component_summary: 'Transform', authored: true, warnings: ['Hierarchy cycle detected: node references itself as parent'] },
+    { id: 'hud', name: 'HUD', type: 'Control', parent_id: 'root', component_summary: 'broken-component-ref', authored: false, warnings: ['Dangling component reference: broken-component-ref', 'Invalid reference: target node not found'] },
+  ],
+};
+
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
   kind: 'application/json',
@@ -1138,6 +1155,23 @@ assert.match(evolveDepthDashboard, /visual/);
 assert.match(evolveDepthDashboard, /fail → pass \(improved\)/);
 assert.match(evolveDepthDashboard, /Read-only exported JSON only/);
 assert.doesNotMatch(evolveDepthDashboard, /<button|<form|<input/i);
+const sceneTreeDashboard = dashboard.renderSceneTreeInspector(run);
+assert.match(sceneTreeDashboard, /Read-only scene tree inspection from exported JSON/);
+assert.match(sceneTreeDashboard, /Main scene/);
+assert.match(sceneTreeDashboard, /selected/);
+assert.match(sceneTreeDashboard, /Player/);
+assert.match(sceneTreeDashboard, /authored state/);
+assert.match(sceneTreeDashboard, /runtime state/);
+assert.match(sceneTreeDashboard, /Transform, Sprite, Collider/);
+assert.match(sceneTreeDashboard, /Missing parent reference: missing-parent/);
+assert.match(sceneTreeDashboard, /Hierarchy cycle detected/);
+assert.match(sceneTreeDashboard, /Dangling component reference: broken-component-ref/);
+assert.match(sceneTreeDashboard, /Invalid reference: target node not found/);
+assert.doesNotMatch(sceneTreeDashboard, /<button|<form|<input/i);
+const sceneTreeDashboardEmpty = dashboard.renderSceneTreeInspector({ scene_tree_inspector: { present: false, empty_state: 'no scene tree fixture' } });
+assert.match(sceneTreeDashboardEmpty, /no scene tree fixture/);
+assert.doesNotMatch(sceneTreeDashboardEmpty, /<button|<form|<input/i);
+assert.match(dashboard.renderSceneTreeInspector({}), /No scene tree read model is exported/);
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);

@@ -1065,6 +1065,37 @@ const OuroforgeDashboard = (() => {
     return `<section class="panel"><h5>Four-gate before/after delta</h5><p class="run-meta">Read-only exported JSON only; no accept/apply/write/merge controls or browser-side trusted comparison logic.</p><ul class="run-meta-list">${rows}</ul></section>`;
   }
 
+  function renderSceneTreeInspector(run = {}) {
+    const model = run.scene_tree_inspector || run.sceneTreeInspector || null;
+    if (!model || model.present === false) {
+      const emptyState = model?.empty_state || model?.emptyState || 'No scene tree read model is exported for this run.';
+      return `<p class="empty-state">${escapeText(emptyState)}</p><p class="run-meta">Read-only inspection only; the dashboard does not write trusted state, edit scenes, expose selection controls, apply, or merge.</p>`;
+    }
+    const scenes = Array.isArray(model.scenes) ? model.scenes : [];
+    const selectedScene = model.selected_scene || model.selectedScene || '';
+    const nodes = Array.isArray(model.nodes) ? model.nodes : [];
+    const sceneRows = scenes.length
+      ? scenes.map((scene) => {
+          const isSelected = scene.selected === true || scene.id === selectedScene;
+          return `<li><strong>${escapeText(scene.name || scene.id || 'unknown scene')}</strong>: <span class="${statusClass(isSelected ? 'pass' : 'neutral')}">${isSelected ? 'selected' : 'not selected'}</span><br><small>${escapeText(scene.id || 'no id')}</small></li>`;
+        }).join('')
+      : '<li>No scenes exported.</li>';
+    const nodeRows = nodes.length
+      ? nodes.map((node) => {
+          const parentId = node.parent_id != null ? node.parent_id : node.parentId;
+          const parentText = parentId != null ? `parent ${escapeText(String(parentId))}` : 'root node';
+          const stateLabel = node.authored === true ? 'authored state' : 'runtime state';
+          const summary = node.component_summary || node.componentSummary || 'no components';
+          const warnings = Array.isArray(node.warnings) ? node.warnings.filter(Boolean) : [];
+          const warningRows = warnings.length
+            ? `<ul class="run-meta-list">${warnings.map((warning) => `<li><span class="${statusClass('fail')}">${escapeText(warning)}</span></li>`).join('')}</ul>`
+            : '';
+          return `<li><strong>${escapeText(node.name || node.id || 'unknown node')}</strong>: <span class="${statusClass(node.authored === true ? 'pass' : 'neutral')}">${escapeText(stateLabel)}</span><br><small>${escapeText(node.type || 'unknown type')} · ${escapeText(String(node.id ?? 'no id'))} · ${parentText} · ${escapeText(summary)}</small>${warningRows}</li>`;
+        }).join('')
+      : '<li>No scene nodes exported.</li>';
+    return `<p class="run-meta">Read-only scene tree inspection from exported JSON. Selection is presentation-only; the dashboard does not edit, apply, merge, or write trusted scene state.</p><h5>Scenes (selection is read-only)</h5><ul class="run-meta-list">${sceneRows}</ul><h5>Node hierarchy (authored vs runtime state)</h5><ul class="run-meta-list">${nodeRows}</ul>`;
+  }
+
   function renderRunComparison(run) {
     const comparison = run?.comparison;
     if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
@@ -2209,6 +2240,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Route attempt evidence</h3>${renderRouteAttempts(run)}</section>
       <section class="panel"><h3>Visual comparison evidence</h3>${renderVisualComparisons(run)}</section>
       <section class="panel"><h3>Evaluator depth inspection</h3>${renderEvaluatorDepthInspection(run)}</section>
+      <section class="panel"><h3>Studio scene tree inspector</h3>${renderSceneTreeInspector(run)}</section>
       <section class="panel"><h3>QA scenario candidates</h3>${renderQaScenarioCandidates(run)}</section>
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
@@ -2310,7 +2342,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
