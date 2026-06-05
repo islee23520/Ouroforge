@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "plugin-registry-fixture",
+  "projectId": "demo_project",
+  "runId": "run-plugin-registry-fixture",
+  "ledgerRef": "runs/plugin-registry-fixture/ledger.jsonl",
+  "generatedState": {
+    "root": "runs/plugin-registry-fixture/plugin-evidence",
+    "fixtureScoped": true,
+    "trackedPolicy": "fixture-scoped sample evidence may be tracked; generated runtime outputs remain ignored"
+  },
+  "plugins": [
+    {
+      "pluginId": "read-only-dashboard-panel",
+      "manifestPath": "plugins/read-only-dashboard-panel/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:1111222233334444",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["dashboardPanel"],
+      "extensionPoints": ["dashboard.panels.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "manifest-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json"
+        }
+      ],
+      "blockedReasons": []
+    },
+    {
+      "pluginId": "blocked-command-panel",
+      "manifestPath": "plugins/blocked-command-panel/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:aaaabbbbccccdddd",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["studioInspectorPanel"],
+      "extensionPoints": ["studio.inspector.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "blocked-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json"
+        }
+      ],
+      "blockedReasons": ["manifest requested executable command authority outside the v1 declarative catalog"]
+    }
+  ],
+  "blockedReasons": ["blocked plugin descriptors remain visible as evidence without execution"],
+  "boundary": "Declarative plugin registry evidence only; no executable plugin runtime, no command execution, no network install, read-only dashboard and Studio display, no trusted source mutation, no publish or deploy authority."
+}

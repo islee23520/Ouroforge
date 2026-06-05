@@ -20,6 +20,7 @@ use behavior_runtime::{
 pub mod behavior_draft;
 mod behavior_draft_validation;
 pub mod internal_sprite_audit;
+pub mod plugin_evidence;
 pub mod runtime_frame_budget;
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
 

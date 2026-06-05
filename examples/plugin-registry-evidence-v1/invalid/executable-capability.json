@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "plugin-registry-invalid",
+  "projectId": "demo_project",
+  "runId": "run-plugin-registry-invalid",
+  "ledgerRef": "runs/plugin-registry-invalid/ledger.jsonl",
+  "generatedState": {
+    "root": "runs/plugin-registry-invalid/plugin-evidence",
+    "fixtureScoped": true,
+    "trackedPolicy": "fixture-scoped sample evidence may be tracked; generated runtime outputs remain ignored"
+  },
+  "plugins": [
+    {
+      "pluginId": "bad-executable-plugin",
+      "manifestPath": "plugins/bad-executable-plugin/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:1111222233334444",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["executeScript"],
+      "extensionPoints": ["dashboard.panels.readOnly"],
+      "evidenceRefs": [],
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Declarative plugin registry evidence only; no executable plugin runtime, no command execution, no network install, read-only dashboard and Studio display."
+}
