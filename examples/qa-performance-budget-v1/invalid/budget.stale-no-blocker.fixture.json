@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-stale-no-blocker",
+  "status": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-011/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-011/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-011-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": 12.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true
+    }
+  ],
+  "verdict": "Stale run without blockers.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

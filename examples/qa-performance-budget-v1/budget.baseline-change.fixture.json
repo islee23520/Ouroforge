@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-frame-budget-baseline-change",
+  "status": "fail",
+  "runMatrixRefs": ["runs/qa-swarm/run-007/matrix.json"],
+  "baselineRefs": ["evidence/profiling/baseline-002.json"],
+  "profilingRefs": ["evidence/profiling/run-007-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": 19.5,
+      "unit": "ms"
+    },
+    {
+      "metricId": "draw-call-peak",
+      "kind": "drawCallCount",
+      "source": "frame_budget_evidence",
+      "present": true,
+      "value": 320,
+      "unit": "count"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true,
+      "baselineRequired": true
+    },
+    {
+      "thresholdId": "draw-call-budget",
+      "metricKind": "drawCallCount",
+      "comparator": "lte",
+      "limit": 800,
+      "supported": true
+    }
+  ],
+  "verdict": "Frame time regressed past the baseline-anchored 16.7ms budget on run-007.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

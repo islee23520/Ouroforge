@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-malformed-metric",
+  "status": "pass",
+  "runMatrixRefs": ["runs/qa-swarm/run-008/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-008-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": -3.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true
+    }
+  ],
+  "verdict": "Malformed metric value.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

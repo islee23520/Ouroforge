@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-missing-baseline",
+  "status": "pass",
+  "runMatrixRefs": ["runs/qa-swarm/run-009/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-009-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": 12.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true,
+      "baselineRequired": true
+    }
+  ],
+  "verdict": "Baseline required but missing.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

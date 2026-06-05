@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-browser-no-warning",
+  "status": "inconclusive",
+  "runMatrixRefs": ["runs/qa-swarm/run-012/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-012-browser-probe.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-browser",
+      "kind": "frameTimeMs",
+      "source": "browser_probe",
+      "present": true,
+      "value": 14.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true
+    }
+  ],
+  "verdict": "Browser metric without a trust warning.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

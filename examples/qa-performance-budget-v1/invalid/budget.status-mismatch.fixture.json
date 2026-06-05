@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-status-mismatch",
+  "status": "pass",
+  "runMatrixRefs": ["runs/qa-swarm/run-013/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-013-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": 25.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-budget",
+      "metricKind": "frameTimeMs",
+      "comparator": "lte",
+      "limit": 16.7,
+      "supported": true
+    }
+  ],
+  "verdict": "Declared pass but the metric violates the budget.",
+  "blockedReasons": [],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

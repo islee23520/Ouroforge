@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "qa-performance-budget-v1",
+  "budgetId": "qa14.8-frame-budget-unsupported",
+  "status": "unsupported",
+  "runMatrixRefs": ["runs/qa-swarm/run-006/matrix.json"],
+  "baselineRefs": [],
+  "profilingRefs": ["evidence/profiling/run-006-frame-budget.json"],
+  "metrics": [
+    {
+      "metricId": "frame-time-p95",
+      "kind": "frameTimeMs",
+      "source": "rust_runtime_profiler",
+      "present": true,
+      "value": 13.0,
+      "unit": "ms"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "frame-time-ratio",
+      "metricKind": "frameTimeMs",
+      "comparator": "ratio_to_baseline",
+      "limit": 1.2,
+      "supported": false
+    }
+  ],
+  "verdict": "The ratio_to_baseline comparator is not supported by the v1 evaluator.",
+  "blockedReasons": ["Threshold comparator ratio_to_baseline is not supported by the v1 evaluator and must be reviewed."],
+  "trustWarnings": [],
+  "boundary": "Performance metrics are evidence inputs, not trusted truth. No auto-fix, no auto-apply, and no production performance guarantee; outputs are review-gated. Browser read-only or draft-only."
+}
