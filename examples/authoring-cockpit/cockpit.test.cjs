@@ -4,6 +4,8 @@ const cockpit = require('./cockpit.js');
 const scene = require('../game-runtime/scene.json');
 const behaviorDraftDocs = fs.readFileSync('docs/behavior-draft-v1.md', 'utf8');
 const behaviorDraftFixtureDocs = fs.readFileSync('examples/behavior-draft-v1/README.md', 'utf8');
+const godotPlusDesignPillarsDoc = fs.readFileSync('docs/godot-plus-demo-design-pillars-v1.md', 'utf8');
+const godotPlusDocsReadme = fs.readFileSync('docs/README.md', 'utf8');
 
 assert.match(behaviorDraftDocs, /untrusted data/i);
 assert.match(behaviorDraftDocs, /does not apply trusted files/i);
@@ -11,6 +13,17 @@ assert.match(behaviorDraftDocs, /No arbitrary script execution/);
 assert.match(behaviorDraftDocs, /generated behavior drafts remain untracked/i);
 assert.match(behaviorDraftFixtureDocs, /fixture-scoped/i);
 assert.match(behaviorDraftFixtureDocs, /read-only validate\/preview/i);
+
+assert.match(godotPlusDesignPillarsDoc, /Issue: #779/);
+assert.match(godotPlusDesignPillarsDoc, /single-screen top-down action-puzzle escape/);
+assert.match(godotPlusDesignPillarsDoc, /Signal Gate/);
+assert.match(godotPlusDesignPillarsDoc, /collect the signal key, open the gate, and exit/);
+assert.match(godotPlusDesignPillarsDoc, /Evidence-native agentic loop/);
+assert.match(godotPlusDesignPillarsDoc, /review-gated Safe Source Apply/);
+assert.match(godotPlusDesignPillarsDoc, /does \*\*not\*\* authorize/);
+assert.match(godotPlusDesignPillarsDoc, /No executable plugin runtime, marketplace, install\/update, or dynamic loading/);
+assert.doesNotMatch(godotPlusDesignPillarsDoc, /full Godot replacement is implemented|production-ready engine is available|commercial release readiness is achieved|browser command bridge enabled|auto-apply enabled|native export ready/);
+assert.match(godotPlusDocsReadme, /godot-plus-demo-design-pillars-v1\.md/);
 
 const moved = cockpit.applyEdit(scene, 'player', 'components.transform.x', '48');
 assert.equal(cockpit.getValue(moved.entities[0], 'components.transform.x'), 48);
