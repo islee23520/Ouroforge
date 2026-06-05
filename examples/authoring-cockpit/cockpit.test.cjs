@@ -1100,6 +1100,58 @@ assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /changed 64 px/
 assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /threshold 10 px/);
 assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /no browser-side trusted writes, mutation controls, command bridge/);
 assert.doesNotMatch(cockpit.renderEvaluatorDepthInspectionSurface(run), /<button|type="button"|data-action="apply"|Apply change/);
+
+// Studio source apply review surface (#712): read-only review readiness.
+const sourceApplyReviewRun = {
+  ...run,
+  source_apply_review: {
+    present: true,
+    status: 'incomplete',
+    emergencyHold: { reason: 'release freeze active' },
+    gates: [
+      { id: 'apply-transaction', present: true, status: 'ready', detail: 'transaction tx_1 ready', refs: [{ kind: 'artifact', path: 'mutation/source-patch-apply-transaction.json' }] },
+      { id: 'review-decision', present: true, status: 'accepted', detail: 'independent review accepted' },
+      { id: 'stale-guard', present: true, status: 'fresh' },
+      { id: 'sandbox-promotion', present: true, status: 'promoted' },
+      { id: 'rollback', present: true, status: 'recorded' },
+      { id: 'verification', present: false, status: 'missing', blockers: ['verification evidence not recorded <yet>'] },
+      { id: 'rerun-comparison', present: true, status: 'compared' },
+      { id: 'audit-ledger', present: true, status: 'appended' },
+      { id: 'evidence-bundle', present: true, status: 'bundled' },
+    ],
+  },
+};
+const sourceApplyReviewHtml = cockpit.renderSourceApplyReviewSurface(sourceApplyReviewRun);
+assert.match(sourceApplyReviewHtml, /Source apply review/);
+assert.match(sourceApplyReviewHtml, /Apply transaction/);
+assert.match(sourceApplyReviewHtml, /Review decision enforcement/);
+assert.match(sourceApplyReviewHtml, /Sandbox-to-trusted promotion/);
+assert.match(sourceApplyReviewHtml, /Rollback snapshot \/ recovery/);
+assert.match(sourceApplyReviewHtml, /Verification/);
+assert.match(sourceApplyReviewHtml, /Rerun \/ comparison/);
+assert.match(sourceApplyReviewHtml, /Audit ledger/);
+assert.match(sourceApplyReviewHtml, /Evidence bundle/);
+assert.match(sourceApplyReviewHtml, /Blocked: verification evidence not recorded &lt;yet&gt;/);
+assert.match(sourceApplyReviewHtml, /Emergency hold: release freeze active/);
+assert.match(sourceApplyReviewHtml, /apply_patch/);
+assert.match(sourceApplyReviewHtml, /reviewer_bypass/);
+assert.match(sourceApplyReviewHtml, /the browser cannot apply patches/);
+assert.doesNotMatch(sourceApplyReviewHtml, /<button|type="button"|data-action="apply"|Apply patch/);
+assert.doesNotMatch(sourceApplyReviewHtml, /<yet>/);
+// Empty state when no read model is exported.
+assert.match(cockpit.renderSourceApplyReviewSurface({}), /No source apply review read model is exported/);
+// Malformed gates surface a notice instead of throwing.
+const malformedReview = cockpit.renderSourceApplyReviewSurface({ source_apply_review: { present: true, gates: { not: 'an array' } } });
+assert.match(malformedReview, /Malformed read-model notices/);
+assert.match(malformedReview, /gates must be an array/);
+// Read model exposes per-gate presence and the surface registry entry.
+assert.equal(cockpit.sourceApplyReviewReadModel(sourceApplyReviewRun).gates.filter((gate) => gate.present).length, 8);
+assert.ok(cockpit.studioSurfaceSummary(sourceApplyReviewRun).some((surface) => surface.id === 'source-apply-review' && surface.present));
+const studioSourceApplyReviewDoc = fs.readFileSync('docs/studio-source-apply-review-surface-v1.md', 'utf8');
+assert.match(studioSourceApplyReviewDoc, /Issue: #712/);
+assert.match(studioSourceApplyReviewDoc, /No apply \/ no command \/ no merge \/ no browser write/);
+assert.match(studioSourceApplyReviewDoc, /#1 and #23 remain open/);
+
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
