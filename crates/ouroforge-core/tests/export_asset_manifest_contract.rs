@@ -113,6 +113,45 @@ fn build_fails_closed_on_missing_asset_root() {
 }
 
 #[test]
+fn build_fails_closed_on_forged_traversal_asset_root() {
+    use ouroforge_core::export_plan::PlannedInputKind;
+    // A plan can be deserialized/mutated outside ExportPlan::from_profile_json, so the
+    // manifest builder must re-validate asset roots instead of trusting the plan. (#724)
+    let mut plan = ExportPlan::from_profile_json(&bundle_profile()).expect("plan");
+    let root = plan
+        .source_inputs
+        .iter_mut()
+        .find(|input| input.kind == PlannedInputKind::AssetRoot)
+        .expect("plan has an asset root");
+    root.path = "../../../../../../etc".to_string();
+    let err = build_asset_manifest(&plan, &repo_root(), "proj_export_bundle_fixture")
+        .expect_err("forged traversal asset root rejected");
+    assert!(
+        err.to_string().contains(".."),
+        "expected traversal rejection, got: {err}"
+    );
+}
+
+#[test]
+fn build_fails_closed_on_blocked_prefix_asset_root() {
+    use ouroforge_core::export_plan::PlannedInputKind;
+    let mut plan = ExportPlan::from_profile_json(&bundle_profile()).expect("plan");
+    let root = plan
+        .source_inputs
+        .iter_mut()
+        .find(|input| input.kind == PlannedInputKind::AssetRoot)
+        .expect("plan has an asset root");
+    // `secrets/` is in the plan's blocked-file policy; a forged root under it must fail.
+    root.path = "secrets/leak".to_string();
+    let err = build_asset_manifest(&plan, &repo_root(), "proj_export_bundle_fixture")
+        .expect_err("blocked-prefix asset root rejected");
+    assert!(
+        err.to_string().contains("blocked prefix"),
+        "expected blocked-prefix rejection, got: {err}"
+    );
+}
+
+#[test]
 fn rewrites_only_explicitly_mapped_references() {
     let plan = ExportPlan::from_profile_json(&bundle_profile()).unwrap();
     let manifest = build_asset_manifest(&plan, &repo_root(), "proj_export_bundle_fixture").unwrap();

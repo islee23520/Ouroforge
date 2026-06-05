@@ -141,6 +141,22 @@ pub fn build_asset_manifest(
         .iter()
         .filter(|i| i.kind == PlannedInputKind::AssetRoot)
     {
+        // Re-validate the asset root before joining it to `repo_root`. `build_asset_manifest`
+        // accepts any `ExportPlan` value, which may have been constructed or deserialized
+        // outside `ExportPlan::from_profile_json` (and thus never passed export-profile
+        // validation). Without this guard a forged plan could carry an absolute or `..`
+        // path and make manifest generation read and hash files outside the asset roots,
+        // or a path under a blocked prefix such as `.git/` or `secrets/`. Fail closed. (#724)
+        validate_relative_path("asset manifest asset root", &input.path)?;
+        if let Some(blocked) = plan.blocked_files.iter().find(|prefix| {
+            input.path == prefix.trim_end_matches('/') || input.path.starts_with(prefix.as_str())
+        }) {
+            return Err(anyhow!(
+                "asset manifest refuses asset root `{}` under blocked prefix `{}`",
+                input.path,
+                blocked
+            ));
+        }
         let segment = last_segment(&input.path);
         let source_dir = repo_root.join(&input.path);
         if !source_dir.is_dir() {
