@@ -455,6 +455,57 @@ const OuroforgeCockpit = (() => {
     return `<span class="status-idle">${escapeText(fallback)}</span>`;
   }
 
+  function studioKeyboardNavModel(run = null) {
+    const hasRun = Boolean(run);
+    const regions = [
+      { id: 'studio-nav', label: 'Studio navigation', role: 'navigation', shortcut: 'Alt+1', detail: 'jump between demo surfaces' },
+      { id: 'live-preview', label: 'Live preview panel', role: 'region', shortcut: 'Alt+2', detail: 'ephemeral probe controls' },
+      { id: 'scene-tree', label: 'Scene tree', role: 'tree', shortcut: 'Alt+3', detail: hasRun ? 'entity tree navigation' : 'scene data not loaded' },
+      { id: 'inspector-fields', label: 'Inspector fields', role: 'form', shortcut: 'Alt+4', detail: 'read/edit field navigation' },
+      { id: 'command-palette', label: 'Command generation', role: 'region', shortcut: 'Alt+5', detail: 'Rust command preview' },
+      { id: 'evidence-pane', label: 'Evidence pane', role: 'region', shortcut: 'Alt+6', detail: 'read-only evidence inspection' },
+    ];
+    // Documented contrast/readability smoke pairs (intent only; no color computation).
+    const contrastPairs = [
+      { region: 'studio-nav', label: 'Studio navigation', intent: 'navigation labels readable at default zoom' },
+      { region: 'scene-tree', label: 'Scene tree', intent: 'tree node labels readable against panel background' },
+      { region: 'inspector-fields', label: 'Inspector fields', intent: 'field labels and values readable for color-blind users' },
+    ];
+    return { schemaVersion: 'studio-keyboard-nav-v1', regions, contrastPairs };
+  }
+
+  function nextStudioFocus(regions, currentId, dir = 'next') {
+    const list = Array.isArray(regions) ? regions : [];
+    if (!list.length) return null;
+    const index = list.findIndex((region) => region && region.id === currentId);
+    if (index === -1) return list[0].id;
+    if (dir === 'prev') {
+      return index === 0 ? list[list.length - 1].id : list[index - 1].id;
+    }
+    return index === list.length - 1 ? list[0].id : list[index + 1].id;
+  }
+
+  function restoreStudioFocus(regions, lastId) {
+    const list = Array.isArray(regions) ? regions : [];
+    if (!list.length) return null;
+    const match = list.find((region) => region && region.id === lastId);
+    return match ? match.id : list[0].id;
+  }
+
+  function renderStudioAccessibilityNavSurface(run = null) {
+    const model = studioKeyboardNavModel(run);
+    const items = model.regions.map((region) => `<li role="listitem" tabindex="0" data-region-id="${escapeText(region.id)}"><a href="#${escapeText(region.id)}"><strong>${escapeText(region.label)}</strong></a> <kbd>${escapeText(region.shortcut)}</kbd><br><small>role ${escapeText(region.role)} · ${escapeText(region.detail)}</small></li>`).join('');
+    const contrast = model.contrastPairs.map((pair) => `<li role="listitem"><strong>${escapeText(pair.label)}</strong>: ${escapeText(pair.intent)}</li>`).join('');
+    return `<section class="panel" id="studio-accessibility-nav"><h2>Keyboard navigation and landmarks</h2>
+      <nav role="navigation" aria-label="Studio keyboard navigation guide">
+        <p class="hint">Read-only keyboard-shortcut and landmark guide. No apply, merge, command execution, or trusted-write controls are exposed.</p>
+        <ol role="list" aria-label="Ordered focusable regions">${items}</ol>
+      </nav>
+      <h3>Contrast and readability smoke</h3>
+      <ul role="list" aria-label="Contrast readability intent">${contrast}</ul>
+    </section>`;
+  }
+
   function studioSurfaceSummary(run) {
     const hasRun = Boolean(run);
     const project = projectContext(run);
@@ -3923,7 +3974,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderIntegration(run, previewState = null) {
-    return `${renderStudioNavigation(run)}<section id="command-palette" class="panel">${renderStudioCommandPaletteSurface(run)}</section><section id="live-preview">${renderPreview()}<div id="preview-controls-host">${renderPreviewControls(previewState)}</div></section><section id="scene-editing">${renderQaPanel()}</section>${renderEvidencePane(run)}${renderStudioGaps()}`;
+    return `${renderStudioNavigation(run)}${renderStudioAccessibilityNavSurface(run)}<section id="command-palette" class="panel">${renderStudioCommandPaletteSurface(run)}</section><section id="live-preview">${renderPreview()}<div id="preview-controls-host">${renderPreviewControls(previewState)}</div></section><section id="scene-editing">${renderQaPanel()}</section>${renderEvidencePane(run)}${renderStudioGaps()}`;
   }
 
   async function loadDashboardData(path = DEFAULT_DASHBOARD_DATA_PATH) {
@@ -4106,7 +4157,7 @@ const OuroforgeCockpit = (() => {
     return defaultWorkspaceLayout();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

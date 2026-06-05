@@ -3068,3 +3068,43 @@ assert.equal(cockpitSaveStorage.store['ouroforge.studio.workspace'], undefined);
 assert.deepEqual(cockpit.loadWorkspaceLayout(cockpitSaveStorage), workspaceDefaults);
 
 console.log('authoring cockpit workspace layout persistence test passed');
+// Studio accessibility and keyboard navigation v1 (#771)
+const a11yNavModel = cockpit.studioKeyboardNavModel(run);
+assert.equal(a11yNavModel.schemaVersion, 'studio-keyboard-nav-v1');
+assert.ok(a11yNavModel.regions.length >= 4, 'keyboard nav model exposes ordered regions');
+assert.equal(a11yNavModel.regions[0].id, 'studio-nav');
+assert.ok(a11yNavModel.contrastPairs.length >= 1, 'contrast/readability smoke pairs present');
+assert.ok(a11yNavModel.regions.every((region) => region.shortcut), 'every region has a panel-switching shortcut');
+const a11yRegions = a11yNavModel.regions;
+const a11yIds = a11yRegions.map((region) => region.id);
+// next/prev focus wraps and stops predictably
+assert.equal(cockpit.nextStudioFocus(a11yRegions, a11yIds[0], 'next'), a11yIds[1]);
+assert.equal(cockpit.nextStudioFocus(a11yRegions, a11yIds[a11yIds.length - 1], 'next'), a11yIds[0]);
+assert.equal(cockpit.nextStudioFocus(a11yRegions, a11yIds[0], 'prev'), a11yIds[a11yIds.length - 1]);
+assert.equal(cockpit.nextStudioFocus(a11yRegions, a11yIds[1], 'prev'), a11yIds[0]);
+assert.equal(cockpit.nextStudioFocus(a11yRegions, 'does-not-exist', 'next'), a11yIds[0]);
+assert.equal(cockpit.nextStudioFocus([], 'x', 'next'), null);
+// restore focus resolves a known id or falls back to first
+assert.equal(cockpit.restoreStudioFocus(a11yRegions, a11yIds[2]), a11yIds[2]);
+assert.equal(cockpit.restoreStudioFocus(a11yRegions, 'missing'), a11yIds[0]);
+assert.equal(cockpit.restoreStudioFocus([], 'x'), null);
+const a11ySurface = cockpit.renderStudioAccessibilityNavSurface(run);
+assert.match(a11ySurface, /Keyboard navigation and landmarks/);
+assert.match(a11ySurface, /role="navigation"/);
+assert.match(a11ySurface, /role="list"/);
+assert.match(a11ySurface, /role="listitem"/);
+assert.match(a11ySurface, /aria-label="Studio keyboard navigation guide"/);
+assert.match(a11ySurface, /aria-label="Ordered focusable regions"/);
+assert.match(a11ySurface, /tabindex="0"/);
+assert.match(a11ySurface, /Studio navigation/);
+assert.match(a11ySurface, /Contrast and readability smoke/);
+// regions render in declared order
+assert.ok(a11ySurface.indexOf('Studio navigation') < a11ySurface.indexOf('Live preview panel'), 'regions render in declared order');
+// no privileged actions or trusted-write controls
+assert.doesNotMatch(a11ySurface, /<button[^>]*type=["']?submit|apply source|auto-merge/i);
+assert.doesNotMatch(a11ySurface, /<button|<form|<input/i);
+assert.doesNotMatch(a11ySurface, /\b(apply|merge|execute|commit) /i);
+// surface is wired into the integration render
+assert.match(cockpit.renderIntegration(run), /studio-accessibility-nav/);
+const a11yXss = cockpit.renderStudioAccessibilityNavSurface({ id: '<script>alert(1)</script>' });
+assert.doesNotMatch(a11yXss, /<script>alert\(1\)<\/script>/);

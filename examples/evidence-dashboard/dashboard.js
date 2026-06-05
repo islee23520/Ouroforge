@@ -2239,7 +2239,56 @@ const OuroforgeDashboard = (() => {
         <div class="run-meta">Review required: true · Rollback required: true · Evidence required: true</div>
         <div class="run-meta">Forbidden actions: ${escapeText(FORBIDDEN.join(' · '))}</div>
         <ul class="run-meta-list">${hints.map((hint) => `<li>${escapeText(hint)}</li>`).join('')}</ul>
-      </article>
+      </article>`;
+  }
+
+  function studioKeyboardNavModel(run = null) {
+    const hasRun = Boolean(run);
+    const regions = [
+      { id: 'run-list', label: 'Run list', role: 'navigation', shortcut: 'Alt+1', detail: hasRun ? 'select an exported run to inspect' : 'no runs loaded' },
+      { id: 'run-detail', label: 'Run detail panel', role: 'region', shortcut: 'Alt+2', detail: hasRun ? 'read-only run evidence' : 'no run selected' },
+      { id: 'evidence-categories', label: 'Evidence categories', role: 'region', shortcut: 'Alt+3', detail: 'category breakdown' },
+      { id: 'run-comparison', label: 'Run comparison', role: 'region', shortcut: 'Alt+4', detail: 'before/after deltas' },
+      { id: 'replay-controls', label: 'Replay controls', role: 'region', shortcut: 'Alt+5', detail: 'read-only replay stepping' },
+    ];
+    // Documented contrast/readability smoke pairs (intent only; no color computation).
+    const contrastPairs = [
+      { region: 'run-list', label: 'Run list', intent: 'high-contrast list labels readable at default zoom' },
+      { region: 'run-detail', label: 'Run detail panel', intent: 'card labels readable against panel background' },
+      { region: 'run-comparison', label: 'Run comparison', intent: 'delta status text readable for color-blind users' },
+    ];
+    return { schemaVersion: 'studio-keyboard-nav-v1', regions, contrastPairs };
+  }
+
+  function nextStudioFocus(regions, currentId, dir = 'next') {
+    const list = Array.isArray(regions) ? regions : [];
+    if (!list.length) return null;
+    const index = list.findIndex((region) => region && region.id === currentId);
+    if (index === -1) return list[0].id;
+    if (dir === 'prev') {
+      return index === 0 ? list[list.length - 1].id : list[index - 1].id;
+    }
+    return index === list.length - 1 ? list[0].id : list[index + 1].id;
+  }
+
+  function restoreStudioFocus(regions, lastId) {
+    const list = Array.isArray(regions) ? regions : [];
+    if (!list.length) return null;
+    const match = list.find((region) => region && region.id === lastId);
+    return match ? match.id : list[0].id;
+  }
+
+  function renderStudioAccessibilityNavSurface(run = null) {
+    const model = studioKeyboardNavModel(run);
+    const items = model.regions.map((region) => `<li role="listitem" tabindex="0" data-region-id="${escapeText(region.id)}"><a href="#${escapeText(region.id)}"><strong>${escapeText(region.label)}</strong></a> <kbd>${escapeText(region.shortcut)}</kbd><br><small>role ${escapeText(region.role)} · ${escapeText(region.detail)}</small></li>`).join('');
+    const contrast = model.contrastPairs.map((pair) => `<li role="listitem"><strong>${escapeText(pair.label)}</strong>: ${escapeText(pair.intent)}</li>`).join('');
+    return `<section class="panel" id="studio-accessibility-nav"><h3>Keyboard navigation and landmarks</h3>
+      <nav role="navigation" aria-label="Studio keyboard navigation guide">
+        <p class="run-meta">Read-only keyboard-shortcut and landmark guide. No apply, merge, command execution, or trusted-write controls are exposed.</p>
+        <ol role="list" aria-label="Ordered focusable regions">${items}</ol>
+      </nav>
+      <h4>Contrast and readability smoke</h4>
+      <ul role="list" aria-label="Contrast readability intent">${contrast}</ul>
     </section>`;
   }
 
@@ -2294,6 +2343,7 @@ const OuroforgeDashboard = (() => {
     const mutations = Array.isArray(run.mutations) ? run.mutations : [];
     return `<article>
       <h2>${escapeText(summary.id)}</h2>
+      ${renderStudioAccessibilityNavSurface(run)}
       <div class="cards">
         <div class="card"><div class="card-label">Seed</div><div class="card-value">${escapeText(summary.seed)}</div></div>
         <div class="card"><div class="card-label">Run</div><div class="card-value"><span class="${statusClass(summary.runStatus)}">${escapeText(summary.runStatus)}</span></div></div>
@@ -2525,7 +2575,7 @@ const OuroforgeDashboard = (() => {
     return defaultWorkspaceLayout();
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
