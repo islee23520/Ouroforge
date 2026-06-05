@@ -25,8 +25,10 @@ fn matrix_gates_desktop_wrapper_as_future_not_implemented() {
     assert!(MATRIX.contains("design-gated") || MATRIX.contains("design gate"));
     // The future target must not be treated as authorized: it is validated like
     // a blocked target until a separate design-gate issue scopes it.
-    assert!(MATRIX.contains("treats it the same as a blocked target")
-        || MATRIX.contains("the same as a blocked target"));
+    assert!(
+        MATRIX.contains("treats it the same as a blocked target")
+            || MATRIX.contains("the same as a blocked target")
+    );
 }
 
 #[test]
