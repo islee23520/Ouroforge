@@ -3,7 +3,7 @@
 Issue: #648  
 Status: feasibility gate artifact, deterministic state rules, fixtures, and display read model contract.
 
-`gdd-feasibility-gate-v1` prevents overbroad or unsupported GDD-derived work from becoming implementation work. Prototype planning starts only after feasibility passes or an accepted bounded slice is recorded. The gate is not prototype generation authority and does not implement scaffold, scene, behavior, asset, scenario, apply, run, or Studio behavior.
+`gdd-feasibility-gate-v1` prevents overbroad or unsupported GDD-derived work from becoming implementation work. Prototype planning starts only after feasibility passes or an accepted bounded slice is recorded. The gate is not a prototype generator and is not prototype generation authority and does not implement scaffold, scene, behavior, asset, scenario, apply, run, or Studio behavior.
 
 ## Artifact shape
 
