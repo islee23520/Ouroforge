@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "gameplay-logic-regression-v9",
+  "description": "Focused Scenario Coverage v9 behavior model/runtime regression pack. Structured data-only gameplay logic coverage; not arbitrary scripting or production engine maturity.",
+  "seed": "seeds/gameplay-logic-regression-v9.yaml",
+  "scenes": [
+    "scenes/gameplay-logic-regression-v9.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "gl10-14-1-behavior-model-runtime",
+      "description": "Behavior validation, event ordering, signal routing, state transitions, ability/cooldown effects, and runtime execution evidence.",
+      "scenarios": [
+        {
+          "id": "behavior-model-runtime-regression",
+          "description": "Execute plate, dash, hazard, and exit structured behaviors and evaluate evidence assertions.",
+          "steps": [
+            {
+              "input": {
+                "actions": {
+                  "platePressed": true
+                }
+              }
+            },
+            {
+              "input": {
+                "actions": {
+                  "dash": true
+                }
+              }
+            },
+            {
+              "input": {
+                "actions": {
+                  "hazardPulse": true
+                }
+              }
+            },
+            {
+              "input": {
+                "actions": {
+                  "exitReached": true
+                }
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "world_state": {
+                "path": "activeStates.pressure-plate",
+                "equals": "pressed"
+              }
+            },
+            {
+              "runtime_events": {
+                "path": "events",
+                "containsType": "gateSignal"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

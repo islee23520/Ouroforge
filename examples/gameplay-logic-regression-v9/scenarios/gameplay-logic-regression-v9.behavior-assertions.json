@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.behavior-scenario-assertion-suite.v1",
+  "suiteId": "gameplay-logic-regression-v9-behavior-runtime",
+  "scenarioId": "behavior-model-runtime-regression",
+  "evidenceRef": "tmp-evidence/gameplay-logic-regression-v9/behavior-runtime-evidence.json",
+  "assertions": [
+    { "assertionId": "plate-transition-action", "kind": "stateTransitionOccurred", "reportIndex": 0, "entityId": "pressure-plate", "state": "pressed" },
+    { "assertionId": "plate-flag", "kind": "flagChanged", "reportIndex": 0, "flag": "platePrimed", "expectedFlag": true },
+    { "assertionId": "plate-input-event-first", "kind": "eventEmitted", "reportIndex": 0, "event": "platePressed" },
+    { "assertionId": "plate-routed-event", "kind": "eventEmitted", "reportIndex": 0, "event": "gateSignal" },
+    { "assertionId": "dash-move-executed", "kind": "behaviorExecuted", "reportIndex": 1, "actionId": "dash-forward" },
+    { "assertionId": "dash-ability-used", "kind": "abilityUsed", "reportIndex": 1, "actionId": "dash-vfx-intent" },
+    { "assertionId": "dash-cooldown-evidence", "kind": "cooldownActive", "reportIndex": 1, "behaviorId": "dash-ability-regression" },
+    { "assertionId": "dash-player-affected", "kind": "entityAffected", "reportIndex": 1, "entityId": "player" },
+    { "assertionId": "hazard-transition", "kind": "stateTransitionOccurred", "reportIndex": 2, "entityId": "hazard", "state": "cooldown" },
+    { "assertionId": "hazard-event", "kind": "eventEmitted", "reportIndex": 2, "event": "hazardFired" },
+    { "assertionId": "exit-win", "kind": "terminalStateReached", "reportIndex": 3, "terminalState": "win" },
+    { "assertionId": "exit-victory-event", "kind": "eventEmitted", "reportIndex": 3, "event": "regressionVictory" }
+  ]
+}

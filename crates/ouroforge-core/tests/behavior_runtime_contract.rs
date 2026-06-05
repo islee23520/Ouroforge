@@ -952,6 +952,138 @@ fn gameplay_logic_demo_v1_fixture_validates_project_pack_and_behavior_outcomes()
 }
 
 #[test]
+fn gameplay_logic_regression_v9_behavior_model_runtime_fixture_covers_gl10_14_1() {
+    use ouroforge_core::behavior_runtime::{BehaviorExecutionInput, BehaviorWorldState};
+
+    let project_root = std::path::Path::new("../../examples/gameplay-logic-regression-v9");
+    let manifest = ProjectManifest::from_path(project_root.join("ouroforge.project.json"))
+        .expect("gameplay logic regression v9 project validates");
+    assert_eq!(manifest.project.id, "scenario_coverage_v9_gameplay_logic");
+    assert!(manifest.generated.roots.iter().any(|root| root == "runs"));
+    assert!(manifest
+        .generated
+        .roots
+        .iter()
+        .any(|root| root == "dashboard-data"));
+
+    let seed = Seed::from_path(project_root.join("seeds/gameplay-logic-regression-v9.yaml"))
+        .expect("gameplay logic regression v9 seed validates");
+    assert_eq!(seed.id, "scenario-coverage-v9.gameplay-logic-regression");
+    assert!(seed
+        .acceptance
+        .iter()
+        .any(|item| item.contains("not a production-stable scripting API")));
+
+    let pack = ScenarioPack::from_path(
+        project_root.join("scenarios/gameplay-logic-regression-v9.scenario-pack.json"),
+    )
+    .expect("gameplay logic regression v9 scenario pack validates");
+    assert_eq!(
+        pack.ordered_scenario_ids(),
+        vec!["behavior-model-runtime-regression"]
+    );
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json"
+    ))
+    .expect("gameplay logic regression v9 behavior artifact validates");
+    let runtime_state = artifact.runtime_state();
+    assert_eq!(runtime_state.status, BehaviorRuntimeStatus::Ready);
+    assert_eq!(runtime_state.counts.behavior_count, 4);
+    assert_eq!(runtime_state.counts.trigger_count, 4);
+    assert_eq!(runtime_state.counts.condition_count, 4);
+    assert_eq!(runtime_state.counts.action_count, 10);
+    assert_eq!(runtime_state.counts.state_machine_count, 2);
+    assert_eq!(runtime_state.counts.ability_count, 1);
+    assert!(runtime_state.diagnostics.is_empty());
+    assert!(runtime_state
+        .trusted_boundary
+        .execution_mode
+        .contains("structured-data-only"));
+    assert!(runtime_state
+        .trusted_boundary
+        .disallowed_actions
+        .iter()
+        .any(|action| action == "command bridge"));
+
+    let plate = artifact.execute(
+        BehaviorExecutionInput::new("onCollision").with_event("platePressed"),
+        BehaviorWorldState::default().with_flag("playerOnPlate", true),
+    );
+    assert_eq!(
+        plate
+            .applied_actions
+            .iter()
+            .map(|action| action.action_id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "plate-enters-pressed",
+            "mark-plate-primed",
+            "route-gate-signal"
+        ]
+    );
+    assert_eq!(plate.world_state.flags.get("platePrimed"), Some(&true));
+    assert_eq!(
+        plate.world_state.active_states.get("pressure-plate"),
+        Some(&"pressed".to_string())
+    );
+    assert_eq!(
+        plate.world_state.events,
+        vec!["platePressed".to_string(), "gateSignal".to_string()],
+        "input event must be recorded before the emitted signal for deterministic routing evidence"
+    );
+
+    let dash = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("dash"),
+        BehaviorWorldState::default().with_position("player", 1, 2),
+    );
+    assert_eq!(dash.world_state.entity_positions["player"].x, 5);
+    assert_eq!(dash.world_state.entity_positions["player"].y, 2);
+    assert_eq!(dash.world_state.flags.get("dashExecuted"), Some(&true));
+    assert_eq!(dash.world_state.audio_intents[0].intent, "dash");
+    assert_eq!(dash.world_state.animation_intents[0].intent, "dash-vfx");
+
+    let hazard = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("hazardPulse"),
+        BehaviorWorldState::default().with_health("player", 5),
+    );
+    assert_eq!(
+        hazard.world_state.active_states.get("hazard"),
+        Some(&"cooldown".to_string())
+    );
+    assert_eq!(hazard.world_state.entity_health.get("player"), Some(&3));
+    assert_eq!(
+        hazard.world_state.events,
+        vec!["hazardPulse".to_string(), "hazardFired".to_string()]
+    );
+
+    let exit = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("exitReached"),
+        BehaviorWorldState::default().with_item("regressionKey"),
+    );
+    let evidence = artifact.evidence_bundle(vec![plate, dash, hazard, exit]);
+    assert_eq!(evidence.summary.report_count, 4);
+    assert_eq!(evidence.summary.applied_action_count, 12);
+    assert_eq!(evidence.summary.terminal_state_count, 1);
+    assert!(evidence.reports[1]
+        .cooldown_behavior_ids
+        .contains(&"dash-ability-regression".to_string()));
+
+    let suite: BehaviorScenarioAssertionSuite = serde_json::from_str(include_str!(
+        "../../../examples/gameplay-logic-regression-v9/scenarios/gameplay-logic-regression-v9.behavior-assertions.json"
+    ))
+    .expect("gameplay logic regression v9 assertion suite JSON parses");
+    let result = suite
+        .evaluate(&evidence)
+        .expect("gameplay logic regression v9 assertion suite evaluates");
+    assert_eq!(result.status, BehaviorScenarioAssertionStatus::Passed);
+    assert!(result
+        .assertions
+        .iter()
+        .all(|assertion| assertion.status == BehaviorScenarioAssertionStatus::Passed));
+}
+
+#[test]
 fn behavior_apply_transaction_read_model_preserves_rollback_rerun_and_evidence_refs() {
     let read_model =
         behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("ready"))

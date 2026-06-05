@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "scenario_coverage_v9_gameplay_logic",
+    "name": "Scenario Coverage v9 Gameplay Logic Regression"
+  },
+  "scenes": [
+    {
+      "id": "gameplay-logic-regression-v9-scene",
+      "path": "scenes/gameplay-logic-regression-v9.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "gameplay-logic-regression-v9",
+      "path": "seeds/gameplay-logic-regression-v9.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "gameplay-logic-regression-v9",
+      "path": "scenarios/gameplay-logic-regression-v9.scenario-pack.json"
+    }
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": [
+      "runs",
+      "dashboard-data",
+      "target",
+      "tmp"
+    ]
+  }
+}

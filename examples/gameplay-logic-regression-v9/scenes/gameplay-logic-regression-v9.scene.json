@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1",
+  "id": "gameplay-logic-regression-v9-scene",
+  "bounds": { "width": 160, "height": 96 },
+  "metadata": {
+    "issue": "#624",
+    "fixture": "gameplay-logic-regression-v9",
+    "sourceOnly": true,
+    "notes": [
+      "Source-like regression scene for structured behavior runtime coverage only.",
+      "No arbitrary script execution, browser trusted writes, command bridge, plugin loader, or production engine claim."
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 16, "y": 48 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "controllable": true
+      },
+      "tags": ["player", "behavior-regression"]
+    },
+    {
+      "id": "pressure-plate",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 48, "y": 48 },
+        "size": { "width": 16, "height": 8 }
+      },
+      "tags": ["trigger", "behavior:event-routing"]
+    },
+    {
+      "id": "hazard",
+      "sprite": { "color": "#ef4444" },
+      "components": {
+        "transform": { "x": 96, "y": 48 },
+        "size": { "width": 12, "height": 12 }
+      },
+      "tags": ["hazard", "behavior:state-machine"]
+    },
+    {
+      "id": "exit",
+      "sprite": { "color": "#22c55e" },
+      "components": {
+        "transform": { "x": 132, "y": 48 },
+        "size": { "width": 12, "height": 16 }
+      },
+      "tags": ["goal", "behavior:terminal-state"]
+    }
+  ]
+}

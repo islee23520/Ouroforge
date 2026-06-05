@@ -1,0 +1,15 @@
+id: scenario-coverage-v9.gameplay-logic-regression
+title: Scenario Coverage v9 Gameplay Logic Regression
+goal: Prove focused structured gameplay behavior validation, event ordering, state transitions, ability effects, cooldown evidence, and runtime execution without arbitrary script execution.
+constraints:
+  target: behavior-runtime
+acceptance:
+  - Structured behavior regression inputs remain data-only and validated by Rust/local code.
+  - Event routing preserves deterministic input-before-emitted ordering evidence.
+  - State machine, ability, cooldown, and runtime outcome evidence is covered independently from the demo fixture.
+  - Browser/dashboard/Studio surfaces may inspect exported read models only and cannot write trusted state or execute commands.
+  - Generated runs, dashboard data, temporary outputs, screenshots, and local tool state remain untracked.
+  - This is not a production-stable scripting API, plugin runtime, hosted service, Godot replacement, or production-ready engine claim.
+scenarios:
+  - id: behavior-model-runtime-regression
+    description: Assert validation, event ordering, state transitions, ability effects, cooldown evidence, and terminal runtime output for structured gameplay logic.
