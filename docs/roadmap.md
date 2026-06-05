@@ -79,6 +79,12 @@ explicit release/publish blockers, and a completed Foundation Hardening v1
 architecture hygiene milestone that extracted `ouroforge-ledger`,
 `ouroforge-evidence`, and `ouroforge-evaluator` behind the existing
 `ouroforge-core` public facade while preserving golden verdict parity, and a
+completed Full Studio Editor v1 milestone for a bounded local Studio authoring
+foundation: integrated overview, scene/entity/component inspection, visual scene
+canvas, draft-only authoring, Safe Source Apply handoff preview, asset,
+evidence, scenario, export, and plugin inspection panels, workspace persistence,
+command palette, accessibility/performance/diagnostics coverage, integrated
+demo, Scenario Coverage v17, and conservative governance refresh, and a
 completed Godot-Plus Demo Game v1 milestone for the Signal Gate local vertical
 slice: a small playable 2D vertical slice, Studio inspect/draft workflow,
 agentic iteration evidence, Safe Source Apply chain evidence, QA swarm evidence
@@ -88,7 +94,7 @@ documentation/reproducibility notes, performance budget evidence, regression
 suite, and conservative governance refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -136,6 +142,30 @@ dependency/CI/build-script mutation, browser trusted writes, command bridges,
 auto-fix, auto-apply, auto-merge, self-approval, reviewer bypass, autonomous
 source repair, secure-sandbox guarantee, production-ready mutation claim, or
 current Godot replacement positioning is introduced.
+
+Full Studio Editor v1 (#757-#776) is now complete as a local-first,
+evidence-backed Studio authoring cockpit foundation under #1. The merged
+evidence chain added the #757 scope contract, project overview, scene tree,
+entity/component inspector, visual scene canvas, draft-only authoring model,
+Safe Source Apply handoff preview, asset browser/metadata inspection,
+scenario/evidence and evidence-timeline panels, export/package inspection,
+plugin/extension descriptor inspection, workspace persistence, command palette,
+accessibility/performance/diagnostics coverage, fixture-scoped integrated demo,
+Scenario Coverage v17, and this governance refresh. This completion authorizes
+only local read-only inspection plus draft-only browser state and Rust/local
+trusted validation/handoff evidence. It does not authorize direct Studio trusted
+writes, browser command bridges, arbitrary shell execution, dependency install,
+CI/workflow mutation, credentialed operations, network install/update,
+publish/deploy/sign/upload, executable plugin runtime, marketplace behavior,
+autonomous apply, auto-merge, self-approval, reviewer bypass, native desktop
+editor, advanced visual scripting, full asset import pipeline, timeline or
+animation editor parity, tilemap/terrain editor parity, production collaboration,
+production-ready editor claims, secure-sandbox guarantees, full Godot parity,
+Godot replacement positioning, or the separate Godot-plus demonstration game.
+Generated workspace/editor state, drafts, previews, panel data, demo outputs,
+validation reports, evidence artifacts, temp servers, screenshots, dashboard
+exports, and local tool state remain ignored unless a future issue explicitly
+scopes deterministic fixture data. #1 remains open. #23 remains open.
 
 Build / Export / Packaging v1 (#720-#736) is now complete as a local-only export
 foundation. The merged evidence chain added the export target matrix, export
@@ -333,6 +363,13 @@ The current implementation has completed these documented milestone surfaces:
   `docs/studio-behavior-inspection-surface-v1.md`,
   `examples/gameplay-logic-demo-v1/README.md`,
   `examples/gameplay-logic-regression-v9/README.md`)
+- Full Studio Editor v1 / local read-only and draft-only authoring cockpit
+  (`docs/full-studio-editor-v1.md`,
+  `docs/full-studio-editor-integrated-demo-v1.md`,
+  `docs/scenario-coverage-v17-full-studio-editor.md`,
+  `examples/full-studio-editor-demo-v1/`,
+  `examples/full-studio-editor-regression-v17/`,
+  `examples/authoring-cockpit/cockpit.test.cjs`)
 - Build / Export / Packaging v1 / local export package foundation
   (`docs/build-export-packaging-v1.md`,
   `docs/export-target-matrix-v1.md`,
@@ -624,6 +661,34 @@ any extraction PR. Layer-3 scope remains unchanged and deferred: distributed
 orchestration / Elixir per ADR #92, native export, plugin runtime, and
 hosted/cloud still require separate design gates and governance approval.
 
+### Full Studio Editor v1 governance refresh
+
+Full Studio Editor v1 (#757-#776) is recorded as **complete as a bounded
+local-first Studio foundation**, not as full Godot editor parity or a production
+editor. The completed capability includes integrated Studio overview and
+project context, scene tree, entity/component inspection, visual scene canvas,
+draft-only authoring, Safe Source Apply handoff previews, asset browser,
+scenario/playtest evidence, evidence timeline, export/package inspection,
+plugin/extension descriptor inspection, workspace persistence, command palette,
+accessibility/performance/diagnostics coverage, fixture-scoped integrated demo,
+and Scenario Coverage v17 regression coverage. #1 and #23 remain open
+governance anchors.
+
+Remaining capability is deliberately separate from this completion: full Godot
+parity, native desktop editor behavior, advanced visual scripting, a full asset
+import pipeline, executable editor plugins, timeline/animation editor,
+tilemap/terrain editor parity, production collaboration features, hosted/cloud
+workflows, marketplace behavior, native export/release readiness, and the
+Godot-plus demonstration game remain future scoped work. The browser Studio
+continues to inspect trusted project state and create draft operations only; it
+does not directly write trusted source files, execute shell commands, publish,
+deploy, sign, upload, install or execute plugins, auto-apply, auto-merge,
+self-approve, bypass review, or mutate CI/workflows. Trusted source mutation
+still requires Safe Source Mutation Apply review gates: validated preview,
+sandbox evidence, accepted independent review, stale-target checks, rollback
+metadata, allowlisted verification, post-apply comparison, audit ledger, and
+emergency hold checks.
+
 ### Godot-Plus Demo Game v1 governance refresh
 
 Godot-Plus Demo Game v1 is recorded as **complete as a bounded local workflow
@@ -820,6 +885,18 @@ remain separate maintainer actions.
   auto-merge, self-approval, reviewer bypass, command bridges, browser trusted
   writes, native export, plugin runtime, hosted/cloud behavior, production
   readiness, or current Godot replacement positioning.
+- Treat Full Studio Editor v1 as complete but bounded. Its artifacts authorize
+  local project/scene/entity/asset/scenario/evidence/export/plugin inspection,
+  draft-only browser authoring, Safe Source Apply handoff previews, workspace
+  layout persistence, command-palette navigation/copy/draft actions, diagnostic
+  surfaces, an integrated fixture demo, and Scenario Coverage v17. They do not
+  authorize direct Studio trusted writes, command bridges, arbitrary shell
+  execution, dependency install, CI/workflow mutation, credentialed operations,
+  network install/update, publish/deploy/sign/upload, executable plugin runtime,
+  marketplace behavior, autonomous apply, auto-merge, self-approval, reviewer
+  bypass, native desktop editor, advanced visual scripting, full asset import
+  pipeline, production collaboration, secure sandbox guarantees, full Godot
+  parity, Godot replacement positioning, or production-ready editor claims.
 - Treat Autonomous QA / Playtest Swarm v1 as complete but bounded. Its artifacts
   authorize deterministic local QA/playtest evidence, fixture-scoped fuzzing,
   explicit worker/rerun/time/output budgets, failure classification, backlog
@@ -881,4 +958,7 @@ approval, and evidence that the change belongs in the current roadmap.
 
 ## Current roadmap anchors
 
+- Full Studio Editor v1 scope contract: [`docs/full-studio-editor-v1.md`](full-studio-editor-v1.md).
+- Full Studio Editor integrated demo: [`docs/full-studio-editor-integrated-demo-v1.md`](full-studio-editor-integrated-demo-v1.md).
+- Full Studio Editor Scenario Coverage v17: [`docs/scenario-coverage-v17-full-studio-editor.md`](scenario-coverage-v17-full-studio-editor.md).
 - Godot-Plus Demo Game v1 scope contract: [`docs/godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md).
