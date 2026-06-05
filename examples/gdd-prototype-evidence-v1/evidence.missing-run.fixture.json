@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "gdd-prototype-evidence-bundle-v1",
+  "evidenceBundleId": "demo-prototype-evidence-missing-run",
+  "runId": "gdd-prototype-run-missing",
+  "status": "missing-run",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "requirementExtractionRef": "docs/gdd-requirement-extraction-v1.md",
+  "feasibilityGateRef": "docs/gdd-feasibility-gate-v1.md",
+  "prototypeBundleRef": "examples/gdd-prototype-draft-bundle-v1/bundle.valid.fixture.json",
+  "reviewDecisionRef": "runs/gdd-prototype-apply-v1/review/accepted.json",
+  "applyArtifactRef": "examples/gdd-prototype-apply-v1/apply.valid.fixture.json",
+  "scenarioRefs": [
+    "docs/gdd-scenario-acceptance-plan-v1.md"
+  ],
+  "runOutputRefs": [],
+  "generatedArtifactRefs": [
+    "runs/gdd-prototype-evidence-v1/evidence/prototype-evidence.json",
+    "dashboard-data/gdd-prototype-evidence-v1.json"
+  ],
+  "scenarioVerdicts": [
+    {
+      "scenarioId": "collect-exit",
+      "verdict": "skipped",
+      "evidenceRef": "runs/gdd-prototype-evidence-v1/outputs/scenario-pass.json",
+      "requirementIds": [
+        "req-collect",
+        "req-exit"
+      ],
+      "blockedReasons": [
+        "prototype run output is missing"
+      ]
+    }
+  ],
+  "requirementCoverage": [
+    {
+      "requirementId": "req-collect",
+      "status": "skipped",
+      "scenarioIds": [
+        "collect-exit"
+      ],
+      "evidenceRefs": [],
+      "blockedReasons": [
+        "run missing"
+      ]
+    },
+    {
+      "requirementId": "req-exit",
+      "status": "skipped",
+      "scenarioIds": [
+        "collect-exit"
+      ],
+      "evidenceRefs": [],
+      "blockedReasons": [
+        "run missing"
+      ]
+    }
+  ],
+  "journalSummary": {
+    "summaryId": "journal-missing-run",
+    "gddSatisfaction": "Run was not available, so GDD satisfaction is unproven.",
+    "failures": [],
+    "observedGaps": [
+      "missing run output"
+    ],
+    "nextStepHypotheses": []
+  },
+  "nextMutationProposals": [],
+  "blockedReasons": [
+    "prototype run output is missing"
+  ],
+  "boundary": "Evidence-gated prototype generation, not autonomous unrestricted game creation; GDD-derived output remains untrusted until Rust/local validation and review-gated apply; browser/dashboard/Studio surfaces remain read-only or draft-only; generated run/evidence output remains untracked unless fixture-scoped; no hidden command execution; no browser trusted writes; no auto-apply; no auto-merge; #1 remains open; #23 remains open."
+}

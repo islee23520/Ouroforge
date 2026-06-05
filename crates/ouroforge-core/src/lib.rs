@@ -24,6 +24,7 @@ pub mod gdd_mechanics_mapping;
 pub mod gdd_project_scaffold_plan;
 pub mod gdd_prototype_apply;
 pub mod gdd_prototype_draft_bundle;
+pub mod gdd_prototype_evidence;
 pub mod gdd_prototype_evidence_bundle;
 pub mod gdd_prototype_task_graph;
 pub mod gdd_requirement_extraction;

@@ -170,4 +170,5 @@ should remain ignored/untracked.
 - [GDD Prototype Task Graph v1](gdd-prototype-task-graph-v1.md) — ordered dependency-checked prototype task graph before review-gated apply.
 - [GDD Prototype Apply v1](gdd-prototype-apply-v1.md) — accepted-review, rollback, rerun, and generated-state audit contract for scoped prototype apply.
 
+- [GDD Prototype Evidence v1](gdd-prototype-evidence-v1.md) — run evidence, requirement coverage, dashboard read model, and journal summary for GDD prototype evaluation.
 - [GDD Prototype Evidence Bundle v1](gdd-prototype-evidence-bundle-v1.md) — run evidence, requirement coverage, and journal summary for bounded GDD-to-prototype validation.
