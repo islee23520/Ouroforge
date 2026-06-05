@@ -172,3 +172,5 @@ should remain ignored/untracked.
 
 - [GDD Prototype Evidence v1](gdd-prototype-evidence-v1.md) — run evidence, requirement coverage, dashboard read model, and journal summary for GDD prototype evaluation.
 - [GDD Prototype Evidence Bundle v1](gdd-prototype-evidence-bundle-v1.md) — run evidence, requirement coverage, and journal summary for bounded GDD-to-prototype validation.
+
+- [Scenario Coverage v11: GDD-to-Prototype Regression Suite](scenario-coverage-v11-gdd-to-prototype.md) — pipeline-stage regression matrix for GDD-to-prototype fixtures and fail-closed cases.
