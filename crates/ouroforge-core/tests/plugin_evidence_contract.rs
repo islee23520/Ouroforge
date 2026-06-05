@@ -18,6 +18,16 @@ fn unsafe_dashboard_panel_fixture() -> &'static str {
     include_str!("../../../examples/plugin-registry-evidence-v1/invalid/unsafe-dashboard-panel-template.json")
 }
 
+fn scenario_template_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/valid/scenario-template-plugin.sample.json"
+    )
+}
+
+fn unsafe_scenario_template_fixture() -> &'static str {
+    include_str!("../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-network.json")
+}
+
 fn fixture_value() -> serde_json::Value {
     serde_json::from_str(valid_fixture()).expect("plugin registry fixture parses")
 }
@@ -275,6 +285,95 @@ fn plugin_registry_evidence_rejects_executable_or_unsafe_descriptors() {
             .contains("dashboard.panels.readOnly requires at least one dashboardPanels descriptor"),
         "{error:?}"
     );
+}
+
+#[test]
+fn plugin_registry_scenario_template_descriptor_accepts_fixture_shape() {
+    let artifact = PluginRegistryEvidenceArtifact::from_json_str(scenario_template_fixture())
+        .expect("scenario template plugin registry fixture validates");
+    assert_eq!(artifact.plugins.len(), 1);
+    let plugin = &artifact.plugins[0];
+    assert_eq!(plugin.plugin_id, "read-only-scenario-template");
+    assert_eq!(plugin.declared_capabilities, ["scenarioTemplate"]);
+    assert_eq!(plugin.extension_points, ["scenario.templates.readOnly"]);
+    assert_eq!(plugin.scenario_templates.len(), 1);
+
+    let template = &plugin.scenario_templates[0];
+    assert_eq!(template.template_id, "collect-goal-smoke");
+    assert_eq!(template.expected_evidence_type, "scenarioPack");
+    assert_eq!(template.supported_game_types, ["platformer", "prototype"]);
+    assert_eq!(template.tags, ["qa-smoke", "gdd-prototype"]);
+    assert_eq!(template.parameters.len(), 2);
+    assert_eq!(template.parameters[0].name, "goalId");
+    assert!(template.parameters[0].required);
+    assert_eq!(template.parameters[1].parameter_type, "enum");
+    assert_eq!(
+        template.parameters[1].allowed_values,
+        ["easy", "normal", "hard"]
+    );
+    assert!(template.boundary.contains("no executable scripts"));
+    assert!(template.boundary.contains("no source mutation hooks"));
+}
+
+#[test]
+fn plugin_registry_scenario_template_descriptor_rejects_unsafe_shapes() {
+    let error = PluginRegistryEvidenceArtifact::from_json_str(unsafe_scenario_template_fixture())
+        .expect_err("network scenario template hint is blocked");
+    assert!(format!("{error:?}").contains("https://"), "{error:?}");
+
+    let base: serde_json::Value =
+        serde_json::from_str(scenario_template_fixture()).expect("scenario fixture parses");
+    let cases = [
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["scenarioTemplates"][0]["description"] =
+                    serde_json::json!("<script>alert(1)</script>");
+                value
+            },
+            "<script",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["scenarioTemplates"][0]["parameters"][0]["name"] =
+                    serde_json::json!("../escape");
+                value
+            },
+            "bounded local id",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["scenarioTemplates"][0]["parameters"][1]["type"] =
+                    serde_json::json!("script");
+                value
+            },
+            "parameter type value `script` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["scenarioTemplates"][0]["expectedEvidenceType"] =
+                    serde_json::json!("sourceMutation");
+                value
+            },
+            "expectedEvidenceType value `sourceMutation` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["scenarioTemplates"] = serde_json::json!([]);
+                value
+            },
+            "scenario.templates.readOnly requires at least one scenarioTemplates descriptor",
+        ),
+    ];
+
+    for (value, expected) in cases {
+        let error = parse_value(value).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
 }
 
 #[test]

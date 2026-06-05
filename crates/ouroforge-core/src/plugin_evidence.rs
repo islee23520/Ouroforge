@@ -35,6 +35,19 @@ const ALLOWED_DASHBOARD_PANEL_TEMPLATES: &[&str] = &[
 
 const ALLOWED_DASHBOARD_PANEL_LAYOUTS: &[&str] = &["summary", "table", "list"];
 
+const ALLOWED_SCENARIO_TEMPLATE_GAME_TYPES: &[&str] =
+    &["platformer", "topDownAdventure", "puzzle", "prototype"];
+
+const ALLOWED_SCENARIO_TEMPLATE_EVIDENCE_TYPES: &[&str] = &[
+    "scenarioPack",
+    "scenarioResult",
+    "inputReplay",
+    "runtimeProbe",
+];
+
+const ALLOWED_SCENARIO_TEMPLATE_PARAMETER_TYPES: &[&str] =
+    &["string", "integer", "boolean", "enum"];
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PluginRegistryEvidenceArtifact {
@@ -89,6 +102,8 @@ pub struct PluginDescriptorEvidence {
     pub evidence_refs: Vec<PluginEvidenceRef>,
     #[serde(rename = "dashboardPanels", default)]
     pub dashboard_panels: Vec<PluginDashboardPanelDescriptor>,
+    #[serde(rename = "scenarioTemplates", default)]
+    pub scenario_templates: Vec<PluginScenarioTemplateDescriptor>,
     #[serde(rename = "blockedReasons", default)]
     pub blocked_reasons: Vec<String>,
 }
@@ -108,6 +123,38 @@ pub struct PluginDashboardPanelDescriptor {
     #[serde(rename = "displayHints", default)]
     pub display_hints: Vec<String>,
     pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PluginScenarioTemplateDescriptor {
+    #[serde(rename = "templateId")]
+    pub template_id: String,
+    pub description: String,
+    #[serde(default)]
+    pub parameters: Vec<PluginScenarioTemplateParameter>,
+    #[serde(rename = "supportedGameTypes", default)]
+    pub supported_game_types: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(rename = "expectedEvidenceType")]
+    pub expected_evidence_type: String,
+    #[serde(rename = "validationHints", default)]
+    pub validation_hints: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PluginScenarioTemplateParameter {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub parameter_type: String,
+    pub description: String,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(rename = "allowedValues", default)]
+    pub allowed_values: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -413,6 +460,35 @@ impl PluginDescriptorEvidence {
                 "plugin descriptor evidence dashboardPanels require dashboard.panels.readOnly extension point"
             ));
         }
+        require_unique_ids(
+            "plugin descriptor evidence scenarioTemplates.templateId",
+            self.scenario_templates
+                .iter()
+                .map(|template| template.template_id.as_str()),
+        )?;
+        for template in &self.scenario_templates {
+            template.validate()?;
+        }
+        if self.scenario_templates.is_empty()
+            && self
+                .extension_points
+                .iter()
+                .any(|point| point == "scenario.templates.readOnly")
+        {
+            return Err(anyhow!(
+                "plugin descriptor evidence scenario.templates.readOnly requires at least one scenarioTemplates descriptor"
+            ));
+        }
+        if !self.scenario_templates.is_empty()
+            && !self
+                .extension_points
+                .iter()
+                .any(|point| point == "scenario.templates.readOnly")
+        {
+            return Err(anyhow!(
+                "plugin descriptor evidence scenarioTemplates require scenario.templates.readOnly extension point"
+            ));
+        }
         for reason in &self.blocked_reasons {
             require_local_text("plugin descriptor evidence blockedReasons", reason)?;
         }
@@ -481,6 +557,111 @@ impl PluginDashboardPanelDescriptor {
                     "plugin dashboard panel descriptor boundary must state `{required}`"
                 ));
             }
+        }
+        Ok(())
+    }
+}
+
+impl PluginScenarioTemplateDescriptor {
+    fn validate(&self) -> Result<()> {
+        require_local_id(
+            "plugin scenario template descriptor templateId",
+            &self.template_id,
+        )?;
+        require_local_text(
+            "plugin scenario template descriptor description",
+            &self.description,
+        )?;
+        if self.parameters.is_empty() {
+            return Err(anyhow!(
+                "plugin scenario template descriptor parameters must not be empty"
+            ));
+        }
+        require_unique_ids(
+            "plugin scenario template descriptor parameters.name",
+            self.parameters
+                .iter()
+                .map(|parameter| parameter.name.as_str()),
+        )?;
+        for parameter in &self.parameters {
+            parameter.validate()?;
+        }
+        require_allowed_values(
+            "plugin scenario template descriptor supportedGameTypes",
+            &self.supported_game_types,
+            ALLOWED_SCENARIO_TEMPLATE_GAME_TYPES,
+        )?;
+        require_unique_ids(
+            "plugin scenario template descriptor tags",
+            self.tags.iter().map(|tag| tag.as_str()),
+        )?;
+        for tag in &self.tags {
+            require_local_id("plugin scenario template descriptor tags", tag)?;
+        }
+        require_allowed_value(
+            "plugin scenario template descriptor expectedEvidenceType",
+            &self.expected_evidence_type,
+            ALLOWED_SCENARIO_TEMPLATE_EVIDENCE_TYPES,
+        )?;
+        if self.validation_hints.is_empty() {
+            return Err(anyhow!(
+                "plugin scenario template descriptor validationHints must not be empty"
+            ));
+        }
+        for hint in &self.validation_hints {
+            require_local_text("plugin scenario template descriptor validationHints", hint)?;
+        }
+        require_local_text(
+            "plugin scenario template descriptor boundary",
+            &self.boundary,
+        )?;
+        let boundary = self.boundary.to_ascii_lowercase();
+        for required in [
+            "declarative",
+            "read-only",
+            "no executable",
+            "no command",
+            "no network",
+            "no source mutation",
+        ] {
+            if !boundary.contains(required) {
+                return Err(anyhow!(
+                    "plugin scenario template descriptor boundary must state `{required}`"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl PluginScenarioTemplateParameter {
+    fn validate(&self) -> Result<()> {
+        require_local_id("plugin scenario template parameter name", &self.name)?;
+        require_allowed_value(
+            "plugin scenario template parameter type",
+            &self.parameter_type,
+            ALLOWED_SCENARIO_TEMPLATE_PARAMETER_TYPES,
+        )?;
+        require_local_text(
+            "plugin scenario template parameter description",
+            &self.description,
+        )?;
+        require_unique_ids(
+            "plugin scenario template parameter allowedValues",
+            self.allowed_values.iter().map(|value| value.as_str()),
+        )?;
+        for value in &self.allowed_values {
+            require_local_id("plugin scenario template parameter allowedValues", value)?;
+        }
+        if self.parameter_type == "enum" && self.allowed_values.is_empty() {
+            return Err(anyhow!(
+                "plugin scenario template parameter enum requires allowedValues"
+            ));
+        }
+        if self.parameter_type != "enum" && !self.allowed_values.is_empty() {
+            return Err(anyhow!(
+                "plugin scenario template parameter allowedValues are only supported for enum"
+            ));
         }
         Ok(())
     }

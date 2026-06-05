@@ -22,3 +22,9 @@ rewriting.
 PES10.9.1 adds the dashboard panel descriptor contract and fixture examples while
 keeping generated runtime registry/evidence outputs ignored unless explicitly
 fixture-scoped.
+
+PES10.10.1 adds fixture-scoped declarative scenario template descriptors for
+QA/GDD/prototype flows. These templates are metadata only: parameters,
+supported game types/tags, expected evidence type, and validation hints. They do
+not execute scripts, own QA runners, fetch network resources, run commands, or
+mutate source/trusted state.

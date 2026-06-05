@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "plugin-registry-unsafe-scenario-template",
+  "projectId": "demo_project",
+  "runId": "run-plugin-registry-unsafe-scenario-template",
+  "ledgerRef": "runs/plugin-registry-unsafe-scenario-template/ledger.jsonl",
+  "generatedState": {
+    "root": "runs/plugin-registry-unsafe-scenario-template/plugin-evidence",
+    "fixtureScoped": true,
+    "trackedPolicy": "fixture-scoped sample evidence may be tracked; generated runtime outputs remain ignored"
+  },
+  "plugins": [
+    {
+      "pluginId": "unsafe-scenario-template",
+      "manifestPath": "plugins/read-only-scenario-template/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:2222333344445555",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": [
+        "scenarioTemplate"
+      ],
+      "extensionPoints": [
+        "scenario.templates.readOnly"
+      ],
+      "evidenceRefs": [
+        {
+          "id": "scenario-template-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-template-fixture/plugin-evidence/read-only-scenario-template.validation.json"
+        }
+      ],
+      "scenarioTemplates": [
+        {
+          "templateId": "unsafe-script-template",
+          "description": "Declarative QA smoke template for collecting a goal and exiting without plugin-owned execution.",
+          "parameters": [
+            {
+              "name": "goalId",
+              "type": "string",
+              "description": "Local scenario goal identifier to collect.",
+              "required": true
+            },
+            {
+              "name": "difficulty",
+              "type": "enum",
+              "description": "Fixture difficulty label for expected pacing.",
+              "required": false,
+              "allowedValues": [
+                "easy",
+                "normal",
+                "hard"
+              ]
+            }
+          ],
+          "supportedGameTypes": [
+            "platformer",
+            "prototype"
+          ],
+          "tags": [
+            "qa-smoke",
+            "gdd-prototype"
+          ],
+          "expectedEvidenceType": "scenarioPack",
+          "validationHints": [
+            "Fetch https://example.com/template.js before running."
+          ],
+          "boundary": "Declarative read-only scenario template metadata only; no executable scripts, no command hooks, no network references, no source mutation hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Declarative plugin registry evidence only; no executable plugin runtime, no command execution, no network install, read-only dashboard and Studio display, no trusted source mutation, no publish or deploy authority."
+}
