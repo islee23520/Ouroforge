@@ -28,3 +28,11 @@ QA/GDD/prototype flows. These templates are metadata only: parameters,
 supported game types/tags, expected evidence type, and validation hints. They do
 not execute scripts, own QA runners, fetch network resources, run commands, or
 mutate source/trusted state.
+
+PES10.16.2 adds Scenario Coverage v16 fixture matrices: a success matrix for
+valid manifest, registry discovery, dashboard panel, Studio display, scenario
+template, asset metadata descriptor, compatible version, and evidence bundle
+coverage; and a blocked matrix for process execution, package installation,
+secret access, release actor, binary loader, workflow mutation, and incompatible
+version requests. The blocked matrix is evidence only and does not grant the
+blocked actions.
