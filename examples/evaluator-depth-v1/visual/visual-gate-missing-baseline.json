@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "visual-comparison-evidence-v1",
+  "comparisonId": "visual_gate_missing_baseline",
+  "runId": "run_visual_gate_smoke",
+  "scenarioId": "collect-and-exit",
+  "checkpointId": "goal-checkpoint",
+  "before": {
+    "missingReason": "declared baseline screenshot was not captured or fixture-scoped"
+  },
+  "after": {
+    "screenshotRef": "evidence/scenarios/collect-and-exit/visual/actual.png",
+    "metadataRef": "evidence/scenarios/collect-and-exit/visual/actual.metadata.json",
+    "format": "png",
+    "width": 320,
+    "height": 180
+  },
+  "outcome": "missing_screenshot",
+  "pixelDiffSummary": {
+    "totalPixels": 57600,
+    "changedPixels": 0,
+    "changedPercentX1000": 0
+  },
+  "thresholds": [],
+  "metadataRefs": [],
+  "evidenceRefs": [
+    "evidence/scenarios/collect-and-exit/visual/actual.png"
+  ],
+  "guardrails": [
+    "Mechanical pixel threshold only; no quality or mutation claim."
+  ]
+}

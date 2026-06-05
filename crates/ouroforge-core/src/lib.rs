@@ -41783,6 +41783,44 @@ pub struct EvaluationVerdict {
     pub failures: Vec<serde_json::Value>,
     pub evidence_refs: Vec<String>,
     pub metadata: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visual: Vec<VisualGateVerdict>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct VisualGateVerdict {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    #[serde(rename = "checkpointId")]
+    pub checkpoint_id: String,
+    pub state: VisualGateState,
+    pub reason: String,
+    #[serde(rename = "comparisonRef")]
+    pub comparison_ref: String,
+    #[serde(rename = "changedPixels")]
+    pub changed_pixels: Option<u64>,
+    #[serde(rename = "changedPercentX1000")]
+    pub changed_percent_x1000: Option<u32>,
+    #[serde(rename = "changedRegionCount")]
+    pub changed_region_count: usize,
+    #[serde(rename = "thresholdSummary")]
+    pub threshold_summary: Vec<String>,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    #[serde(rename = "outputRoot")]
+    pub output_root: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum VisualGateState {
+    Pass,
+    Fail,
+    MissingBaseline,
+    MissingScreenshot,
+    UnsupportedFormat,
+    ThresholdNotDeclared,
+    StaleRef,
 }
 
 const SCENE3D_SCENARIO_EVIDENCE_FIELDS: &[&str] = &[
@@ -42055,8 +42093,10 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 "evaluator": "ouroforge-evaluator-v0",
                 "scenario_results": 0,
                 "suite_summaries": suite_summaries,
-                "behavior_evaluator_results": behavior_evaluator_results
+                "behavior_evaluator_results": behavior_evaluator_results,
+                "visual_gate_results": 0
             }),
+            visual: Vec::new(),
         };
         write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
         return Ok(verdict);
@@ -42232,6 +42272,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
         apply_explicit_evaluator_checks(run_dir, &evidence, config, &mut failures)?;
     }
 
+    let visual = evaluate_visual_gate(run_dir, &evidence, &mut failures, &mut evidence_refs)?;
+
     let status = if failures.is_empty() {
         "passed"
     } else {
@@ -42258,11 +42300,329 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
             "evaluator": "ouroforge-evaluator-v0",
             "scenario_results": scenario_results.len(),
             "suite_summaries": suite_summaries,
-            "behavior_evaluator_results": behavior_evaluator_results
+            "behavior_evaluator_results": behavior_evaluator_results,
+            "visual_gate_results": visual.len()
         }),
+        visual,
     };
     write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
     Ok(verdict)
+}
+
+fn evaluate_visual_gate(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    failures: &mut Vec<serde_json::Value>,
+    evidence_refs: &mut Vec<String>,
+) -> Result<Vec<VisualGateVerdict>> {
+    let mut verdicts = Vec::new();
+    for artifact in evidence.artifacts.iter().filter(|artifact| {
+        artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("visual_comparison_evidence")
+            && (artifact
+                .metadata
+                .get("declaredAcceptance")
+                .or_else(|| artifact.metadata.get("declared_acceptance"))
+                .and_then(|value| value.as_bool())
+                == Some(true)
+                || artifact
+                    .metadata
+                    .get("gate")
+                    .and_then(|value| value.as_str())
+                    == Some("visual"))
+    }) {
+        let verdict = evaluate_declared_visual_comparison(run_dir, artifact)?;
+        if !matches!(verdict.state, VisualGateState::Pass) {
+            failures.push(json!({
+                "kind": "visual_gate_failed",
+                "scenario_id": verdict.scenario_id,
+                "checkpoint_id": verdict.checkpoint_id,
+                "state": verdict.state,
+                "path": verdict.comparison_ref,
+                "reason": verdict.reason,
+                "changed_pixels": verdict.changed_pixels,
+                "changed_percent_x1000": verdict.changed_percent_x1000,
+                "changed_region_count": verdict.changed_region_count,
+                "threshold_summary": verdict.threshold_summary
+            }));
+        }
+        if !evidence_refs
+            .iter()
+            .any(|reference| reference == &verdict.comparison_ref)
+        {
+            evidence_refs.push(verdict.comparison_ref.clone());
+        }
+        verdicts.push(verdict);
+    }
+    Ok(verdicts)
+}
+
+fn evaluate_declared_visual_comparison(
+    run_dir: &Path,
+    artifact: &EvidenceArtifact,
+) -> Result<VisualGateVerdict> {
+    let path = artifact.path.clone();
+    let value = read_json_value(run_dir.join(&path)).with_context(|| {
+        format!(
+            "failed to read declared visual comparison {}",
+            artifact.path
+        )
+    })?;
+    let scenario_id = json_string(&value, "scenarioId")
+        .or_else(|| json_string(&value, "scenario_id"))
+        .unwrap_or_else(|| {
+            artifact
+                .metadata
+                .get("scenarioId")
+                .or_else(|| artifact.metadata.get("scenario_id"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown-scenario")
+                .to_string()
+        });
+    let checkpoint_id = json_string(&value, "checkpointId")
+        .or_else(|| json_string(&value, "checkpoint_id"))
+        .unwrap_or_else(|| {
+            artifact
+                .metadata
+                .get("checkpointId")
+                .or_else(|| artifact.metadata.get("checkpoint_id"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown-checkpoint")
+                .to_string()
+        });
+
+    let comparison = match serde_json::from_value::<VisualComparisonEvidenceArtifact>(value.clone())
+        .context("failed to parse Visual Comparison Evidence JSON")
+        .and_then(|comparison| {
+            comparison.validate()?;
+            Ok(comparison)
+        }) {
+        Ok(comparison) => comparison,
+        Err(error) => {
+            let reason = error.to_string();
+            let state = classify_visual_gate_parse_error(&reason);
+            return Ok(VisualGateVerdictParts {
+                scenario_id,
+                checkpoint_id,
+                state,
+                reason,
+                comparison_ref: path,
+                changed_pixels: None,
+                changed_percent_x1000: None,
+                changed_region_count: 0,
+                threshold_summary: Vec::new(),
+                evidence_refs: Vec::new(),
+            }
+            .into_verdict());
+        }
+    };
+
+    let summary = comparison.pixel_diff_summary.as_ref();
+    let changed_pixels = summary.map(|summary| summary.changed_pixels);
+    let changed_percent_x1000 = summary.map(|summary| summary.changed_percent_x1000);
+    let threshold_summary = comparison
+        .thresholds
+        .iter()
+        .map(|threshold| {
+            format!(
+                "{} <= {} px and {} x1000",
+                threshold.threshold_id,
+                threshold.max_changed_pixels,
+                threshold.max_changed_percent_x1000
+            )
+        })
+        .collect::<Vec<_>>();
+    let evidence_refs = visual_gate_evidence_refs(&comparison);
+    let changed_region_count = comparison.changed_regions.len();
+
+    let (state, reason) = if comparison.before.is_missing() {
+        (
+            VisualGateState::MissingBaseline,
+            format!("baseline screenshot missing for declared visual gate at {path}"),
+        )
+    } else if comparison.after.is_missing() {
+        (
+            VisualGateState::MissingScreenshot,
+            format!("actual screenshot missing for declared visual gate at {path}"),
+        )
+    } else if comparison.thresholds.is_empty() {
+        (
+            VisualGateState::ThresholdNotDeclared,
+            format!("declared visual gate at {path} does not declare a threshold"),
+        )
+    } else if let Err(error) = validate_visual_comparison_evidence_refs(run_dir, &comparison) {
+        let reason = error.to_string();
+        if reason.contains("changed outcome must exceed") {
+            (
+                VisualGateState::Pass,
+                visual_gate_threshold_reason("visual gate passed", &path, &comparison),
+            )
+        } else {
+            let state = if reason.contains("threshold") {
+                VisualGateState::ThresholdNotDeclared
+            } else if reason.contains("format") || reason.contains("PNG") || reason.contains("JPEG")
+            {
+                VisualGateState::UnsupportedFormat
+            } else {
+                VisualGateState::StaleRef
+            };
+            (state, reason)
+        }
+    } else {
+        match comparison.outcome {
+            VisualComparisonOutcome::Unchanged => (
+                VisualGateState::Pass,
+                visual_gate_threshold_reason("visual gate passed", &path, &comparison),
+            ),
+            VisualComparisonOutcome::Changed | VisualComparisonOutcome::MismatchedDimensions => (
+                VisualGateState::Fail,
+                visual_gate_threshold_reason("visual gate failed", &path, &comparison),
+            ),
+            VisualComparisonOutcome::MissingScreenshot => {
+                if comparison.before.is_missing() {
+                    (
+                        VisualGateState::MissingBaseline,
+                        format!("baseline screenshot missing for declared visual gate at {path}"),
+                    )
+                } else {
+                    (
+                        VisualGateState::MissingScreenshot,
+                        format!("actual screenshot missing for declared visual gate at {path}"),
+                    )
+                }
+            }
+            VisualComparisonOutcome::MalformedScreenshot | VisualComparisonOutcome::Unsupported => (
+                VisualGateState::UnsupportedFormat,
+                format!("declared visual gate at {path} has unsupported or malformed screenshot evidence"),
+            ),
+            VisualComparisonOutcome::Blocked => (
+                VisualGateState::Fail,
+                format!("declared visual gate at {path} is blocked: {}", comparison.blocked_reasons.join("; ")),
+            ),
+        }
+    };
+
+    Ok(VisualGateVerdictParts {
+        scenario_id: comparison.scenario_id.clone(),
+        checkpoint_id: comparison.checkpoint_id.clone(),
+        state,
+        reason,
+        comparison_ref: path,
+        changed_pixels,
+        changed_percent_x1000,
+        changed_region_count,
+        threshold_summary,
+        evidence_refs,
+    }
+    .into_verdict())
+}
+
+fn classify_visual_gate_parse_error(reason: &str) -> VisualGateState {
+    if reason.contains("threshold") {
+        VisualGateState::ThresholdNotDeclared
+    } else if reason.contains("screenshot")
+        || reason.contains("PNG")
+        || reason.contains("JPEG")
+        || reason.contains("format")
+        || reason.contains("dimensions")
+    {
+        VisualGateState::UnsupportedFormat
+    } else {
+        VisualGateState::StaleRef
+    }
+}
+
+struct VisualGateVerdictParts {
+    scenario_id: String,
+    checkpoint_id: String,
+    reason: String,
+    state: VisualGateState,
+    comparison_ref: String,
+    changed_pixels: Option<u64>,
+    changed_percent_x1000: Option<u32>,
+    changed_region_count: usize,
+    threshold_summary: Vec<String>,
+    evidence_refs: Vec<String>,
+}
+
+impl VisualGateVerdictParts {
+    fn into_verdict(self) -> VisualGateVerdict {
+        VisualGateVerdict {
+            scenario_id: self.scenario_id,
+            checkpoint_id: self.checkpoint_id,
+            state: self.state,
+            reason: self.reason,
+            output_root: visual_gate_output_root(&self.comparison_ref),
+            comparison_ref: self.comparison_ref,
+            changed_pixels: self.changed_pixels,
+            changed_percent_x1000: self.changed_percent_x1000,
+            changed_region_count: self.changed_region_count,
+            threshold_summary: self.threshold_summary,
+            evidence_refs: self.evidence_refs,
+        }
+    }
+}
+
+fn visual_gate_output_root(path: &str) -> String {
+    let parent = Path::new(path)
+        .parent()
+        .map(|parent| parent.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|| "evidence/visual".to_string());
+    if parent.starts_with("evidence/") {
+        parent
+    } else {
+        "evidence/visual".to_string()
+    }
+}
+
+fn visual_gate_threshold_reason(
+    prefix: &str,
+    path: &str,
+    comparison: &VisualComparisonEvidenceArtifact,
+) -> String {
+    let summary = comparison
+        .pixel_diff_summary
+        .as_ref()
+        .map(|summary| {
+            format!(
+                "{} changed pixels ({} x1000)",
+                summary.changed_pixels, summary.changed_percent_x1000
+            )
+        })
+        .unwrap_or_else(|| "no pixel diff summary".to_string());
+    let threshold = comparison
+        .thresholds
+        .iter()
+        .map(|threshold| {
+            format!(
+                "{} <= {} px/{} x1000",
+                threshold.threshold_id,
+                threshold.max_changed_pixels,
+                threshold.max_changed_percent_x1000
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "{prefix}: {path}; {summary}; {} changed region(s); threshold(s): {threshold}",
+        comparison.changed_regions.len()
+    )
+}
+
+fn visual_gate_evidence_refs(comparison: &VisualComparisonEvidenceArtifact) -> Vec<String> {
+    let mut refs = Vec::new();
+    refs.extend(comparison.evidence_refs.iter().cloned());
+    refs.extend(comparison.metadata_refs.iter().cloned());
+    refs.extend(comparison.before.screenshot_ref.iter().cloned());
+    refs.extend(comparison.after.screenshot_ref.iter().cloned());
+    refs.extend(comparison.before.metadata_ref.iter().cloned());
+    refs.extend(comparison.after.metadata_ref.iter().cloned());
+    refs.sort();
+    refs.dedup();
+    refs
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

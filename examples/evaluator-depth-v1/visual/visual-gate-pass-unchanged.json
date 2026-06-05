@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "visual-comparison-evidence-v1",
+  "comparisonId": "visual_gate_collect_goal",
+  "runId": "run_visual_gate_smoke",
+  "scenarioId": "collect-and-exit",
+  "checkpointId": "goal-checkpoint",
+  "before": {
+    "screenshotRef": "evidence/scenarios/collect-and-exit/visual/baseline.png",
+    "metadataRef": "evidence/scenarios/collect-and-exit/visual/baseline.metadata.json",
+    "format": "png",
+    "width": 320,
+    "height": 180
+  },
+  "after": {
+    "screenshotRef": "evidence/scenarios/collect-and-exit/visual/actual.png",
+    "metadataRef": "evidence/scenarios/collect-and-exit/visual/actual.metadata.json",
+    "format": "png",
+    "width": 320,
+    "height": 180
+  },
+  "outcome": "unchanged",
+  "pixelDiffSummary": {
+    "totalPixels": 57600,
+    "changedPixels": 0,
+    "changedPercentX1000": 0
+  },
+  "thresholds": [
+    {
+      "thresholdId": "pixel-threshold",
+      "maxChangedPixels": 32,
+      "maxChangedPercentX1000": 50
+    }
+  ],
+  "metadataRefs": [
+    "evidence/scenarios/collect-and-exit/visual/baseline.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/actual.metadata.json"
+  ],
+  "evidenceRefs": [
+    "evidence/scenarios/collect-and-exit/visual/baseline.png",
+    "evidence/scenarios/collect-and-exit/visual/actual.png"
+  ],
+  "guardrails": [
+    "Mechanical pixel threshold only; no quality or mutation claim."
+  ]
+}
