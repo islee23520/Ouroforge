@@ -2478,6 +2478,62 @@ const OuroforgeDashboard = (() => {
     }
   }
 
+  function arrayField(value, ...keys) {
+    if (!value || typeof value !== 'object') return [];
+    for (const key of keys) {
+      if (Array.isArray(value[key])) return value[key].filter(Boolean);
+    }
+    return [];
+  }
+
+  function diagnosticObjectCandidates(item) {
+    const candidates = [];
+    const seen = new Set();
+    const visit = (value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) return;
+      seen.add(value);
+      candidates.push(value);
+      visit(value.value);
+      visit(value.readModel);
+      visit(value.read_model);
+      visit(value.validation);
+    };
+    visit(item);
+    return candidates;
+  }
+
+  function mutationDiagnosticArtifacts(run, id, path) {
+    const artifacts = Array.isArray(run?.mutation_artifacts || run?.mutationArtifacts)
+      ? (run.mutation_artifacts || run.mutationArtifacts)
+      : [];
+    return artifacts.filter((artifact) => artifact && typeof artifact === 'object' && (artifact.id === id || artifact.path === path));
+  }
+
+  function firstDiagnosticStatus(candidates) {
+    const statusSource = candidates.find((candidate) => candidate.status !== undefined && candidate.status !== null && String(candidate.status));
+    return statusSource ? String(statusSource.status) : '';
+  }
+
+  function diagnosticStatuses(candidates) {
+    return candidates
+      .map((candidate) => candidate.status)
+      .filter((status) => status !== undefined && status !== null && String(status))
+      .map((status) => String(status));
+  }
+
+  function blockedDiagnosticStatus(status) {
+    return /blocked|forbidden|denied|rejected|failed|error|incompatible/.test(String(status || '').toLowerCase());
+  }
+
+  function staleDiagnosticStatus(status) {
+    return /stale|expired|outdated|diverged|mismatch|dirty/.test(String(status || '').toLowerCase());
+  }
+
+  function diagnosticTarget(item, candidates) {
+    const source = candidates.find((candidate) => candidate.id || candidate.transactionId || candidate.transaction_id || candidate.guardId || candidate.guard_id || candidate.targetPath || candidate.target_path || candidate.path) || item || {};
+    return source.id || source.transactionId || source.transaction_id || source.guardId || source.guard_id || source.targetPath || source.target_path || source.path || 'operation';
+  }
+
   function studioDiagnosticsModel(run) {
     const diagnostics = [];
     const record = (kind, severity, summary, governingGuardrail) => {
@@ -2521,32 +2577,42 @@ const OuroforgeDashboard = (() => {
         run.source_patch_apply_transactions, run.sourcePatchApplyTransactions,
         run.source_apply, run.sourceApply,
         run.mutations,
+        mutationDiagnosticArtifacts(run, 'source-patch-apply-transaction', 'mutation/source-patch-apply-transaction.json'),
       ];
       sources.forEach((source) => {
         const list = Array.isArray(source) ? source : (source && typeof source === 'object' ? [source] : []);
         list.forEach((item) => {
           if (!item || typeof item !== 'object') return;
-          const blocked = item.blockedReasons || item.blocked_reasons || (item.blocked === true ? ['blocked operation'] : null);
-          const reasons = Array.isArray(blocked) ? blocked.filter(Boolean) : (blocked ? [blocked] : []);
+          const candidates = diagnosticObjectCandidates(item);
+          const status = firstDiagnosticStatus(candidates);
+          const forbidden = candidates.flatMap((candidate) => arrayField(candidate, 'forbiddenActions', 'forbidden_actions'));
+          const blocked = candidates.flatMap((candidate) => arrayField(candidate, 'blockedReasons', 'blocked_reasons'));
+          const reasons = blocked.length
+            ? blocked.concat(blockedDiagnosticStatus(status) ? forbidden.map((action) => `forbidden action: ${action}`) : [])
+            : (item.blocked === true ? ['blocked operation'] : (blockedDiagnosticStatus(status) ? [`status ${status}`].concat(forbidden.map((action) => `forbidden action: ${action}`)) : []));
           if (reasons.length) {
-            const target = item.id || item.targetPath || item.target_path || item.path || 'operation';
-            record('blocked-operation', 'warning', `Operation "${target}" is blocked: ${reasons.join('; ')}.`, 'trusted-persistence-boundary');
+            record('blocked-operation', 'warning', `Operation "${diagnosticTarget(item, candidates)}" is blocked: ${reasons.join('; ')}.`, 'trusted-persistence-boundary');
           }
         });
       });
     });
 
     safeCheck('stale-source-apply-target', () => {
-      const guards = run.source_patch_stale_target_guards || run.sourcePatchStaleTargetGuards || run.stale_target_guards || run.staleTargetGuards || null;
-      const list = Array.isArray(guards) ? guards : (guards && typeof guards === 'object' ? [guards] : []);
-      list.forEach((guard) => {
-        if (!guard || typeof guard !== 'object') return;
-        const value = guard.value || guard;
-        const validation = value.validation || value;
-        const status = String(validation.status || value.status || '').toLowerCase();
-        if (status && status !== 'fresh' && status !== 'ok' && status !== 'current') {
-          record('stale-source-apply-target', 'warning', `Source-apply target is stale (${validation.status || value.status}); apply must be re-validated against the current base before trusting it.`, 'stale-target-guard');
-        }
+      const sources = [
+        run.source_patch_stale_target_guards, run.sourcePatchStaleTargetGuards,
+        run.stale_target_guards, run.staleTargetGuards,
+        mutationDiagnosticArtifacts(run, 'source-patch-stale-target-guard', 'mutation/source-patch-stale-target-guard.json'),
+      ];
+      sources.forEach((source) => {
+        const list = Array.isArray(source) ? source : (source && typeof source === 'object' ? [source] : []);
+        list.forEach((guard) => {
+          if (!guard || typeof guard !== 'object') return;
+          const candidates = diagnosticObjectCandidates(guard);
+          const status = diagnosticStatuses(candidates).find(staleDiagnosticStatus);
+          if (status) {
+            record('stale-source-apply-target', 'warning', `Source-apply target is stale (${status}); apply must be re-validated against the current base before trusting it.`, 'stale-target-guard');
+          }
+        });
       });
     });
 
