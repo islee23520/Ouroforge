@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "gdd-to-prototype-demo-v1",
+  "demoId": "tiny-collect-demo-v1",
+  "issue": 659,
+  "status": "evidence-gated-pass",
+  "gddRef": "examples/gdd-to-prototype-demo-v1/tiny-collect-gdd.md",
+  "artifactRefs": {
+    "designBrief": "examples/gdd-design-brief-v1/design-brief.valid.fixture.json",
+    "requirements": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+    "mechanicsMapping": "examples/gdd-mechanics-mapping-v1/mechanics.supported.fixture.json",
+    "feasibilityGate": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+    "scaffoldPlan": "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+    "sceneLevelPlan": "examples/gdd-scene-level-plan-v1/scene-level-plan.valid.fixture.json",
+    "behaviorPlan": "examples/gdd-gameplay-behavior-plan-v1/behavior-plan.valid.fixture.json",
+    "assetPlan": "examples/gdd-asset-placeholder-plan-v1/asset-plan.valid.fixture.json",
+    "scenarioPlan": "examples/gdd-scenario-acceptance-plan-v1/scenario-plan.valid.fixture.json",
+    "taskGraph": "examples/gdd-prototype-task-graph-v1/task-graph.valid.fixture.json",
+    "draftBundle": "examples/gdd-prototype-draft-bundle-v1/bundle.valid.fixture.json",
+    "reviewApply": "examples/gdd-prototype-apply-v1/apply.valid.fixture.json",
+    "runEvidence": "examples/gdd-prototype-evidence-v1/evidence.pass.fixture.json",
+    "evidenceJournalBundle": "examples/gdd-prototype-evidence-bundle-v1/evidence.pass.fixture.json",
+    "studioInspection": "examples/authoring-cockpit/README.md"
+  },
+  "inertCommands": [
+    "cargo test -p ouroforge-core --test gdd_to_prototype_demo_contract -- --nocapture",
+    "node examples/authoring-cockpit/cockpit.test.cjs"
+  ],
+  "expectedEvidence": [
+    "requirements stay traceable to the tiny GDD fixture",
+    "mechanics, feasibility, plans, draft bundle, review/apply, run evidence, and journal bundle remain separate artifacts",
+    "dashboard and Studio consume read-only/read-model compatible data",
+    "generated prototype run/evidence output remains ignored unless explicitly fixture-scoped"
+  ],
+  "knownGaps": [
+    "v1 demonstrates one deterministic bounded fixture only",
+    "unsupported future mechanics must stay explicit evidence gaps",
+    "the browser surface inspects artifacts but does not run generation, apply changes, or persist trusted state"
+  ],
+  "assetSourceNotes": [
+    "uses placeholder/local fixture and manifest references only",
+    "no generated copyrighted or proprietary assets are introduced",
+    "asset generation is out of scope for this demo"
+  ],
+  "cleanupPolicy": [
+    "generated prototype drafts, runs, screenshots, dashboard exports, temp projects, and local tool state remain untracked",
+    "only tiny deterministic fixture-scoped source artifacts are committed"
+  ],
+  "boundary": "Evidence-gated bounded prototype demo only; GDD-derived output remains untrusted until Rust/local validation and review-gated apply; no autonomous unrestricted game creation, no arbitrary source mutation, no arbitrary script execution, no browser trusted writes, no command bridge, no auto-apply, no auto-merge, no production-ready claim, no current Godot replacement claim, no native export, no plugin runtime, no hosted/cloud behavior; #1 remains open and #23 remains open."
+}
