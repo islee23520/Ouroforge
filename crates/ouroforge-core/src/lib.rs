@@ -16,6 +16,7 @@ use tungstenite::client::IntoClientRequest;
 pub mod behavior_runtime;
 pub mod source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
+pub mod gdd_asset_placeholder_plan;
 pub mod gdd_design_brief;
 pub mod gdd_feasibility_gate;
 pub mod gdd_gameplay_behavior_plan;
