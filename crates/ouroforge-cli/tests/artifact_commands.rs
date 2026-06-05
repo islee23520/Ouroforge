@@ -3562,3 +3562,242 @@ fn behavior_draft_cli_validates_previews_and_reports_stale_targets() {
 
     fs::remove_dir_all(temp).ok();
 }
+
+#[test]
+fn behavior_apply_transaction_cli_validates_review_gate_without_applying() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let ready_path = repo_root.join("examples/behavior-apply-v1/valid/behavior-apply.ready.json");
+
+    let validated = run_cli(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            ready_path.to_str().unwrap(),
+        ],
+    );
+    assert!(validated.contains("ouroforge.behavior-apply-transaction-validation.v1"));
+    assert!(validated.contains(r#""trustedApplyReady": true"#));
+    assert!(validated.contains(r#""reviewAccepted": true"#));
+    assert!(validated.contains(r#""targetHashFresh": true"#));
+    assert!(validated.contains("does not apply trusted files"));
+    assert!(validated.contains("auto-apply"));
+    assert!(validated.contains("self-approve"));
+
+    let stale = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            repo_root
+                .join("examples/behavior-apply-v1/valid/behavior-apply.stale.json")
+                .to_str()
+                .unwrap(),
+        ],
+    );
+    assert!(stale.contains(r#""trustedApplyReady": false"#));
+    assert!(stale.contains(r#""targetHashFresh": false"#));
+    assert!(stale.contains("not ready for trusted apply"));
+
+    let temp = unique_temp_dir("ouroforge-behavior-apply-cli-test");
+    fs::create_dir_all(&temp).expect("temp exists");
+    let mut self_approval: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&ready_path).expect("ready fixture reads"))
+            .expect("ready fixture parses");
+    self_approval["reviewDecision"]["reviewerId"] = serde_json::json!("agent-author");
+    let self_approval_path = temp.join("behavior-apply.self-approval.json");
+    fs::write(
+        &self_approval_path,
+        serde_json::to_string_pretty(&self_approval).expect("self-approval serializes"),
+    )
+    .expect("self-approval fixture written");
+    let blocked = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            self_approval_path.to_str().unwrap(),
+        ],
+    );
+    assert!(blocked.contains("forbids self-approval"));
+
+    fs::remove_dir_all(temp).ok();
+}
+
+#[test]
+fn behavior_apply_transaction_cli_reports_review_gated_readiness_without_writes() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let ready = repo_root.join("examples/behavior-apply-v1/valid/behavior-apply.ready.json");
+    let stale = repo_root.join("examples/behavior-apply-v1/valid/behavior-apply.stale.json");
+    let before_ready = fs::read_to_string(&ready).expect("ready fixture reads before CLI");
+    let before_stale = fs::read_to_string(&stale).expect("stale fixture reads before CLI");
+
+    let ready_output = run_cli(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            ready.to_str().unwrap(),
+        ],
+    );
+    assert!(ready_output.contains("ouroforge.behavior-apply-transaction-validation.v1"));
+    assert!(ready_output.contains(r#""status": "readyForTrustedApply""#));
+    assert!(ready_output.contains(r#""trustedApplyReady": true"#));
+    assert!(ready_output.contains(r#""reviewAccepted": true"#));
+    assert!(ready_output.contains(r#""selfApproval": false"#));
+    assert!(ready_output.contains(r#""targetHashFresh": true"#));
+    assert!(ready_output.contains("read-only local validation only"));
+    assert!(ready_output.contains("does not apply trusted files"));
+
+    let stale_output = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            stale.to_str().unwrap(),
+        ],
+    );
+    assert!(stale_output.contains(r#""status": "blocked""#));
+    assert!(stale_output.contains(r#""transactionStatus": "stale""#));
+    assert!(stale_output.contains(r#""trustedApplyReady": false"#));
+    assert!(stale_output.contains(r#""targetHashFresh": false"#));
+    assert!(stale_output.contains("stale target hash drift blocks trusted behavior apply"));
+    assert!(stale_output.contains("behavior apply transaction is not ready for trusted apply"));
+
+    assert_eq!(
+        fs::read_to_string(&ready).expect("ready fixture reads after CLI"),
+        before_ready
+    );
+    assert_eq!(
+        fs::read_to_string(&stale).expect("stale fixture reads after CLI"),
+        before_stale
+    );
+}
+
+#[test]
+fn behavior_apply_transaction_cli_surfaces_missing_rejected_and_self_approval_blocks() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = unique_temp_dir("ouroforge-behavior-apply-cli-test");
+    fs::create_dir_all(&temp).expect("temp exists");
+    let mut transaction: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../examples/behavior-apply-v1/valid/behavior-apply.ready.json"
+    ))
+    .expect("transaction fixture parses");
+
+    transaction["status"] = serde_json::json!("missingReview");
+    transaction["reviewDecision"]["status"] = serde_json::json!("missing");
+    transaction["reviewDecision"]["reviewDecisionId"] = serde_json::json!("review-missing");
+    transaction["reviewDecision"]["reviewerId"] = serde_json::json!("reviewer-missing");
+    transaction["blockedReasons"] =
+        serde_json::json!(["missing accepted review decision blocks trusted behavior apply"]);
+    let missing_path = temp.join("missing-review.json");
+    fs::write(
+        &missing_path,
+        serde_json::to_string_pretty(&transaction).expect("missing review serializes"),
+    )
+    .expect("missing review writes");
+    let missing_output = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            missing_path.to_str().unwrap(),
+        ],
+    );
+    assert!(missing_output.contains(r#""transactionStatus": "missingReview""#));
+    assert!(missing_output.contains(r#""reviewAccepted": false"#));
+    assert!(missing_output.contains("missing accepted review decision"));
+    assert!(missing_output.contains("behavior apply transaction is not ready for trusted apply"));
+
+    transaction["status"] = serde_json::json!("rejected");
+    transaction["reviewDecision"]["status"] = serde_json::json!("rejected");
+    transaction["reviewDecision"]["reviewDecisionId"] = serde_json::json!("review-rejected");
+    transaction["reviewDecision"]["reviewerId"] = serde_json::json!("human-reviewer");
+    transaction["blockedReasons"] =
+        serde_json::json!(["rejected review decision blocks trusted behavior apply"]);
+    let rejected_path = temp.join("rejected-review.json");
+    fs::write(
+        &rejected_path,
+        serde_json::to_string_pretty(&transaction).expect("rejected review serializes"),
+    )
+    .expect("rejected review writes");
+    let rejected_output = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            rejected_path.to_str().unwrap(),
+        ],
+    );
+    assert!(rejected_output.contains(r#""transactionStatus": "rejected""#));
+    assert!(rejected_output.contains(r#""trustedApplyReady": false"#));
+    assert!(rejected_output.contains("rejected review decision"));
+    assert!(rejected_output.contains("behavior apply transaction is not ready for trusted apply"));
+
+    transaction["status"] = serde_json::json!("blocked");
+    transaction["reviewDecision"]["status"] = serde_json::json!("accepted");
+    transaction["reviewDecision"]["reviewDecisionId"] = serde_json::json!("review-self-approval");
+    transaction["reviewDecision"]["reviewerId"] = serde_json::json!("agent-author");
+    transaction["reviewDecision"]["draftAuthorId"] = serde_json::json!("agent-author");
+    transaction["blockedReasons"] =
+        serde_json::json!(["self-approval blocks trusted behavior apply"]);
+    let self_approval_path = temp.join("self-approval.json");
+    fs::write(
+        &self_approval_path,
+        serde_json::to_string_pretty(&transaction).expect("self approval serializes"),
+    )
+    .expect("self approval writes");
+    let self_approval_output = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            self_approval_path.to_str().unwrap(),
+        ],
+    );
+    assert!(self_approval_output.contains(r#""transactionStatus": "blocked""#));
+    assert!(self_approval_output.contains(r#""reviewAccepted": true"#));
+    assert!(self_approval_output.contains(r#""selfApproval": true"#));
+    assert!(self_approval_output.contains("self-approval blocks trusted behavior apply"));
+    assert!(
+        self_approval_output.contains("behavior apply transaction is not ready for trusted apply")
+    );
+
+    transaction["trustedBoundary"] =
+        serde_json::json!("Accepted review and rollback metadata are required before trusted Rust/local behavior apply; no arbitrary script execution and no self-approval.");
+    let missing_no_auto_apply_path = temp.join("missing-no-auto-apply.json");
+    fs::write(
+        &missing_no_auto_apply_path,
+        serde_json::to_string_pretty(&transaction).expect("boundary serializes"),
+    )
+    .expect("boundary writes");
+    let missing_no_auto_apply = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "apply",
+            "transaction",
+            "validate",
+            missing_no_auto_apply_path.to_str().unwrap(),
+        ],
+    );
+    assert!(missing_no_auto_apply.contains("trustedBoundary must state `no auto-apply`"));
+
+    fs::remove_dir_all(temp).ok();
+}

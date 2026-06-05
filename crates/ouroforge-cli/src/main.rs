@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use ouroforge_core::behavior_runtime::BehaviorDraftArtifact;
+use ouroforge_core::behavior_runtime::{
+    BehaviorApplyTransactionArtifact, BehaviorApplyTransactionStatus, BehaviorDraftArtifact,
+};
 use ouroforge_core::internal_sprite_audit::{
     audit_internal_sprite_reference, InternalSpriteAuditProfile, InternalSpriteAuditReport,
 };
@@ -144,6 +146,10 @@ enum BehaviorCommand {
         #[command(subcommand)]
         command: BehaviorDraftCommand,
     },
+    Apply {
+        #[command(subcommand)]
+        command: BehaviorApplyCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -158,6 +164,19 @@ enum BehaviorDraftCommand {
         #[arg(long, value_name = "PATH")]
         project_root: Option<PathBuf>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum BehaviorApplyCommand {
+    Transaction {
+        #[command(subcommand)]
+        command: BehaviorApplyTransactionCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum BehaviorApplyTransactionCommand {
+    Validate { transaction_path: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -548,6 +567,56 @@ fn main() -> Result<()> {
                     "guardrail": "read-only untrusted preview; does not apply trusted files, execute scripts, open command bridges, or grant browser writes"
                 }))?
             );
+        }
+        Commands::Behavior {
+            command:
+                BehaviorCommand::Apply {
+                    command:
+                        BehaviorApplyCommand::Transaction {
+                            command: BehaviorApplyTransactionCommand::Validate { transaction_path },
+                        },
+                },
+        } => {
+            let transaction = read_behavior_apply_transaction(&transaction_path)?;
+            let review_accepted = transaction.review_decision.status
+                == ouroforge_core::behavior_runtime::BehaviorApplyReviewDecisionStatus::Accepted;
+            let target_hash_fresh = transaction.target_hashes.expected_before_hash
+                == transaction.target_hashes.observed_before_hash;
+            let self_approval = transaction.review_decision.reviewer_id
+                == transaction.review_decision.draft_author_id;
+            let trusted_apply_ready = transaction.status
+                == BehaviorApplyTransactionStatus::ReadyForTrustedApply
+                && review_accepted
+                && target_hash_fresh
+                && !self_approval;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schemaVersion": "ouroforge.behavior-apply-transaction-validation.v1",
+                    "status": if trusted_apply_ready { "readyForTrustedApply" } else { "blocked" },
+                    "trustedApplyReady": trusted_apply_ready,
+                    "transactionStatus": transaction.status,
+                    "transactionId": transaction.transaction_id,
+                    "draftId": transaction.draft_id,
+                    "reviewDecision": transaction.review_decision,
+                    "reviewAccepted": review_accepted,
+                    "selfApproval": self_approval,
+                    "target": transaction.target,
+                    "targetHashes": transaction.target_hashes,
+                    "targetHashFresh": target_hash_fresh,
+                    "transactionOutputRef": transaction.transaction_output_ref,
+                    "rollbackMetadata": transaction.rollback_metadata,
+                    "rerunCommand": transaction.rerun_command,
+                    "evidenceRefCount": transaction.evidence_refs.len(),
+                    "blockedReasons": transaction.blocked_reasons,
+                    "guardrail": "read-only local validation only; does not apply trusted files, execute scripts, auto-apply, self-approve, open command bridges, or grant browser writes"
+                }))?
+            );
+            if !trusted_apply_ready {
+                return Err(anyhow!(
+                    "behavior apply transaction is not ready for trusted apply"
+                ));
+            }
         }
         Commands::PatchPreview {
             command:
@@ -1372,6 +1441,23 @@ fn read_behavior_draft(path: &Path) -> Result<BehaviorDraftArtifact> {
             .with_context(|| format!("failed to read behavior draft {}", path.display()))?,
     )
     .with_context(|| format!("failed to validate behavior draft {}", path.display()))
+}
+
+fn read_behavior_apply_transaction(path: &Path) -> Result<BehaviorApplyTransactionArtifact> {
+    BehaviorApplyTransactionArtifact::from_json_str(&std::fs::read_to_string(path).with_context(
+        || {
+            format!(
+                "failed to read behavior apply transaction {}",
+                path.display()
+            )
+        },
+    )?)
+    .with_context(|| {
+        format!(
+            "failed to validate behavior apply transaction {}",
+            path.display()
+        )
+    })
 }
 
 fn behavior_draft_target_check(
