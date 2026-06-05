@@ -1,7 +1,9 @@
 use ouroforge_core::behavior_runtime::{
     behavior_apply_transaction_read_model_from_json_str, BehaviorApplyTransactionArtifact,
     BehaviorArtifact, BehaviorDraftArtifact, BehaviorRuntimeStatus,
+    BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
+use ouroforge_core::{ProjectManifest, ScenarioPack, Seed};
 
 fn valid_fixture() -> &'static str {
     include_str!("../../../examples/behavior-runtime-v1/valid/behavior-artifact.sample.json")
@@ -840,6 +842,113 @@ fn behavior_apply_transaction_rejects_missing_review_blocker_and_guardrail_drift
         let error = parse_behavior_apply(value).expect_err(expected);
         assert!(format!("{error:?}").contains(expected), "{error:?}");
     }
+}
+
+#[test]
+fn gameplay_logic_demo_v1_fixture_validates_project_pack_and_behavior_outcomes() {
+    use ouroforge_core::behavior_runtime::{BehaviorExecutionInput, BehaviorWorldState};
+
+    let project_root = std::path::Path::new("../../examples/gameplay-logic-demo-v1");
+    let manifest = ProjectManifest::from_path(project_root.join("ouroforge.project.json"))
+        .expect("gameplay logic demo project validates");
+    assert_eq!(manifest.project.id, "gameplay_logic_demo_v1");
+    assert!(manifest.generated.roots.iter().any(|root| root == "runs"));
+    assert!(manifest
+        .generated
+        .roots
+        .iter()
+        .any(|root| root == "dashboard-data"));
+
+    let seed = Seed::from_path(project_root.join("seeds/gameplay-logic-demo.yaml"))
+        .expect("gameplay logic demo seed validates");
+    assert_eq!(seed.id, "gameplay-logic-demo.v1");
+    assert!(seed
+        .acceptance
+        .iter()
+        .any(|item| item.contains("not browser command execution")));
+
+    let pack = ScenarioPack::from_path(
+        project_root.join("scenarios/gameplay-logic-demo.scenario-pack.json"),
+    )
+    .expect("gameplay logic demo scenario pack validates");
+    assert_eq!(
+        pack.ordered_scenario_ids(),
+        vec!["collect-key", "open-door-and-exit", "dash-and-patrol"]
+    );
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json"
+    ))
+    .expect("gameplay logic demo behavior artifact validates");
+    let runtime_state = artifact.runtime_state();
+    assert_eq!(runtime_state.status, BehaviorRuntimeStatus::Ready);
+    assert_eq!(runtime_state.counts.behavior_count, 5);
+    assert_eq!(runtime_state.counts.trigger_count, 5);
+    assert_eq!(runtime_state.counts.condition_count, 5);
+    assert_eq!(runtime_state.counts.action_count, 13);
+    assert_eq!(runtime_state.counts.state_machine_count, 2);
+    assert_eq!(runtime_state.counts.ability_count, 1);
+    assert!(runtime_state.diagnostics.is_empty());
+
+    let key = artifact.execute(
+        BehaviorExecutionInput::new("onCollision").with_event("keyPickup"),
+        BehaviorWorldState::default().with_flag("keyVisible", true),
+    );
+    let door = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("doorReached"),
+        BehaviorWorldState::default().with_item("key"),
+    );
+    let dash = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("dash"),
+        BehaviorWorldState::default()
+            .with_flag("staminaReady", true)
+            .with_position("player", 1, 2),
+    );
+    let patrol = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("patrolTick"),
+        BehaviorWorldState::default()
+            .with_flag("playerInHazardLane", true)
+            .with_health("player", 3),
+    );
+    let exit = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("exitReached"),
+        BehaviorWorldState::default().with_flag("doorOpen", true),
+    );
+
+    assert!(key.world_state.inventory.contains("key"));
+    assert_eq!(door.world_state.flags.get("doorOpen"), Some(&true));
+    assert_eq!(dash.world_state.entity_positions["player"].x, 4);
+    assert_eq!(patrol.world_state.entity_health.get("player"), Some(&2));
+    assert_eq!(
+        exit.world_state.terminal_state,
+        Some(ouroforge_core::behavior_runtime::BehaviorTerminalState::Win)
+    );
+
+    let evidence = artifact.evidence_bundle(vec![key, door, dash, patrol, exit]);
+    assert_eq!(evidence.summary.report_count, 5);
+    assert_eq!(evidence.summary.terminal_state_count, 1);
+    assert!(evidence
+        .trusted_boundary
+        .execution_mode
+        .contains("structured-data-only"));
+    assert!(evidence
+        .trusted_boundary
+        .disallowed_actions
+        .iter()
+        .any(|action| action == "command bridge"));
+
+    let suite: BehaviorScenarioAssertionSuite = serde_json::from_str(include_str!(
+        "../../../examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.behavior-assertions.json"
+    ))
+    .expect("behavior assertion suite JSON parses");
+    let result = suite
+        .evaluate(&evidence)
+        .expect("behavior assertion suite evaluates");
+    assert_eq!(result.status, BehaviorScenarioAssertionStatus::Passed);
+    assert!(result
+        .assertions
+        .iter()
+        .all(|assertion| assertion.status == BehaviorScenarioAssertionStatus::Passed));
 }
 
 #[test]

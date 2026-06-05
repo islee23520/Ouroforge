@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "gameplay_logic_demo_v1",
+    "name": "Gameplay Logic Demo v1"
+  },
+  "scenes": [
+    {
+      "id": "logic-demo",
+      "path": "scenes/gameplay-logic-demo.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "gameplay-logic-demo",
+      "path": "seeds/gameplay-logic-demo.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "gameplay-logic-demo",
+      "path": "scenarios/gameplay-logic-demo.scenario-pack.json"
+    }
+  ],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": ["runs", "dashboard-data", "screenshots", "browser-profiles", "tmp-evidence"]
+  }
+}

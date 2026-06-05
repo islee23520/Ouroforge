@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "gameplay-logic-demo-inspection-v1",
+  "demoId": "gameplay-logic-demo-v1",
+  "status": "ready",
+  "behaviorModelRef": "examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json",
+  "eventSignalRef": "examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json",
+  "stateMachineRef": "examples/gameplay-state-machine-v1/state-machine.valid.fixture.json",
+  "abilityActionRef": "examples/gameplay-ability-action-v1/ability-action.valid.fixture.json",
+  "behaviorDraftRefs": [
+    "examples/behavior-draft-v1/valid/behavior-draft.valid.json"
+  ],
+  "behaviorApplyRefs": [
+    "examples/behavior-apply-v1/valid/behavior-apply.ready.json"
+  ],
+  "behaviorEvidenceRefs": [
+    "examples/behavior-evidence-bundle-v1/behavior-evidence-bundle.complete.json"
+  ],
+  "scenarioPackRef": "examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.scenario-pack.json",
+  "studioPanels": [
+    "behavior-list-panel",
+    "behavior-event-signal-panel",
+    "behavior-state-machine-panel",
+    "behavior-ability-action-panel",
+    "behavior-draft-status",
+    "behavior-review-apply-status"
+  ],
+  "requiredBeats": [
+    "item_collection",
+    "door_flag_logic",
+    "enemy_patrol",
+    "hazard",
+    "player_ability",
+    "win_condition"
+  ],
+  "generatedStatePolicy": {
+    "ignoredRoots": [
+      "runs",
+      "dashboard-data",
+      "screenshots",
+      "browser-profiles",
+      "tmp-evidence"
+    ],
+    "fixtureScopedOnly": true
+  },
+  "boundary": "Read-only structured gameplay logic demo inspection; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, browser trusted writes, source mutation, auto-apply, auto-merge, self-approval, hosted/cloud behavior, production-stable scripting API, production editor, or Godot replacement claim.",
+  "behaviorRuntimeRef": "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json"
+}

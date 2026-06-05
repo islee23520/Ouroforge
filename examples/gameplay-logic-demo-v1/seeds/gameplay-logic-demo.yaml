@@ -1,0 +1,52 @@
+id: gameplay-logic-demo.v1
+title: Gameplay Logic Demo v1
+goal: Demonstrate scoped structured gameplay behavior without arbitrary scripts.
+constraints:
+  target: browser-fixture
+acceptance:
+  - Key collection, door flag logic, dash ability, patrol hazard, and win condition are represented as structured behavior data.
+  - Scenario assertions prove behavior outcomes through generated evidence, not browser command execution.
+  - Generated runs, dashboard data, screenshots, browser profiles, and temp evidence remain ignored.
+  - This is not a production-stable scripting API or Godot replacement.
+scenarios:
+  - id: collect-key
+    description: Collecting the key adds inventory and emits keyCollected.
+    steps:
+      - input:
+          actions:
+            keyPickup: true
+    assertions:
+      - world_state:
+          path: inventory.key
+          exists: true
+  - id: open-door-and-exit
+    description: Door and exit behavior reach a win state only through structured flags/events.
+    steps:
+      - input:
+          actions:
+            doorReached: true
+      - input:
+          actions:
+            exitReached: true
+    assertions:
+      - world_flags:
+          path: flags.doorOpen
+          equals: true
+      - runtime_events:
+          path: events.victory
+          exists: true
+  - id: dash-and-patrol
+    description: Dash ability and patrol hazard produce bounded movement, intent, state, and health evidence.
+    steps:
+      - input:
+          actions:
+            dash: true
+      - wait:
+          frames: 8
+    assertions:
+      - world_state:
+          path: entityPositions.player
+          exists: true
+      - runtime_events:
+          path: events.patrolHazard
+          exists: true

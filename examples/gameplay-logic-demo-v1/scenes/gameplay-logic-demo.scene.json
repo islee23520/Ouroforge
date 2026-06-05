@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "1",
+  "id": "gameplay-logic-demo-scene",
+  "bounds": { "width": 320, "height": 180 },
+  "metadata": {
+    "issue": "#623",
+    "fixture": "gameplay-logic-demo-v1",
+    "sourceOnly": true,
+    "behaviorInspectionRef": "behavior-inspection-demo.json",
+    "notes": [
+      "Structured behavior demo fixture only; no arbitrary script execution.",
+      "Generated runs and dashboard exports remain untracked."
+    ]
+  },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      { "id": "has_blue_keycard", "initial": false, "label": "Blue key collected" },
+      { "id": "blue_door_open", "initial": false, "label": "Blue door open" },
+      { "id": "dash_ready", "initial": true, "label": "Dash available" },
+      { "id": "hazard_seen", "initial": false, "label": "Hazard observed" },
+      { "id": "guard_patrolling", "initial": true, "label": "Guard patrol active" },
+      { "id": "escape_complete", "initial": false, "label": "Escape complete" }
+    ]
+  },
+  "collisionRules": { "defaultLayer": "default" },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 24, "y": 88 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "status": { "hitPoints": 3, "maxHitPoints": 3, "flags": ["dash_ready"], "states": ["grounded"] },
+        "input": { "scheme": "keyboard", "moveSpeed": 3, "allowedActions": ["move", "dash"] },
+        "collider": { "shape": "aabb", "body": "dynamic", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 16 }, "collisionGroup": "player", "collisionMask": ["terrain", "triggers"] }
+      },
+      "tags": ["player"]
+    },
+    {
+      "id": "blue_keycard",
+      "sprite": { "color": "#facc15" },
+      "components": {
+        "transform": { "x": 72, "y": 88 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 12, "height": 12 }, "trigger": true, "collisionGroup": "triggers" },
+        "trigger": {
+          "id": "collect_blue_keycard",
+          "kind": "overlap",
+          "targetFlag": "has_blue_keycard",
+          "onEnter": [
+            { "kind": "setFlag", "flag": "has_blue_keycard", "value": true },
+            { "kind": "hideEntity", "entityId": "blue_keycard" }
+          ]
+        },
+        "goalFlag": { "flag": "has_blue_keycard", "label": "Blue key collected" }
+      },
+      "tags": ["collectible", "behavior:item-collection"]
+    },
+    {
+      "id": "blue_door",
+      "sprite": { "color": "#38bdf8" },
+      "components": {
+        "transform": { "x": 132, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 14, "height": 32 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 14, "height": 32 }, "collisionGroup": "terrain" },
+        "trigger": {
+          "id": "open_blue_door_on_key",
+          "kind": "flag",
+          "targetFlag": "blue_door_open",
+          "requiredFlags": ["has_blue_keycard"],
+          "onEnter": [{ "kind": "setFlag", "flag": "blue_door_open", "value": true }]
+        },
+        "goalFlag": { "flag": "blue_door_open", "label": "Blue door open" }
+      },
+      "tags": ["door", "behavior:door-flag"]
+    },
+    {
+      "id": "spike_hazard",
+      "sprite": { "color": "#ef4444" },
+      "components": {
+        "transform": { "x": 176, "y": 96 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 12 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 16, "height": 12 }, "trigger": true, "collisionGroup": "triggers" },
+        "trigger": { "id": "hazard_contact", "kind": "overlap", "targetFlag": "hazard_seen", "onEnter": [{ "kind": "setFlag", "flag": "hazard_seen", "value": true }] },
+        "goalFlag": { "flag": "hazard_seen", "label": "Hazard observed" }
+      },
+      "tags": ["hazard", "behavior:enemy-or-hazard"]
+    },
+    {
+      "id": "guard_patrol_marker",
+      "sprite": { "color": "#fb7185" },
+      "components": {
+        "transform": { "x": 208, "y": 88 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 14, "height": 14 },
+        "status": { "flags": ["guard_patrolling"], "states": ["patrol"] },
+        "patrol": { "pathId": "route_a", "mode": "loop", "waypoints": [{ "x": 208, "y": 88 }, { "x": 232, "y": 88 }] }
+      },
+      "tags": ["enemy", "behavior:patrol"]
+    },
+    {
+      "id": "dash_pickup",
+      "sprite": { "color": "#a78bfa" },
+      "components": {
+        "transform": { "x": 104, "y": 88 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 12, "height": 12 },
+        "ability": { "id": "player-dash", "actionId": "action-dash", "runtimeStatus": "available", "cooldownMs": 850 },
+        "goalFlag": { "flag": "dash_ready", "label": "Dash ready" }
+      },
+      "tags": ["ability", "behavior:player-ability"]
+    },
+    {
+      "id": "exit_zone",
+      "sprite": { "color": "#22c55e" },
+      "components": {
+        "transform": { "x": 272, "y": 80 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 18, "height": 28 },
+        "collider": { "shape": "aabb", "body": "static", "offset": { "x": 0, "y": 0 }, "size": { "width": 18, "height": 28 }, "trigger": true, "collisionGroup": "triggers" },
+        "trigger": { "id": "escape_after_door", "kind": "overlap", "targetFlag": "escape_complete", "requiredFlags": ["blue_door_open"], "onEnter": [{ "kind": "setFlag", "flag": "escape_complete", "value": true }] },
+        "goalFlag": { "flag": "escape_complete", "label": "Escape complete" }
+      },
+      "tags": ["exit", "behavior:win-condition"]
+    },
+    {
+      "id": "hud_goal",
+      "sprite": { "color": "#ffffff", "visible": false },
+      "components": {
+        "transform": { "x": 8, "y": 8 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 156, "height": 12 },
+        "uiText": { "text": "Collect key, open door, avoid hazard, dash, exit", "role": "hud", "bindFlag": "escape_complete" },
+        "hudValue": { "kind": "goal", "label": "Goal", "value": "Structured gameplay logic demo", "bindFlag": "escape_complete" }
+      },
+      "tags": ["hud"]
+    }
+  ]
+}

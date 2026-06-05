@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "ouroforge.behavior-artifact.v1",
+  "artifactId": "gameplay-logic-demo-v1",
+  "sceneId": "gameplay-logic-demo-scene",
+  "validatedBy": {
+    "authority": "ouroforge-rust-local-validator",
+    "validationStatus": "passed",
+    "reviewDecisionId": "review-gl10-13-1-fixture"
+  },
+  "behaviors": [
+    {
+      "id": "key-pickup",
+      "entityId": "key",
+      "triggers": [{ "id": "key-collision", "kind": "onCollision", "event": "keyPickup" }],
+      "conditions": [{ "id": "key-visible", "kind": "flagEquals", "field": "keyVisible", "value": "true" }],
+      "actions": [
+        { "id": "collect-key", "kind": "collectItem", "effectKind": "inventory", "targetEntityId": "player", "item": "key" },
+        { "id": "hide-key", "kind": "setFlag", "effectKind": "flag", "flag": "keyCollected" },
+        { "id": "emit-key-collected", "kind": "emitEvent", "effectKind": "event", "event": "keyCollected" }
+      ]
+    },
+    {
+      "id": "door-unlock",
+      "entityId": "door",
+      "triggers": [{ "id": "door-event", "kind": "onEvent", "event": "doorReached" }],
+      "conditions": [{ "id": "has-key", "kind": "hasItem", "value": "key" }],
+      "actions": [
+        { "id": "open-door", "kind": "setFlag", "effectKind": "flag", "flag": "doorOpen" },
+        { "id": "emit-door-opened", "kind": "emitEvent", "effectKind": "event", "event": "doorOpened" }
+      ],
+      "stateMachine": {
+        "initialState": "closed",
+        "states": [
+          { "id": "closed", "transitions": [{ "id": "door-state-open", "to": "open", "onEvent": "doorReached" }] },
+          { "id": "open", "transitions": [] }
+        ]
+      }
+    },
+    {
+      "id": "player-dash",
+      "entityId": "player",
+      "triggers": [{ "id": "dash-input", "kind": "onInputAction", "event": "dash" }],
+      "conditions": [{ "id": "dash-ready", "kind": "flagEquals", "field": "staminaReady", "value": "true" }],
+      "actions": [
+        { "id": "dash-move", "kind": "moveEntity", "effectKind": "movement", "targetEntityId": "player", "dx": 3, "dy": 0 },
+        { "id": "mark-dash-used", "kind": "setFlag", "effectKind": "flag", "flag": "dashUsed" },
+        { "id": "dash-audio", "kind": "startAudioIntent", "effectKind": "audioIntent", "targetEntityId": "player", "value": "dash" }
+      ],
+      "abilities": [
+        {
+          "id": "dash-vfx",
+          "actions": [
+            { "id": "dash-animation", "kind": "startAnimationIntent", "effectKind": "animationIntent", "targetEntityId": "player", "value": "dash-trail" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "enemy-patrol-hazard",
+      "entityId": "enemy",
+      "triggers": [{ "id": "patrol-tick", "kind": "onEvent", "event": "patrolTick" }],
+      "conditions": [{ "id": "player-in-lane", "kind": "flagEquals", "field": "playerInHazardLane", "value": "true" }],
+      "actions": [
+        { "id": "damage-player", "kind": "damage", "effectKind": "health", "targetEntityId": "player", "amount": 1 },
+        { "id": "emit-patrol-hazard", "kind": "emitEvent", "effectKind": "event", "event": "patrolHazard" }
+      ],
+      "stateMachine": {
+        "initialState": "patrolLeft",
+        "states": [
+          { "id": "patrolLeft", "transitions": [{ "id": "patrol-turn-right", "to": "patrolRight", "onEvent": "patrolTick" }] },
+          { "id": "patrolRight", "transitions": [{ "id": "patrol-turn-left", "to": "patrolLeft", "onEvent": "patrolTick" }] }
+        ]
+      }
+    },
+    {
+      "id": "exit-win-condition",
+      "entityId": "exit",
+      "triggers": [{ "id": "exit-event", "kind": "onEvent", "event": "exitReached" }],
+      "conditions": [{ "id": "door-open", "kind": "flagEquals", "field": "doorOpen", "value": "true" }],
+      "actions": [
+        { "id": "mark-win", "kind": "markWinState", "effectKind": "terminalState" },
+        { "id": "emit-victory", "kind": "emitEvent", "effectKind": "event", "event": "victory" }
+      ]
+    }
+  ]
+}

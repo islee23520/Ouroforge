@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.behavior-scenario-assertion-suite.v1",
+  "suiteId": "gameplay-logic-demo-behavior-outcomes",
+  "scenarioId": "gameplay-logic-demo",
+  "evidenceRef": "tmp-evidence/gameplay-logic-demo/behavior-runtime-evidence.json",
+  "assertions": [
+    { "assertionId": "key-action-executed", "kind": "behaviorExecuted", "reportIndex": 0, "actionId": "collect-key" },
+    { "assertionId": "key-collected", "kind": "itemCollected", "reportIndex": 0, "item": "key" },
+    { "assertionId": "key-event", "kind": "eventEmitted", "reportIndex": 0, "event": "keyCollected" },
+    { "assertionId": "door-open-flag", "kind": "flagChanged", "reportIndex": 1, "flag": "doorOpen", "expectedFlag": true },
+    { "assertionId": "door-state-open", "kind": "stateTransitionOccurred", "reportIndex": 1, "entityId": "door", "state": "open" },
+    { "assertionId": "dash-ability-used", "kind": "abilityUsed", "reportIndex": 2, "actionId": "dash-animation" },
+    { "assertionId": "dash-cooldown-evidence", "kind": "cooldownActive", "reportIndex": 2, "behaviorId": "player-dash" },
+    { "assertionId": "player-moved", "kind": "entityAffected", "reportIndex": 2, "entityId": "player" },
+    { "assertionId": "patrol-state-transition", "kind": "stateTransitionOccurred", "reportIndex": 3, "entityId": "enemy", "state": "patrolRight" },
+    { "assertionId": "patrol-hazard-event", "kind": "eventEmitted", "reportIndex": 3, "event": "patrolHazard" },
+    { "assertionId": "win-state", "kind": "terminalStateReached", "reportIndex": 4, "terminalState": "win" },
+    { "assertionId": "victory-event", "kind": "eventEmitted", "reportIndex": 4, "event": "victory" }
+  ]
+}
