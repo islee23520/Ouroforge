@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-classified-missing-evidence",
+  "status": "classified",
+  "runMatrixRefs": [
+    "runs/qa-swarm/run-101/matrix.json"
+  ],
+  "entries": [
+    {
+      "errorId": "console-warn-1",
+      "kind": "console",
+      "failureClass": "warning",
+      "severity": "warning",
+      "message": "Texture atlas missing mip level; falling back to nearest.",
+      "consoleLevel": "warning",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/console-log.json"
+      ],
+      "affectedRun": "run-101",
+      "affectedScenario": "collect-and-exit"
+    },
+    {
+      "errorId": "console-error-1",
+      "kind": "console",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Uncaught TypeError reading 'position' of undefined.",
+      "consoleLevel": "error",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/console-log.json"
+      ],
+      "affectedWorker": "worker-2"
+    },
+    {
+      "errorId": "exception-1",
+      "kind": "exception",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Runtime exception: index out of bounds in collision pass.",
+      "evidenceRefs": []
+    },
+    {
+      "errorId": "crash-1",
+      "kind": "crash",
+      "failureClass": "crash",
+      "severity": "critical",
+      "message": "Process aborted with SIGSEGV during render flush.",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/crash-report.json"
+      ]
+    },
+    {
+      "errorId": "probe-1",
+      "kind": "probe-unavailable",
+      "failureClass": "probe-failure",
+      "severity": "error",
+      "message": "Runtime probe endpoint did not respond within the probe window.",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/probe-status.json"
+      ]
+    },
+    {
+      "errorId": "asset-1",
+      "kind": "asset-load-failure",
+      "failureClass": "asset-failure",
+      "severity": "error",
+      "message": "Sprite sheet failed to load: hash mismatch.",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/asset-load.json"
+      ]
+    },
+    {
+      "errorId": "timeout-1",
+      "kind": "scenario-timeout",
+      "failureClass": "timeout",
+      "severity": "warning",
+      "message": "Scenario exceeded the bounded step budget before reaching the goal.",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/scenario-result.json"
+      ]
+    },
+    {
+      "errorId": "unknown-1",
+      "kind": "exception",
+      "failureClass": "unknown",
+      "severity": "info",
+      "message": "Unrecognized log signature; classification deferred to review.",
+      "evidenceRefs": [
+        "evidence/qa-swarm/run-101/unknown-signal.json"
+      ]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

@@ -73,6 +73,10 @@ fn invalid_classifier_fixtures_fail_closed() {
             "missing console/probe evidence",
         ),
         (
+            "invalid/classifier.missing-entry-evidence.fixture.json",
+            "missing supporting evidence",
+        ),
+        (
             "invalid/classifier.malformed-payload.fixture.json",
             "malformed error payload",
         ),

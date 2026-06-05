@@ -340,10 +340,21 @@ impl QaErrorEntry {
                 self.error_id
             ));
         }
+        // Every classifier entry kind must link to supporting evidence artifacts
+        // (issue #690 Definition of Done): no error — including exception,
+        // crash, asset-load-failure, or scenario-timeout — may enter the read
+        // model without evidence.
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "QA error classifier {} entry `{}` is missing supporting evidence",
+                self.kind,
+                self.error_id
+            ));
+        }
         validate_ref_list(
             "QA error classifier evidenceRefs",
             &self.evidence_refs,
-            false,
+            true,
         )?;
 
         for (field, value) in [
