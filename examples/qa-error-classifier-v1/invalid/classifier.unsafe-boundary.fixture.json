@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-unsafe-boundary",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-113/matrix.json"],
+  "entries": [
+    {
+      "errorId": "console-unsafe-boundary",
+      "kind": "console",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Console entry with an incomplete boundary statement.",
+      "consoleLevel": "error",
+      "evidenceRefs": ["evidence/qa-swarm/run-113/console-log.json"]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs."
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-unsupported-kind",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-108/matrix.json"],
+  "entries": [
+    {
+      "errorId": "network-error",
+      "kind": "network-failure",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Unsupported error kind for the v1 classifier.",
+      "evidenceRefs": ["evidence/qa-swarm/run-108/network-log.json"]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-unknown-severity",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-107/matrix.json"],
+  "entries": [
+    {
+      "errorId": "exception-bad-severity",
+      "kind": "exception",
+      "failureClass": "error",
+      "severity": "fatal",
+      "message": "Runtime exception with an unknown severity value.",
+      "evidenceRefs": ["evidence/qa-swarm/run-107/exception-trace.json"]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

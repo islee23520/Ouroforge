@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-stale",
+  "status": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-103/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-103/matrix.json"],
+  "entries": [
+    {
+      "errorId": "console-stale-1",
+      "kind": "console",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Console error captured against a stale run snapshot.",
+      "consoleLevel": "error",
+      "evidenceRefs": ["evidence/qa-swarm/run-103/console-log.json"]
+    }
+  ],
+  "blockedReasons": ["Run matrix entry run-103 is stale; classifications must be re-collected before triage."],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

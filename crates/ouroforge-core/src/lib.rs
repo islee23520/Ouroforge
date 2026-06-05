@@ -73,6 +73,7 @@ pub mod plugin_threat_model;
 pub mod source_apply_audit_ledger;
 pub use source_apply_audit_ledger::*;
 pub mod qa_performance_budget;
+pub mod qa_error_classifier;
 pub mod runtime_frame_budget;
 pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,

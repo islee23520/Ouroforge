@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-stale-no-blocker",
+  "status": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-111/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-111/matrix.json"],
+  "entries": [
+    {
+      "errorId": "console-stale-no-blocker",
+      "kind": "console",
+      "failureClass": "error",
+      "severity": "error",
+      "message": "Stale run classification without blockers.",
+      "consoleLevel": "error",
+      "evidenceRefs": ["evidence/qa-swarm/run-111/console-log.json"]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

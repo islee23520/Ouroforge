@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-inconclusive",
+  "status": "blocked",
+  "runMatrixRefs": ["runs/qa-swarm/run-102/matrix.json"],
+  "entries": [
+    {
+      "errorId": "probe-inconclusive-1",
+      "kind": "probe-unavailable",
+      "failureClass": "inconclusive",
+      "severity": "warning",
+      "message": "Probe was unavailable; classification is inconclusive until a rerun captures it.",
+      "evidenceRefs": ["evidence/qa-swarm/run-102/probe-status.json"],
+      "blockedReasons": ["Probe evidence is incomplete; this entry needs a bounded rerun before triage."]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}

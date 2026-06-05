@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "qa-error-classifier-v1",
+  "classifierId": "qa14.9-kind-class-mismatch",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-110/matrix.json"],
+  "entries": [
+    {
+      "errorId": "crash-mismatch",
+      "kind": "crash",
+      "failureClass": "asset-failure",
+      "severity": "critical",
+      "message": "Crash entry tagged with an inconsistent asset-failure class.",
+      "evidenceRefs": ["evidence/qa-swarm/run-110/crash-report.json"]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Error classifications are evidence inputs, not trusted truth, and remain evidence and backlog inputs only until reviewed. No auto-fix, no auto-apply, and no production safety guarantee; outputs are review-gated. Browser read-only or draft-only."
+}
