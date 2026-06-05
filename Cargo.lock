@@ -302,6 +302,7 @@ dependencies = [
 name = "ouroforge-evaluator"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "ouroforge-evidence",
  "serde",
  "serde_json",
