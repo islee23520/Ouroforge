@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "demo-qa-swarm-plan-v1",
+  "id": "collect-and-exit-qa-swarm",
+  "description": "Bounded autonomous QA/playtest swarm plan for the Collect-and-Exit demo. Each worker replays a deterministic input route against the runtime, captures world-state/performance/event evidence, and records a classified verdict. The swarm never auto-fixes, auto-applies, or mutates source.",
+  "policy": {
+    "maxWorkers": 3,
+    "autoFix": false,
+    "autoApply": false,
+    "sourceMutation": "forbidden",
+    "determinismRequired": true,
+    "boundary": "Evidence-only QA; failures are classified and reported, never auto-fixed or applied."
+  },
+  "classifications": [
+    "pass",
+    "objective_blocked",
+    "hazard_contact_loss",
+    "budget_exhausted"
+  ],
+  "routes": [
+    {
+      "id": "qa-win-path",
+      "worker": "worker-1",
+      "description": "Hold right to collect the key and reach the exit.",
+      "inputReplay": [{ "atStep": 0, "input": { "right": true } }],
+      "budgetSteps": 250,
+      "stopWhen": "exit_reached == true",
+      "expectedVerdict": "pass",
+      "expectedClassification": "pass",
+      "evidence": ["world_state", "frame_stats", "runtime_events"]
+    },
+    {
+      "id": "qa-objective-blocked",
+      "worker": "worker-2",
+      "description": "Stay idle; the win must remain gated (objective blocked).",
+      "inputReplay": [],
+      "budgetSteps": 120,
+      "stopWhen": "budget_exhausted",
+      "expectedVerdict": "fail",
+      "expectedClassification": "objective_blocked",
+      "evidence": ["world_state", "frame_stats", "runtime_events"]
+    },
+    {
+      "id": "qa-hazard-contact",
+      "worker": "worker-3",
+      "description": "Hold right with the hazard drone armed past the key; contact must end the run.",
+      "hazard": { "archetype": "behaviors/hazard-drone.json", "placement": { "x": 192, "y": 80 } },
+      "inputReplay": [{ "atStep": 0, "input": { "right": true } }],
+      "budgetSteps": 250,
+      "stopWhen": "player_alive == false",
+      "expectedVerdict": "fail",
+      "expectedClassification": "hazard_contact_loss",
+      "evidence": ["world_state", "frame_stats", "runtime_events"]
+    }
+  ],
+  "boundary": "Source-like bounded QA swarm plan only. Evidence is generated locally and untracked; the swarm performs no auto-fix, auto-apply, source mutation, trusted browser write, command execution, network access, production/native/store export, or full Godot parity/replacement claim."
+}
