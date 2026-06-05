@@ -61328,6 +61328,53 @@ scenarios:
     }
 
     #[test]
+    fn gdd_to_playable_prototype_scope_contract_preserves_v1_boundaries() {
+        let doc = fs::read_to_string(repo_fixture_path("docs/gdd-to-playable-prototype-v1.md"))
+            .expect("gdd-to-prototype scope doc reads");
+
+        for required in [
+            "Issue: #644",
+            "small scoped 2D prototype first",
+            "GDD-derived output remains untrusted until Rust/local validation and review-gated apply",
+            "Browser, dashboard, and Studio surfaces are read-only or draft-only",
+            "V1 may use placeholders, local fixtures, or manifest references only",
+            "Generated prototype drafts, plans, reviews, applies, runs, evidence, screenshots, dashboard exports, temporary projects, and local tool state remain ignored unless explicitly fixture-scoped",
+            "#645",
+            "#661",
+            "#1 remains the broad vision and implementation-roadmap anchor",
+            "#23 remains the repo-memory/design context anchor",
+        ] {
+            assert!(
+                doc.contains(required),
+                "GDD-to-prototype scope doc is missing required boundary: {required}"
+            );
+        }
+
+        let non_goal_section = doc
+            .split("## Explicit non-goals")
+            .nth(1)
+            .expect("non-goals section exists");
+        for forbidden in [
+            "autonomous unrestricted game creation",
+            "arbitrary source mutation",
+            "arbitrary script execution",
+            "plugin loading",
+            "browser trusted writes",
+            "command bridge",
+            "uncontrolled asset generation",
+            "generated copyrighted/proprietary assets",
+            "current Godot replacement",
+            "native export",
+            "hosted/cloud/server/auth/account behavior",
+        ] {
+            assert!(
+                non_goal_section.contains(forbidden),
+                "non-goals must keep {forbidden} out of scope"
+            );
+        }
+    }
+
+    #[test]
     fn agent_role_model_v1_rejects_duplicate_and_underbounded_roles() {
         let body = read_json_fixture("examples/multi-agent-pipeline-v1/agent-roles.fixture.json");
         let mut value: serde_json::Value = serde_json::from_str(&body).expect("fixture json");
