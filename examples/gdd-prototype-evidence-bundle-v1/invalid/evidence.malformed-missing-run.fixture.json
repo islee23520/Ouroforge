@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "gdd-prototype-evidence-bundle-v1",
+  "bundleId": "evidence-collect-exit",
+  "runId": "run-collect-exit-001",
+  "status": "pass",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "requirementExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "prototypeBundleRef": "examples/gdd-prototype-draft-bundle-v1/bundle.valid.fixture.json",
+  "reviewDecisionRef": "runs/gdd-prototype-apply-v1/review/review.accepted.json",
+  "applyArtifactRef": "examples/gdd-prototype-apply-v1/apply.valid.fixture.json",
+  "scenarioVerdicts": [
+    {
+      "scenarioId": "scenario-collect-exit",
+      "scenarioRef": "examples/scenario-packs/core-2d-smoke.json",
+      "requirementIds": [
+        "REQ-collect",
+        "REQ-exit"
+      ],
+      "verdict": "missing",
+      "runOutputRefs": [
+        "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/scenario-collect-exit.json"
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "requirementCoverage": [
+    {
+      "requirementId": "REQ-collect",
+      "status": "satisfied",
+      "scenarioIds": [
+        "scenario-collect-exit"
+      ],
+      "evidenceRefs": [
+        "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/scenario-collect-exit.json"
+      ],
+      "failureSummary": "",
+      "blockedReasons": []
+    },
+    {
+      "requirementId": "REQ-exit",
+      "status": "satisfied",
+      "scenarioIds": [
+        "scenario-collect-exit"
+      ],
+      "evidenceRefs": [
+        "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/scenario-collect-exit.json"
+      ],
+      "failureSummary": "",
+      "blockedReasons": []
+    }
+  ],
+  "generatedArtifacts": [
+    "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/evidence-bundle.json",
+    "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/journal-summary.json"
+  ],
+  "journalSummary": {
+    "journalRef": "runs/gdd-prototype-evidence-bundle-v1/run-collect-exit-001/journal-summary.json",
+    "gddSatisfaction": "All declared fixture requirements are satisfied by linked scenario evidence.",
+    "observedGaps": [],
+    "nextStepHypotheses": [
+      "Keep fixture coverage bounded and add broader requirements in later scoped issues."
+    ]
+  },
+  "nextMutationProposals": [],
+  "blockedReasons": [],
+  "boundary": "evidence-gated prototype generation; not autonomous unrestricted game creation; untrusted until Rust/local validation; review-gated apply; browser read-only or draft-only; generated run/evidence output remains untracked; no direct trusted writes"
+}
