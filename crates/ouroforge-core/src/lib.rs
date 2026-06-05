@@ -18,10 +18,10 @@ pub mod source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod gdd_design_brief;
 pub mod source_apply_sandbox_promotion;
-pub use source_apply_sandbox_promotion::*;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
+pub use source_apply_sandbox_promotion::*;
 pub mod behavior_draft;
 pub mod source_apply_rollback_snapshot;
 pub use source_apply_rollback_snapshot::*;
@@ -30565,6 +30565,14 @@ fn classify_failure_category(
             MutationClassificationCategory::RuntimeCrash,
             "failure references runtime crash evidence".to_string(),
         )
+    } else if haystack.contains("runtime_invariant")
+        || haystack.contains("runtime-invariant")
+        || haystack.contains("semantic")
+    {
+        (
+            MutationClassificationCategory::RuntimeProbeFailure,
+            "failure references semantic/runtime invariant evidence".to_string(),
+        )
     } else if haystack.contains("visual") || haystack.contains("screenshot") {
         (
             MutationClassificationCategory::VisualMismatch,
@@ -30583,6 +30591,8 @@ fn classify_failure_category(
     } else if haystack.contains("runtime_probe_failure")
         || haystack.contains("runtime probe failure")
         || haystack.contains("runtime_probe")
+        || haystack.contains("runtime-probe")
+        || haystack.contains("runtime/")
     {
         (
             MutationClassificationCategory::RuntimeProbeFailure,
@@ -41428,6 +41438,82 @@ fn render_journal(
             }
         }
     }
+    out.push_str(&render_evolve_rerun_delta_journal_section(
+        run_dir, proposals,
+    ));
+    out
+}
+
+fn render_evolve_rerun_delta_journal_section(
+    run_dir: &Path,
+    proposals: &[MutationProposal],
+) -> String {
+    let comparison = read_dashboard_comparison(run_dir);
+    if !comparison.present || comparison.artifacts.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    out.push_str("\n## Mutation loop summary\n\n");
+    out.push_str(
+        "- Summary shape: hypothesis → failing gate → evidence → proposal → rerun delta.\n",
+    );
+    out.push_str("- Four-gate rerun delta:\n");
+    for artifact in &comparison.artifacts {
+        let Some(value) = &artifact.value else {
+            continue;
+        };
+        if let Some(gates) = value
+            .get("fourGate")
+            .and_then(|four_gate| four_gate.get("gates"))
+            .and_then(|gates| gates.as_array())
+        {
+            for gate in gates {
+                let gate_name = gate
+                    .get("gate")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let before = gate
+                    .get("before")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let after = gate
+                    .get("after")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let transition = gate
+                    .get("transition")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                out.push_str(&format!(
+                    "  - `{gate_name}`: `{before}` -> `{after}` (`{transition}`) via `{}`.\n",
+                    artifact.path
+                ));
+            }
+        }
+    }
+    for (index, proposal) in proposals.iter().enumerate() {
+        let Some(rationale) = &proposal.rationale else {
+            continue;
+        };
+        let gate = rationale
+            .failing_gate_category
+            .as_ref()
+            .map(mutation_proposal_gate_category_label)
+            .unwrap_or("unknown");
+        let evidence = rationale
+            .justifying_evidence_ref
+            .as_deref()
+            .unwrap_or("missing");
+        out.push_str(&format!(
+            "- proposal `mutation-{}` (`{}`): hypothesis `{}`; failing gate `{}`; evidence `{}`; rerun delta above remains manual-review evidence only.\n",
+            index + 1,
+            proposal.id,
+            rationale.expected_effect,
+            gate,
+            evidence
+        ));
+    }
+    out.push('\n');
     out
 }
 
@@ -41508,6 +41594,7 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("visual gate did not pass");
         let evidence = gate
             .get("comparisonRef")
+            .or_else(|| gate.get("comparison_ref"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-evidence");
         out.push_str(&format!(
@@ -41524,10 +41611,12 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("unknown");
         let invariant = gate
             .get("invariantId")
+            .or_else(|| gate.get("invariant_id"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-invariant");
         let target = gate
             .get("targetPath")
+            .or_else(|| gate.get("target_path"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-target");
         let reason = gate
@@ -41536,9 +41625,11 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("semantic gate did not pass");
         let evidence = gate
             .get("modelRef")
+            .or_else(|| gate.get("model_ref"))
             .and_then(|value| value.as_str())
             .or_else(|| {
                 gate.get("evidenceRefs")
+                    .or_else(|| gate.get("evidence_refs"))
                     .and_then(|value| value.as_array())
                     .and_then(|refs| refs.first())
                     .and_then(|value| value.as_str())
@@ -42358,6 +42449,10 @@ fn render_authoring_governance_journal_section(
                 join_or_none(&artifact.evidence_refs),
                 join_or_none(&artifact.unsupported)
             ));
+            out.push_str(&render_four_gate_delta_journal_lines(
+                &artifact.value,
+                proposals,
+            ));
         }
     }
 
@@ -42395,6 +42490,75 @@ fn render_authoring_governance_journal_section(
                 promotion.after_hash.value
             ));
         }
+    }
+    out
+}
+
+fn render_four_gate_delta_journal_lines(
+    value: &Option<serde_json::Value>,
+    proposals: &[MutationProposal],
+) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    let Some(deltas) = value
+        .get("fourGateDeltas")
+        .and_then(|value| value.as_array())
+    else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for delta in deltas {
+        let gate = delta
+            .get("gate")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let transition = delta
+            .get("transition")
+            .and_then(|value| value.as_str())
+            .unwrap_or("changed");
+        let before = delta
+            .get("beforeStatus")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let after = delta
+            .get("afterStatus")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        out.push_str(&format!(
+            "  - rerun delta `{gate}`: `{transition}` (`{before}` -> `{after}`)
+"
+        ));
+    }
+    if let Some(proposal) = proposals.first() {
+        let (failed_gate, evidence, hypothesis) = proposal
+            .rationale
+            .as_ref()
+            .map(|rationale| {
+                (
+                    rationale
+                        .failing_gate_category
+                        .as_ref()
+                        .map(mutation_proposal_gate_category_label)
+                        .unwrap_or("unknown"),
+                    rationale
+                        .justifying_evidence_ref
+                        .as_deref()
+                        .unwrap_or(proposal.evidence_id.as_str()),
+                    rationale.expected_effect.as_str(),
+                )
+            })
+            .unwrap_or((
+                "unknown",
+                proposal.evidence_id.as_str(),
+                proposal.reason.as_str(),
+            ));
+        out.push_str(&format!(
+            "  - Next-step hypothesis: {hypothesis}
+  - Evidence-linked gate: `{failed_gate}` evidence `{evidence}` proposal `{}`; rerun deltas above are manual-review evidence only.
+",
+            proposal.id
+        ));
     }
     out
 }
@@ -43877,6 +44041,11 @@ pub struct RunComparison {
     pub before: RunComparisonSnapshot,
     pub after: RunComparisonSnapshot,
     pub deltas: serde_json::Value,
+    #[serde(rename = "fourGate")]
+    pub four_gate: serde_json::Value,
+    #[serde(rename = "fourGateDeltas")]
+    pub four_gate_deltas: Vec<RunGateDelta>,
+    pub comparability: RunComparisonComparability,
     pub semantic: RunSemanticDiff,
     pub evidence_refs: Vec<String>,
     pub unsupported: Vec<String>,
@@ -44002,9 +44171,46 @@ pub struct RunComparisonSnapshot {
     pub mutation_proposals: usize,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunGateDelta {
+    pub gate: String,
+    pub transition: String,
+    #[serde(rename = "beforeStatus")]
+    pub before_status: String,
+    #[serde(rename = "afterStatus")]
+    pub after_status: String,
+    #[serde(rename = "beforeDeclared")]
+    pub before_declared: bool,
+    #[serde(rename = "afterDeclared")]
+    pub after_declared: bool,
+    #[serde(rename = "beforeEvidenceRefs")]
+    pub before_evidence_refs: Vec<String>,
+    #[serde(rename = "afterEvidenceRefs")]
+    pub after_evidence_refs: Vec<String>,
+    #[serde(rename = "comparabilityState")]
+    pub comparability_state: String,
+    #[serde(rename = "nonComparableReasons")]
+    pub non_comparable_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunComparisonComparability {
+    pub state: String,
+    pub reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RunGateObservation {
+    declared: bool,
+    status: String,
+    evidence_refs: Vec<String>,
+    non_comparable_reasons: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 struct RunComparisonDetails {
     snapshot: RunComparisonSnapshot,
+    gate_observations: BTreeMap<String, RunGateObservation>,
     scenario_statuses: BTreeMap<String, String>,
     world_state: BTreeMap<String, serde_json::Value>,
     events: BTreeSet<String>,
@@ -44028,6 +44234,9 @@ pub fn compare_runs(
     let after = after_details.snapshot.clone();
     let classification = classify_run_comparison(&before, &after).to_string();
     let semantic = build_run_semantic_diff(&before_details, &after_details, &classification);
+    let four_gate_deltas = build_four_gate_deltas(&before_details, &after_details);
+    let comparability = run_comparison_comparability(&four_gate_deltas);
+    let four_gate = run_four_gate_comparison_value(&four_gate_deltas);
     let evidence_refs = vec![
         before_run_dir.join("run.json").display().to_string(),
         before_run_dir.join("verdict.json").display().to_string(),
@@ -44055,6 +44264,9 @@ pub fn compare_runs(
             "input_replay_artifacts": after.input_replay_artifacts as i64 - before.input_replay_artifacts as i64,
             "mutation_proposals": after.mutation_proposals as i64 - before.mutation_proposals as i64
         }),
+        four_gate,
+        four_gate_deltas,
+        comparability,
         semantic,
         before,
         after,
@@ -44157,6 +44369,308 @@ pub fn write_run_comparison_artifact(
     ));
     write_json(&path, &json!(comparison))?;
     Ok(path)
+}
+
+fn build_four_gate_deltas(
+    before: &RunComparisonDetails,
+    after: &RunComparisonDetails,
+) -> Vec<RunGateDelta> {
+    ["mechanical", "runtime", "visual", "semantic"]
+        .into_iter()
+        .map(|gate| {
+            let before_gate = before
+                .gate_observations
+                .get(gate)
+                .cloned()
+                .unwrap_or_else(|| default_gate_observation(gate, &before.snapshot.verdict_status));
+            let after_gate = after
+                .gate_observations
+                .get(gate)
+                .cloned()
+                .unwrap_or_else(|| default_gate_observation(gate, &after.snapshot.verdict_status));
+            let mut reasons = Vec::new();
+            if before_gate.declared != after_gate.declared {
+                reasons.push(format!(
+                    "gate declaration mismatch for {gate}: before `{}` after `{}`",
+                    before_gate.declared, after_gate.declared
+                ));
+            }
+            reasons.extend(
+                before_gate
+                    .non_comparable_reasons
+                    .iter()
+                    .map(|reason| format!("before {reason}")),
+            );
+            reasons.extend(
+                after_gate
+                    .non_comparable_reasons
+                    .iter()
+                    .map(|reason| format!("after {reason}")),
+            );
+            reasons.sort();
+            reasons.dedup();
+            RunGateDelta {
+                gate: gate.to_string(),
+                transition: gate_transition(&before_gate.status, &after_gate.status),
+                before_status: before_gate.status,
+                after_status: after_gate.status,
+                before_declared: before_gate.declared,
+                after_declared: after_gate.declared,
+                before_evidence_refs: before_gate.evidence_refs,
+                after_evidence_refs: after_gate.evidence_refs,
+                comparability_state: if reasons.is_empty() {
+                    "comparable".to_string()
+                } else {
+                    "non_comparable".to_string()
+                },
+                non_comparable_reasons: reasons,
+            }
+        })
+        .collect()
+}
+
+fn run_comparison_comparability(deltas: &[RunGateDelta]) -> RunComparisonComparability {
+    let mut reasons = deltas
+        .iter()
+        .flat_map(|delta| {
+            delta
+                .non_comparable_reasons
+                .iter()
+                .map(move |reason| format!("{}: {reason}", delta.gate))
+        })
+        .collect::<Vec<_>>();
+    reasons.sort();
+    reasons.dedup();
+    RunComparisonComparability {
+        state: if reasons.is_empty() {
+            "comparable".to_string()
+        } else {
+            "non_comparable".to_string()
+        },
+        reasons,
+    }
+}
+
+fn run_four_gate_comparison_value(deltas: &[RunGateDelta]) -> serde_json::Value {
+    json!({
+        "schemaVersion": "run-four-gate-comparison-v1",
+        "gates": deltas
+            .iter()
+            .map(|delta| {
+                let mut evidence_refs = delta.before_evidence_refs.clone();
+                evidence_refs.extend(delta.after_evidence_refs.iter().cloned());
+                evidence_refs.sort();
+                evidence_refs.dedup();
+                json!({
+                    "gate": delta.gate,
+                    "before": delta.before_status,
+                    "after": delta.after_status,
+                    "transition": legacy_four_gate_transition_label(delta),
+                    "evidenceRefs": evidence_refs,
+                    "comparability": delta.comparability_state,
+                    "nonComparableReasons": delta.non_comparable_reasons,
+                })
+            })
+            .collect::<Vec<_>>(),
+        "nonComparable": deltas
+            .iter()
+            .filter(|delta| delta.comparability_state != "comparable")
+            .flat_map(|delta| {
+                delta
+                    .non_comparable_reasons
+                    .iter()
+                    .map(move |reason| format!("{}: {reason}", delta.gate))
+            })
+            .collect::<Vec<_>>(),
+        "boundary": "Rust/local read-only rerun comparison; reports bounded per-gate deltas and never auto-applies, auto-fixes, auto-merges, or claims production quality."
+    })
+}
+
+fn legacy_four_gate_transition_label(delta: &RunGateDelta) -> &'static str {
+    match delta.transition.as_str() {
+        "fail_to_pass" => "improved",
+        "pass_to_fail" => "regressed",
+        "unchanged_pass" | "unchanged_fail" => "unchanged",
+        _ => "changed",
+    }
+}
+
+fn gate_transition(before: &str, after: &str) -> String {
+    let before_pass = before == "pass" || before == "passed";
+    let after_pass = after == "pass" || after == "passed";
+    match (before_pass, after_pass, before == after) {
+        (false, true, _) => "fail_to_pass".to_string(),
+        (true, false, _) => "pass_to_fail".to_string(),
+        (true, true, true) => "unchanged_pass".to_string(),
+        (false, false, true) => "unchanged_fail".to_string(),
+        _ => "changed".to_string(),
+    }
+}
+
+fn default_gate_observation(gate: &str, verdict_status: &str) -> RunGateObservation {
+    let status = if gate == "mechanical" && verdict_status == "passed" {
+        "pass"
+    } else if gate == "mechanical" && verdict_status == "failed" {
+        "fail"
+    } else {
+        "unknown"
+    };
+    RunGateObservation {
+        declared: false,
+        status: status.to_string(),
+        evidence_refs: Vec::new(),
+        non_comparable_reasons: Vec::new(),
+    }
+}
+
+fn collect_run_gate_observations(
+    verdict: &serde_json::Value,
+    evidence: &EvidenceIndex,
+    run_id: &str,
+    warnings: &[String],
+) -> BTreeMap<String, RunGateObservation> {
+    let mut observations = BTreeMap::new();
+    for gate in ["mechanical", "runtime", "visual", "semantic"] {
+        let category = verdict
+            .get("gateCategories")
+            .and_then(|value| value.get(gate));
+        let declared = category
+            .and_then(|value| value.get("declared"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let status = category
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                default_gate_observation(gate, verdict["status"].as_str().unwrap_or("unknown"))
+                    .status
+            });
+        let mut refs = Vec::new();
+        if let Some(category) = category {
+            collect_gate_json_evidence_refs(category, &mut refs);
+        }
+        if gate == "mechanical" {
+            collect_top_level_verdict_evidence_refs(verdict, &mut refs);
+        }
+        collect_gate_refs_from_verdict_arrays(verdict, gate, &mut refs);
+        collect_gate_refs_from_failures(verdict, gate, &mut refs);
+        refs.sort();
+        refs.dedup();
+        let mut reasons = Vec::new();
+        if (declared || status != "pass") && refs.is_empty() {
+            reasons.push(format!("{gate} gate has no before/after evidence refs"));
+        }
+        for reference in &refs {
+            match evidence
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.path == *reference || artifact.id == *reference)
+            {
+                Some(artifact) => {
+                    if evidence_artifact_is_stale_for_run(artifact, run_id) {
+                        reasons.push(format!(
+                            "stale evidence ref `{reference}` for run `{run_id}`"
+                        ));
+                    }
+                }
+                None => reasons.push(format!("missing evidence ref `{reference}`")),
+            }
+        }
+        reasons.extend(warnings.iter().cloned());
+        reasons.sort();
+        reasons.dedup();
+        observations.insert(
+            gate.to_string(),
+            RunGateObservation {
+                declared,
+                status,
+                evidence_refs: refs,
+                non_comparable_reasons: reasons,
+            },
+        );
+    }
+    observations
+}
+
+fn collect_top_level_verdict_evidence_refs(verdict: &serde_json::Value, refs: &mut Vec<String>) {
+    if let Some(paths) = verdict
+        .get("evidence_refs")
+        .and_then(|value| value.as_array())
+    {
+        for path in paths.iter().filter_map(|value| value.as_str()) {
+            if path.contains("scenario-result") || path.contains("scenario_result") {
+                push_unique_ref(refs, path);
+            }
+        }
+    }
+}
+
+fn collect_gate_refs_from_verdict_arrays(
+    verdict: &serde_json::Value,
+    gate: &str,
+    refs: &mut Vec<String>,
+) {
+    if let Some(items) = verdict.get(gate).and_then(|value| value.as_array()) {
+        for item in items {
+            collect_gate_json_evidence_refs(item, refs);
+        }
+    }
+}
+
+fn collect_gate_refs_from_failures(
+    verdict: &serde_json::Value,
+    gate: &str,
+    refs: &mut Vec<String>,
+) {
+    if let Some(failures) = verdict.get("failures").and_then(|value| value.as_array()) {
+        for failure in failures {
+            let haystack = failure.to_string().to_ascii_lowercase();
+            let explicit_gate = failure
+                .get("gate")
+                .or_else(|| failure.get("gate_category"))
+                .and_then(|value| value.as_str())
+                .map(|value| value == gate)
+                .unwrap_or(false);
+            if explicit_gate || haystack.contains(gate) {
+                collect_gate_json_evidence_refs(failure, refs);
+            }
+        }
+    }
+}
+
+fn collect_gate_json_evidence_refs(value: &serde_json::Value, refs: &mut Vec<String>) {
+    for key in [
+        "path",
+        "evidence_path",
+        "evidence_ref",
+        "model_ref",
+        "world_state_ref",
+        "comparison_ref",
+        "comparisonRef",
+        "modelRef",
+        "worldStateRef",
+    ] {
+        if let Some(path) = value.get(key).and_then(|value| value.as_str()) {
+            push_unique_ref(refs, path);
+        }
+    }
+    for key in ["evidence_refs", "evidenceRefs"] {
+        if let Some(paths) = value.get(key).and_then(|value| value.as_array()) {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                push_unique_ref(refs, path);
+            }
+        }
+    }
+}
+
+fn evidence_artifact_is_stale_for_run(artifact: &EvidenceArtifact, run_id: &str) -> bool {
+    for key in ["run_id", "runId"] {
+        if let Some(value) = artifact.metadata.get(key).and_then(|value| value.as_str()) {
+            return value != run_id;
+        }
+    }
+    false
 }
 
 fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunComparisonDetails> {
@@ -44375,8 +44889,11 @@ fn load_run_comparison_details_without_project(
         input_replay_artifacts,
         mutation_proposals,
     };
+    let gate_observations =
+        collect_run_gate_observations(&verdict, &evidence, &snapshot.run_id, &warnings);
     Ok(RunComparisonDetails {
         snapshot,
+        gate_observations,
         scenario_statuses,
         world_state,
         events,
