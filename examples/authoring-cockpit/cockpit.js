@@ -4157,7 +4157,99 @@ const OuroforgeCockpit = (() => {
     return defaultWorkspaceLayout();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  function studioPerformanceBudget() {
+    return {
+      schemaVersion: 'studio-performance-budget-v1',
+      thresholds: {
+        sceneCount: 64,
+        entityNodeCount: 4000,
+        assetCount: 1200,
+        evidenceRunCount: 256,
+        pluginCount: 48,
+        panelRenderMs: 250,
+        panelUpdateMs: 120,
+      },
+    };
+  }
+
+  function evaluateStudioPerformanceBudget(metrics, budget) {
+    const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+    const activeBudget = budget && typeof budget === 'object' ? budget : studioPerformanceBudget();
+    const thresholds = activeBudget.thresholds && typeof activeBudget.thresholds === 'object' ? activeBudget.thresholds : {};
+    const dimensions = [
+      'sceneCount',
+      'entityNodeCount',
+      'assetCount',
+      'evidenceRunCount',
+      'pluginCount',
+      'panelRenderMs',
+      'panelUpdateMs',
+    ];
+    const results = {};
+    const gaps = [];
+    dimensions.forEach((dimension) => {
+      const rawValue = safeMetrics[dimension];
+      const rawLimit = thresholds[dimension];
+      const hasValue = typeof rawValue === 'number' && Number.isFinite(rawValue);
+      const hasLimit = typeof rawLimit === 'number' && Number.isFinite(rawLimit);
+      const value = hasValue ? rawValue : null;
+      const limit = hasLimit ? rawLimit : null;
+      // Fail open to recording gaps: missing metric or limit counts as an explicit gap, never a throw.
+      const within = hasValue && hasLimit ? value <= limit : false;
+      results[dimension] = { within, value, limit };
+      if (!within) {
+        gaps.push({
+          dimension,
+          value,
+          limit,
+          reason: !hasValue ? 'missing-metric' : !hasLimit ? 'missing-limit' : 'over-budget',
+        });
+      }
+    });
+    return {
+      schemaVersion: 'studio-performance-budget-evaluation-v1',
+      pass: gaps.length === 0,
+      dimensions: results,
+      gaps,
+    };
+  }
+
+  function renderStudioPerformanceBudgetSurface(run) {
+    const metrics = run && typeof run === 'object' && run.performanceMetrics && typeof run.performanceMetrics === 'object'
+      ? run.performanceMetrics
+      : {};
+    const budget = studioPerformanceBudget();
+    const evaluation = evaluateStudioPerformanceBudget(metrics, budget);
+    const labels = {
+      sceneCount: 'Fixture scenes',
+      entityNodeCount: 'Entity / node count',
+      assetCount: 'Asset count',
+      evidenceRunCount: 'Evidence run count',
+      pluginCount: 'Plugin count',
+      panelRenderMs: 'Panel render (ms)',
+      panelUpdateMs: 'Panel update (ms)',
+    };
+    const rows = Object.keys(labels).map((dimension) => {
+      const result = evaluation.dimensions[dimension] || { within: false, value: null, limit: null };
+      const statusLabel = result.within ? 'PASS' : 'GAP';
+      const statusCls = result.within ? 'status-ok' : 'status-error';
+      const measured = result.value === null ? 'not measured' : result.value;
+      const limit = result.limit === null ? 'no limit' : result.limit;
+      return `<li><strong>${escapeText(labels[dimension])}</strong>: <span class="${statusCls}">${escapeText(statusLabel)}</span> · measured ${escapeText(measured)} · budget ${escapeText(limit)}</li>`;
+    }).join('');
+    const overall = evaluation.pass ? 'PASS' : 'GAP';
+    const overallCls = evaluation.pass ? 'status-ok' : 'status-error';
+    const gapSummary = evaluation.gaps.length
+      ? `<ul class="surface-list">${evaluation.gaps.map((gap) => `<li>${escapeText(labels[gap.dimension] || gap.dimension)}: ${escapeText(gap.reason)} (measured ${escapeText(gap.value === null ? 'n/a' : gap.value)} / budget ${escapeText(gap.limit === null ? 'n/a' : gap.limit)})</li>`).join('')}</ul>`
+      : '<p class="surface-note">No over-budget dimensions recorded.</p>';
+    return `<section class="surface-panel"><h3>Studio Performance Budget</h3>
+      <p class="surface-note">Read-only exported metrics vs declared budget; no trusted writes, mutation controls, command bridge, or browser-side enforcement.</p>
+      <p><span class="${overallCls}">Overall ${escapeText(overall)}</span></p>
+      <ul class="surface-list">${rows}</ul>
+      <h4>Recorded gaps</h4>${gapSummary}</section>`;
+  }
+
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

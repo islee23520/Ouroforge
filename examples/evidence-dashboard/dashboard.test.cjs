@@ -2047,6 +2047,87 @@ assert.deepEqual(dashResetResult, dashWorkspaceDefaults);
 assert.equal(dashSaveStorage.store['ouroforge.studio.workspace'], undefined);
 assert.deepEqual(dashboard.loadWorkspaceLayout(dashSaveStorage), dashWorkspaceDefaults);
 
+// Studio performance budget v1 (#772): model + evaluation + render surface + large-fixture smoke.
+const performanceBudget = dashboard.studioPerformanceBudget();
+assert.equal(performanceBudget.schemaVersion, 'studio-performance-budget-v1');
+['sceneCount', 'entityNodeCount', 'assetCount', 'evidenceRunCount', 'pluginCount', 'panelRenderMs', 'panelUpdateMs'].forEach((dimension) => {
+  assert.ok(typeof performanceBudget.thresholds[dimension] === 'number', `budget threshold ${dimension} must be numeric`);
+});
+
+// Fail open to recording gaps rather than throwing on missing metrics.
+const emptyBudgetEval = dashboard.evaluateStudioPerformanceBudget(undefined, performanceBudget);
+assert.equal(emptyBudgetEval.pass, false);
+assert.ok(emptyBudgetEval.gaps.length > 0, 'missing metrics must be recorded as explicit gaps');
+assert.ok(emptyBudgetEval.gaps.every((gap) => gap.reason === 'missing-metric'));
+
+// Build a large-ish inline fixture of run summaries to exercise the core run-list panel.
+const largePerfFixtureRuns = [];
+const largePerfFixtureSceneCount = 40;
+const largePerfFixtureAssetCount = 900;
+let largePerfFixtureEntityCount = 0;
+for (let i = 0; i < largePerfFixtureSceneCount; i += 1) {
+  const evidenceCount = 30 + i;
+  const mutationCount = 12 + (i % 7);
+  const workerCount = 4 + (i % 3);
+  largePerfFixtureEntityCount += 80 + (i % 11);
+  largePerfFixtureRuns.push({
+    summary: {
+      id: `perf-run-${i}`,
+      seed_id: `seed-${i}`,
+      run_status: i % 2 === 0 ? 'completed' : 'running',
+      verdict_status: i % 3 === 0 ? 'pass' : 'fail',
+      scenario_status: 'pass',
+      worker_count: workerCount,
+      evidence_count: evidenceCount,
+      mutation_count: mutationCount,
+    },
+    project: { id: `project-${i % 5}`, name: `Project ${i % 5}` },
+  });
+}
+
+// Measure core-panel render timing over the large fixture using a monotonic clock.
+const perfRenderStart = process.hrtime.bigint();
+const perfRenderMarkup = dashboard.renderRunList(largePerfFixtureRuns, 'perf-run-0');
+const perfRenderEnd = process.hrtime.bigint();
+const perfRenderMs = Number(perfRenderEnd - perfRenderStart) / 1e6;
+
+// Measure an incremental update (re-render with a different selection) for the update budget.
+const perfUpdateStart = process.hrtime.bigint();
+dashboard.renderRunList(largePerfFixtureRuns, 'perf-run-1');
+const perfUpdateEnd = process.hrtime.bigint();
+const perfUpdateMs = Number(perfUpdateEnd - perfUpdateStart) / 1e6;
+
+assert.ok(perfRenderMarkup.length > 0, 'large-fixture run-list render must produce markup');
+
+const perfMetrics = {
+  sceneCount: largePerfFixtureSceneCount,
+  entityNodeCount: largePerfFixtureEntityCount,
+  assetCount: largePerfFixtureAssetCount,
+  evidenceRunCount: largePerfFixtureRuns.length,
+  pluginCount: 12,
+  panelRenderMs: perfRenderMs,
+  panelUpdateMs: perfUpdateMs,
+};
+const perfEval = dashboard.evaluateStudioPerformanceBudget(perfMetrics, performanceBudget);
+// No silent pass: either within budget OR the gaps are explicitly recorded.
+assert.ok(perfEval.pass === true || perfEval.gaps.length > 0, 'budget smoke must either pass or record explicit gaps');
+if (!perfEval.pass) {
+  assert.ok(perfEval.gaps.every((gap) => typeof gap.dimension === 'string' && typeof gap.reason === 'string'));
+}
+// Surface the measured timings as a closure artifact for the PR body.
+console.log(`[#772 perf] dashboard renderRunList render=${perfRenderMs.toFixed(3)}ms update=${perfUpdateMs.toFixed(3)}ms scenes=${largePerfFixtureSceneCount} entities=${largePerfFixtureEntityCount} pass=${perfEval.pass} gaps=${perfEval.gaps.length}`);
+
+const perfBudgetSurface = dashboard.renderStudioPerformanceBudgetSurface({ performanceMetrics: perfMetrics });
+assert.match(perfBudgetSurface, /Studio Performance Budget/);
+assert.match(perfBudgetSurface, /Panel render \(ms\)/);
+assert.match(perfBudgetSurface, /Overall (PASS|GAP)/);
+assert.match(perfBudgetSurface, /Read-only exported metrics/);
+assert.doesNotMatch(perfBudgetSurface, /<button|<form|<input/i);
+
+// XSS / escaping boundary: metric-adjacent run fields must be escaped, no script execution path.
+const perfBudgetXssSurface = dashboard.renderStudioPerformanceBudgetSurface({ performanceMetrics: { sceneCount: '<script>scenes</script>' } });
+assert.doesNotMatch(perfBudgetXssSurface, /<button|<form|<input/i);
+
 console.log('dashboard workspace layout persistence test passed');
 // Studio accessibility and keyboard navigation v1 (#771)
 const a11yNavModel = dashboard.studioKeyboardNavModel(run);

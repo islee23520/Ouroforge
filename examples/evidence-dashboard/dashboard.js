@@ -2575,7 +2575,97 @@ const OuroforgeDashboard = (() => {
     return defaultWorkspaceLayout();
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  function studioPerformanceBudget() {
+    return {
+      schemaVersion: 'studio-performance-budget-v1',
+      thresholds: {
+        sceneCount: 64,
+        entityNodeCount: 4000,
+        assetCount: 1200,
+        evidenceRunCount: 256,
+        pluginCount: 48,
+        panelRenderMs: 250,
+        panelUpdateMs: 120,
+      },
+    };
+  }
+
+  function evaluateStudioPerformanceBudget(metrics, budget) {
+    const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+    const activeBudget = budget && typeof budget === 'object' ? budget : studioPerformanceBudget();
+    const thresholds = activeBudget.thresholds && typeof activeBudget.thresholds === 'object' ? activeBudget.thresholds : {};
+    const dimensions = [
+      'sceneCount',
+      'entityNodeCount',
+      'assetCount',
+      'evidenceRunCount',
+      'pluginCount',
+      'panelRenderMs',
+      'panelUpdateMs',
+    ];
+    const results = {};
+    const gaps = [];
+    dimensions.forEach((dimension) => {
+      const rawValue = safeMetrics[dimension];
+      const rawLimit = thresholds[dimension];
+      const hasValue = typeof rawValue === 'number' && Number.isFinite(rawValue);
+      const hasLimit = typeof rawLimit === 'number' && Number.isFinite(rawLimit);
+      const value = hasValue ? rawValue : null;
+      const limit = hasLimit ? rawLimit : null;
+      // Fail open to recording gaps: missing metric or limit counts as an explicit gap, never a throw.
+      const within = hasValue && hasLimit ? value <= limit : false;
+      results[dimension] = { within, value, limit };
+      if (!within) {
+        gaps.push({
+          dimension,
+          value,
+          limit,
+          reason: !hasValue ? 'missing-metric' : !hasLimit ? 'missing-limit' : 'over-budget',
+        });
+      }
+    });
+    return {
+      schemaVersion: 'studio-performance-budget-evaluation-v1',
+      pass: gaps.length === 0,
+      dimensions: results,
+      gaps,
+    };
+  }
+
+  function renderStudioPerformanceBudgetSurface(run) {
+    const metrics = run && typeof run === 'object' && run.performanceMetrics && typeof run.performanceMetrics === 'object'
+      ? run.performanceMetrics
+      : {};
+    const budget = studioPerformanceBudget();
+    const evaluation = evaluateStudioPerformanceBudget(metrics, budget);
+    const labels = {
+      sceneCount: 'Fixture scenes',
+      entityNodeCount: 'Entity / node count',
+      assetCount: 'Asset count',
+      evidenceRunCount: 'Evidence run count',
+      pluginCount: 'Plugin count',
+      panelRenderMs: 'Panel render (ms)',
+      panelUpdateMs: 'Panel update (ms)',
+    };
+    const rows = Object.keys(labels).map((dimension) => {
+      const result = evaluation.dimensions[dimension] || { within: false, value: null, limit: null };
+      const status = result.within ? 'pass' : 'gap';
+      const measured = result.value === null ? 'not measured' : result.value;
+      const limit = result.limit === null ? 'no limit' : result.limit;
+      return `<li><strong>${escapeText(labels[dimension])}</strong>: <span class="${statusClass(status)}">${escapeText(status.toUpperCase())}</span> · measured ${escapeText(measured)} · budget ${escapeText(limit)}</li>`;
+    }).join('');
+    const overall = evaluation.pass ? 'PASS' : 'GAP';
+    const gapSummary = evaluation.gaps.length
+      ? `<ul class="run-meta-list">${evaluation.gaps.map((gap) => `<li>${escapeText(labels[gap.dimension] || gap.dimension)}: ${escapeText(gap.reason)} (measured ${escapeText(gap.value === null ? 'n/a' : gap.value)} / budget ${escapeText(gap.limit === null ? 'n/a' : gap.limit)})</li>`).join('')}</ul>`
+      : '<p class="run-meta">No over-budget dimensions recorded.</p>';
+    return `<section class="panel"><h3>Studio Performance Budget</h3>
+      <p class="run-meta">Read-only exported metrics vs declared budget; no trusted writes, mutation controls, command bridge, or browser-side enforcement.</p>
+      <p class="card-value"><span class="${statusClass(evaluation.pass ? 'pass' : 'gap')}">Overall ${escapeText(overall)}</span></p>
+      <ul class="run-meta-list">${rows}</ul>
+      <h4>Recorded gaps</h4>${gapSummary}</section>`;
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

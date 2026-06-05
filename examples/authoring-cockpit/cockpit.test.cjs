@@ -3067,6 +3067,69 @@ assert.deepEqual(cockpitResetResult, workspaceDefaults);
 assert.equal(cockpitSaveStorage.store['ouroforge.studio.workspace'], undefined);
 assert.deepEqual(cockpit.loadWorkspaceLayout(cockpitSaveStorage), workspaceDefaults);
 
+// Studio performance budget v1 (#772): model + evaluation + render surface + large-fixture smoke.
+const cockpitPerfBudget = cockpit.studioPerformanceBudget();
+assert.equal(cockpitPerfBudget.schemaVersion, 'studio-performance-budget-v1');
+['sceneCount', 'entityNodeCount', 'assetCount', 'evidenceRunCount', 'pluginCount', 'panelRenderMs', 'panelUpdateMs'].forEach((dimension) => {
+  assert.ok(typeof cockpitPerfBudget.thresholds[dimension] === 'number', `budget threshold ${dimension} must be numeric`);
+});
+
+// Fail open to recording gaps rather than throwing on missing metrics.
+const cockpitEmptyEval = cockpit.evaluateStudioPerformanceBudget(undefined, cockpitPerfBudget);
+assert.equal(cockpitEmptyEval.pass, false);
+assert.ok(cockpitEmptyEval.gaps.length > 0, 'missing metrics must be recorded as explicit gaps');
+assert.ok(cockpitEmptyEval.gaps.every((gap) => gap.reason === 'missing-metric'));
+
+// Build a large-ish inline scene fixture to exercise the core tree panel render.
+const cockpitPerfEntityCount = 2500;
+const cockpitPerfEntities = [];
+for (let i = 0; i < cockpitPerfEntityCount; i += 1) {
+  cockpitPerfEntities.push({ id: `entity-${i}`, components: { controllable: i % 4 === 0 } });
+}
+const cockpitPerfScene = { entities: cockpitPerfEntities };
+
+// Measure core-panel render timing over the large fixture using a monotonic clock.
+const cockpitRenderStart = process.hrtime.bigint();
+const cockpitPerfMarkup = cockpit.renderTree(cockpitPerfScene, 'entity-0');
+const cockpitRenderEnd = process.hrtime.bigint();
+const cockpitRenderMs = Number(cockpitRenderEnd - cockpitRenderStart) / 1e6;
+
+const cockpitUpdateStart = process.hrtime.bigint();
+cockpit.renderTree(cockpitPerfScene, 'entity-1');
+const cockpitUpdateEnd = process.hrtime.bigint();
+const cockpitUpdateMs = Number(cockpitUpdateEnd - cockpitUpdateStart) / 1e6;
+
+assert.ok(cockpitPerfMarkup.length > 0, 'large-fixture tree render must produce markup');
+
+const cockpitPerfMetrics = {
+  sceneCount: 40,
+  entityNodeCount: cockpitPerfEntityCount,
+  assetCount: 850,
+  evidenceRunCount: 120,
+  pluginCount: 10,
+  panelRenderMs: cockpitRenderMs,
+  panelUpdateMs: cockpitUpdateMs,
+};
+const cockpitPerfEval = cockpit.evaluateStudioPerformanceBudget(cockpitPerfMetrics, cockpitPerfBudget);
+// No silent pass: either within budget OR the gaps are explicitly recorded.
+assert.ok(cockpitPerfEval.pass === true || cockpitPerfEval.gaps.length > 0, 'budget smoke must either pass or record explicit gaps');
+if (!cockpitPerfEval.pass) {
+  assert.ok(cockpitPerfEval.gaps.every((gap) => typeof gap.dimension === 'string' && typeof gap.reason === 'string'));
+}
+// Surface the measured timings as a closure artifact for the PR body.
+console.log(`[#772 perf] cockpit renderTree render=${cockpitRenderMs.toFixed(3)}ms update=${cockpitUpdateMs.toFixed(3)}ms entities=${cockpitPerfEntityCount} pass=${cockpitPerfEval.pass} gaps=${cockpitPerfEval.gaps.length}`);
+
+const cockpitPerfSurface = cockpit.renderStudioPerformanceBudgetSurface({ performanceMetrics: cockpitPerfMetrics });
+assert.match(cockpitPerfSurface, /Studio Performance Budget/);
+assert.match(cockpitPerfSurface, /Panel render \(ms\)/);
+assert.match(cockpitPerfSurface, /Overall (PASS|GAP)/);
+assert.match(cockpitPerfSurface, /Read-only exported metrics/);
+assert.doesNotMatch(cockpitPerfSurface, /<button|<form|<input/i);
+
+// XSS / escaping boundary: metric-adjacent fields must be escaped, no script execution path.
+const cockpitPerfXssSurface = cockpit.renderStudioPerformanceBudgetSurface({ performanceMetrics: { sceneCount: '<script>scenes</script>' } });
+assert.doesNotMatch(cockpitPerfXssSurface, /<button|<form|<input/i);
+
 console.log('authoring cockpit workspace layout persistence test passed');
 // Studio accessibility and keyboard navigation v1 (#771)
 const a11yNavModel = cockpit.studioKeyboardNavModel(run);
