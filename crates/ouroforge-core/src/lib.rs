@@ -40745,6 +40745,7 @@ fn render_journal(
             .as_str()
             .unwrap_or("No summary available.")
     ));
+    out.push_str(&render_visual_semantic_gate_journal_section(verdict));
 
     out.push_str("## Failed Criteria\n\n");
     let failures = verdict["failures"].as_array().cloned().unwrap_or_default();
@@ -40789,6 +40790,130 @@ fn render_journal(
             }
         }
     }
+    out
+}
+
+fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> String {
+    let mut out = String::new();
+    if let Some(categories) = verdict
+        .get("gateCategories")
+        .and_then(|value| value.as_object())
+    {
+        out.push_str("## Four-Gate Verdict Categories\n\n");
+        for gate in ["mechanical", "runtime", "visual", "semantic"] {
+            let Some(category) = categories.get(gate) else {
+                continue;
+            };
+            let declared = category
+                .get("declared")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let status = category
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown");
+            let result_count = category
+                .get("resultCount")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(0);
+            let failure_count = category
+                .get("failureCount")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(0);
+            out.push_str(&format!(
+                "- `{gate}`: `{status}` (declared: `{declared}`, results: `{result_count}`, failures: `{failure_count}`)\n"
+            ));
+        }
+        if let Some(aggregation) = categories.get("aggregation") {
+            let operator = aggregation
+                .get("operator")
+                .and_then(|value| value.as_str())
+                .unwrap_or("declared-gate-and");
+            let undeclared = aggregation
+                .get("undeclaredGatePolicy")
+                .and_then(|value| value.as_str())
+                .unwrap_or("neutral");
+            out.push_str(&format!(
+                "- Aggregation: `{operator}`; undeclared gate policy: `{undeclared}`.\n"
+            ));
+        }
+        out.push('\n');
+    }
+
+    let visual_failures = verdict
+        .get("visual")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter(|gate| gate.get("state").and_then(|value| value.as_str()) != Some("pass"))
+        .collect::<Vec<_>>();
+    let semantic_failures = verdict
+        .get("semantic")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter(|gate| gate.get("state").and_then(|value| value.as_str()) != Some("pass"))
+        .collect::<Vec<_>>();
+    if visual_failures.is_empty() && semantic_failures.is_empty() {
+        return out;
+    }
+
+    out.push_str("## Visual/Semantic Gate Observations\n\n");
+    for gate in visual_failures {
+        let state = gate
+            .get("state")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let reason = gate
+            .get("reason")
+            .and_then(|value| value.as_str())
+            .unwrap_or("visual gate did not pass");
+        let evidence = gate
+            .get("comparisonRef")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown-evidence");
+        out.push_str(&format!(
+            "- Visual `{state}`: {reason} (evidence `{evidence}`)\n"
+        ));
+        out.push_str(&format!(
+            "  - Next-step hypothesis: inspect `{evidence}` and its screenshot refs before changing visual acceptance.\n"
+        ));
+    }
+    for gate in semantic_failures {
+        let state = gate
+            .get("state")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let invariant = gate
+            .get("invariantId")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown-invariant");
+        let target = gate
+            .get("targetPath")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown-target");
+        let reason = gate
+            .get("reason")
+            .and_then(|value| value.as_str())
+            .unwrap_or("semantic gate did not pass");
+        let evidence = gate
+            .get("modelRef")
+            .and_then(|value| value.as_str())
+            .or_else(|| {
+                gate.get("evidenceRefs")
+                    .and_then(|value| value.as_array())
+                    .and_then(|refs| refs.first())
+                    .and_then(|value| value.as_str())
+            })
+            .unwrap_or("unknown-evidence");
+        out.push_str(&format!(
+            "- Semantic `{state}`: invariant `{invariant}` over `{target}` — {reason} (evidence `{evidence}`)\n"
+        ));
+        out.push_str(&format!(
+            "  - Next-step hypothesis: inspect `{evidence}` and the declared invariant before changing scenario semantics.\n"
+        ));
+    }
+    out.push('\n');
     out
 }
 
@@ -41783,6 +41908,12 @@ pub struct EvaluationVerdict {
     pub failures: Vec<serde_json::Value>,
     pub evidence_refs: Vec<String>,
     pub metadata: serde_json::Value,
+    #[serde(
+        rename = "gateCategories",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub gate_categories: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visual: Vec<VisualGateVerdict>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -42133,6 +42264,7 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
                 "visual_gate_results": 0,
                 "semantic_gate_results": 0
             }),
+            gate_categories: None,
             visual: Vec::new(),
             semantic: Vec::new(),
         };
@@ -42312,6 +42444,13 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
 
     let visual = evaluate_visual_gate(run_dir, &evidence, &mut failures, &mut evidence_refs)?;
     let semantic = evaluate_semantic_gate(run_dir, &evidence, &mut failures, &mut evidence_refs)?;
+    let gate_categories = evaluation_gate_categories(
+        scenario_results.len(),
+        behavior_evaluator_results,
+        &failures,
+        &visual,
+        &semantic,
+    );
 
     let status = if failures.is_empty() {
         "passed"
@@ -42343,11 +42482,85 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
             "visual_gate_results": visual.len(),
             "semantic_gate_results": semantic.len()
         }),
+        gate_categories,
         visual,
         semantic,
     };
     write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
     Ok(verdict)
+}
+
+fn evaluation_gate_categories(
+    scenario_result_count: usize,
+    behavior_evaluator_results: usize,
+    failures: &[serde_json::Value],
+    visual: &[VisualGateVerdict],
+    semantic: &[SemanticGateVerdict],
+) -> Option<serde_json::Value> {
+    if visual.is_empty() && semantic.is_empty() {
+        return None;
+    }
+    let mechanical_failures = failures
+        .iter()
+        .filter(|failure| {
+            matches!(
+                failure.get("kind").and_then(|value| value.as_str()),
+                Some("missing_evidence")
+                    | Some("scenario_failed")
+                    | Some("assertion_failed")
+                    | Some("visual_checkpoint_failed")
+                    | Some("missing_scenario_evidence")
+                    | Some("unsupported_scenario_assertion_target")
+            )
+        })
+        .count();
+    let runtime_failures = failures
+        .iter()
+        .filter(|failure| {
+            matches!(
+                failure.get("kind").and_then(|value| value.as_str()),
+                Some("behavior_assertion_failed")
+            )
+        })
+        .count();
+    let failed_visual = visual
+        .iter()
+        .filter(|gate| gate.state != VisualGateState::Pass)
+        .count();
+    let failed_semantic = semantic
+        .iter()
+        .filter(|gate| gate.state != SemanticGateState::Pass)
+        .count();
+    Some(json!({
+        "mechanical": {
+            "declared": scenario_result_count > 0,
+            "status": if mechanical_failures == 0 { "pass" } else { "fail" },
+            "resultCount": scenario_result_count,
+            "failureCount": mechanical_failures
+        },
+        "runtime": {
+            "declared": behavior_evaluator_results > 0,
+            "status": if runtime_failures == 0 { "pass" } else { "fail" },
+            "resultCount": behavior_evaluator_results,
+            "failureCount": runtime_failures
+        },
+        "visual": {
+            "declared": !visual.is_empty(),
+            "status": if failed_visual == 0 { "pass" } else { "fail" },
+            "resultCount": visual.len(),
+            "failureCount": failed_visual
+        },
+        "semantic": {
+            "declared": !semantic.is_empty(),
+            "status": if failed_semantic == 0 { "pass" } else { "fail" },
+            "resultCount": semantic.len(),
+            "failureCount": failed_semantic
+        },
+        "aggregation": {
+            "operator": "declared-gate-and",
+            "undeclaredGatePolicy": "neutral"
+        }
+    }))
 }
 
 fn evaluate_semantic_gate(
