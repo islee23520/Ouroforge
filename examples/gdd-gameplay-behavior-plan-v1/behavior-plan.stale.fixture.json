@@ -1,0 +1,146 @@
+{
+  "schemaVersion": "gdd-gameplay-behavior-plan-v1",
+  "planId": "gdd-behavior-stale",
+  "status": "stale",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.valid.fixture.json",
+  "requirementIds": [
+    "req:collect-key",
+    "req:reach-exit"
+  ],
+  "mechanicsMappingIds": [
+    "map:collect",
+    "map:exit"
+  ],
+  "behaviorModels": [
+    {
+      "behaviorModelId": "behavior_collect_exit",
+      "behaviorModelRef": "examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:collect-key",
+          "mechanicsMappingId": "map:collect"
+        },
+        {
+          "requirementId": "req:reach-exit",
+          "mechanicsMappingId": "map:exit"
+        }
+      ],
+      "capabilityStatus": "supported",
+      "blockedReasons": []
+    }
+  ],
+  "eventSignalNeeds": [
+    {
+      "eventId": "key_collected",
+      "signalRef": "examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:collect-key",
+          "mechanicsMappingId": "map:collect"
+        }
+      ],
+      "capabilityStatus": "supported",
+      "blockedReasons": []
+    }
+  ],
+  "stateAbilityPlans": [
+    {
+      "planId": "unlock_exit_after_key",
+      "stateMachineRef": "examples/gameplay-state-machine-v1/state-machine.valid.fixture.json",
+      "abilityActionRef": "examples/gameplay-ability-action-v1/ability-action.valid.fixture.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:reach-exit",
+          "mechanicsMappingId": "map:exit"
+        }
+      ],
+      "capabilityStatus": "supported",
+      "blockedReasons": []
+    }
+  ],
+  "expectedFlagsEvents": [
+    {
+      "expectationId": "expect-key-collected",
+      "requirementId": "req:collect-key",
+      "mechanicsMappingId": "map:collect",
+      "flagOrEvent": "key_collected",
+      "proofExpectationRef": "evidence/gdd-gameplay-behavior-plan-v1/key-collected-scenario.json"
+    },
+    {
+      "expectationId": "expect-exit-unlocked",
+      "requirementId": "req:reach-exit",
+      "mechanicsMappingId": "map:exit",
+      "flagOrEvent": "exit_unlocked",
+      "proofExpectationRef": "evidence/gdd-gameplay-behavior-plan-v1/exit-unlocked-scenario.json"
+    }
+  ],
+  "scenarioNeeds": [
+    {
+      "scenarioId": "collect_exit_behavior_smoke",
+      "scenarioRef": "examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.behavior-assertions.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:collect-key",
+          "mechanicsMappingId": "map:collect"
+        },
+        {
+          "requirementId": "req:reach-exit",
+          "mechanicsMappingId": "map:exit"
+        }
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "unsupportedScriptNeeds": [],
+  "targetRefs": [
+    {
+      "targetRef": "examples/gameplay-behavior-model-v1/behavior-model.valid.fixture.json",
+      "kind": "behavior-model",
+      "expectedHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "staleRef": true,
+      "blockedReasons": [
+        "Behavior model changed after mechanics mapping."
+      ]
+    },
+    {
+      "targetRef": "examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json",
+      "kind": "event-signal",
+      "expectedHash": null,
+      "staleRef": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/gameplay-state-machine-v1/state-machine.valid.fixture.json",
+      "kind": "state-machine",
+      "expectedHash": null,
+      "staleRef": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/gameplay-ability-action-v1/ability-action.valid.fixture.json",
+      "kind": "ability-action",
+      "expectedHash": null,
+      "staleRef": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/gameplay-logic-demo-v1/scenarios/gameplay-logic-demo.behavior-assertions.json",
+      "kind": "scenario-pack",
+      "expectedHash": null,
+      "staleRef": false,
+      "blockedReasons": []
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "behavior-plan-preview",
+      "pathHint": "evidence/gdd-gameplay-behavior-plan-v1/behavior-plan-preview.json",
+      "description": "Read-only preview of GDD-linked behavior model, event, state, ability, and scenario needs."
+    }
+  ],
+  "blockedReasons": [
+    "Behavior model hash is stale."
+  ],
+  "boundary": "Non-mutating GDD gameplay behavior planning; untrusted until Rust/local validation; review-gated apply only; no arbitrary script generation; no arbitrary script execution; no autonomous unrestricted game creation; browser read-only or draft-only"
+}
