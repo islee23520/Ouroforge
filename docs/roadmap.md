@@ -61,8 +61,16 @@ that consumes the four-gate evaluator foundation so failed mechanical, runtime,
 visual, and semantic evidence can produce evidence-linked, failure-classified,
 bounded data/scene/scenario proposals, compare before/after reruns, surface the
 loop read-only in Studio, prove the lifecycle with deterministic demo fixtures,
-and lock Scenario Coverage v20, and a completed Build / Export / Packaging v1
-local export foundation: export target matrix, export profile, dry-run export
+and lock Scenario Coverage v20, and a completed Safe Source Mutation Apply v1
+milestone for review-gated trusted source apply over explicitly allowed low-risk
+source-like file classes: threat model, trusted-worktree boundary, source apply
+transaction model, stale target/hash guard, independent review enforcement,
+sandbox-to-trusted promotion readiness, rollback snapshot/recovery metadata,
+allowlisted verification runner, post-apply rerun/comparison evidence,
+dependency/CI/build-script blockers, append-only audit ledger, evidence bundle,
+read-only Studio/dashboard inspection, deterministic demo, Scenario Coverage
+v14, emergency hold/kill-switch, and conservative governance refresh, and a
+completed Build / Export / Packaging v1 local export foundation: export target matrix, export profile, dry-run export
 plan, deterministic staging, local web bundle assembly, asset manifest/path
 rewriting, runtime probe preservation, checksums/provenance, export verification
 evidence, fixture-scoped Scenario Coverage v15, read-only inspection, and
@@ -79,7 +87,7 @@ documentation/reproducibility notes, performance budget evidence, regression
 suite, and conservative governance refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -110,6 +118,23 @@ arbitrary source patching, auto-accept, auto-apply, auto-merge, self-approval,
 reviewer bypass, command bridges, production-readiness claims, or current Godot
 replacement positioning. Confidence remains an evidence-derived bounded signal,
 not a correctness or quality guarantee.
+
+Safe Source Mutation Apply v1 (#699-#716) is now complete as a bounded
+review-gated trusted apply path for explicitly allowed low-risk source-like file
+classes. The merged evidence chain added the #699 scope contract, #700 threat
+model refresh, #701 trusted worktree boundary, #702 source apply transaction
+model, #703 stale target/hash guard, #704 independent review enforcement, #705
+sandbox-to-trusted promotion readiness, #706 rollback snapshot/recovery
+metadata, #707 allowlisted verification runner, #708 post-apply
+rerun/comparison evidence, #709 dependency/CI/build-script blockers, #710 audit
+ledger, #711 evidence bundle, #712 read-only Studio inspection, #713 demo, #714
+Scenario Coverage v14, #715 emergency hold/kill-switch, and this #716 governance
+refresh. This completion authorizes only the bounded chain proved by those
+artifacts: no unrestricted source mutation, forbidden file-class changes,
+dependency/CI/build-script mutation, browser trusted writes, command bridges,
+auto-fix, auto-apply, auto-merge, self-approval, reviewer bypass, autonomous
+source repair, secure-sandbox guarantee, production-ready mutation claim, or
+current Godot replacement positioning is introduced.
 
 Build / Export / Packaging v1 (#720-#736) is now complete as a local-only export
 foundation. The merged evidence chain added the export target matrix, export
@@ -562,6 +587,25 @@ deferred: distributed orchestration / Elixir per ADR #92, native export, plugin
 runtime, and hosted/cloud still require separate design gates and governance
 approval.
 
+### Safe Source Mutation Apply v1 governance refresh
+
+Safe Source Mutation Apply v1 is recorded as **complete as bounded review-gated
+trusted source apply**, closing the Milestone 15 governance chain without closing
+#1 or #23. The completion evidence is the merged issue sequence #699-#716: scope
+and threat model, trusted-worktree boundary, transaction/stale-target/review
+controls, sandbox promotion readiness, rollback, allowlisted verification,
+post-apply rerun/comparison, dependency/CI/build-script blockers, audit ledger,
+evidence bundle, read-only Studio inspection, deterministic demo, Scenario
+Coverage v14, emergency hold/kill-switch, and this roadmap refresh.
+
+The remaining source-mutation gaps stay explicit and require separate scoped
+governance issues before implementation: expanding eligible file classes,
+dependency or lockfile mutation, CI/workflow or build-script mutation,
+credential/network/cloud/release/export mutation, browser trusted writes,
+command bridges, autonomous source repair, executable script repair, production
+secure-sandbox claims, and production-ready mutation guarantees. #1 and #23
+remain open governance anchors.
+
 ### Foundation Hardening v1 governance refresh
 
 Foundation Hardening v1 is recorded as **complete for Milestone A.H**, closing
@@ -678,11 +722,12 @@ Recommended next milestone candidates after this governance refresh are:
    repair, browser trusted writes, command bridges, auto-fix, auto-apply,
    auto-merge, self-approval, production QA certification, public-launch
    approval, current Godot replacement, or production-ready claims.
-2. **Resolve Safe Source Mutation Apply governance refresh #716 if it remains
-   open**, then continue only through fixed scoped issue sequences for Full
-   Studio Editor and Godot-Plus Demo. Preserve Rust/local trusted persistence,
-   independent review, rollback, stale-target, sandbox, and allowlisted
-   verification gates.
+2. **Safe Source Mutation Apply v1 (#699-#716) is complete as bounded
+   review-gated trusted source-like apply**. Continue only through fixed scoped
+   issue sequences for Full Studio Editor, Plugin / Extension System, and
+   Godot-Plus Demo; preserve Rust/local trusted persistence, independent review,
+   rollback, stale-target, sandbox, allowlisted verification, post-apply evidence,
+   audit ledger, and emergency hold gates.
 3. **Safe Executable Script Implementation Gate** — defer until maintainers open
    a separate governance issue with threat model, test matrix, rollback story,
    review-gate story, generated-state policy, and public wording; #611-#625 do
@@ -724,10 +769,16 @@ remain separate maintainer actions.
   run-facing surface should distinguish Rust-trusted artifacts from browser/CDP
   observations, and should expose missing or malformed evidence/review state as
   warnings instead of inferred passes.
-- Keep source mutation apply blocked until a separately scoped later milestone
-  has an explicit implementation decision, sandbox/evidence enforcement, and
-  review approval; the completed design gate, completed Source Mutation Preview
-  v1 milestone, and completed Asset Pipeline v1 are not that authorization.
+- Treat Safe Source Mutation Apply v1 as complete but narrow. Its artifacts
+  authorize only review-gated trusted apply for explicitly allowed low-risk
+  source-like file classes after validated preview, sandbox dry-run evidence,
+  independent accepted review, stale-target checks, rollback metadata,
+  allowlisted verification, post-apply evidence, audit ledger, and emergency
+  hold checks. They do not authorize unrestricted source mutation, forbidden
+  file-class expansion, dependency/CI/build-script mutation, browser trusted
+  writes, command bridges, autonomous source repair, auto-apply, auto-merge,
+  production-ready mutation claims, secure-sandbox guarantees, native export,
+  plugin runtime, hosted/cloud behavior, or current Godot replacement positioning.
 - Treat Source Mutation Preview v1 as complete but preview-only. Its artifacts
   are evidence inputs for review/governance, not authority to apply patches,
   merge branches, execute browser-originated commands, mutate dependencies/CI,

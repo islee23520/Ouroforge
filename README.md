@@ -242,14 +242,22 @@ prototype path. Autonomous QA / Playtest Swarm v1 is now recorded as complete in
 `docs/roadmap.md`, `docs/autonomous-qa-playtest-swarm-v1.md`,
 `docs/autonomous-qa-playtest-swarm-governance-handoff.md`, the QA swarm fixture/docs
 chain, and `examples/qa-swarm-regression-suite-v13/` as bounded local QA/playtest
-evidence and backlog inputs. These milestones do not authorize autonomous
-unrestricted game creation, uncontrolled asset generation, hidden workers,
-remote/cloud swarm orchestration, arbitrary source/script mutation, browser
+evidence and backlog inputs. Safe Source Mutation Apply v1 is recorded as
+complete in `docs/roadmap.md`, `docs/safe-source-mutation-apply-v1.md`, and
+`docs/safe-source-apply-governance-handoff.md` as review-gated trusted apply for
+explicitly allowed low-risk source-like file classes only: validated previews,
+sandbox evidence, independent review, stale-target checks, rollback metadata,
+allowlisted verification, post-apply evidence, audit ledger entries, and
+emergency hold controls remain mandatory. These milestones do not authorize
+autonomous unrestricted game creation, uncontrolled asset generation, hidden
+workers, remote/cloud swarm orchestration, unrestricted source/script mutation,
+forbidden file-class mutation, dependency/CI/build-script mutation, browser
 trusted writes, command bridges, auto-fix, auto-apply, auto-merge, native export,
-plugin runtime, hosted/cloud behavior, production readiness, public launch, or a
-current Godot replacement claim. The next recommended governance step is Safe
-Source Mutation Apply refresh #716 if still open, then the remaining bounded Full
-Studio Editor and Godot-Plus Demo sequences.
+plugin runtime, hosted/cloud behavior, production readiness, public launch,
+secure-sandbox guarantees, autonomous source repair, or a current Godot
+replacement claim. The next recommended governance step is the remaining bounded
+Full Studio Editor sequence, then Plugin / Extension System and Godot-Plus Demo
+scope only where already accepted by issue evidence.
 
 ## Contributor guide
 
