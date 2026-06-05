@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-blocked",
+  "status": "blocked",
+  "runMatrixRefs": ["runs/qa-swarm/run-305/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-blocked-1",
+      "failureClass": "physics-collision",
+      "severity": "high",
+      "evidenceRefs": ["evidence/qa-swarm/run-305/invariant-violation.json"],
+      "ownerLane": "engine",
+      "suggestedInvestigation": "Reproduce the tunneling case once a deterministic seed is available.",
+      "reproductionContext": {
+        "summary": "Fast-moving body tunnels through a thin collider; reproduction needs a fixed seed."
+      },
+      "reviewStatus": "deferred",
+      "blockedReasons": ["Reproduction requires a deterministic physics seed that is not yet captured."]
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

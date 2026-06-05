@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-stale",
+  "status": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-304/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-304/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-stale-1",
+      "failureClass": "level-design",
+      "severity": "medium",
+      "evidenceRefs": ["evidence/qa-swarm/run-304/scenario-result.json"],
+      "ownerLane": "level",
+      "suggestedInvestigation": "Re-run against a fresh run matrix entry before triaging the blocked-path report.",
+      "reproductionContext": {
+        "summary": "Player path is blocked by an unreachable ledge in the captured run."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": ["Run matrix entry run-304 is stale; backlog items must be re-collected before triage."],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-unsafe-ref",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-313/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-unsafe-ref",
+      "failureClass": "asset",
+      "severity": "low",
+      "evidenceRefs": ["evidence/../../etc/passwd"],
+      "ownerLane": "art",
+      "suggestedInvestigation": "Evidence ref escapes the local roots.",
+      "reproductionContext": {
+        "summary": "Traversal evidence ref."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

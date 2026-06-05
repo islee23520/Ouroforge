@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-flaky",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-303/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-flaky-1",
+      "failureClass": "flaky",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-303/flake-policy.json"],
+      "ownerLane": "qa",
+      "suggestedInvestigation": "Stabilize the rerun harness; the scenario alternates pass/fail without a code change.",
+      "reproductionContext": {
+        "summary": "Scenario passes and fails across reruns with divergent final scores."
+      },
+      "relatedFuzzSeed": "seed-00417",
+      "reviewStatus": "triaged"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

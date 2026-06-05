@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-status-mismatch",
+  "status": "blocked",
+  "runMatrixRefs": ["runs/qa-swarm/run-314/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-status-mismatch",
+      "failureClass": "visual",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-314/screenshot-diff.json"],
+      "ownerLane": "art",
+      "suggestedInvestigation": "Declared blocked but there are no blockers.",
+      "reproductionContext": {
+        "summary": "No blockers present so the computed status is classified."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-missing-evidence",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-306/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-no-evidence",
+      "failureClass": "gameplay-logic",
+      "severity": "high",
+      "evidenceRefs": [],
+      "ownerLane": "gameplay",
+      "suggestedInvestigation": "This item has no supporting evidence.",
+      "reproductionContext": {
+        "summary": "Reported failure without any evidence ref."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-classified",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-301/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-gameplay-1",
+      "failureClass": "gameplay-logic",
+      "severity": "high",
+      "evidenceRefs": ["evidence/qa-swarm/run-301/scenario-result.json"],
+      "ownerLane": "gameplay",
+      "suggestedInvestigation": "Check the goal-completion flag transition when the player re-enters the trigger volume.",
+      "reproductionContext": {
+        "summary": "Player reaches the goal but the win flag does not set on re-entry.",
+        "worldStateRef": "evidence/qa-swarm/run-301/world-state-goal.json"
+      },
+      "relatedScenarioId": "collect-and-exit",
+      "reviewStatus": "pending-review"
+    },
+    {
+      "itemId": "bug-performance-1",
+      "failureClass": "performance",
+      "severity": "medium",
+      "evidenceRefs": ["evidence/qa-swarm/run-301/frame-budget.json"],
+      "ownerLane": "engine",
+      "suggestedInvestigation": "Profile the collision pass; frame time regressed past budget under heavy entity counts.",
+      "reproductionContext": {
+        "summary": "Frame time exceeds the 16.7ms budget when more than 2000 entities are active."
+      },
+      "reviewStatus": "triaged"
+    },
+    {
+      "itemId": "bug-visual-1",
+      "failureClass": "visual",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-301/screenshot-diff.json"],
+      "ownerLane": "art",
+      "suggestedInvestigation": "Compare the sprite atlas mip selection against the visual baseline.",
+      "reproductionContext": {
+        "summary": "Background tiles show a seam at the 2x zoom level."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

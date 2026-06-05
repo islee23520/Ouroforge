@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-unsafe-boundary",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-315/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-unsafe-boundary",
+      "failureClass": "visual",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-315/screenshot-diff.json"],
+      "ownerLane": "art",
+      "suggestedInvestigation": "Boundary omits the required conservative wording.",
+      "reproductionContext": {
+        "summary": "Incomplete boundary."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications are evidence inputs."
+}

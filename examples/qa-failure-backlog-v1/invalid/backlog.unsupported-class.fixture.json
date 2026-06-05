@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-unsupported-class",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-308/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-bad-class",
+      "failureClass": "netcode",
+      "severity": "high",
+      "evidenceRefs": ["evidence/qa-swarm/run-308/scenario-result.json"],
+      "ownerLane": "engine",
+      "suggestedInvestigation": "Failure class is not supported by the v1 model.",
+      "reproductionContext": {
+        "summary": "Failure reported with an unsupported class."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

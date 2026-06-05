@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-duplicate-id",
+  "status": "classified",
+  "runMatrixRefs": ["runs/qa-swarm/run-311/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-dup",
+      "failureClass": "asset",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-311/asset-load.json"],
+      "ownerLane": "art",
+      "suggestedInvestigation": "First item.",
+      "reproductionContext": {
+        "summary": "Asset failed to load."
+      },
+      "reviewStatus": "pending-review"
+    },
+    {
+      "itemId": "bug-dup",
+      "failureClass": "console-error",
+      "severity": "low",
+      "evidenceRefs": ["evidence/qa-swarm/run-311/console-log.json"],
+      "ownerLane": "engine",
+      "suggestedInvestigation": "Duplicate item id.",
+      "reproductionContext": {
+        "summary": "Console error duplicate id."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}

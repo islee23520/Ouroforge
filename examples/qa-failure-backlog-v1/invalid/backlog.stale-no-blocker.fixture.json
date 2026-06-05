@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-failure-backlog-v1",
+  "backlogId": "qa14.11-stale-no-blocker",
+  "status": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-310/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-310/matrix.json"],
+  "items": [
+    {
+      "itemId": "bug-stale-no-blocker",
+      "failureClass": "level-design",
+      "severity": "medium",
+      "evidenceRefs": ["evidence/qa-swarm/run-310/scenario-result.json"],
+      "ownerLane": "level",
+      "suggestedInvestigation": "Stale run without blockers.",
+      "reproductionContext": {
+        "summary": "Stale capture missing blockers."
+      },
+      "reviewStatus": "pending-review"
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Failure classifications and mutation backlog items are evidence and backlog inputs only, not automatic fixes. They are evidence inputs and remain review-gated until a reviewer triages them. No auto-fix, no auto-apply, and no hidden tasks. Browser read-only or draft-only."
+}
