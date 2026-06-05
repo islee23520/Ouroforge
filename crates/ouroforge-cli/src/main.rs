@@ -138,6 +138,26 @@ enum Commands {
         #[command(subcommand)]
         command: BehaviorCommand,
     },
+    Plugin {
+        #[command(subcommand)]
+        command: PluginCommand,
+    },
+}
+
+/// Read-only local plugin registry inspection (#752). No install, update, run,
+/// enable, disable, delete, publish, or marketplace behavior is provided.
+#[derive(Debug, Subcommand)]
+enum PluginCommand {
+    /// Discover and list local plugins with status and descriptors (JSON).
+    List {
+        #[arg(default_value = "plugins")]
+        dir: PathBuf,
+    },
+    /// Validate local plugins; exits non-zero if any plugin or conflict fails.
+    Validate {
+        #[arg(default_value = "plugins")]
+        dir: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1332,6 +1352,9 @@ fn main() -> Result<()> {
             )?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
+        Commands::Plugin { command } => {
+            handle_plugin_command(command)?;
+        }
     }
 
     Ok(())
@@ -2162,6 +2185,54 @@ fn print_semantic_compare_summary(comparison_json: &str) -> Result<()> {
                     "- [warning] {}",
                     warning.as_str().unwrap_or("unknown project warning")
                 );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Read-only plugin registry inspection (#752). Discovers and validates local
+/// plugins; never installs, updates, runs, enables, or mutates anything.
+fn handle_plugin_command(command: PluginCommand) -> Result<()> {
+    match command {
+        PluginCommand::List { dir } => {
+            let registry = ouroforge_core::plugin_registry::discover_plugins_in_dir(&dir)?;
+            let read_model = registry.read_model();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schemaVersion": "ouroforge.plugin-cli-list.v1",
+                    "root": registry.root,
+                    "summary": read_model,
+                    "plugins": registry.entries,
+                    "guardrail": "read-only plugin inspection; no install, update, run, enable, disable, delete, publish, or marketplace behavior"
+                }))?
+            );
+        }
+        PluginCommand::Validate { dir } => {
+            let registry = ouroforge_core::plugin_registry::discover_plugins_in_dir(&dir)?;
+            let read_model = registry.read_model();
+            let conflicts = ouroforge_core::plugin_conflicts::detect_conflicts(&registry);
+            let ok = read_model.invalid_count == 0
+                && read_model.blocked_count == 0
+                && read_model.incompatible_count == 0
+                && !conflicts.has_failures();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schemaVersion": "ouroforge.plugin-cli-validate.v1",
+                    "status": if ok { "ok" } else { "failed" },
+                    "root": registry.root,
+                    "summary": read_model,
+                    "plugins": registry.entries,
+                    "conflicts": conflicts,
+                    "guardrail": "read-only plugin validation; no install, update, run, enable, disable, delete, publish, or marketplace behavior"
+                }))?
+            );
+            if !ok {
+                return Err(anyhow!(
+                    "plugin validation failed: invalid/blocked/incompatible plugins or conflicts present"
+                ));
             }
         }
     }
