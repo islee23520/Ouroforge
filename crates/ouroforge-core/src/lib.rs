@@ -29338,8 +29338,73 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         .first()
         .cloned()
         .unwrap_or_else(|| json!({ "kind": "failed_verdict" }));
-    let evidence_id = select_evidence_id_for_failure(&evidence, &failure, &verdict)
-        .ok_or_else(|| anyhow!("failed verdict has no evidence artifact to link"))?;
+    let evidence_refs = collect_classification_evidence_refs(&failure, &verdict);
+    let (category, _) = classify_failure_category(&failure, &verdict, "", &evidence_refs);
+    let gate_category = infer_mutation_proposal_gate_category(&failure, &verdict, &category);
+    let evidence_state = infer_mutation_proposal_evidence_state(&evidence_refs, &evidence);
+    if matches!(gate_category, MutationProposalGateCategory::Unsupported)
+        && matches!(evidence_state, MutationProposalEvidenceState::Linked)
+    {
+        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+        let classification_ids = classification_artifact
+            .classifications
+            .iter()
+            .map(|classification| classification.id.clone())
+            .collect::<Vec<_>>();
+        let summary = EvolveSummary {
+            status: mutation_proposal_gate_category_label(&gate_category).to_string(),
+            proposals_created: 0,
+            proposal_ids: Vec::new(),
+            classification_ids,
+            patch_draft_ids: Vec::new(),
+            reason: "failed verdict uses an unsupported mutation proposal gate; no mutation proposal was fabricated".to_string(),
+        };
+        append_ledger_event(
+            run_dir,
+            "evolve.completed",
+            "evolve-cli",
+            json!({
+                "status": summary.status,
+                "proposals_created": summary.proposals_created,
+                "classification_ids": summary.classification_ids,
+                "reason": summary.reason
+            }),
+        )?;
+        update_journal(run_dir)?;
+        return Ok(summary);
+    }
+    let Some(evidence_id) = select_evidence_id_for_failure(&evidence, &failure, &verdict) else {
+        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+        let classification_ids = classification_artifact
+            .classifications
+            .iter()
+            .map(|classification| classification.id.clone())
+            .collect::<Vec<_>>();
+        let summary = EvolveSummary {
+            status: mutation_proposal_evidence_state_label(&evidence_state).to_string(),
+            proposals_created: 0,
+            proposal_ids: Vec::new(),
+            classification_ids,
+            patch_draft_ids: Vec::new(),
+            reason: format!(
+                "failed verdict has {} justifying evidence; no mutation proposal was fabricated",
+                mutation_proposal_evidence_state_label(&evidence_state)
+            ),
+        };
+        append_ledger_event(
+            run_dir,
+            "evolve.completed",
+            "evolve-cli",
+            json!({
+                "status": summary.status,
+                "proposals_created": summary.proposals_created,
+                "classification_ids": summary.classification_ids,
+                "reason": summary.reason
+            }),
+        )?;
+        update_journal(run_dir)?;
+        return Ok(summary);
+    };
     let proposal = create_mutation_proposal(
         run_dir,
         MutationProposalInput {
@@ -29407,12 +29472,33 @@ fn select_evidence_id_for_failure(
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
 ) -> Option<String> {
-    for key in ["path", "evidence_path"] {
+    for key in [
+        "path",
+        "evidence_path",
+        "evidence_ref",
+        "model_ref",
+        "world_state_ref",
+        "comparison_ref",
+    ] {
         if let Some(path) = failure.get(key).and_then(|value| value.as_str()) {
             if let Some(artifact) = evidence
                 .artifacts
                 .iter()
-                .find(|artifact| artifact.path == path)
+                .find(|artifact| artifact.path == path || artifact.id == path)
+            {
+                return Some(artifact.id.clone());
+            }
+        }
+    }
+    if let Some(paths) = failure
+        .get("evidence_refs")
+        .and_then(|value| value.as_array())
+    {
+        for path in paths.iter().filter_map(|value| value.as_str()) {
+            if let Some(artifact) = evidence
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.path == path || artifact.id == path)
             {
                 return Some(artifact.id.clone());
             }
@@ -29428,15 +29514,9 @@ fn select_evidence_id_for_failure(
                     evidence
                         .artifacts
                         .iter()
-                        .find(|artifact| artifact.path == path)
+                        .find(|artifact| artifact.path == path || artifact.id == path)
                         .map(|artifact| artifact.id.clone())
                 })
-        })
-        .or_else(|| {
-            evidence
-                .artifacts
-                .first()
-                .map(|artifact| artifact.id.clone())
         })
 }
 
@@ -29449,6 +29529,11 @@ fn build_mutation_proposal_rationale(
 ) -> Result<MutationProposalRationale> {
     let evidence_refs = collect_classification_evidence_refs(failure, verdict);
     let (category, reason) = classify_failure_category(failure, verdict, journal, &evidence_refs);
+    let failing_gate_category = infer_mutation_proposal_gate_category(failure, verdict, &category);
+    let justifying_evidence_ref = select_justifying_evidence_ref(&evidence_refs, evidence);
+    let evidence_state = infer_mutation_proposal_evidence_state(&evidence_refs, evidence);
+    let (confidence, confidence_basis) =
+        derive_mutation_proposal_confidence(&evidence_state, &failing_gate_category);
     let mut evidence_artifact_ids = Vec::new();
     push_unique_ref(&mut evidence_artifact_ids, &proposal.evidence_id);
     for evidence_ref in &evidence_refs {
@@ -29460,11 +29545,25 @@ fn build_mutation_proposal_rationale(
             push_unique_ref(&mut evidence_artifact_ids, &artifact.id);
         }
     }
+    let mut scenario_result_refs = collect_scenario_result_refs(&evidence_refs, evidence);
+    if scenario_result_refs.is_empty() {
+        let verdict_evidence_refs = verdict
+            .get("evidence_refs")
+            .and_then(|value| value.as_array())
+            .map(|refs| {
+                refs.iter()
+                    .filter_map(|value| value.as_str())
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        scenario_result_refs = collect_scenario_result_refs(&verdict_evidence_refs, evidence);
+    }
     let rationale = MutationProposalRationale {
         schema_version: "1".to_string(),
         failure_classification: mutation_classification_category_label(&category).to_string(),
         evidence_artifact_ids,
-        scenario_result_refs: collect_scenario_result_refs(&evidence_refs, evidence),
+        scenario_result_refs,
         verdict_refs: vec!["verdict.json".to_string()],
         expected_effect: format!(
             "Review evidence-linked failure `{}` and adjust `{}` at `{}` only if review accepts the proposal.",
@@ -29472,12 +29571,123 @@ fn build_mutation_proposal_rationale(
             proposal.target,
             proposal.path
         ),
-        confidence: MutationProposalRationaleConfidence::Medium,
+        confidence,
         reasoning_summary: reason,
         allowed_mutation_type: MutationProposalAllowedMutationType::DataOnly,
+        failing_gate_category: Some(failing_gate_category.clone()),
+        justifying_evidence_ref,
+        evidence_state: Some(evidence_state),
+        confidence_basis: Some(confidence_basis),
+        bounded_mutation_type: Some(bounded_mutation_type_for_gate(&failing_gate_category)),
     };
     rationale.validate(&proposal.evidence_id)?;
     Ok(rationale)
+}
+
+fn infer_mutation_proposal_gate_category(
+    failure: &serde_json::Value,
+    verdict: &serde_json::Value,
+    category: &MutationClassificationCategory,
+) -> MutationProposalGateCategory {
+    for key in ["gate", "gate_category", "category"] {
+        if let Some(value) = failure.get(key).and_then(|value| value.as_str()) {
+            match value.to_ascii_lowercase().as_str() {
+                "mechanical" => return MutationProposalGateCategory::Mechanical,
+                "runtime" => return MutationProposalGateCategory::Runtime,
+                "visual" => return MutationProposalGateCategory::Visual,
+                "semantic" => return MutationProposalGateCategory::Semantic,
+                _ => return MutationProposalGateCategory::Unsupported,
+            }
+        }
+    }
+    let haystack = [failure.to_string(), verdict.to_string()]
+        .join(" ")
+        .to_ascii_lowercase();
+    if haystack.contains("visual") || haystack.contains("screenshot") {
+        MutationProposalGateCategory::Visual
+    } else if haystack.contains("semantic") || haystack.contains("invariant") {
+        MutationProposalGateCategory::Semantic
+    } else if matches!(
+        category,
+        MutationClassificationCategory::RuntimeProbeFailure
+            | MutationClassificationCategory::ConsoleError
+            | MutationClassificationCategory::PerformanceRegression
+    ) || haystack.contains("runtime")
+        || haystack.contains("console")
+        || haystack.contains("performance")
+        || haystack.contains("probe")
+    {
+        MutationProposalGateCategory::Runtime
+    } else {
+        MutationProposalGateCategory::Mechanical
+    }
+}
+
+fn select_justifying_evidence_ref(
+    evidence_refs: &[String],
+    evidence: &EvidenceIndex,
+) -> Option<String> {
+    evidence_refs
+        .iter()
+        .find(|evidence_ref| {
+            evidence
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.path == **evidence_ref || artifact.id == **evidence_ref)
+        })
+        .cloned()
+}
+
+fn infer_mutation_proposal_evidence_state(
+    evidence_refs: &[String],
+    evidence: &EvidenceIndex,
+) -> MutationProposalEvidenceState {
+    if select_justifying_evidence_ref(evidence_refs, evidence).is_some() {
+        MutationProposalEvidenceState::Linked
+    } else if evidence_refs.is_empty()
+        || evidence_refs
+            .iter()
+            .any(|evidence_ref| evidence_ref.contains("missing"))
+    {
+        MutationProposalEvidenceState::MissingEvidence
+    } else {
+        MutationProposalEvidenceState::StaleRef
+    }
+}
+
+fn bounded_mutation_type_for_gate(
+    gate_category: &MutationProposalGateCategory,
+) -> MutationProposalBoundedMutationType {
+    match gate_category {
+        MutationProposalGateCategory::Mechanical => MutationProposalBoundedMutationType::Scenario,
+        MutationProposalGateCategory::Runtime => MutationProposalBoundedMutationType::Data,
+        MutationProposalGateCategory::Visual => MutationProposalBoundedMutationType::Scene,
+        MutationProposalGateCategory::Semantic => MutationProposalBoundedMutationType::Data,
+        MutationProposalGateCategory::Unsupported => MutationProposalBoundedMutationType::Data,
+    }
+}
+
+fn derive_mutation_proposal_confidence(
+    evidence_state: &MutationProposalEvidenceState,
+    gate_category: &MutationProposalGateCategory,
+) -> (MutationProposalRationaleConfidence, String) {
+    match evidence_state {
+        MutationProposalEvidenceState::Linked => (
+            MutationProposalRationaleConfidence::High,
+            format!(
+                "bounded evidence signal: linked {:?} gate artifact exists; confidence is not a correctness guarantee",
+                gate_category
+            ),
+        ),
+        MutationProposalEvidenceState::StaleRef => (
+            MutationProposalRationaleConfidence::Low,
+            "bounded evidence signal: verdict referenced stale evidence; proposal generation should fail closed".to_string(),
+        ),
+        MutationProposalEvidenceState::MissingEvidence | MutationProposalEvidenceState::Unsupported => (
+            MutationProposalRationaleConfidence::Low,
+            "bounded evidence signal: missing or unsupported evidence; proposal generation should fail closed".to_string(),
+        ),
+    }
 }
 
 fn mutation_classification_category_label(
@@ -29491,6 +29701,35 @@ fn mutation_classification_category_label(
         MutationClassificationCategory::VisualMismatch => "visual_mismatch",
         MutationClassificationCategory::MissingEvidence => "missing_evidence",
         MutationClassificationCategory::Unknown => "unknown",
+    }
+}
+
+fn mutation_proposal_gate_category_label(category: &MutationProposalGateCategory) -> &'static str {
+    match category {
+        MutationProposalGateCategory::Mechanical => "mechanical",
+        MutationProposalGateCategory::Runtime => "runtime",
+        MutationProposalGateCategory::Visual => "visual",
+        MutationProposalGateCategory::Semantic => "semantic",
+        MutationProposalGateCategory::Unsupported => "unsupported",
+    }
+}
+
+fn mutation_proposal_evidence_state_label(state: &MutationProposalEvidenceState) -> &'static str {
+    match state {
+        MutationProposalEvidenceState::Linked => "linked",
+        MutationProposalEvidenceState::MissingEvidence => "missing-evidence",
+        MutationProposalEvidenceState::StaleRef => "stale-ref",
+        MutationProposalEvidenceState::Unsupported => "unsupported",
+    }
+}
+
+fn mutation_proposal_bounded_type_label(
+    bounded_type: &MutationProposalBoundedMutationType,
+) -> &'static str {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Data => "data",
+        MutationProposalBoundedMutationType::Scene => "scene",
+        MutationProposalBoundedMutationType::Scenario => "scenario",
     }
 }
 
@@ -29566,6 +29805,16 @@ pub struct MutationProposalRationale {
     pub confidence: MutationProposalRationaleConfidence,
     pub reasoning_summary: String,
     pub allowed_mutation_type: MutationProposalAllowedMutationType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failing_gate_category: Option<MutationProposalGateCategory>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub justifying_evidence_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_state: Option<MutationProposalEvidenceState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence_basis: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounded_mutation_type: Option<MutationProposalBoundedMutationType>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -29582,6 +29831,33 @@ pub enum MutationProposalAllowedMutationType {
     SceneOnly,
     ProjectSceneOnly,
     DataOnly,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationProposalGateCategory {
+    Mechanical,
+    Runtime,
+    Visual,
+    Semantic,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationProposalEvidenceState {
+    Linked,
+    MissingEvidence,
+    StaleRef,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationProposalBoundedMutationType {
+    Data,
+    Scene,
+    Scenario,
 }
 
 impl MutationProposalIndex {
@@ -29676,6 +29952,21 @@ impl MutationProposalRationale {
         }
         for verdict_ref in &self.verdict_refs {
             require_text("mutation proposal rationale verdict_ref", verdict_ref)?;
+        }
+        if let Some(justifying_evidence_ref) = &self.justifying_evidence_ref {
+            require_text(
+                "mutation proposal rationale justifying_evidence_ref",
+                justifying_evidence_ref,
+            )?;
+        }
+        if matches!(
+            self.evidence_state,
+            Some(MutationProposalEvidenceState::Linked)
+        ) && self.justifying_evidence_ref.is_none()
+        {
+            return Err(anyhow!(
+                "mutation proposal rationale linked evidence_state requires justifying_evidence_ref"
+            ));
         }
         Ok(())
     }
@@ -29907,7 +30198,14 @@ fn collect_classification_evidence_refs(
     // `evidence_ref` (singular) is where failed assertions / visual checkpoints
     // record their direct artifact link, while `path` only points at the broader
     // scenario result; include it so those links are not dropped.
-    for key in ["path", "evidence_path", "evidence_ref"] {
+    for key in [
+        "path",
+        "evidence_path",
+        "evidence_ref",
+        "model_ref",
+        "world_state_ref",
+        "comparison_ref",
+    ] {
         if let Some(path) = failure.get(key).and_then(|value| value.as_str()) {
             push_unique_ref(&mut refs, path);
         }
@@ -40787,6 +41085,22 @@ fn render_journal(
                     mutation_allowed_type_label(&rationale.allowed_mutation_type),
                     mutation_rationale_confidence_label(&rationale.confidence)
                 ));
+                if let (Some(gate), Some(evidence_state), Some(bounded_type)) = (
+                    &rationale.failing_gate_category,
+                    &rationale.evidence_state,
+                    &rationale.bounded_mutation_type,
+                ) {
+                    out.push_str(&format!(
+                        "  - Evidence-linked gate: `{}`; justifying evidence: `{}`; evidence state: `{}`; bounded type: `{}`\n",
+                        mutation_proposal_gate_category_label(gate),
+                        rationale
+                            .justifying_evidence_ref
+                            .as_deref()
+                            .unwrap_or("missing"),
+                        mutation_proposal_evidence_state_label(evidence_state),
+                        mutation_proposal_bounded_type_label(bounded_type)
+                    ));
+                }
             }
         }
     }
@@ -41518,6 +41832,23 @@ fn render_authoring_governance_journal_section(
                     join_or_none(&rationale.scenario_result_refs),
                     join_or_none(&rationale.verdict_refs)
                 ));
+                if let (Some(gate), Some(evidence_state), Some(bounded_type)) = (
+                    &rationale.failing_gate_category,
+                    &rationale.evidence_state,
+                    &rationale.bounded_mutation_type,
+                ) {
+                    out.push_str(&format!(
+                        "  - Evidence-linked gate `{}` via `{}`; evidence state `{}`; bounded type `{}`
+",
+                        mutation_proposal_gate_category_label(gate),
+                        rationale
+                            .justifying_evidence_ref
+                            .as_deref()
+                            .unwrap_or("missing"),
+                        mutation_proposal_evidence_state_label(evidence_state),
+                        mutation_proposal_bounded_type_label(bounded_type)
+                    ));
+                }
             } else {
                 out.push_str(
                     "  - Rationale: missing; proposal quality evidence has not been attached.
@@ -78684,6 +79015,11 @@ scenarios:
                 confidence: MutationProposalRationaleConfidence::High,
                 reasoning_summary: "failed goal assertion".to_string(),
                 allowed_mutation_type: MutationProposalAllowedMutationType::ProjectSceneOnly,
+                failing_gate_category: Some(MutationProposalGateCategory::Mechanical),
+                justifying_evidence_ref: Some("evidence-1".to_string()),
+                evidence_state: Some(MutationProposalEvidenceState::Linked),
+                confidence_basis: Some("bounded linked evidence signal".to_string()),
+                bounded_mutation_type: Some(MutationProposalBoundedMutationType::Scene),
             }),
         };
         let decision = MutationReviewDecision {
