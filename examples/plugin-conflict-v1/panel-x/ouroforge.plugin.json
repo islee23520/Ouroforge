@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-panel-x",
+  "name": "Fixture Panel X",
+  "version": "1.0.0",
+  "description": "Declares a dashboard panel descriptor id shared with another plugin.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Conflict Fixtures"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "descriptorRefs": [
+    { "id": "shared-panel-descriptor", "kind": "dashboardPanel", "path": "descriptors/panel.json" }
+  ],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

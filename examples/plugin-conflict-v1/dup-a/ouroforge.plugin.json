@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-duplicate-plugin",
+  "name": "Fixture Duplicate Plugin A",
+  "version": "1.0.0",
+  "description": "First manifest declaring a duplicate plugin id for conflict detection.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Conflict Fixtures"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "descriptorRefs": [
+    { "id": "dup-a-panel", "kind": "dashboardPanel", "path": "descriptors/panel.json" }
+  ],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

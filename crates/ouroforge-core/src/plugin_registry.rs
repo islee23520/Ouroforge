@@ -48,6 +48,12 @@ pub enum PluginRegistryCompatibility {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PluginRegistryDescriptor {
+    pub kind: String,
+    pub id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PluginRegistryEntry {
     #[serde(rename = "pluginId")]
     pub plugin_id: String,
@@ -64,6 +70,9 @@ pub struct PluginRegistryEntry {
     pub permissions: Vec<String>,
     #[serde(rename = "assetMetadataDescriptors")]
     pub asset_metadata_descriptors: Vec<String>,
+    /// Contributed extension descriptors (kind + id), used for cross-plugin
+    /// conflict detection (#751).
+    pub descriptors: Vec<PluginRegistryDescriptor>,
     #[serde(rename = "compatibilityStatus")]
     pub compatibility_status: PluginRegistryCompatibility,
     #[serde(rename = "manifestHash")]
@@ -270,9 +279,33 @@ fn blocked_entry(base: &Path, path: &Path, reason: &str) -> PluginRegistryEntry 
         extension_points: Vec::new(),
         permissions: Vec::new(),
         asset_metadata_descriptors: Vec::new(),
+        descriptors: Vec::new(),
         compatibility_status: PluginRegistryCompatibility::Unknown,
         manifest_hash: String::new(),
     }
+}
+
+/// Collect contributed extension descriptors (kind + id) from a validated
+/// manifest: descriptor references plus inline asset metadata descriptors.
+fn descriptors_from_manifest(manifest: &PluginManifest) -> Vec<PluginRegistryDescriptor> {
+    let mut descriptors: Vec<PluginRegistryDescriptor> = manifest
+        .descriptor_refs
+        .iter()
+        .map(|reference| PluginRegistryDescriptor {
+            kind: reference.kind.clone(),
+            id: reference.id.clone(),
+        })
+        .collect();
+    descriptors.extend(
+        manifest
+            .asset_metadata
+            .iter()
+            .map(|descriptor| PluginRegistryDescriptor {
+                kind: "assetMetadataProvider".to_string(),
+                id: descriptor.descriptor_id.clone(),
+            }),
+    );
+    descriptors
 }
 
 fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
@@ -329,6 +362,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
                 extension_points: Vec::new(),
                 permissions: Vec::new(),
                 asset_metadata_descriptors: Vec::new(),
+                descriptors: Vec::new(),
                 compatibility_status: PluginRegistryCompatibility::Incompatible,
                 manifest_hash,
             });
@@ -389,6 +423,11 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
                 } else {
                     Vec::new()
                 },
+                descriptors: if contributes {
+                    descriptors_from_manifest(&manifest)
+                } else {
+                    Vec::new()
+                },
                 compatibility_status,
                 manifest_hash,
             })
@@ -402,6 +441,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
             extension_points: Vec::new(),
             permissions: Vec::new(),
             asset_metadata_descriptors: Vec::new(),
+            descriptors: Vec::new(),
             compatibility_status: PluginRegistryCompatibility::Unknown,
             manifest_hash,
         }),
