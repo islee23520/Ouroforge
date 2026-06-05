@@ -439,14 +439,7 @@ fn validate_scope_text(field: &str, value: &str) -> Result<()> {
 }
 
 fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
-    const NEGATIONS: [&str; 6] = [
-        "no ",
-        "not ",
-        "without ",
-        "avoid ",
-        "forbid ",
-        "forbidden ",
-    ];
+    const NEGATIONS: [&str; 6] = ["no ", "not ", "without ", "avoid ", "forbid ", "forbidden "];
     let hay = value.to_ascii_lowercase();
     let hay = hay.as_str();
     // Scope negation to the clause/sentence containing each occurrence so a

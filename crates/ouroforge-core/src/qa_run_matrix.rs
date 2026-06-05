@@ -534,7 +534,13 @@ mod negation_scope_tests {
 
     #[test]
     fn plain_positive_is_flagged_and_absent_is_not() {
-        assert!(contains_positive_phrase("auto-merge happens here", "auto-merge"));
-        assert!(!contains_positive_phrase("read-only evidence only", "auto-merge"));
+        assert!(contains_positive_phrase(
+            "auto-merge happens here",
+            "auto-merge"
+        ));
+        assert!(!contains_positive_phrase(
+            "read-only evidence only",
+            "auto-merge"
+        ));
     }
 }

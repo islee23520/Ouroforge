@@ -609,10 +609,7 @@ fn require_local_id(field: &str, value: &str) -> Result<()> {
 /// (`*.json` scene/behavior/scenario/manifest fixtures), never build manifests
 /// or Rust/JS/script source files.
 fn is_source_like_target(value: &str) -> bool {
-    if value.starts_with("crates/")
-        || value.starts_with("src/")
-        || value.contains("/src/")
-    {
+    if value.starts_with("crates/") || value.starts_with("src/") || value.contains("/src/") {
         return true;
     }
     let file_name = value.rsplit('/').next().unwrap_or(value);
