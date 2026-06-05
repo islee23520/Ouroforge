@@ -41,10 +41,16 @@ terrain drafts, entity/objective/encounter placement drafts, reachability and
 objective proof evidence, difficulty/pacing heuristic evidence, visual/semantic
 diffs, review-gated level apply records, read-only Studio inspection, a
 deterministic demo, Scenario Coverage v10, and a conservative governance
-refresh:
+refresh, and a completed Gameplay Scripting / Logic System v1 milestone for
+structured data-only gameplay logic: behavior models, deterministic
+event/signal contracts, state-machine and ability/action contracts, script and
+sandbox design gates, runtime integration, scenario assertions, behavior drafts,
+review-gated apply records, evidence/journal integration, escaped read-only
+Studio/dashboard inspection, a deterministic demo, Scenario Coverage v9, and a
+conservative governance refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic/evidence
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -174,6 +180,20 @@ The current implementation has completed these documented milestone surfaces:
   `docs/agentic-level-design-demo-v1.md`,
   `docs/scenario-coverage-v10-agentic-level-design.md`,
   `docs/agentic-scene-level-designer-governance-handoff.md`)
+- Gameplay Scripting / Logic System v1 / structured data-only gameplay behavior
+  (`docs/gameplay-scripting-logic-system-v1.md`,
+  `docs/gameplay-behavior-model-v1.md`,
+  `docs/gameplay-event-signal-system-v1.md`,
+  `docs/gameplay-state-machine-v1.md`,
+  `docs/gameplay-ability-action-v1.md`,
+  `docs/script-module-interface-design-gate-v1.md`,
+  `docs/safe-script-sandbox-trust-boundary-v1.md`,
+  `docs/gameplay-state-ability-evidence-compatibility-v1.md`,
+  `docs/behavior-draft-v1.md`,
+  `docs/behavior-apply-transaction-v1.md`,
+  `docs/studio-behavior-inspection-surface-v1.md`,
+  `examples/gameplay-logic-demo-v1/README.md`,
+  `examples/gameplay-logic-regression-v9/README.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -263,18 +283,17 @@ previews, screenshots, runs, dashboard exports, temp projects, and local tool
 outputs remain ignored generated state unless a later issue explicitly scopes a
 deterministic source-like fixture.
 
-After #642, the recommended next milestone candidate is the remaining Gameplay
-Scripting / Logic System v1 sequence (#614-#625). The #611 scope contract, #612
-behavior model, and #613 event/signal system are already closed, but state
-machine/ability actions, script-module design gates, safe script sandboxing,
-runtime integration, behavior scenario assertions, agent-generated behavior
-drafts, review-gated behavior apply, evidence/journal integration, Studio
-behavior inspection, demo evidence, Scenario Coverage v9, and the #625
-roadmap/#1 governance refresh remain open. This recommendation stays bounded to
-local behavior/evidence contracts and must not become arbitrary third-party code
-loading, plugin runtime, browser command bridge, hosted execution, production
-scripting, source-apply authority, public-launch approval, or Godot replacement
-scope.
+After #625, Gameplay Scripting / Logic System v1 (#611-#625) is complete as a
+structured data-only gameplay behavior/evidence milestone. It covers behavior
+models, deterministic events/signals, state machines, ability/action contracts,
+script and sandbox design gates, runtime integration, behavior scenario
+assertions, agent-generated behavior drafts, review-gated behavior apply,
+evidence/journal integration, Studio behavior inspection, demo evidence,
+Scenario Coverage v9, and this roadmap/#1 governance refresh. This completion
+stays bounded to local behavior/evidence contracts and is not arbitrary
+third-party code loading, plugin runtime, browser command bridge, hosted
+execution, production scripting, source-apply authority, public-launch approval,
+or Godot replacement scope.
 
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
@@ -337,11 +356,13 @@ conservative wording.
 The 3D Capability Gate v1 sequence (#596-#608) and Agentic Scene and Level
 Designer v1 sequence (#627-#642) are now recorded as complete after
 implementation, demo, regression, Studio inspection, and governance evidence.
-The conservative next technical milestone candidate is the remaining Gameplay
-Scripting / Logic System v1 sequence (#614-#625), framed as bounded local
-behavior/evidence contracts rather than arbitrary scripting, plugin loading,
-hosted execution, browser command bridges, source apply, public launch,
-production readiness, or Godot replacement scope.
+Gameplay Scripting / Logic System v1 (#611-#625) is now recorded as complete,
+framed as bounded local behavior/evidence contracts rather than arbitrary
+scripting, plugin loading, hosted execution, browser command bridges, source
+apply, public launch, production readiness, or Godot replacement scope. The
+conservative next technical milestone candidate is GDD-to-Playable Prototype v1
+(#644-#661), using the completed behavior/evidence contracts in a bounded
+prototype flow.
 
 Other possible later governance topics remain Native Export Design Gate, Plugin
 Design Gate, Source Mutation Apply Design Gate, and Visual Authoring v2. None is
@@ -373,21 +394,18 @@ publication, and support boundaries described above.
 
 Recommended next milestone candidates after this governance refresh are:
 
-1. **Gameplay Scripting / Logic System v1 remaining sequence (#614-#625)** —
-   the next dependency-ordered technical branch because its scope contract and
-   first data-only behavior/event artifacts are already in place. Continue with
-   #614 and keep the branch bounded to local behavior models, state-machine and
-   ability-action contracts, safe script-module design gates, sandbox evidence,
-   behavior runtime integration, behavior assertions, review-gated behavior
-   apply, evidence/journal integration, Studio behavior inspection, demo
-   evidence, Scenario Coverage v9, generated-state audits, and conservative
-   wording. It must not become arbitrary third-party code loading, plugin
-   runtime, browser command bridge, hosted execution, production scripting,
-   source-apply authority, public-launch approval, or Godot replacement scope.
-2. **GDD-to-Playable Prototype v1 (#644-#661)** — a later agentic authoring
-   candidate that requires its own scoped contract, review gates, generated-state
-   audits, and conservative wording after the behavior/evidence backlog is
-   reconciled.
+1. **GDD-to-Playable Prototype v1 (#644-#661)** — the next dependency-ordered
+   technical branch because Gameplay Scripting / Logic System v1 is now
+   reconciled and can feed a bounded prototype flow. Keep it scoped to design
+   requirement extraction, mechanics/core-loop mapping, project scaffold, scene
+   and gameplay plans, scenario criteria, placeholder assets, implementation
+   task graph, review-gated prototype apply, evidence/journal bundles, Studio
+   planning inspection, demo, Scenario Coverage v11, generated-state audits, and
+   conservative wording.
+2. **Safe Executable Script Implementation Gate** — defer until maintainers open
+   a separate governance issue with threat model, test matrix, rollback story,
+   review-gate story, generated-state policy, and public wording; #611-#625 do
+   not authorize arbitrary executable scripts.
 3. **Autonomous QA / Playtest Swarm, Safe Source Mutation Apply, Build/Export/
    Packaging, Plugin/Extension System, Full Studio Editor, and demo game tracks**
    — later candidates only when opened by their own fixed issue sequences with
@@ -452,6 +470,12 @@ remain separate maintainer actions.
   visual editor maturity, visual scripting, browser trusted writes, command
   bridges, unrestricted source apply, native export, plugin runtime, hosted/cloud
   behavior, public launch, production readiness, or Godot replacement status.
+- Treat Gameplay Scripting / Logic System v1 as complete but bounded. Its
+  artifacts are structured data-only local behavior/evidence contracts, not
+  arbitrary script execution, a production-stable scripting API, secure sandbox
+  guarantee, plugin runtime, command bridge, browser trusted write path,
+  unrestricted source apply, native export, hosted/cloud behavior, public-launch
+  automation, production readiness, or Godot replacement status.
 
 ## Active anchors
 

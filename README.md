@@ -227,10 +227,16 @@ Designer v1 is recorded as complete in `docs/roadmap.md`,
 level/scene-authoring evidence milestone; it is not autonomous full game
 generation, a production editor, visual scripting, browser trusted writes,
 native export, plugin runtime, hosted/cloud behavior, source-apply authority,
-public-launch approval, or Godot replacement scope. The next recommended
-technical branch is the remaining scoped Gameplay Scripting / Logic System v1
-sequence (#614-#625), not arbitrary third-party scripting or unrestricted
-autonomous project mutation.
+public-launch approval, or Godot replacement scope. Gameplay Scripting /
+Logic System v1 is now recorded as complete in `docs/roadmap.md`,
+`docs/gameplay-scripting-logic-system-v1.md`, `examples/gameplay-logic-demo-v1/`,
+and `examples/gameplay-logic-regression-v9/` as a structured data-only behavior
+and evidence milestone; it is not arbitrary script execution, a production-stable
+scripting API, plugin runtime, browser trusted write path, command bridge,
+unrestricted source apply, public-launch approval, or Godot replacement scope.
+The next recommended technical branch is GDD-to-Playable Prototype v1 (#644-#661)
+so the completed behavior/evidence contracts can be exercised in a bounded
+prototype flow rather than expanded into arbitrary third-party scripting.
 
 ## Contributor guide
 

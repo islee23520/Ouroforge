@@ -96,11 +96,21 @@ proves a safer dependency order:
 14. #625 — Roadmap and #1 Governance Refresh after Gameplay Scripting / Logic
     System v1.
 
-Each issue should use the smallest safe PR unit with focused tests, generated-
-state audit, no-arbitrary-script audit, compatibility audit, and conservative
-wording audit. Do not combine behavior model, events, state machines, runtime,
-drafts, apply, evidence, Studio, demo, and regression behavior when independent
-verification would be clearer.
+As of the #625 roadmap refresh, #611-#624 are complete and closed with merged
+PR evidence, `motjaengi/fast-ci` success, detached `origin/main` post-merge
+verification, final issue comments, and #1/#23 preserved open. The completed
+chain covers structured behavior models, deterministic event/signal contracts,
+state-machine and ability/action contracts, script/sandbox design gates,
+behavior runtime integration, behavior scenario assertions, agent-generated
+behavior drafts, review-gated behavior apply records, behavior evidence/journal
+integration, escaped read-only Studio/dashboard inspection, a deterministic demo,
+and Scenario Coverage v9.
+
+Each future issue that cites this milestone should use the smallest safe PR unit
+with focused tests, generated-state audit, no-arbitrary-script audit,
+compatibility audit, and conservative wording audit. Do not combine behavior
+model, events, state machines, runtime, drafts, apply, evidence, Studio, demo,
+and regression behavior when independent verification would be clearer.
 
 ## Trusted boundary
 
@@ -221,3 +231,33 @@ Milestone 10 does not authorize:
 - This document may be revised only by an explicit follow-up governance issue or
   roadmap refresh. Implementation issues should cite it rather than weakening
   its boundaries locally.
+
+
+## Completion evidence after #625 roadmap refresh
+
+Gameplay Scripting / Logic System v1 is complete as a bounded local structured
+behavior/evidence milestone, not as an arbitrary executable scripting runtime.
+The evidence chain is:
+
+- #611 scope contract, #612 behavior model, #613 event/signal system, #614 state
+  machine and ability/action contracts, #615 script module interface design gate,
+  and #616 safe script sandbox/trust-boundary design gate.
+- #617 behavior runtime integration, #618 behavior scenario assertions, #619
+  agent-generated behavior drafts, #620 review-gated behavior apply records, and
+  #621 behavior evidence/journal integration.
+- #622 escaped read-only Studio behavior inspection, #623 deterministic gameplay
+  logic demo, and #624 Scenario Coverage v9 regression matrix/read-model
+  compatibility.
+
+The merged PR sequence for the last implementation/demo/coverage issues includes
+#1267-#1269 for #623 and #1270-#1272 for #624, all with `motjaengi/fast-ci`
+success and detached `origin/main` post-merge verification. Earlier #611-#622
+issue comments and the ultragoal ledger record the matching PRs and verification
+logs. Generated behavior drafts, applies, runs, dashboard exports, local tool
+state, and screenshots remain ignored unless fixture-scoped.
+
+Known gaps remain explicit: no arbitrary JS/Rust/Python/Lua/WASM execution, no
+production-stable scripting API, no secure-sandbox guarantee, no plugin runtime,
+no command bridge, no browser trusted writes, no unrestricted source apply, no
+native export, no hosted/cloud/server/auth behavior, no public-launch automation,
+and no current Godot replacement or production-ready claim.
