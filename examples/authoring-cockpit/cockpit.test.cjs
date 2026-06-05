@@ -1018,6 +1018,24 @@ run.asset_browser = {
     { id: 'bad/path.png', type: 'texture', source_path: '../../etc/passwd', output_path: 'build/bad.png', hash: 'fnv1a64:ccc', status: 'ready' },
   ],
 };
+run.scenario_panel = {
+  present: true,
+  scenarios: [
+    {
+      id: 'collect-and-exit', template_source: 'gdd/prototype/collect-and-exit.json', run_status: 'completed', verdict: 'pass',
+      screenshots: ['evidence/scenario/collect-and-exit/frame-1.png'],
+      world_state: { collected: 3, exited: true },
+      logs: ['scenario.start', 'scenario.collect', 'scenario.exit'],
+      evidence_links: ['evidence/scenario/collect-and-exit/report.json'],
+    },
+    {
+      id: 'boss-fight', template_source: 'qa-swarm/boss-fight.json', run_status: 'completed', verdict: 'fail',
+      failure_classification: 'timeout-no-victory',
+      evidence_links: [{ ref: 'evidence/scenario/boss-fight/report.json', broken: true }],
+      stale: true,
+    },
+  ],
+};
 
 run.route_attempts = {
   present: true,
@@ -2698,6 +2716,24 @@ assert.strictEqual(typeof cockpit.importAsset, 'undefined');
 assert.strictEqual(typeof cockpit.uploadAsset, 'undefined');
 assert.strictEqual(typeof cockpit.generateAsset, 'undefined');
 assert.match(cockpit.renderStudioAssetBrowserSurface({}), /No asset browser read model/);
+// #765 Scenario and playtest panel
+const scenarioModel = cockpit.studioScenarioPanelModel(run);
+assert.strictEqual(scenarioModel.present, true);
+assert.strictEqual(scenarioModel.runControlsEnabled, false);
+assert.strictEqual(scenarioModel.scenarios.length, 2);
+const bossScenario = scenarioModel.scenarios.find((s) => s.id === 'boss-fight');
+assert.strictEqual(bossScenario.failureClassification, 'timeout-no-victory');
+assert.ok(bossScenario.warnings.some((w) => /Stale evidence/.test(w)));
+assert.ok(bossScenario.warnings.some((w) => /broken\/missing/.test(w)));
+const scenarioMarkup = cockpit.renderStudioScenarioPanelSurface(run);
+assert.match(scenarioMarkup, /Scenario and playtest panel/);
+assert.match(scenarioMarkup, /collect-and-exit/);
+assert.match(scenarioMarkup, /Failure classification: timeout-no-victory/);
+assert.match(scenarioMarkup, /Stale evidence/);
+assert.match(scenarioMarkup, /broken\/missing/);
+assert.match(scenarioMarkup, /no autonomous run\/start/);
+assert.doesNotMatch(scenarioMarkup, /<button|<form|onclick|localStorage|fetch\(|run scenario|start run|auto-merge/i);
+assert.match(cockpit.renderStudioScenarioPanelSurface({}), /No scenario\/playtest read model/);
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);

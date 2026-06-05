@@ -886,6 +886,13 @@ run.asset_browser = {
     { id: 'textures/dup-b.png', type: 'texture', source_path: 'assets/dup.png', output_path: 'build/dup-b.png', hash: 'fnv1a64:dup', status: 'ready' },
   ],
 };
+run.scenario_panel = {
+  present: true,
+  scenarios: [
+    { id: 'collect-and-exit', template_source: 'gdd/collect-and-exit.json', run_status: 'completed', verdict: 'pass', evidence_links: ['evidence/scenario/collect-and-exit/report.json'] },
+    { id: 'boss-fight', template_source: 'qa-swarm/boss-fight.json', run_status: 'completed', verdict: 'fail', failure_classification: 'timeout-no-victory', evidence_links: [{ ref: 'evidence/scenario/boss-fight/report.json', broken: true }], stale: true },
+  ],
+};
 
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
@@ -2003,6 +2010,16 @@ assert.doesNotMatch(assetBrowserMarkup, /<button|<form|onclick|showOpenFilePicke
 assert.strictEqual(typeof dashboard.importAsset, 'undefined');
 assert.strictEqual(typeof dashboard.uploadAsset, 'undefined');
 assert.match(dashboard.renderAssetBrowser({}), /No asset browser inputs/);
+// #765 Scenario and playtest panel
+const scenarioPanelMarkup = dashboard.renderScenarioPanel(run);
+assert.match(scenarioPanelMarkup, /Scenario and playtest panel/);
+assert.match(scenarioPanelMarkup, /collect-and-exit/);
+assert.match(scenarioPanelMarkup, /Failure classification: timeout-no-victory/);
+assert.match(scenarioPanelMarkup, /Stale evidence/);
+assert.match(scenarioPanelMarkup, /broken\/missing/);
+assert.match(scenarioPanelMarkup, /Run controls are disabled|run controls are disabled/i);
+assert.doesNotMatch(scenarioPanelMarkup, /<button|<form|onclick|run scenario|start run|auto-merge/i);
+assert.match(dashboard.renderScenarioPanel({}), /No scenario\/playtest inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);
