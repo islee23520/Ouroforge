@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "summary": "1 scenario result(s) passed with consistent evidence.",
+  "failures": [],
+  "evidence_refs": [
+    "evidence/scenarios/collect-and-exit/scenario-result.json"
+  ],
+  "metadata": {
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "suite_summaries": 0,
+    "behavior_evaluator_results": 0,
+    "visual_gate_results": 0,
+    "semantic_gate_results": 0
+  }
+}

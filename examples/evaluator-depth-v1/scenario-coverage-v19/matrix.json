@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "scenario-coverage-v19-evaluator-depth-v1",
+  "coverageId": "scenario-coverage-v19-evaluator-depth",
+  "issue": 1288,
+  "scope": "Evaluator Depth v1 gate-state regression coverage",
+  "fixtureScoped": true,
+  "boundary": "Deterministic fixture coverage only; no subjective quality assertions, browser writes, command bridge, auto-fix, auto-apply, auto-merge, self-approval, reviewer bypass, or trusted mutation.",
+  "legacyGoldenRef": "legacy-two-gate-verdict.golden.json",
+  "visualGateStates": [
+    { "state": "pass", "caseId": "unchanged", "fixtureRef": "../visual/visual-gate-pass-unchanged.json", "expect": { "outcome": "unchanged", "changedPixels": 0, "thresholdDeclared": true } },
+    { "state": "fail", "caseId": "changed-over-threshold", "fixtureRef": "../visual/visual-gate-fail-changed-over-threshold.json", "expect": { "outcome": "changed", "changedPixels": 64, "thresholdDeclared": true } },
+    { "state": "pass", "caseId": "under-threshold", "fixtureRef": "../visual/visual-gate-pass-under-threshold.json", "expect": { "outcome": "changed", "changedPixels": 8, "thresholdDeclared": true } },
+    { "state": "missing-baseline", "caseId": "missing-baseline", "fixtureRef": "../visual/visual-gate-missing-baseline.json", "expect": { "outcome": "missing_screenshot", "missingSide": "before" } },
+    { "state": "missing-screenshot", "caseId": "missing-screenshot", "fixtureRef": "../visual/visual-gate-missing-screenshot.json", "expect": { "outcome": "missing_screenshot", "missingSide": "after" } },
+    { "state": "threshold-not-declared", "caseId": "threshold-not-declared", "fixtureRef": "../visual/invalid/visual-gate-missing-threshold.json", "expect": { "outcome": "unchanged", "thresholdDeclared": false } },
+    { "state": "stale-ref", "caseId": "stale-ref", "fixtureRef": "../visual/invalid/visual-gate-stale-ref.json", "expect": { "staleRef": true } }
+  ],
+  "semanticGateStates": [
+    { "state": "pass", "caseId": "pass", "fixtureRef": "../semantic/semantic-gate-pass-health.json", "expect": { "invariantType": "health_non_negative", "targetPath": "player.safeHealth" } },
+    { "state": "fail", "caseId": "violation", "fixtureRef": "../semantic/semantic-gate-fail-health.json", "expect": { "invariantType": "health_non_negative", "targetPath": "player.health" } },
+    { "state": "unsupported", "caseId": "unsupported", "fixtureRef": "../semantic/invalid/semantic-gate-unsupported-type.json", "expect": { "invariantType": "no_impossible_state", "unsupportedType": true } },
+    { "state": "missing-target-state", "caseId": "missing-target-state", "fixtureRef": "../semantic/semantic-gate-missing-target-state.json", "expect": { "invariantType": "required_entity_present", "targetPath": "entities.required" } },
+    { "state": "malformed-invariant", "caseId": "malformed", "fixtureRef": "../semantic/invalid/semantic-gate-malformed-invariant.json", "expect": { "invariantType": "player_in_bounds", "malformed": true } },
+    { "state": "unsafe-expression", "caseId": "unsafe-expression", "fixtureRef": "../semantic/invalid/semantic-gate-unsafe-expression.json", "expect": { "unsafeExpression": true } },
+    { "state": "stale-ref", "caseId": "stale-ref", "fixtureRef": "../semantic/invalid/semantic-gate-stale-ref.json", "expect": { "staleRunId": true } }
+  ],
+  "fourCategoryVerdictShape": {
+    "requiredCategories": ["mechanical", "runtime", "visual", "semantic"],
+    "aggregation": { "operator": "declared-gate-and", "undeclaredGatePolicy": "neutral" },
+    "declaredGateStatuses": ["pass", "fail"],
+    "emptyVisualSemanticFieldsAreOmittedForLegacyGolden": true
+  }
+}
