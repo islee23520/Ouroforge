@@ -289,10 +289,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "ouroforge-ledger",
  "serde",
  "serde_json",
  "serde_yaml",
  "tungstenite",
+]
+
+[[package]]
+name = "ouroforge-ledger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
 ]
 
 [[package]]
