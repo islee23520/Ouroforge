@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "gameplay-logic-demo-read-model-compatibility-v1",
+  "demoId": "gameplay-logic-demo-v1",
+  "status": "compatible",
+  "dashboard": {
+    "surface": "examples/evidence-dashboard/dashboard.js",
+    "expectedSections": [
+      "behaviorDefinitions",
+      "runtimeEvents",
+      "scenarioOutcomes",
+      "behaviorEvidenceBundle",
+      "journalFragment",
+      "generatedStatePolicy"
+    ],
+    "requiredRefs": [
+      "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json",
+      "examples/gameplay-logic-demo-v1/evidence/behavior-evidence-bundle.fixture.json",
+      "examples/gameplay-logic-demo-v1/evidence/runtime-events.fixture.json",
+      "examples/gameplay-logic-demo-v1/evidence/scenario-outcome.fixture.json",
+      "examples/gameplay-logic-demo-v1/journal/behavior-evidence-journal.fragment.md"
+    ]
+  },
+  "studio": {
+    "surface": "examples/authoring-cockpit/cockpit.js",
+    "expectedPanels": [
+      "behavior-list-panel",
+      "behavior-event-signal-panel",
+      "behavior-state-machine-panel",
+      "behavior-ability-action-panel",
+      "behavior-draft-status",
+      "behavior-review-apply-status"
+    ],
+    "displayOnlyFields": [
+      "behaviorId",
+      "entityId",
+      "runtimeEventType",
+      "scenarioStatus",
+      "evidenceRef",
+      "journalSummary",
+      "blockedReasons",
+      "generatedStatePolicy"
+    ],
+    "emptyAndMalformedPolicy": "visible warning or empty state; no browser mutation, command execution, repair, persistence, or auto-apply"
+  },
+  "commands": [
+    "node examples/gameplay-logic-demo-v1/schema-smoke.test.cjs",
+    "node examples/gameplay-logic-demo-v1/evidence-flow-smoke.test.cjs",
+    "node examples/gameplay-logic-demo-v1/read-model-compatibility-smoke.test.cjs",
+    "node examples/evidence-dashboard/dashboard.test.cjs",
+    "node examples/authoring-cockpit/cockpit.test.cjs"
+  ],
+  "knownGaps": [
+    "Fixture evidence is expected data, not a live browser run artifact.",
+    "GL10.13.3 does not add new browser commands, write APIs, runtime script execution, production editor claims, or hosted/cloud behavior.",
+    "Future issues may wire richer dashboard/Studio rendering after preserving this read-only contract."
+  ],
+  "cleanupPolicy": {
+    "trackedFixtureRoots": ["examples/gameplay-logic-demo-v1"],
+    "ignoredGeneratedRoots": ["runs", "dashboard-data", "screenshots", "browser-profiles", "tmp-evidence"],
+    "manualCleanup": "Delete ignored generated roots after local review if they are created; never commit them unless a later issue scopes tiny fixtures explicitly."
+  },
+  "boundary": "Dashboard and Studio compatibility is read-only inspection of structured behavior evidence; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, browser trusted writes, source mutation, auto-apply, auto-merge, self-approval, hosted/cloud behavior, production-stable scripting API, production editor, native export, or Godot replacement claim."
+}

@@ -43,5 +43,6 @@
     "fixtureScopedOnly": true
   },
   "boundary": "Read-only structured gameplay logic demo inspection; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, browser trusted writes, source mutation, auto-apply, auto-merge, self-approval, hosted/cloud behavior, production-stable scripting API, production editor, or Godot replacement claim.",
-  "behaviorRuntimeRef": "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json"
+  "behaviorRuntimeRef": "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json",
+  "readModelCompatibilityRef": "examples/gameplay-logic-demo-v1/read-model-compatibility.fixture.json"
 }
