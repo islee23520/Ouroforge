@@ -14,6 +14,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
 pub mod behavior_runtime;
+pub mod source_apply_review_enforcement;
+pub use source_apply_review_enforcement::*;
 pub mod gdd_design_brief;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
