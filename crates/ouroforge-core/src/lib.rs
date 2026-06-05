@@ -44,6 +44,8 @@ pub use ouroforge_evidence::{
 pub mod source_apply_evidence_bundle;
 pub use source_apply_evidence_bundle::*;
 pub use ouroforge_ledger::{append_ledger_event, read_ledger_events, write_ledger_created};
+pub mod source_apply_emergency_hold;
+pub use source_apply_emergency_hold::*;
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
 
 static MUTATION_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
