@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-self-review",
+  "status": "blocked",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture."
+  },
+  "stages": [
+    {
+      "stageId": "stage-independent-review",
+      "stageKind": "independent-review",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/review.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/review.json",
+      "summary": "Review where the author tries to approve their own change.",
+      "authorId": "author-local",
+      "reviewerId": "author-local",
+      "decision": "accepted"
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-review",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/review.json",
+      "description": "Review evidence placeholder."
+    }
+  ],
+  "blockedReasons": ["self review is not allowed"],
+  "cleanupPolicy": "Generated demo outputs stay untracked and git-ignored.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}

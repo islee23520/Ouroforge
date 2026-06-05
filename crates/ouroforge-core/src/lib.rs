@@ -30,6 +30,7 @@ pub mod gdd_prototype_task_graph;
 pub mod gdd_requirement_extraction;
 pub mod gdd_scenario_acceptance_plan;
 pub mod gdd_scene_level_plan;
+pub mod safe_source_apply_demo;
 pub mod source_apply_sandbox_promotion;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,

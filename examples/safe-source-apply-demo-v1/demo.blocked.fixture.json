@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-blocked",
+  "status": "blocked",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture used only for the demo apply chain."
+  },
+  "stages": [
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Deterministic patch preview targets one allowed low-risk source-like fixture."
+    },
+    {
+      "stageId": "stage-high-risk-blocker",
+      "stageKind": "high-risk-blocker",
+      "status": "blocked",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/high-risk-blocker.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/high-risk-blocker.json",
+      "summary": "High-risk blocker stops the chain because the recorded target hash drifted.",
+      "blockedReasons": ["recorded target hash no longer matches the live fixture"]
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-high-risk-blocker",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/high-risk-blocker.json",
+      "description": "Blocker evidence proving the chain fails closed before apply."
+    }
+  ],
+  "blockedReasons": ["chain halted before apply: high-risk blocker did not pass"],
+  "cleanupPolicy": "Generated demo previews and evidence stay untracked and git-ignored; only fixture-scoped JSON under examples/ is committed.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}

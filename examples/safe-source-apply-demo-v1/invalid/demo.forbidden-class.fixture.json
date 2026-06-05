@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-forbidden-class",
+  "status": "ready",
+  "fixture": {
+    "fixtureId": "demo-target-lockfile",
+    "fileClass": "lockfile",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/Cargo.lock",
+    "description": "Forbidden high-risk lockfile target that must fail closed."
+  },
+  "stages": [
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Preview that should never be reached for a forbidden class."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-preview",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "description": "Preview evidence placeholder."
+    }
+  ],
+  "blockedReasons": [],
+  "cleanupPolicy": "Generated demo outputs stay untracked and git-ignored.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}

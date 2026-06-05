@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-partial",
+  "status": "partial",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture used only for the demo apply chain."
+  },
+  "stages": [
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Deterministic patch preview targets one allowed low-risk source-like fixture."
+    },
+    {
+      "stageId": "stage-file-class",
+      "stageKind": "file-class",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/file-class.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/file-class.json",
+      "summary": "File-class report confirms the target is an allowed source-like class."
+    },
+    {
+      "stageId": "stage-independent-review",
+      "stageKind": "independent-review",
+      "status": "blocked",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/review.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/review.json",
+      "summary": "Independent review is still pending, so the chain cannot reach apply.",
+      "authorId": "author-local",
+      "reviewerId": "reviewer-local",
+      "decision": "rejected",
+      "blockedReasons": ["independent review has not accepted the change yet"]
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-preview",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "description": "Preview evidence captured before the chain blocked on review."
+    }
+  ],
+  "blockedReasons": [],
+  "cleanupPolicy": "Generated demo previews and evidence stay untracked and git-ignored; only fixture-scoped JSON under examples/ is committed.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}

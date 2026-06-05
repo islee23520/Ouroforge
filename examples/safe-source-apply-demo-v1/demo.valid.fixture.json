@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-low-risk-doc",
+  "status": "ready",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture used only for the demo apply chain."
+  },
+  "stages": [
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Deterministic patch preview targets one allowed low-risk source-like fixture."
+    },
+    {
+      "stageId": "stage-file-class",
+      "stageKind": "file-class",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/file-class.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/file-class.json",
+      "summary": "File-class report confirms the target is an allowed source-like class, never a high-risk class."
+    },
+    {
+      "stageId": "stage-diff-integrity",
+      "stageKind": "diff-integrity",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/diff-integrity.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/diff-integrity.json",
+      "summary": "Diff integrity check matches preview hunks against the recorded base hash."
+    },
+    {
+      "stageId": "stage-worktree-context",
+      "stageKind": "worktree-context",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/worktree-context.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/worktree-context.json",
+      "summary": "Worktree context check confirms an isolated local worktree boundary."
+    },
+    {
+      "stageId": "stage-stale-guard",
+      "stageKind": "stale-guard",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/stale-guard.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/stale-guard.json",
+      "summary": "Stale guard confirms the recorded target hash still matches the live fixture."
+    },
+    {
+      "stageId": "stage-high-risk-blocker",
+      "stageKind": "high-risk-blocker",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/high-risk-blocker.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/high-risk-blocker.json",
+      "summary": "High-risk blocker confirms no forbidden file class, manifest, lockfile, or workflow is touched."
+    },
+    {
+      "stageId": "stage-sandbox-dry-run",
+      "stageKind": "sandbox-dry-run",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/sandbox-dry-run.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/sandbox-dry-run.json",
+      "summary": "Sandbox dry-run records allowlisted local checks without claiming a secure sandbox."
+    },
+    {
+      "stageId": "stage-sandbox-promotion",
+      "stageKind": "sandbox-promotion",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/sandbox-promotion.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/sandbox-promotion.json",
+      "summary": "Promotion readiness confirms sandbox evidence is present before any trusted apply."
+    },
+    {
+      "stageId": "stage-independent-review",
+      "stageKind": "independent-review",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/review.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/review.json",
+      "summary": "Independent review accepts the change; the reviewer differs from the author.",
+      "authorId": "author-local",
+      "reviewerId": "reviewer-local",
+      "decision": "accepted"
+    },
+    {
+      "stageId": "stage-apply-transaction",
+      "stageKind": "apply-transaction",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/apply-transaction.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/apply-transaction.json",
+      "summary": "Trusted apply transaction is recorded only after every pre-apply gate passes."
+    },
+    {
+      "stageId": "stage-rollback-snapshot",
+      "stageKind": "rollback-snapshot",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/rollback-snapshot.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/rollback-snapshot.json",
+      "summary": "Rollback snapshot captures the pre-apply state so the change can be reverted."
+    },
+    {
+      "stageId": "stage-verification",
+      "stageKind": "verification",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/verification.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/verification.json",
+      "summary": "Allowlisted verification logs are recorded after the trusted write."
+    },
+    {
+      "stageId": "stage-rerun-comparison",
+      "stageKind": "rerun-comparison",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/rerun-comparison.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/rerun-comparison.json",
+      "summary": "Rerun comparison records the before/after evidence diff with no regression."
+    },
+    {
+      "stageId": "stage-audit-ledger",
+      "stageKind": "audit-ledger",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/audit-ledger.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/audit-ledger.json",
+      "summary": "Append-only audit ledger entry records the apply with its evidence references."
+    },
+    {
+      "stageId": "stage-evidence-bundle",
+      "stageKind": "evidence-bundle",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/evidence-bundle.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/evidence-bundle.json",
+      "summary": "Evidence bundle aggregates every stage artifact reference for review handoff."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-bundle-index",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/evidence-bundle.json",
+      "description": "Aggregated source-apply evidence bundle index for the demo run."
+    },
+    {
+      "evidenceId": "evidence-rollback",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/rollback-snapshot.json",
+      "description": "Rollback snapshot evidence proving the apply is reversible."
+    }
+  ],
+  "blockedReasons": [],
+  "cleanupPolicy": "Generated demo previews, sandbox outputs, rollback snapshots, verification logs, and evidence bundles stay untracked and git-ignored; only fixture-scoped JSON under examples/ is committed.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}

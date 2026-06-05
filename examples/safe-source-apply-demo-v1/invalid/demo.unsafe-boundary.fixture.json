@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-unsafe-boundary",
+  "status": "blocked",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture."
+  },
+  "stages": [
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "blocked",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Preview stage with a boundary missing required governance phrases.",
+      "blockedReasons": ["boundary incomplete"]
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-preview",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "description": "Preview evidence placeholder."
+    }
+  ],
+  "blockedReasons": ["boundary incomplete"],
+  "cleanupPolicy": "Generated demo outputs stay untracked and git-ignored.",
+  "boundary": "This demo applies source changes."
+}

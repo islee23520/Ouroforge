@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "safe-source-apply-demo-v1",
+  "demoId": "safe-source-apply-demo-chain-order",
+  "status": "blocked",
+  "fixture": {
+    "fixtureId": "demo-target-doc-note",
+    "fileClass": "markdown-doc",
+    "riskTier": "low",
+    "path": "examples/safe-source-apply-demo-v1/target/note.md",
+    "description": "Tiny low-risk source-like documentation fixture."
+  },
+  "stages": [
+    {
+      "stageId": "stage-apply-transaction",
+      "stageKind": "apply-transaction",
+      "status": "recorded",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/apply-transaction.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/apply-transaction.json",
+      "summary": "Apply transaction placed before its pre-apply gate."
+    },
+    {
+      "stageId": "stage-preview",
+      "stageKind": "preview",
+      "status": "validated",
+      "artifactRef": "examples/safe-source-apply-demo-v1/chain/preview.json",
+      "evidencePath": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "summary": "Preview that incorrectly follows the apply transaction."
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "evidence-preview",
+      "pathHint": "examples/safe-source-apply-demo-v1/evidence/preview.json",
+      "description": "Preview evidence placeholder."
+    }
+  ],
+  "blockedReasons": ["chain order is invalid"],
+  "cleanupPolicy": "Generated demo outputs stay untracked and git-ignored.",
+  "boundary": "This demo proves a review-gated trusted source apply chain over one allowed low-risk source-like fixture; it is not unrestricted source mutation. There is no auto-apply and no self-approval: independent review required, and rollback and evidence required before any trusted write. Browser read-only or draft-only surfaces cannot apply patches or run commands."
+}
