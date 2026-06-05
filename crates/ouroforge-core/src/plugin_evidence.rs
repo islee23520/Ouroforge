@@ -21,6 +21,20 @@ const ALLOWED_EXTENSION_POINTS: &[&str] = &[
     "assets.metadata.readOnly",
 ];
 
+const ALLOWED_DASHBOARD_PANEL_DATA_SOURCES: &[&str] = &[
+    "pluginRegistry.summary",
+    "pluginRegistry.plugins",
+    "pluginRegistry.blockedReasons",
+];
+
+const ALLOWED_DASHBOARD_PANEL_TEMPLATES: &[&str] = &[
+    "pluginRegistrySummaryCard",
+    "pluginDescriptorTable",
+    "pluginBlockedReasonList",
+];
+
+const ALLOWED_DASHBOARD_PANEL_LAYOUTS: &[&str] = &["summary", "table", "list"];
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PluginRegistryEvidenceArtifact {
@@ -73,8 +87,27 @@ pub struct PluginDescriptorEvidence {
     pub extension_points: Vec<String>,
     #[serde(rename = "evidenceRefs", default)]
     pub evidence_refs: Vec<PluginEvidenceRef>,
+    #[serde(rename = "dashboardPanels", default)]
+    pub dashboard_panels: Vec<PluginDashboardPanelDescriptor>,
     #[serde(rename = "blockedReasons", default)]
     pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PluginDashboardPanelDescriptor {
+    #[serde(rename = "panelId")]
+    pub panel_id: String,
+    pub title: String,
+    #[serde(rename = "dataSourceKey")]
+    pub data_source_key: String,
+    #[serde(rename = "templateRef")]
+    pub template_ref: String,
+    #[serde(rename = "layoutHint")]
+    pub layout_hint: String,
+    #[serde(rename = "displayHints", default)]
+    pub display_hints: Vec<String>,
+    pub boundary: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -117,6 +150,8 @@ pub struct PluginRegistryEvidenceReadModel {
     pub extension_point_summary: Vec<String>,
     #[serde(rename = "blockedReasons")]
     pub blocked_reasons: Vec<String>,
+    #[serde(rename = "dashboardPanelSummary")]
+    pub dashboard_panel_summary: Vec<String>,
     pub boundary: String,
 }
 
@@ -176,6 +211,7 @@ impl PluginRegistryEvidenceArtifact {
         let mut capability_summary = Vec::new();
         let mut extension_point_summary = Vec::new();
         let mut blocked_reasons = self.blocked_reasons.clone();
+        let mut dashboard_panel_summary = Vec::new();
         let mut blocked_count = 0;
         for plugin in &self.plugins {
             capability_summary.extend(
@@ -190,6 +226,12 @@ impl PluginRegistryEvidenceArtifact {
                     .iter()
                     .map(|extension_point| format!("{}:{extension_point}", plugin.plugin_id)),
             );
+            dashboard_panel_summary.extend(plugin.dashboard_panels.iter().map(|panel| {
+                format!(
+                    "{}:{}:{}",
+                    plugin.plugin_id, panel.panel_id, panel.template_ref
+                )
+            }));
             if plugin.validation_status == PluginValidationStatus::Blocked
                 || plugin.compatibility_status == PluginCompatibilityStatus::Incompatible
                 || !plugin.blocked_reasons.is_empty()
@@ -209,6 +251,8 @@ impl PluginRegistryEvidenceArtifact {
         extension_point_summary.dedup();
         blocked_reasons.sort();
         blocked_reasons.dedup();
+        dashboard_panel_summary.sort();
+        dashboard_panel_summary.dedup();
         PluginRegistryEvidenceReadModel {
             schema_version: "ouroforge.plugin-registry-evidence-read-model.v1".to_string(),
             registry_id: self.registry_id.clone(),
@@ -222,7 +266,8 @@ impl PluginRegistryEvidenceArtifact {
             capability_summary,
             extension_point_summary,
             blocked_reasons,
-            boundary: "Read-only plugin registry evidence summary; displays declarative descriptors without executing plugins, installing dependencies, running commands, mutating source, publishing, deploying, or writing trusted files.".to_string(),
+            dashboard_panel_summary,
+            boundary: "Read-only plugin registry evidence summary; displays declarative descriptors and allowlisted dashboard panel descriptors without executing plugins, installing dependencies, running commands, mutating source, publishing, deploying, or writing trusted files.".to_string(),
         }
     }
 }
@@ -339,6 +384,35 @@ impl PluginDescriptorEvidence {
         for evidence in &self.evidence_refs {
             evidence.validate()?;
         }
+        require_unique_ids(
+            "plugin descriptor evidence dashboardPanels.panelId",
+            self.dashboard_panels
+                .iter()
+                .map(|panel| panel.panel_id.as_str()),
+        )?;
+        for panel in &self.dashboard_panels {
+            panel.validate()?;
+        }
+        if self.dashboard_panels.is_empty()
+            && self
+                .extension_points
+                .iter()
+                .any(|point| point == "dashboard.panels.readOnly")
+        {
+            return Err(anyhow!(
+                "plugin descriptor evidence dashboard.panels.readOnly requires at least one dashboardPanels descriptor"
+            ));
+        }
+        if !self.dashboard_panels.is_empty()
+            && !self
+                .extension_points
+                .iter()
+                .any(|point| point == "dashboard.panels.readOnly")
+        {
+            return Err(anyhow!(
+                "plugin descriptor evidence dashboardPanels require dashboard.panels.readOnly extension point"
+            ));
+        }
         for reason in &self.blocked_reasons {
             require_local_text("plugin descriptor evidence blockedReasons", reason)?;
         }
@@ -362,6 +436,51 @@ impl PluginDescriptorEvidence {
             return Err(anyhow!(
                 "plugin descriptor evidence incompatible status requires blockedReasons"
             ));
+        }
+        Ok(())
+    }
+}
+
+impl PluginDashboardPanelDescriptor {
+    fn validate(&self) -> Result<()> {
+        require_local_id("plugin dashboard panel descriptor panelId", &self.panel_id)?;
+        require_local_text("plugin dashboard panel descriptor title", &self.title)?;
+        require_allowed_value(
+            "plugin dashboard panel descriptor dataSourceKey",
+            &self.data_source_key,
+            ALLOWED_DASHBOARD_PANEL_DATA_SOURCES,
+        )?;
+        require_allowed_value(
+            "plugin dashboard panel descriptor templateRef",
+            &self.template_ref,
+            ALLOWED_DASHBOARD_PANEL_TEMPLATES,
+        )?;
+        require_allowed_value(
+            "plugin dashboard panel descriptor layoutHint",
+            &self.layout_hint,
+            ALLOWED_DASHBOARD_PANEL_LAYOUTS,
+        )?;
+        require_unique_ids(
+            "plugin dashboard panel descriptor displayHints",
+            self.display_hints.iter().map(|hint| hint.as_str()),
+        )?;
+        for hint in &self.display_hints {
+            require_local_id("plugin dashboard panel descriptor displayHints", hint)?;
+        }
+        require_local_text("plugin dashboard panel descriptor boundary", &self.boundary)?;
+        let boundary = self.boundary.to_ascii_lowercase();
+        for required in [
+            "declarative",
+            "allowlisted",
+            "read-only",
+            "no javascript",
+            "no command",
+        ] {
+            if !boundary.contains(required) {
+                return Err(anyhow!(
+                    "plugin dashboard panel descriptor boundary must state `{required}`"
+                ));
+            }
         }
         Ok(())
     }
@@ -455,6 +574,17 @@ fn require_hash_text(field: &str, value: &str) -> Result<()> {
     }
     if digest.len() != 16 || !digest.chars().all(|ch| ch.is_ascii_hexdigit()) {
         return Err(anyhow!("{field} digest must be 16 hex characters"));
+    }
+    Ok(())
+}
+
+fn require_allowed_value(field: &str, value: &str, allowed: &[&str]) -> Result<()> {
+    require_local_text(field, value)?;
+    let allowed = allowed.iter().copied().collect::<BTreeSet<_>>();
+    if !allowed.contains(value) {
+        return Err(anyhow!(
+            "{field} value `{value}` is not in the v1 allowlist"
+        ));
     }
     Ok(())
 }

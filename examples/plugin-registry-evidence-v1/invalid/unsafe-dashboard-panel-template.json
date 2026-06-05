@@ -1,17 +1,17 @@
 {
   "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
-  "registryId": "plugin-registry-fixture",
+  "registryId": "plugin-registry-unsafe-dashboard-panel",
   "projectId": "demo_project",
-  "runId": "run-plugin-registry-fixture",
-  "ledgerRef": "runs/plugin-registry-fixture/ledger.jsonl",
+  "runId": "run-plugin-registry-unsafe-dashboard-panel",
+  "ledgerRef": "runs/plugin-registry-unsafe-dashboard-panel/ledger.jsonl",
   "generatedState": {
-    "root": "runs/plugin-registry-fixture/plugin-evidence",
+    "root": "runs/plugin-registry-unsafe-dashboard-panel/plugin-evidence",
     "fixtureScoped": true,
     "trackedPolicy": "fixture-scoped sample evidence may be tracked; generated runtime outputs remain ignored"
   },
   "plugins": [
     {
-      "pluginId": "read-only-dashboard-panel",
+      "pluginId": "unsafe-dashboard-panel",
       "manifestPath": "plugins/read-only-dashboard-panel/plugin.json",
       "manifestHash": "fnv1a64-canonical-json-v1:1111222233334444",
       "manifestVersion": "0.1.0",
@@ -33,43 +33,17 @@
       "blockedReasons": [],
       "dashboardPanels": [
         {
-          "panelId": "plugin-registry-summary",
-          "title": "Plugin registry summary",
+          "panelId": "unsafe-dashboard-panel",
+          "title": "Unsafe dashboard panel",
           "dataSourceKey": "pluginRegistry.summary",
-          "templateRef": "pluginRegistrySummaryCard",
+          "templateRef": "https://example.com/remote.js",
           "layoutHint": "summary",
           "displayHints": [
-            "compact",
-            "blocked-count"
+            "compact"
           ],
           "boundary": "Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes."
         }
       ]
-    },
-    {
-      "pluginId": "blocked-command-panel",
-      "manifestPath": "plugins/blocked-command-panel/plugin.json",
-      "manifestHash": "fnv1a64-canonical-json-v1:aaaabbbbccccdddd",
-      "manifestVersion": "0.1.0",
-      "validationStatus": "blocked",
-      "compatibilityStatus": "incompatible",
-      "declaredCapabilities": [
-        "studioInspectorPanel"
-      ],
-      "extensionPoints": [
-        "studio.inspector.readOnly"
-      ],
-      "evidenceRefs": [
-        {
-          "id": "blocked-validation",
-          "kind": "plugin-manifest-validation",
-          "path": "runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json"
-        }
-      ],
-      "blockedReasons": [
-        "manifest requested executable command authority outside the v1 declarative catalog"
-      ],
-      "dashboardPanels": []
     }
   ],
   "blockedReasons": [

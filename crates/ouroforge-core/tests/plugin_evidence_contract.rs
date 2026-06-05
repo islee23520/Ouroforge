@@ -14,6 +14,10 @@ fn invalid_fixture() -> &'static str {
     include_str!("../../../examples/plugin-registry-evidence-v1/invalid/executable-capability.json")
 }
 
+fn unsafe_dashboard_panel_fixture() -> &'static str {
+    include_str!("../../../examples/plugin-registry-evidence-v1/invalid/unsafe-dashboard-panel-template.json")
+}
+
 fn fixture_value() -> serde_json::Value {
     serde_json::from_str(valid_fixture()).expect("plugin registry fixture parses")
 }
@@ -74,7 +78,15 @@ fn plugin_registry_evidence_accepts_fixture_and_read_model() {
         .iter()
         .any(|summary| summary == "read-only-dashboard-panel:dashboard.panels.readOnly"));
     assert!(read_model.boundary.contains("without executing plugins"));
+    assert!(read_model
+        .boundary
+        .contains("allowlisted dashboard panel descriptors"));
     assert!(read_model.boundary.contains("writing trusted files"));
+    assert!(read_model
+        .dashboard_panel_summary
+        .iter()
+        .any(|summary| summary
+            == "read-only-dashboard-panel:plugin-registry-summary:pluginRegistrySummaryCard"));
 }
 
 #[test]
@@ -109,6 +121,15 @@ fn plugin_registry_fixture_records_descriptor_evidence_fields() {
         dashboard_panel.evidence_refs[0].path,
         "runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json"
     );
+    assert_eq!(dashboard_panel.dashboard_panels.len(), 1);
+    let descriptor = &dashboard_panel.dashboard_panels[0];
+    assert_eq!(descriptor.panel_id, "plugin-registry-summary");
+    assert_eq!(descriptor.title, "Plugin registry summary");
+    assert_eq!(descriptor.data_source_key, "pluginRegistry.summary");
+    assert_eq!(descriptor.template_ref, "pluginRegistrySummaryCard");
+    assert_eq!(descriptor.layout_hint, "summary");
+    assert_eq!(descriptor.display_hints, ["compact", "blocked-count"]);
+    assert!(descriptor.boundary.contains("no JavaScript"));
     assert!(dashboard_panel.blocked_reasons.is_empty());
 
     let blocked_panel = artifact
@@ -188,6 +209,24 @@ fn plugin_registry_evidence_rejects_executable_or_unsafe_descriptors() {
         let error = parse_value(value).expect_err(expected);
         assert!(format!("{error:?}").contains(expected), "{error:?}");
     }
+
+    let error = PluginRegistryEvidenceArtifact::from_json_str(unsafe_dashboard_panel_fixture())
+        .expect_err("remote template ref is blocked");
+    assert!(
+        format!("{error:?}").contains(
+            "templateRef value `https://example.com/remote.js` is not in the v1 allowlist"
+        ),
+        "{error:?}"
+    );
+
+    let mut missing_panel = fixture_value();
+    missing_panel["plugins"][0]["dashboardPanels"] = serde_json::json!([]);
+    let error = parse_value(missing_panel).expect_err("dashboard extension requires descriptor");
+    assert!(
+        format!("{error:?}")
+            .contains("dashboard.panels.readOnly requires at least one dashboardPanels descriptor"),
+        "{error:?}"
+    );
 }
 
 #[test]
