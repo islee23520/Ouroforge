@@ -2894,6 +2894,50 @@ assert.match(behaviorEvidenceXssSurface, /evidence\/&lt;bad&gt;\/result\.json/);
 assert.doesNotMatch(behaviorEvidenceXssSurface, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
 assert.match(cockpit.renderEvidencePane({ ...run, ...behaviorEvidenceRun }), /Behavior evidence lifecycle/);
 
+
+const prototypePlanningRun = {
+  gdd_prototype_inspection: {
+    present: true,
+    status: 'ready',
+    boundary: 'Read-only GDD-to-prototype planning inspection; no browser writes, no command execution, no autonomous unrestricted game creation, no auto-apply, no auto-merge, no browser trusted writes; #1 remains open and #23 remains open.',
+    panels: [
+      { panelId: 'gdd-panel', title: 'GDD panel', status: 'ready', artifactKind: 'gdd', itemCount: 1, evidenceRefs: ['docs/gdd-demo.md'], commands: ['cargo run --bin ouroforge -- gdd validate --input docs/gdd-demo.md'], summary: 'Design brief source only.' },
+      { panelId: 'requirements-panel', title: 'Requirements panel', status: 'ready', artifactKind: 'requirements', itemCount: 2, evidenceRefs: ['examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json'], summary: 'Extracted requirement rows.' },
+      { panelId: 'feasibility-panel', title: 'Feasibility panel', status: 'ready', artifactKind: 'feasibility', itemCount: 1, evidenceRefs: ['examples/gdd-feasibility-gate-v1/feasibility.valid.fixture.json'], summary: 'Feasibility status remains separate.' },
+      { panelId: 'mechanics-panel', title: 'Mechanics/core-loop mapping panel', status: 'ready', artifactKind: 'mechanics', itemCount: 1, evidenceRefs: ['examples/gdd-mechanics-mapping-v1/mechanics.valid.fixture.json'], summary: 'Mechanics rows are display-only.' },
+      { panelId: 'plans-panel', title: 'Scaffold scene behavior asset scenario plan panels', status: 'ready', artifactKind: 'plans', itemCount: 5, evidenceRefs: ['examples/gdd-project-scaffold-plan-v1/scaffold-plan.valid.fixture.json', 'examples/gdd-scene-level-plan-v1/scene-level-plan.valid.fixture.json'], summary: 'Plan panels stay separate.' },
+      { panelId: 'task-graph-panel', title: 'Task graph panel', status: 'ready', artifactKind: 'task-graph', itemCount: 4, evidenceRefs: ['examples/gdd-prototype-task-graph-v1/task-graph.valid.fixture.json'], summary: 'Dependency graph is inspected only.' },
+      { panelId: 'review-apply-panel', title: 'Prototype draft bundle and review/apply status panel', status: 'ready', artifactKind: 'review-apply', itemCount: 2, evidenceRefs: ['examples/gdd-prototype-draft-bundle-v1/draft-bundle.valid.fixture.json', 'examples/gdd-prototype-apply-v1/apply.valid.fixture.json'], summary: 'Review and apply artifacts remain read-only.' },
+      { panelId: 'run-evidence-panel', title: 'Run evidence and requirement coverage panel', status: 'complete', artifactKind: 'run-evidence', itemCount: 3, evidenceRefs: ['examples/gdd-prototype-evidence-bundle-v1/evidence.valid.fixture.json'], summary: 'Run verdicts and requirement coverage are visible.' },
+    ],
+  },
+};
+const prototypeModel = cockpit.prototypePlanningInspectionModel(prototypePlanningRun);
+assert.equal(prototypeModel.panels.length, 8);
+assert.match(cockpit.renderPrototypePlanningInspectionSurface(prototypePlanningRun), /GDD prototype planning inspection/);
+assert.match(cockpit.renderPrototypePlanningInspectionSurface(prototypePlanningRun), /Run evidence and requirement coverage panel/);
+assert.match(cockpit.renderPrototypePlanningInspectionSurface(prototypePlanningRun), /Inert command text/);
+assert.ok(cockpit.studioSurfaceSummary({ ...run, ...prototypePlanningRun }).some((surface) => surface.id === 'prototype-planning-inspection' && surface.present), 'Studio surface summary should include prototype planning inspection');
+assert.match(cockpit.renderEvidencePane({ ...run, ...prototypePlanningRun }), /GDD prototype planning inspection/);
+
+const missingPrototypePlanning = cockpit.renderPrototypePlanningInspectionSurface({});
+assert.match(missingPrototypePlanning, /No prototype planning inspection read model/);
+assert.match(missingPrototypePlanning, /No GDD-to-prototype planning inspection read model/);
+assert.equal(cockpit.prototypePlanningInspectionModel({ studioPrototypePlanningInspection: { present: true, panels: 'bad', malformedReasons: ['panels <bad>'] } }).status, 'malformed');
+assert.match(cockpit.renderPrototypePlanningInspectionSurface({ studioPrototypePlanningInspection: { present: true, panels: 'bad', malformedReasons: ['panels <bad>'] } }), /panels &lt;bad&gt;/);
+const prototypePlanningXss = cockpit.renderPrototypePlanningInspectionSurface({
+  gddPrototypeInspection: {
+    present: true,
+    status: '<script>ready</script>',
+    boundary: '<script>boundary</script>',
+    malformedReasons: ['<img src=x> malformed'],
+    panels: [{ panelId: '<img src=x onerror=alert(1)>', title: '<script>alert(1)</script>', status: '<script>pass</script>', artifactKind: '<img src=x>', itemCount: 1, evidenceRefs: ['runs/<bad>/evidence.json'], commands: ['node --eval "<script>bad</script>"'], blockedReasons: ['<script>blocked</script>'], malformedReasons: ['<script>malformed</script>'], summary: '<img src=x>' }],
+  },
+});
+assert.match(prototypePlanningXss, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+assert.match(prototypePlanningXss, /runs\/&lt;bad&gt;\/evidence\.json/);
+assert.doesNotMatch(prototypePlanningXss, /<script>|<img|<button|onclick=|executeCommand|browserCommandBridge/);
+
 const behaviorInspectionRun = {
   behavior_inspection: {
     present: true,
@@ -3283,3 +3327,20 @@ assert.doesNotMatch(a11ySurface, /\b(apply|merge|execute|commit) /i);
 assert.match(cockpit.renderIntegration(run), /studio-accessibility-nav/);
 const a11yXss = cockpit.renderStudioAccessibilityNavSurface({ id: '<script>alert(1)</script>' });
 assert.doesNotMatch(a11yXss, /<script>alert\(1\)<\/script>/);
+
+const prototypePlanningReadme = fs.readFileSync(require.resolve('./README.md'), 'utf8');
+assert.match(prototypePlanningReadme, /GDD prototype planning inspection/);
+assert.match(prototypePlanningReadme, /escaped read-only panels for GDD, requirements, feasibility/);
+assert.match(prototypePlanningReadme, /Copyable commands are inert text only/);
+assert.match(prototypePlanningReadme, /generated-state and asset\/license\/source evidence remain Rust\/local fixture-scoped/);
+assert.match(prototypePlanningReadme, /#1 and #23 remain governance anchors/);
+for (const forbiddenPrototypePlanningPhrase of [
+  'browser trusted write enabled',
+  'auto-apply enabled',
+  'auto-merge enabled',
+  'autonomous unrestricted game creation enabled',
+  'production-ready claim enabled',
+  'current Godot replacement is implemented',
+]) {
+  assert.doesNotMatch(prototypePlanningReadme, new RegExp(forbiddenPrototypePlanningPhrase), `forbidden wording: ${forbiddenPrototypePlanningPhrase}`);
+}

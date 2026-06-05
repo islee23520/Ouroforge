@@ -370,3 +370,7 @@ authoring demo remains an inert local authoring aid:
 VA1.10.3 changes documentation only. Any future trusted write must stay routed
 through Rust validation, explicit review gates, rollback/evidence records, and
 source/generated-state audits.
+
+## GDD prototype planning inspection
+
+When generated dashboard data includes `gdd_prototype_inspection`, Studio renders escaped read-only panels for GDD, requirements, feasibility, mechanics/core-loop mapping, scaffold/scene/behavior/asset/scenario plans, task graph, prototype draft bundle, review/apply status, run evidence, requirement coverage, and journal artifact links. Copyable commands are inert text only. The browser does not write files, execute commands, run generation, auto-apply, auto-merge, perform browser trusted writes, claim autonomous unrestricted game creation, or create assets; generated-state and asset/license/source evidence remain Rust/local fixture-scoped. #1 and #23 remain governance anchors.
