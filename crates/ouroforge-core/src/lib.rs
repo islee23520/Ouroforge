@@ -78,6 +78,7 @@ pub mod qa_failure_backlog;
 pub mod qa_flake_rerun_policy;
 pub mod qa_performance_budget;
 pub mod qa_playtest_demo;
+pub mod qa_regression_coverage;
 pub mod qa_run_matrix;
 pub mod runtime_frame_budget;
 pub use ouroforge_evidence::{

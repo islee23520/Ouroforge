@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "qa-swarm-regression-coverage-v1",
+  "coverageId": "qa14.16-coverage-matrix",
+  "entries": [
+    {
+      "area": "scenario-generation",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-scenario-candidate-v1",
+      "notes": "QaScenarioCandidateArtifact fixtures re-validated by the regression suite (#683)."
+    },
+    {
+      "area": "fuzzing-plan",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/adversarial-input-fuzzing-v1",
+      "notes": "AdversarialInputFuzzingPlanArtifact fixtures re-validated (#684)."
+    },
+    {
+      "area": "worker-budget",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-worker-assignment-v1",
+      "notes": "QaWorkerAssignmentArtifact fixtures re-validated (#685)."
+    },
+    {
+      "area": "runtime-invariant",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/runtime-invariant-checker-v1",
+      "notes": "RuntimeInvariantModel/Evidence fixtures re-validated (#686)."
+    },
+    {
+      "area": "route-attempt",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/route-attempt-evidence-v1",
+      "notes": "RouteAttemptEvidenceArtifact fixtures re-validated (#687)."
+    },
+    {
+      "area": "visual-comparison",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/visual-comparison-evidence-v1",
+      "notes": "VisualComparisonEvidenceArtifact fixtures re-validated (#688)."
+    },
+    {
+      "area": "studio-dashboard-read-model",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/evidence-dashboard",
+      "notes": "Dashboard and authoring-cockpit node smokes cover the read-only Studio/dashboard read model."
+    },
+    {
+      "area": "malformed-missing-stale",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/runtime-frame-budget-v1",
+      "notes": "Invalid fixtures across the in-repo artifacts cover malformed, missing, and stale cases."
+    },
+    {
+      "area": "performance-budget",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-performance-budget-v1",
+      "notes": "Contract tests are in-repo via the focused QA artifact contract tests."
+    },
+    {
+      "area": "error-classifier",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-error-classifier-v1",
+      "notes": "Contract tests are in-repo via qa_error_classifier_contract (#690)."
+    },
+    {
+      "area": "flake-rerun",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-flake-rerun-policy-v1",
+      "notes": "Contract tests are in-repo via qa_flake_rerun_policy_contract (#691)."
+    },
+    {
+      "area": "failure-backlog",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-failure-backlog-v1",
+      "notes": "Contract tests are in-repo via qa_failure_backlog_contract (#692)."
+    },
+    {
+      "area": "run-matrix",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-swarm-run-matrix-v1",
+      "notes": "Contract tests are in-repo via qa_run_matrix_contract (#693)."
+    },
+    {
+      "area": "evidence-bundle",
+      "coverageStatus": "in-repo",
+      "testRef": "examples/qa-swarm-evidence-bundle-v1",
+      "notes": "Contract tests are in-repo via qa_evidence_bundle_contract (#694)."
+    }
+  ],
+  "knownGaps": [
+    "Live capture (running the engine to produce evidence) is out of scope for v1; the suite validates deterministic fixtures, schemas, and read models only.",
+    "Visual, performance, and error signals are heuristic evidence inputs, not proof of fun, quality, production safety, accessibility compliance, market readiness, or release readiness.",
+    "Studio/dashboard compatibility is covered by read-model fixtures plus existing evidence-dashboard and authoring-cockpit node smokes; no browser trusted write path is added."
+  ],
+  "boundary": "auto-fix enabled with hidden workers and browser trusted write enabled"
+}
