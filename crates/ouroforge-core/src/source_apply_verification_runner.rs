@@ -285,21 +285,19 @@ fn forbidden_reason(argv: &[String]) -> Option<&'static str> {
             return Some("destructive/privilege command")
         }
         "sh" | "bash" | "zsh" | "eval" | "source" => return Some("arbitrary shell command"),
-        "git" => {
+        "git"
             if argv
                 .iter()
-                .any(|arg| matches!(arg.as_str(), "push" | "merge" | "apply" | "am"))
-            {
-                return Some("git mutation/apply command");
-            }
+                .any(|arg| matches!(arg.as_str(), "push" | "merge" | "apply" | "am")) =>
+        {
+            return Some("git mutation/apply command");
         }
-        "cargo" => {
+        "cargo"
             if argv
                 .iter()
-                .any(|arg| matches!(arg.as_str(), "install" | "publish" | "add" | "update"))
-            {
-                return Some("cargo install/publish/dependency command");
-            }
+                .any(|arg| matches!(arg.as_str(), "install" | "publish" | "add" | "update")) =>
+        {
+            return Some("cargo install/publish/dependency command");
         }
         _ => {}
     }
