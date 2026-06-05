@@ -1725,6 +1725,426 @@ impl VisualComparisonThreshold {
     }
 }
 
+const SCENE3D_SCENARIO_EVIDENCE_FIELDS: &[&str] = &[
+    "scene3d_camera",
+    "scene3d_animation",
+    "scene3d_probe",
+    "scene3d_transform",
+    "scene3d_render",
+    "scene3d_collision",
+];
+
+pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
+    evaluate_run_with_config(run_dir, None)
+}
+
+pub fn evaluate_run_with_config(
+    run_dir: impl AsRef<Path>,
+    evaluator_config: Option<EvaluatorConfig>,
+) -> Result<EvaluationVerdict> {
+    evaluate_run_with_behavior_evaluator(
+        run_dir,
+        evaluator_config,
+        |_run_dir, suite_path, failures, _evidence_refs| {
+            failures.push(json!({
+                "kind": "unsupported_behavior_assertion_suite",
+                "path": suite_path,
+                "reason": "behavior assertion suite evaluation requires a host crate evaluator"
+            }));
+            Ok(false)
+        },
+    )
+}
+
+fn validate_scene3d_scenario_evidence_ref(
+    run_dir: &Path,
+    result: &serde_json::Value,
+    path: &str,
+    evidence_field: &str,
+    target: Option<&str>,
+    failures: &mut Vec<serde_json::Value>,
+) {
+    let full_path = run_dir.join(path);
+    if !full_path.is_file() {
+        let mut failure = json!({
+            "kind": "missing_scenario_evidence",
+            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+            "path": path,
+            "evidence_field": evidence_field
+        });
+        if let Some(target) = target {
+            failure["target"] = json!(target);
+        }
+        failures.push(failure);
+        return;
+    }
+    match read_json_value(&full_path) {
+        Ok(value) if value.is_object() => {}
+        Ok(value) => {
+            let mut failure = json!({
+                "kind": "malformed_scenario_evidence",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "evidence_field": evidence_field,
+                "reason": format!("expected JSON object, found {}", json_type_name(&value))
+            });
+            if let Some(target) = target {
+                failure["target"] = json!(target);
+            }
+            failures.push(failure);
+        }
+        Err(error) => {
+            let mut failure = json!({
+                "kind": "malformed_scenario_evidence",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "evidence_field": evidence_field,
+                "reason": error.to_string()
+            });
+            if let Some(target) = target {
+                failure["target"] = json!(target);
+            }
+            failures.push(failure);
+        }
+    }
+}
+
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+pub fn evaluate_run_with_behavior_evaluator<F>(
+    run_dir: impl AsRef<Path>,
+    evaluator_config: Option<EvaluatorConfig>,
+    mut evaluate_behavior_assertion_suite_artifact: F,
+) -> Result<EvaluationVerdict>
+where
+    F: FnMut(&Path, &str, &mut Vec<serde_json::Value>, &mut Vec<String>) -> Result<bool>,
+{
+    let run_dir = run_dir.as_ref();
+    let evidence = read_evidence_index(run_dir)?;
+    let mut failures = Vec::new();
+    let mut evidence_refs = Vec::new();
+    let mut scenario_results = Vec::new();
+    let mut behavior_assertion_suites = Vec::new();
+    let mut suite_summaries = 0usize;
+
+    for artifact in &evidence.artifacts {
+        let artifact_path = run_dir.join(&artifact.path);
+        if !artifact_path.is_file() {
+            failures.push(json!({
+                "kind": "missing_evidence",
+                "artifact_id": artifact.id,
+                "path": artifact.path
+            }));
+            continue;
+        }
+        evidence_refs.push(artifact.path.clone());
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("scenario_result")
+        {
+            let input = fs::read_to_string(&artifact_path).with_context(|| {
+                format!("failed to read scenario result {}", artifact_path.display())
+            })?;
+            let result: serde_json::Value = serde_json::from_str(&input).with_context(|| {
+                format!(
+                    "failed to parse scenario result {}",
+                    artifact_path.display()
+                )
+            })?;
+            scenario_results.push((artifact.path.clone(), result));
+        }
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("suite_summary")
+        {
+            suite_summaries += 1;
+        }
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("behavior_assertion_suite")
+        {
+            behavior_assertion_suites.push(artifact.path.clone());
+        }
+    }
+
+    let mut behavior_evaluator_results = 0usize;
+    for suite_path in &behavior_assertion_suites {
+        evaluate_behavior_assertion_suite_artifact(
+            run_dir,
+            suite_path,
+            &mut failures,
+            &mut evidence_refs,
+        )?;
+        behavior_evaluator_results += 1;
+    }
+
+    if scenario_results.is_empty() && behavior_assertion_suites.is_empty() {
+        let status = if failures.is_empty() {
+            "pending"
+        } else {
+            "failed"
+        };
+        let summary = if failures.is_empty() {
+            "No scenario result artifacts are available yet.".to_string()
+        } else {
+            format!(
+                "{} evidence consistency failure(s) found before scenario results were available.",
+                failures.len()
+            )
+        };
+        let verdict = EvaluationVerdict {
+            status: status.to_string(),
+            summary,
+            failures,
+            evidence_refs,
+            metadata: json!({
+                "evaluator": "ouroforge-evaluator-v0",
+                "scenario_results": 0,
+                "suite_summaries": suite_summaries,
+                "behavior_evaluator_results": behavior_evaluator_results,
+                "visual_gate_results": 0,
+                "semantic_gate_results": 0
+            }),
+            gate_categories: None,
+            visual: Vec::new(),
+            semantic: Vec::new(),
+        };
+        write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
+        return Ok(verdict);
+    }
+
+    for (path, result) in &scenario_results {
+        if result.get("status").and_then(|value| value.as_str()) != Some("passed") {
+            failures.push(json!({
+                "kind": "scenario_failed",
+                "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                "path": path,
+                "assertions": result.get("assertions").cloned().unwrap_or_else(|| json!([]))
+            }));
+        }
+        if let Some(assertions) = result.get("assertions").and_then(|value| value.as_array()) {
+            for assertion in assertions.iter().filter(|assertion| {
+                assertion.get("passed").and_then(|value| value.as_bool()) == Some(false)
+            }) {
+                failures.push(json!({
+                    "kind": "assertion_failed",
+                    "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "path": path,
+                    "target": assertion.get("target").cloned().unwrap_or(serde_json::Value::Null),
+                    "assertion_path": assertion.get("path").cloned().unwrap_or(serde_json::Value::Null),
+                    "operator": assertion.get("operator").cloned().unwrap_or(serde_json::Value::Null),
+                    "evidence_ref": assertion.get("evidence_ref").cloned().unwrap_or(serde_json::Value::Null)
+                }));
+            }
+        }
+        if let Some(visual_checks) = result
+            .get("visual_checkpoints")
+            .and_then(|value| value.as_array())
+        {
+            for visual_check in visual_checks.iter().filter(|visual_check| {
+                visual_check.get("passed").and_then(|value| value.as_bool()) == Some(false)
+            }) {
+                failures.push(json!({
+                    "kind": "visual_checkpoint_failed",
+                    "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "path": path,
+                    "checkpoint_id": visual_check.get("checkpoint_id").cloned().unwrap_or(serde_json::Value::Null),
+                    "evidence_ref": visual_check.get("evidence_ref").cloned().unwrap_or(serde_json::Value::Null),
+                    "comparison": visual_check.get("comparison").cloned().unwrap_or(serde_json::Value::Null)
+                }));
+            }
+        }
+        let scenario_passed =
+            result.get("status").and_then(|value| value.as_str()) == Some("passed");
+        for evidence_path in ["world_state", "frame_stats"] {
+            match result
+                .get("evidence")
+                .and_then(|evidence| evidence.get(evidence_path))
+                .and_then(|value| value.as_str())
+            {
+                Some(path) if !run_dir.join(path).is_file() => {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
+                }
+                Some(_) => {}
+                // A passed scenario must carry its required evidence refs; an
+                // absent or non-string ref is itself a consistency failure rather
+                // than something to silently ignore.
+                None if scenario_passed => {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "evidence_field": evidence_path,
+                        "reason": "absent_or_non_string"
+                    }));
+                }
+                None => {}
+            }
+        }
+        for evidence_field in SCENE3D_SCENARIO_EVIDENCE_FIELDS {
+            if let Some(path) = result
+                .get("evidence")
+                .and_then(|evidence| evidence.get(evidence_field))
+                .and_then(|value| value.as_str())
+            {
+                validate_scene3d_scenario_evidence_ref(
+                    run_dir,
+                    result,
+                    path,
+                    evidence_field,
+                    None,
+                    &mut failures,
+                );
+            }
+        }
+        if let Some(assertions) = result.get("assertions").and_then(|value| value.as_array()) {
+            for assertion in assertions {
+                let Some(target) = assertion.get("target").and_then(|value| value.as_str()) else {
+                    continue;
+                };
+                if !target.starts_with("scene3d_") {
+                    continue;
+                }
+                if !SCENE3D_SCENARIO_EVIDENCE_FIELDS.contains(&target) {
+                    failures.push(json!({
+                        "kind": "unsupported_scenario_assertion_target",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path,
+                        "target": target,
+                        "reason": "unsupported_scene3d_assertion_target"
+                    }));
+                    continue;
+                }
+                match assertion.get("evidence_ref").and_then(|value| value.as_str()) {
+                    Some(path) => validate_scene3d_scenario_evidence_ref(
+                        run_dir,
+                        result,
+                        path,
+                        target,
+                        Some(target),
+                        &mut failures,
+                    ),
+                    None => failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "evidence_field": target,
+                        "target": target,
+                        "reason": "assertion_evidence_ref_absent_or_non_string"
+                    })),
+                }
+            }
+        }
+        if let Some(paths) = result
+            .get("evidence")
+            .and_then(|evidence| evidence.get("input_replays"))
+            .and_then(|value| value.as_array())
+        {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                if !run_dir.join(path).is_file() {
+                    failures.push(json!({
+                        "kind": "missing_scenario_evidence",
+                        "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                        "path": path
+                    }));
+                }
+            }
+        }
+        for evidence_list in [
+            "snapshots",
+            "visual_checkpoints",
+            "visual_checkpoint_screenshots",
+            "console_logs",
+            "performance_metrics",
+            "cdp_trace_summaries",
+        ] {
+            if let Some(paths) = result
+                .get("evidence")
+                .and_then(|evidence| evidence.get(evidence_list))
+                .and_then(|value| value.as_array())
+            {
+                for path in paths.iter().filter_map(|value| value.as_str()) {
+                    if !run_dir.join(path).is_file() {
+                        failures.push(json!({
+                            "kind": "missing_scenario_evidence",
+                            "scenario_id": result.get("scenario_id").cloned().unwrap_or(serde_json::Value::Null),
+                            "path": path,
+                            "evidence_list": evidence_list
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(config) = &evaluator_config {
+        apply_explicit_evaluator_checks(run_dir, &evidence, config, &mut failures)?;
+    }
+
+    let visual = evaluate_visual_gate(run_dir, &evidence, &mut failures, &mut evidence_refs)?;
+    let semantic = evaluate_semantic_gate(run_dir, &evidence, &mut failures, &mut evidence_refs)?;
+    let gate_categories = evaluation_gate_categories(
+        scenario_results.len(),
+        behavior_evaluator_results,
+        &failures,
+        &visual,
+        &semantic,
+    );
+
+    let status = if failures.is_empty() {
+        "passed"
+    } else {
+        "failed"
+    };
+    let summary = if failures.is_empty() {
+        format!(
+            "{} scenario result(s) passed with consistent evidence.",
+            scenario_results.len()
+        )
+    } else {
+        format!(
+            "{} failure(s) found across {} scenario result(s).",
+            failures.len(),
+            scenario_results.len()
+        )
+    };
+    let verdict = EvaluationVerdict {
+        status: status.to_string(),
+        summary,
+        failures,
+        evidence_refs,
+        metadata: json!({
+            "evaluator": "ouroforge-evaluator-v0",
+            "scenario_results": scenario_results.len(),
+            "suite_summaries": suite_summaries,
+            "behavior_evaluator_results": behavior_evaluator_results,
+            "visual_gate_results": visual.len(),
+            "semantic_gate_results": semantic.len()
+        }),
+        gate_categories,
+        visual,
+        semantic,
+    };
+    write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
+    Ok(verdict)
+}
+
 pub fn apply_explicit_evaluator_checks(
     run_dir: &Path,
     evidence: &EvidenceIndex,
