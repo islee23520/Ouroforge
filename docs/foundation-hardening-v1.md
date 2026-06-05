@@ -2,13 +2,13 @@
 
 Issue: #1301
 Roadmap anchor: #1 Milestone A.H (Roadmap Alignment Addendum).
-Status: scope contract only; no executable behavior.
+Status: complete after #1306 governance refresh; mechanical refactor only, no executable behavior added.
 
-Foundation Hardening v1 is the architectural-hygiene milestone that decomposes the ~89k-line `crates/ouroforge-core/src/lib.rs` toward the Suggested Repository Structure crate seams. It is a mechanical refactor only: it moves cohesive type/function clusters into new crates, preserves the public API via re-export, and changes no runtime behavior. The primary acceptance gate is that golden run evidence/verdict bytes are unchanged.
+Foundation Hardening v1 was the architectural-hygiene milestone that decomposed the ~89k-line `crates/ouroforge-core/src/lib.rs` toward the Suggested Repository Structure crate seams. It is a mechanical refactor only: it moves cohesive type/function clusters into new crates, preserves the public API via re-export, and changes no runtime behavior. The primary acceptance gate is that golden run evidence/verdict bytes are unchanged.
 
 v1 extracts three crates (`ouroforge-ledger`, `ouroforge-evidence`, `ouroforge-evaluator`); other clusters (mutation, evolve, runtime, behavior, seed) remain in `ouroforge-core` for a later A.H2. It does NOT add features, change behavior, alter serialization, fix bugs opportunistically, or introduce a dependency cycle. Discovered bugs must be filed as separate issues, not fixed inside an extraction PR.
 
-This document is the canonical contract for all follow-up extraction issues. It adds no executable behavior.
+This document remains the canonical contract and closure record for the v1 extraction sequence. It added no executable behavior.
 
 ## Target crates and contents
 
@@ -61,7 +61,7 @@ The extractions are strictly sequential (they touch the same `lib.rs`/workspace 
 
 ## Verification and closure gates
 
-This is a scope/contract issue and adds no executable behavior. PR evidence must include the canonical `docs/foundation-hardening-v1.md`, the crate boundary / dependency-direction / re-export / golden-parity definitions, the bounded-v1 cluster list, and a #1/#23 governance audit. Each follow-up extraction PR must additionally keep `cargo test --workspace` green, keep `cargo clippy --all-targets --all-features -- -D warnings` clean, preserve the #1302 golden parity byte-for-byte, and move exactly one crate.
+This was a scope/contract issue and added no executable behavior. PR evidence included the canonical `docs/foundation-hardening-v1.md`, the crate boundary / dependency-direction / re-export / golden-parity definitions, the bounded-v1 cluster list, and a #1/#23 governance audit. Each follow-up extraction PR kept `cargo test --workspace` green, kept `cargo clippy --all-targets --all-features -- -D warnings` clean, preserved the #1302 golden parity byte-for-byte, and moved one bounded crate slice. #1306 recorded the final governance refresh after #1305 closure.
 
 ## Explicit non-goals
 
@@ -76,3 +76,24 @@ This is a scope/contract issue and adds no executable behavior. PR evidence must
 ## Governance anchors
 
 #1 remains the broad roadmap/final-goal anchor. #23 remains the repo-memory/design context anchor. Both remain open through this contract issue; this milestone does not close or modify either without a separate explicit governance decision.
+
+
+## Completion record after #1306
+
+Foundation Hardening v1 completed through the planned sequence: #1301 scope,
+#1302 golden parity baseline, #1303 `ouroforge-ledger`, #1304
+`ouroforge-evidence`, #1305 `ouroforge-evaluator`, and #1306 governance. The
+realized dependency direction remains acyclic:
+
+```text
+ouroforge-ledger <- ouroforge-evidence <- ouroforge-evaluator <- ouroforge-core <- ouroforge-cli
+```
+
+At the #1306 audit, `crates/ouroforge-core/src/lib.rs` measured 89,047 lines,
+while the extracted crates measured 96 lines (`ouroforge-ledger`), 130 lines
+(`ouroforge-evidence`), and 2,960 lines (`ouroforge-evaluator`). Golden run
+verdict parity remained byte-identical via `refactor_parity_golden`, full
+workspace tests and clippy passed, and #1/#23 remained open. The recommended
+next hardening direction is a separately scoped A.H2 candidate for one of the
+remaining `ouroforge-core` clusters (mutation/evolve, runtime, behavior, or
+seed); this completion does not authorize that work by itself.

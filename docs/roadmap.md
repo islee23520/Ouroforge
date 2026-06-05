@@ -56,10 +56,13 @@ dry-run export plan, deterministic staging, local web bundle assembly, asset
 manifest/path rewriting,
 runtime probe preservation, checksums/provenance, export verification evidence,
 fixture-scoped Scenario Coverage v15, read-only inspection, and explicit
-release/publish blockers:
+release/publish blockers, and a completed Foundation Hardening v1 architecture
+hygiene milestone that extracted `ouroforge-ledger`, `ouroforge-evidence`, and
+`ouroforge-evaluator` behind the existing `ouroforge-core` public facade while
+preserving golden verdict parity:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> local web export/package evidence
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -91,6 +94,24 @@ commercial readiness, secure distribution, multi-platform parity, or Godot
 replacement status. Generated package outputs, checksums, verification logs,
 screenshots, temp servers, dashboard exports, and local tool state remain
 ignored unless a future issue explicitly scopes a source-like fixture.
+
+Foundation Hardening v1 (#1301-#1306) is now complete as Milestone A.H from #1's
+Roadmap Alignment Addendum. The merged chain established the golden parity
+baseline (#1302), extracted `ouroforge-ledger` (#1303), extracted
+`ouroforge-evidence` (#1304), extracted `ouroforge-evaluator` (#1305), and
+recorded this governance refresh (#1306). The realized dependency direction is
+`ouroforge-ledger <- ouroforge-evidence <- ouroforge-evaluator <-
+ouroforge-core <- ouroforge-cli`; `ouroforge-core` preserves public API
+compatibility through re-exports and thin facades. `crates/ouroforge-core/src/lib.rs`
+was reduced from approximately 89k lines at milestone start to 89,047 lines
+after #1305, with the new extracted crates measuring 96 (`ouroforge-ledger`),
+130 (`ouroforge-evidence`), and 2,960 (`ouroforge-evaluator`) lines at the
+#1306 audit. The `refactor_parity_golden` gate remained byte-identical across
+the milestone, and full workspace tests/clippy stayed green. This was mechanical
+hygiene only: no feature, behavior, serialization, release, production-readiness,
+plugin/runtime, hosted/cloud, native-export, source-apply, or Godot-replacement
+claim changed. Mutation, evolve, runtime, behavior, and seed remain in
+`ouroforge-core` as explicit A.H2 candidates, not accepted work.
 
 ## Completed evidence-native milestones
 
@@ -238,6 +259,12 @@ The current implementation has completed these documented milestone surfaces:
   `examples/export-bundle-v1/export-profile.fixture.json`,
   `examples/export-asset-manifest-v1/asset-manifest.valid.fixture.json`,
   `examples/export-probe-v1/`)
+- Foundation Hardening v1 / mechanical crate decomposition
+  (`docs/foundation-hardening-v1.md`,
+  `docs/refactor-parity-golden-baseline-v1.md`,
+  `crates/ouroforge-ledger/`,
+  `crates/ouroforge-evidence/`,
+  `crates/ouroforge-evaluator/`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -400,6 +427,23 @@ continue on the corrected four-gate basis. Layer-3 expansion remains unchanged
 and deferred: distributed orchestration / Elixir per ADR #92, native export,
 plugin runtime, and hosted/cloud scope still require separate scoped issue
 sequences and governance approval.
+
+### Foundation Hardening v1 governance refresh
+
+Foundation Hardening v1 is recorded as **complete for Milestone A.H**, closing
+the structural-drift item in #1's Roadmap Alignment Addendum. The completion
+evidence is the merged issue/PR chain #1301, #1302, #1303, #1304, #1305, and
+#1306, with zero-diff golden parity evidence and final full required gates
+recorded on #1306. #1 and #23 remain open governance anchors.
+
+The recommended next hardening direction is a later **A.H2** candidate focused
+on one of the still-large `ouroforge-core` clusters: mutation/evolve, runtime,
+behavior, or seed. This recommendation is not approval to start that work; an
+A.H2 scope issue must define the exact crate seam, acyclic dependency direction,
+re-export strategy, golden/parity gates, and no-behavior-change guardrails before
+any extraction PR. Layer-3 scope remains unchanged and deferred: distributed
+orchestration / Elixir per ADR #92, native export, plugin runtime, and
+hosted/cloud still require separate design gates and governance approval.
 
 ### Public Alpha Readiness handoff
 
@@ -567,6 +611,12 @@ remain separate maintainer actions.
   publishing, desktop/mobile/native export, credentialed release flow,
   production-ready export claims, commercial distribution, secure distribution,
   multi-platform parity, or Godot replacement status.
+- Treat Foundation Hardening v1 as complete but mechanical. Its artifacts
+  authorize the realized `ouroforge-ledger`, `ouroforge-evidence`, and
+  `ouroforge-evaluator` crate seams, re-export facades, and golden-parity audit;
+  they do not authorize behavior changes, bug fixes, new user capability, source
+  apply, native export, plugin runtime, hosted/cloud behavior, release
+  readiness, production claims, or Godot replacement status.
 
 ## Active anchors
 
