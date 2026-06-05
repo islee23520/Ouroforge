@@ -40716,6 +40716,9 @@ fn render_journal(
     out.push_str(&render_behavior_assertions_journal_section(
         run_dir, evidence, verdict,
     ));
+    out.push_str(&render_behavior_lifecycle_journal_section(
+        run_dir, evidence,
+    ));
 
     out.push_str("## Evidence\n\n");
     if evidence.artifacts.is_empty() {
@@ -41047,6 +41050,157 @@ fn render_behavior_assertions_journal_section(
         out.push('\n');
     }
     out
+}
+
+fn render_behavior_lifecycle_journal_section(run_dir: &Path, evidence: &EvidenceIndex) -> String {
+    let mut out = String::new();
+    out.push_str("## Behavior Lifecycle Evidence\n\n");
+    out.push_str("- Boundary: read-only structured behavior lifecycle summary; no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, browser trusted writes, auto-apply, auto-merge, or production-stable scripting API.\n");
+
+    let bundles = match select_dashboard_artifacts(
+        run_dir,
+        &evidence.artifacts,
+        dashboard_artifact_is_behavior_evidence_bundle,
+    ) {
+        Ok(bundles) => bundles,
+        Err(error) => {
+            out.push_str(&format!(
+                "- Behavior lifecycle evidence could not be read: {error}\n\n"
+            ));
+            return out;
+        }
+    };
+
+    if bundles.is_empty() {
+        out.push_str("- Status: `missing`; no behavior evidence bundle artifacts were recorded, so behavior definitions, runtime events, scenario outcomes, drafts, reviews, applies, rollback metadata, and rerun comparisons remain unavailable instead of inferred.\n\n");
+        return out;
+    }
+
+    out.push_str(&format!(
+        "- Behavior evidence bundle artifacts: `{}`.\n",
+        bundles.len()
+    ));
+    for artifact in &bundles {
+        out.push_str(&format!(
+            "- Bundle artifact `{}` path `{}`:\n",
+            artifact.id, artifact.path
+        ));
+        if let Some(error) = &artifact.read_error {
+            out.push_str(&format!(
+                "  - Status: `malformed`; artifact is present but unreadable: {error}\n"
+            ));
+            continue;
+        }
+        let Some(value) = artifact.value.as_ref() else {
+            out.push_str(
+                "  - Status: `malformed`; artifact is present but no JSON value was available.\n",
+            );
+            continue;
+        };
+        let bundle_json = match serde_json::to_string(value) {
+            Ok(bundle_json) => bundle_json,
+            Err(error) => {
+                out.push_str(&format!(
+                    "  - Status: `malformed`; artifact could not be serialized for validation: {error}\n"
+                ));
+                continue;
+            }
+        };
+        let bundle =
+            match behavior_evidence::BehaviorEvidenceBundleArtifact::from_json_str(&bundle_json) {
+                Ok(bundle) => bundle,
+                Err(error) => {
+                    out.push_str(&format!(
+                    "  - Status: `malformed`; behavior evidence bundle validation failed: {error}\n"
+                ));
+                    continue;
+                }
+            };
+        let validation = bundle.inspect();
+        out.push_str(&format!(
+            "  - Bundle `{}` status `{}`; lifecycle refs `{}`; validation status `{}`.\n",
+            bundle.bundle_id,
+            behavior_bundle_status_label(bundle.status),
+            validation.lifecycle_ref_count,
+            validation.status
+        ));
+        out.push_str(&format!(
+            "  - Behavior definitions: {}; runtime events: {}; scenario outcomes: {}\n",
+            behavior_ref_paths(&bundle.behavior_definition_refs),
+            behavior_ref_paths(&bundle.runtime_event_refs),
+            behavior_ref_paths(&bundle.scenario_outcome_refs)
+        ));
+        out.push_str(&format!(
+            "  - Drafts: {}; reviews: {}; applies: {}; rollback: {}; rerun comparisons: {}\n",
+            behavior_ref_paths(&bundle.draft_refs),
+            behavior_ref_paths(&bundle.review_decision_refs),
+            behavior_ref_paths(&bundle.apply_transaction_refs),
+            behavior_ref_paths(&bundle.rollback_metadata_refs),
+            behavior_ref_paths(&bundle.rerun_comparison_refs)
+        ));
+        if bundle.observed_failures.is_empty() {
+            out.push_str("  - Observed failures: none recorded.\n");
+        } else {
+            out.push_str("  - Observed failures:\n");
+            for failure in &bundle.observed_failures {
+                out.push_str(&format!(
+                    "    - Scenario `{}`: {} (evidence `{}`)\n",
+                    failure.scenario_id, failure.summary, failure.evidence_ref.path
+                ));
+            }
+        }
+        if bundle.next_step_hypotheses.is_empty() {
+            out.push_str("  - Next-step hypotheses: none recorded.\n");
+        } else {
+            out.push_str("  - Next-step hypotheses:\n");
+            for hypothesis in &bundle.next_step_hypotheses {
+                out.push_str(&format!(
+                    "    - `{}`: {}\n",
+                    hypothesis.id, hypothesis.summary
+                ));
+            }
+        }
+        if bundle.blocked_reasons.is_empty() {
+            out.push_str("  - Blocked/stale reasons: none recorded.\n");
+        } else {
+            out.push_str(&format!(
+                "  - Blocked/stale reasons: {}\n",
+                join_or_none(&bundle.blocked_reasons)
+            ));
+        }
+        out.push_str(&format!(
+            "  - Linked evidence refs: {}\n",
+            behavior_ref_paths(&bundle.linked_evidence)
+        ));
+        out.push_str(&format!(
+            "  - Guardrails: {}\n",
+            join_or_none(&bundle.guardrails)
+        ));
+    }
+    out.push('\n');
+    out
+}
+
+fn behavior_bundle_status_label(
+    status: behavior_evidence::BehaviorEvidenceBundleStatus,
+) -> &'static str {
+    match status {
+        behavior_evidence::BehaviorEvidenceBundleStatus::Complete => "complete",
+        behavior_evidence::BehaviorEvidenceBundleStatus::Partial => "partial",
+        behavior_evidence::BehaviorEvidenceBundleStatus::Blocked => "blocked",
+        behavior_evidence::BehaviorEvidenceBundleStatus::Stale => "stale",
+    }
+}
+
+fn behavior_ref_paths(refs: &[behavior_evidence::BehaviorEvidenceRef]) -> String {
+    if refs.is_empty() {
+        "none".to_string()
+    } else {
+        refs.iter()
+            .map(|reference| format!("`{}`", reference.path))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 fn read_dashboard_behavior_assertions(
@@ -55417,6 +55571,16 @@ fn dashboard_artifact_is_behavior_assertion_result(artifact: &EvidenceArtifact) 
         == Some("behavior_assertion_result")
         || artifact.id.contains("behavior-assertion-result")
         || artifact.path.contains("behavior-assertions")
+}
+
+fn dashboard_artifact_is_behavior_evidence_bundle(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("behavior_evidence_bundle")
+        || artifact.id.contains("behavior-evidence-bundle")
+        || artifact.path.contains("behavior-evidence-bundle")
 }
 
 fn dashboard_artifact_is_input_replay(artifact: &EvidenceArtifact) -> bool {
@@ -77301,6 +77465,72 @@ scenarios:
     }
 
     #[test]
+    fn journal_summarizes_behavior_lifecycle_bundle() {
+        let (root, artifacts) = create_test_run("behavior-lifecycle-journal-test");
+        let bundle_path = write_behavior_evidence_bundle_fixture(&artifacts.run_dir);
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+
+        assert!(journal.contains("## Behavior Lifecycle Evidence"));
+        assert!(journal.contains("Bundle `behavior-evidence-jump-boost` status `complete`"));
+        assert!(journal.contains("Behavior definitions"));
+        assert!(journal.contains("runtime-events.json"));
+        assert!(journal.contains("Cooldown assertion failed"));
+        assert!(journal.contains("hypothesis-rerun-after-rollback"));
+        assert!(journal.contains("no arbitrary script execution, eval, dynamic import"));
+        assert!(journal.contains(&bundle_path));
+
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        let lifecycle_entry = dashboard
+            .journal_view
+            .entries
+            .iter()
+            .find(|entry| entry.heading == "Behavior Lifecycle Evidence")
+            .expect("behavior lifecycle journal entry present");
+        assert!(lifecycle_entry
+            .evidence_refs
+            .iter()
+            .any(|reference| reference == &bundle_path));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn journal_keeps_missing_and_malformed_behavior_lifecycle_visible() {
+        let (missing_root, missing_artifacts) = create_test_run("behavior-lifecycle-missing-test");
+        let missing_journal = update_journal(&missing_artifacts.run_dir).expect("journal updates");
+        assert!(missing_journal.contains("## Behavior Lifecycle Evidence"));
+        assert!(missing_journal.contains("Status: `missing`"));
+        assert!(missing_journal.contains("remain unavailable instead of inferred"));
+        fs::remove_dir_all(missing_root).ok();
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("behavior-lifecycle-malformed-test");
+        let malformed_path = "evidence/behavior/behavior-evidence-bundle-malformed.json";
+        fs::create_dir_all(malformed_artifacts.run_dir.join("evidence/behavior"))
+            .expect("behavior evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed behavior bundle written");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "behavior-evidence-bundle-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "behavior_evidence_bundle" }),
+        )
+        .expect("malformed behavior bundle indexed");
+
+        let malformed_journal =
+            update_journal(&malformed_artifacts.run_dir).expect("journal updates");
+        assert!(malformed_journal.contains("Status: `malformed`"));
+        assert!(malformed_journal.contains("artifact is present but unreadable"));
+        assert!(malformed_journal.contains(malformed_path));
+        fs::remove_dir_all(malformed_root).ok();
+    }
+
+    #[test]
     fn evaluator_marks_run_pending_without_scenario_results() {
         let (root, artifacts) = create_test_run("ouroforge-eval-pending-test");
 
@@ -88207,6 +88437,25 @@ scenarios:
             )
             .expect("artifact indexed");
         }
+    }
+
+    fn write_behavior_evidence_bundle_fixture(run_dir: &Path) -> String {
+        let bundle_path = "evidence/behavior/behavior-evidence-bundle.complete.json".to_string();
+        fs::create_dir_all(run_dir.join("evidence/behavior")).expect("behavior dir created");
+        fs::write(
+            run_dir.join(&bundle_path),
+            include_str!("../../../examples/behavior-evidence-bundle-v1/behavior-evidence-bundle.complete.json"),
+        )
+        .expect("behavior evidence bundle written");
+        add_evidence_artifact(
+            run_dir,
+            "behavior-evidence-bundle-complete",
+            "application/json",
+            &bundle_path,
+            json!({ "artifact": "behavior_evidence_bundle" }),
+        )
+        .expect("behavior evidence bundle indexed");
+        bundle_path
     }
 
     fn write_behavior_assertion_suite_fixture(
