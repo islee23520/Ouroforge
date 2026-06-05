@@ -69,10 +69,17 @@ evidence, fixture-scoped Scenario Coverage v15, read-only inspection, and
 explicit release/publish blockers, and a completed Foundation Hardening v1
 architecture hygiene milestone that extracted `ouroforge-ledger`,
 `ouroforge-evidence`, and `ouroforge-evaluator` behind the existing
-`ouroforge-core` public facade while preserving golden verdict parity:
+`ouroforge-core` public facade while preserving golden verdict parity, and a
+completed Godot-Plus Demo Game v1 milestone for the Signal Gate local vertical
+slice: a small playable 2D vertical slice, Studio inspect/draft workflow,
+agentic iteration evidence, Safe Source Apply chain evidence, QA swarm evidence
+and QA/playtest swarm evidence, local web export/package verification, plugin
+descriptors used as metadata, Godot-plus comparison matrix,
+documentation/reproducibility notes, performance budget evidence, regression
+suite, and conservative governance refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -135,6 +142,29 @@ hygiene only: no feature, behavior, serialization, release, production-readiness
 plugin/runtime, hosted/cloud, native-export, source-apply, or Godot-replacement
 claim changed. Mutation, evolve, runtime, behavior, and seed remain in
 `ouroforge-core` as explicit A.H2 candidates, not accepted work.
+
+Godot-Plus Demo Game v1 (#778-#797) is now complete as a bounded local workflow
+demonstration under #1. The merged evidence chain proved Signal Gate as a small
+playable demo game and 2D vertical slice with deterministic gameplay evidence,
+read-only or draft-only Studio inspect/draft workflow, agentic iteration
+evidence, Safe Source Apply review-gated source mutation chain evidence, QA
+swarm evidence and QA/playtest swarm evidence, local web export/package
+verification, plugin descriptors used as metadata, a scoped Godot-plus
+comparison matrix, documentation/reproducibility notes, performance budget
+evidence, regression suite coverage, and this governance refresh. The
+remaining gaps stay explicit: full Godot parity, mature editor tooling,
+native/mobile export, large game production, real marketplace, executable plugin
+ecosystem, production collaboration, commercial release readiness, production
+engine maturity, secure sandbox guarantees, hosted/cloud operation, and broad
+support promises. This completion does not authorize direct Studio trusted
+writes, browser command bridges, arbitrary shell execution, dependency install,
+network install/update, credentialed operation, unreviewed source mutation,
+auto-apply, auto-merge, self-approval, reviewer bypass, public deployment,
+native/mobile/console/store publishing, production-readiness claims, or current
+Godot replacement positioning. Generated demo outputs, exports, QA runs,
+evidence bundles, screenshots, videos, temp servers, package bundles, and local
+tool state remain ignored unless a later issue explicitly scopes deterministic
+source-like fixtures. #1 remains open. #23 remains open.
 
 ## Completed evidence-native milestones
 
@@ -300,6 +330,13 @@ The current implementation has completed these documented milestone surfaces:
   `crates/ouroforge-ledger/`,
   `crates/ouroforge-evidence/`,
   `crates/ouroforge-evaluator/`)
+- Godot-Plus Demo Game v1 / Signal Gate local workflow demonstration
+  (`docs/godot-plus-demo-game-v1.md`,
+  `docs/godot-plus-demo-design-pillars-v1.md`,
+  `docs/autonomous-qa-playtest-swarm-v1.md`,
+  `docs/safe-source-mutation-apply-v1.md`,
+  `docs/scenario-coverage-v15-build-export-packaging.md`,
+  `docs/scenario-coverage-v16-plugin-extension.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -542,6 +579,26 @@ any extraction PR. Layer-3 scope remains unchanged and deferred: distributed
 orchestration / Elixir per ADR #92, native export, plugin runtime, and
 hosted/cloud still require separate design gates and governance approval.
 
+### Godot-Plus Demo Game v1 governance refresh
+
+Godot-Plus Demo Game v1 is recorded as **complete as a bounded local workflow
+demonstration**, closing the Era C (#660-#797) governance chain without closing
+#1 or #23. The completion evidence is the merged issue sequence #778-#797:
+Signal Gate design and implementation, scenario/regression evidence,
+QA swarm evidence, QA/playtest swarm evidence, agentic iteration and Safe
+Source Apply chain evidence, read-only or draft-only Studio walkthrough
+evidence, local web export/package verification, plugin descriptors used as
+metadata, scoped comparison matrix, performance budget evidence,
+documentation/reproducibility, and this roadmap refresh.
+
+The recommended next technical sequence is not expanded by this completion.
+Future work still needs separate scoped issues for any mature editor tooling,
+native/mobile export, executable plugin ecosystem, real marketplace,
+large-project production workflow, production collaboration, commercial release
+readiness, production engine maturity, distributed orchestration / Elixir per
+ADR #92, hosted/cloud behavior, or broader compatibility claim. #1 and #23
+remain open governance anchors.
+
 ### Public Alpha Readiness handoff
 
 The scope contract for this preparation milestone is [`docs/public-alpha-readiness-v1.md`](public-alpha-readiness-v1.md).
@@ -734,6 +791,19 @@ remain separate maintainer actions.
   they do not authorize behavior changes, bug fixes, new user capability, source
   apply, native export, plugin runtime, hosted/cloud behavior, release
   readiness, production claims, or Godot replacement status.
+- Treat Godot-Plus Demo Game v1 as complete but scoped. Its artifacts authorize
+  claims about the Signal Gate local evidence-native workflow only: a small
+  playable 2D vertical slice, Studio inspect/draft workflow, agentic iteration
+  evidence, review-gated Safe Source Apply chain evidence, QA swarm evidence,
+  QA/playtest swarm evidence, local web export/package verification, plugin
+  descriptors used as metadata, scoped comparison evidence, performance budget
+  evidence, documentation, and regression coverage. They do not authorize full
+  Godot parity, mature editor tooling claims, native/mobile export, large game
+  production, real marketplace, executable plugin ecosystem, production
+  collaboration, commercial release readiness, production engine maturity,
+  public deployment, direct Studio trusted writes, command bridges, unreviewed
+  source mutation, auto-apply, auto-merge, self-approval, reviewer bypass,
+  secure sandbox guarantees, or current Godot replacement positioning.
 
 ## Active anchors
 
