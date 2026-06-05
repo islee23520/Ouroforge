@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "qa-flake-rerun-policy-v1",
+  "policyId": "qa14.10-unsupported",
+  "classification": "unsupported",
+  "runMatrixRefs": ["runs/qa-swarm/run-206/matrix.json"],
+  "maxReruns": 3,
+  "rerunsUsed": 0,
+  "consistencyThreshold": 0.9,
+  "rerunSupported": false,
+  "cleanupPolicy": "Generated rerun artifacts under the output roots are deleted after triage; nothing is tracked in git.",
+  "outputRoots": ["runs/qa-swarm/run-206/flake"],
+  "originalEvidenceRef": "evidence/qa-swarm/run-206/scenario-result.json",
+  "rerunEvidenceRefs": [],
+  "observedOutcomes": ["failed"],
+  "blockedReasons": ["This scenario does not support deterministic reruns; flake handling is unsupported and must be reviewed manually."],
+  "boundary": "Flake and rerun results are evidence inputs and remain review-gated until triaged. Reruns are bounded reruns with an explicit cleanup policy and disjoint output roots. No auto-fix, no auto-apply, and no quality guarantee. Browser read-only or draft-only."
+}

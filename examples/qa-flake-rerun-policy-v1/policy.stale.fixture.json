@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "qa-flake-rerun-policy-v1",
+  "policyId": "qa14.10-stale",
+  "classification": "stale",
+  "runMatrixRefs": ["runs/qa-swarm/run-207/matrix.json"],
+  "staleRunRefs": ["runs/qa-swarm/run-207/matrix.json"],
+  "maxReruns": 3,
+  "rerunsUsed": 0,
+  "consistencyThreshold": 0.9,
+  "rerunSupported": true,
+  "cleanupPolicy": "Generated rerun artifacts under the output roots are deleted after triage; nothing is tracked in git.",
+  "outputRoots": ["runs/qa-swarm/run-207/flake"],
+  "originalEvidenceRef": "evidence/qa-swarm/run-207/scenario-result.json",
+  "rerunEvidenceRefs": [],
+  "observedOutcomes": ["passed"],
+  "blockedReasons": ["Run matrix entry run-207 is stale; flake evidence must be re-collected before triage."],
+  "boundary": "Flake and rerun results are evidence inputs and remain review-gated until triaged. Reruns are bounded reruns with an explicit cleanup policy and disjoint output roots. No auto-fix, no auto-apply, and no quality guarantee. Browser read-only or draft-only."
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "qa-flake-rerun-policy-v1",
+  "policyId": "qa14.10-unsafe-boundary",
+  "classification": "stable-pass",
+  "runMatrixRefs": ["runs/qa-swarm/run-216/matrix.json"],
+  "maxReruns": 4,
+  "rerunsUsed": 1,
+  "consistencyThreshold": 1.0,
+  "rerunSupported": true,
+  "cleanupPolicy": "Generated rerun artifacts are deleted after triage.",
+  "outputRoots": ["runs/qa-swarm/run-216/flake"],
+  "originalEvidenceRef": "evidence/qa-swarm/run-216/scenario-result.json",
+  "rerunEvidenceRefs": ["evidence/qa-swarm/run-216/rerun-1.json"],
+  "observedOutcomes": ["passed", "passed"],
+  "blockedReasons": [],
+  "boundary": "Flake and rerun results are evidence inputs."
+}

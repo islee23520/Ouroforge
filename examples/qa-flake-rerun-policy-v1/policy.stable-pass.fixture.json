@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "qa-flake-rerun-policy-v1",
+  "policyId": "qa14.10-stable-pass",
+  "classification": "stable-pass",
+  "runMatrixRefs": ["runs/qa-swarm/run-201/matrix.json"],
+  "maxReruns": 4,
+  "rerunsUsed": 1,
+  "consistencyThreshold": 1.0,
+  "rerunSupported": true,
+  "cleanupPolicy": "Generated rerun artifacts under the output roots are deleted after triage; nothing is tracked in git.",
+  "outputRoots": ["runs/qa-swarm/run-201/flake"],
+  "originalEvidenceRef": "evidence/qa-swarm/run-201/scenario-result.json",
+  "rerunEvidenceRefs": ["evidence/qa-swarm/run-201/rerun-1.json"],
+  "observedOutcomes": ["passed", "passed"],
+  "blockedReasons": [],
+  "boundary": "Flake and rerun results are evidence inputs and remain review-gated until triaged. Reruns are bounded reruns with an explicit cleanup policy and disjoint output roots. No auto-fix, no auto-apply, and no quality guarantee. Browser read-only or draft-only."
+}
