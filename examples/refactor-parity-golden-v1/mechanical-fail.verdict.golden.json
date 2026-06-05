@@ -1,0 +1,22 @@
+{
+  "evidence_refs": [
+    "evidence/scenarios/collect-and-exit/scenario-result.json"
+  ],
+  "failures": [
+    {
+      "assertions": [],
+      "kind": "scenario_failed",
+      "path": "evidence/scenarios/collect-and-exit/scenario-result.json",
+      "scenario_id": "collect-and-exit"
+    }
+  ],
+  "metadata": {
+    "behavior_evaluator_results": 0,
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "suite_summaries": 0,
+    "visual_gate_results": 0
+  },
+  "status": "failed",
+  "summary": "1 failure(s) found across 1 scenario result(s)."
+}

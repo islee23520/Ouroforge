@@ -1,0 +1,113 @@
+{
+  "evidence_refs": [
+    "evidence/scenarios/collect-and-exit/scenario-result.json",
+    "evidence/scenarios/collect-and-exit/visual/pass-unchanged/after.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/pass-unchanged/after.png",
+    "evidence/scenarios/collect-and-exit/visual/pass-unchanged/before.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/pass-unchanged/before.png",
+    "evidence/scenarios/collect-and-exit/visual/pass-unchanged/visual-comparison.json",
+    "evidence/scenarios/collect-and-exit/visual/fail-changed/after.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/fail-changed/after.png",
+    "evidence/scenarios/collect-and-exit/visual/fail-changed/before.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/fail-changed/before.png",
+    "evidence/scenarios/collect-and-exit/visual/fail-changed/visual-comparison.json",
+    "evidence/scenarios/collect-and-exit/visual/missing-baseline/after.metadata.json",
+    "evidence/scenarios/collect-and-exit/visual/missing-baseline/after.png",
+    "evidence/scenarios/collect-and-exit/visual/missing-baseline/visual-comparison.json"
+  ],
+  "failures": [
+    {
+      "changed_percent_x1000": 111,
+      "changed_pixels": 64,
+      "changed_region_count": 1,
+      "checkpoint_id": "goal-checkpoint",
+      "kind": "visual_gate_failed",
+      "path": "evidence/scenarios/collect-and-exit/visual/fail-changed/visual-comparison.json",
+      "reason": "visual gate failed: evidence/scenarios/collect-and-exit/visual/fail-changed/visual-comparison.json; 64 changed pixels (111 x1000); 1 changed region(s); threshold(s): pixel-threshold <= 32 px/50 x1000",
+      "scenario_id": "collect-and-exit",
+      "state": "fail",
+      "threshold_summary": [
+        "pixel-threshold <= 32 px and 50 x1000"
+      ]
+    },
+    {
+      "changed_percent_x1000": 0,
+      "changed_pixels": 0,
+      "changed_region_count": 0,
+      "checkpoint_id": "goal-checkpoint",
+      "kind": "visual_gate_failed",
+      "path": "evidence/scenarios/collect-and-exit/visual/missing-baseline/visual-comparison.json",
+      "reason": "baseline screenshot missing for declared visual gate at evidence/scenarios/collect-and-exit/visual/missing-baseline/visual-comparison.json",
+      "scenario_id": "collect-and-exit",
+      "state": "missing-baseline",
+      "threshold_summary": []
+    }
+  ],
+  "metadata": {
+    "behavior_evaluator_results": 0,
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "suite_summaries": 0,
+    "visual_gate_results": 3
+  },
+  "status": "failed",
+  "summary": "2 failure(s) found across 1 scenario result(s).",
+  "visual": [
+    {
+      "changedPercentX1000": 0,
+      "changedPixels": 0,
+      "changedRegionCount": 0,
+      "checkpointId": "goal-checkpoint",
+      "comparisonRef": "evidence/scenarios/collect-and-exit/visual/pass-unchanged/visual-comparison.json",
+      "evidenceRefs": [
+        "evidence/scenarios/collect-and-exit/visual/pass-unchanged/after.metadata.json",
+        "evidence/scenarios/collect-and-exit/visual/pass-unchanged/after.png",
+        "evidence/scenarios/collect-and-exit/visual/pass-unchanged/before.metadata.json",
+        "evidence/scenarios/collect-and-exit/visual/pass-unchanged/before.png"
+      ],
+      "outputRoot": "evidence/scenarios/collect-and-exit/visual/pass-unchanged",
+      "reason": "visual gate passed: evidence/scenarios/collect-and-exit/visual/pass-unchanged/visual-comparison.json; 0 changed pixels (0 x1000); 0 changed region(s); threshold(s): pixel-threshold <= 32 px/50 x1000",
+      "scenarioId": "collect-and-exit",
+      "state": "pass",
+      "thresholdSummary": [
+        "pixel-threshold <= 32 px and 50 x1000"
+      ]
+    },
+    {
+      "changedPercentX1000": 111,
+      "changedPixels": 64,
+      "changedRegionCount": 1,
+      "checkpointId": "goal-checkpoint",
+      "comparisonRef": "evidence/scenarios/collect-and-exit/visual/fail-changed/visual-comparison.json",
+      "evidenceRefs": [
+        "evidence/scenarios/collect-and-exit/visual/fail-changed/after.metadata.json",
+        "evidence/scenarios/collect-and-exit/visual/fail-changed/after.png",
+        "evidence/scenarios/collect-and-exit/visual/fail-changed/before.metadata.json",
+        "evidence/scenarios/collect-and-exit/visual/fail-changed/before.png"
+      ],
+      "outputRoot": "evidence/scenarios/collect-and-exit/visual/fail-changed",
+      "reason": "visual gate failed: evidence/scenarios/collect-and-exit/visual/fail-changed/visual-comparison.json; 64 changed pixels (111 x1000); 1 changed region(s); threshold(s): pixel-threshold <= 32 px/50 x1000",
+      "scenarioId": "collect-and-exit",
+      "state": "fail",
+      "thresholdSummary": [
+        "pixel-threshold <= 32 px and 50 x1000"
+      ]
+    },
+    {
+      "changedPercentX1000": 0,
+      "changedPixels": 0,
+      "changedRegionCount": 0,
+      "checkpointId": "goal-checkpoint",
+      "comparisonRef": "evidence/scenarios/collect-and-exit/visual/missing-baseline/visual-comparison.json",
+      "evidenceRefs": [
+        "evidence/scenarios/collect-and-exit/visual/missing-baseline/after.metadata.json",
+        "evidence/scenarios/collect-and-exit/visual/missing-baseline/after.png"
+      ],
+      "outputRoot": "evidence/scenarios/collect-and-exit/visual/missing-baseline",
+      "reason": "baseline screenshot missing for declared visual gate at evidence/scenarios/collect-and-exit/visual/missing-baseline/visual-comparison.json",
+      "scenarioId": "collect-and-exit",
+      "state": "missing-baseline",
+      "thresholdSummary": []
+    }
+  ]
+}
