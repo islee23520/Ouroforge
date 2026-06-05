@@ -41,6 +41,7 @@ pub mod source_apply_highrisk_blocker;
 pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
 pub mod plugin_manifest;
+pub mod plugin_registry;
 pub mod source_apply_audit_ledger;
 pub use source_apply_audit_ledger::*;
 pub mod runtime_frame_budget;
@@ -49073,7 +49074,7 @@ pub struct SceneOnlyMutationApplicationIndex {
     pub applications: Vec<SceneOnlyMutationApplicationRecord>,
 }
 
-fn canonical_json_digest(value: serde_json::Value) -> Result<String> {
+pub(crate) fn canonical_json_digest(value: serde_json::Value) -> Result<String> {
     let bytes = serde_json::to_vec(&canonical_json_value(value))
         .context("failed to serialize canonical JSON for digest")?;
     Ok(format!("{:016x}", fnv1a64(&bytes)))
@@ -51104,7 +51105,7 @@ fn canonical_json_value(value: serde_json::Value) -> serde_json::Value {
     }
 }
 
-fn fnv1a64(bytes: &[u8]) -> u64 {
+pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf29ce484222325_u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
