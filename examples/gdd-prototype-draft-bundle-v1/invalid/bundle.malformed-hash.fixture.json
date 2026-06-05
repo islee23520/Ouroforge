@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "gdd-prototype-draft-bundle-v1",
+  "bundleId": "bundle-collect-exit",
+  "status": "ready",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "requirementExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "scaffoldPlanRef": "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+  "sceneLevelPlanRef": "examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json",
+  "behaviorPlanRef": "examples/behavior-draft-v1/behavior-draft.valid.fixture.json",
+  "assetPlanRef": "examples/asset-manifest-v1/valid.fixture.json",
+  "scenarioDraftRefs": [
+    "examples/scenario-packs/core-2d-smoke.json"
+  ],
+  "taskGraphRef": "examples/agent-work-package-v1/work-package.ready.fixture.json",
+  "expectedEvidenceRefs": [
+    "runs/gdd-prototype-draft-bundle-v1/evidence/expected-preview.json"
+  ],
+  "sourceNoteRefs": [
+    "examples/gdd-prototype-draft-bundle-v1/source-notes/local-placeholder-assets.json"
+  ],
+  "targetHashes": [
+    {
+      "targetRef": "examples/gdd-prototype-draft-bundle-v1/preview/bundle.json",
+      "hash": "not-a-sha",
+      "stale": false,
+      "blockedReasons": []
+    }
+  ],
+  "components": [
+    {
+      "kind": "requirements",
+      "artifactRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "feasibility",
+      "artifactRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "scaffold",
+      "artifactRef": "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "scene-level",
+      "artifactRef": "examples/agent-generated-level-draft-v1/level-draft.drafted.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "behavior",
+      "artifactRef": "examples/behavior-draft-v1/behavior-draft.valid.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "assets",
+      "artifactRef": "examples/asset-manifest-v1/valid.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "scenarios",
+      "artifactRef": "examples/scenario-packs/core-2d-smoke.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    },
+    {
+      "kind": "task-graph",
+      "artifactRef": "examples/agent-work-package-v1/work-package.ready.fixture.json",
+      "validationStatus": "pass",
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "review surface only; untrusted until Rust/local validation; review-gated apply; no direct trusted writes; no autonomous unrestricted game creation; browser read-only or draft-only; no asset generation"
+}
