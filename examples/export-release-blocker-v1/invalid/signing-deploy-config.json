@@ -1,0 +1,9 @@
+{
+  "exportTarget": "web-local",
+  "outputDir": "dist/export/x",
+  "release": {
+    "deployTarget": "prod-cdn",
+    "signingKey": "credential-abc",
+    "uploadUrl": "configured-elsewhere"
+  }
+}

@@ -39,6 +39,7 @@ pub mod export_package_metadata;
 pub mod export_plan;
 pub mod export_probe_check;
 pub mod export_profile;
+pub mod export_release_blocker;
 pub mod export_staging;
 pub mod export_verification;
 pub mod source_apply_post_apply_rerun;

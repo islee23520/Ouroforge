@@ -1,0 +1,5 @@
+{
+  "exportTarget": "web-local",
+  "outputDir": "dist/export/x",
+  "publish": { "channel": "public" }
+}
