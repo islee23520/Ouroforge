@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "demo-asset-provenance-v1",
+  "id": "collect_and_exit_demo_asset_provenance",
+  "manifest": "asset-manifest.json",
+  "description": "Consolidated provenance and license record for the Collect-and-Exit demo asset pack. Every asset is a deterministic local CC0 fixture authored for Ouroforge; no external, third-party, or copyrighted assets are used. Generated previews/runs/dashboard output stay untracked.",
+  "packLicense": "CC0-1.0",
+  "copyrightRisk": "none",
+  "assets": [
+    {
+      "id": "collect_and_exit_sheet",
+      "path": "assets/sprites/collect-and-exit-sheet.png",
+      "license": "CC0-1.0",
+      "source": "Ouroforge deterministic fixture",
+      "origin": "authored-in-repo",
+      "copyrightRisk": "none"
+    },
+    {
+      "id": "collect_and_exit_atlas",
+      "path": "assets/atlases/collect-and-exit.atlas.json",
+      "license": "CC0-1.0",
+      "source": "Ouroforge deterministic fixture",
+      "origin": "authored-in-repo",
+      "copyrightRisk": "none"
+    },
+    {
+      "id": "collect_and_exit_tileset",
+      "path": "assets/tilesets/collect-and-exit.tileset.json",
+      "license": "CC0-1.0",
+      "source": "Ouroforge deterministic fixture",
+      "origin": "authored-in-repo",
+      "copyrightRisk": "none"
+    },
+    {
+      "id": "collect_and_exit_tilemap",
+      "path": "assets/tilemaps/collect-and-exit.tilemap.json",
+      "license": "CC0-1.0",
+      "source": "Ouroforge deterministic fixture",
+      "origin": "authored-in-repo",
+      "copyrightRisk": "none"
+    },
+    {
+      "id": "collect_sound",
+      "path": "assets/audio/collect.ogg",
+      "license": "CC0-1.0",
+      "source": "Ouroforge deterministic fixture",
+      "origin": "authored-in-repo",
+      "copyrightRisk": "none"
+    }
+  ],
+  "uiNote": "The demo HUD is text-based (uiText/hudValue); UI icons reuse existing atlas frames (key/door/exit) rather than adding new icon binaries, to keep the pack minimal and provenance-safe.",
+  "boundary": "Source-like deterministic asset provenance record only. No external/copyrighted assets, no asset upload/fetch/import, no marketplace, no committed generated output, and no full Godot parity or replacement claim."
+}
