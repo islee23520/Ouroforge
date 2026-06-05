@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "scenario-coverage-v18-godot-plus-demo-regression-v1",
+  "suiteId": "scenario_coverage_v18_godot_plus_demo_regression",
+  "issue": 796,
+  "status": "fixture-scoped",
+  "demo": {
+    "name": "Signal Gate",
+    "boundary": "Small local 2D Godot-plus evidence-native workflow demonstration; no Godot replacement, no production-ready engine/editor claim, no commercial release readiness, no native/mobile/console/store export, and no public deployment."
+  },
+  "generatedStatePolicy": "Tracked scenario coverage matrix only. Generated runs, QA evidence, screenshots, dashboard exports, package bundles, temp servers, local browser profiles, target outputs, and tool state remain ignored unless explicitly fixture-scoped.",
+  "guardrails": [
+    "fixture-scoped scenario matrix",
+    "generated outputs remain ignored",
+    "read-only dashboard and Studio inspection",
+    "draft-only Studio proposal surfaces",
+    "review-gated Safe Source Apply handoff",
+    "no trusted browser write",
+    "no command bridge",
+    "no auto-apply",
+    "no auto-merge",
+    "no self-approval",
+    "no publish",
+    "no deploy",
+    "no sign",
+    "no upload",
+    "no executable plugin runtime",
+    "no marketplace",
+    "no network install/update",
+    "no credentialed operation",
+    "no commercial release",
+    "no Godot replacement",
+    "#1 and #23 remain open"
+  ],
+  "governanceAnchors": {
+    "issue1": "open",
+    "issue23": "open",
+    "closureStatement": "#1 and #23 remain open"
+  },
+  "scenarios": [
+    {
+      "id": "GPD18.success-game-start",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs"
+      ],
+      "expected": "game start loads a local source fixture through existing runtime probe evidence"
+    },
+    {
+      "id": "GPD18.success-player-movement",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs"
+      ],
+      "expected": "player movement changes deterministic world state and input evidence"
+    },
+    {
+      "id": "GPD18.success-objective-update",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs",
+        "docs/godot-plus-demo-design-pillars-v1.md"
+      ],
+      "expected": "objective flags for key, gate, and exit update in evidence read models"
+    },
+    {
+      "id": "GPD18.success-enemy-npc-behavior",
+      "kind": "success",
+      "evidenceRefs": [
+        "docs/godot-plus-demo-design-pillars-v1.md",
+        "examples/production-2d-regression-v7/runtime-feature-regressions.test.cjs"
+      ],
+      "expected": "hazard or enemy/NPC behavior is represented as deterministic state evidence, not arbitrary executable scripting"
+    },
+    {
+      "id": "GPD18.success-level-completion",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+        "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json"
+      ],
+      "expected": "level completion reaches the exit trigger with a passing scenario verdict"
+    },
+    {
+      "id": "GPD18.success-lose-restart",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+        "docs/godot-plus-demo-design-pillars-v1.md"
+      ],
+      "expected": "lose/restart coverage preserves reset or checkpoint evidence for repeatable local reruns"
+    },
+    {
+      "id": "GPD18.success-hud-update",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs",
+        "examples/authoring-cockpit/cockpit.test.cjs"
+      ],
+      "expected": "HUD state exposes key, gate, exit, hazard, and restart readiness through read-only surfaces"
+    },
+    {
+      "id": "GPD18.success-runtime-probe",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/export-probe-v1/",
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs"
+      ],
+      "expected": "runtime probe compatibility remains available for local scenario evidence"
+    },
+    {
+      "id": "GPD18.success-qa-pass",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/qa-scenario-candidate-v1/",
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+        "runs/godot-plus-demo-regression-v18/qa-pass.json"
+      ],
+      "expected": "QA scenario pass evidence is local generated state linked to fixture-scoped scenario definitions"
+    },
+    {
+      "id": "GPD18.success-export-package-evidence",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/build-export-packaging-regression-v15/coverage-matrix.fixture.json",
+        "examples/export-bundle-v1/export-profile.fixture.json",
+        "runs/godot-plus-demo-regression-v18/export-package/"
+      ],
+      "expected": "local web export/package verification evidence is recorded without native, mobile, console, store, signing, publish, or deploy authority"
+    },
+    {
+      "id": "GPD18.success-studio-walkthrough-rendering",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/authoring-cockpit/cockpit.js",
+        "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs"
+      ],
+      "expected": "Studio walkthrough rendering remains read-only or draft-only and does not expose trusted browser writes"
+    },
+    {
+      "id": "GPD18.success-plugin-descriptor-validation",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/plugin-registry-evidence-v1/valid/scenario-coverage-v16-success-matrix.sample.json",
+        "examples/plugin-manifest-v1/valid"
+      ],
+      "expected": "plugin descriptor validation uses inert metadata only with no executable plugin runtime"
+    },
+    {
+      "id": "GPD18.success-evidence-bundle-existence",
+      "kind": "success",
+      "evidenceRefs": [
+        "examples/source-patch-evidence-bundle-v1/",
+        "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs",
+        "runs/godot-plus-demo-regression-v18/evidence-bundle/"
+      ],
+      "expected": "evidence bundle existence is linked from source-like fixtures or ignored generated run roots"
+    },
+    {
+      "id": "GPD18.block-broken-objective",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+        "docs/godot-plus-demo-design-pillars-v1.md"
+      ],
+      "expected": "broken objective must fail closed with a diagnostic before pass verdict promotion",
+      "diagnostic": "Fix the missing key/gate/exit evidence link, then rerun the deterministic scenario before review."
+    },
+    {
+      "id": "GPD18.block-missing-asset",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/export-asset-manifest-v1/missing-asset-profile.fixture.json",
+        "examples/playable-demo-v2/collect-and-exit/asset-evidence-smoke.test.cjs"
+      ],
+      "expected": "missing asset must block package or scenario acceptance with an asset diagnostic",
+      "diagnostic": "Provide the declared asset manifest entry or restore the referenced source asset before accepting evidence."
+    },
+    {
+      "id": "GPD18.block-missing-probe",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/export-probe-v1/invalid/no-probe-global-bootstrap.js",
+        "examples/export-probe-v1/invalid/missing-getevents-bootstrap.js"
+      ],
+      "expected": "missing runtime probe must fail closed before runtime compatibility is claimed",
+      "diagnostic": "Restore the runtime probe global and required methods, then rerun probe compatibility evidence."
+    },
+    {
+      "id": "GPD18.block-invalid-level-metadata",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+        "examples/playable-demo-v2/collect-and-exit/asset-manifest.json"
+      ],
+      "expected": "invalid level metadata must block scenario acceptance with a metadata diagnostic",
+      "diagnostic": "Fix level metadata, declared scene ids, or asset references before scenario evidence can pass."
+    },
+    {
+      "id": "GPD18.block-broken-export",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/export-profile-v1/invalid",
+        "examples/build-export-packaging-regression-v15/coverage-matrix.fixture.json"
+      ],
+      "expected": "broken export must block local package evidence with an export diagnostic",
+      "diagnostic": "Review the export profile and generated-state policy before rerunning local package verification."
+    },
+    {
+      "id": "GPD18.block-invalid-plugin",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/plugin-registry-evidence-v1/invalid",
+        "examples/plugin-manifest-v1/invalid"
+      ],
+      "expected": "invalid plugin descriptor must reject registry evidence without executable fallback",
+      "diagnostic": "Fix descriptor metadata and allowed extension points; do not execute plugin code to recover."
+    },
+    {
+      "id": "GPD18.block-unclassified-qa-failure",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/qa-scenario-candidate-v1/invalid",
+        "docs/godot-plus-demo-game-v1.md"
+      ],
+      "expected": "unclassified QA failure must block closure with a diagnostic and journal/evidence classification",
+      "diagnostic": "Classify the QA failure and link evidence before accepting or reviewing a fix."
+    },
+    {
+      "id": "GPD18.block-incomplete-evidence-bundle",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/source-patch-evidence-bundle-v1/",
+        "docs/godot-plus-demo-game-v1.md"
+      ],
+      "expected": "incomplete evidence bundle must fail closed before demo regression closure",
+      "diagnostic": "Provide scenario, runtime probe, QA, review, export, Studio, and plugin evidence links before closure."
+    },
+    {
+      "id": "GPD18.block-direct-source-apply-attempt",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "examples/source-mutation-preview-demo-v1/",
+        "examples/source-patch-apply-transaction-v1/",
+        "examples/source-patch-command-allowlist-v1/"
+      ],
+      "expected": "direct source apply attempt must reject unreviewed trusted writes and require review-gated Safe Source Apply",
+      "diagnostic": "Reject direct source mutation, require independent review, and use Safe Source Apply transaction evidence."
+    },
+    {
+      "id": "GPD18.block-publish-deploy-attempt",
+      "kind": "blocked",
+      "evidenceRefs": [
+        "docs/export-target-matrix-v1.md",
+        "examples/export-release-blocker-v1/invalid"
+      ],
+      "expected": "publish/deploy attempt must block with no publish, no deploy, no sign, and no upload authority",
+      "diagnostic": "Reject publish or deploy target and keep evidence limited to local web package verification."
+    }
+  ]
+}
