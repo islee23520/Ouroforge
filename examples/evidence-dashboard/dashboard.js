@@ -2465,6 +2465,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
+      ${renderSceneCanvas(run)}
       ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
@@ -2974,7 +2975,54 @@ const OuroforgeDashboard = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  function renderSceneCanvas(run) {
+    const source = run?.scene_canvas || run?.sceneCanvas || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No scene canvas inputs are exported for this run.';
+      return `<section class="panel scene-canvas-panel"><h3>Visual scene canvas</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only visual preview. Studio produces draft transform operations only; the browser cannot write trusted scene files, execute commands, or apply edits.</p></section>`;
+    }
+    const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+    const width = num(source.width, 640);
+    const height = num(source.height, 360);
+    const grid = source.grid && typeof source.grid === 'object' ? source.grid : {};
+    const gridSize = num(grid.size, 32);
+    const snap = grid.snap === true;
+    const selectedEntity = source.selected_entity || source.selectedEntity || '';
+    const nodes = Array.isArray(source.nodes) ? source.nodes : [];
+    const gridLines = [];
+    if (gridSize > 0) {
+      for (let x = 0; x <= width; x += gridSize) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${height}" class="canvas-grid-line" stroke="#e0e0e0" stroke-width="1"/>`);
+      for (let y = 0; y <= height; y += gridSize) gridLines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}" class="canvas-grid-line" stroke="#e0e0e0" stroke-width="1"/>`);
+    }
+    const shapes = nodes.map((node, index) => {
+      const id = node?.id || node?.entity_id || `node-${index + 1}`;
+      const isSelected = node?.selected === true || id === selectedEntity;
+      const authored = node?.authored !== false;
+      const x = num(node?.x, 0);
+      const y = num(node?.y, 0);
+      const w = num(node?.w ?? node?.width, 24);
+      const h = num(node?.h ?? node?.height, 24);
+      const rotation = num(node?.rotation, 0);
+      const cx = x + (w / 2);
+      const cy = y + (h / 2);
+      const fill = authored ? '#5b8def' : '#bbbbbb';
+      const stroke = isSelected ? '#ff8c00' : '#333333';
+      return `<g class="${authored ? 'canvas-node-authored' : 'canvas-node-runtime'}" data-entity="${escapeText(id)}" data-selected="${isSelected ? 'true' : 'false'}" transform="rotate(${rotation} ${cx} ${cy})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="${isSelected ? 3 : 1}"/></g>`;
+    }).join('');
+    const legend = nodes.map((node, index) => {
+      const id = node?.id || node?.entity_id || `node-${index + 1}`;
+      const isSelected = node?.selected === true || id === selectedEntity;
+      const authored = node?.authored !== false;
+      return `<li><span class="${statusClass(isSelected ? 'passed' : 'unknown')}">${escapeText(isSelected ? 'selected' : 'not selected')}</span> ${escapeText(node?.name || id)} · ${escapeText(authored ? 'authored state' : 'runtime state')}</li>`;
+    }).join('') || '<li>No scene nodes recorded.</li>';
+    return `<section class="panel scene-canvas-panel"><h3>Visual scene canvas</h3>
+      <p class="run-meta">Read-only visual preview of exported scene/runtime data (${escapeText(String(width))}×${escapeText(String(height))} · grid ${escapeText(String(gridSize))}px · snap ${snap ? 'on' : 'off'}). Studio produces draft transform operations only; trusted apply requires Safe Source Apply handoff. The browser cannot write trusted files, execute commands, or apply edits.</p>
+      <svg class="scene-canvas" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Read-only scene preview">${gridLines.join('')}${shapes}</svg>
+      <ul class="run-meta-list">${legend}</ul>
+    </section>`;
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

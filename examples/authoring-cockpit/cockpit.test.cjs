@@ -990,6 +990,17 @@ run.entity_component_inspector = {
     },
   ],
 };
+run.scene_canvas = {
+  present: true,
+  width: 320,
+  height: 200,
+  grid: { size: 32, snap: true },
+  selected_entity: 'player',
+  nodes: [
+    { id: 'player', name: 'Player', x: 64, y: 32, w: 24, h: 24, rotation: 0, scale: [1, 1], authored: true, selected: true, runtime: { x: 70, y: 36 } },
+    { id: 'enemy', name: 'Enemy', x: 160, y: 96, w: 24, h: 24, rotation: 45, scaleX: 2, scaleY: 1, authored: false },
+  ],
+};
 
 run.route_attempts = {
   present: true,
@@ -2613,6 +2624,36 @@ assert.match(draftOpMarkup, /validated/);
 assert.match(draftOpMarkup, /Safe Source Apply preview handoff/);
 assert.doesNotMatch(draftOpMarkup, /<button|<form|onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
 assert.match(cockpit.renderStudioDraftOperationModelSurface({}), /No Studio draft operation model/);
+// #763 Visual scene canvas
+const canvasModel = cockpit.studioSceneCanvasModel(run);
+assert.strictEqual(canvasModel.present, true);
+assert.strictEqual(canvasModel.nodes.length, 2);
+assert.strictEqual(canvasModel.grid.snap, true);
+const canvasMarkup = cockpit.renderStudioSceneCanvasSurface(run);
+assert.match(canvasMarkup, /Visual scene canvas/);
+assert.match(canvasMarkup, /<svg/);
+assert.match(canvasMarkup, /canvas-grid-line/);
+assert.match(canvasMarkup, /data-entity="player"/);
+assert.match(canvasMarkup, /data-selected="true"/);
+assert.match(canvasMarkup, /canvas-node-authored/);
+assert.match(canvasMarkup, /canvas-node-runtime/);
+assert.match(canvasMarkup, /Safe Source Apply handoff/);
+assert.doesNotMatch(canvasMarkup, /<button|<form|onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
+assert.match(cockpit.renderStudioSceneCanvasSurface({}), /No scene canvas read model/);
+// Transform interactions produce draft operations only
+const canvasTarget = { id: 'player', path: 'scenes/main.scene.json' };
+const transformDraft = cockpit.studioCanvasTransformDraft(canvasTarget, { position: [96, 64], rotation: 90, scale: [1, 1] });
+assert.strictEqual(transformDraft.validationStatus, 'validated');
+assert.strictEqual(transformDraft.applyCapability, false);
+assert.strictEqual(transformDraft.requiresSafeSourceApplyHandoff, true);
+assert.strictEqual(transformDraft.proposedOperations.length, 3);
+assert.ok(transformDraft.proposedOperations.every((op) => op.kind === 'set_component_field'));
+const badTransform = cockpit.studioCanvasTransformDraft(canvasTarget, { position: ['x', 64] });
+assert.strictEqual(badTransform.validationStatus, 'blocked');
+assert.strictEqual(badTransform.proposedOperations.length, 0);
+const traversalTransform = cockpit.studioCanvasTransformDraft({ id: 'player', path: '../../etc/passwd' }, { rotation: 1 });
+assert.strictEqual(traversalTransform.validationStatus, 'blocked');
+assert.ok(traversalTransform.blockedReasons.some((r) => /allowlisted in-project source path/.test(r)));
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);

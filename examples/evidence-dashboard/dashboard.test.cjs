@@ -866,6 +866,17 @@ run.entity_component_inspector = {
     },
   ],
 };
+run.scene_canvas = {
+  present: true,
+  width: 320,
+  height: 200,
+  grid: { size: 32, snap: true },
+  selected_entity: 'player',
+  nodes: [
+    { id: 'player', name: 'Player', x: 64, y: 32, w: 24, h: 24, rotation: 0, authored: true, selected: true },
+    { id: 'enemy', name: 'Enemy', x: 160, y: 96, w: 24, h: 24, rotation: 45, authored: false },
+  ],
+};
 
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
@@ -1959,6 +1970,18 @@ assert.match(draftOpModelMarkup, /blocked/);
 assert.match(draftOpModelMarkup, /Safe Source Apply preview handoff/);
 assert.doesNotMatch(draftOpModelMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
 assert.match(dashboard.renderDraftOperationModel({}), /No draft operation model/);
+// #763 Visual scene canvas
+const sceneCanvasMarkup = dashboard.renderSceneCanvas(run);
+assert.match(sceneCanvasMarkup, /Visual scene canvas/);
+assert.match(sceneCanvasMarkup, /<svg/);
+assert.match(sceneCanvasMarkup, /canvas-grid-line/);
+assert.match(sceneCanvasMarkup, /data-entity="player"/);
+assert.match(sceneCanvasMarkup, /data-selected="true"/);
+assert.match(sceneCanvasMarkup, /canvas-node-authored/);
+assert.match(sceneCanvasMarkup, /canvas-node-runtime/);
+assert.match(sceneCanvasMarkup, /Safe Source Apply handoff/);
+assert.doesNotMatch(sceneCanvasMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
+assert.match(dashboard.renderSceneCanvas({}), /No scene canvas inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);

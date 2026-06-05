@@ -3304,6 +3304,7 @@ const OuroforgeCockpit = (() => {
       ${renderProposalRationaleSurface(run)}
       ${renderEvolveDepthInspectionSurface(run)}
       ${renderStudioSceneTreeInspectorSurface(run)}
+      ${renderStudioSceneCanvasSurface(run)}
       ${renderReviewDecisionSurface(lifecycle, run)}
       ${renderSceneMutationLifecycleSurface(run)}
       <h3>Command hints</h3><div class="command-list">${hints}</div>
@@ -4844,7 +4845,133 @@ const OuroforgeCockpit = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  function studioSceneCanvasModel(run) {
+    const source = run?.scene_canvas || run?.sceneCanvas || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      return {
+        present: false,
+        empty_state: source?.empty_state || source?.emptyState || 'No scene canvas read model is available for this run.',
+        boundary: 'Read-only visual scene preview from exported scene/runtime data; Studio does not write trusted scene files, run commands, or apply edits.',
+        width: 0,
+        height: 0,
+        grid: { size: 0, snap: false },
+        selectedEntity: '',
+        nodes: [],
+      };
+    }
+    const grid = source.grid && typeof source.grid === 'object' ? source.grid : {};
+    const selectedEntity = source.selected_entity || source.selectedEntity || '';
+    const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+    const nodes = Array.isArray(source.nodes) ? source.nodes.map((node, index) => {
+      const authored = node?.authored !== false;
+      const scaleX = num(node?.scaleX ?? node?.scale_x ?? (Array.isArray(node?.scale) ? node.scale[0] : node?.scale), 1);
+      const scaleY = num(node?.scaleY ?? node?.scale_y ?? (Array.isArray(node?.scale) ? node.scale[1] : node?.scale), 1);
+      const runtime = node?.runtime && typeof node.runtime === 'object' ? node.runtime : null;
+      return {
+        id: node?.id || node?.entity_id || `node-${index + 1}`,
+        name: node?.name || node?.id || `Node ${index + 1}`,
+        x: num(node?.x, 0),
+        y: num(node?.y, 0),
+        w: num(node?.w ?? node?.width, 24),
+        h: num(node?.h ?? node?.height, 24),
+        rotation: num(node?.rotation, 0),
+        scaleX,
+        scaleY,
+        authored,
+        selected: node?.selected === true,
+        runtime: runtime ? { x: num(runtime.x, 0), y: num(runtime.y, 0) } : null,
+      };
+    }) : [];
+    return {
+      present: true,
+      empty_state: source.empty_state || source.emptyState || 'No scene canvas read model is available for this run.',
+      boundary: source.boundary || 'Read-only visual scene preview from exported scene/runtime data; Studio does not write trusted scene files, run commands, or apply edits.',
+      width: num(source.width, 640),
+      height: num(source.height, 360),
+      grid: { size: num(grid.size, 32), snap: grid.snap === true },
+      selectedEntity,
+      nodes,
+    };
+  }
+
+  function studioCanvasTransformDraft(target, transform) {
+    const reasons = [];
+    const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+    const t = transform && typeof transform === 'object' ? transform : {};
+    const operations = [];
+    if ('position' in t) {
+      const pos = t.position;
+      if (!Array.isArray(pos) || pos.length < 2 || !pos.every(finite)) reasons.push('Position transform requires a finite [x, y] tuple.');
+      else operations.push({ id: 'set-transform-position', kind: 'set_component_field', path: 'transform.position', value: pos.slice(0, 2), summary: `Set position to ${JSON.stringify(pos.slice(0, 2))} (draft only)` });
+    }
+    if ('rotation' in t) {
+      if (!finite(t.rotation)) reasons.push('Rotation transform requires a finite number.');
+      else operations.push({ id: 'set-transform-rotation', kind: 'set_component_field', path: 'transform.rotation', value: t.rotation, summary: `Set rotation to ${t.rotation} (draft only)` });
+    }
+    if ('scale' in t) {
+      const scale = t.scale;
+      if (!Array.isArray(scale) || scale.length < 2 || !scale.every(finite)) reasons.push('Scale transform requires a finite [x, y] tuple.');
+      else operations.push({ id: 'set-transform-scale', kind: 'set_component_field', path: 'transform.scale', value: scale.slice(0, 2), summary: `Set scale to ${JSON.stringify(scale.slice(0, 2))} (draft only)` });
+    }
+    if (!operations.length && !reasons.length) reasons.push('No supported transform (position, rotation, scale) was provided.');
+    const path = String((target && (target.path || target.source_path)) || 'unknown');
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(path) || path.startsWith('/') || /[;&|`$<>]/.test(path)) reasons.push('Target path is not an allowlisted in-project source path.');
+    const id = (target && (target.id || target.entity_id)) || 'unknown';
+    const baseTarget = { type: 'scene', path, id };
+    if (reasons.length) {
+      return { draftId: `canvas-transform-${id}-blocked`, schemaVersion: 'visual-edit-draft-v1', target: baseTarget, proposedOperations: [], validationStatus: 'blocked', blockedReasons: reasons, requiresSafeSourceApplyHandoff: true, applyCapability: false };
+    }
+    return {
+      draftId: `canvas-transform-${id}`,
+      schemaVersion: 'visual-edit-draft-v1',
+      target: baseTarget,
+      proposedOperations: operations,
+      validationStatus: 'validated',
+      blockedReasons: [],
+      expectedAfterSummary: `Draft proposes ${operations.length} transform change(s); no trusted write without Safe Source Apply review.`,
+      requiresSafeSourceApplyHandoff: true,
+      applyCapability: false,
+      linkedEvidence: [],
+    };
+  }
+
+  function renderStudioSceneCanvasSurface(run) {
+    const model = studioSceneCanvasModel(run);
+    if (!model.present) {
+      return `<section id="studio-scene-canvas" class="panel"><h2>Visual scene canvas</h2><p class="empty">${escapeText(model.empty_state)}</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const gridLines = [];
+    if (model.grid.size > 0) {
+      for (let x = 0; x <= model.width; x += model.grid.size) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${model.height}" class="canvas-grid-line" stroke="#dddddd" stroke-width="1"/>`);
+      for (let y = 0; y <= model.height; y += model.grid.size) gridLines.push(`<line x1="0" y1="${y}" x2="${model.width}" y2="${y}" class="canvas-grid-line" stroke="#dddddd" stroke-width="1"/>`);
+    }
+    const nodeShapes = model.nodes.map((node) => {
+      const isSelected = node.selected || node.id === model.selectedEntity;
+      const stateClass = node.authored ? 'canvas-node-authored' : 'canvas-node-runtime';
+      const fill = node.authored ? '#5b8def' : '#bbbbbb';
+      const stroke = isSelected ? '#ff8c00' : '#333333';
+      const strokeWidth = isSelected ? 3 : 1;
+      const cx = node.x + (node.w / 2);
+      const cy = node.y + (node.h / 2);
+      const runtimeGhost = node.runtime
+        ? `<rect x="${node.runtime.x}" y="${node.runtime.y}" width="${node.w}" height="${node.h}" class="canvas-node-runtime-ghost" fill="none" stroke="#999999" stroke-dasharray="4 2"/>`
+        : '';
+      return `${runtimeGhost}<g class="${stateClass}" data-entity="${escapeText(node.id)}" data-selected="${isSelected ? 'true' : 'false'}" transform="rotate(${node.rotation} ${cx} ${cy})"><rect x="${node.x}" y="${node.y}" width="${node.w * node.scaleX}" height="${node.h * node.scaleY}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/><text x="${node.x}" y="${node.y - 2}" class="canvas-node-label">${escapeText(node.name)}</text></g>`;
+    }).join('');
+    const legendRows = model.nodes.map((node) => {
+      const isSelected = node.selected || node.id === model.selectedEntity;
+      return `<li class="surface-row">${surfaceState(isSelected, isSelected ? 'selected' : 'not selected')} <strong>${escapeText(node.name)}</strong> ${surfaceState(node.authored, node.authored ? 'authored state' : 'runtime state')}<br><small>pos (${escapeText(String(node.x))}, ${escapeText(String(node.y))}) · rot ${escapeText(String(node.rotation))} · scale (${escapeText(String(node.scaleX))}, ${escapeText(String(node.scaleY))})</small></li>`;
+    }).join('') || '<li class="surface-row">No scene nodes recorded.</li>';
+    const snapLabel = model.grid.snap ? `grid ${model.grid.size}px · snap on` : (model.grid.size ? `grid ${model.grid.size}px · snap off` : 'no grid');
+    return `<section id="studio-scene-canvas" class="panel"><h2>Visual scene canvas</h2>
+      <p class="hint">${escapeText(model.boundary)} Selection and transform handles are presentation-only; valid transforms produce draft operations only (no trusted scene writes, commands, or apply). Authored state is solid; runtime state is shown as a dashed ghost. Trusted apply requires Safe Source Apply handoff.</p>
+      <p class="hint">Canvas ${escapeText(String(model.width))}×${escapeText(String(model.height))} · ${escapeText(snapLabel)}</p>
+      <svg class="scene-canvas" width="${model.width}" height="${model.height}" viewBox="0 0 ${model.width} ${model.height}" role="img" aria-label="Read-only scene preview">${gridLines.join('')}${nodeShapes}</svg>
+      <h4>Nodes (authored vs runtime state)</h4><ul>${legendRows}</ul>
+    </section>`;
+  }
+
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {
