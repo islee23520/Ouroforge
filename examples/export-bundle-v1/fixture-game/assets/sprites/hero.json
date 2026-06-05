@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "export-fixture-asset-v1",
+  "assetId": "hero",
+  "kind": "sprite-sheet",
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "frames": 4,
+  "palette": ["#1b1b29", "#4f6d7a", "#c0d6df", "#dbe9ee"]
+}

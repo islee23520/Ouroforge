@@ -3,8 +3,8 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::fs;
+use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -14,23 +14,50 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
 pub mod behavior_runtime;
+pub mod source_apply_review_enforcement;
+pub use source_apply_review_enforcement::*;
 pub mod gdd_design_brief;
+pub mod source_apply_sandbox_promotion;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
+pub use source_apply_sandbox_promotion::*;
 pub mod behavior_draft;
+pub mod source_apply_rollback_snapshot;
+pub use source_apply_rollback_snapshot::*;
 mod behavior_draft_validation;
+pub mod source_apply_verification_runner;
+pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
+pub mod export_asset_manifest;
+pub mod export_bundle;
+pub mod export_hash;
+pub mod source_apply_post_apply_rerun;
+pub use source_apply_post_apply_rerun::*;
+pub mod export_plan;
+pub mod export_profile;
 pub mod internal_sprite_audit;
+pub mod source_apply_highrisk_blocker;
+pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;
 pub mod plugin_manifest;
 pub mod plugin_registry;
+pub mod source_apply_audit_ledger;
+pub use source_apply_audit_ledger::*;
 pub mod runtime_frame_budget;
+pub use ouroforge_evidence::{
+    add_evidence_artifact, list_evidence_artifacts, read_evidence_index,
+    validate_evidence_artifact_path, write_evidence_index, EvidenceArtifact, EvidenceIndex,
+};
+pub mod source_apply_evidence_bundle;
+pub use ouroforge_evaluator::*;
+pub use ouroforge_ledger::{append_ledger_event, read_ledger_events, write_ledger_created};
+pub use source_apply_evidence_bundle::*;
+pub mod source_apply_emergency_hold;
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
+pub use source_apply_emergency_hold::*;
 
-static LEDGER_APPEND_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-static EVIDENCE_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static MUTATION_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -24609,8 +24636,6 @@ pub fn validate_qa_worker_assignment_refs(
     Ok(())
 }
 
-const RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION: &str = "runtime-invariant-model-v1";
-const RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION: &str = "runtime-invariant-evidence-v1";
 const RUNTIME_STATE_SCHEMA_VERSION: &str = "runtime-state-v1";
 const RUNTIME_SAVE_ARTIFACT_SCHEMA_VERSION: &str = "runtime-save-artifact-v1";
 const RUNTIME_REPLAY_DIGEST_SCHEMA_VERSION: &str = "runtime-replay-digest-v1";
@@ -25106,918 +25131,6 @@ fn validate_runtime_replay_local_generated_path(path: &str) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeInvariantModel {
-    #[serde(rename = "schemaVersion")]
-    pub schema_version: String,
-    #[serde(rename = "modelId")]
-    pub model_id: String,
-    #[serde(rename = "runId")]
-    pub run_id: String,
-    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
-    pub scenario_id: Option<String>,
-    #[serde(rename = "worldStatePath")]
-    pub world_state_path: String,
-    #[serde(rename = "scenarioResultPath", skip_serializing_if = "Option::is_none")]
-    pub scenario_result_path: Option<String>,
-    #[serde(rename = "evidenceIndexPath")]
-    pub evidence_index_path: String,
-    pub invariants: Vec<RuntimeInvariantSpec>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeInvariantSpec {
-    #[serde(rename = "invariantId")]
-    pub invariant_id: String,
-    #[serde(rename = "invariantType")]
-    pub invariant_type: RuntimeInvariantType,
-    #[serde(rename = "targetPath")]
-    pub target_path: String,
-    #[serde(rename = "evidencePath")]
-    pub evidence_path: String,
-    #[serde(rename = "requiredEntityId", skip_serializing_if = "Option::is_none")]
-    pub required_entity_id: Option<String>,
-    #[serde(rename = "boundsPath", skip_serializing_if = "Option::is_none")]
-    pub bounds_path: Option<String>,
-    #[serde(
-        rename = "transitionTargetPath",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub transition_target_path: Option<String>,
-    #[serde(rename = "behaviorStatePath", skip_serializing_if = "Option::is_none")]
-    pub behavior_state_path: Option<String>,
-    #[serde(
-        rename = "allowedStates",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub allowed_states: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum RuntimeInvariantType {
-    PlayerInBounds,
-    EntityInBounds,
-    FiniteTransform,
-    HealthNonNegative,
-    ObjectiveFlagsConsistent,
-    SceneTransitionValid,
-    NoImpossibleState,
-    RequiredEntityPresent,
-    BehaviorStateConsistent,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeInvariantEvidence {
-    #[serde(rename = "schemaVersion")]
-    pub schema_version: String,
-    #[serde(rename = "modelId")]
-    pub model_id: String,
-    #[serde(rename = "runId")]
-    pub run_id: String,
-    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
-    pub scenario_id: Option<String>,
-    #[serde(rename = "worldStatePath")]
-    pub world_state_path: String,
-    #[serde(rename = "scenarioResultPath", skip_serializing_if = "Option::is_none")]
-    pub scenario_result_path: Option<String>,
-    #[serde(rename = "recordedAtUnixMs")]
-    pub recorded_at_unix_ms: u128,
-    pub checks: Vec<RuntimeInvariantCheck>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeInvariantCheck {
-    #[serde(rename = "invariantId")]
-    pub invariant_id: String,
-    #[serde(rename = "invariantType")]
-    pub invariant_type: RuntimeInvariantType,
-    pub status: RuntimeInvariantStatus,
-    #[serde(rename = "targetPath")]
-    pub target_path: String,
-    #[serde(rename = "evidenceRefs")]
-    pub evidence_refs: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub observed: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum RuntimeInvariantStatus {
-    Passed,
-    Failed,
-    Unsupported,
-    Missing,
-    Malformed,
-    Stale,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeInvariantEvidenceSummary {
-    #[serde(rename = "schemaVersion")]
-    pub schema_version: String,
-    #[serde(rename = "modelId")]
-    pub model_id: String,
-    #[serde(rename = "runId")]
-    pub run_id: String,
-    #[serde(rename = "scenarioId", skip_serializing_if = "Option::is_none")]
-    pub scenario_id: Option<String>,
-    #[serde(rename = "checkCount")]
-    pub check_count: usize,
-    #[serde(rename = "passedCount")]
-    pub passed_count: usize,
-    #[serde(rename = "failedCount")]
-    pub failed_count: usize,
-    #[serde(rename = "unsupportedCount")]
-    pub unsupported_count: usize,
-    #[serde(rename = "missingCount")]
-    pub missing_count: usize,
-    #[serde(rename = "malformedCount")]
-    pub malformed_count: usize,
-    #[serde(rename = "staleCount")]
-    pub stale_count: usize,
-}
-
-impl RuntimeInvariantModel {
-    pub fn from_json_str(input: &str) -> Result<Self> {
-        let model: RuntimeInvariantModel =
-            serde_json::from_str(input).context("failed to parse Runtime Invariant Model JSON")?;
-        model.validate()?;
-        Ok(model)
-    }
-    pub fn validate(&self) -> Result<()> {
-        if self.schema_version != RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION {
-            return Err(anyhow!("runtime invariant model schemaVersion must be {RUNTIME_INVARIANT_MODEL_SCHEMA_VERSION}"));
-        }
-        validate_path_component("runtime invariant model modelId", &self.model_id)?;
-        validate_path_component("runtime invariant model runId", &self.run_id)?;
-        if let Some(scenario_id) = &self.scenario_id {
-            validate_path_component("runtime invariant model scenarioId", scenario_id)?;
-        }
-        validate_runtime_invariant_world_state_ref(&self.world_state_path)?;
-        if let Some(path) = &self.scenario_result_path {
-            validate_scenario_result_ref(path)?;
-        }
-        validate_runtime_invariant_evidence_index_ref(&self.evidence_index_path)?;
-        if self.invariants.is_empty() {
-            return Err(anyhow!(
-                "runtime invariant model invariants must not be empty"
-            ));
-        }
-        let mut ids = BTreeSet::new();
-        for (index, invariant) in self.invariants.iter().enumerate() {
-            invariant.validate(index)?;
-            if !ids.insert(invariant.invariant_id.as_str()) {
-                return Err(anyhow!(
-                    "duplicate runtime invariant model invariantId: {}",
-                    invariant.invariant_id
-                ));
-            }
-        }
-        Ok(())
-    }
-}
-
-impl RuntimeInvariantSpec {
-    fn validate(&self, index: usize) -> Result<()> {
-        validate_path_component(
-            &format!("runtime invariant model invariants[{index}].invariantId"),
-            &self.invariant_id,
-        )?;
-        validate_scenario_path(&self.target_path).with_context(|| {
-            format!("runtime invariant model invariants[{index}].targetPath is invalid")
-        })?;
-        validate_runtime_invariant_evidence_ref(&self.evidence_path)?;
-        if let Some(entity_id) = &self.required_entity_id {
-            validate_path_component(
-                &format!("runtime invariant model invariants[{index}].requiredEntityId"),
-                entity_id,
-            )?;
-        }
-        if let Some(path) = &self.bounds_path {
-            validate_scenario_path(path).with_context(|| {
-                format!("runtime invariant model invariants[{index}].boundsPath is invalid")
-            })?;
-        }
-        if let Some(path) = &self.transition_target_path {
-            validate_scenario_path(path).with_context(|| {
-                format!(
-                    "runtime invariant model invariants[{index}].transitionTargetPath is invalid"
-                )
-            })?;
-        }
-        if let Some(path) = &self.behavior_state_path {
-            validate_scenario_path(path).with_context(|| {
-                format!("runtime invariant model invariants[{index}].behaviorStatePath is invalid")
-            })?;
-        }
-        for state in &self.allowed_states {
-            validate_path_component(
-                &format!("runtime invariant model invariants[{index}].allowedStates"),
-                state,
-            )?;
-        }
-        match self.invariant_type {
-            RuntimeInvariantType::PlayerInBounds | RuntimeInvariantType::EntityInBounds if self.bounds_path.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] in-bounds invariants require boundsPath")),
-            RuntimeInvariantType::SceneTransitionValid if self.transition_target_path.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] scene transition invariants require transitionTargetPath")),
-            RuntimeInvariantType::BehaviorStateConsistent if self.behavior_state_path.is_none() || self.allowed_states.is_empty() => Err(anyhow!("runtime invariant model invariants[{index}] behavior state invariants require behaviorStatePath and allowedStates")),
-            RuntimeInvariantType::RequiredEntityPresent if self.required_entity_id.is_none() => Err(anyhow!("runtime invariant model invariants[{index}] required entity invariants require requiredEntityId")),
-            _ => Ok(()),
-        }
-    }
-}
-
-impl RuntimeInvariantEvidence {
-    pub fn from_json_str(input: &str) -> Result<Self> {
-        let evidence: RuntimeInvariantEvidence = serde_json::from_str(input)
-            .context("failed to parse Runtime Invariant Evidence JSON")?;
-        evidence.validate()?;
-        Ok(evidence)
-    }
-    pub fn validate(&self) -> Result<()> {
-        if self.schema_version != RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION {
-            return Err(anyhow!("runtime invariant evidence schemaVersion must be {RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION}"));
-        }
-        validate_path_component("runtime invariant evidence modelId", &self.model_id)?;
-        validate_path_component("runtime invariant evidence runId", &self.run_id)?;
-        if let Some(scenario_id) = &self.scenario_id {
-            validate_path_component("runtime invariant evidence scenarioId", scenario_id)?;
-        }
-        validate_runtime_invariant_world_state_ref(&self.world_state_path)?;
-        if let Some(path) = &self.scenario_result_path {
-            validate_scenario_result_ref(path)?;
-        }
-        if self.checks.is_empty() {
-            return Err(anyhow!(
-                "runtime invariant evidence checks must not be empty"
-            ));
-        }
-        let mut ids = BTreeSet::new();
-        for (index, check) in self.checks.iter().enumerate() {
-            check.validate(index)?;
-            if !ids.insert(check.invariant_id.as_str()) {
-                return Err(anyhow!(
-                    "duplicate runtime invariant evidence invariantId: {}",
-                    check.invariant_id
-                ));
-            }
-        }
-        Ok(())
-    }
-    pub fn summary(&self) -> RuntimeInvariantEvidenceSummary {
-        let count = |status: RuntimeInvariantStatus| -> usize {
-            self.checks
-                .iter()
-                .filter(|check| check.status == status)
-                .count()
-        };
-        RuntimeInvariantEvidenceSummary {
-            schema_version: "runtime-invariant-evidence-summary-v1".to_string(),
-            model_id: self.model_id.clone(),
-            run_id: self.run_id.clone(),
-            scenario_id: self.scenario_id.clone(),
-            check_count: self.checks.len(),
-            passed_count: count(RuntimeInvariantStatus::Passed),
-            failed_count: count(RuntimeInvariantStatus::Failed),
-            unsupported_count: count(RuntimeInvariantStatus::Unsupported),
-            missing_count: count(RuntimeInvariantStatus::Missing),
-            malformed_count: count(RuntimeInvariantStatus::Malformed),
-            stale_count: count(RuntimeInvariantStatus::Stale),
-        }
-    }
-}
-
-impl RuntimeInvariantCheck {
-    fn validate(&self, index: usize) -> Result<()> {
-        validate_path_component(
-            &format!("runtime invariant evidence checks[{index}].invariantId"),
-            &self.invariant_id,
-        )?;
-        validate_scenario_path(&self.target_path).with_context(|| {
-            format!("runtime invariant evidence checks[{index}].targetPath is invalid")
-        })?;
-        if self.evidence_refs.is_empty() {
-            return Err(anyhow!(
-                "runtime invariant evidence checks[{index}].evidenceRefs must not be empty"
-            ));
-        }
-        for evidence_ref in &self.evidence_refs {
-            validate_runtime_invariant_evidence_ref(evidence_ref)?;
-        }
-        match self.status {
-            RuntimeInvariantStatus::Passed if self.message.is_some() => Err(anyhow!(
-                "runtime invariant evidence checks[{index}] passed status must not include message"
-            )),
-            RuntimeInvariantStatus::Failed
-            | RuntimeInvariantStatus::Unsupported
-            | RuntimeInvariantStatus::Missing
-            | RuntimeInvariantStatus::Malformed
-            | RuntimeInvariantStatus::Stale => {
-                let Some(message) = &self.message else {
-                    return Err(anyhow!(
-                        "runtime invariant evidence checks[{index}] {:?} status requires message",
-                        self.status
-                    ));
-                };
-                require_bounded_display_text(
-                    &format!("runtime invariant evidence checks[{index}].message"),
-                    message,
-                )?;
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    }
-}
-
-fn validate_runtime_invariant_world_state_ref(reference: &str) -> Result<()> {
-    validate_evidence_artifact_path(reference)?;
-    if !reference.starts_with("evidence/scenarios/") || !reference.ends_with("/world-state.json") {
-        return Err(anyhow!("runtime invariant worldStatePath must reference evidence/scenarios/<scenario-id>/world-state.json"));
-    }
-    Ok(())
-}
-fn validate_runtime_invariant_evidence_index_ref(reference: &str) -> Result<()> {
-    validate_evidence_artifact_path(reference)?;
-    if reference != "evidence/index.json" {
-        return Err(anyhow!(
-            "runtime invariant evidenceIndexPath must reference evidence/index.json"
-        ));
-    }
-    Ok(())
-}
-fn validate_runtime_invariant_evidence_ref(reference: &str) -> Result<()> {
-    require_text("runtime invariant evidence ref", reference)?;
-    if reference.starts_with("evidence/") {
-        return validate_evidence_artifact_path(reference);
-    }
-    if reference.starts_with("invariants/") {
-        // Reject raw backslash separators and repeated path separators before the
-        // component check. On Unix `Path::components()` treats a backslash as an
-        // ordinary character, so a ref like `invariants/..\secret.json` would
-        // otherwise pass as a single normal component yet escape the subtree in a
-        // consumer that normalizes `\` to `/`. Fail closed on those raw shapes.
-        if reference.contains('\\') {
-            return Err(anyhow!(
-                "runtime invariant evidence ref must not contain backslash separators"
-            ));
-        }
-        if reference.contains("//") {
-            return Err(anyhow!(
-                "runtime invariant evidence ref must not contain repeated path separators"
-            ));
-        }
-        let path = Path::new(reference);
-        if path.is_absolute()
-            || path.components().any(|component| {
-                matches!(
-                    component,
-                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
-                )
-            })
-        {
-            return Err(anyhow!(
-                "runtime invariant evidence ref must be run-relative and must not escape the run"
-            ));
-        }
-        if !reference.ends_with(".json") {
-            return Err(anyhow!(
-                "runtime invariant evidence ref under invariants/ must point to a JSON artifact"
-            ));
-        }
-        return Ok(());
-    }
-    Err(anyhow!(
-        "runtime invariant evidence refs must point to evidence/ or invariants/"
-    ))
-}
-
-pub fn write_runtime_invariant_evidence(
-    run_dir: impl AsRef<Path>,
-    evidence: &RuntimeInvariantEvidence,
-) -> Result<EvidenceArtifact> {
-    let run_dir = run_dir.as_ref();
-    evidence.validate()?;
-    let run = read_json_value(run_dir.join("run.json"))?;
-    let current_run_id = json_string(&run, "id").unwrap_or_else(|| run_id_from_run_dir(run_dir));
-    if evidence.run_id != current_run_id {
-        return Err(anyhow!(
-            "runtime invariant evidence runId {} is stale for current run {current_run_id}",
-            evidence.run_id
-        ));
-    }
-    let scenario_dir = evidence
-        .scenario_id
-        .as_deref()
-        .map(|scenario_id| format!("scenarios/{scenario_id}"))
-        .unwrap_or_else(|| "run".to_string());
-    let artifact_path = format!(
-        "evidence/{scenario_dir}/runtime-invariant-evidence-{}.json",
-        evidence.model_id
-    );
-    if let Some(parent) = run_dir.join(&artifact_path).parent() {
-        fs::create_dir_all(parent)?;
-    }
-    write_json(&run_dir.join(&artifact_path), &json!(evidence))?;
-    let summary = evidence.summary();
-    add_evidence_artifact(
-        run_dir,
-        &format!("runtime-invariant-evidence-{}", evidence.model_id),
-        "application/json",
-        &artifact_path,
-        json!({
-            "artifact": "runtime_invariant_evidence",
-            "schemaVersion": evidence.schema_version,
-            "modelId": evidence.model_id,
-            "runId": evidence.run_id,
-            "scenarioId": evidence.scenario_id,
-            "checkCount": summary.check_count,
-            "passedCount": summary.passed_count,
-            "failedCount": summary.failed_count,
-            "unsupportedCount": summary.unsupported_count,
-            "missingCount": summary.missing_count,
-            "malformedCount": summary.malformed_count,
-            "staleCount": summary.stale_count,
-            "boundary": "runtime invariant evidence is Rust-written validation evidence only; it does not mutate source, launch workers, execute browser commands, auto-fix, auto-apply, or auto-merge"
-        }),
-    )
-}
-
-pub fn evaluate_runtime_invariants(
-    model: &RuntimeInvariantModel,
-    world_state: &serde_json::Value,
-    scenario_result: Option<&serde_json::Value>,
-    recorded_at_unix_ms: u128,
-) -> Result<RuntimeInvariantEvidence> {
-    model.validate()?;
-    let mut checks = Vec::new();
-    for invariant in &model.invariants {
-        checks.push(evaluate_runtime_invariant(
-            model,
-            invariant,
-            world_state,
-            scenario_result,
-        ));
-    }
-    let evidence = RuntimeInvariantEvidence {
-        schema_version: RUNTIME_INVARIANT_EVIDENCE_SCHEMA_VERSION.to_string(),
-        model_id: model.model_id.clone(),
-        run_id: model.run_id.clone(),
-        scenario_id: model.scenario_id.clone(),
-        world_state_path: model.world_state_path.clone(),
-        scenario_result_path: model.scenario_result_path.clone(),
-        recorded_at_unix_ms,
-        checks,
-    };
-    evidence.validate()?;
-    Ok(evidence)
-}
-
-fn evaluate_runtime_invariant(
-    model: &RuntimeInvariantModel,
-    invariant: &RuntimeInvariantSpec,
-    world_state: &serde_json::Value,
-    scenario_result: Option<&serde_json::Value>,
-) -> RuntimeInvariantCheck {
-    let Some(source) = runtime_invariant_source(model, invariant, world_state, scenario_result)
-    else {
-        return runtime_invariant_check(
-            invariant,
-            RuntimeInvariantStatus::Unsupported,
-            None,
-            Some("invariant evidencePath is not a supported world-state or scenario-result source"),
-        );
-    };
-
-    let target = runtime_invariant_path_value(source, &invariant.target_path);
-    if target.is_none() {
-        return runtime_invariant_check(
-            invariant,
-            RuntimeInvariantStatus::Missing,
-            None,
-            Some("targetPath was not present in referenced runtime evidence"),
-        );
-    }
-    let target = target.unwrap_or(&serde_json::Value::Null);
-    let (status, observed, message) = match invariant.invariant_type {
-        RuntimeInvariantType::PlayerInBounds | RuntimeInvariantType::EntityInBounds => {
-            evaluate_in_bounds(source, target, invariant.bounds_path.as_deref())
-        }
-        RuntimeInvariantType::FiniteTransform => evaluate_finite_transform(target),
-        RuntimeInvariantType::HealthNonNegative => evaluate_health_non_negative(target),
-        RuntimeInvariantType::ObjectiveFlagsConsistent => {
-            evaluate_objective_flags_consistent(target)
-        }
-        RuntimeInvariantType::SceneTransitionValid => evaluate_scene_transition_valid(
-            source,
-            target,
-            invariant.transition_target_path.as_deref(),
-        ),
-        RuntimeInvariantType::NoImpossibleState => evaluate_no_impossible_state(target),
-        RuntimeInvariantType::RequiredEntityPresent => {
-            evaluate_required_entity_present(target, invariant.required_entity_id.as_deref())
-        }
-        RuntimeInvariantType::BehaviorStateConsistent => evaluate_behavior_state_consistent(
-            source,
-            invariant.behavior_state_path.as_deref(),
-            &invariant.allowed_states,
-        ),
-    };
-    runtime_invariant_check(invariant, status, observed, message.as_deref())
-}
-
-fn runtime_invariant_source<'a>(
-    model: &RuntimeInvariantModel,
-    invariant: &RuntimeInvariantSpec,
-    world_state: &'a serde_json::Value,
-    scenario_result: Option<&'a serde_json::Value>,
-) -> Option<&'a serde_json::Value> {
-    if invariant.evidence_path == model.world_state_path {
-        return Some(world_state);
-    }
-    if invariant.evidence_path == model.scenario_result_path.as_deref().unwrap_or_default() {
-        return scenario_result;
-    }
-    None
-}
-
-fn runtime_invariant_check(
-    invariant: &RuntimeInvariantSpec,
-    status: RuntimeInvariantStatus,
-    observed: Option<serde_json::Value>,
-    message: Option<&str>,
-) -> RuntimeInvariantCheck {
-    RuntimeInvariantCheck {
-        invariant_id: invariant.invariant_id.clone(),
-        invariant_type: invariant.invariant_type,
-        status,
-        target_path: invariant.target_path.clone(),
-        evidence_refs: vec![invariant.evidence_path.clone()],
-        observed,
-        message: message.map(ToString::to_string),
-    }
-}
-
-fn runtime_invariant_path_value<'a>(
-    source: &'a serde_json::Value,
-    path: &str,
-) -> Option<&'a serde_json::Value> {
-    let mut current = source;
-    for segment in path.split('.') {
-        current = match current {
-            serde_json::Value::Object(map) => map.get(segment)?,
-            serde_json::Value::Array(items) => {
-                let index = segment.parse::<usize>().ok()?;
-                items.get(index)?
-            }
-            _ => return None,
-        };
-    }
-    Some(current)
-}
-
-fn evaluate_in_bounds(
-    source: &serde_json::Value,
-    target: &serde_json::Value,
-    bounds_path: Option<&str>,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(bounds_path) = bounds_path else {
-        return (
-            RuntimeInvariantStatus::Unsupported,
-            Some(target.clone()),
-            Some("in-bounds invariant is missing boundsPath".to_string()),
-        );
-    };
-    let Some(bounds) = runtime_invariant_path_value(source, bounds_path) else {
-        return (
-            RuntimeInvariantStatus::Missing,
-            Some(target.clone()),
-            Some("boundsPath was not present in referenced runtime evidence".to_string()),
-        );
-    };
-    let Some((x, y)) = runtime_invariant_xy(target) else {
-        return (
-            RuntimeInvariantStatus::Malformed,
-            Some(target.clone()),
-            Some("targetPath did not contain finite numeric x/y values".to_string()),
-        );
-    };
-    let Some((min_x, max_x, min_y, max_y)) = runtime_invariant_bounds(bounds) else {
-        return (
-            RuntimeInvariantStatus::Malformed,
-            Some(bounds.clone()),
-            Some(
-                "boundsPath did not contain finite min/max or x/y/width/height bounds".to_string(),
-            ),
-        );
-    };
-    if x >= min_x && x <= max_x && y >= min_y && y <= max_y {
-        (
-            RuntimeInvariantStatus::Passed,
-            Some(json!({ "x": x, "y": y })),
-            None,
-        )
-    } else {
-        (
-            RuntimeInvariantStatus::Failed,
-            Some(
-                json!({ "x": x, "y": y, "bounds": { "minX": min_x, "maxX": max_x, "minY": min_y, "maxY": max_y } }),
-            ),
-            Some("entity transform was outside configured bounds".to_string()),
-        )
-    }
-}
-
-fn evaluate_finite_transform(
-    target: &serde_json::Value,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(object) = target.as_object() else {
-        return (
-            RuntimeInvariantStatus::Malformed,
-            Some(target.clone()),
-            Some("transform target must be an object".to_string()),
-        );
-    };
-    let numeric_keys = ["x", "y", "z", "rotation", "scale", "scaleX", "scaleY"];
-    let mut found = false;
-    for key in numeric_keys {
-        if let Some(value) = object.get(key) {
-            found = true;
-            if runtime_invariant_f64(value).is_none() {
-                return (
-                    RuntimeInvariantStatus::Malformed,
-                    Some(target.clone()),
-                    Some(format!("transform field {key} was not a finite number")),
-                );
-            }
-        }
-    }
-    if found {
-        (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
-    } else {
-        (
-            RuntimeInvariantStatus::Missing,
-            Some(target.clone()),
-            Some("transform target had no recognized numeric fields".to_string()),
-        )
-    }
-}
-
-fn evaluate_health_non_negative(
-    target: &serde_json::Value,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(value) = runtime_invariant_f64(target) else {
-        return (
-            RuntimeInvariantStatus::Malformed,
-            Some(target.clone()),
-            Some("health target was not numeric".to_string()),
-        );
-    };
-    if value >= 0.0 {
-        (RuntimeInvariantStatus::Passed, Some(json!(value)), None)
-    } else {
-        (
-            RuntimeInvariantStatus::Failed,
-            Some(json!(value)),
-            Some("health target was below zero".to_string()),
-        )
-    }
-}
-
-fn evaluate_objective_flags_consistent(
-    target: &serde_json::Value,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    match target {
-        serde_json::Value::Bool(_) => (RuntimeInvariantStatus::Passed, Some(target.clone()), None),
-        serde_json::Value::Object(map) => {
-            let contradiction = map.get("completed").and_then(|v| v.as_bool()) == Some(true)
-                && map.get("failed").and_then(|v| v.as_bool()) == Some(true);
-            if contradiction {
-                (
-                    RuntimeInvariantStatus::Failed,
-                    Some(target.clone()),
-                    Some("objective flags were both completed and failed".to_string()),
-                )
-            } else {
-                (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
-            }
-        }
-        _ => (
-            RuntimeInvariantStatus::Malformed,
-            Some(target.clone()),
-            Some("objective flag target must be boolean or object".to_string()),
-        ),
-    }
-}
-
-fn evaluate_scene_transition_valid(
-    source: &serde_json::Value,
-    target: &serde_json::Value,
-    transition_target_path: Option<&str>,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(path) = transition_target_path else {
-        return (
-            RuntimeInvariantStatus::Unsupported,
-            Some(target.clone()),
-            Some("scene transition invariant is missing transitionTargetPath".to_string()),
-        );
-    };
-    let Some(transition_target) = runtime_invariant_path_value(source, path) else {
-        return (
-            RuntimeInvariantStatus::Missing,
-            Some(target.clone()),
-            Some("transitionTargetPath was not present in referenced runtime evidence".to_string()),
-        );
-    };
-    let current = target.as_str();
-    let valid = match transition_target {
-        serde_json::Value::String(next) => current.is_some_and(|current| current == next),
-        serde_json::Value::Array(items) => {
-            current.is_some_and(|current| items.iter().any(|item| item.as_str() == Some(current)))
-        }
-        serde_json::Value::Object(map) => current.is_some_and(|current| map.contains_key(current)),
-        _ => false,
-    };
-    if valid {
-        (
-            RuntimeInvariantStatus::Passed,
-            Some(json!({ "current": target, "declared": transition_target })),
-            None,
-        )
-    } else {
-        (
-            RuntimeInvariantStatus::Failed,
-            Some(json!({ "current": target, "declared": transition_target })),
-            Some("scene transition target was not declared".to_string()),
-        )
-    }
-}
-
-fn evaluate_no_impossible_state(
-    target: &serde_json::Value,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    match target.as_bool() {
-        Some(false) => (RuntimeInvariantStatus::Passed, Some(target.clone()), None),
-        Some(true) => (
-            RuntimeInvariantStatus::Failed,
-            Some(target.clone()),
-            Some("impossible-state marker was true".to_string()),
-        ),
-        None => (
-            RuntimeInvariantStatus::Malformed,
-            Some(target.clone()),
-            Some("impossible-state marker must be boolean".to_string()),
-        ),
-    }
-}
-
-fn evaluate_required_entity_present(
-    target: &serde_json::Value,
-    required_entity_id: Option<&str>,
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(required) = required_entity_id else {
-        return (
-            RuntimeInvariantStatus::Unsupported,
-            Some(target.clone()),
-            Some("required entity invariant is missing requiredEntityId".to_string()),
-        );
-    };
-    let present = match target {
-        serde_json::Value::Object(map) => {
-            map.contains_key(required) || map.get("id").and_then(|v| v.as_str()) == Some(required)
-        }
-        serde_json::Value::Array(items) => items.iter().any(|item| {
-            item.as_str() == Some(required)
-                || item.get("id").and_then(|v| v.as_str()) == Some(required)
-        }),
-        serde_json::Value::String(value) => value == required,
-        _ => false,
-    };
-    if present {
-        (RuntimeInvariantStatus::Passed, Some(target.clone()), None)
-    } else {
-        (
-            RuntimeInvariantStatus::Failed,
-            Some(target.clone()),
-            Some(format!("required entity {required} was not present")),
-        )
-    }
-}
-
-fn evaluate_behavior_state_consistent(
-    source: &serde_json::Value,
-    behavior_state_path: Option<&str>,
-    allowed_states: &[String],
-) -> (
-    RuntimeInvariantStatus,
-    Option<serde_json::Value>,
-    Option<String>,
-) {
-    let Some(path) = behavior_state_path else {
-        return (
-            RuntimeInvariantStatus::Unsupported,
-            None,
-            Some("behavior invariant is missing behaviorStatePath".to_string()),
-        );
-    };
-    if allowed_states.is_empty() {
-        return (
-            RuntimeInvariantStatus::Unsupported,
-            None,
-            Some("behavior invariant has no allowedStates".to_string()),
-        );
-    }
-    let Some(state) = runtime_invariant_path_value(source, path) else {
-        return (
-            RuntimeInvariantStatus::Missing,
-            None,
-            Some("behaviorStatePath was not present in referenced runtime evidence".to_string()),
-        );
-    };
-    let Some(state) = state.as_str() else {
-        return (
-            RuntimeInvariantStatus::Malformed,
-            Some(state.clone()),
-            Some("behavior state was not a string".to_string()),
-        );
-    };
-    if allowed_states.iter().any(|allowed| allowed == state) {
-        (RuntimeInvariantStatus::Passed, Some(json!(state)), None)
-    } else {
-        (
-            RuntimeInvariantStatus::Failed,
-            Some(json!(state)),
-            Some("behavior state was outside allowedStates".to_string()),
-        )
-    }
-}
-
-fn runtime_invariant_xy(value: &serde_json::Value) -> Option<(f64, f64)> {
-    let object = value.as_object()?;
-    Some((
-        runtime_invariant_f64(object.get("x")?)?,
-        runtime_invariant_f64(object.get("y")?)?,
-    ))
-}
-
-fn runtime_invariant_bounds(value: &serde_json::Value) -> Option<(f64, f64, f64, f64)> {
-    let object = value.as_object()?;
-    if let (Some(min_x), Some(max_x), Some(min_y), Some(max_y)) = (
-        object.get("minX").and_then(runtime_invariant_f64),
-        object.get("maxX").and_then(runtime_invariant_f64),
-        object.get("minY").and_then(runtime_invariant_f64),
-        object.get("maxY").and_then(runtime_invariant_f64),
-    ) {
-        return Some((min_x, max_x, min_y, max_y));
-    }
-    let x = object.get("x").and_then(runtime_invariant_f64)?;
-    let y = object.get("y").and_then(runtime_invariant_f64)?;
-    let width = object.get("width").and_then(runtime_invariant_f64)?;
-    let height = object.get("height").and_then(runtime_invariant_f64)?;
-    Some((x, x + width, y, y + height))
-}
-
-fn runtime_invariant_f64(value: &serde_json::Value) -> Option<f64> {
-    let number = value.as_f64()?;
-    number.is_finite().then_some(number)
 }
 
 const RUNTIME_ASSET_LOAD_EVIDENCE_SCHEMA_VERSION: &str = "runtime-asset-load-evidence-v1";
@@ -27797,155 +26910,6 @@ fn require_http_url(field: &str, value: &str) -> Result<()> {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct EvidenceArtifact {
-    pub id: String,
-    pub kind: String,
-    pub path: String,
-    #[serde(default)]
-    pub metadata: serde_json::Value,
-    pub added_at_unix_ms: u128,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct EvidenceIndex {
-    pub artifacts: Vec<EvidenceArtifact>,
-}
-
-pub fn append_ledger_event(
-    run_dir: impl AsRef<Path>,
-    kind: &str,
-    actor: &str,
-    payload: serde_json::Value,
-) -> Result<serde_json::Value> {
-    require_text("ledger event kind", kind)?;
-    require_text("ledger event actor", actor)?;
-
-    let event = json!({
-        "event": kind,
-        "actor": actor,
-        "payload": payload,
-        "created_at_unix_ms": unix_millis()?,
-    });
-    let ledger_path = run_dir.as_ref().join("ledger.jsonl");
-    let line = serde_json::to_string(&event).context("failed to serialize ledger event")?;
-    let _guard = LEDGER_APPEND_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .map_err(|_| anyhow!("ledger append lock poisoned"))?;
-    let mut file = OpenOptions::new()
-        .create(false)
-        .append(true)
-        .open(&ledger_path)
-        .with_context(|| format!("failed to open ledger for append {}", ledger_path.display()))?;
-    writeln!(file, "{line}").context("failed to append ledger event")?;
-    Ok(event)
-}
-
-pub fn read_ledger_events(run_dir: impl AsRef<Path>) -> Result<Vec<serde_json::Value>> {
-    let ledger_path = run_dir.as_ref().join("ledger.jsonl");
-    let file = File::open(&ledger_path)
-        .with_context(|| format!("failed to read ledger {}", ledger_path.display()))?;
-    let reader = BufReader::new(file);
-    let mut events = Vec::new();
-
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = line.with_context(|| {
-            format!(
-                "failed to read ledger line {} from {}",
-                line_number + 1,
-                ledger_path.display()
-            )
-        })?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let event: serde_json::Value = serde_json::from_str(&line).with_context(|| {
-            format!(
-                "failed to parse ledger JSON on line {} from {}",
-                line_number + 1,
-                ledger_path.display()
-            )
-        })?;
-        events.push(event);
-    }
-
-    Ok(events)
-}
-
-pub fn add_evidence_artifact(
-    run_dir: impl AsRef<Path>,
-    id: &str,
-    kind: &str,
-    path: &str,
-    metadata: serde_json::Value,
-) -> Result<EvidenceArtifact> {
-    require_text("evidence artifact id", id)?;
-    require_text("evidence artifact kind", kind)?;
-    require_text("evidence artifact path", path)?;
-    validate_evidence_artifact_path(path)?;
-
-    let _guard = EVIDENCE_INDEX_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .map_err(|_| anyhow!("evidence index lock poisoned"))?;
-    let mut index = read_evidence_index(&run_dir)?;
-    if index.artifacts.iter().any(|artifact| artifact.id == id) {
-        return Err(anyhow!("evidence artifact id already exists: {id}"));
-    }
-
-    let artifact = EvidenceArtifact {
-        id: id.to_string(),
-        kind: kind.to_string(),
-        path: path.to_string(),
-        metadata,
-        added_at_unix_ms: unix_millis()?,
-    };
-    index.artifacts.push(artifact.clone());
-    write_evidence_index(run_dir, &index)?;
-    Ok(artifact)
-}
-
-pub fn list_evidence_artifacts(run_dir: impl AsRef<Path>) -> Result<Vec<EvidenceArtifact>> {
-    Ok(read_evidence_index(run_dir)?.artifacts)
-}
-
-fn validate_evidence_artifact_path(path: &str) -> Result<()> {
-    let evidence_path = Path::new(path);
-    if evidence_path.is_absolute() {
-        return Err(anyhow!("evidence artifact path must be relative"));
-    }
-    if !path.starts_with("evidence/") {
-        return Err(anyhow!("evidence artifact path must start with evidence/"));
-    }
-    for component in evidence_path.components() {
-        match component {
-            Component::Normal(_) | Component::CurDir => {}
-            _ => {
-                return Err(anyhow!(
-                    "evidence artifact path must stay inside the run evidence tree"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn read_evidence_index(run_dir: impl AsRef<Path>) -> Result<EvidenceIndex> {
-    let index_path = run_dir.as_ref().join("evidence/index.json");
-    let input = fs::read_to_string(&index_path)
-        .with_context(|| format!("failed to read evidence index {}", index_path.display()))?;
-    let index: EvidenceIndex = serde_json::from_str(&input)
-        .with_context(|| format!("failed to parse evidence index {}", index_path.display()))?;
-    Ok(index)
-}
-
-fn write_evidence_index(run_dir: impl AsRef<Path>, index: &EvidenceIndex) -> Result<()> {
-    write_json_atomic(&run_dir.as_ref().join("evidence/index.json"), &json!(index))
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CdpConnectionConfig {
     pub target_ws_url: String,
@@ -29305,6 +28269,73 @@ pub struct EvolveSummary {
     pub reason: String,
 }
 
+/// Parse a `classification-{N}` id into its zero-based failure index (defaults to 0).
+fn classification_failure_index(classification_id: &str) -> usize {
+    classification_id
+        .rsplit('-')
+        .next()
+        .and_then(|suffix| suffix.parse::<usize>().ok())
+        .and_then(|ordinal| ordinal.checked_sub(1))
+        .unwrap_or(0)
+}
+
+/// Returns true when `candidate` should be selected ahead of `current`, using the same
+/// ordering as the within-classification backlog selection: higher severity first, then
+/// broader evidence, then lower id.
+fn backlog_candidate_is_better(
+    candidate: &MutationBacklogItem,
+    current: &MutationBacklogItem,
+) -> bool {
+    severity_rank(&current.severity)
+        .cmp(&severity_rank(&candidate.severity))
+        .then_with(|| {
+            current
+                .evidence_refs
+                .len()
+                .cmp(&candidate.evidence_refs.len())
+        })
+        .then_with(|| candidate.id.cmp(&current.id))
+        .is_lt()
+}
+
+/// Choose the classification whose backlog item has the globally highest severity
+/// across ALL current classifications, so a later classification's higher-severity
+/// backlog item is not starved by always taking the first. Falls back to the first
+/// classification when no backlog item applies (or no backlog exists), preserving the
+/// prior classification-only behavior. #1293
+fn select_primary_classification<'a>(
+    run_dir: &Path,
+    classifications: &'a [MutationClassification],
+) -> Option<&'a MutationClassification> {
+    let first = classifications.first()?;
+    if !run_dir.join("mutation/backlog.json").exists() {
+        return Some(first);
+    }
+    let Ok(backlog) = read_mutation_backlog_artifact(run_dir) else {
+        return Some(first);
+    };
+    let mut best: Option<&MutationBacklogItem> = None;
+    for classification in classifications {
+        for item in &backlog.items {
+            if item.classification_id != classification.id
+                && item.failure_class != classification.category
+            {
+                continue;
+            }
+            if best.is_none_or(|current| backlog_candidate_is_better(item, current)) {
+                best = Some(item);
+            }
+        }
+    }
+    match best {
+        Some(item) => classifications
+            .iter()
+            .find(|classification| classification.id == item.classification_id)
+            .or(Some(first)),
+        None => Some(first),
+    }
+}
+
 pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     let run_dir = run_dir.as_ref();
     append_ledger_event(run_dir, "evolve.started", "evolve-cli", json!({}))?;
@@ -29337,8 +28368,26 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     let evidence = read_evidence_index(run_dir)?;
     let failures = verdict["failures"].as_array().cloned().unwrap_or_default();
     let mut proposal_ids = Vec::new();
+    // Classify every failure first, then choose the primary classification by backlog
+    // severity across ALL classifications (not just the first). Selecting the first
+    // classification before consulting the backlog starves a later classification's
+    // higher-severity backlog item. #1293
+    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+    let Some(classification) =
+        select_primary_classification(run_dir, &classification_artifact.classifications)
+    else {
+        return complete_evolve_without_proposal(
+            run_dir,
+            "missing-classification",
+            "failed verdict did not produce a mutation classification; no mutation proposal was fabricated".to_string(),
+        );
+    };
+    // Use the failure that produced the selected classification (classification-{N}
+    // maps to failures[N-1]) so the proposal's evidence and rationale stay coherent
+    // with the chosen backlog item.
     let failure = failures
-        .first()
+        .get(classification_failure_index(&classification.id))
+        .or_else(|| failures.first())
         .cloned()
         .unwrap_or_else(|| json!({ "kind": "failed_verdict" }));
     let evidence_refs = collect_classification_evidence_refs(&failure, &verdict);
@@ -29348,65 +28397,32 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     if matches!(gate_category, MutationProposalGateCategory::Unsupported)
         && matches!(evidence_state, MutationProposalEvidenceState::Linked)
     {
-        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
-        let classification_ids = classification_artifact
-            .classifications
-            .iter()
-            .map(|classification| classification.id.clone())
-            .collect::<Vec<_>>();
-        let summary = EvolveSummary {
-            status: mutation_proposal_gate_category_label(&gate_category).to_string(),
-            proposals_created: 0,
-            proposal_ids: Vec::new(),
-            classification_ids,
-            patch_draft_ids: Vec::new(),
-            reason: "failed verdict uses an unsupported mutation proposal gate; no mutation proposal was fabricated".to_string(),
-        };
-        append_ledger_event(
+        return complete_evolve_without_proposal(
             run_dir,
-            "evolve.completed",
-            "evolve-cli",
-            json!({
-                "status": summary.status,
-                "proposals_created": summary.proposals_created,
-                "classification_ids": summary.classification_ids,
-                "reason": summary.reason
-            }),
-        )?;
-        update_journal(run_dir)?;
-        return Ok(summary);
+            mutation_proposal_gate_category_label(&gate_category),
+            "failed verdict uses an unsupported mutation proposal gate; no mutation proposal was fabricated".to_string(),
+        );
     }
     let Some(evidence_id) = select_evidence_id_for_failure(&evidence, &failure, &verdict) else {
-        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
-        let classification_ids = classification_artifact
-            .classifications
-            .iter()
-            .map(|classification| classification.id.clone())
-            .collect::<Vec<_>>();
-        let summary = EvolveSummary {
-            status: mutation_proposal_evidence_state_label(&evidence_state).to_string(),
-            proposals_created: 0,
-            proposal_ids: Vec::new(),
-            classification_ids,
-            patch_draft_ids: Vec::new(),
-            reason: format!(
+        return complete_evolve_without_proposal(
+            run_dir,
+            mutation_proposal_evidence_state_label(&evidence_state),
+            format!(
                 "failed verdict has {} justifying evidence; no mutation proposal was fabricated",
                 mutation_proposal_evidence_state_label(&evidence_state)
             ),
-        };
-        append_ledger_event(
+        );
+    };
+    let selection = select_mutation_proposal_strategy(run_dir, classification, &evidence)?;
+    let Some(selection) = selection else {
+        return complete_evolve_without_proposal(
             run_dir,
-            "evolve.completed",
-            "evolve-cli",
-            json!({
-                "status": summary.status,
-                "proposals_created": summary.proposals_created,
-                "classification_ids": summary.classification_ids,
-                "reason": summary.reason
-            }),
-        )?;
-        update_journal(run_dir)?;
-        return Ok(summary);
+            "backlog-only",
+            format!(
+                "failure classification `{}` is backlog-only; no mutation proposal was fabricated",
+                mutation_classification_category_label(&classification.category)
+            ),
+        );
     };
     let proposal = create_mutation_proposal(
         run_dir,
@@ -29416,8 +28432,8 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
                 failure["kind"].as_str().unwrap_or("failed_verdict")
             ),
             evidence_id,
-            target: "seeds/evolve-v1-draft-target.yaml".to_string(),
-            path: "scenarios.evolve-controlled-failure.assertions".to_string(),
+            target: mutation_selection_target_path(&selection.bounded_mutation_type).to_string(),
+            path: mutation_selection_path(&selection.bounded_mutation_type).to_string(),
             from: "current evidence-linked failing criteria".to_string(),
             to: "review evidence and adjust the next explicit implementation issue".to_string(),
         },
@@ -29430,6 +28446,7 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         &verdict,
         &evidence,
         &existing_journal,
+        &selection,
     )?;
     attach_mutation_proposal_rationale(run_dir, &proposal_id, rationale)?;
     proposal_ids.push(proposal_id);
@@ -29523,12 +28540,216 @@ fn select_evidence_id_for_failure(
         })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MutationProposalSelection {
+    bounded_mutation_type: MutationProposalBoundedMutationType,
+    backlog_item_id: Option<String>,
+    source: String,
+    reason: String,
+    backlog_read_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationBacklogSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationBacklogItem {
+    pub id: String,
+    pub classification_id: String,
+    pub failure_class: MutationClassificationCategory,
+    pub bounded_mutation_type: MutationProposalBoundedMutationType,
+    pub severity: MutationBacklogSeverity,
+    pub reproduction_context: String,
+    pub evidence_refs: Vec<String>,
+    pub suggested_next_investigation: String,
+    pub owner_lane: String,
+    pub review_status: String,
+    #[serde(default)]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationBacklogArtifact {
+    pub schema_version: String,
+    pub run_id: String,
+    pub items: Vec<MutationBacklogItem>,
+}
+
+impl MutationBacklogArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!("mutation backlog schema_version must be \"1\""));
+        }
+        require_text("mutation backlog run_id", &self.run_id)?;
+        let mut ids = BTreeSet::new();
+        for item in &self.items {
+            item.validate()?;
+            if !ids.insert(item.id.as_str()) {
+                return Err(anyhow!("duplicate mutation backlog id: {}", item.id));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationBacklogItem {
+    pub fn validate(&self) -> Result<()> {
+        require_text("mutation backlog item id", &self.id)?;
+        require_text(
+            "mutation backlog item classification_id",
+            &self.classification_id,
+        )?;
+        require_text(
+            "mutation backlog item reproduction_context",
+            &self.reproduction_context,
+        )?;
+        require_text(
+            "mutation backlog item suggested_next_investigation",
+            &self.suggested_next_investigation,
+        )?;
+        require_text("mutation backlog item owner_lane", &self.owner_lane)?;
+        require_text("mutation backlog item review_status", &self.review_status)?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("mutation backlog item requires evidence_refs"));
+        }
+        for evidence_ref in &self.evidence_refs {
+            require_text("mutation backlog item evidence_ref", evidence_ref)?;
+        }
+        for blocked_reason in &self.blocked_reasons {
+            require_text("mutation backlog item blocked_reason", blocked_reason)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn read_mutation_backlog_artifact(
+    run_dir: impl AsRef<Path>,
+) -> Result<MutationBacklogArtifact> {
+    let path = run_dir.as_ref().join("mutation/backlog.json");
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read mutation backlog {}", path.display()))?;
+    let artifact: MutationBacklogArtifact = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse mutation backlog {}", path.display()))?;
+    artifact
+        .validate()
+        .with_context(|| format!("failed to validate mutation backlog {}", path.display()))?;
+    Ok(artifact)
+}
+
+pub fn write_mutation_backlog_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &MutationBacklogArtifact,
+) -> Result<PathBuf> {
+    artifact.validate()?;
+    let dir = run_dir.as_ref().join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    let path = dir.join("backlog.json");
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
+fn select_mutation_proposal_strategy(
+    run_dir: &Path,
+    classification: &MutationClassification,
+    evidence: &EvidenceIndex,
+) -> Result<Option<MutationProposalSelection>> {
+    let Some(mapped_type) = bounded_mutation_type_for_classification(&classification.category)
+    else {
+        return Ok(None);
+    };
+    let backlog_path = run_dir.join("mutation/backlog.json");
+    if !backlog_path.exists() {
+        return Ok(Some(MutationProposalSelection {
+            bounded_mutation_type: mapped_type,
+            backlog_item_id: None,
+            source: "classification-only".to_string(),
+            reason: format!(
+                "classified failure `{}` mapped directly because no mutation backlog artifact exists",
+                mutation_classification_category_label(&classification.category)
+            ),
+            backlog_read_only: true,
+        }));
+    }
+
+    let backlog = read_mutation_backlog_artifact(run_dir)?;
+    let mut candidates = backlog
+        .items
+        .iter()
+        .filter(|item| {
+            item.classification_id == classification.id
+                || item.failure_class == classification.category
+        })
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Err(anyhow!(
+            "missing-backlog-ref: mutation backlog has no item for classification {}",
+            classification.id
+        ));
+    }
+    candidates.sort_by(|left, right| {
+        severity_rank(&right.severity)
+            .cmp(&severity_rank(&left.severity))
+            .then_with(|| right.evidence_refs.len().cmp(&left.evidence_refs.len()))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let selected = candidates[0];
+    if selected.classification_id != classification.id {
+        return Err(anyhow!(
+            "missing-classification: selected backlog item {} references {} instead of {}",
+            selected.id,
+            selected.classification_id,
+            classification.id
+        ));
+    }
+    if selected.bounded_mutation_type != mapped_type {
+        return Err(anyhow!(
+            "bounded-type-violation: classification {} maps to {} but backlog item {} requested {}",
+            mutation_classification_category_label(&classification.category),
+            mutation_proposal_bounded_type_label(&mapped_type),
+            selected.id,
+            mutation_proposal_bounded_type_label(&selected.bounded_mutation_type)
+        ));
+    }
+    let stale_ref = selected.evidence_refs.iter().find(|evidence_ref| {
+        !evidence
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.path == **evidence_ref || artifact.id == **evidence_ref)
+    });
+    if let Some(stale_ref) = stale_ref {
+        return Err(anyhow!(
+            "stale-ref: mutation backlog item {} references missing evidence {}",
+            selected.id,
+            stale_ref
+        ));
+    }
+    Ok(Some(MutationProposalSelection {
+        bounded_mutation_type: selected.bounded_mutation_type.clone(),
+        backlog_item_id: Some(selected.id.clone()),
+        source: "mutation/backlog.json".to_string(),
+        reason: format!(
+            "selected backlog item {} by severity {:?} and reproduction context `{}` without mutating backlog state",
+            selected.id, selected.severity, selected.reproduction_context
+        ),
+        backlog_read_only: true,
+    }))
+}
+
 fn build_mutation_proposal_rationale(
     proposal: &MutationProposal,
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
     evidence: &EvidenceIndex,
     journal: &str,
+    selection: &MutationProposalSelection,
 ) -> Result<MutationProposalRationale> {
     let evidence_refs = collect_classification_evidence_refs(failure, verdict);
     let (category, reason) = classify_failure_category(failure, verdict, journal, &evidence_refs);
@@ -29562,6 +28783,21 @@ fn build_mutation_proposal_rationale(
             .unwrap_or_default();
         scenario_result_refs = collect_scenario_result_refs(&verdict_evidence_refs, evidence);
     }
+    if scenario_result_refs.is_empty() {
+        scenario_result_refs = evidence
+            .artifacts
+            .iter()
+            .filter(|artifact| {
+                artifact.path.contains("scenario-result")
+                    || artifact
+                        .metadata
+                        .get("artifact")
+                        .and_then(|value| value.as_str())
+                        == Some("scenario_result")
+            })
+            .map(|artifact| artifact.path.clone())
+            .collect();
+    }
     let rationale = MutationProposalRationale {
         schema_version: "1".to_string(),
         failure_classification: mutation_classification_category_label(&category).to_string(),
@@ -29576,15 +28812,53 @@ fn build_mutation_proposal_rationale(
         ),
         confidence,
         reasoning_summary: reason,
-        allowed_mutation_type: MutationProposalAllowedMutationType::DataOnly,
+        allowed_mutation_type: mutation_allowed_type_for_selection(&selection.bounded_mutation_type),
         failing_gate_category: Some(failing_gate_category.clone()),
         justifying_evidence_ref,
         evidence_state: Some(evidence_state),
         confidence_basis: Some(confidence_basis),
-        bounded_mutation_type: Some(bounded_mutation_type_for_gate(&failing_gate_category)),
+        bounded_mutation_type: Some(selection.bounded_mutation_type.clone()),
+        selection_backlog_item_id: selection.backlog_item_id.clone(),
+        selection_source: Some(selection.source.clone()),
+        selection_reason: Some(selection.reason.clone()),
+        backlog_read_only: Some(selection.backlog_read_only),
     };
     rationale.validate(&proposal.evidence_id)?;
     Ok(rationale)
+}
+
+fn complete_evolve_without_proposal(
+    run_dir: &Path,
+    status: &str,
+    reason: String,
+) -> Result<EvolveSummary> {
+    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+    let classification_ids = classification_artifact
+        .classifications
+        .iter()
+        .map(|classification| classification.id.clone())
+        .collect::<Vec<_>>();
+    let summary = EvolveSummary {
+        status: status.to_string(),
+        proposals_created: 0,
+        proposal_ids: Vec::new(),
+        classification_ids,
+        patch_draft_ids: Vec::new(),
+        reason,
+    };
+    append_ledger_event(
+        run_dir,
+        "evolve.completed",
+        "evolve-cli",
+        json!({
+            "status": summary.status,
+            "proposals_created": summary.proposals_created,
+            "classification_ids": summary.classification_ids,
+            "reason": summary.reason
+        }),
+    )?;
+    update_journal(run_dir)?;
+    Ok(summary)
 }
 
 fn infer_mutation_proposal_gate_category(
@@ -29613,6 +28887,8 @@ fn infer_mutation_proposal_gate_category(
     } else if matches!(
         category,
         MutationClassificationCategory::RuntimeProbeFailure
+            | MutationClassificationCategory::ProbeFailure
+            | MutationClassificationCategory::RuntimeCrash
             | MutationClassificationCategory::ConsoleError
             | MutationClassificationCategory::PerformanceRegression
     ) || haystack.contains("runtime")
@@ -29658,15 +28934,83 @@ fn infer_mutation_proposal_evidence_state(
     }
 }
 
-fn bounded_mutation_type_for_gate(
-    gate_category: &MutationProposalGateCategory,
-) -> MutationProposalBoundedMutationType {
-    match gate_category {
-        MutationProposalGateCategory::Mechanical => MutationProposalBoundedMutationType::Scenario,
-        MutationProposalGateCategory::Runtime => MutationProposalBoundedMutationType::Data,
-        MutationProposalGateCategory::Visual => MutationProposalBoundedMutationType::Scene,
-        MutationProposalGateCategory::Semantic => MutationProposalBoundedMutationType::Data,
-        MutationProposalGateCategory::Unsupported => MutationProposalBoundedMutationType::Data,
+fn bounded_mutation_type_for_classification(
+    category: &MutationClassificationCategory,
+) -> Option<MutationProposalBoundedMutationType> {
+    match category {
+        MutationClassificationCategory::GameplayLogic => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::LevelDesign => {
+            Some(MutationProposalBoundedMutationType::Scene)
+        }
+        MutationClassificationCategory::Asset => Some(MutationProposalBoundedMutationType::Data),
+        MutationClassificationCategory::PhysicsCollision => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::Input => {
+            Some(MutationProposalBoundedMutationType::Scenario)
+        }
+        MutationClassificationCategory::ScenarioAssertionFailure => {
+            Some(MutationProposalBoundedMutationType::Scenario)
+        }
+        MutationClassificationCategory::RuntimeCrash
+        | MutationClassificationCategory::ProbeFailure
+        | MutationClassificationCategory::RuntimeProbeFailure
+        | MutationClassificationCategory::ConsoleError
+        | MutationClassificationCategory::PerformanceRegression => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::VisualMismatch => {
+            Some(MutationProposalBoundedMutationType::Scene)
+        }
+        MutationClassificationCategory::Flaky
+        | MutationClassificationCategory::MissingEvidence
+        | MutationClassificationCategory::Unsupported
+        | MutationClassificationCategory::Unknown => None,
+    }
+}
+
+fn mutation_allowed_type_for_selection(
+    bounded_type: &MutationProposalBoundedMutationType,
+) -> MutationProposalAllowedMutationType {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Scene => {
+            MutationProposalAllowedMutationType::SceneOnly
+        }
+        MutationProposalBoundedMutationType::Data
+        | MutationProposalBoundedMutationType::Scenario => {
+            MutationProposalAllowedMutationType::DataOnly
+        }
+    }
+}
+
+fn mutation_selection_target_path(
+    bounded_type: &MutationProposalBoundedMutationType,
+) -> &'static str {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Data => "seeds/evolve-v1-draft-target.yaml",
+        MutationProposalBoundedMutationType::Scene => "scenes/evolve-v1-draft-target.yaml",
+        MutationProposalBoundedMutationType::Scenario => "seeds/evolve-v1-draft-target.yaml",
+    }
+}
+
+fn mutation_selection_path(bounded_type: &MutationProposalBoundedMutationType) -> &'static str {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Data => "data.evolve_controlled_failure",
+        MutationProposalBoundedMutationType::Scene => "scene.evolve_controlled_failure",
+        MutationProposalBoundedMutationType::Scenario => {
+            "scenarios.evolve-controlled-failure.assertions"
+        }
+    }
+}
+
+fn severity_rank(severity: &MutationBacklogSeverity) -> u8 {
+    match severity {
+        MutationBacklogSeverity::Low => 0,
+        MutationBacklogSeverity::Medium => 1,
+        MutationBacklogSeverity::High => 2,
+        MutationBacklogSeverity::Critical => 3,
     }
 }
 
@@ -29697,12 +29041,21 @@ fn mutation_classification_category_label(
     category: &MutationClassificationCategory,
 ) -> &'static str {
     match category {
+        MutationClassificationCategory::GameplayLogic => "gameplay_logic",
+        MutationClassificationCategory::LevelDesign => "level_design",
+        MutationClassificationCategory::Asset => "asset",
+        MutationClassificationCategory::PhysicsCollision => "physics_collision",
+        MutationClassificationCategory::Input => "input",
         MutationClassificationCategory::ScenarioAssertionFailure => "scenario_assertion_failure",
+        MutationClassificationCategory::RuntimeCrash => "runtime_crash",
+        MutationClassificationCategory::ProbeFailure => "probe_failure",
         MutationClassificationCategory::RuntimeProbeFailure => "runtime_probe_failure",
         MutationClassificationCategory::ConsoleError => "console_error",
         MutationClassificationCategory::PerformanceRegression => "performance_regression",
         MutationClassificationCategory::VisualMismatch => "visual_mismatch",
+        MutationClassificationCategory::Flaky => "flaky",
         MutationClassificationCategory::MissingEvidence => "missing_evidence",
+        MutationClassificationCategory::Unsupported => "unsupported",
         MutationClassificationCategory::Unknown => "unknown",
     }
 }
@@ -29818,6 +29171,14 @@ pub struct MutationProposalRationale {
     pub confidence_basis: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounded_mutation_type: Option<MutationProposalBoundedMutationType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_backlog_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backlog_read_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -29971,6 +29332,29 @@ impl MutationProposalRationale {
                 "mutation proposal rationale linked evidence_state requires justifying_evidence_ref"
             ));
         }
+        if let Some(backlog_item_id) = &self.selection_backlog_item_id {
+            require_text(
+                "mutation proposal rationale selection_backlog_item_id",
+                backlog_item_id,
+            )?;
+        }
+        if let Some(selection_source) = &self.selection_source {
+            require_text(
+                "mutation proposal rationale selection_source",
+                selection_source,
+            )?;
+        }
+        if let Some(selection_reason) = &self.selection_reason {
+            require_text(
+                "mutation proposal rationale selection_reason",
+                selection_reason,
+            )?;
+        }
+        if self.backlog_read_only == Some(false) {
+            return Err(anyhow!(
+                "mutation proposal rationale backlog_read_only cannot be false"
+            ));
+        }
         Ok(())
     }
 }
@@ -29987,12 +29371,21 @@ pub struct MutationProposalInput {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MutationClassificationCategory {
+    GameplayLogic,
+    LevelDesign,
+    Asset,
+    PhysicsCollision,
+    Input,
     ScenarioAssertionFailure,
+    RuntimeCrash,
+    ProbeFailure,
     RuntimeProbeFailure,
     ConsoleError,
     PerformanceRegression,
     VisualMismatch,
+    Flaky,
     MissingEvidence,
+    Unsupported,
     Unknown,
 }
 
@@ -30071,10 +29464,16 @@ impl MutationClassification {
                 scenario_result_ref,
             )?;
         }
-        if self.category != MutationClassificationCategory::Unknown && self.evidence_refs.is_empty()
+        if !matches!(
+            self.category,
+            MutationClassificationCategory::Unknown
+                | MutationClassificationCategory::Unsupported
+                | MutationClassificationCategory::Flaky
+                | MutationClassificationCategory::MissingEvidence
+        ) && self.evidence_refs.is_empty()
         {
             return Err(anyhow!(
-                "non-unknown mutation classifications require at least one evidence ref"
+                "non-unknown mutation classifications require at least one evidence ref; proposal-producing classifications must cite evidence"
             ));
         }
         Ok(())
@@ -30240,12 +29639,57 @@ fn push_unique_ref(refs: &mut Vec<String>, value: &str) {
     }
 }
 
+fn parse_declared_failure_class(value: &str) -> Option<MutationClassificationCategory> {
+    match value.trim().to_ascii_lowercase().replace('-', "_").as_str() {
+        "gameplay_logic" | "gameplay" => Some(MutationClassificationCategory::GameplayLogic),
+        "level_design" | "level" => Some(MutationClassificationCategory::LevelDesign),
+        "asset" | "assets" => Some(MutationClassificationCategory::Asset),
+        "physics_collision" | "physics" | "collision" => {
+            Some(MutationClassificationCategory::PhysicsCollision)
+        }
+        "input" => Some(MutationClassificationCategory::Input),
+        "scenario_assertion_failure" | "scenario" | "assertion" => {
+            Some(MutationClassificationCategory::ScenarioAssertionFailure)
+        }
+        "runtime_crash" | "crash" => Some(MutationClassificationCategory::RuntimeCrash),
+        "probe_failure" | "probe" => Some(MutationClassificationCategory::ProbeFailure),
+        "runtime_probe_failure" | "runtime_probe" => {
+            Some(MutationClassificationCategory::RuntimeProbeFailure)
+        }
+        "console_error" | "console" => Some(MutationClassificationCategory::ConsoleError),
+        "performance_regression" | "performance" => {
+            Some(MutationClassificationCategory::PerformanceRegression)
+        }
+        "visual_mismatch" | "visual" => Some(MutationClassificationCategory::VisualMismatch),
+        "flaky" => Some(MutationClassificationCategory::Flaky),
+        "missing_evidence" => Some(MutationClassificationCategory::MissingEvidence),
+        "unsupported" => Some(MutationClassificationCategory::Unsupported),
+        "unknown" => Some(MutationClassificationCategory::Unknown),
+        _ => None,
+    }
+}
+
 fn classify_failure_category(
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
     _journal: &str,
     evidence_refs: &[String],
 ) -> (MutationClassificationCategory, String) {
+    for key in [
+        "failure_class",
+        "classification",
+        "classification_category",
+        "class",
+    ] {
+        if let Some(value) = failure.get(key).and_then(|value| value.as_str()) {
+            if let Some(category) = parse_declared_failure_class(value) {
+                return (
+                    category,
+                    format!("failure declares #692 classification `{value}`"),
+                );
+            }
+        }
+    }
     if evidence_refs.is_empty() {
         return (
             MutationClassificationCategory::Unknown,
@@ -30265,7 +29709,52 @@ fn classify_failure_category(
     .join(" ")
     .to_ascii_lowercase();
 
-    if haystack.contains("visual") || haystack.contains("screenshot") {
+    if haystack.contains("flaky") || haystack.contains("flake") {
+        (
+            MutationClassificationCategory::Flaky,
+            "failure is classified as flaky and remains backlog-only".to_string(),
+        )
+    } else if haystack.contains("unsupported") {
+        (
+            MutationClassificationCategory::Unsupported,
+            "failure is unsupported and remains backlog-only".to_string(),
+        )
+    } else if haystack.contains("gameplay_logic") || haystack.contains("gameplay logic") {
+        (
+            MutationClassificationCategory::GameplayLogic,
+            "failure references gameplay logic evidence".to_string(),
+        )
+    } else if haystack.contains("level_design") || haystack.contains("level design") {
+        (
+            MutationClassificationCategory::LevelDesign,
+            "failure references level design evidence".to_string(),
+        )
+    } else if haystack.contains("physics_collision")
+        || haystack.contains("physics/collision")
+        || haystack.contains("collision")
+        || haystack.contains("physics")
+    {
+        (
+            MutationClassificationCategory::PhysicsCollision,
+            "failure references physics or collision evidence".to_string(),
+        )
+    } else if haystack.contains("runtime_crash")
+        || haystack.contains("runtime crash")
+        || haystack.contains("crash")
+    {
+        (
+            MutationClassificationCategory::RuntimeCrash,
+            "failure references runtime crash evidence".to_string(),
+        )
+    } else if haystack.contains("runtime_invariant")
+        || haystack.contains("runtime-invariant")
+        || haystack.contains("semantic")
+    {
+        (
+            MutationClassificationCategory::RuntimeProbeFailure,
+            "failure references semantic/runtime invariant evidence".to_string(),
+        )
+    } else if haystack.contains("visual") || haystack.contains("screenshot") {
         (
             MutationClassificationCategory::VisualMismatch,
             "failure references visual or screenshot evidence".to_string(),
@@ -30280,10 +29769,33 @@ fn classify_failure_category(
             MutationClassificationCategory::ConsoleError,
             "failure references console evidence".to_string(),
         )
-    } else if haystack.contains("runtime") || haystack.contains("probe") {
+    } else if haystack.contains("runtime_probe_failure")
+        || haystack.contains("runtime probe failure")
+        || haystack.contains("runtime_probe")
+        || haystack.contains("runtime-probe")
+        || haystack.contains("runtime/")
+    {
         (
             MutationClassificationCategory::RuntimeProbeFailure,
             "failure references runtime probe evidence".to_string(),
+        )
+    } else if haystack.contains("probe_failure") || haystack.contains("probe failure") {
+        (
+            MutationClassificationCategory::ProbeFailure,
+            "failure references probe failure evidence".to_string(),
+        )
+    } else if haystack.contains("input") || haystack.contains("control") {
+        (
+            MutationClassificationCategory::Input,
+            "failure references input or control evidence".to_string(),
+        )
+    } else if haystack.contains("asset")
+        || haystack.contains("sprite")
+        || haystack.contains("audio")
+    {
+        (
+            MutationClassificationCategory::Asset,
+            "failure references asset evidence".to_string(),
         )
     } else if haystack.contains("missing") && haystack.contains("evidence") {
         (
@@ -41107,6 +40619,82 @@ fn render_journal(
             }
         }
     }
+    out.push_str(&render_evolve_rerun_delta_journal_section(
+        run_dir, proposals,
+    ));
+    out
+}
+
+fn render_evolve_rerun_delta_journal_section(
+    run_dir: &Path,
+    proposals: &[MutationProposal],
+) -> String {
+    let comparison = read_dashboard_comparison(run_dir);
+    if !comparison.present || comparison.artifacts.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    out.push_str("\n## Mutation loop summary\n\n");
+    out.push_str(
+        "- Summary shape: hypothesis → failing gate → evidence → proposal → rerun delta.\n",
+    );
+    out.push_str("- Four-gate rerun delta:\n");
+    for artifact in &comparison.artifacts {
+        let Some(value) = &artifact.value else {
+            continue;
+        };
+        if let Some(gates) = value
+            .get("fourGate")
+            .and_then(|four_gate| four_gate.get("gates"))
+            .and_then(|gates| gates.as_array())
+        {
+            for gate in gates {
+                let gate_name = gate
+                    .get("gate")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let before = gate
+                    .get("before")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let after = gate
+                    .get("after")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                let transition = gate
+                    .get("transition")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("unknown");
+                out.push_str(&format!(
+                    "  - `{gate_name}`: `{before}` -> `{after}` (`{transition}`) via `{}`.\n",
+                    artifact.path
+                ));
+            }
+        }
+    }
+    for (index, proposal) in proposals.iter().enumerate() {
+        let Some(rationale) = &proposal.rationale else {
+            continue;
+        };
+        let gate = rationale
+            .failing_gate_category
+            .as_ref()
+            .map(mutation_proposal_gate_category_label)
+            .unwrap_or("unknown");
+        let evidence = rationale
+            .justifying_evidence_ref
+            .as_deref()
+            .unwrap_or("missing");
+        out.push_str(&format!(
+            "- proposal `mutation-{}` (`{}`): hypothesis `{}`; failing gate `{}`; evidence `{}`; rerun delta above remains manual-review evidence only.\n",
+            index + 1,
+            proposal.id,
+            rationale.expected_effect,
+            gate,
+            evidence
+        ));
+    }
+    out.push('\n');
     out
 }
 
@@ -41187,6 +40775,7 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("visual gate did not pass");
         let evidence = gate
             .get("comparisonRef")
+            .or_else(|| gate.get("comparison_ref"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-evidence");
         out.push_str(&format!(
@@ -41203,10 +40792,12 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("unknown");
         let invariant = gate
             .get("invariantId")
+            .or_else(|| gate.get("invariant_id"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-invariant");
         let target = gate
             .get("targetPath")
+            .or_else(|| gate.get("target_path"))
             .and_then(|value| value.as_str())
             .unwrap_or("unknown-target");
         let reason = gate
@@ -41215,9 +40806,11 @@ fn render_visual_semantic_gate_journal_section(verdict: &serde_json::Value) -> S
             .unwrap_or("semantic gate did not pass");
         let evidence = gate
             .get("modelRef")
+            .or_else(|| gate.get("model_ref"))
             .and_then(|value| value.as_str())
             .or_else(|| {
                 gate.get("evidenceRefs")
+                    .or_else(|| gate.get("evidence_refs"))
                     .and_then(|value| value.as_array())
                     .and_then(|refs| refs.first())
                     .and_then(|value| value.as_str())
@@ -42037,6 +41630,10 @@ fn render_authoring_governance_journal_section(
                 join_or_none(&artifact.evidence_refs),
                 join_or_none(&artifact.unsupported)
             ));
+            out.push_str(&render_four_gate_delta_journal_lines(
+                &artifact.value,
+                proposals,
+            ));
         }
     }
 
@@ -42074,6 +41671,75 @@ fn render_authoring_governance_journal_section(
                 promotion.after_hash.value
             ));
         }
+    }
+    out
+}
+
+fn render_four_gate_delta_journal_lines(
+    value: &Option<serde_json::Value>,
+    proposals: &[MutationProposal],
+) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    let Some(deltas) = value
+        .get("fourGateDeltas")
+        .and_then(|value| value.as_array())
+    else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for delta in deltas {
+        let gate = delta
+            .get("gate")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let transition = delta
+            .get("transition")
+            .and_then(|value| value.as_str())
+            .unwrap_or("changed");
+        let before = delta
+            .get("beforeStatus")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        let after = delta
+            .get("afterStatus")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown");
+        out.push_str(&format!(
+            "  - rerun delta `{gate}`: `{transition}` (`{before}` -> `{after}`)
+"
+        ));
+    }
+    if let Some(proposal) = proposals.first() {
+        let (failed_gate, evidence, hypothesis) = proposal
+            .rationale
+            .as_ref()
+            .map(|rationale| {
+                (
+                    rationale
+                        .failing_gate_category
+                        .as_ref()
+                        .map(mutation_proposal_gate_category_label)
+                        .unwrap_or("unknown"),
+                    rationale
+                        .justifying_evidence_ref
+                        .as_deref()
+                        .unwrap_or(proposal.evidence_id.as_str()),
+                    rationale.expected_effect.as_str(),
+                )
+            })
+            .unwrap_or((
+                "unknown",
+                proposal.evidence_id.as_str(),
+                proposal.reason.as_str(),
+            ));
+        out.push_str(&format!(
+            "  - Next-step hypothesis: {hypothesis}
+  - Evidence-linked gate: `{failed_gate}` evidence `{evidence}` proposal `{}`; rerun deltas above are manual-review evidence only.
+",
+            proposal.id
+        ));
     }
     out
 }
@@ -42233,95 +41899,6 @@ fn render_regression_promotion_journal_section(
         }
     }
     out
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct EvaluationVerdict {
-    pub status: String,
-    pub summary: String,
-    pub failures: Vec<serde_json::Value>,
-    pub evidence_refs: Vec<String>,
-    pub metadata: serde_json::Value,
-    #[serde(
-        rename = "gateCategories",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub gate_categories: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub visual: Vec<VisualGateVerdict>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub semantic: Vec<SemanticGateVerdict>,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct VisualGateVerdict {
-    #[serde(rename = "scenarioId")]
-    pub scenario_id: String,
-    #[serde(rename = "checkpointId")]
-    pub checkpoint_id: String,
-    pub state: VisualGateState,
-    pub reason: String,
-    #[serde(rename = "comparisonRef")]
-    pub comparison_ref: String,
-    #[serde(rename = "changedPixels")]
-    pub changed_pixels: Option<u64>,
-    #[serde(rename = "changedPercentX1000")]
-    pub changed_percent_x1000: Option<u32>,
-    #[serde(rename = "changedRegionCount")]
-    pub changed_region_count: usize,
-    #[serde(rename = "thresholdSummary")]
-    pub threshold_summary: Vec<String>,
-    #[serde(rename = "evidenceRefs")]
-    pub evidence_refs: Vec<String>,
-    #[serde(rename = "outputRoot")]
-    pub output_root: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "kebab-case")]
-pub enum VisualGateState {
-    Pass,
-    Fail,
-    MissingBaseline,
-    MissingScreenshot,
-    UnsupportedFormat,
-    ThresholdNotDeclared,
-    StaleRef,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct SemanticGateVerdict {
-    #[serde(rename = "scenarioId")]
-    pub scenario_id: String,
-    #[serde(rename = "modelId")]
-    pub model_id: String,
-    #[serde(rename = "invariantId")]
-    pub invariant_id: String,
-    #[serde(rename = "invariantType")]
-    pub invariant_type: Option<RuntimeInvariantType>,
-    pub state: SemanticGateState,
-    pub reason: String,
-    #[serde(rename = "modelRef")]
-    pub model_ref: String,
-    #[serde(rename = "worldStateRef")]
-    pub world_state_ref: Option<String>,
-    #[serde(rename = "targetPath")]
-    pub target_path: Option<String>,
-    #[serde(rename = "evidenceRefs")]
-    pub evidence_refs: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "kebab-case")]
-pub enum SemanticGateState {
-    Pass,
-    Fail,
-    Unsupported,
-    MissingTargetState,
-    MalformedInvariant,
-    UnsafeExpression,
-    StaleRef,
 }
 
 const SCENE3D_SCENARIO_EVIDENCE_FIELDS: &[&str] = &[
@@ -43556,6 +43133,11 @@ pub struct RunComparison {
     pub before: RunComparisonSnapshot,
     pub after: RunComparisonSnapshot,
     pub deltas: serde_json::Value,
+    #[serde(rename = "fourGate")]
+    pub four_gate: serde_json::Value,
+    #[serde(rename = "fourGateDeltas")]
+    pub four_gate_deltas: Vec<RunGateDelta>,
+    pub comparability: RunComparisonComparability,
     pub semantic: RunSemanticDiff,
     pub evidence_refs: Vec<String>,
     pub unsupported: Vec<String>,
@@ -43681,9 +43263,46 @@ pub struct RunComparisonSnapshot {
     pub mutation_proposals: usize,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunGateDelta {
+    pub gate: String,
+    pub transition: String,
+    #[serde(rename = "beforeStatus")]
+    pub before_status: String,
+    #[serde(rename = "afterStatus")]
+    pub after_status: String,
+    #[serde(rename = "beforeDeclared")]
+    pub before_declared: bool,
+    #[serde(rename = "afterDeclared")]
+    pub after_declared: bool,
+    #[serde(rename = "beforeEvidenceRefs")]
+    pub before_evidence_refs: Vec<String>,
+    #[serde(rename = "afterEvidenceRefs")]
+    pub after_evidence_refs: Vec<String>,
+    #[serde(rename = "comparabilityState")]
+    pub comparability_state: String,
+    #[serde(rename = "nonComparableReasons")]
+    pub non_comparable_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunComparisonComparability {
+    pub state: String,
+    pub reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RunGateObservation {
+    declared: bool,
+    status: String,
+    evidence_refs: Vec<String>,
+    non_comparable_reasons: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 struct RunComparisonDetails {
     snapshot: RunComparisonSnapshot,
+    gate_observations: BTreeMap<String, RunGateObservation>,
     scenario_statuses: BTreeMap<String, String>,
     world_state: BTreeMap<String, serde_json::Value>,
     events: BTreeSet<String>,
@@ -43707,6 +43326,9 @@ pub fn compare_runs(
     let after = after_details.snapshot.clone();
     let classification = classify_run_comparison(&before, &after).to_string();
     let semantic = build_run_semantic_diff(&before_details, &after_details, &classification);
+    let four_gate_deltas = build_four_gate_deltas(&before_details, &after_details);
+    let comparability = run_comparison_comparability(&four_gate_deltas);
+    let four_gate = run_four_gate_comparison_value(&four_gate_deltas);
     let evidence_refs = vec![
         before_run_dir.join("run.json").display().to_string(),
         before_run_dir.join("verdict.json").display().to_string(),
@@ -43734,6 +43356,9 @@ pub fn compare_runs(
             "input_replay_artifacts": after.input_replay_artifacts as i64 - before.input_replay_artifacts as i64,
             "mutation_proposals": after.mutation_proposals as i64 - before.mutation_proposals as i64
         }),
+        four_gate,
+        four_gate_deltas,
+        comparability,
         semantic,
         before,
         after,
@@ -43836,6 +43461,308 @@ pub fn write_run_comparison_artifact(
     ));
     write_json(&path, &json!(comparison))?;
     Ok(path)
+}
+
+fn build_four_gate_deltas(
+    before: &RunComparisonDetails,
+    after: &RunComparisonDetails,
+) -> Vec<RunGateDelta> {
+    ["mechanical", "runtime", "visual", "semantic"]
+        .into_iter()
+        .map(|gate| {
+            let before_gate = before
+                .gate_observations
+                .get(gate)
+                .cloned()
+                .unwrap_or_else(|| default_gate_observation(gate, &before.snapshot.verdict_status));
+            let after_gate = after
+                .gate_observations
+                .get(gate)
+                .cloned()
+                .unwrap_or_else(|| default_gate_observation(gate, &after.snapshot.verdict_status));
+            let mut reasons = Vec::new();
+            if before_gate.declared != after_gate.declared {
+                reasons.push(format!(
+                    "gate declaration mismatch for {gate}: before `{}` after `{}`",
+                    before_gate.declared, after_gate.declared
+                ));
+            }
+            reasons.extend(
+                before_gate
+                    .non_comparable_reasons
+                    .iter()
+                    .map(|reason| format!("before {reason}")),
+            );
+            reasons.extend(
+                after_gate
+                    .non_comparable_reasons
+                    .iter()
+                    .map(|reason| format!("after {reason}")),
+            );
+            reasons.sort();
+            reasons.dedup();
+            RunGateDelta {
+                gate: gate.to_string(),
+                transition: gate_transition(&before_gate.status, &after_gate.status),
+                before_status: before_gate.status,
+                after_status: after_gate.status,
+                before_declared: before_gate.declared,
+                after_declared: after_gate.declared,
+                before_evidence_refs: before_gate.evidence_refs,
+                after_evidence_refs: after_gate.evidence_refs,
+                comparability_state: if reasons.is_empty() {
+                    "comparable".to_string()
+                } else {
+                    "non_comparable".to_string()
+                },
+                non_comparable_reasons: reasons,
+            }
+        })
+        .collect()
+}
+
+fn run_comparison_comparability(deltas: &[RunGateDelta]) -> RunComparisonComparability {
+    let mut reasons = deltas
+        .iter()
+        .flat_map(|delta| {
+            delta
+                .non_comparable_reasons
+                .iter()
+                .map(move |reason| format!("{}: {reason}", delta.gate))
+        })
+        .collect::<Vec<_>>();
+    reasons.sort();
+    reasons.dedup();
+    RunComparisonComparability {
+        state: if reasons.is_empty() {
+            "comparable".to_string()
+        } else {
+            "non_comparable".to_string()
+        },
+        reasons,
+    }
+}
+
+fn run_four_gate_comparison_value(deltas: &[RunGateDelta]) -> serde_json::Value {
+    json!({
+        "schemaVersion": "run-four-gate-comparison-v1",
+        "gates": deltas
+            .iter()
+            .map(|delta| {
+                let mut evidence_refs = delta.before_evidence_refs.clone();
+                evidence_refs.extend(delta.after_evidence_refs.iter().cloned());
+                evidence_refs.sort();
+                evidence_refs.dedup();
+                json!({
+                    "gate": delta.gate,
+                    "before": delta.before_status,
+                    "after": delta.after_status,
+                    "transition": legacy_four_gate_transition_label(delta),
+                    "evidenceRefs": evidence_refs,
+                    "comparability": delta.comparability_state,
+                    "nonComparableReasons": delta.non_comparable_reasons,
+                })
+            })
+            .collect::<Vec<_>>(),
+        "nonComparable": deltas
+            .iter()
+            .filter(|delta| delta.comparability_state != "comparable")
+            .flat_map(|delta| {
+                delta
+                    .non_comparable_reasons
+                    .iter()
+                    .map(move |reason| format!("{}: {reason}", delta.gate))
+            })
+            .collect::<Vec<_>>(),
+        "boundary": "Rust/local read-only rerun comparison; reports bounded per-gate deltas and never auto-applies, auto-fixes, auto-merges, or claims production quality."
+    })
+}
+
+fn legacy_four_gate_transition_label(delta: &RunGateDelta) -> &'static str {
+    match delta.transition.as_str() {
+        "fail_to_pass" => "improved",
+        "pass_to_fail" => "regressed",
+        "unchanged_pass" | "unchanged_fail" => "unchanged",
+        _ => "changed",
+    }
+}
+
+fn gate_transition(before: &str, after: &str) -> String {
+    let before_pass = before == "pass" || before == "passed";
+    let after_pass = after == "pass" || after == "passed";
+    match (before_pass, after_pass, before == after) {
+        (false, true, _) => "fail_to_pass".to_string(),
+        (true, false, _) => "pass_to_fail".to_string(),
+        (true, true, true) => "unchanged_pass".to_string(),
+        (false, false, true) => "unchanged_fail".to_string(),
+        _ => "changed".to_string(),
+    }
+}
+
+fn default_gate_observation(gate: &str, verdict_status: &str) -> RunGateObservation {
+    let status = if gate == "mechanical" && verdict_status == "passed" {
+        "pass"
+    } else if gate == "mechanical" && verdict_status == "failed" {
+        "fail"
+    } else {
+        "unknown"
+    };
+    RunGateObservation {
+        declared: false,
+        status: status.to_string(),
+        evidence_refs: Vec::new(),
+        non_comparable_reasons: Vec::new(),
+    }
+}
+
+fn collect_run_gate_observations(
+    verdict: &serde_json::Value,
+    evidence: &EvidenceIndex,
+    run_id: &str,
+    warnings: &[String],
+) -> BTreeMap<String, RunGateObservation> {
+    let mut observations = BTreeMap::new();
+    for gate in ["mechanical", "runtime", "visual", "semantic"] {
+        let category = verdict
+            .get("gateCategories")
+            .and_then(|value| value.get(gate));
+        let declared = category
+            .and_then(|value| value.get("declared"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let status = category
+            .and_then(|value| value.get("status"))
+            .and_then(|value| value.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                default_gate_observation(gate, verdict["status"].as_str().unwrap_or("unknown"))
+                    .status
+            });
+        let mut refs = Vec::new();
+        if let Some(category) = category {
+            collect_gate_json_evidence_refs(category, &mut refs);
+        }
+        if gate == "mechanical" {
+            collect_top_level_verdict_evidence_refs(verdict, &mut refs);
+        }
+        collect_gate_refs_from_verdict_arrays(verdict, gate, &mut refs);
+        collect_gate_refs_from_failures(verdict, gate, &mut refs);
+        refs.sort();
+        refs.dedup();
+        let mut reasons = Vec::new();
+        if (declared || status != "pass") && refs.is_empty() {
+            reasons.push(format!("{gate} gate has no before/after evidence refs"));
+        }
+        for reference in &refs {
+            match evidence
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.path == *reference || artifact.id == *reference)
+            {
+                Some(artifact) => {
+                    if evidence_artifact_is_stale_for_run(artifact, run_id) {
+                        reasons.push(format!(
+                            "stale evidence ref `{reference}` for run `{run_id}`"
+                        ));
+                    }
+                }
+                None => reasons.push(format!("missing evidence ref `{reference}`")),
+            }
+        }
+        reasons.extend(warnings.iter().cloned());
+        reasons.sort();
+        reasons.dedup();
+        observations.insert(
+            gate.to_string(),
+            RunGateObservation {
+                declared,
+                status,
+                evidence_refs: refs,
+                non_comparable_reasons: reasons,
+            },
+        );
+    }
+    observations
+}
+
+fn collect_top_level_verdict_evidence_refs(verdict: &serde_json::Value, refs: &mut Vec<String>) {
+    if let Some(paths) = verdict
+        .get("evidence_refs")
+        .and_then(|value| value.as_array())
+    {
+        for path in paths.iter().filter_map(|value| value.as_str()) {
+            if path.contains("scenario-result") || path.contains("scenario_result") {
+                push_unique_ref(refs, path);
+            }
+        }
+    }
+}
+
+fn collect_gate_refs_from_verdict_arrays(
+    verdict: &serde_json::Value,
+    gate: &str,
+    refs: &mut Vec<String>,
+) {
+    if let Some(items) = verdict.get(gate).and_then(|value| value.as_array()) {
+        for item in items {
+            collect_gate_json_evidence_refs(item, refs);
+        }
+    }
+}
+
+fn collect_gate_refs_from_failures(
+    verdict: &serde_json::Value,
+    gate: &str,
+    refs: &mut Vec<String>,
+) {
+    if let Some(failures) = verdict.get("failures").and_then(|value| value.as_array()) {
+        for failure in failures {
+            let haystack = failure.to_string().to_ascii_lowercase();
+            let explicit_gate = failure
+                .get("gate")
+                .or_else(|| failure.get("gate_category"))
+                .and_then(|value| value.as_str())
+                .map(|value| value == gate)
+                .unwrap_or(false);
+            if explicit_gate || haystack.contains(gate) {
+                collect_gate_json_evidence_refs(failure, refs);
+            }
+        }
+    }
+}
+
+fn collect_gate_json_evidence_refs(value: &serde_json::Value, refs: &mut Vec<String>) {
+    for key in [
+        "path",
+        "evidence_path",
+        "evidence_ref",
+        "model_ref",
+        "world_state_ref",
+        "comparison_ref",
+        "comparisonRef",
+        "modelRef",
+        "worldStateRef",
+    ] {
+        if let Some(path) = value.get(key).and_then(|value| value.as_str()) {
+            push_unique_ref(refs, path);
+        }
+    }
+    for key in ["evidence_refs", "evidenceRefs"] {
+        if let Some(paths) = value.get(key).and_then(|value| value.as_array()) {
+            for path in paths.iter().filter_map(|value| value.as_str()) {
+                push_unique_ref(refs, path);
+            }
+        }
+    }
+}
+
+fn evidence_artifact_is_stale_for_run(artifact: &EvidenceArtifact, run_id: &str) -> bool {
+    for key in ["run_id", "runId"] {
+        if let Some(value) = artifact.metadata.get(key).and_then(|value| value.as_str()) {
+            return value != run_id;
+        }
+    }
+    false
 }
 
 fn load_run_comparison_details(run_dir: &Path, label: &str) -> Result<RunComparisonDetails> {
@@ -44054,8 +43981,11 @@ fn load_run_comparison_details_without_project(
         input_replay_artifacts,
         mutation_proposals,
     };
+    let gate_observations =
+        collect_run_gate_observations(&verdict, &evidence, &snapshot.run_id, &warnings);
     Ok(RunComparisonDetails {
         snapshot,
+        gate_observations,
         scenario_statuses,
         world_state,
         events,
@@ -60544,17 +60474,6 @@ fn write_json_atomic(path: &Path, value: &serde_json::Value) -> Result<()> {
             temp_path.display()
         )
     })
-}
-
-fn write_ledger_created(path: &Path, created_at_unix_ms: u128) -> Result<()> {
-    let mut file =
-        File::create(path).with_context(|| format!("failed to write {}", path.display()))?;
-    let line = serde_json::to_string(&json!({
-        "event": "run.created",
-        "created_at_unix_ms": created_at_unix_ms,
-    }))
-    .context("failed to serialize ledger event")?;
-    writeln!(file, "{line}").context("failed to write ledger event")
 }
 
 fn initial_journal() -> &'static str {
@@ -79023,6 +78942,10 @@ scenarios:
                 evidence_state: Some(MutationProposalEvidenceState::Linked),
                 confidence_basis: Some("bounded linked evidence signal".to_string()),
                 bounded_mutation_type: Some(MutationProposalBoundedMutationType::Scene),
+                selection_backlog_item_id: None,
+                selection_source: None,
+                selection_reason: None,
+                backlog_read_only: None,
             }),
         };
         let decision = MutationReviewDecision {

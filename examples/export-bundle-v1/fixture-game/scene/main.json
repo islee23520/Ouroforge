@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "export-fixture-scene-v1",
+  "sceneId": "main",
+  "title": "Collect and Exit (Export Fixture)",
+  "bounds": { "width": 320, "height": 180 },
+  "entities": [
+    { "id": "player", "kind": "player", "x": 16, "y": 96, "sprite": "assets/sprites/hero.json" },
+    { "id": "coin_1", "kind": "coin", "x": 160, "y": 96 },
+    { "id": "exit", "kind": "exit", "x": 296, "y": 96 }
+  ],
+  "spawn": { "x": 16, "y": 96 }
+}

@@ -1,5 +1,8 @@
 [workspace]
 members = [
+  "crates/ouroforge-ledger",
+  "crates/ouroforge-evidence",
+  "crates/ouroforge-evaluator",
   "crates/ouroforge-core",
   "crates/ouroforge-cli",
 ]

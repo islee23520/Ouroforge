@@ -289,10 +289,40 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "ouroforge-evaluator",
+ "ouroforge-evidence",
+ "ouroforge-ledger",
  "serde",
  "serde_json",
  "serde_yaml",
  "tungstenite",
+]
+
+[[package]]
+name = "ouroforge-evaluator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ouroforge-evidence",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ouroforge-evidence"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ouroforge-ledger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
 ]
 
 [[package]]

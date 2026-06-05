@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "export-profile-v1",
+  "profileId": "profile_colliding_segment",
+  "projectId": "proj_collect_and_exit",
+  "title": "Collect and Exit (Colliding Asset Segment)",
+  "version": "0.1.0",
+  "exportTarget": "web-local",
+  "entryScene": "examples/game-runtime/scenes/intro.json",
+  "assetRoots": [
+    "examples/level-a/assets",
+    "examples/level-b/assets"
+  ],
+  "outputDir": "dist/export/collect-and-exit",
+  "runtimeProbeMode": "preserve",
+  "verificationScenarioIds": ["scenario_reach_exit"],
+  "packageMetadataRef": "examples/export-profile-v1/package-metadata.fixture.json",
+  "boundary": "Local, evidence-backed export profile only; no publish, deploy, sign, or upload. Validation is fail closed against the export target matrix."
+}
