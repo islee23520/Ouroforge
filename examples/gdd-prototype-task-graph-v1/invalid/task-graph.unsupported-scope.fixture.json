@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "gdd-prototype-task-graph-v1",
+  "graphId": "task-graph-collect-exit",
+  "status": "ready",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "requirementExtractionRef": "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.valid.fixture.json",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "planRefs": [
+    "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+    "examples/gdd-asset-placeholder-plan-v1/asset-plan.valid.fixture.json",
+    "examples/gdd-scenario-acceptance-plan-v1/scenario-plan.valid.fixture.json"
+  ],
+  "tasks": [
+    {
+      "taskId": "task-scaffold",
+      "kind": "scaffold",
+      "status": "ready",
+      "dependsOn": [],
+      "producerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scaffold-plan.json"
+      ],
+      "consumerArtifacts": [],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/preview/project-manifest.json"
+      ],
+      "expectedVerification": [
+        "run arbitrary script execution"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-assets",
+      "kind": "assets",
+      "status": "ready",
+      "dependsOn": [
+        "task-scaffold"
+      ],
+      "producerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/asset-placeholders.json"
+      ],
+      "consumerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scaffold-plan.json"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/preview/assets/placeholder-index.json"
+      ],
+      "expectedVerification": [
+        "verify placeholder asset source notes and no asset generation"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-scenes",
+      "kind": "scene-level",
+      "status": "ready",
+      "dependsOn": [
+        "task-scaffold",
+        "task-assets"
+      ],
+      "producerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scene-level-drafts.json"
+      ],
+      "consumerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scaffold-plan.json",
+        "examples/gdd-prototype-task-graph-v1/out/asset-placeholders.json"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/preview/scenes/collect-exit.json"
+      ],
+      "expectedVerification": [
+        "validate scene and level draft refs"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-behavior",
+      "kind": "behavior",
+      "status": "ready",
+      "dependsOn": [
+        "task-scenes"
+      ],
+      "producerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/behavior-drafts.json"
+      ],
+      "consumerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scene-level-drafts.json"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/preview/behavior/collect-exit.json"
+      ],
+      "expectedVerification": [
+        "validate behavior draft refs and unsupported behavior blockers"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-scenarios",
+      "kind": "scenarios",
+      "status": "ready",
+      "dependsOn": [
+        "task-behavior"
+      ],
+      "producerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scenario-acceptance-drafts.json"
+      ],
+      "consumerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/behavior-drafts.json"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/preview/scenarios/collect-exit.json"
+      ],
+      "expectedVerification": [
+        "validate scenario draft refs and evidence expectations"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-run-evidence",
+      "kind": "run-evidence",
+      "status": "ready",
+      "dependsOn": [
+        "task-scenarios"
+      ],
+      "producerArtifacts": [
+        "runs/gdd-prototype-task-graph-v1/evidence/run-preview.json"
+      ],
+      "consumerArtifacts": [
+        "examples/gdd-prototype-task-graph-v1/out/scenario-acceptance-drafts.json"
+      ],
+      "fileOwnership": [
+        "runs/gdd-prototype-task-graph-v1/evidence/run-preview.json"
+      ],
+      "expectedVerification": [
+        "collect local preview evidence refs without hidden commands"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-review",
+      "kind": "review-gate",
+      "status": "ready",
+      "dependsOn": [
+        "task-run-evidence"
+      ],
+      "producerArtifacts": [
+        "runs/gdd-prototype-task-graph-v1/review/review-gate.json"
+      ],
+      "consumerArtifacts": [
+        "runs/gdd-prototype-task-graph-v1/evidence/run-preview.json"
+      ],
+      "fileOwnership": [
+        "runs/gdd-prototype-task-graph-v1/review/review-gate.json"
+      ],
+      "expectedVerification": [
+        "record accepted review gate evidence before apply"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-apply",
+      "kind": "apply-step",
+      "status": "ready",
+      "dependsOn": [
+        "task-review"
+      ],
+      "producerArtifacts": [
+        "runs/gdd-prototype-task-graph-v1/apply/apply-plan.json"
+      ],
+      "consumerArtifacts": [
+        "runs/gdd-prototype-task-graph-v1/review/review-gate.json"
+      ],
+      "fileOwnership": [
+        "runs/gdd-prototype-task-graph-v1/apply/apply-plan.json"
+      ],
+      "expectedVerification": [
+        "review evidence must be accepted before any apply step"
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "ordered dependency-checked task graph before apply; untrusted until Rust/local validation; review-gated apply; does not execute hidden commands; no autonomous unrestricted game creation; browser read-only or draft-only; no direct trusted writes; no asset generation"
+}

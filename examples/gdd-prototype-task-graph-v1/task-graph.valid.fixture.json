@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "gdd-prototype-task-graph-v1",
+  "graphId": "demo-gdd-task-graph",
+  "status": "ready",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "requirementExtractionRef": "docs/gdd-requirement-extraction-v1.md",
+  "mechanicsMappingRef": "docs/gdd-mechanics-mapping-v1.md",
+  "feasibilityGateRef": "docs/gdd-feasibility-gate-v1.md",
+  "planRefs": [
+    "docs/gdd-project-scaffold-plan-v1.md",
+    "docs/gdd-asset-placeholder-plan-v1.md",
+    "docs/gdd-scene-level-plan-v1.md",
+    "docs/gdd-gameplay-behavior-plan-v1.md",
+    "docs/gdd-scenario-acceptance-plan-v1.md"
+  ],
+  "tasks": [
+    {
+      "taskId": "task-scaffold",
+      "kind": "scaffold",
+      "status": "ready",
+      "dependsOn": [],
+      "producerArtifacts": [
+        "docs/gdd-project-scaffold-plan-v1.md"
+      ],
+      "consumerArtifacts": [],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-scaffold.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-assets",
+      "kind": "assets",
+      "status": "ready",
+      "dependsOn": [
+        "task-scaffold"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-project-scaffold-plan-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-assets.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-scene",
+      "kind": "scene-level",
+      "status": "ready",
+      "dependsOn": [
+        "task-assets"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-scene-level-plan-v1.md"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-scene.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-behavior",
+      "kind": "behavior",
+      "status": "ready",
+      "dependsOn": [
+        "task-scene"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-gameplay-behavior-plan-v1.md"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-scene-level-plan-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-behavior.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-scenarios",
+      "kind": "scenarios",
+      "status": "ready",
+      "dependsOn": [
+        "task-behavior"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-scenario-acceptance-plan-v1.md"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-gameplay-behavior-plan-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-scenarios.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-run-evidence",
+      "kind": "run-evidence",
+      "status": "ready",
+      "dependsOn": [
+        "task-scenarios"
+      ],
+      "producerArtifacts": [
+        "runs/gdd-prototype/evidence.json"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-scenario-acceptance-plan-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-run-evidence.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-review",
+      "kind": "review-gate",
+      "status": "ready",
+      "dependsOn": [
+        "task-run-evidence"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-prototype-review-v1.md"
+      ],
+      "consumerArtifacts": [
+        "runs/gdd-prototype/evidence.json"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/task-review.json"
+      ],
+      "expectedVerification": [
+        "cargo test -p ouroforge-core --test gdd_prototype_task_graph_contract -- --nocapture"
+      ],
+      "blockedReasons": []
+    },
+    {
+      "taskId": "task-apply",
+      "kind": "apply-step",
+      "status": "ready",
+      "dependsOn": [
+        "task-review"
+      ],
+      "producerArtifacts": [
+        "docs/gdd-prototype-apply-v1.md"
+      ],
+      "consumerArtifacts": [
+        "docs/gdd-prototype-review-v1.md"
+      ],
+      "fileOwnership": [
+        "examples/gdd-prototype-task-graph-v1/owned/apply-preview.json"
+      ],
+      "expectedVerification": [
+        "review evidence accepted before apply preview"
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Ordered dependency-checked task graph before apply; untrusted until Rust/local validation; review-gated apply only; does not execute hidden commands; no autonomous unrestricted game creation; browser read-only or draft-only; no direct trusted writes; no asset generation."
+}
