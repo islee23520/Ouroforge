@@ -1489,6 +1489,20 @@ assert.ok(!xssAssetInspectorMarkup.includes('<script>frame</script>'), 'asset in
 assert.ok(!xssAssetInspectorMarkup.includes('<script>tileset</script>'), 'asset inspector tilemaps must be escaped');
 assert.match(xssAssetInspectorMarkup, /&lt;script&gt;status&lt;\/script&gt;/);
 
+const pluginExtensionCoverageMatrix = fs.readFileSync(require.resolve('../../docs/scenario-coverage-v16-plugin-extension.md'), 'utf8');
+assert.match(pluginExtensionCoverageMatrix, /Scenario Coverage v16: Plugin Extension Regression Suite/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.3 integrates the Scenario Coverage v16 matrix with local verification/);
+assert.match(pluginExtensionCoverageMatrix, /browser-facing verification fails if the Scenario\s+Coverage v16 local-gate wording/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.studio-display/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.scenario-template/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-native-extension/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-ci-mutation/);
+assert.match(pluginExtensionCoverageMatrix, /No arbitrary JavaScript or runtime plugin execution/);
+assert.match(pluginExtensionCoverageMatrix, /No shell command execution, browser command bridge, or local server command bridge/);
+assert.match(pluginExtensionCoverageMatrix, /No native export, publish\/deploy mutation, signing, upload, or release automation/);
+assert.match(pluginExtensionCoverageMatrix, /local cargo\/node integration/);
+assert.match(pluginExtensionCoverageMatrix, /#1 remains the broad roadmap\/governance anchor and #23 remains the protected/);
+
 const sourcePatchCoverageMatrix = fs.readFileSync(require.resolve('../../docs/source-patch-preview-coverage-matrix-v1.md'), 'utf8');
 assert.match(sourcePatchCoverageMatrix, /Scenario Coverage v6 \/ SMP1\.11\.3 coverage matrix/);
 assert.match(sourcePatchCoverageMatrix, /Forbidden file classes/);

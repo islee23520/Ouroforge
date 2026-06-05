@@ -1,7 +1,7 @@
 # Scenario Coverage v16: Plugin Extension Regression Suite
 
 Issue: #753 — Scenario Coverage v16: Plugin Extension Regression Suite.  
-Status: PES10.16.1 scenario definitions.
+Status: PES10.16.3 verification integration.
 
 Scenario Coverage v16 locks Plugin / Extension System v1 as a declarative,
 allowlisted, evidence-backed plugin descriptor surface. It is a regression suite,
@@ -53,11 +53,18 @@ fixtures.
 | PES10.16.block-native-extension | Descriptor requests native dynamic library loading, binary plugin, editor script, or runtime extension code. | Block with native extension/executable plugin diagnostic. | No native extension or dynamic library loading. |
 | PES10.16.block-ci-mutation | Descriptor requests workflow, CI, dependency graph, or release configuration mutation. | Block with CI/workflow mutation diagnostic. | No CI/workflow mutation or reviewer bypass. |
 
-## Verification integration plan
+## Verification integration
 
-PES10.16.1 defines the scenario matrix and doc-audit coverage. Later slices may
-add fixture manifests/descriptors and wire scenario checks into cargo/node smoke
-commands. Required local verification for each slice remains:
+PES10.16.3 integrates the Scenario Coverage v16 matrix with local verification
+without adding plugin runtime scope. The existing `cargo test` gate runs the
+focused Rust plugin evidence contract tests that audit this document, validate
+the success and blocked fixture matrices, and reject unsafe fixture drift. The
+existing dashboard and cockpit Node smoke tests now read this document as an
+integration sentinel so browser-facing verification fails if the Scenario
+Coverage v16 local-gate wording, read-only display boundary, or no-executable /
+no-network / no-command / no-publish guardrails are removed.
+
+Required local verification for each slice remains:
 
 ```bash
 gh issue view 753 --repo shaun0927/Ouroforge
@@ -76,7 +83,7 @@ git status --short --ignored
 
 Issue-specific evidence must include generated-state, no-executable-plugin,
 no-network-install, no-command-execution, no-publish/deploy, wording,
-fixture-scope, and #1/#23 governance audits.
+fixture-scope, local cargo/node integration, and #1/#23 governance audits.
 
 ## Explicit non-goals
 
