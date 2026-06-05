@@ -1341,7 +1341,22 @@ const OuroforgeCockpit = (() => {
         const panelBoundaries = panels.length
           ? `<small>${escapeText(panels.map((panel) => panel.boundary || 'Declarative allowlisted read-only dashboard panel descriptor; no JavaScript, no commands, no trusted writes.').join(' · '))}</small>`
           : '';
-        return `<div class="surface-row"><strong>${escapeText(plugin.plugin_id || plugin.pluginId || 'unknown plugin')}</strong> ${surfaceState(true, plugin.validation_status || plugin.validationStatus || 'unknown')} ${surfaceState(true, plugin.compatibility_status || plugin.compatibilityStatus || 'unknown')}<br><small>registry ${escapeText(item.registry_id || item.registryId || 'unknown')} · version ${escapeText(plugin.manifest_version || plugin.manifestVersion || 'unknown')} · hash ${escapeText(plugin.manifest_hash || plugin.manifestHash || 'missing')} · capabilities ${escapeText(caps)} · extension points ${escapeText(points)} · manifest ${escapeText(plugin.manifest_path || plugin.manifestPath || 'missing')}</small>${panelRows}${panelBoundaries}${reasons ? `<div class="hint">Blocked: ${escapeText(reasons)}</div>` : ''}</div>`;
+        const templates = Array.isArray(plugin.scenario_templates || plugin.scenarioTemplates) ? (plugin.scenario_templates || plugin.scenarioTemplates) : [];
+        const templateRows = templates.length
+          ? `<div class="hint">Scenario templates: ${escapeText(templates.slice(0, 6).map((template) => {
+              const params = Array.isArray(template.parameters) ? template.parameters : [];
+              const paramSummary = params.slice(0, 8).map((parameter) => `${parameter.name || 'parameter'}:${parameter.parameter_type || parameter.parameterType || parameter.type || 'unknown'}${parameter.required ? ':required' : ''}`).join(',');
+              const games = Array.isArray(template.supported_game_types || template.supportedGameTypes) ? (template.supported_game_types || template.supportedGameTypes).join(',') : 'none';
+              return `${template.template_id || template.templateId || 'scenario-template'}:${template.expected_evidence_type || template.expectedEvidenceType || 'unknown'}:${games}:${paramSummary || 'no-parameters'}`;
+            }).join(' · '))}</div>`
+          : '';
+        const templateBoundaries = templates.length
+          ? `<small>${escapeText(templates.map((template) => {
+              const hints = Array.isArray(template.validation_hints || template.validationHints) ? (template.validation_hints || template.validationHints).join(' · ') : 'no validation hints';
+              return `${hints} · ${template.boundary || 'Declarative read-only scenario template metadata only; no executable scripts, no commands, no network, no source mutation, no trusted writes.'}`;
+            }).join(' · '))}</small>`
+          : '';
+        return `<div class="surface-row"><strong>${escapeText(plugin.plugin_id || plugin.pluginId || 'unknown plugin')}</strong> ${surfaceState(true, plugin.validation_status || plugin.validationStatus || 'unknown')} ${surfaceState(true, plugin.compatibility_status || plugin.compatibilityStatus || 'unknown')}<br><small>registry ${escapeText(item.registry_id || item.registryId || 'unknown')} · version ${escapeText(plugin.manifest_version || plugin.manifestVersion || 'unknown')} · hash ${escapeText(plugin.manifest_hash || plugin.manifestHash || 'missing')} · capabilities ${escapeText(caps)} · extension points ${escapeText(points)} · manifest ${escapeText(plugin.manifest_path || plugin.manifestPath || 'missing')}</small>${panelRows}${panelBoundaries}${templateRows}${templateBoundaries}${reasons ? `<div class="hint">Blocked: ${escapeText(reasons)}</div>` : ''}</div>`;
       });
     }).slice(0, 24).join('') || '<div class="surface-row">No plugin descriptor rows exported.</div>';
     return `<section id="plugin-registry-browser" class="panel"><h2>Plugin registry browser</h2>

@@ -52493,6 +52493,7 @@ pub struct RunDashboardPluginDescriptorRow {
     pub extension_points: Vec<String>,
     pub evidence_refs: Vec<String>,
     pub dashboard_panels: Vec<RunDashboardPluginPanelDescriptorRow>,
+    pub scenario_templates: Vec<RunDashboardPluginScenarioTemplateDescriptorRow>,
     pub blocked_reasons: Vec<String>,
 }
 
@@ -52505,6 +52506,27 @@ pub struct RunDashboardPluginPanelDescriptorRow {
     pub layout_hint: String,
     pub display_hints: Vec<String>,
     pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginScenarioTemplateDescriptorRow {
+    pub template_id: String,
+    pub description: String,
+    pub parameters: Vec<RunDashboardPluginScenarioTemplateParameterRow>,
+    pub supported_game_types: Vec<String>,
+    pub tags: Vec<String>,
+    pub expected_evidence_type: String,
+    pub validation_hints: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginScenarioTemplateParameterRow {
+    pub name: String,
+    pub parameter_type: String,
+    pub description: String,
+    pub required: bool,
+    pub allowed_values: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -54075,6 +54097,30 @@ fn read_dashboard_plugin_registry(
                             layout_hint: panel.layout_hint.clone(),
                             display_hints: panel.display_hints.clone(),
                             boundary: panel.boundary.clone(),
+                        })
+                        .collect(),
+                    scenario_templates: plugin
+                        .scenario_templates
+                        .iter()
+                        .map(|template| RunDashboardPluginScenarioTemplateDescriptorRow {
+                            template_id: template.template_id.clone(),
+                            description: template.description.clone(),
+                            parameters: template
+                                .parameters
+                                .iter()
+                                .map(|parameter| RunDashboardPluginScenarioTemplateParameterRow {
+                                    name: parameter.name.clone(),
+                                    parameter_type: parameter.parameter_type.clone(),
+                                    description: parameter.description.clone(),
+                                    required: parameter.required,
+                                    allowed_values: parameter.allowed_values.clone(),
+                                })
+                                .collect(),
+                            supported_game_types: template.supported_game_types.clone(),
+                            tags: template.tags.clone(),
+                            expected_evidence_type: template.expected_evidence_type.clone(),
+                            validation_hints: template.validation_hints.clone(),
+                            boundary: template.boundary.clone(),
                         })
                         .collect(),
                     blocked_reasons: plugin.blocked_reasons.clone(),
@@ -85970,6 +86016,63 @@ scenarios:
             .blocked_reasons
             .iter()
             .any(|reason| reason.contains("executable command authority")));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_plugin_registry_read_model_exposes_scenario_templates() {
+        let (root, artifacts) = create_test_run("dashboard-scenario-template-registry");
+        let plugin_fixture = read_json_fixture(
+            "examples/plugin-registry-evidence-v1/valid/scenario-template-plugin.sample.json",
+        );
+        let plugin_artifact =
+            plugin_evidence::PluginRegistryEvidenceArtifact::from_json_str(&plugin_fixture)
+                .expect("scenario template plugin registry fixture validates");
+        plugin_evidence::write_plugin_registry_evidence(&artifacts.run_dir, &plugin_artifact)
+            .expect("plugin evidence writes and indexes");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.plugin_registry.present);
+        assert_eq!(model.plugin_registry.status, "ready");
+        assert_eq!(model.plugin_registry.registry_count, 1);
+        assert_eq!(model.plugin_registry.plugin_count, 1);
+        assert_eq!(model.plugin_registry.blocked_count, 0);
+
+        let registry = model
+            .plugin_registry
+            .registries
+            .first()
+            .expect("registry row exists");
+        let plugin = registry
+            .plugins
+            .iter()
+            .find(|plugin| plugin.plugin_id == "read-only-scenario-template")
+            .expect("scenario template plugin row exists");
+        assert_eq!(plugin.declared_capabilities, ["scenarioTemplate"]);
+        assert_eq!(plugin.extension_points, ["scenario.templates.readOnly"]);
+        assert_eq!(plugin.scenario_templates.len(), 1);
+
+        let template = &plugin.scenario_templates[0];
+        assert_eq!(template.template_id, "collect-goal-smoke");
+        assert_eq!(template.expected_evidence_type, "scenarioPack");
+        assert_eq!(template.supported_game_types, ["platformer", "prototype"]);
+        assert_eq!(template.tags, ["qa-smoke", "gdd-prototype"]);
+        assert!(template
+            .validation_hints
+            .iter()
+            .any(|hint| hint.contains("trusted scenario runner")));
+        assert!(template.boundary.contains("no executable scripts"));
+        assert!(template.boundary.contains("no trusted writes"));
+        assert_eq!(template.parameters.len(), 2);
+        assert_eq!(template.parameters[0].name, "goalId");
+        assert_eq!(template.parameters[0].parameter_type, "string");
+        assert!(template.parameters[0].required);
+        assert_eq!(template.parameters[1].parameter_type, "enum");
+        assert_eq!(
+            template.parameters[1].allowed_values,
+            ["easy", "normal", "hard"]
+        );
 
         fs::remove_dir_all(root).expect("fixture removed");
     }

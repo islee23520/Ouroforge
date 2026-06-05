@@ -87,7 +87,7 @@ const run = {
     present: true,
     status: 'blocked',
     registry_count: 1,
-    plugin_count: 2,
+    plugin_count: 3,
     blocked_count: 1,
     malformed_count: 0,
     evidence_refs: ['evidence/plugins/plugin-registry-fixture.json'],
@@ -98,11 +98,12 @@ const run = {
       runId: 'run-plugin-registry-fixture',
       ledgerRef: 'runs/plugin-registry-fixture/ledger.jsonl',
       status: 'blocked',
-      pluginCount: 2,
+      pluginCount: 3,
       blockedCount: 1,
       blockedReasons: ['blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog'],
       plugins: [
         { pluginId: 'read-only-dashboard-panel', manifestPath: 'plugins/read-only-dashboard-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:1111222233334444', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json'], dashboardPanels: [{ panelId: 'plugin-registry-summary', title: 'Plugin registry summary', dataSourceKey: 'pluginRegistry.summary', templateRef: 'pluginRegistrySummaryCard', layoutHint: 'summary', displayHints: ['compact', 'blocked-count'], boundary: 'Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes.' }], blockedReasons: [] },
+        { pluginId: 'read-only-scenario-template', manifestPath: 'plugins/read-only-scenario-template/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:2222333344445555', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['scenarioTemplate'], extensionPoints: ['scenario.templates.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-scenario-template.validation.json'], scenarioTemplates: [{ templateId: 'collect-goal-smoke', description: 'Declarative QA smoke template for collecting a goal and exiting without plugin-owned execution.', parameters: [{ name: 'goalId', parameterType: 'string', description: 'Local scenario goal identifier to collect.', required: true }, { name: 'difficulty', parameterType: 'enum', description: 'Fixture difficulty label for expected pacing.', required: false, allowedValues: ['easy', 'normal', 'hard'] }], supportedGameTypes: ['platformer', 'prototype'], tags: ['qa-smoke', 'gdd-prototype'], expectedEvidenceType: 'scenarioPack', validationHints: ['Require existing trusted scenario runner to own execution.', 'Record input replay and runtime probe evidence refs after trusted QA execution.'], boundary: 'Declarative read-only scenario template metadata only; no executable scripts, no command hooks, no network references, no source mutation hooks, no trusted writes.' }], blockedReasons: [] },
         { pluginId: 'blocked-command-panel', manifestPath: 'plugins/blocked-command-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:aaaabbbbccccdddd', manifestVersion: '0.1.0', validationStatus: 'blocked', compatibilityStatus: 'incompatible', declaredCapabilities: ['studioInspectorPanel'], extensionPoints: ['studio.inspector.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json'], blockedReasons: ['manifest requested executable command authority outside the v1 declarative catalog'] },
       ],
     }],
@@ -1825,11 +1826,23 @@ assert.doesNotMatch(pluginDashboardPanelXss, /href="javascript:/i);
 assert.match(pluginDashboardPanelXss, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 assert.match(pluginDashboardPanelXss, /javascript:alert\(1\)/);
 
+const pluginScenarioTemplateXss = dashboard.renderPluginRegistry({ plugin_registry: { present: true, status: 'ready', registries: [{ registryId: 'xss-registry', plugins: [{ pluginId: 'xss-scenario-template', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['scenarioTemplate'], extensionPoints: ['scenario.templates.readOnly'], scenarioTemplates: [{ templateId: '<img src=x onerror=alert(1)>', description: '<script>alert(1)</script>', parameters: [{ name: '<script>name</script>', parameterType: 'enum', required: true, allowedValues: ['<script>easy</script>'] }], supportedGameTypes: ['<script>platformer</script>'], tags: ['<script>tag</script>'], expectedEvidenceType: '<script>scenarioPack</script>', validationHints: ['<script>hint</script>'], boundary: '<script>boundary</script>' }] }] }] } });
+assert.doesNotMatch(pluginScenarioTemplateXss, /<script>alert\(1\)<\/script>/);
+assert.doesNotMatch(pluginScenarioTemplateXss, /<img src=x onerror=alert\(1\)>/);
+assert.doesNotMatch(pluginScenarioTemplateXss, /<button/i);
+assert.doesNotMatch(pluginScenarioTemplateXss, /data-action=/i);
+assert.match(pluginScenarioTemplateXss, /&lt;script&gt;scenarioPack&lt;\/script&gt;/);
+assert.match(pluginScenarioTemplateXss, /&lt;script&gt;boundary&lt;\/script&gt;/);
+
 const pluginRegistrySmokeMarkup = dashboard.renderPluginRegistry(run);
 assert.match(pluginRegistrySmokeMarkup, /Plugin registry evidence refs/);
 assert.match(pluginRegistrySmokeMarkup, /plugin-registry-summary/);
 assert.match(pluginRegistrySmokeMarkup, /pluginRegistrySummaryCard/);
 assert.match(pluginRegistrySmokeMarkup, /read-only-dashboard-panel/);
+assert.match(pluginRegistrySmokeMarkup, /read-only-scenario-template/);
+assert.match(pluginRegistrySmokeMarkup, /collect-goal-smoke/);
+assert.match(pluginRegistrySmokeMarkup, /scenarioPack/);
+assert.match(pluginRegistrySmokeMarkup, /no executable scripts/);
 assert.match(pluginRegistrySmokeMarkup, /blocked-command-panel/);
 assert.match(pluginRegistrySmokeMarkup, /manifest requested executable command authority/);
 assert.ok(!/<button/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render action buttons');
