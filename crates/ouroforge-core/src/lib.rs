@@ -52572,6 +52572,7 @@ pub struct RunDashboardReadModel {
     pub qa_scenario_candidates: RunDashboardQaScenarioCandidates,
     pub route_attempts: RunDashboardRouteAttempts,
     pub visual_comparisons: RunDashboardVisualComparisons,
+    pub qa_swarm_inspection: RunDashboardQaSwarmInspection,
     pub evidence_categories: Vec<RunDashboardCategorySummary>,
     pub probe_contract_status: RunDashboardProbeContractStatus,
     pub evidence_fidelity: RunDashboardEvidenceFidelity,
@@ -53029,6 +53030,31 @@ pub struct RunDashboardVisualComparisons {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardQaSwarmInspection {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub panel_count: usize,
+    pub missing_panel_count: usize,
+    pub malformed_panel_count: usize,
+    pub item_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub panels: Vec<RunDashboardQaSwarmPanelSummary>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardQaSwarmPanelSummary {
+    pub panel_id: String,
+    pub title: String,
+    pub status: String,
+    pub item_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunDashboardVisualComparisonSummary {
     pub comparison_id: String,
     pub run_id: String,
@@ -53416,13 +53442,6 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let fuzzing_plans = read_dashboard_fuzzing_plans(run_dir, &evidence)?;
     let qa_scenario_candidates = read_dashboard_qa_scenario_candidates(run_dir, &evidence)?;
     let route_attempts = read_dashboard_route_attempts(run_dir, &evidence)?;
-    let visual_comparisons = read_dashboard_visual_comparisons(run_dir, &evidence)?;
-    let probe_contract_status = dashboard_probe_contract_status(
-        &evidence,
-        &world_states,
-        &frame_metrics,
-        &scenario_results,
-    );
     let evidence_categories = dashboard_category_summaries(DashboardCategoryArtifacts {
         screenshots: &screenshots,
         world_states: &world_states,
@@ -53433,6 +53452,27 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results: &scenario_results,
         mutation_artifacts: &mutation_artifacts,
     });
+    let visual_comparisons = read_dashboard_visual_comparisons(run_dir, &evidence)?;
+    let qa_swarm_inspection = dashboard_qa_swarm_inspection(DashboardQaSwarmInspectionInputs {
+        qa_scenario_candidates: &qa_scenario_candidates,
+        fuzzing_plans: &fuzzing_plans,
+        qa_worker_assignments: &qa_worker_assignments,
+        qa_agent_work_queues: &qa_agent_work_queues,
+        runtime_invariants: &runtime_invariants,
+        route_attempts: &route_attempts,
+        visual_comparisons: &visual_comparisons,
+        performance_metrics: &performance_metrics,
+        console_logs: &console_logs,
+        scenario_results: &scenario_results,
+        evidence_categories: &evidence_categories,
+        mutations: &mutations,
+    });
+    let probe_contract_status = dashboard_probe_contract_status(
+        &evidence,
+        &world_states,
+        &frame_metrics,
+        &scenario_results,
+    );
     let evidence_fidelity = dashboard_evidence_fidelity(DashboardEvidenceFidelityInputs {
         transaction_provenance: transaction_provenance.as_ref(),
         probe_contract_status: &probe_contract_status,
@@ -53484,6 +53524,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         qa_scenario_candidates,
         route_attempts,
         visual_comparisons,
+        qa_swarm_inspection,
         evidence_categories,
         probe_contract_status,
         evidence_fidelity,
@@ -54502,6 +54543,275 @@ fn read_dashboard_visual_comparisons(
         artifacts,
         boundary,
     })
+}
+
+struct DashboardQaSwarmInspectionInputs<'a> {
+    qa_scenario_candidates: &'a RunDashboardQaScenarioCandidates,
+    fuzzing_plans: &'a RunDashboardFuzzingPlans,
+    qa_worker_assignments: &'a RunDashboardQaWorkerAssignments,
+    qa_agent_work_queues: &'a RunDashboardQaAgentWorkQueues,
+    runtime_invariants: &'a RunDashboardRuntimeInvariants,
+    route_attempts: &'a RunDashboardRouteAttempts,
+    visual_comparisons: &'a RunDashboardVisualComparisons,
+    performance_metrics: &'a [RunDashboardArtifact],
+    console_logs: &'a [RunDashboardArtifact],
+    scenario_results: &'a [RunDashboardArtifact],
+    evidence_categories: &'a [RunDashboardCategorySummary],
+    mutations: &'a [MutationProposal],
+}
+
+fn dashboard_qa_swarm_inspection(
+    inputs: DashboardQaSwarmInspectionInputs<'_>,
+) -> RunDashboardQaSwarmInspection {
+    let mut panels = vec![
+        dashboard_qa_swarm_panel(
+            "scenario-candidates",
+            "Scenario candidate panel",
+            &inputs.qa_scenario_candidates.status,
+            inputs.qa_scenario_candidates.candidate_count,
+            inputs.qa_scenario_candidates.malformed_count,
+            inputs.qa_scenario_candidates.evidence_refs.clone(),
+            &inputs.qa_scenario_candidates.boundary,
+        ),
+        dashboard_qa_swarm_panel(
+            "fuzzing-plans",
+            "Fuzzing plan panel",
+            &inputs.fuzzing_plans.status,
+            inputs.fuzzing_plans.plan_count,
+            inputs.fuzzing_plans.malformed_count,
+            inputs.fuzzing_plans.evidence_refs.clone(),
+            &inputs.fuzzing_plans.boundary,
+        ),
+        dashboard_qa_swarm_panel(
+            "worker-assignments",
+            "Worker budget/assignment panel",
+            &inputs.qa_worker_assignments.status,
+            inputs.qa_worker_assignments.assignment_count,
+            inputs.qa_worker_assignments.malformed_count,
+            inputs.qa_worker_assignments.evidence_refs.clone(),
+            &inputs.qa_worker_assignments.boundary,
+        ),
+        dashboard_qa_swarm_panel(
+            "qa-run-matrix",
+            "QA run matrix panel",
+            dashboard_artifact_panel_status(inputs.scenario_results),
+            inputs.scenario_results.len(),
+            dashboard_artifact_malformed_count(inputs.scenario_results),
+            dashboard_artifact_refs(inputs.scenario_results),
+            "Read-only QA run matrix summary; dashboard/Studio surfaces must not rerun scenarios, execute commands, spawn workers, or write trusted state.",
+        ),
+        dashboard_qa_swarm_panel(
+            "invariant-checker",
+            "Invariant checker panel",
+            &inputs.runtime_invariants.status,
+            inputs.runtime_invariants.check_count,
+            inputs.runtime_invariants.malformed_count,
+            inputs.runtime_invariants.evidence_refs.clone(),
+            &inputs.runtime_invariants.boundary,
+        ),
+        dashboard_qa_swarm_panel(
+            "objective-route-attempts",
+            "Objective route attempt panel",
+            &inputs.route_attempts.status,
+            inputs.route_attempts.attempt_count,
+            inputs.route_attempts.malformed_count,
+            inputs.route_attempts.evidence_refs.clone(),
+            &inputs.route_attempts.boundary,
+        ),
+        dashboard_qa_swarm_panel(
+            "visual-performance-error-evidence",
+            "Visual/performance/error evidence panel",
+            dashboard_visual_performance_error_status(
+                inputs.visual_comparisons,
+                inputs.performance_metrics,
+                inputs.console_logs,
+            ),
+            inputs.visual_comparisons.comparison_count
+                + inputs.performance_metrics.len()
+                + inputs.console_logs.len(),
+            inputs.visual_comparisons.malformed_count
+                + dashboard_artifact_malformed_count(inputs.performance_metrics)
+                + dashboard_artifact_malformed_count(inputs.console_logs),
+            dashboard_visual_performance_error_refs(
+                inputs.visual_comparisons,
+                inputs.performance_metrics,
+                inputs.console_logs,
+            ),
+            "Read-only visual, performance, and error evidence summary; Studio may inspect escaped evidence only and must not compute trusted diffs, run probes, execute commands, or claim quality guarantees.",
+        ),
+        dashboard_qa_swarm_panel(
+            "flaky-rerun-failure-backlog",
+            "Flaky rerun policy/results and failure backlog panel",
+            dashboard_flaky_backlog_status(inputs.qa_agent_work_queues, inputs.mutations),
+            inputs.qa_agent_work_queues.flaky_count
+                + inputs.qa_agent_work_queues.needs_rerun_count
+                + inputs.qa_agent_work_queues.failed_count
+                + inputs.qa_agent_work_queues.blocked_count
+                + inputs.mutations.len(),
+            inputs.qa_agent_work_queues.malformed_count,
+            inputs.qa_agent_work_queues.evidence_refs.clone(),
+            "Read-only flaky/rerun/failure backlog summary; QA outputs remain evidence and backlog inputs only until reviewed and must not auto-fix, auto-apply, auto-merge, or self-approve.",
+        ),
+        dashboard_qa_swarm_panel(
+            "qa-evidence-bundle",
+            "QA evidence bundle panel",
+            if inputs.evidence_categories.is_empty() { "missing" } else { "present" },
+            inputs.evidence_categories.iter().map(|category| category.count).sum(),
+            0,
+            Vec::new(),
+            "Read-only QA evidence bundle category summary; generated runs, fuzz inputs, screenshots, videos, traces, and local tool state remain generated/ignored unless fixture-scoped.",
+        ),
+    ];
+    panels.sort_by(|left, right| left.panel_id.cmp(&right.panel_id));
+
+    let panel_count = panels.len();
+    let missing_panel_count = panels
+        .iter()
+        .filter(|panel| panel.status == "missing")
+        .count();
+    let malformed_panel_count: usize = panels.iter().map(|panel| panel.malformed_count).sum();
+    let item_count: usize = panels.iter().map(|panel| panel.item_count).sum();
+    let mut evidence_refs: Vec<String> = panels
+        .iter()
+        .flat_map(|panel| panel.evidence_refs.iter().cloned())
+        .collect();
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let present = item_count > 0 || malformed_panel_count > 0;
+    let status = if malformed_panel_count > 0 {
+        "malformed"
+    } else if panels.iter().any(|panel| {
+        matches!(
+            panel.status.as_str(),
+            "blocked" | "failed" | "flaky" | "needs-rerun" | "regressed" | "changed"
+        )
+    }) {
+        "needs-review"
+    } else if present {
+        "present"
+    } else {
+        "missing"
+    };
+    RunDashboardQaSwarmInspection {
+        present,
+        empty_state: if present {
+            String::new()
+        } else {
+            "No QA/playtest swarm inspection evidence is indexed for this run.".to_string()
+        },
+        status: status.to_string(),
+        panel_count,
+        missing_panel_count,
+        malformed_panel_count,
+        item_count,
+        evidence_refs,
+        panels,
+        boundary: "Read-only QA/playtest swarm inspection summary; Studio and dashboard surfaces must not spawn workers, execute commands, bridge to local/cloud runners, write trusted state, auto-fix, auto-apply, auto-merge, self-approve, or claim production quality guarantees.".to_string(),
+    }
+}
+
+fn dashboard_qa_swarm_panel(
+    panel_id: &str,
+    title: &str,
+    status: &str,
+    item_count: usize,
+    malformed_count: usize,
+    evidence_refs: Vec<String>,
+    boundary: &str,
+) -> RunDashboardQaSwarmPanelSummary {
+    let mut evidence_refs = evidence_refs;
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    RunDashboardQaSwarmPanelSummary {
+        panel_id: panel_id.to_string(),
+        title: title.to_string(),
+        status: status.to_string(),
+        item_count,
+        malformed_count,
+        evidence_refs,
+        boundary: boundary.to_string(),
+    }
+}
+
+fn dashboard_artifact_refs(artifacts: &[RunDashboardArtifact]) -> Vec<String> {
+    let mut refs: Vec<String> = artifacts
+        .iter()
+        .map(|artifact| artifact.path.clone())
+        .collect();
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn dashboard_artifact_malformed_count(artifacts: &[RunDashboardArtifact]) -> usize {
+    artifacts
+        .iter()
+        .filter(|artifact| artifact.read_error.is_some() || artifact.value.is_none())
+        .count()
+}
+
+fn dashboard_artifact_panel_status(artifacts: &[RunDashboardArtifact]) -> &'static str {
+    if artifacts.is_empty() {
+        "missing"
+    } else if dashboard_artifact_malformed_count(artifacts) > 0 {
+        "malformed"
+    } else {
+        "present"
+    }
+}
+
+fn dashboard_visual_performance_error_status(
+    visual_comparisons: &RunDashboardVisualComparisons,
+    performance_metrics: &[RunDashboardArtifact],
+    console_logs: &[RunDashboardArtifact],
+) -> &'static str {
+    if visual_comparisons.malformed_count > 0
+        || dashboard_artifact_malformed_count(performance_metrics) > 0
+        || dashboard_artifact_malformed_count(console_logs) > 0
+    {
+        "malformed"
+    } else if visual_comparisons.changed_count > 0
+        || visual_comparisons.missing_screenshot_count > 0
+        || visual_comparisons.mismatched_dimensions_count > 0
+        || visual_comparisons.blocked_count > 0
+        || !console_logs.is_empty()
+    {
+        "needs-review"
+    } else if visual_comparisons.comparison_count > 0 || !performance_metrics.is_empty() {
+        "present"
+    } else {
+        "missing"
+    }
+}
+
+fn dashboard_visual_performance_error_refs(
+    visual_comparisons: &RunDashboardVisualComparisons,
+    performance_metrics: &[RunDashboardArtifact],
+    console_logs: &[RunDashboardArtifact],
+) -> Vec<String> {
+    let mut refs = visual_comparisons.evidence_refs.clone();
+    refs.extend(dashboard_artifact_refs(performance_metrics));
+    refs.extend(dashboard_artifact_refs(console_logs));
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn dashboard_flaky_backlog_status(
+    queues: &RunDashboardQaAgentWorkQueues,
+    mutations: &[MutationProposal],
+) -> &'static str {
+    if queues.malformed_count > 0 {
+        "malformed"
+    } else if queues.flaky_count > 0 || queues.needs_rerun_count > 0 {
+        "needs-rerun"
+    } else if queues.failed_count > 0 || queues.blocked_count > 0 || !mutations.is_empty() {
+        "needs-review"
+    } else if queues.item_count > 0 {
+        "present"
+    } else {
+        "missing"
+    }
 }
 
 fn visual_comparison_evidence_refs(comparison: &VisualComparisonEvidenceArtifact) -> Vec<String> {
@@ -66966,6 +67276,100 @@ scenarios:
         assert!(malformed.qa_scenario_candidates.present);
         assert_eq!(malformed.qa_scenario_candidates.status, "malformed");
         assert_eq!(malformed.qa_scenario_candidates.malformed_count, 1);
+        fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
+    }
+
+    #[test]
+    fn qa_swarm_inspection_read_model_normalizes_missing_present_and_malformed_panels() {
+        let (missing_root, missing_artifacts) = create_test_run("qa-swarm-inspection-missing");
+        let missing = read_dashboard_run(&missing_artifacts.run_dir).expect("dashboard reads");
+        assert!(!missing.qa_swarm_inspection.present);
+        assert_eq!(missing.qa_swarm_inspection.status, "missing");
+        assert_eq!(missing.qa_swarm_inspection.panel_count, 9);
+        assert_eq!(missing.qa_swarm_inspection.missing_panel_count, 8);
+        assert!(missing
+            .qa_swarm_inspection
+            .panels
+            .iter()
+            .any(|panel| panel.panel_id == "qa-evidence-bundle" && panel.status == "present"));
+        assert!(missing
+            .qa_swarm_inspection
+            .boundary
+            .contains("must not spawn workers, execute commands"));
+        fs::remove_dir_all(missing_root).expect("missing fixture removed");
+
+        let (root, artifacts) = create_test_run("qa-swarm-inspection-present");
+        let mut candidate = QaScenarioCandidateArtifact::from_json_str(include_str!(
+            "../../../examples/qa-scenario-candidate-v1/scenario-candidate.sample.json"
+        ))
+        .expect("fixture parses");
+        let run = read_json_value(artifacts.run_dir.join("run.json")).expect("run reads");
+        candidate.run_id = json_string(&run, "id").expect("run id present");
+        let path = "evidence/qa-scenario-candidates/scenario-candidate.json";
+        fs::create_dir_all(artifacts.run_dir.join("evidence/qa-scenario-candidates"))
+            .expect("candidate evidence dir exists");
+        write_json(&artifacts.run_dir.join(path), &json!(candidate)).expect("candidate writes");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            "qa-scenario-candidate-plan",
+            "application/json",
+            path,
+            json!({ "artifact": "qa_scenario_candidate" }),
+        )
+        .expect("candidate indexed");
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        assert!(dashboard.qa_swarm_inspection.present);
+        assert_eq!(dashboard.qa_swarm_inspection.status, "present");
+        assert_eq!(dashboard.qa_swarm_inspection.item_count, 1);
+        assert!(dashboard
+            .qa_swarm_inspection
+            .evidence_refs
+            .contains(&path.to_string()));
+        let scenario_panel = dashboard
+            .qa_swarm_inspection
+            .panels
+            .iter()
+            .find(|panel| panel.panel_id == "scenario-candidates")
+            .expect("scenario candidate panel summary");
+        assert_eq!(scenario_panel.status, "proposed");
+        assert_eq!(scenario_panel.item_count, 1);
+        assert!(scenario_panel.boundary.contains("must not run candidates"));
+        fs::remove_dir_all(root).expect("fixture removed");
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("qa-swarm-inspection-malformed");
+        let malformed_path = "evidence/qa-scenario-candidates/scenario-candidate-malformed.json";
+        fs::create_dir_all(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/qa-scenario-candidates"),
+        )
+        .expect("candidate evidence dir exists");
+        fs::write(
+            malformed_artifacts.run_dir.join(malformed_path),
+            "{not-json",
+        )
+        .expect("malformed candidate writes");
+        add_evidence_artifact(
+            &malformed_artifacts.run_dir,
+            "qa-scenario-candidate-malformed",
+            "application/json",
+            malformed_path,
+            json!({ "artifact": "qa_scenario_candidate" }),
+        )
+        .expect("malformed candidate indexed");
+        let malformed = read_dashboard_run(&malformed_artifacts.run_dir).expect("dashboard reads");
+        assert!(malformed.qa_swarm_inspection.present);
+        assert_eq!(malformed.qa_swarm_inspection.status, "malformed");
+        assert_eq!(malformed.qa_swarm_inspection.malformed_panel_count, 1);
+        let malformed_panel = malformed
+            .qa_swarm_inspection
+            .panels
+            .iter()
+            .find(|panel| panel.panel_id == "scenario-candidates")
+            .expect("malformed panel summary");
+        assert_eq!(malformed_panel.status, "malformed");
+        assert_eq!(malformed_panel.malformed_count, 1);
         fs::remove_dir_all(malformed_root).expect("malformed fixture removed");
     }
 
