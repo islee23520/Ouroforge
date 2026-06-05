@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "read-only-asset-metadata",
+  "name": "Read-Only Asset Metadata",
+  "version": "1.0.0",
+  "description": "Declaratively extends sprite asset metadata for read-only inspection.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["assetMetadataProvider"],
+  "extensionPoints": ["assets.metadata.readOnly"],
+  "assetMetadata": [
+    {
+      "descriptorId": "sprite-pivot-metadata",
+      "assetType": "sprite",
+      "fields": [
+        { "name": "pivot", "type": "enum", "label": "Pivot", "required": true, "allowedValues": ["center", "bottom", "top"] },
+        { "name": "frameCount", "type": "integer", "label": "Frame Count" }
+      ],
+      "manifestIntegrationKeys": ["sprite_pivot", "sprite_frame_count"],
+      "validationHints": ["pivot must be one of center, bottom, top"],
+      "boundary": "Declarative read-only asset metadata descriptor with no asset generation, no command execution, and no network access."
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
+}

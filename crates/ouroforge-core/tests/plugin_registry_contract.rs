@@ -70,6 +70,17 @@ fn fixture_tree_reports_expected_states() {
     assert_eq!(invalid.validation_status, PluginRegistryStatus::Invalid);
     assert!(!invalid.validation_errors.is_empty());
 
+    // Asset metadata descriptors are reported for read-only inspection (#748).
+    let asset = registry
+        .entries
+        .iter()
+        .find(|entry| entry.plugin_id == "read-only-asset-metadata")
+        .expect("asset metadata fixture present");
+    assert_eq!(asset.validation_status, PluginRegistryStatus::Valid);
+    assert!(asset
+        .asset_metadata_descriptors
+        .contains(&"sprite-pivot-metadata".to_string()));
+
     // A structurally valid manifest that requires a newer engine is reported as
     // future-version and blocked from extension contribution (#743).
     let future = registry

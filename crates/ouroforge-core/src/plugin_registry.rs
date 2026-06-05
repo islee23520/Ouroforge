@@ -62,6 +62,8 @@ pub struct PluginRegistryEntry {
     #[serde(rename = "extensionPoints")]
     pub extension_points: Vec<String>,
     pub permissions: Vec<String>,
+    #[serde(rename = "assetMetadataDescriptors")]
+    pub asset_metadata_descriptors: Vec<String>,
     #[serde(rename = "compatibilityStatus")]
     pub compatibility_status: PluginRegistryCompatibility,
     #[serde(rename = "manifestHash")]
@@ -94,6 +96,8 @@ pub struct PluginRegistryReadModel {
     pub extension_point_summary: Vec<String>,
     #[serde(rename = "permissionSummary")]
     pub permission_summary: Vec<String>,
+    #[serde(rename = "assetMetadataSummary")]
+    pub asset_metadata_summary: Vec<String>,
     pub boundary: String,
 }
 
@@ -106,6 +110,7 @@ impl PluginRegistry {
         let mut capability_summary = Vec::new();
         let mut extension_point_summary = Vec::new();
         let mut permission_summary = Vec::new();
+        let mut asset_metadata_summary = Vec::new();
         for entry in &self.entries {
             match entry.validation_status {
                 PluginRegistryStatus::Valid => valid_count += 1,
@@ -131,6 +136,12 @@ impl PluginRegistry {
                     .iter()
                     .map(|permission| format!("{}:{permission}", entry.plugin_id)),
             );
+            asset_metadata_summary.extend(
+                entry
+                    .asset_metadata_descriptors
+                    .iter()
+                    .map(|descriptor| format!("{}:{descriptor}", entry.plugin_id)),
+            );
         }
         capability_summary.sort();
         capability_summary.dedup();
@@ -138,6 +149,8 @@ impl PluginRegistry {
         extension_point_summary.dedup();
         permission_summary.sort();
         permission_summary.dedup();
+        asset_metadata_summary.sort();
+        asset_metadata_summary.dedup();
         PluginRegistryReadModel {
             root: self.root.clone(),
             plugin_count: self.entries.len(),
@@ -148,6 +161,7 @@ impl PluginRegistry {
             capability_summary,
             extension_point_summary,
             permission_summary,
+            asset_metadata_summary,
             boundary: "Read-only plugin registry summary; declarative discovery only, with no plugin execution, no command execution, no network install, and no trusted writes.".to_string(),
         }
     }
@@ -255,6 +269,7 @@ fn blocked_entry(base: &Path, path: &Path, reason: &str) -> PluginRegistryEntry 
         declared_capabilities: Vec::new(),
         extension_points: Vec::new(),
         permissions: Vec::new(),
+        asset_metadata_descriptors: Vec::new(),
         compatibility_status: PluginRegistryCompatibility::Unknown,
         manifest_hash: String::new(),
     }
@@ -313,6 +328,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
                 declared_capabilities: Vec::new(),
                 extension_points: Vec::new(),
                 permissions: Vec::new(),
+                asset_metadata_descriptors: Vec::new(),
                 compatibility_status: PluginRegistryCompatibility::Incompatible,
                 manifest_hash,
             });
@@ -364,6 +380,15 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
                     Vec::new()
                 },
                 permissions: manifest.permissions.clone(),
+                asset_metadata_descriptors: if contributes {
+                    manifest
+                        .asset_metadata
+                        .iter()
+                        .map(|descriptor| descriptor.descriptor_id.clone())
+                        .collect()
+                } else {
+                    Vec::new()
+                },
                 compatibility_status,
                 manifest_hash,
             })
@@ -376,6 +401,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
             declared_capabilities: Vec::new(),
             extension_points: Vec::new(),
             permissions: Vec::new(),
+            asset_metadata_descriptors: Vec::new(),
             compatibility_status: PluginRegistryCompatibility::Unknown,
             manifest_hash,
         }),

@@ -45,6 +45,7 @@ pub mod export_verification;
 pub mod source_apply_post_apply_rerun;
 pub use source_apply_post_apply_rerun::*;
 pub mod internal_sprite_audit;
+pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;
 pub mod source_apply_highrisk_blocker;
 pub use source_apply_highrisk_blocker::*;

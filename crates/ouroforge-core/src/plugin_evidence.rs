@@ -768,7 +768,7 @@ fn require_hash_text(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn require_allowed_value(field: &str, value: &str, allowed: &[&str]) -> Result<()> {
+pub(crate) fn require_allowed_value(field: &str, value: &str, allowed: &[&str]) -> Result<()> {
     require_local_text(field, value)?;
     let allowed = allowed.iter().copied().collect::<BTreeSet<_>>();
     if !allowed.contains(value) {

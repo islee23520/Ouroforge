@@ -15,5 +15,7 @@ The tree exercises the registry's reported states:
 - `plugins/future-engine/ouroforge.plugin.json` — **future-version** (structurally
   valid but requires a newer Ouroforge engine; reported and blocked from
   extension contribution)
+- `plugins/asset-metadata/ouroforge.plugin.json` — **valid** with a declarative
+  asset metadata descriptor (read-only; no asset generation/import/export)
 
 These manifests are declarative descriptors only and contain no executable code.

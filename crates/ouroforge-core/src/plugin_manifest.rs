@@ -53,6 +53,10 @@ pub struct PluginManifest {
     /// permission allowlist (#742). Declarations only; granting no runtime power.
     #[serde(default)]
     pub permissions: Vec<String>,
+    /// Optional declarative asset metadata descriptors (#748). Pure metadata;
+    /// no asset generation, importer/exporter execution, or command hooks.
+    #[serde(rename = "assetMetadata", default)]
+    pub asset_metadata: Vec<crate::plugin_asset_metadata::PluginAssetMetadataDescriptor>,
     pub boundary: String,
 }
 
@@ -110,6 +114,8 @@ pub struct PluginManifestReadModel {
     #[serde(rename = "extensionPoints")]
     pub extension_points: Vec<String>,
     pub permissions: Vec<String>,
+    #[serde(rename = "assetMetadataDescriptors")]
+    pub asset_metadata_descriptors: Vec<String>,
     #[serde(rename = "descriptorRefCount")]
     pub descriptor_ref_count: usize,
     #[serde(rename = "docCount")]
@@ -189,6 +195,30 @@ impl PluginManifest {
             "plugin manifest permissions",
             &self.permissions,
         )?;
+        crate::plugin_asset_metadata::validate_descriptors(
+            "plugin manifest assetMetadata",
+            &self.asset_metadata,
+        )?;
+        if !self.asset_metadata.is_empty() {
+            if !self
+                .declared_capabilities
+                .iter()
+                .any(|c| c == "assetMetadataProvider")
+            {
+                return Err(anyhow!(
+                    "plugin manifest assetMetadata requires the `assetMetadataProvider` capability"
+                ));
+            }
+            if !self
+                .extension_points
+                .iter()
+                .any(|p| p == "assets.metadata.readOnly")
+            {
+                return Err(anyhow!(
+                    "plugin manifest assetMetadata requires the `assets.metadata.readOnly` extension point"
+                ));
+            }
+        }
         require_manifest_boundary("plugin manifest boundary", &self.boundary)?;
         Ok(())
     }
@@ -231,6 +261,12 @@ impl PluginManifest {
         extension_points.sort();
         let mut permissions = self.permissions.clone();
         permissions.sort();
+        let mut asset_metadata_descriptors = self
+            .asset_metadata
+            .iter()
+            .map(|descriptor| descriptor.descriptor_id.clone())
+            .collect::<Vec<_>>();
+        asset_metadata_descriptors.sort();
         PluginManifestReadModel {
             schema_version: self.schema_version.clone(),
             plugin_id: self.plugin_id.clone(),
@@ -239,6 +275,7 @@ impl PluginManifest {
             declared_capabilities,
             extension_points,
             permissions,
+            asset_metadata_descriptors,
             descriptor_ref_count: self.descriptor_refs.len(),
             doc_count: self.paths.docs.len(),
             asset_count: self.paths.assets.len(),
@@ -547,6 +584,39 @@ mod tests {
         let mut manifest = base_manifest();
         manifest["permissions"] = serde_json::json!(["super_admin"]);
         expect_invalid(manifest, "not in the v1 permission allowlist");
+    }
+
+    #[test]
+    fn accepts_asset_metadata_descriptor() {
+        let mut manifest = base_manifest();
+        manifest["declaredCapabilities"] = serde_json::json!(["assetMetadataProvider"]);
+        manifest["extensionPoints"] = serde_json::json!(["assets.metadata.readOnly"]);
+        manifest["assetMetadata"] = serde_json::json!([{
+            "descriptorId": "sprite-metadata",
+            "assetType": "sprite",
+            "fields": [{ "name": "pivot", "type": "string", "label": "Pivot" }],
+            "boundary": "Declarative read-only asset metadata descriptor with no asset generation, no command execution, and no network access."
+        }]);
+        let parsed = PluginManifest::from_json_str(&manifest.to_string())
+            .expect("asset metadata manifest validates");
+        assert_eq!(parsed.asset_metadata.len(), 1);
+        assert_eq!(
+            parsed.read_model().asset_metadata_descriptors,
+            ["sprite-metadata"]
+        );
+    }
+
+    #[test]
+    fn rejects_asset_metadata_without_capability() {
+        let mut manifest = base_manifest();
+        // dashboardPanel capability but asset metadata present -> rejected.
+        manifest["assetMetadata"] = serde_json::json!([{
+            "descriptorId": "sprite-metadata",
+            "assetType": "sprite",
+            "fields": [{ "name": "pivot", "type": "string", "label": "Pivot" }],
+            "boundary": "Declarative read-only asset metadata descriptor with no asset generation, no command execution, and no network access."
+        }]);
+        expect_invalid(manifest, "requires the `assetMetadataProvider` capability");
     }
 
     #[test]
