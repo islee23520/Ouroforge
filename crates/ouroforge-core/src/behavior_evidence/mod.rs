@@ -1,3 +1,4 @@
+mod dashboard;
 mod journal;
 mod rules;
 mod validation;
@@ -5,6 +6,7 @@ mod validation;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+pub use dashboard::{read_dashboard_behavior_evidence, RunDashboardBehaviorEvidence};
 pub use journal::render_behavior_evidence_journal_section;
 pub use validation::{inspect_behavior_evidence_bundle, validate_behavior_evidence_bundle};
 

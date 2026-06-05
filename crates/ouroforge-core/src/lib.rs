@@ -52514,6 +52514,7 @@ pub struct RunDashboardReadModel {
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub scenario_assertions: RunDashboardScenarioAssertions,
     pub behavior_assertions: RunDashboardBehaviorAssertions,
+    pub behavior_evidence: behavior_evidence::RunDashboardBehaviorEvidence,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub review_cockpit: RunDashboardReviewCockpit,
@@ -53352,6 +53353,8 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         dashboard_artifact_is_behavior_assertion_result,
     )?;
     let behavior_assertions = read_dashboard_behavior_assertions(&behavior_assertion_results);
+    let behavior_evidence =
+        behavior_evidence::read_dashboard_behavior_evidence(run_dir, &evidence)?;
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let regression_promotions = read_regression_promotion_records(run_dir);
@@ -53423,6 +53426,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         scenario_results,
         scenario_assertions,
         behavior_assertions,
+        behavior_evidence,
         mutation_artifacts,
         mutation_lifecycle,
         review_cockpit,
