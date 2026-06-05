@@ -101,6 +101,28 @@ assert.deepEqual(fullStudioModel.panels.map((panel) => panel.id), [
 ]);
 assert.match(cockpit.renderFullStudioEditorDemoSurface(fullStudioDemoFixture), /Full Studio Editor integrated demo/);
 assert.match(cockpit.renderFullStudioEditorDemoSurface(fullStudioDemoFixture), /All required integrated demo panels/);
+
+// Fail closed (#774): a fixture missing a required panel descriptor must report
+// that panel as missing instead of defaulting an omitted descriptor to present.
+const fullStudioMissingPanelFixture = {
+  ...fullStudioDemoFixture,
+  full_studio_editor_demo: {
+    ...fullStudioDemoFixture.full_studio_editor_demo,
+    panels: (fullStudioDemoFixture.full_studio_editor_demo.panels || []).filter(
+      (panel) => String(panel && panel.id) !== 'studio-plugin-panel',
+    ),
+  },
+};
+const fullStudioMissingModel = cockpit.fullStudioEditorDemoModel(fullStudioMissingPanelFixture);
+assert.ok(
+  fullStudioMissingModel.missingPanels.includes('studio-plugin-panel'),
+  'omitted required panel must be reported as missing',
+);
+assert.equal(
+  fullStudioMissingModel.panels.find((panel) => panel.id === 'studio-plugin-panel').present,
+  false,
+);
+
 assert.match(cockpit.renderProjectOverviewSurface(fullStudioDemoFixture), /Full Studio Editor fixture/);
 assert.match(cockpit.renderStudioSceneTreeInspectorSurface(fullStudioDemoFixture), /scene tree/);
 assert.match(cockpit.renderEntityComponentInspectorSurface(fullStudioDemoFixture), /Entity/);

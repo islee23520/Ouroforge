@@ -4598,7 +4598,10 @@ const OuroforgeCockpit = (() => {
         id,
         label: panel.label || id,
         required: panel.required !== false,
-        present: panel.present !== false,
+        // Fail closed: a required panel id absent from the fixture is missing,
+        // not present. `panelMap.get(id) || {}` would otherwise default an
+        // omitted descriptor to present and report an incomplete demo as ready.
+        present: panelMap.has(id) && panel.present !== false,
       };
     });
     const missingPanels = panels.filter((panel) => panel.required && !panel.present).map((panel) => panel.id);
