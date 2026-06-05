@@ -57,6 +57,14 @@ fn invalid_prototype_apply_fixtures_fail_closed() {
             "source-like fixture policy",
         ),
         (
+            "invalid/apply.nested-manifest-target.fixture.json",
+            "source-like fixture policy",
+        ),
+        (
+            "invalid/apply.nested-source-target.fixture.json",
+            "source-like fixture policy",
+        ),
+        (
             "invalid/apply.generated-output-collision.fixture.json",
             "generated-output collision",
         ),

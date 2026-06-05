@@ -357,12 +357,7 @@ impl GddPrototypeTransaction {
     fn validate(&self) -> Result<()> {
         require_local_id("GDD prototype apply transactionId", &self.transaction_id)?;
         require_local_ref("GDD prototype apply targetRef", &self.target_ref)?;
-        if self.target_ref.starts_with("crates/")
-            || self.target_ref.starts_with("src/")
-            || self.target_ref == "Cargo.toml"
-            || self.target_ref == "Cargo.lock"
-            || self.target_ref.contains("/src/")
-        {
+        if is_source_like_target(&self.target_ref) {
             return Err(anyhow!(
                 "GDD prototype apply targetRef violates source-like fixture policy"
             ));
@@ -606,6 +601,39 @@ fn require_local_id(field: &str, value: &str) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Reject targets that point at source-like files even when they sit under an
+/// otherwise-allowed local fixture root (issue #656: no arbitrary source
+/// mutation). Legitimate prototype apply targets are inert data artifacts
+/// (`*.json` scene/behavior/scenario/manifest fixtures), never build manifests
+/// or Rust/JS/script source files.
+fn is_source_like_target(value: &str) -> bool {
+    if value.starts_with("crates/")
+        || value.starts_with("src/")
+        || value.contains("/src/")
+    {
+        return true;
+    }
+    let file_name = value.rsplit('/').next().unwrap_or(value);
+    const SOURCE_MANIFESTS: [&str; 7] = [
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "tsconfig.json",
+    ];
+    if SOURCE_MANIFESTS.contains(&file_name) {
+        return true;
+    }
+    const SOURCE_EXTENSIONS: [&str; 13] = [
+        ".rs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".sh", ".rb", ".go", ".c",
+        ".cpp",
+    ];
+    let lower = file_name.to_ascii_lowercase();
+    SOURCE_EXTENSIONS.iter().any(|ext| lower.ends_with(ext))
 }
 
 fn require_local_ref(field: &str, value: &str) -> Result<()> {
