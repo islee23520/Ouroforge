@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "behavior-evidence-bundle-v1",
+  "bundleId": "behavior-evidence-jump-boost",
+  "status": "complete",
+  "behaviorDefinitionRefs": [
+    {
+      "kind": "behavior-definition",
+      "path": "examples/behavior-runtime-v1/valid/behavior-artifact.sample.json",
+      "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "runtimeEventRefs": [
+    {
+      "kind": "runtime-event-log",
+      "path": "runs/behavior-runtime/jump-boost/evidence/runtime-events.json"
+    }
+  ],
+  "scenarioOutcomeRefs": [
+    {
+      "kind": "scenario-outcome",
+      "path": "runs/behavior-runtime/jump-boost/evidence/scenario-outcome.json"
+    }
+  ],
+  "draftRefs": [
+    {
+      "kind": "behavior-draft",
+      "path": "examples/behavior-draft-v1/valid/behavior-draft.valid.json"
+    }
+  ],
+  "reviewDecisionRefs": [
+    {
+      "kind": "behavior-review-decision",
+      "path": "runs/behavior-applies/review-behavior-jump-boost-accepted.json"
+    }
+  ],
+  "applyTransactionRefs": [
+    {
+      "kind": "behavior-apply-transaction",
+      "path": "examples/behavior-apply-v1/valid/behavior-apply.ready.json"
+    }
+  ],
+  "rollbackMetadataRefs": [
+    {
+      "kind": "behavior-rollback-metadata",
+      "path": "runs/behavior-applies/behavior-apply-jump-boost.rollback.json"
+    }
+  ],
+  "rerunComparisonRefs": [
+    {
+      "kind": "behavior-rerun-comparison",
+      "path": "runs/behavior-applies/behavior-apply-jump-boost.rerun-comparison.json"
+    }
+  ],
+  "observedFailures": [
+    {
+      "scenarioId": "jump_boost_cooldown_regression",
+      "summary": "Cooldown assertion failed before accepted behavior transaction evidence was linked.",
+      "evidenceRef": {
+        "kind": "scenario-outcome",
+        "path": "runs/behavior-runtime/jump-boost/evidence/scenario-outcome.json"
+      }
+    }
+  ],
+  "nextStepHypotheses": [
+    {
+      "id": "hypothesis-rerun-after-rollback",
+      "summary": "Rerun the scenario after rollback metadata is available and compare behavior assertions."
+    }
+  ],
+  "linkedEvidence": [
+    {
+      "kind": "behavior-definition",
+      "path": "examples/behavior-runtime-v1/valid/behavior-artifact.sample.json",
+      "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "kind": "runtime-event-log",
+      "path": "runs/behavior-runtime/jump-boost/evidence/runtime-events.json"
+    },
+    {
+      "kind": "scenario-outcome",
+      "path": "runs/behavior-runtime/jump-boost/evidence/scenario-outcome.json"
+    },
+    {
+      "kind": "behavior-draft",
+      "path": "examples/behavior-draft-v1/valid/behavior-draft.valid.json"
+    },
+    {
+      "kind": "behavior-review-decision",
+      "path": "runs/behavior-applies/review-behavior-jump-boost-accepted.json"
+    },
+    {
+      "kind": "behavior-apply-transaction",
+      "path": "examples/behavior-apply-v1/valid/behavior-apply.ready.json"
+    },
+    {
+      "kind": "behavior-rollback-metadata",
+      "path": "runs/behavior-applies/behavior-apply-jump-boost.rollback.json"
+    },
+    {
+      "kind": "behavior-rerun-comparison",
+      "path": "runs/behavior-applies/behavior-apply-jump-boost.rerun-comparison.json"
+    }
+  ],
+  "blockedReasons": [],
+  "guardrails": [
+    "behavior evidence bundle is read-only lifecycle audit data",
+    "no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, or browser trusted write",
+    "Rust/local validation owns trusted behavior draft/apply and generated evidence contracts",
+    "generated behavior evidence remains untracked unless fixture-scoped"
+  ]
+}
