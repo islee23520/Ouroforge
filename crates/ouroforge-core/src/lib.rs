@@ -29199,65 +29199,40 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
     if matches!(gate_category, MutationProposalGateCategory::Unsupported)
         && matches!(evidence_state, MutationProposalEvidenceState::Linked)
     {
-        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
-        let classification_ids = classification_artifact
-            .classifications
-            .iter()
-            .map(|classification| classification.id.clone())
-            .collect::<Vec<_>>();
-        let summary = EvolveSummary {
-            status: mutation_proposal_gate_category_label(&gate_category).to_string(),
-            proposals_created: 0,
-            proposal_ids: Vec::new(),
-            classification_ids,
-            patch_draft_ids: Vec::new(),
-            reason: "failed verdict uses an unsupported mutation proposal gate; no mutation proposal was fabricated".to_string(),
-        };
-        append_ledger_event(
+        return complete_evolve_without_proposal(
             run_dir,
-            "evolve.completed",
-            "evolve-cli",
-            json!({
-                "status": summary.status,
-                "proposals_created": summary.proposals_created,
-                "classification_ids": summary.classification_ids,
-                "reason": summary.reason
-            }),
-        )?;
-        update_journal(run_dir)?;
-        return Ok(summary);
+            mutation_proposal_gate_category_label(&gate_category),
+            "failed verdict uses an unsupported mutation proposal gate; no mutation proposal was fabricated".to_string(),
+        );
     }
     let Some(evidence_id) = select_evidence_id_for_failure(&evidence, &failure, &verdict) else {
-        let classification_artifact = classify_mutation_failures(run_dir, &[])?;
-        let classification_ids = classification_artifact
-            .classifications
-            .iter()
-            .map(|classification| classification.id.clone())
-            .collect::<Vec<_>>();
-        let summary = EvolveSummary {
-            status: mutation_proposal_evidence_state_label(&evidence_state).to_string(),
-            proposals_created: 0,
-            proposal_ids: Vec::new(),
-            classification_ids,
-            patch_draft_ids: Vec::new(),
-            reason: format!(
+        return complete_evolve_without_proposal(
+            run_dir,
+            mutation_proposal_evidence_state_label(&evidence_state),
+            format!(
                 "failed verdict has {} justifying evidence; no mutation proposal was fabricated",
                 mutation_proposal_evidence_state_label(&evidence_state)
             ),
-        };
-        append_ledger_event(
+        );
+    };
+    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+    let Some(classification) = classification_artifact.classifications.first() else {
+        return complete_evolve_without_proposal(
             run_dir,
-            "evolve.completed",
-            "evolve-cli",
-            json!({
-                "status": summary.status,
-                "proposals_created": summary.proposals_created,
-                "classification_ids": summary.classification_ids,
-                "reason": summary.reason
-            }),
-        )?;
-        update_journal(run_dir)?;
-        return Ok(summary);
+            "missing-classification",
+            "failed verdict did not produce a mutation classification; no mutation proposal was fabricated".to_string(),
+        );
+    };
+    let selection = select_mutation_proposal_strategy(run_dir, classification, &evidence)?;
+    let Some(selection) = selection else {
+        return complete_evolve_without_proposal(
+            run_dir,
+            "backlog-only",
+            format!(
+                "failure classification `{}` is backlog-only; no mutation proposal was fabricated",
+                mutation_classification_category_label(&classification.category)
+            ),
+        );
     };
     let proposal = create_mutation_proposal(
         run_dir,
@@ -29267,8 +29242,8 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
                 failure["kind"].as_str().unwrap_or("failed_verdict")
             ),
             evidence_id,
-            target: "seeds/evolve-v1-draft-target.yaml".to_string(),
-            path: "scenarios.evolve-controlled-failure.assertions".to_string(),
+            target: mutation_selection_target_path(&selection.bounded_mutation_type).to_string(),
+            path: mutation_selection_path(&selection.bounded_mutation_type).to_string(),
             from: "current evidence-linked failing criteria".to_string(),
             to: "review evidence and adjust the next explicit implementation issue".to_string(),
         },
@@ -29281,6 +29256,7 @@ pub fn evolve_run(run_dir: impl AsRef<Path>) -> Result<EvolveSummary> {
         &verdict,
         &evidence,
         &existing_journal,
+        &selection,
     )?;
     attach_mutation_proposal_rationale(run_dir, &proposal_id, rationale)?;
     proposal_ids.push(proposal_id);
@@ -29374,12 +29350,216 @@ fn select_evidence_id_for_failure(
         })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MutationProposalSelection {
+    bounded_mutation_type: MutationProposalBoundedMutationType,
+    backlog_item_id: Option<String>,
+    source: String,
+    reason: String,
+    backlog_read_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationBacklogSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationBacklogItem {
+    pub id: String,
+    pub classification_id: String,
+    pub failure_class: MutationClassificationCategory,
+    pub bounded_mutation_type: MutationProposalBoundedMutationType,
+    pub severity: MutationBacklogSeverity,
+    pub reproduction_context: String,
+    pub evidence_refs: Vec<String>,
+    pub suggested_next_investigation: String,
+    pub owner_lane: String,
+    pub review_status: String,
+    #[serde(default)]
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MutationBacklogArtifact {
+    pub schema_version: String,
+    pub run_id: String,
+    pub items: Vec<MutationBacklogItem>,
+}
+
+impl MutationBacklogArtifact {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != "1" {
+            return Err(anyhow!("mutation backlog schema_version must be \"1\""));
+        }
+        require_text("mutation backlog run_id", &self.run_id)?;
+        let mut ids = BTreeSet::new();
+        for item in &self.items {
+            item.validate()?;
+            if !ids.insert(item.id.as_str()) {
+                return Err(anyhow!("duplicate mutation backlog id: {}", item.id));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl MutationBacklogItem {
+    pub fn validate(&self) -> Result<()> {
+        require_text("mutation backlog item id", &self.id)?;
+        require_text(
+            "mutation backlog item classification_id",
+            &self.classification_id,
+        )?;
+        require_text(
+            "mutation backlog item reproduction_context",
+            &self.reproduction_context,
+        )?;
+        require_text(
+            "mutation backlog item suggested_next_investigation",
+            &self.suggested_next_investigation,
+        )?;
+        require_text("mutation backlog item owner_lane", &self.owner_lane)?;
+        require_text("mutation backlog item review_status", &self.review_status)?;
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!("mutation backlog item requires evidence_refs"));
+        }
+        for evidence_ref in &self.evidence_refs {
+            require_text("mutation backlog item evidence_ref", evidence_ref)?;
+        }
+        for blocked_reason in &self.blocked_reasons {
+            require_text("mutation backlog item blocked_reason", blocked_reason)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn read_mutation_backlog_artifact(
+    run_dir: impl AsRef<Path>,
+) -> Result<MutationBacklogArtifact> {
+    let path = run_dir.as_ref().join("mutation/backlog.json");
+    let input = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read mutation backlog {}", path.display()))?;
+    let artifact: MutationBacklogArtifact = serde_json::from_str(&input)
+        .with_context(|| format!("failed to parse mutation backlog {}", path.display()))?;
+    artifact
+        .validate()
+        .with_context(|| format!("failed to validate mutation backlog {}", path.display()))?;
+    Ok(artifact)
+}
+
+pub fn write_mutation_backlog_artifact(
+    run_dir: impl AsRef<Path>,
+    artifact: &MutationBacklogArtifact,
+) -> Result<PathBuf> {
+    artifact.validate()?;
+    let dir = run_dir.as_ref().join("mutation");
+    fs::create_dir_all(&dir).context("failed to create mutation directory")?;
+    let path = dir.join("backlog.json");
+    write_json_atomic(&path, &json!(artifact))?;
+    Ok(path)
+}
+
+fn select_mutation_proposal_strategy(
+    run_dir: &Path,
+    classification: &MutationClassification,
+    evidence: &EvidenceIndex,
+) -> Result<Option<MutationProposalSelection>> {
+    let Some(mapped_type) = bounded_mutation_type_for_classification(&classification.category)
+    else {
+        return Ok(None);
+    };
+    let backlog_path = run_dir.join("mutation/backlog.json");
+    if !backlog_path.exists() {
+        return Ok(Some(MutationProposalSelection {
+            bounded_mutation_type: mapped_type,
+            backlog_item_id: None,
+            source: "classification-only".to_string(),
+            reason: format!(
+                "classified failure `{}` mapped directly because no mutation backlog artifact exists",
+                mutation_classification_category_label(&classification.category)
+            ),
+            backlog_read_only: true,
+        }));
+    }
+
+    let backlog = read_mutation_backlog_artifact(run_dir)?;
+    let mut candidates = backlog
+        .items
+        .iter()
+        .filter(|item| {
+            item.classification_id == classification.id
+                || item.failure_class == classification.category
+        })
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Err(anyhow!(
+            "missing-backlog-ref: mutation backlog has no item for classification {}",
+            classification.id
+        ));
+    }
+    candidates.sort_by(|left, right| {
+        severity_rank(&right.severity)
+            .cmp(&severity_rank(&left.severity))
+            .then_with(|| right.evidence_refs.len().cmp(&left.evidence_refs.len()))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let selected = candidates[0];
+    if selected.classification_id != classification.id {
+        return Err(anyhow!(
+            "missing-classification: selected backlog item {} references {} instead of {}",
+            selected.id,
+            selected.classification_id,
+            classification.id
+        ));
+    }
+    if selected.bounded_mutation_type != mapped_type {
+        return Err(anyhow!(
+            "bounded-type-violation: classification {} maps to {} but backlog item {} requested {}",
+            mutation_classification_category_label(&classification.category),
+            mutation_proposal_bounded_type_label(&mapped_type),
+            selected.id,
+            mutation_proposal_bounded_type_label(&selected.bounded_mutation_type)
+        ));
+    }
+    let stale_ref = selected.evidence_refs.iter().find(|evidence_ref| {
+        !evidence
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.path == **evidence_ref || artifact.id == **evidence_ref)
+    });
+    if let Some(stale_ref) = stale_ref {
+        return Err(anyhow!(
+            "stale-ref: mutation backlog item {} references missing evidence {}",
+            selected.id,
+            stale_ref
+        ));
+    }
+    Ok(Some(MutationProposalSelection {
+        bounded_mutation_type: selected.bounded_mutation_type.clone(),
+        backlog_item_id: Some(selected.id.clone()),
+        source: "mutation/backlog.json".to_string(),
+        reason: format!(
+            "selected backlog item {} by severity {:?} and reproduction context `{}` without mutating backlog state",
+            selected.id, selected.severity, selected.reproduction_context
+        ),
+        backlog_read_only: true,
+    }))
+}
+
 fn build_mutation_proposal_rationale(
     proposal: &MutationProposal,
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
     evidence: &EvidenceIndex,
     journal: &str,
+    selection: &MutationProposalSelection,
 ) -> Result<MutationProposalRationale> {
     let evidence_refs = collect_classification_evidence_refs(failure, verdict);
     let (category, reason) = classify_failure_category(failure, verdict, journal, &evidence_refs);
@@ -29413,6 +29593,21 @@ fn build_mutation_proposal_rationale(
             .unwrap_or_default();
         scenario_result_refs = collect_scenario_result_refs(&verdict_evidence_refs, evidence);
     }
+    if scenario_result_refs.is_empty() {
+        scenario_result_refs = evidence
+            .artifacts
+            .iter()
+            .filter(|artifact| {
+                artifact.path.contains("scenario-result")
+                    || artifact
+                        .metadata
+                        .get("artifact")
+                        .and_then(|value| value.as_str())
+                        == Some("scenario_result")
+            })
+            .map(|artifact| artifact.path.clone())
+            .collect();
+    }
     let rationale = MutationProposalRationale {
         schema_version: "1".to_string(),
         failure_classification: mutation_classification_category_label(&category).to_string(),
@@ -29427,15 +29622,53 @@ fn build_mutation_proposal_rationale(
         ),
         confidence,
         reasoning_summary: reason,
-        allowed_mutation_type: MutationProposalAllowedMutationType::DataOnly,
+        allowed_mutation_type: mutation_allowed_type_for_selection(&selection.bounded_mutation_type),
         failing_gate_category: Some(failing_gate_category.clone()),
         justifying_evidence_ref,
         evidence_state: Some(evidence_state),
         confidence_basis: Some(confidence_basis),
-        bounded_mutation_type: Some(bounded_mutation_type_for_gate(&failing_gate_category)),
+        bounded_mutation_type: Some(selection.bounded_mutation_type.clone()),
+        selection_backlog_item_id: selection.backlog_item_id.clone(),
+        selection_source: Some(selection.source.clone()),
+        selection_reason: Some(selection.reason.clone()),
+        backlog_read_only: Some(selection.backlog_read_only),
     };
     rationale.validate(&proposal.evidence_id)?;
     Ok(rationale)
+}
+
+fn complete_evolve_without_proposal(
+    run_dir: &Path,
+    status: &str,
+    reason: String,
+) -> Result<EvolveSummary> {
+    let classification_artifact = classify_mutation_failures(run_dir, &[])?;
+    let classification_ids = classification_artifact
+        .classifications
+        .iter()
+        .map(|classification| classification.id.clone())
+        .collect::<Vec<_>>();
+    let summary = EvolveSummary {
+        status: status.to_string(),
+        proposals_created: 0,
+        proposal_ids: Vec::new(),
+        classification_ids,
+        patch_draft_ids: Vec::new(),
+        reason,
+    };
+    append_ledger_event(
+        run_dir,
+        "evolve.completed",
+        "evolve-cli",
+        json!({
+            "status": summary.status,
+            "proposals_created": summary.proposals_created,
+            "classification_ids": summary.classification_ids,
+            "reason": summary.reason
+        }),
+    )?;
+    update_journal(run_dir)?;
+    Ok(summary)
 }
 
 fn infer_mutation_proposal_gate_category(
@@ -29464,6 +29697,8 @@ fn infer_mutation_proposal_gate_category(
     } else if matches!(
         category,
         MutationClassificationCategory::RuntimeProbeFailure
+            | MutationClassificationCategory::ProbeFailure
+            | MutationClassificationCategory::RuntimeCrash
             | MutationClassificationCategory::ConsoleError
             | MutationClassificationCategory::PerformanceRegression
     ) || haystack.contains("runtime")
@@ -29509,15 +29744,83 @@ fn infer_mutation_proposal_evidence_state(
     }
 }
 
-fn bounded_mutation_type_for_gate(
-    gate_category: &MutationProposalGateCategory,
-) -> MutationProposalBoundedMutationType {
-    match gate_category {
-        MutationProposalGateCategory::Mechanical => MutationProposalBoundedMutationType::Scenario,
-        MutationProposalGateCategory::Runtime => MutationProposalBoundedMutationType::Data,
-        MutationProposalGateCategory::Visual => MutationProposalBoundedMutationType::Scene,
-        MutationProposalGateCategory::Semantic => MutationProposalBoundedMutationType::Data,
-        MutationProposalGateCategory::Unsupported => MutationProposalBoundedMutationType::Data,
+fn bounded_mutation_type_for_classification(
+    category: &MutationClassificationCategory,
+) -> Option<MutationProposalBoundedMutationType> {
+    match category {
+        MutationClassificationCategory::GameplayLogic => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::LevelDesign => {
+            Some(MutationProposalBoundedMutationType::Scene)
+        }
+        MutationClassificationCategory::Asset => Some(MutationProposalBoundedMutationType::Data),
+        MutationClassificationCategory::PhysicsCollision => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::Input => {
+            Some(MutationProposalBoundedMutationType::Scenario)
+        }
+        MutationClassificationCategory::ScenarioAssertionFailure => {
+            Some(MutationProposalBoundedMutationType::Scenario)
+        }
+        MutationClassificationCategory::RuntimeCrash
+        | MutationClassificationCategory::ProbeFailure
+        | MutationClassificationCategory::RuntimeProbeFailure
+        | MutationClassificationCategory::ConsoleError
+        | MutationClassificationCategory::PerformanceRegression => {
+            Some(MutationProposalBoundedMutationType::Data)
+        }
+        MutationClassificationCategory::VisualMismatch => {
+            Some(MutationProposalBoundedMutationType::Scene)
+        }
+        MutationClassificationCategory::Flaky
+        | MutationClassificationCategory::MissingEvidence
+        | MutationClassificationCategory::Unsupported
+        | MutationClassificationCategory::Unknown => None,
+    }
+}
+
+fn mutation_allowed_type_for_selection(
+    bounded_type: &MutationProposalBoundedMutationType,
+) -> MutationProposalAllowedMutationType {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Scene => {
+            MutationProposalAllowedMutationType::SceneOnly
+        }
+        MutationProposalBoundedMutationType::Data
+        | MutationProposalBoundedMutationType::Scenario => {
+            MutationProposalAllowedMutationType::DataOnly
+        }
+    }
+}
+
+fn mutation_selection_target_path(
+    bounded_type: &MutationProposalBoundedMutationType,
+) -> &'static str {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Data => "seeds/evolve-v1-draft-target.yaml",
+        MutationProposalBoundedMutationType::Scene => "scenes/evolve-v1-draft-target.yaml",
+        MutationProposalBoundedMutationType::Scenario => "seeds/evolve-v1-draft-target.yaml",
+    }
+}
+
+fn mutation_selection_path(bounded_type: &MutationProposalBoundedMutationType) -> &'static str {
+    match bounded_type {
+        MutationProposalBoundedMutationType::Data => "data.evolve_controlled_failure",
+        MutationProposalBoundedMutationType::Scene => "scene.evolve_controlled_failure",
+        MutationProposalBoundedMutationType::Scenario => {
+            "scenarios.evolve-controlled-failure.assertions"
+        }
+    }
+}
+
+fn severity_rank(severity: &MutationBacklogSeverity) -> u8 {
+    match severity {
+        MutationBacklogSeverity::Low => 0,
+        MutationBacklogSeverity::Medium => 1,
+        MutationBacklogSeverity::High => 2,
+        MutationBacklogSeverity::Critical => 3,
     }
 }
 
@@ -29548,12 +29851,21 @@ fn mutation_classification_category_label(
     category: &MutationClassificationCategory,
 ) -> &'static str {
     match category {
+        MutationClassificationCategory::GameplayLogic => "gameplay_logic",
+        MutationClassificationCategory::LevelDesign => "level_design",
+        MutationClassificationCategory::Asset => "asset",
+        MutationClassificationCategory::PhysicsCollision => "physics_collision",
+        MutationClassificationCategory::Input => "input",
         MutationClassificationCategory::ScenarioAssertionFailure => "scenario_assertion_failure",
+        MutationClassificationCategory::RuntimeCrash => "runtime_crash",
+        MutationClassificationCategory::ProbeFailure => "probe_failure",
         MutationClassificationCategory::RuntimeProbeFailure => "runtime_probe_failure",
         MutationClassificationCategory::ConsoleError => "console_error",
         MutationClassificationCategory::PerformanceRegression => "performance_regression",
         MutationClassificationCategory::VisualMismatch => "visual_mismatch",
+        MutationClassificationCategory::Flaky => "flaky",
         MutationClassificationCategory::MissingEvidence => "missing_evidence",
+        MutationClassificationCategory::Unsupported => "unsupported",
         MutationClassificationCategory::Unknown => "unknown",
     }
 }
@@ -29669,6 +29981,14 @@ pub struct MutationProposalRationale {
     pub confidence_basis: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounded_mutation_type: Option<MutationProposalBoundedMutationType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_backlog_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backlog_read_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -29822,6 +30142,29 @@ impl MutationProposalRationale {
                 "mutation proposal rationale linked evidence_state requires justifying_evidence_ref"
             ));
         }
+        if let Some(backlog_item_id) = &self.selection_backlog_item_id {
+            require_text(
+                "mutation proposal rationale selection_backlog_item_id",
+                backlog_item_id,
+            )?;
+        }
+        if let Some(selection_source) = &self.selection_source {
+            require_text(
+                "mutation proposal rationale selection_source",
+                selection_source,
+            )?;
+        }
+        if let Some(selection_reason) = &self.selection_reason {
+            require_text(
+                "mutation proposal rationale selection_reason",
+                selection_reason,
+            )?;
+        }
+        if self.backlog_read_only == Some(false) {
+            return Err(anyhow!(
+                "mutation proposal rationale backlog_read_only cannot be false"
+            ));
+        }
         Ok(())
     }
 }
@@ -29838,12 +30181,21 @@ pub struct MutationProposalInput {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MutationClassificationCategory {
+    GameplayLogic,
+    LevelDesign,
+    Asset,
+    PhysicsCollision,
+    Input,
     ScenarioAssertionFailure,
+    RuntimeCrash,
+    ProbeFailure,
     RuntimeProbeFailure,
     ConsoleError,
     PerformanceRegression,
     VisualMismatch,
+    Flaky,
     MissingEvidence,
+    Unsupported,
     Unknown,
 }
 
@@ -29922,10 +30274,16 @@ impl MutationClassification {
                 scenario_result_ref,
             )?;
         }
-        if self.category != MutationClassificationCategory::Unknown && self.evidence_refs.is_empty()
+        if !matches!(
+            self.category,
+            MutationClassificationCategory::Unknown
+                | MutationClassificationCategory::Unsupported
+                | MutationClassificationCategory::Flaky
+                | MutationClassificationCategory::MissingEvidence
+        ) && self.evidence_refs.is_empty()
         {
             return Err(anyhow!(
-                "non-unknown mutation classifications require at least one evidence ref"
+                "non-unknown mutation classifications require at least one evidence ref; proposal-producing classifications must cite evidence"
             ));
         }
         Ok(())
@@ -30091,12 +30449,57 @@ fn push_unique_ref(refs: &mut Vec<String>, value: &str) {
     }
 }
 
+fn parse_declared_failure_class(value: &str) -> Option<MutationClassificationCategory> {
+    match value.trim().to_ascii_lowercase().replace('-', "_").as_str() {
+        "gameplay_logic" | "gameplay" => Some(MutationClassificationCategory::GameplayLogic),
+        "level_design" | "level" => Some(MutationClassificationCategory::LevelDesign),
+        "asset" | "assets" => Some(MutationClassificationCategory::Asset),
+        "physics_collision" | "physics" | "collision" => {
+            Some(MutationClassificationCategory::PhysicsCollision)
+        }
+        "input" => Some(MutationClassificationCategory::Input),
+        "scenario_assertion_failure" | "scenario" | "assertion" => {
+            Some(MutationClassificationCategory::ScenarioAssertionFailure)
+        }
+        "runtime_crash" | "crash" => Some(MutationClassificationCategory::RuntimeCrash),
+        "probe_failure" | "probe" => Some(MutationClassificationCategory::ProbeFailure),
+        "runtime_probe_failure" | "runtime_probe" => {
+            Some(MutationClassificationCategory::RuntimeProbeFailure)
+        }
+        "console_error" | "console" => Some(MutationClassificationCategory::ConsoleError),
+        "performance_regression" | "performance" => {
+            Some(MutationClassificationCategory::PerformanceRegression)
+        }
+        "visual_mismatch" | "visual" => Some(MutationClassificationCategory::VisualMismatch),
+        "flaky" => Some(MutationClassificationCategory::Flaky),
+        "missing_evidence" => Some(MutationClassificationCategory::MissingEvidence),
+        "unsupported" => Some(MutationClassificationCategory::Unsupported),
+        "unknown" => Some(MutationClassificationCategory::Unknown),
+        _ => None,
+    }
+}
+
 fn classify_failure_category(
     failure: &serde_json::Value,
     verdict: &serde_json::Value,
     _journal: &str,
     evidence_refs: &[String],
 ) -> (MutationClassificationCategory, String) {
+    for key in [
+        "failure_class",
+        "classification",
+        "classification_category",
+        "class",
+    ] {
+        if let Some(value) = failure.get(key).and_then(|value| value.as_str()) {
+            if let Some(category) = parse_declared_failure_class(value) {
+                return (
+                    category,
+                    format!("failure declares #692 classification `{value}`"),
+                );
+            }
+        }
+    }
     if evidence_refs.is_empty() {
         return (
             MutationClassificationCategory::Unknown,
@@ -30116,7 +30519,44 @@ fn classify_failure_category(
     .join(" ")
     .to_ascii_lowercase();
 
-    if haystack.contains("visual") || haystack.contains("screenshot") {
+    if haystack.contains("flaky") || haystack.contains("flake") {
+        (
+            MutationClassificationCategory::Flaky,
+            "failure is classified as flaky and remains backlog-only".to_string(),
+        )
+    } else if haystack.contains("unsupported") {
+        (
+            MutationClassificationCategory::Unsupported,
+            "failure is unsupported and remains backlog-only".to_string(),
+        )
+    } else if haystack.contains("gameplay_logic") || haystack.contains("gameplay logic") {
+        (
+            MutationClassificationCategory::GameplayLogic,
+            "failure references gameplay logic evidence".to_string(),
+        )
+    } else if haystack.contains("level_design") || haystack.contains("level design") {
+        (
+            MutationClassificationCategory::LevelDesign,
+            "failure references level design evidence".to_string(),
+        )
+    } else if haystack.contains("physics_collision")
+        || haystack.contains("physics/collision")
+        || haystack.contains("collision")
+        || haystack.contains("physics")
+    {
+        (
+            MutationClassificationCategory::PhysicsCollision,
+            "failure references physics or collision evidence".to_string(),
+        )
+    } else if haystack.contains("runtime_crash")
+        || haystack.contains("runtime crash")
+        || haystack.contains("crash")
+    {
+        (
+            MutationClassificationCategory::RuntimeCrash,
+            "failure references runtime crash evidence".to_string(),
+        )
+    } else if haystack.contains("visual") || haystack.contains("screenshot") {
         (
             MutationClassificationCategory::VisualMismatch,
             "failure references visual or screenshot evidence".to_string(),
@@ -30131,10 +30571,30 @@ fn classify_failure_category(
             MutationClassificationCategory::ConsoleError,
             "failure references console evidence".to_string(),
         )
-    } else if haystack.contains("runtime") || haystack.contains("probe") {
+    } else if haystack.contains("probe_failure")
+        || (haystack.contains("probe failure") && !haystack.contains("runtime probe failure"))
+    {
+        (
+            MutationClassificationCategory::ProbeFailure,
+            "failure references probe failure evidence".to_string(),
+        )
+    } else if haystack.contains("runtime") || haystack.contains("runtime_probe") {
         (
             MutationClassificationCategory::RuntimeProbeFailure,
             "failure references runtime probe evidence".to_string(),
+        )
+    } else if haystack.contains("input") || haystack.contains("control") {
+        (
+            MutationClassificationCategory::Input,
+            "failure references input or control evidence".to_string(),
+        )
+    } else if haystack.contains("asset")
+        || haystack.contains("sprite")
+        || haystack.contains("audio")
+    {
+        (
+            MutationClassificationCategory::Asset,
+            "failure references asset evidence".to_string(),
         )
     } else if haystack.contains("missing") && haystack.contains("evidence") {
         (
@@ -78863,6 +79323,10 @@ scenarios:
                 evidence_state: Some(MutationProposalEvidenceState::Linked),
                 confidence_basis: Some("bounded linked evidence signal".to_string()),
                 bounded_mutation_type: Some(MutationProposalBoundedMutationType::Scene),
+                selection_backlog_item_id: None,
+                selection_source: None,
+                selection_reason: None,
+                backlog_read_only: None,
             }),
         };
         let decision = MutationReviewDecision {
