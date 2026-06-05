@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "export-package-metadata-v1",
+  "projectId": "proj_export_bundle_fixture",
+  "title": "",
+  "version": "0.1.0",
+  "author": "Ouroforge local export",
+  "description": "A small local web export fixture for collect-and-exit.",
+  "icon": "assets/icon-placeholder.json",
+  "entryScene": "scene/main.json"
+}

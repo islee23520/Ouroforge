@@ -34,6 +34,7 @@ pub mod export_bundle;
 pub mod export_evidence;
 pub mod export_fingerprint;
 pub mod export_hash;
+pub mod export_package_metadata;
 pub mod export_plan;
 pub mod export_probe_check;
 pub mod export_profile;
