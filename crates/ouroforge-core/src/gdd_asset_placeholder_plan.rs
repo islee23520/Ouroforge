@@ -149,7 +149,7 @@ impl GddAssetPlaceholderPlanArtifact {
             &self.mechanics_mapping_ids,
             true,
         )?;
-        validate_ref_list(
+        validate_manifest_ref_list(
             "GDD asset placeholder plan manifestRefs",
             &self.manifest_refs,
             true,
@@ -285,7 +285,7 @@ fn validate_assets(
             )?;
         }
         if let Some(manifest_ref) = str_field(entry, "manifestRef") {
-            require_ref(
+            require_asset_ref(
                 "GDD asset placeholder plan assetEntries.manifestRef",
                 manifest_ref,
             )?;
@@ -476,13 +476,13 @@ fn validate_id_list(field: &str, values: &[String], required: bool) -> Result<()
     }
     Ok(())
 }
-fn validate_ref_list(field: &str, values: &[String], required: bool) -> Result<()> {
+fn validate_manifest_ref_list(field: &str, values: &[String], required: bool) -> Result<()> {
     if required {
         require_nonempty(field, values.len())?;
     }
     let mut seen = BTreeSet::new();
     for value in values {
-        require_ref(field, value)?;
+        require_asset_ref(field, value)?;
         if !seen.insert(value.as_str()) {
             return Err(anyhow!("{field} contains duplicate ref `{value}`"));
         }
@@ -583,16 +583,29 @@ fn require_text(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
-    value.contains(phrase)
-        && ![
-            "no ",
-            "not ",
-            "without ",
-            "avoid ",
-            "forbid ",
-            "forbidden ",
-            "out of scope ",
-        ]
-        .iter()
-        .any(|prefix| value.contains(&format!("{prefix}{phrase}")))
+    const NEGATIONS: [&str; 7] = [
+        "no ",
+        "not ",
+        "without ",
+        "avoid ",
+        "forbid ",
+        "forbidden ",
+        "out of scope ",
+    ];
+    // Judge every occurrence independently: an occurrence is allowed only when it
+    // is locally negated (immediately preceded by a negation prefix). A later
+    // positive copy must not be suppressed by an earlier negated one, so e.g.
+    // `no remote fetch; remote fetch enabled` still fails closed.
+    let mut search_start = 0;
+    while let Some(rel) = value[search_start..].find(phrase) {
+        let idx = search_start + rel;
+        let locally_negated = NEGATIONS
+            .iter()
+            .any(|prefix| value[..idx].ends_with(prefix));
+        if !locally_negated {
+            return true;
+        }
+        search_start = idx + phrase.len();
+    }
+    false
 }

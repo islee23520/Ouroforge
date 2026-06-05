@@ -68,6 +68,14 @@ fn invalid_asset_plan_fixtures_fail_closed() {
             "invalid/asset-plan.stale-no-blocker.fixture.json",
             "stale manifest refs",
         ),
+        (
+            "invalid/asset-plan.manifest-generated-root.fixture.json",
+            "generated-root or evidence output",
+        ),
+        (
+            "invalid/asset-plan.boundary-negation-bypass.fixture.json",
+            "forbidden GDD asset authority text",
+        ),
     ] {
         let error = GddAssetPlaceholderPlanArtifact::from_json_str(&read_fixture(name))
             .expect_err(name)
