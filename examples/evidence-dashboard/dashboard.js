@@ -501,6 +501,44 @@ const OuroforgeDashboard = (() => {
       <p class="run-meta">${escapeText(preview.boundary || 'Read-only asset preview evidence. The dashboard never fetches remote assets, uploads files, writes trusted state, or executes commands.')}</p>`;
   }
 
+  function renderPluginRegistry(run = {}) {
+    const registry = run.plugin_registry || run.pluginRegistry || {};
+    if (!registry.present) {
+      return `<p class="empty-state">${escapeText(registry.empty_state || 'No plugin registry evidence is available for this run.')}</p>`;
+    }
+    const registries = Array.isArray(registry.registries) ? registry.registries : [];
+    const refs = Array.isArray(registry.evidence_refs || registry.evidenceRefs) ? (registry.evidence_refs || registry.evidenceRefs) : [];
+    const rows = [
+      ['Status', registry.status || 'unknown'],
+      ['Registries', registry.registry_count ?? registry.registryCount ?? registries.length],
+      ['Plugins', registry.plugin_count ?? registry.pluginCount ?? registries.reduce((count, item) => count + (item.plugin_count ?? item.pluginCount ?? (Array.isArray(item.plugins) ? item.plugins.length : 0)), 0)],
+      ['Blocked', registry.blocked_count ?? registry.blockedCount ?? 0],
+      ['Malformed', registry.malformed_count ?? registry.malformedCount ?? 0],
+    ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+    const registryRows = registries.length
+      ? registries.map((item) => {
+          const plugins = Array.isArray(item.plugins) ? item.plugins : [];
+          const pluginRows = plugins.slice(0, 12).map((plugin) => {
+            const caps = Array.isArray(plugin.declared_capabilities || plugin.declaredCapabilities) ? (plugin.declared_capabilities || plugin.declaredCapabilities).join(', ') : 'none';
+            const points = Array.isArray(plugin.extension_points || plugin.extensionPoints) ? (plugin.extension_points || plugin.extensionPoints).join(', ') : 'none';
+            const reasons = Array.isArray(plugin.blocked_reasons || plugin.blockedReasons) ? (plugin.blocked_reasons || plugin.blockedReasons).join(' · ') : '';
+            return `<li><strong>${escapeText(plugin.plugin_id || plugin.pluginId || 'unknown plugin')}</strong>: <span class="${statusClass(plugin.validation_status || plugin.validationStatus)}">${escapeText(plugin.validation_status || plugin.validationStatus || 'unknown')}</span> / <span class="${statusClass(plugin.compatibility_status || plugin.compatibilityStatus)}">${escapeText(plugin.compatibility_status || plugin.compatibilityStatus || 'unknown')}</span><br><small>version ${escapeText(plugin.manifest_version || plugin.manifestVersion || 'unknown')} · hash ${escapeText(plugin.manifest_hash || plugin.manifestHash || 'hash missing')} · manifest ${escapeText(plugin.manifest_path || plugin.manifestPath || 'manifest missing')} · capabilities ${escapeText(caps)} · extension points ${escapeText(points)}</small>${reasons ? `<div class="artifact-warning">${escapeText(reasons)}</div>` : ''}</li>`;
+          }).join('') || '<li>No plugin rows exported.</li>';
+          const blocked = Array.isArray(item.blocked_reasons || item.blockedReasons) ? (item.blocked_reasons || item.blockedReasons) : [];
+          return `<article class="artifact"><h4>${escapeText(item.registry_id || item.registryId || 'plugin registry')}</h4>
+            <div class="run-meta">project ${escapeText(item.project_id || item.projectId || 'unknown')} · run ${escapeText(item.run_id || item.runId || 'unknown')} · ledger ${escapeText(item.ledger_ref || item.ledgerRef || 'none')}</div>
+            <div class="run-meta">status ${escapeText(item.status || 'unknown')} · plugins ${escapeText(item.plugin_count ?? item.pluginCount ?? plugins.length)} · blocked ${escapeText(item.blocked_count ?? item.blockedCount ?? blocked.length)}</div>
+            ${blocked.length ? `<div class="artifact-warning">Blocked: ${escapeText(blocked.join(' · '))}</div>` : ''}
+            <ul class="run-meta-list">${pluginRows}</ul>
+          </article>`;
+        }).join('')
+      : '<p class="empty-state compact">No parsed plugin registry rows are available.</p>';
+    return `<div class="field-grid">${rows}</div>
+      <div class="artifact-grid">${registryRows}</div>
+      ${renderRefLinks('Plugin registry evidence refs', refs, run)}
+      <p class="run-meta">${escapeText(registry.boundary || 'Read-only plugin registry evidence. The dashboard never installs plugins, runs commands, writes trusted files, or loads executable extensions.')}</p>`;
+  }
+
   function renderSourceApplyWorktreeContext(run = {}) {
     const context = run.source_apply_worktree_context || run.sourceApplyWorktreeContext || {};
     if (!context.present) {
@@ -2030,6 +2068,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Asset reference integrity</h3>${renderAssetIntegrity(run)}</section>
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
+      <section class="panel"><h3>Plugin registry browser</h3>${renderPluginRegistry(run)}</section>
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
       <section class="panel"><h3>Route attempt evidence</h3>${renderRouteAttempts(run)}</section>
@@ -2135,7 +2174,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderPluginRegistry, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

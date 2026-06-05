@@ -444,6 +444,30 @@ const run = {
       { assetId: 'missing_audio', assetType: 'audio', sourcePath: 'assets/audio/missing.ogg', contentHash: 'hash-missing', runtimeStatuses: ['Failed'], warnings: ['missing_asset_file'] },
     ],
   },
+  plugin_registry: {
+    present: true,
+    status: 'blocked',
+    registry_count: 1,
+    plugin_count: 2,
+    blocked_count: 1,
+    malformed_count: 0,
+    evidence_refs: ['evidence/plugins/plugin-registry-fixture.json'],
+    boundary: 'Read-only plugin registry browser data; dashboard/Studio surfaces must not install, update, delete, enable executable plugins, run commands, mutate source, publish, deploy, or write trusted files.',
+    registries: [{
+      registryId: 'plugin-registry-fixture',
+      projectId: 'demo_project',
+      runId: 'run-plugin-registry-fixture',
+      ledgerRef: 'runs/plugin-registry-fixture/ledger.jsonl',
+      status: 'blocked',
+      pluginCount: 2,
+      blockedCount: 1,
+      blockedReasons: ['blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog'],
+      plugins: [
+        { pluginId: 'read-only-dashboard-panel', manifestPath: 'plugins/read-only-dashboard-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:1111222233334444', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json'], blockedReasons: [] },
+        { pluginId: 'blocked-command-panel', manifestPath: 'plugins/blocked-command-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:aaaabbbbccccdddd', manifestVersion: '0.1.0', validationStatus: 'blocked', compatibilityStatus: 'incompatible', declaredCapabilities: ['studioInspectorPanel'], extensionPoints: ['studio.inspector.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json'], blockedReasons: ['manifest requested executable command authority outside the v1 declarative catalog'] },
+      ],
+    }],
+  },
   project: {
     id: 'minimal_2d',
     name: 'Minimal 2D Ouroforge Project',
@@ -961,7 +985,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not ru
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 30);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 31);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -2032,6 +2056,7 @@ assert.match(assetInspectorMarkup, /asset-integrity\.json/);
 assert.match(assetInspectorMarkup, /no upload, write, fetch, or execute controls/);
 assert.match(assetInspectorMarkup, /browser cannot upload assets, write manifests, fetch remote assets, or execute commands/);
 assert.match(cockpit.renderStudioAssetInspectorSurface({}), /No asset inspector data/);
+assert.match(cockpit.renderPluginRegistryBrowserSurface({}), /No plugin registry evidence/);
 assert.match(cockpit.renderEvidencePane(run), /Runtime asset loading/);
 assert.match(cockpit.renderEvidencePane(run), /Asset preview evidence/);
 assert.match(cockpit.renderEvidencePane(run), /Source apply context/);
@@ -2044,6 +2069,7 @@ assert.match(cockpit.renderSourceApplyWorktreeContextSurface({}), /No source app
 assert.match(cockpit.renderEvidencePane(run), /Visual diff preview/);
 assert.match(cockpit.renderEvidencePane(run), /Tilemap draft previews/);
 assert.match(cockpit.renderEvidencePane(run), /Asset inspector/);
+assert.match(cockpit.renderEvidencePane(run), /Plugin registry browser/);
 assert.match(cockpit.renderEvidencePane(run), /Loop cockpit/);
 
 const studioPipelineInspection = {
@@ -2411,3 +2437,7 @@ assert.match(performanceRegressionSurface, /Browser metrics are advisory evidenc
 assert.doesNotMatch(performanceRegressionSurface, /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
 assert.match(cockpit.renderPerformanceRegressionLaneSurface(null), /No performance\/regression lane/);
 assert.match(cockpit.renderEvidencePane({ ...run, performanceRegressionLane }), /Performance\/regression lane/);
+
+const pluginRegistrySurfaceXss = cockpit.renderPluginRegistryBrowserSurface({ plugin_registry: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], registries: [{ registryId: '<img src=x onerror=alert(1)>', plugins: [{ pluginId: '<img src=x onerror=alert(1)>', manifestPath: '<script>manifest</script>', manifestHash: '<script>hash</script>', manifestVersion: '<script>version</script>', validationStatus: '<script>valid</script>', compatibilityStatus: '<script>compat</script>', declaredCapabilities: ['<script>cap</script>'], extensionPoints: ['<script>point</script>'], blockedReasons: ['<script>reason</script>'] }] }] } });
+assert.ok(!pluginRegistrySurfaceXss.includes('<script>blocked</script>'), 'plugin registry Studio status must be escaped');
+assert.ok(!pluginRegistrySurfaceXss.includes('<img src=x onerror=alert(1)>'), 'plugin registry Studio rows must be escaped');

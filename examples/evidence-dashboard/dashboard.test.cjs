@@ -83,6 +83,30 @@ const run = {
     ],
     warnings: [{ assetId: 'missing_audio', kind: 'missing_asset_file', message: 'missing audio preview source', path: 'assets/audio/missing.ogg' }],
   },
+  plugin_registry: {
+    present: true,
+    status: 'blocked',
+    registry_count: 1,
+    plugin_count: 2,
+    blocked_count: 1,
+    malformed_count: 0,
+    evidence_refs: ['evidence/plugins/plugin-registry-fixture.json'],
+    boundary: 'Read-only plugin registry browser data; dashboard/Studio surfaces must not install, update, delete, enable executable plugins, run commands, mutate source, publish, deploy, or write trusted files.',
+    registries: [{
+      registryId: 'plugin-registry-fixture',
+      projectId: 'demo_project',
+      runId: 'run-plugin-registry-fixture',
+      ledgerRef: 'runs/plugin-registry-fixture/ledger.jsonl',
+      status: 'blocked',
+      pluginCount: 2,
+      blockedCount: 1,
+      blockedReasons: ['blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog'],
+      plugins: [
+        { pluginId: 'read-only-dashboard-panel', manifestPath: 'plugins/read-only-dashboard-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:1111222233334444', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json'], blockedReasons: [] },
+        { pluginId: 'blocked-command-panel', manifestPath: 'plugins/blocked-command-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:aaaabbbbccccdddd', manifestVersion: '0.1.0', validationStatus: 'blocked', compatibilityStatus: 'incompatible', declaredCapabilities: ['studioInspectorPanel'], extensionPoints: ['studio.inspector.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json'], blockedReasons: ['manifest requested executable command authority outside the v1 declarative catalog'] },
+      ],
+    }],
+  },
   runtime_invariants: {
     present: true,
     status: 'failed',
@@ -1102,6 +1126,12 @@ assert.match(dashboard.renderAssetLoading(run), /Image load failed/);
 assert.match(dashboard.renderAssetPreview(run), /Asset preview evidence refs/);
 assert.match(dashboard.renderAssetPreview(run), /player_atlas/);
 assert.match(dashboard.renderAssetPreview(run), /missing_asset_file/);
+assert.match(dashboard.renderPluginRegistry(run), /Plugin registry evidence refs/);
+assert.match(dashboard.renderPluginRegistry(run), /read-only-dashboard-panel/);
+assert.match(dashboard.renderPluginRegistry(run), /fnv1a64-canonical-json-v1:1111222233334444/);
+assert.match(dashboard.renderPluginRegistry(run), /dashboardPanel/);
+assert.match(dashboard.renderPluginRegistry(run), /studio.inspector.readOnly/);
+assert.match(dashboard.renderPluginRegistry(run), /executable command authority/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /Source apply context evidence refs/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /source-apply-worktree-boundary-v1/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /dirty-target/);
@@ -1128,6 +1158,7 @@ assert.doesNotMatch(dashboard.renderSourceApplyWorktreeContext(run), /<button|on
 assert.match(dashboard.renderRunDetail(run), /Asset reference integrity/);
 assert.match(dashboard.renderRunDetail(run), /Runtime asset loading/);
 assert.match(dashboard.renderRunDetail(run), /Asset preview evidence/);
+assert.match(dashboard.renderRunDetail(run), /Plugin registry browser/);
 assert.match(dashboard.renderRunDetail(run), /Source apply worktree context/);
 assert.match(dashboard.renderRunDetail(run), /Runtime invariant evidence/);
 assert.match(dashboard.renderRunDetail(run), /Route attempt evidence/);
@@ -1139,6 +1170,7 @@ assert.match(dashboard.renderRunDetail(run), /stale_asset_hash/);
 assert.match(dashboard.renderAssetIntegrity({ asset_integrity: { present: false, empty_state: 'No integrity evidence' } }), /No integrity evidence/);
 assert.match(dashboard.renderAssetLoading({ asset_loading: { present: false, empty_state: 'No loading evidence' } }), /No loading evidence/);
 assert.match(dashboard.renderAssetPreview({ asset_preview: { present: false, empty_state: 'No preview evidence' } }), /No preview evidence/);
+assert.match(dashboard.renderPluginRegistry({ plugin_registry: { present: false, empty_state: 'No plugin evidence' } }), /No plugin evidence/);
 assert.match(dashboard.renderSourceApplyWorktreeContext({ source_apply_worktree_context: { present: false, empty_state: 'No context evidence' } }), /No context evidence/);
 assert.match(dashboard.renderRuntimeInvariants({ runtime_invariants: { present: false, empty_state: 'No invariant evidence' } }), /No invariant evidence/);
 assert.match(dashboard.renderRouteAttempts({ route_attempts: { present: false, empty_state: 'No route attempt evidence' } }), /No route attempt evidence/);
@@ -1723,3 +1755,7 @@ assert.match(performanceRegressionMarkup, /Read-only performance\/regression lan
 assert.doesNotMatch(performanceRegressionMarkup, /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand/);
 assert.match(dashboard.renderPerformanceRegressionLanes({ performanceRegressionLanes: { present: false, emptyState: 'No lanes.' } }), /No lanes/);
 assert.match(dashboard.renderRunDetail({ ...run, performanceRegressionLanes: { present: true, lanes: [performanceRegressionLane] } }), /Performance\/regression lanes/);
+
+const pluginRegistryXss = dashboard.renderPluginRegistry({ plugin_registry: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], registries: [{ registryId: '<img src=x onerror=alert(1)>', projectId: '<script>project</script>', runId: '<script>run</script>', ledgerRef: '<script>ledger</script>', status: '<script>status</script>', blockedReasons: ['<script>blocked</script>'], plugins: [{ pluginId: '<img src=x onerror=alert(1)>', manifestPath: '<script>manifest</script>', manifestHash: '<script>hash</script>', manifestVersion: '<script>version</script>', validationStatus: '<script>valid</script>', compatibilityStatus: '<script>compat</script>', declaredCapabilities: ['<script>cap</script>'], extensionPoints: ['<script>point</script>'], blockedReasons: ['<script>reason</script>'] }] }] } });
+assert.ok(!pluginRegistryXss.includes('<script>blocked</script>'), 'plugin registry status must be escaped');
+assert.ok(!pluginRegistryXss.includes('<img src=x onerror=alert(1)>'), 'plugin registry rows must be escaped');
