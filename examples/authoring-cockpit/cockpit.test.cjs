@@ -90,6 +90,42 @@ const run = {
     environmentHints: ['The cockpit does not execute commands'],
   },
 
+  qa_swarm_inspection: {
+    present: true,
+    status: '<needs-review>',
+    panel_count: 3,
+    missing_panel_count: 0,
+    malformed_panel_count: 1,
+    item_count: 4,
+    evidence_refs: ['evidence/qa/<candidate>.json'],
+    boundary: 'Read-only QA/playtest swarm inspection; Studio must not spawn <workers>, execute commands, bridge to cloud runners, write trusted state, auto-fix, auto-apply, auto-merge, self-approve, or claim quality guarantees.',
+    panels: [{
+      panel_id: 'scenario-candidates',
+      title: 'Scenario <candidate> panel',
+      status: 'proposed',
+      item_count: 1,
+      malformed_count: 0,
+      evidence_refs: ['evidence/qa/<candidate>.json'],
+      boundary: 'Read-only scenario candidates; Studio must not run candidates.',
+    }, {
+      panel_id: 'worker-assignments',
+      title: 'Worker budget/assignment panel',
+      status: 'blocked',
+      item_count: 2,
+      malformed_count: 0,
+      evidence_refs: ['evidence/qa/worker-assignment.json'],
+      boundary: 'Read-only worker assignments; Studio must not spawn workers.',
+    }, {
+      panel_id: 'visual-performance-error-evidence',
+      title: 'Visual/performance/error evidence panel',
+      status: 'malformed',
+      item_count: 1,
+      malformed_count: 1,
+      evidence_refs: ['evidence/qa/<bad>.json'],
+      boundary: 'Read-only visual evidence; Studio must not compute trusted diffs or run probes.',
+    }],
+  },
+
   loop_dry_run: {
     schemaVersion: 'authoring-loop-dry-run-v1',
     loopId: '<loop-1>',
@@ -2335,6 +2371,16 @@ assert.match(multiAgentDemoDoc, /Issues #1 and #23 must remain open/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Source patch evidence bundle/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /bundle-1/);
 assert.match(cockpit.renderSourcePatchEvidenceBundleSurface(run), /Review docs patch preview/);
+
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /QA swarm inspection/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /Scenario &lt;candidate&gt; panel/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /Worker budget\/assignment panel/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /Visual\/performance\/error evidence panel/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /evidence\/qa\/&lt;candidate&gt;\.json/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(run), /must not spawn &lt;workers&gt;, execute commands/);
+assert.doesNotMatch(cockpit.renderQaSwarmInspectionSurface(run), /<script>|<button|executeCommand|browserCommandBridge|applyCommand|mergeCommand|selfApprovalCommand|cloudRunnerCommand/);
+assert.match(cockpit.renderQaSwarmInspectionSurface(null), /No QA swarm inspection summary/);
+assert.match(cockpit.renderIntegration(run), /QA swarm inspection/);
 
 assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /QA agent work queue/);
 assert.match(cockpit.renderQaAgentWorkQueueSurface(run), /&lt;qa-item&gt;/);
