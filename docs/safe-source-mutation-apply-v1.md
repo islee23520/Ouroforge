@@ -1,11 +1,12 @@
 # Safe Source Mutation Apply v1
 
-Safe Source Mutation Apply v1 defines the bounded contract for any future trusted
-source patch application in Ouroforge. It is a governance and implementation
-scope document: source patches may reach the trusted worktree only through a
-validated preview, sandbox dry-run evidence, an accepted independent review,
-stale-target checks, rollback metadata, allowlisted verification, and
-post-apply comparison evidence.
+Safe Source Mutation Apply v1 defines the bounded completed contract for trusted
+source patch application in Ouroforge after the #699-#716 evidence chain. It is
+a governance and implementation scope document: source patches may reach the
+trusted worktree only through a validated preview, sandbox dry-run evidence, an
+accepted independent review, stale-target checks, rollback metadata, allowlisted
+verification, emergency hold checks, audit evidence, and post-apply comparison
+evidence.
 
 This milestone does not authorize unrestricted source mutation, auto-apply,
 auto-merge, reviewer bypass, dependency mutation, CI/workflow mutation,
@@ -111,7 +112,7 @@ A Safe Source Mutation Apply v1 issue cannot close until its own scope has:
 - no browser apply/write/command bridge, unrestricted source mutation,
   dependency/CI/build mutation, or production-ready claim.
 
-For the milestone as a whole, #716 is the final governance refresh and must not
-mark Safe Source Mutation Apply v1 complete until implementation evidence from
-#700 through #715 exists or unresolved items are explicitly deferred with open
-follow-up anchors.
+For the milestone as a whole, #716 is the final governance refresh that records
+Safe Source Mutation Apply v1 as complete only because implementation evidence
+from #700 through #715 exists. Later work must not broaden source apply beyond
+that bounded chain without a new explicit governance issue and fresh evidence.

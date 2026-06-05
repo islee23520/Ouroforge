@@ -70,8 +70,9 @@ allowlisted verification runner, post-apply rerun/comparison evidence,
 dependency/CI/build-script blockers, append-only audit ledger, evidence bundle,
 read-only Studio/dashboard inspection, deterministic demo, Scenario Coverage
 v14, emergency hold/kill-switch, and conservative governance refresh, and a
-completed Build / Export / Packaging v1 local export foundation: export target matrix, export profile, dry-run export
-plan, deterministic staging, local web bundle assembly, asset manifest/path
+completed Build / Export / Packaging v1 local export foundation: export target
+matrix, export profile, dry-run export plan, deterministic staging, local web
+bundle assembly, asset manifest/path
 rewriting, runtime probe preservation, checksums/provenance, export verification
 evidence, fixture-scoped Scenario Coverage v15, read-only inspection, and
 explicit release/publish blockers, and a completed Foundation Hardening v1
