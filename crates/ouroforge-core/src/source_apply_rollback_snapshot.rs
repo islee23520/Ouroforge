@@ -144,6 +144,13 @@ impl SourceApplyRollbackSnapshot {
     pub fn evaluate(&self) -> SourceApplyRollbackEvaluation {
         let mut gaps = Vec::new();
 
+        if self.targets.is_empty() {
+            gaps.push(
+                "rollback snapshot records no targets, so it cannot roll back the apply transaction"
+                    .to_string(),
+            );
+        }
+
         if self.snapshot_base_revision != self.transaction_base_revision {
             gaps.push(
                 "rollback snapshot is stale: recorded against a different base revision"

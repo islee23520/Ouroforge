@@ -125,6 +125,23 @@ fn empty_targets_fail_validation() {
 }
 
 #[test]
+fn empty_targets_block_completeness() {
+    // `is_complete()`/`evaluate()` are the fail-closed readiness gate and must
+    // not report a snapshot that records no targets as Complete, even though
+    // every other field is well formed.
+    let mut snapshot = complete_fixture();
+    snapshot.targets.clear();
+    let evaluation = snapshot.evaluate();
+    assert_eq!(evaluation.status, SourceApplyRollbackStatus::Blocked);
+    assert_eq!(evaluation.target_count, 0);
+    assert!(evaluation
+        .recovery_gaps
+        .iter()
+        .any(|gap| gap.contains("records no targets")));
+    assert!(!snapshot.is_complete());
+}
+
+#[test]
 fn malformed_json_is_rejected() {
     let malformed =
         r#"{"schemaVersion":"source-apply-rollback-snapshot-v1","unexpectedField":true}"#;
