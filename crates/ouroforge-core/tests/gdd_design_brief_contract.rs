@@ -195,6 +195,22 @@ fn gdd_design_brief_read_model_keeps_partial_blocked_and_malformed_states_visibl
 }
 
 #[test]
+fn gdd_design_brief_requires_blocked_reasons_top_level_field() {
+    // The published gdd-design-brief-v1 contract lists blockedReasons as a required
+    // top-level field, so a brief that omits it must fail closed rather than silently
+    // defaulting to an empty list.
+    let mut value: serde_json::Value = serde_json::from_str(valid_fixture()).expect("fixture json");
+    value
+        .as_object_mut()
+        .expect("brief object")
+        .remove("blockedReasons");
+    let missing = GddDesignBriefArtifact::from_json_str(&value.to_string())
+        .expect_err("missing blockedReasons is rejected");
+    assert!(missing
+        .to_string()
+        .contains("failed to parse GDD Design Brief JSON"));
+}
+#[test]
 fn gdd_design_brief_docs_audit_generation_boundary() {
     let doc = include_str!("../../../docs/gdd-design-brief-v1.md");
     assert!(doc.contains("Issue: #645"));

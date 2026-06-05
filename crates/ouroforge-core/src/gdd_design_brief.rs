@@ -84,7 +84,7 @@ pub struct GddDesignBriefArtifact {
     pub non_goals: Vec<GddTextItem>,
     #[serde(rename = "acceptanceGoals")]
     pub acceptance_goals: Vec<GddTextItem>,
-    #[serde(rename = "blockedReasons", default)]
+    #[serde(rename = "blockedReasons")]
     pub blocked_reasons: Vec<String>,
     pub boundary: String,
 }
