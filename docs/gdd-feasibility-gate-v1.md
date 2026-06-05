@@ -7,25 +7,26 @@ Status: feasibility gate artifact, deterministic state rules, fixtures, and disp
 
 ## Artifact shape
 
-Top-level fields include `schemaVersion`, `gateId`, `status`, `sourceRequirementExtractionRef`, `sourceMechanicsMappingRef`, `targetPrototypeSize`, `limits`, `supportedMechanics`, `requiredPriorMilestones`, `acceptanceCriteria`, `scenarioPlanRefs`, `assetSourceRisks`, `riskFlags`, `blockedRisks`, `knownGaps`, optional `sliceRecommendation`, `deterministicRule`, and `boundary`.
+Top-level fields are `schemaVersion`, `gateId`, `state`, `mechanicsMappingRef`, `targetPrototypeSize`, `supportedMechanics`, `requiredPriorMilestones`, `acceptanceCriteriaRefs`, `scenarioPlanRefs`, `riskFlags`, `knownGaps`, optional `sliceRecommendation`, and `boundary`. `targetPrototypeSize` carries the scope limits (`maxScenes`, `maxLevels`, `maxEntities`, `maxAssets`, `maxMechanics`).
 
-Allowed states are `pass`, `fail`, `defer`, `slice`, and `blocked`. The deterministic rule must define pass/fail/defer behavior. Passing gates must have complete prior milestones and no blocked or asset-source risks. Deferred or sliced gates require visible risks/gaps plus a downgrade, defer, or bounded slice recommendation.
+Allowed states are `pass`, `fail`, `defer`, `downgrade`, and `blocked`. The deterministic state rule defines pass/fail/defer behavior. Passing gates must have complete prior milestones and no blocking risk flags. Deferred or downgraded gates require visible risk flags or known gaps plus a downgrade, defer, or bounded slice recommendation.
 
 ## Validation gates
 
-Rust/local validation rejects missing mechanics mappings, unsupported or overbroad limits, unclear acceptance criteria, asset/source risks on passing gates, missing scenario plans, missing prior capability prerequisites, deferred/sliced gates without recommendations, and unsafe authority wording.
+Rust/local validation rejects missing mechanics mappings, unsupported or overbroad limits, unclear acceptance criteria, blocking risk flags on passing gates, missing scenario plans, missing prior capability prerequisites, deferred/downgraded gates without recommendations, and unsafe authority wording.
 
 ## Fixtures
 
 Valid/visible-state fixtures:
 
-- `examples/gdd-feasibility-gate-v1/feasibility.pass.fixture.json`
-- `examples/gdd-feasibility-gate-v1/feasibility.fail.fixture.json`
-- `examples/gdd-feasibility-gate-v1/feasibility.defer.fixture.json`
-- `examples/gdd-feasibility-gate-v1/feasibility.slice.fixture.json`
-- `examples/gdd-feasibility-gate-v1/feasibility.blocked.fixture.json`
+- `examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json` (`pass`)
+- `examples/gdd-feasibility-gate-v1/feasibility.infeasible.fixture.json` (`fail`)
+- `examples/gdd-feasibility-gate-v1/feasibility.deferred.fixture.json` (`defer`)
+- `examples/gdd-feasibility-gate-v1/feasibility.downgraded.fixture.json` (`downgrade`)
+- `examples/gdd-feasibility-gate-v1/feasibility.overbroad.fixture.json` (`fail`)
+- `examples/gdd-feasibility-gate-v1/feasibility.blocked.fixture.json` (`blocked`)
 
-Invalid fixtures under `examples/gdd-feasibility-gate-v1/invalid/` cover missing mappings, overbroad scope, unclear acceptance, asset risk on pass, missing scenario plan, missing prior prerequisite, defer without slice recommendation, and unsafe wording.
+Invalid fixtures under `examples/gdd-feasibility-gate-v1/invalid/` cover missing mappings, unsupported mechanics without risk, overbroad scope without risk, unclear acceptance, missing scenario plan, missing prior prerequisite, defer without slice recommendation, and unsafe wording.
 
 ## Boundaries
 
