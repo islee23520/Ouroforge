@@ -44,6 +44,7 @@ pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;
 pub mod plugin_manifest;
+pub mod plugin_permission;
 pub mod plugin_registry;
 pub mod source_apply_audit_ledger;
 pub use source_apply_audit_ledger::*;

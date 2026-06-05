@@ -49,6 +49,10 @@ pub struct PluginManifest {
     pub paths: PluginManifestPaths,
     #[serde(rename = "descriptorRefs", default)]
     pub descriptor_refs: Vec<PluginManifestDescriptorRef>,
+    /// Optional declared permissions, validated against the fail-closed
+    /// permission allowlist (#742). Declarations only; granting no runtime power.
+    #[serde(default)]
+    pub permissions: Vec<String>,
     pub boundary: String,
 }
 
@@ -105,6 +109,7 @@ pub struct PluginManifestReadModel {
     pub declared_capabilities: Vec<String>,
     #[serde(rename = "extensionPoints")]
     pub extension_points: Vec<String>,
+    pub permissions: Vec<String>,
     #[serde(rename = "descriptorRefCount")]
     pub descriptor_ref_count: usize,
     #[serde(rename = "docCount")]
@@ -180,6 +185,10 @@ impl PluginManifest {
         }
 
         self.paths.validate()?;
+        crate::plugin_permission::validate_permissions(
+            "plugin manifest permissions",
+            &self.permissions,
+        )?;
         require_manifest_boundary("plugin manifest boundary", &self.boundary)?;
         Ok(())
     }
@@ -220,6 +229,8 @@ impl PluginManifest {
         declared_capabilities.sort();
         let mut extension_points = self.extension_points.clone();
         extension_points.sort();
+        let mut permissions = self.permissions.clone();
+        permissions.sort();
         PluginManifestReadModel {
             schema_version: self.schema_version.clone(),
             plugin_id: self.plugin_id.clone(),
@@ -227,6 +238,7 @@ impl PluginManifest {
             version: self.version.clone(),
             declared_capabilities,
             extension_points,
+            permissions,
             descriptor_ref_count: self.descriptor_refs.len(),
             doc_count: self.paths.docs.len(),
             asset_count: self.paths.assets.len(),
@@ -508,6 +520,33 @@ mod tests {
             serde_json::json!(["dashboard.panels.readOnly", "source.write.unsafe"]);
         // Blocked categories are rejected by the catalog membership check.
         expect_invalid(manifest, "not in the v1 allowlist");
+    }
+
+    #[test]
+    fn accepts_allowed_permissions() {
+        let mut manifest = base_manifest();
+        manifest["permissions"] = serde_json::json!(["read_docs", "read_evidence"]);
+        let parsed = PluginManifest::from_json_str(&manifest.to_string())
+            .expect("allowed permissions validate");
+        assert_eq!(parsed.permissions.len(), 2);
+        assert_eq!(
+            parsed.read_model().permissions,
+            ["read_docs", "read_evidence"]
+        );
+    }
+
+    #[test]
+    fn rejects_blocked_permission() {
+        let mut manifest = base_manifest();
+        manifest["permissions"] = serde_json::json!(["read_docs", "run_command"]);
+        expect_invalid(manifest, "blocked");
+    }
+
+    #[test]
+    fn rejects_unknown_permission() {
+        let mut manifest = base_manifest();
+        manifest["permissions"] = serde_json::json!(["super_admin"]);
+        expect_invalid(manifest, "not in the v1 permission allowlist");
     }
 
     #[test]

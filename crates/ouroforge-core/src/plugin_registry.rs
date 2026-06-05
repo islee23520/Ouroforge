@@ -60,6 +60,7 @@ pub struct PluginRegistryEntry {
     pub declared_capabilities: Vec<String>,
     #[serde(rename = "extensionPoints")]
     pub extension_points: Vec<String>,
+    pub permissions: Vec<String>,
     #[serde(rename = "compatibilityStatus")]
     pub compatibility_status: PluginRegistryCompatibility,
     #[serde(rename = "manifestHash")]
@@ -90,6 +91,8 @@ pub struct PluginRegistryReadModel {
     pub capability_summary: Vec<String>,
     #[serde(rename = "extensionPointSummary")]
     pub extension_point_summary: Vec<String>,
+    #[serde(rename = "permissionSummary")]
+    pub permission_summary: Vec<String>,
     pub boundary: String,
 }
 
@@ -101,6 +104,7 @@ impl PluginRegistry {
         let mut incompatible_count = 0;
         let mut capability_summary = Vec::new();
         let mut extension_point_summary = Vec::new();
+        let mut permission_summary = Vec::new();
         for entry in &self.entries {
             match entry.validation_status {
                 PluginRegistryStatus::Valid => valid_count += 1,
@@ -120,11 +124,19 @@ impl PluginRegistry {
                     .iter()
                     .map(|point| format!("{}:{point}", entry.plugin_id)),
             );
+            permission_summary.extend(
+                entry
+                    .permissions
+                    .iter()
+                    .map(|permission| format!("{}:{permission}", entry.plugin_id)),
+            );
         }
         capability_summary.sort();
         capability_summary.dedup();
         extension_point_summary.sort();
         extension_point_summary.dedup();
+        permission_summary.sort();
+        permission_summary.dedup();
         PluginRegistryReadModel {
             root: self.root.clone(),
             plugin_count: self.entries.len(),
@@ -134,6 +146,7 @@ impl PluginRegistry {
             incompatible_count,
             capability_summary,
             extension_point_summary,
+            permission_summary,
             boundary: "Read-only plugin registry summary; declarative discovery only, with no plugin execution, no command execution, no network install, and no trusted writes.".to_string(),
         }
     }
@@ -240,6 +253,7 @@ fn blocked_entry(base: &Path, path: &Path, reason: &str) -> PluginRegistryEntry 
         validation_errors: vec![reason.to_string()],
         declared_capabilities: Vec::new(),
         extension_points: Vec::new(),
+        permissions: Vec::new(),
         compatibility_status: PluginRegistryCompatibility::Unknown,
         manifest_hash: String::new(),
     }
@@ -297,6 +311,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
                 )],
                 declared_capabilities: Vec::new(),
                 extension_points: Vec::new(),
+                permissions: Vec::new(),
                 compatibility_status: PluginRegistryCompatibility::Incompatible,
                 manifest_hash,
             });
@@ -311,6 +326,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
             validation_errors: Vec::new(),
             declared_capabilities: manifest.declared_capabilities.clone(),
             extension_points: manifest.extension_points.clone(),
+            permissions: manifest.permissions.clone(),
             compatibility_status: PluginRegistryCompatibility::Compatible,
             manifest_hash,
         }),
@@ -321,6 +337,7 @@ fn manifest_entry(base: &Path, path: &Path) -> Result<PluginRegistryEntry> {
             validation_errors: vec![format!("{error:#}")],
             declared_capabilities: Vec::new(),
             extension_points: Vec::new(),
+            permissions: Vec::new(),
             compatibility_status: PluginRegistryCompatibility::Unknown,
             manifest_hash,
         }),

@@ -42,6 +42,11 @@ fn fixture_tree_reports_expected_states() {
         .expect("valid fixture present");
     assert_eq!(valid.validation_status, PluginRegistryStatus::Valid);
     assert_eq!(valid.declared_capabilities, ["dashboardPanel"]);
+    // Declared permissions are reported in the registry output (#742).
+    assert!(valid.permissions.contains(&"read_docs".to_string()));
+    assert!(valid
+        .permissions
+        .contains(&"contribute_dashboard_panel".to_string()));
     assert!(valid
         .manifest_hash
         .starts_with("fnv1a64-canonical-json-v1:"));

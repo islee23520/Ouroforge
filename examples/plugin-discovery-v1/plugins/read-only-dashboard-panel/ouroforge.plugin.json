@@ -13,5 +13,6 @@
   },
   "declaredCapabilities": ["dashboardPanel"],
   "extensionPoints": ["dashboard.panels.readOnly"],
+  "permissions": ["read_docs", "read_evidence", "contribute_dashboard_panel"],
   "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
 }
