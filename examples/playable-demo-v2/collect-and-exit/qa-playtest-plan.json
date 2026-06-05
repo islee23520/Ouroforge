@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "demo-qa-playtest-plan-v1",
+  "id": "collect-and-exit-demo-qa-playtest",
+  "issue": 788,
+  "projectId": "collect_and_exit_demo",
+  "scenarioMatrix": "scenarios/demo-scenario-matrix.json",
+  "description": "Bounded read-only QA/playtest plan for the Collect-and-Exit Godot-Plus demo. The plan defines deterministic local workers, input replays, budgets, stop conditions, evidence expectations, and failure classification without auto-fix, auto-apply, trusted source mutation, browser command bridge, dependency install, credentials, release, or plugin runtime authority.",
+  "workerBudget": {
+    "maxWorkers": 3,
+    "maxAttemptsPerWorker": 2,
+    "maxFramesPerAttempt": 160,
+    "maxEvidenceFilesPerAttempt": 6,
+    "writeScope": "temporary-generated-evidence-only"
+  },
+  "stopConditions": [
+    "allRequiredScenariosHaveVerdicts",
+    "anyWorkerExceedsAttemptBudget",
+    "anyForbiddenActionRequested",
+    "anyEvidenceWriteTargetsTrustedSource",
+    "runtimeSmokeCannotLoadFixture"
+  ],
+  "forbiddenActions": [
+    "autoFix",
+    "autoApply",
+    "autoMerge",
+    "directTrustedSourceWrite",
+    "sourceMutationBypass",
+    "browserCommandBridge",
+    "arbitraryShellExecution",
+    "dependencyInstall",
+    "credentialedOperation",
+    "publicDeploy",
+    "releaseSigning",
+    "storePublishing",
+    "executablePluginRuntime",
+    "pluginMarketplace",
+    "networkPluginInstall"
+  ],
+  "evidenceKinds": [
+    "input_replay",
+    "world_state",
+    "runtime_events",
+    "frame_stats",
+    "console_log",
+    "crash_check",
+    "screenshot_placeholder",
+    "failure_classification",
+    "verdict"
+  ],
+  "workers": [
+    {
+      "id": "qa-win-path",
+      "role": "deterministic-route-playtester",
+      "scenarioIds": ["start-game", "move-player", "complete-level", "objective-update", "ui-state", "runtime-probe-state"],
+      "inputReplay": [{ "frames": 120, "input": { "right": true } }],
+      "expectedVerdict": "pass",
+      "expectedFlags": { "key_collected": true, "door_open": true, "exit_reached": true, "player_alive": true },
+      "expectedEvidence": ["input_replay", "world_state", "runtime_events", "frame_stats", "verdict"]
+    },
+    {
+      "id": "qa-hazard-failure",
+      "role": "negative-path-classifier",
+      "scenarioIds": ["fail-restart", "enemy-interaction", "evidence-bundle"],
+      "inputReplay": [{ "frames": 64, "input": { "right": true } }],
+      "hazardPlacement": { "x": 192, "y": 80 },
+      "expectedVerdict": "fail-expected",
+      "expectedFailureClass": "designed-gameplay-failure",
+      "expectedFlags": { "key_collected": true, "player_alive": false, "exit_reached": false },
+      "expectedEvidence": ["input_replay", "world_state", "runtime_events", "failure_classification", "verdict"]
+    },
+    {
+      "id": "qa-integration-surfaces",
+      "role": "read-only-surface-auditor",
+      "scenarioIds": ["export-smoke", "studio-walkthrough", "plugin-validation"],
+      "inputReplay": [],
+      "expectedVerdict": "pass",
+      "expectedEvidence": ["export_profile", "plugin_descriptor", "dashboard_read_model", "console_log", "crash_check", "verdict"]
+    }
+  ],
+  "reportContract": {
+    "schemaVersion": "demo-qa-playtest-report-v1",
+    "requiredTopLevelFields": ["schemaVersion", "planId", "status", "workerReports", "mutationAudit", "generatedStateAudit"],
+    "mutationAudit": { "trustedSourceWrites": 0, "autoFixes": 0, "autoApplies": 0, "autoMerges": 0 },
+    "generatedStatePolicy": "Smoke may write a temporary report outside the repository and must remove it before exit. Checked-in report fixtures are not required for v1."
+  },
+  "boundary": "Read-only local QA/playtest plan and smoke only. No QA auto-fix, no auto-apply, no source mutation bypass, no trusted browser writes, no dependency install, no credentials, no public release/deploy/sign/store publishing, no executable plugin runtime, no marketplace/network plugin install, and no Godot replacement/parity/production-ready claim."
+}
