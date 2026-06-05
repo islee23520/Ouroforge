@@ -6,6 +6,8 @@ const behaviorDraftDocs = fs.readFileSync('docs/behavior-draft-v1.md', 'utf8');
 const behaviorDraftFixtureDocs = fs.readFileSync('examples/behavior-draft-v1/README.md', 'utf8');
 const godotPlusDesignPillarsDoc = fs.readFileSync('docs/godot-plus-demo-design-pillars-v1.md', 'utf8');
 const godotPlusDocsReadme = fs.readFileSync('docs/README.md', 'utf8');
+const studioQaSwarmInspectionDoc = fs.readFileSync('docs/studio-qa-swarm-inspection-surface-v1.md', 'utf8');
+const cockpitQaSwarmReadme = fs.readFileSync('examples/authoring-cockpit/README.md', 'utf8');
 
 assert.match(behaviorDraftDocs, /untrusted data/i);
 assert.match(behaviorDraftDocs, /does not apply trusted files/i);
@@ -38,6 +40,26 @@ assert.match(godotPlusDesignPillarsDoc, /does \*\*not\*\* authorize/);
 assert.match(godotPlusDesignPillarsDoc, /No executable plugin runtime, marketplace, install\/update, dynamic loading, remote asset loading, or arbitrary JavaScript/);
 assert.doesNotMatch(godotPlusDesignPillarsDoc, /full Godot replacement is implemented|production-ready engine is available|commercial release readiness is achieved|browser command bridge enabled|auto-apply enabled|native export ready/);
 assert.match(godotPlusDocsReadme, /godot-plus-demo-design-pillars-v1\.md/);
+
+assert.match(godotPlusDocsReadme, /studio-qa-swarm-inspection-surface-v1\.md/);
+assert.match(studioQaSwarmInspectionDoc, /no-worker-runner|without becoming a worker runner/i);
+assert.match(studioQaSwarmInspectionDoc, /spawn QA workers, hidden workers, background agents, unbounded workers, local runners, cloud runners/i);
+assert.match(studioQaSwarmInspectionDoc, /execute commands/);
+assert.match(studioQaSwarmInspectionDoc, /browser command bridge/);
+assert.match(studioQaSwarmInspectionDoc, /local server bridge/);
+assert.match(studioQaSwarmInspectionDoc, /write trusted browser state, source files, dashboard exports, generated evidence/);
+assert.match(studioQaSwarmInspectionDoc, /auto-fix, auto-apply, auto-merge, self-approve/);
+assert.match(studioQaSwarmInspectionDoc, /quality guarantee/);
+assert.match(studioQaSwarmInspectionDoc, /production readiness/);
+assert.match(studioQaSwarmInspectionDoc, /current Godot replacement/);
+assert.match(studioQaSwarmInspectionDoc, /Generated QA\/playtest runs, fuzz inputs, screenshots, videos, traces, dashboard exports, temporary projects, browser profiles, and local tool state remain ignored\/untracked/);
+assert.match(studioQaSwarmInspectionDoc, /Escape all rendered data/);
+assert.match(studioQaSwarmInspectionDoc, /#1 and #23 remain open/);
+assert.match(cockpitQaSwarmReadme, /qa_swarm_inspection/);
+assert.match(cockpitQaSwarmReadme, /never spawns workers, executes copyable commands, opens a command bridge, bridges to local\/cloud runners/);
+assert.match(cockpitQaSwarmReadme, /Generated QA\/playtest runs, fuzz inputs, screenshots, videos, traces, dashboard exports, temp projects, browser profiles, and local tool state remain ignored/);
+assert.match(cockpitQaSwarmReadme, /issues #1 and #23 remain governance anchors/);
+assert.doesNotMatch(studioQaSwarmInspectionDoc, /QA swarm autonomously guarantees|fun is proven|production-ready engine is available|current Godot replacement is implemented|browser command bridge enabled|auto-fix enabled|cloud runner enabled/);
 
 const moved = cockpit.applyEdit(scene, 'player', 'components.transform.x', '48');
 assert.equal(cockpit.getValue(moved.entities[0], 'components.transform.x'), 48);

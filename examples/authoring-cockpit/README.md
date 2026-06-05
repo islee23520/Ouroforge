@@ -343,6 +343,10 @@ When exported dashboard data includes `loop_cockpit`, the cockpit displays a sta
 
 When exported dashboard data includes `agent_handoffs`, the cockpit displays a read-only Handoff Studio surface with the next safe action, blockers, required decisions, inert allowed command text, forbidden actions, evidence refs, guardrails, and boundary. The browser never creates command buttons, executes handoff commands, grants authority, applies mutations, repairs references, or merges changes. See `../../docs/agent-handoff-contract-v1.md`.
 
+## Studio QA Swarm Inspection Surface v1
+
+When exported dashboard data includes `qa_swarm_inspection`, the cockpit displays scenario candidates, fuzzing plans, worker budgets/assignments, QA run matrix, invariant checks, objective route attempts, visual/performance/error evidence, flaky rerun policy/results, failure classification/backlog, and QA evidence bundle summaries as escaped read-only evidence. The browser never spawns workers, executes copyable commands, opens a command bridge, bridges to local/cloud runners, writes trusted browser/source/generated state, auto-fixes, auto-applies, auto-merges, self-approves, or claims quality, production readiness, or current Godot replacement. Generated QA/playtest runs, fuzz inputs, screenshots, videos, traces, dashboard exports, temp projects, browser profiles, and local tool state remain ignored unless explicitly fixture-scoped. See `../../docs/studio-qa-swarm-inspection-surface-v1.md`; issues #1 and #23 remain governance anchors and must stay open unless a separate explicit governance decision exists.
+
 
 ## Visual Authoring Demo v1 Studio boundary audit
 
