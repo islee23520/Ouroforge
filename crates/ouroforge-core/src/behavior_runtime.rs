@@ -274,6 +274,24 @@ pub struct BehaviorRuntimeEvidenceBundle {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct BehaviorScenarioAssertionSuite {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "suiteId")]
+    pub suite_id: String,
+    #[serde(
+        rename = "scenarioId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "evidenceRef")]
+    pub evidence_ref: String,
+    pub assertions: Vec<BehaviorScenarioAssertion>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BehaviorScenarioAssertion {
     #[serde(rename = "assertionId")]
     pub assertion_id: String,
@@ -338,6 +356,27 @@ pub struct BehaviorScenarioAssertionVerdict {
     pub assertion_id: String,
     pub status: BehaviorScenarioAssertionStatus,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorScenarioAssertionResultArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "suiteId")]
+    pub suite_id: String,
+    #[serde(
+        rename = "scenarioId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scenario_id: Option<String>,
+    #[serde(rename = "evidenceRef")]
+    pub evidence_ref: String,
+    pub status: BehaviorScenarioAssertionStatus,
+    pub assertions: Vec<BehaviorScenarioAssertionVerdict>,
+    #[serde(rename = "trustedBoundary")]
+    pub trusted_boundary: BehaviorRuntimeBoundary,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -890,6 +929,64 @@ impl BehaviorScenarioAssertion {
             } else {
                 format!("behavior assertion `{}` failed", self.assertion_id)
             },
+        })
+    }
+}
+
+impl BehaviorScenarioAssertionSuite {
+    pub fn validate(&self) -> Result<()> {
+        require_local_text(
+            "behavior assertion suite schemaVersion",
+            &self.schema_version,
+        )?;
+        if self.schema_version != "ouroforge.behavior-scenario-assertion-suite.v1" {
+            return Err(anyhow!(
+                "behavior assertion suite schemaVersion is unsupported: {}",
+                self.schema_version
+            ));
+        }
+        require_local_id("behavior assertion suite suiteId", &self.suite_id)?;
+        if let Some(scenario_id) = &self.scenario_id {
+            require_local_id("behavior assertion suite scenarioId", scenario_id)?;
+        }
+        require_local_text("behavior assertion suite evidenceRef", &self.evidence_ref)?;
+        if self.assertions.is_empty() {
+            return Err(anyhow!(
+                "behavior assertion suite assertions must not be empty"
+            ));
+        }
+        for assertion in &self.assertions {
+            assertion.validate()?;
+        }
+        Ok(())
+    }
+
+    pub fn evaluate(
+        &self,
+        evidence: &BehaviorRuntimeEvidenceBundle,
+    ) -> Result<BehaviorScenarioAssertionResultArtifact> {
+        self.validate()?;
+        let assertions = self
+            .assertions
+            .iter()
+            .map(|assertion| assertion.evaluate(evidence))
+            .collect::<Result<Vec<_>>>()?;
+        let status = if assertions
+            .iter()
+            .all(|verdict| verdict.status == BehaviorScenarioAssertionStatus::Passed)
+        {
+            BehaviorScenarioAssertionStatus::Passed
+        } else {
+            BehaviorScenarioAssertionStatus::Failed
+        };
+        Ok(BehaviorScenarioAssertionResultArtifact {
+            schema_version: "ouroforge.behavior-scenario-assertion-result.v1".to_string(),
+            suite_id: self.suite_id.clone(),
+            scenario_id: self.scenario_id.clone(),
+            evidence_ref: self.evidence_ref.clone(),
+            status,
+            assertions,
+            trusted_boundary: evidence.trusted_boundary.clone(),
         })
     }
 }

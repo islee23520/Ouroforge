@@ -14,6 +14,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 
 pub mod behavior_runtime;
+use behavior_runtime::{
+    BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
+};
 pub mod internal_sprite_audit;
 pub mod runtime_frame_budget;
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
@@ -41466,6 +41469,122 @@ fn validate_scene3d_scenario_evidence_ref(
     }
 }
 
+fn evaluate_behavior_assertion_suite_artifact(
+    run_dir: &Path,
+    suite_path: &str,
+    failures: &mut Vec<serde_json::Value>,
+    evidence_refs: &mut Vec<String>,
+) -> Result<bool> {
+    validate_relative_artifact_path("behavior assertion suite path", suite_path)?;
+    let suite_full_path = run_dir.join(suite_path);
+    let suite = match fs::read_to_string(&suite_full_path)
+        .with_context(|| format!("failed to read behavior assertion suite {suite_path}"))
+        .and_then(|input| {
+            serde_json::from_str::<BehaviorScenarioAssertionSuite>(&input)
+                .with_context(|| format!("failed to parse behavior assertion suite {suite_path}"))
+        })
+        .and_then(|suite| {
+            suite.validate().with_context(|| {
+                format!("failed to validate behavior assertion suite {suite_path}")
+            })?;
+            Ok(suite)
+        }) {
+        Ok(suite) => suite,
+        Err(error) => {
+            failures.push(json!({
+                "kind": "malformed_behavior_assertion_suite",
+                "path": suite_path,
+                "reason": error.to_string()
+            }));
+            return Ok(false);
+        }
+    };
+
+    validate_relative_artifact_path("behavior assertion suite evidenceRef", &suite.evidence_ref)?;
+    let evidence_full_path = run_dir.join(&suite.evidence_ref);
+    let evidence = match fs::read_to_string(&evidence_full_path) {
+        Ok(input) => match serde_json::from_str::<BehaviorRuntimeEvidenceBundle>(&input) {
+            Ok(evidence) => evidence,
+            Err(error) => {
+                failures.push(json!({
+                    "kind": "malformed_behavior_evidence",
+                    "suite_id": suite.suite_id,
+                    "path": suite.evidence_ref,
+                    "reason": error.to_string()
+                }));
+                return Ok(false);
+            }
+        },
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            failures.push(json!({
+                "kind": "missing_behavior_evidence",
+                "suite_id": suite.suite_id,
+                "path": suite.evidence_ref
+            }));
+            return Ok(false);
+        }
+        Err(error) => {
+            failures.push(json!({
+                "kind": "malformed_behavior_evidence",
+                "suite_id": suite.suite_id,
+                "path": suite.evidence_ref,
+                "reason": error.to_string()
+            }));
+            return Ok(false);
+        }
+    };
+
+    let result = match suite.evaluate(&evidence) {
+        Ok(result) => result,
+        Err(error) => {
+            failures.push(json!({
+                "kind": "malformed_behavior_assertion_suite",
+                "path": suite_path,
+                "reason": error.to_string()
+            }));
+            return Ok(false);
+        }
+    };
+    let result_path = format!(
+        "evidence/behavior-assertions/{}-result.json",
+        suite.suite_id
+    );
+    fs::create_dir_all(run_dir.join("evidence/behavior-assertions"))
+        .context("failed to create behavior assertion evidence directory")?;
+    write_json(&run_dir.join(&result_path), &json!(result))?;
+    add_evidence_artifact(
+        run_dir,
+        &format!("behavior-assertion-result-{}", suite.suite_id),
+        "application/json",
+        &result_path,
+        json!({
+            "artifact": "behavior_assertion_result",
+            "suite_id": suite.suite_id,
+            "scenario_id": suite.scenario_id,
+            "evidence_ref": suite.evidence_ref
+        }),
+    )?;
+    evidence_refs.push(result_path.clone());
+
+    for assertion in result
+        .assertions
+        .iter()
+        .filter(|assertion| assertion.status == BehaviorScenarioAssertionStatus::Failed)
+    {
+        failures.push(json!({
+            "kind": "behavior_assertion_failed",
+            "suite_id": result.suite_id,
+            "scenario_id": result.scenario_id,
+            "path": suite_path,
+            "assertion_id": assertion.assertion_id,
+            "evidence_ref": result.evidence_ref,
+            "result_ref": result_path,
+            "message": assertion.message
+        }));
+    }
+    Ok(result.status == BehaviorScenarioAssertionStatus::Passed)
+}
+
 pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     let run_dir = run_dir.as_ref();
     let evidence = read_evidence_index(run_dir)?;
@@ -41475,6 +41594,7 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
     let mut failures = Vec::new();
     let mut evidence_refs = Vec::new();
     let mut scenario_results = Vec::new();
+    let mut behavior_assertion_suites = Vec::new();
     let mut suite_summaries = 0usize;
 
     for artifact in &evidence.artifacts {
@@ -41513,9 +41633,28 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
         {
             suite_summaries += 1;
         }
+        if artifact
+            .metadata
+            .get("artifact")
+            .and_then(|value| value.as_str())
+            == Some("behavior_assertion_suite")
+        {
+            behavior_assertion_suites.push(artifact.path.clone());
+        }
     }
 
-    if scenario_results.is_empty() {
+    let mut behavior_evaluator_results = 0usize;
+    for suite_path in &behavior_assertion_suites {
+        evaluate_behavior_assertion_suite_artifact(
+            run_dir,
+            suite_path,
+            &mut failures,
+            &mut evidence_refs,
+        )?;
+        behavior_evaluator_results += 1;
+    }
+
+    if scenario_results.is_empty() && behavior_assertion_suites.is_empty() {
         let status = if failures.is_empty() {
             "pending"
         } else {
@@ -41537,7 +41676,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
             metadata: json!({
                 "evaluator": "ouroforge-evaluator-v0",
                 "scenario_results": 0,
-                "suite_summaries": suite_summaries
+                "suite_summaries": suite_summaries,
+                "behavior_evaluator_results": behavior_evaluator_results
             }),
         };
         write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
@@ -41739,7 +41879,8 @@ pub fn evaluate_run(run_dir: impl AsRef<Path>) -> Result<EvaluationVerdict> {
         metadata: json!({
             "evaluator": "ouroforge-evaluator-v0",
             "scenario_results": scenario_results.len(),
-            "suite_summaries": suite_summaries
+            "suite_summaries": suite_summaries,
+            "behavior_evaluator_results": behavior_evaluator_results
         }),
     };
     write_json(&run_dir.join("verdict.json"), &json!(verdict))?;
@@ -76716,6 +76857,110 @@ scenarios:
     }
 
     #[test]
+    fn evaluator_writes_behavior_assertion_result_artifacts() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-behavior-pass-test");
+        write_behavior_assertion_suite_fixture(
+            &artifacts.run_dir,
+            "behavior-pass-suite",
+            "jump-motion",
+            "evidence/behavior/runtime-evidence.json",
+        );
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "passed");
+        assert_eq!(verdict.metadata["behavior_evaluator_results"], 1);
+        assert!(verdict
+            .evidence_refs
+            .iter()
+            .any(|path| path == "evidence/behavior-assertions/behavior-pass-suite-result.json"));
+        let result = read_json_value(
+            artifacts
+                .run_dir
+                .join("evidence/behavior-assertions/behavior-pass-suite-result.json"),
+        )
+        .expect("behavior result reads");
+        assert_eq!(
+            result["schemaVersion"],
+            "ouroforge.behavior-scenario-assertion-result.v1"
+        );
+        assert_eq!(result["status"], "passed");
+        assert!(result["trustedBoundary"]["executionMode"]
+            .as_str()
+            .is_some_and(|mode| mode.contains("structured-data-only")));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_marks_behavior_assertion_failures_failed() {
+        let (root, artifacts) = create_test_run("ouroforge-eval-behavior-fail-test");
+        write_behavior_assertion_suite_fixture(
+            &artifacts.run_dir,
+            "behavior-fail-suite",
+            "missing-action",
+            "evidence/behavior/runtime-evidence.json",
+        );
+
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(verdict.status, "failed");
+        assert!(verdict.failures.iter().any(|failure| {
+            failure["kind"] == "behavior_assertion_failed"
+                && failure["assertion_id"] == "jump-action"
+                && failure["evidence_ref"] == "evidence/behavior/runtime-evidence.json"
+        }));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn evaluator_reports_missing_and_malformed_behavior_evidence() {
+        let (missing_root, missing_artifacts) =
+            create_test_run("ouroforge-eval-behavior-missing-test");
+        write_behavior_assertion_suite_json(
+            &missing_artifacts.run_dir,
+            "missing-behavior-suite",
+            "evidence/behavior/missing-runtime-evidence.json",
+            "jump-motion",
+        );
+
+        let missing = evaluate_run(&missing_artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(missing.status, "failed");
+        assert!(missing
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "missing_behavior_evidence"));
+        fs::remove_dir_all(missing_root).ok();
+
+        let (malformed_root, malformed_artifacts) =
+            create_test_run("ouroforge-eval-behavior-malformed-test");
+        fs::create_dir_all(malformed_artifacts.run_dir.join("evidence/behavior"))
+            .expect("behavior dir");
+        fs::write(
+            malformed_artifacts
+                .run_dir
+                .join("evidence/behavior/runtime-evidence.json"),
+            "{not json",
+        )
+        .expect("malformed behavior evidence written");
+        write_behavior_assertion_suite_json(
+            &malformed_artifacts.run_dir,
+            "malformed-behavior-suite",
+            "evidence/behavior/runtime-evidence.json",
+            "jump-motion",
+        );
+
+        let malformed = evaluate_run(&malformed_artifacts.run_dir).expect("evaluation succeeds");
+
+        assert_eq!(malformed.status, "failed");
+        assert!(malformed
+            .failures
+            .iter()
+            .any(|failure| failure["kind"] == "malformed_behavior_evidence"));
+        fs::remove_dir_all(malformed_root).ok();
+    }
+
+    #[test]
     fn evaluator_reports_assertion_failures_with_evidence_refs() {
         let (root, artifacts) = create_test_run("ouroforge-eval-assertion-failure-test");
         write_scenario_result_fixture(&artifacts.run_dir, "failed");
@@ -87370,6 +87615,71 @@ scenarios:
             )
             .expect("artifact indexed");
         }
+    }
+
+    fn write_behavior_assertion_suite_fixture(
+        run_dir: &Path,
+        suite_id: &str,
+        action_id: &str,
+        evidence_ref: &str,
+    ) {
+        use crate::behavior_runtime::{
+            BehaviorArtifact, BehaviorExecutionInput, BehaviorWorldState,
+        };
+
+        let behavior_dir = run_dir.join("evidence/behavior");
+        fs::create_dir_all(&behavior_dir).expect("behavior dir created");
+        let artifact = BehaviorArtifact::from_json_str(include_str!(
+            "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+        ))
+        .expect("behavior artifact fixture parses");
+        let evidence = artifact.evidence_bundle(vec![artifact.execute(
+            BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+            BehaviorWorldState::default()
+                .with_flag("grounded", true)
+                .with_position("player", 2, 5),
+        )]);
+        write_json(&run_dir.join(evidence_ref), &json!(evidence))
+            .expect("behavior evidence written");
+        write_behavior_assertion_suite_json(run_dir, suite_id, evidence_ref, action_id);
+    }
+
+    fn write_behavior_assertion_suite_json(
+        run_dir: &Path,
+        suite_id: &str,
+        evidence_ref: &str,
+        action_id: &str,
+    ) {
+        let suite_path = format!("evidence/behavior/{suite_id}.json");
+        fs::create_dir_all(run_dir.join("evidence/behavior")).expect("behavior dir created");
+        write_json(
+            &run_dir.join(&suite_path),
+            &json!({
+                "schemaVersion": "ouroforge.behavior-scenario-assertion-suite.v1",
+                "suiteId": suite_id,
+                "scenarioId": "bootstrap-smoke",
+                "evidenceRef": evidence_ref,
+                "assertions": [{
+                    "assertionId": "jump-action",
+                    "kind": "behaviorExecuted",
+                    "reportIndex": 0,
+                    "actionId": action_id
+                }]
+            }),
+        )
+        .expect("behavior assertion suite written");
+        add_evidence_artifact(
+            run_dir,
+            &format!("fixture-{suite_id}"),
+            "application/json",
+            &suite_path,
+            json!({
+                "artifact": "behavior_assertion_suite",
+                "scenario_id": "bootstrap-smoke",
+                "evidence_ref": evidence_ref
+            }),
+        )
+        .expect("behavior assertion suite indexed");
     }
 
     fn project_metadata_fixture(
