@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use ouroforge_core::behavior_runtime::BehaviorDraftArtifact;
 use ouroforge_core::internal_sprite_audit::{
     audit_internal_sprite_reference, InternalSpriteAuditProfile, InternalSpriteAuditReport,
 };
@@ -130,6 +131,32 @@ enum Commands {
     PatchPreview {
         #[command(subcommand)]
         command: PatchPreviewCommand,
+    },
+    Behavior {
+        #[command(subcommand)]
+        command: BehaviorCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum BehaviorCommand {
+    Draft {
+        #[command(subcommand)]
+        command: BehaviorDraftCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum BehaviorDraftCommand {
+    Validate {
+        draft_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project_root: Option<PathBuf>,
+    },
+    Preview {
+        draft_path: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        project_root: Option<PathBuf>,
     },
 }
 
@@ -465,6 +492,63 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Behavior {
+            command:
+                BehaviorCommand::Draft {
+                    command:
+                        BehaviorDraftCommand::Validate {
+                            draft_path,
+                            project_root,
+                        },
+                },
+        } => {
+            let draft = read_behavior_draft(&draft_path)?;
+            let target_check = behavior_draft_target_check(&draft, project_root.as_deref())?;
+            let valid = target_check.get("stale").and_then(|value| value.as_bool()) != Some(true);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "status": if valid { "valid" } else { "stale" },
+                    "draftId": draft.draft_id,
+                    "validationStatus": draft.validation_status,
+                    "target": draft.target,
+                    "targetCheck": target_check,
+                    "guardrail": "untrusted draft validation only; does not apply trusted files or execute scripts"
+                }))?
+            );
+            if !valid {
+                return Err(anyhow!("behavior draft target hash is stale"));
+            }
+        }
+        Commands::Behavior {
+            command:
+                BehaviorCommand::Draft {
+                    command:
+                        BehaviorDraftCommand::Preview {
+                            draft_path,
+                            project_root,
+                        },
+                },
+        } => {
+            let draft = read_behavior_draft(&draft_path)?;
+            let runtime = draft.proposed_behavior.runtime_state();
+            let target_check = behavior_draft_target_check(&draft, project_root.as_deref())?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schemaVersion": "ouroforge.behavior-draft-preview.v1",
+                    "draftId": draft.draft_id,
+                    "target": draft.target,
+                    "validationStatus": draft.validation_status,
+                    "linkedEvidenceCount": draft.linked_evidence.len(),
+                    "expectedScenarioImpactCount": draft.expected_scenario_impact.len(),
+                    "behaviorCount": runtime.counts.behavior_count,
+                    "diagnostics": runtime.diagnostics,
+                    "targetCheck": target_check,
+                    "guardrail": "read-only untrusted preview; does not apply trusted files, execute scripts, open command bridges, or grant browser writes"
+                }))?
+            );
+        }
         Commands::PatchPreview {
             command:
                 PatchPreviewCommand::Validate {
@@ -1280,6 +1364,41 @@ fn resolve_project_manifest_path(project_root_or_manifest: &Path) -> PathBuf {
     } else {
         project_root_or_manifest.to_path_buf()
     }
+}
+
+fn read_behavior_draft(path: &Path) -> Result<BehaviorDraftArtifact> {
+    BehaviorDraftArtifact::from_json_str(
+        &std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read behavior draft {}", path.display()))?,
+    )
+    .with_context(|| format!("failed to validate behavior draft {}", path.display()))
+}
+
+fn behavior_draft_target_check(
+    draft: &BehaviorDraftArtifact,
+    project_root: Option<&Path>,
+) -> Result<serde_json::Value> {
+    let Some(project_root) = project_root else {
+        return Ok(serde_json::json!({
+            "checked": false,
+            "reason": "project-root not provided"
+        }));
+    };
+    let scene_path = project_root.join(&draft.target.scene_path);
+    let current = hash_scene_document(&read_scene(&scene_path).with_context(|| {
+        format!(
+            "failed to read behavior draft target scene {}",
+            scene_path.display()
+        )
+    })?)?;
+    let current_hash = format!("{}:{}", current.algorithm, current.value);
+    Ok(serde_json::json!({
+        "checked": true,
+        "scenePath": scene_path,
+        "expectedHash": draft.target.scene_hash,
+        "currentHash": current_hash,
+        "stale": current_hash != draft.target.scene_hash
+    }))
 }
 
 fn bind_project_context_to_scene_mutation_operation(
