@@ -47,16 +47,30 @@ event/signal contracts, state-machine and ability/action contracts, script and
 sandbox design gates, runtime integration, scenario assertions, behavior drafts,
 review-gated apply records, evidence/journal integration, escaped read-only
 Studio/dashboard inspection, a deterministic demo, Scenario Coverage v9, and a
-conservative governance refresh:
+conservative governance refresh, and a completed Evaluator Depth v1 milestone
+that adds bounded visual and semantic evaluator gates, additive four-category
+verdict/Journals, read-only inspection, deterministic demo evidence, Scenario
+Coverage v19, and conservative governance:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic/evidence
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
 read exported JSON and show copyable commands; they do not execute commands,
 write trusted files, accept mutations, or act as a production editor. Browser
 and CDP observations are evidence inputs, not trusted authority.
+
+Evaluator Depth v1 (#1279/#1283-#1288) is now complete as the Milestone 4.1
+four-gate evaluator foundation. The merged evidence chain added bounded visual
+gate fixtures, declared semantic invariant fixtures, additive four-category
+`verdict.json` and Journal summaries, read-only dashboard/Studio inspection, a
+deterministic demo, and Scenario Coverage v19. This completion is mechanical and
+declared-invariant evaluation only: visual judgment is bounded screenshot diff
+evidence rather than aesthetic quality, semantic judgment is over declared
+invariants rather than general AI correctness, and no auto-fix/apply/merge,
+trusted mutation, command bridge, release-readiness claim, or engine-replacement
+claim is introduced.
 
 ## Completed evidence-native milestones
 
@@ -295,6 +309,22 @@ third-party code loading, plugin runtime, browser command bridge, hosted
 execution, production scripting, source-apply authority, public-launch approval,
 or Godot replacement scope.
 
+Evaluator Depth v1 (#1279/#1283-#1288) is complete after the merged evidence
+chain: #1300 defined the scope contract, #1308 added Visual Evaluator Gate v1,
+#1311 added Semantic Evaluator Gate v1, #1318 added four-category verdict and
+Journal summaries, #1320 added read-only evaluator-depth inspection surfaces,
+#1323 added the deterministic demo, and #1325 added Scenario Coverage v19 plus
+the legacy two-gate golden. The resulting verdict changes are additive: legacy
+two-gate runs remain byte-compatible when visual/semantic gates are undeclared,
+while declared gates expose `mechanical`, `runtime`, `visual`, and `semantic`
+categories with evidence-linked reasons. Rust/local validation retains trusted
+persistence, gate logic, and verdict serialization; browser/dashboard/Studio
+surfaces remain read-only evidence viewers. Known gaps remain deliberately
+outside this milestone: no aesthetic visual quality judgment, no general
+semantic correctness guarantee, no source mutation authority, no command bridge,
+no native export, no plugin runtime, no hosted/cloud behavior, no release
+readiness, and no engine-replacement claim.
+
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
 file-class, preview-artifact, review-gate, rollback/audit, sandbox/worktree, and
@@ -323,6 +353,23 @@ behavior, create support/security SLAs, implement source apply, or replace the
 #1/#23 governance anchors.
 
 ## Near-term governance and public-readiness work
+
+### Evaluator Depth v1 governance refresh
+
+Evaluator Depth v1 is recorded as **complete for Milestone 4.1**, closing the
+four-gate evaluator drift identified in #1's Roadmap Alignment Addendum. The
+completion evidence is the merged implementation chain #1300, #1308, #1311,
+#1318, #1320, #1323, and #1325, with required local verification and CI evidence
+recorded on the linked issues. #1 and #23 remain open governance anchors.
+
+The recommended next technical milestone is **Milestone 5.1: Evolve Loop Depth
+v1** (#1290/#1292-#1298): evidence-linked, domain-aware mutation proposals that
+consume the corrected four-gate verdict foundation. After that sequence, Era C
+breadth (#660-#797), including QA/playtest swarm and Godot-Plus demo work, may
+continue on the corrected four-gate basis. Layer-3 expansion remains unchanged
+and deferred: distributed orchestration / Elixir per ADR #92, native export,
+plugin runtime, and hosted/cloud scope still require separate scoped issue
+sequences and governance approval.
 
 ### Public Alpha Readiness handoff
 
@@ -359,10 +406,8 @@ implementation, demo, regression, Studio inspection, and governance evidence.
 Gameplay Scripting / Logic System v1 (#611-#625) is now recorded as complete,
 framed as bounded local behavior/evidence contracts rather than arbitrary
 scripting, plugin loading, hosted execution, browser command bridges, source
-apply, public launch, production readiness, or Godot replacement scope. The
-conservative next technical milestone candidate is GDD-to-Playable Prototype v1
-(#644-#661), using the completed behavior/evidence contracts in a bounded
-prototype flow.
+apply, public launch, production readiness, or Godot replacement scope.
+
 
 Other possible later governance topics remain Native Export Design Gate, Plugin
 Design Gate, Source Mutation Apply Design Gate, and Visual Authoring v2. None is
@@ -476,6 +521,14 @@ remain separate maintainer actions.
   guarantee, plugin runtime, command bridge, browser trusted write path,
   unrestricted source apply, native export, hosted/cloud behavior, public-launch
   automation, production readiness, or Godot replacement status.
+- Treat Evaluator Depth v1 as complete but bounded. Its artifacts are
+  mechanical visual diff and declared-invariant semantic evaluator contracts,
+  not aesthetic scoring, general semantic correctness guarantees, source
+  mutation authority, command bridges, browser trusted writes, native export,
+  plugin runtime, hosted/cloud behavior, public-launch automation, release
+  readiness, or engine-replacement status. Use Milestone 5.1 to consume these
+  verdicts for evidence-linked mutation proposals rather than weakening the
+  evaluator boundary.
 
 ## Active anchors
 
