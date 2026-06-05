@@ -111,7 +111,6 @@ const run = {
     cdpTransport: 'chrome_devtools_protocol',
     environmentHints: ['The cockpit does not execute commands'],
   },
-
   qa_swarm_inspection: {
     present: true,
     status: '<needs-review>',
@@ -569,6 +568,29 @@ const run = {
   screenshots: [{ id: 'shot-1', path: 'evidence/shot.png' }],
   journal: '# Journal',
   journal_view: { exists: true, path: 'journal.md', summary: 'journal summary', entries: [{ id: 'entry-1' }], evidence_refs: ['evidence/indexed.json'] },
+  verdict: {
+    status: 'failed',
+    gateCategories: {
+      mechanical: { declared: true, status: 'pass', resultCount: 1, failureCount: 0 },
+      runtime: { declared: false, status: 'pass', resultCount: 0, failureCount: 0 },
+      visual: { declared: true, status: 'fail', resultCount: 3, failureCount: 2 },
+      semantic: { declared: true, status: 'fail', resultCount: 4, failureCount: 3 },
+      aggregation: { operator: 'declared-gate-and', undeclaredGatePolicy: 'neutral' },
+    },
+    gateSummary: ['visual gate failed with changed regions', 'semantic gate failed with violated invariants'],
+    visual: [
+      { scenarioId: 'collect-and-exit', checkpointId: 'goal-checkpoint', state: 'pass', changedPixels: 0, changedRegionCount: 0, thresholdSummary: ['within threshold'], comparisonRef: 'evidence/visual/pass.json', evidenceRefs: ['evidence/screenshots/pass.png'] },
+      { scenarioId: 'collect-and-exit', checkpointId: 'goal-checkpoint', state: 'fail', changedPixels: 64, changedRegionCount: 1, thresholdSummary: ['threshold 10 px'], comparisonRef: 'evidence/visual/fail.json', evidenceRefs: ['evidence/screenshots/fail.png'] },
+      { scenarioId: 'collect-and-exit', checkpointId: 'missing-checkpoint', state: 'missing-screenshot', changedPixels: 0, changedRegionCount: 0, thresholdSummary: [], comparisonRef: 'evidence/visual/missing.json', evidenceRefs: [] },
+      { scenarioId: 'collect-and-exit', checkpointId: 'unsupported-checkpoint', state: 'unsupported', changedPixels: 0, changedRegionCount: 0, thresholdSummary: ['unsupported image format'], comparisonRef: 'evidence/visual/unsupported.json', evidenceRefs: [] },
+    ],
+    semantic: [
+      { scenarioId: 'collect-and-exit', invariantId: 'health-non-negative', state: 'fail', targetPath: 'player.health', reason: 'health was negative', modelRef: 'evidence/semantic/fail.json', worldStateRef: 'evidence/world.json', evidenceRefs: ['evidence/world.json'] },
+      { scenarioId: 'collect-and-exit', invariantId: 'bounds-check', state: 'pass', targetPath: 'player.transform', reason: 'in bounds', modelRef: 'evidence/semantic/pass.json', worldStateRef: 'evidence/world.json', evidenceRefs: ['evidence/world.json'] },
+      { scenarioId: 'collect-and-exit', invariantId: 'unsupported-rule', state: 'unsupported', targetPath: 'world.rule', reason: 'unsupported invariant type', modelRef: 'evidence/semantic/unsupported.json', evidenceRefs: [] },
+      { scenarioId: 'collect-and-exit', invariantId: 'missing-target', state: 'missing-target-state', targetPath: 'npc.health', reason: 'missing target state', modelRef: 'evidence/semantic/missing.json', evidenceRefs: [] },
+    ],
+  },
   transaction_provenance: {
     transactionId: 'scene-edit-abc123',
     transactionArtifactPath: '.omx/tmp/transaction.json',
@@ -1068,10 +1090,20 @@ assert.match(cockpit.renderQaPanel(), /Run QA/);
 assert.match(cockpit.renderEvidencePane(run), /journal summary/);
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /qa14_6_collect_goal_route/);
 assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not run solvers/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /Evaluator depth inspection/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /mechanical gate/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /missing-screenshot/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /unsupported-checkpoint/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /unsupported-rule/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /missing-target-state/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /changed 64 px/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /threshold 10 px/);
+assert.match(cockpit.renderEvaluatorDepthInspectionSurface(run), /no browser-side trusted writes, mutation controls, command bridge/);
+assert.doesNotMatch(cockpit.renderEvaluatorDepthInspectionSurface(run), /<button|type="button"|data-action="apply"|Apply change/);
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 31);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 32);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');

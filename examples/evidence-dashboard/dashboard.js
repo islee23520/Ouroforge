@@ -2096,6 +2096,45 @@ const OuroforgeDashboard = (() => {
     return renderRunDetailWithState(run, createReplayState(run), run?.regression_matrix || run?.regressionMatrix || null, run?.loop_evidence_bundles || run?.loopEvidenceBundles || run?.loop_evidence_bundle || run?.loopEvidenceBundle || null, run?.agent_handoffs || run?.agentHandoffs || run?.agent_handoff || run?.agentHandoff || null);
   }
 
+  function renderEvaluatorDepthInspection(run = {}) {
+    const verdict = run.verdict && typeof run.verdict === 'object' ? run.verdict : {};
+    const categories = verdict.gateCategories || verdict.gate_categories || {};
+    const summary = verdict.gateSummary || verdict.gate_summary || [];
+    const visual = Array.isArray(verdict.visual || verdict.visualGateVerdicts || verdict.visual_gate_verdicts) ? (verdict.visual || verdict.visualGateVerdicts || verdict.visual_gate_verdicts) : [];
+    const semantic = Array.isArray(verdict.semantic || verdict.semanticInvariantVerdicts || verdict.semantic_invariant_verdicts) ? (verdict.semantic || verdict.semanticInvariantVerdicts || verdict.semantic_invariant_verdicts) : [];
+    const categoryKeys = ['mechanical', 'runtime', 'visual', 'semantic'];
+    if (!Object.keys(categories).length && !(Array.isArray(summary) && summary.length) && !visual.length && !semantic.length) {
+      return '<p class="empty-state">No evaluator-depth verdict categories are exported for this run.</p><p class="run-meta">Read-only inspection only; the dashboard does not write trusted state, expose mutation controls, bridge commands, auto-fix, auto-merge, or score subjective quality.</p>';
+    }
+    const categoryCards = categoryKeys.map((key) => {
+      const category = categories[key] || {};
+      const declared = category.declared === true ? 'declared' : 'undeclared / neutral';
+      return `<article class="category-card">
+        <div class="card-label">${escapeText(key)} gate</div>
+        <div class="card-value"><span class="${statusClass(category.status || (category.declared === false ? 'neutral' : 'unknown'))}">${escapeText(category.status || (category.declared === false ? 'neutral' : 'unknown'))}</span></div>
+        <div class="run-meta">${escapeText(declared)} · results ${escapeText(category.resultCount ?? category.result_count ?? 0)} · failures ${escapeText(category.failureCount ?? category.failure_count ?? 0)}</div>
+      </article>`;
+    }).join('');
+    const visualRows = visual.length
+      ? visual.map((gate) => {
+          const refs = [gate.comparisonRef || gate.comparison_ref, ...(Array.isArray(gate.evidenceRefs || gate.evidence_refs) ? (gate.evidenceRefs || gate.evidence_refs) : [])].filter(Boolean);
+          const threshold = Array.isArray(gate.thresholdSummary || gate.threshold_summary) ? (gate.thresholdSummary || gate.threshold_summary).join(' · ') : 'no threshold summary';
+          return `<li><strong>${escapeText(gate.scenarioId || gate.scenario_id || 'scenario')} / ${escapeText(gate.checkpointId || gate.checkpoint_id || 'checkpoint')}</strong>: <span class="${statusClass(gate.state)}">${escapeText(gate.state || 'unknown')}</span> · changed ${escapeText(gate.changedPixels ?? gate.changed_pixels ?? 0)} px · regions ${escapeText(gate.changedRegionCount ?? gate.changed_region_count ?? 0)} · ${escapeText(threshold)}${renderRefLinks('Visual evidence', refs, run)}</li>`;
+        }).join('')
+      : '<li>No visual gate verdicts exported.</li>';
+    const semanticRows = semantic.length
+      ? semantic.map((gate) => {
+          const refs = [gate.modelRef || gate.model_ref, gate.worldStateRef || gate.world_state_ref, ...(Array.isArray(gate.evidenceRefs || gate.evidence_refs) ? (gate.evidenceRefs || gate.evidence_refs) : [])].filter(Boolean);
+          return `<li><strong>${escapeText(gate.invariantId || gate.invariant_id || 'invariant')}</strong>: <span class="${statusClass(gate.state)}">${escapeText(gate.state || 'unknown')}</span> · target ${escapeText(gate.targetPath || gate.target_path || 'n/a')} · ${escapeText(gate.reason || 'no reason')}${renderRefLinks('Semantic evidence', refs, run)}</li>`;
+        }).join('')
+      : '<li>No semantic invariant verdicts exported.</li>';
+    return `<div class="category-grid">${categoryCards}</div>
+      ${Array.isArray(summary) && summary.length ? `<h4>Gate summary</h4><ul class="run-meta-list">${summary.slice(0, 8).map((item) => `<li>${escapeText(item)}</li>`).join('')}</ul>` : ''}
+      <h4>Visual gate verdicts</h4><ul class="run-meta-list">${visualRows}</ul>
+      <h4>Semantic invariant verdicts</h4><ul class="run-meta-list">${semanticRows}</ul>
+      <p class="run-meta">Read-only evaluator-depth inspection from exported JSON only; no trusted writes, mutation controls, command bridge, hidden execution, auto-fix, auto-merge, or subjective quality scoring.</p>`;
+  }
+
   function renderRunDetailWithState(run, replayState, regressionMatrix = null, loopEvidenceBundles = null, agentHandoffs = null) {
     if (!run) return '<div class="empty-state">Select a run to inspect its evidence.</div>';
     const verdict = run.verdict || {};
@@ -2132,6 +2171,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
       <section class="panel"><h3>Route attempt evidence</h3>${renderRouteAttempts(run)}</section>
       <section class="panel"><h3>Visual comparison evidence</h3>${renderVisualComparisons(run)}</section>
+      <section class="panel"><h3>Evaluator depth inspection</h3>${renderEvaluatorDepthInspection(run)}</section>
       <section class="panel"><h3>QA scenario candidates</h3>${renderQaScenarioCandidates(run)}</section>
       <section class="panel"><h3>Adversarial input fuzzing plans</h3>${renderFuzzingPlans(run)}</section>
       <section class="panel"><h3>QA worker assignments</h3>${renderQaWorkerAssignments(run)}</section>
@@ -2233,7 +2273,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
