@@ -13,12 +13,20 @@ The schema is input validation, not generation authority. GDD-derived output rem
 
 `targetGameClass` is intentionally narrow: `small2d-prototype` first, with `compatibility3d-prototype` only for later slices that can cite prior 3D gate evidence.
 
+## Validation gates
+
+Rust validation rejects missing or one-step ready-state core loops, unsupported target classes, unsafe local refs, unsupported asset/style ref kinds or unclear license evidence, overbroad scope, contradictory constraints/non-goals, missing acceptance goals, and unclear ready-state win/loss conditions. These checks are guardrails for later evidence-gated planning; they do not authorize generation or apply behavior.
+
 ## Fixtures
 
 - `examples/gdd-design-brief-v1/design-brief.valid.fixture.json`
 - `examples/gdd-design-brief-v1/design-brief.partial.fixture.json`
 - `examples/gdd-design-brief-v1/design-brief.blocked.fixture.json`
 - `examples/gdd-design-brief-v1/invalid/design-brief.unsafe-ref.fixture.json`
+- `examples/gdd-design-brief-v1/invalid/design-brief.overbroad-scope.fixture.json`
+- `examples/gdd-design-brief-v1/invalid/design-brief.contradictory.fixture.json`
+- `examples/gdd-design-brief-v1/invalid/design-brief.unclear-win-loss.fixture.json`
+- `examples/gdd-design-brief-v1/invalid/design-brief.unsupported-asset-kind.fixture.json`
 
 ## Boundaries
 

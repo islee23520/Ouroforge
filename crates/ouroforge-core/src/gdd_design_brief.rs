@@ -123,6 +123,14 @@ impl GddDesignBriefArtifact {
         require_text("GDD design brief genre", &self.genre)?;
         require_text("GDD design brief playerFantasy", &self.player_fantasy)?;
         self.core_loop.validate()?;
+        if self.status == GddDesignBriefStatus::Ready && self.core_loop.steps.len() < 2 {
+            return Err(anyhow!(
+                "GDD design brief coreLoop.steps must include at least two concrete steps"
+            ));
+        }
+        validate_scope_text("GDD design brief gameTitle", &self.game_title)?;
+        validate_scope_text("GDD design brief genre", &self.genre)?;
+        validate_scope_text("GDD design brief playerFantasy", &self.player_fantasy)?;
         require_nonempty("GDD design brief mechanics", self.mechanics.len())?;
         for mechanic in &self.mechanics {
             mechanic.validate()?;
@@ -131,7 +139,8 @@ impl GddDesignBriefArtifact {
         for control in &self.controls {
             control.validate()?;
         }
-        self.win_loss_conditions.validate()?;
+        self.win_loss_conditions
+            .validate(self.status == GddDesignBriefStatus::Ready)?;
         require_nonempty("GDD design brief scenesLevels", self.scenes_levels.len())?;
         for scene in &self.scenes_levels {
             scene.validate()?;
@@ -150,6 +159,7 @@ impl GddDesignBriefArtifact {
             &self.acceptance_goals,
             true,
         )?;
+        validate_cross_field_scope(self)?;
         for reason in &self.blocked_reasons {
             require_text("GDD design brief blockedReasons", reason)?;
         }
@@ -191,9 +201,20 @@ impl GddControl {
     }
 }
 impl GddWinLossConditions {
-    fn validate(&self) -> Result<()> {
+    fn validate(&self, ready: bool) -> Result<()> {
         require_string_list("GDD design brief winLossConditions.win", &self.win, true)?;
-        require_string_list("GDD design brief winLossConditions.loss", &self.loss, true)
+        require_string_list("GDD design brief winLossConditions.loss", &self.loss, true)?;
+        if ready {
+            for (field, values) in [
+                ("GDD design brief winLossConditions.win", &self.win),
+                ("GDD design brief winLossConditions.loss", &self.loss),
+            ] {
+                for value in values {
+                    reject_unclear_goal_text(field, value)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 impl GddSceneLevel {
@@ -212,10 +233,140 @@ impl GddAssetStyleRef {
     fn validate(&self) -> Result<()> {
         require_local_id("GDD design brief assetStyleRefs.id", &self.id)?;
         require_local_id("GDD design brief assetStyleRefs.kind", &self.kind)?;
+        if !matches!(
+            self.kind.as_str(),
+            "placeholder"
+                | "palette"
+                | "tilemap"
+                | "sprite-sheet"
+                | "audio-placeholder"
+                | "docs-ref"
+        ) {
+            return Err(anyhow!(
+                "GDD design brief assetStyleRefs.kind `{}` is not supported in v1",
+                self.kind
+            ));
+        }
         require_local_ref("GDD design brief assetStyleRefs.source", &self.source)?;
-        require_text("GDD design brief assetStyleRefs.license", &self.license)
+        require_text("GDD design brief assetStyleRefs.license", &self.license)?;
+        let license = self.license.to_ascii_lowercase();
+        if !(license.contains("repo-fixture")
+            || license.contains("placeholder")
+            || license.contains("public-domain")
+            || license.contains("cc0")
+            || license.contains("local-fixture"))
+        {
+            return Err(anyhow!(
+                "GDD design brief assetStyleRefs.license must be explicit local fixture, placeholder, public-domain, or CC0 evidence"
+            ));
+        }
+        Ok(())
     }
 }
+
+fn validate_cross_field_scope(artifact: &GddDesignBriefArtifact) -> Result<()> {
+    for mechanic in &artifact.mechanics {
+        validate_scope_text("GDD design brief mechanics.summary", &mechanic.summary)?;
+    }
+    for scene in &artifact.scenes_levels {
+        validate_scope_text("GDD design brief scenesLevels.summary", &scene.summary)?;
+    }
+    for entity in &artifact.entities {
+        validate_scope_text("GDD design brief entities.role", &entity.role)?;
+    }
+    for item in artifact
+        .constraints
+        .iter()
+        .chain(artifact.acceptance_goals.iter())
+    {
+        validate_scope_text("GDD design brief scoped text", &item.text)?;
+    }
+
+    for phrase in [
+        "native export",
+        "asset generation",
+        "autonomous unrestricted game creation",
+        "source mutation",
+        "remote assets",
+        "production game",
+        "commercial readiness",
+    ] {
+        let positive = artifact
+            .constraints
+            .iter()
+            .chain(artifact.acceptance_goals.iter())
+            .any(|item| contains_positive_phrase(&item.text, phrase));
+        let rejected = artifact
+            .non_goals
+            .iter()
+            .any(|item| item.text.to_ascii_lowercase().contains(phrase));
+        if positive && rejected {
+            return Err(anyhow!(
+                "GDD design brief has contradictory requirements for `{phrase}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_scope_text(field: &str, value: &str) -> Result<()> {
+    let lower = value.to_ascii_lowercase();
+    for forbidden in [
+        "full game",
+        "open world",
+        "massively multiplayer",
+        "mmo",
+        "every platform",
+        "all platforms",
+        "unlimited",
+        "unrestricted",
+        "ship-ready",
+        "commercial release",
+        "production game",
+        "native export",
+        "plugin runtime",
+        "hosted cloud",
+        "source mutation",
+        "asset generation",
+    ] {
+        if contains_positive_phrase(&lower, forbidden) {
+            return Err(anyhow!(
+                "{field} contains overbroad or out-of-scope v1 requirement `{forbidden}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    if !lower.contains(phrase) {
+        return false;
+    }
+    !["no ", "not ", "without ", "avoid ", "forbid ", "forbidden "]
+        .iter()
+        .any(|prefix| lower.contains(&format!("{prefix}{phrase}")))
+}
+
+fn reject_unclear_goal_text(field: &str, value: &str) -> Result<()> {
+    let lower = value.to_ascii_lowercase();
+    for unclear in [
+        "tbd",
+        "todo",
+        "unclear",
+        "unknown",
+        "clarify",
+        "not decided",
+    ] {
+        if lower.contains(unclear) {
+            return Err(anyhow!(
+                "{field} must be concrete for ready design briefs, found `{unclear}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_text_items(field: &str, items: &[GddTextItem], required: bool) -> Result<()> {
     if required {
         require_nonempty(field, items.len())?;
