@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v0",
+  "pluginId": "fixture-legacy-schema",
+  "name": "Fixture Legacy Schema",
+  "version": "1.0.0",
+  "description": "Declares an unsupported manifest schema version and is reported as incompatible.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

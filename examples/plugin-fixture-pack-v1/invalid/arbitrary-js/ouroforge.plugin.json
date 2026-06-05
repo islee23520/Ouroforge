@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-arbitrary-js",
+  "name": "Fixture Arbitrary JS",
+  "version": "1.0.0",
+  "description": "Attempts to smuggle an executable entry point and is reported as invalid.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "entryScript": "eval(atob('YWxlcnQoMSk='))",
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

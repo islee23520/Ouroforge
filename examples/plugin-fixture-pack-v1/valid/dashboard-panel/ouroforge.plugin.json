@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-dashboard-panel",
+  "name": "Fixture Dashboard Panel",
+  "version": "1.0.0",
+  "description": "Valid read-only dashboard panel plugin for the fixture pack.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "permissions": ["read_evidence", "contribute_dashboard_panel"],
+  "descriptorRefs": [
+    {
+      "id": "fixture-dashboard-panel-descriptor",
+      "kind": "dashboardPanel",
+      "path": "descriptors/dashboard-panel.json"
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
+}

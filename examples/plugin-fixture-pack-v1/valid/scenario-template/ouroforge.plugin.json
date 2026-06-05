@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-scenario-template",
+  "name": "Fixture Scenario Template",
+  "version": "1.0.0",
+  "description": "Valid read-only scenario template plugin for the fixture pack.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["scenarioTemplate"],
+  "extensionPoints": ["scenario.templates.readOnly"],
+  "permissions": ["read_docs", "contribute_scenario_template"],
+  "descriptorRefs": [
+    {
+      "id": "fixture-scenario-template-descriptor",
+      "kind": "scenarioTemplate",
+      "path": "descriptors/scenario-template.json"
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
+}

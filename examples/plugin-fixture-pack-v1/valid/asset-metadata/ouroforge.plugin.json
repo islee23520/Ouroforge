@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-asset-metadata",
+  "name": "Fixture Asset Metadata",
+  "version": "1.0.0",
+  "description": "Valid read-only asset metadata plugin for the fixture pack.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["assetMetadataProvider"],
+  "extensionPoints": ["assets.metadata.readOnly"],
+  "permissions": ["contribute_asset_metadata"],
+  "assetMetadata": [
+    {
+      "descriptorId": "fixture-sprite-metadata",
+      "assetType": "sprite",
+      "fields": [
+        { "name": "pivot", "type": "enum", "label": "Pivot", "required": true, "allowedValues": ["center", "bottom"] }
+      ],
+      "manifestIntegrationKeys": ["sprite_pivot"],
+      "validationHints": ["pivot must be center or bottom"],
+      "boundary": "Declarative read-only asset metadata descriptor with no asset generation, no command execution, and no network access."
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
+}

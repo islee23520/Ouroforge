@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "fixture-blocked-capability",
+  "name": "Fixture Blocked Capability",
+  "version": "1.0.0",
+  "description": "Declares a non-allowlisted capability and is reported as invalid.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Fixture Pack"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["executeScript"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}
