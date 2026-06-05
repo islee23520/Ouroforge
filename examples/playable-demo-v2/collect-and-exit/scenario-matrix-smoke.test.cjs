@@ -79,8 +79,8 @@ for (const token of blockedTokens) {
 }
 
 assert.ok(
-  project.scenarioPacks.some((pack) => pack.id === matrix.id && pack.path === 'scenarios/demo-scenario-matrix.json'),
-  'project manifest registers the demo scenario matrix pack'
+  project.scenarioPacks.some((pack) => pack.id === 'collect-and-exit' && pack.path === 'scenarios/collect-and-exit.json'),
+  'project manifest keeps executable scenario pack separate from matrix fixture'
 );
 
 assert.ok(Array.isArray(matrix.scenarioFixtures) && matrix.scenarioFixtures.length >= 8, 'scenario fixtures are declared');
