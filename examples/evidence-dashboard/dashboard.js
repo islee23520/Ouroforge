@@ -2378,7 +2378,105 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  const WORKSPACE_LAYOUT_STORAGE_KEY = 'ouroforge.studio.workspace';
+  const WORKSPACE_LAYOUT_VERSION = 1;
+
+  function defaultWorkspaceLayout() {
+    return {
+      version: WORKSPACE_LAYOUT_VERSION,
+      selectedProjectId: null,
+      selectedSceneId: null,
+      selectedEntityId: null,
+      visiblePanels: { runList: true, runDetail: true, evidence: true, replay: true },
+      panelSizes: { runList: 280, runDetail: 480, evidence: 320 },
+      filters: { runSearch: '', evidenceSearch: '' },
+    };
+  }
+
+  function normalizeWorkspaceLayout(raw) {
+    const defaults = defaultWorkspaceLayout();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return defaults;
+    }
+    if (raw.version !== WORKSPACE_LAYOUT_VERSION) {
+      // Missing, older, or future layout versions fall back to defaults (draft-only browser state).
+      return defaults;
+    }
+    const normalizeString = (value) => (typeof value === 'string' ? value : null);
+    const visiblePanels = raw.visiblePanels && typeof raw.visiblePanels === 'object' && !Array.isArray(raw.visiblePanels) ? raw.visiblePanels : {};
+    const panelSizes = raw.panelSizes && typeof raw.panelSizes === 'object' && !Array.isArray(raw.panelSizes) ? raw.panelSizes : {};
+    const filters = raw.filters && typeof raw.filters === 'object' && !Array.isArray(raw.filters) ? raw.filters : {};
+    const normalizeSize = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback);
+    return {
+      version: WORKSPACE_LAYOUT_VERSION,
+      selectedProjectId: normalizeString(raw.selectedProjectId),
+      selectedSceneId: normalizeString(raw.selectedSceneId),
+      selectedEntityId: normalizeString(raw.selectedEntityId),
+      visiblePanels: {
+        runList: typeof visiblePanels.runList === 'boolean' ? visiblePanels.runList : defaults.visiblePanels.runList,
+        runDetail: typeof visiblePanels.runDetail === 'boolean' ? visiblePanels.runDetail : defaults.visiblePanels.runDetail,
+        evidence: typeof visiblePanels.evidence === 'boolean' ? visiblePanels.evidence : defaults.visiblePanels.evidence,
+        replay: typeof visiblePanels.replay === 'boolean' ? visiblePanels.replay : defaults.visiblePanels.replay,
+      },
+      panelSizes: {
+        runList: normalizeSize(panelSizes.runList, defaults.panelSizes.runList),
+        runDetail: normalizeSize(panelSizes.runDetail, defaults.panelSizes.runDetail),
+        evidence: normalizeSize(panelSizes.evidence, defaults.panelSizes.evidence),
+      },
+      filters: {
+        runSearch: typeof filters.runSearch === 'string' ? filters.runSearch : defaults.filters.runSearch,
+        evidenceSearch: typeof filters.evidenceSearch === 'string' ? filters.evidenceSearch : defaults.filters.evidenceSearch,
+      },
+    };
+  }
+
+  function loadWorkspaceLayout(storage) {
+    if (!storage || typeof storage.getItem !== 'function') {
+      return defaultWorkspaceLayout();
+    }
+    let rawText = null;
+    try {
+      rawText = storage.getItem(WORKSPACE_LAYOUT_STORAGE_KEY);
+    } catch (error) {
+      return defaultWorkspaceLayout();
+    }
+    if (typeof rawText !== 'string' || !rawText.length) {
+      return defaultWorkspaceLayout();
+    }
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (error) {
+      // Malformed JSON fails closed to defaults; never throw.
+      return defaultWorkspaceLayout();
+    }
+    return normalizeWorkspaceLayout(parsed);
+  }
+
+  function saveWorkspaceLayout(storage, state) {
+    const normalized = normalizeWorkspaceLayout(state);
+    if (storage && typeof storage.setItem === 'function') {
+      try {
+        storage.setItem(WORKSPACE_LAYOUT_STORAGE_KEY, JSON.stringify(normalized));
+      } catch (error) {
+        // Browser storage may be unavailable or full; draft-only state is best effort.
+      }
+    }
+    return normalized;
+  }
+
+  function resetWorkspaceLayout(storage) {
+    if (storage && typeof storage.removeItem === 'function') {
+      try {
+        storage.removeItem(WORKSPACE_LAYOUT_STORAGE_KEY);
+      } catch (error) {
+        // Ignore storage removal failures; defaults are returned regardless.
+      }
+    }
+    return defaultWorkspaceLayout();
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

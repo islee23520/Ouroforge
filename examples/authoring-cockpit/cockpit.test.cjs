@@ -2973,3 +2973,59 @@ assert.ok(!/<button/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry 
 assert.ok(!/data-action=/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render action hooks');
 assert.ok(!/href=["']javascript:/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render javascript links');
 assert.ok(!/command bridge/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not advertise a command bridge');
+
+// Studio workspace layout persistence (draft-only browser-local state; #769)
+function makeFakeStorage(seed) {
+  const store = Object.assign({}, seed || {});
+  return {
+    store,
+    getItem(key) { return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; },
+    setItem(key, value) { store[key] = String(value); },
+    removeItem(key) { delete store[key]; },
+  };
+}
+
+const workspaceDefaults = cockpit.defaultWorkspaceLayout();
+assert.equal(cockpit.WORKSPACE_LAYOUT_STORAGE_KEY, 'ouroforge.studio.workspace');
+assert.equal(workspaceDefaults.version, cockpit.WORKSPACE_LAYOUT_VERSION);
+assert.equal(workspaceDefaults.selectedEntityId, null);
+assert.equal(workspaceDefaults.visiblePanels.tree, true);
+assert.equal(workspaceDefaults.filters.entitySearch, '');
+// defaults are a fresh object each call (no shared mutation across the workspace)
+assert.notEqual(cockpit.defaultWorkspaceLayout(), cockpit.defaultWorkspaceLayout());
+
+// missing stored state -> defaults, never throws
+assert.deepEqual(cockpit.loadWorkspaceLayout(makeFakeStorage()), workspaceDefaults);
+// no storage object at all -> defaults
+assert.deepEqual(cockpit.loadWorkspaceLayout(undefined), workspaceDefaults);
+
+// malformed JSON -> defaults (fail closed)
+assert.deepEqual(cockpit.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '{not json' })), workspaceDefaults);
+// non-object JSON -> defaults
+assert.deepEqual(cockpit.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '"a string"' })), workspaceDefaults);
+assert.deepEqual(cockpit.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '[1,2,3]' })), workspaceDefaults);
+// wrong/old layout version -> defaults
+assert.deepEqual(cockpit.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': JSON.stringify({ version: 0, selectedEntityId: 'hero' }) })), workspaceDefaults);
+// invalid shape with correct version -> normalized to defaults for bad fields
+const cockpitNormalized = cockpit.normalizeWorkspaceLayout({ version: cockpit.WORKSPACE_LAYOUT_VERSION, selectedEntityId: 42, visiblePanels: 'nope', panelSizes: { tree: -5 }, filters: { entitySearch: 7 } });
+assert.equal(cockpitNormalized.selectedEntityId, null);
+assert.equal(cockpitNormalized.visiblePanels.tree, true);
+assert.equal(cockpitNormalized.panelSizes.tree, workspaceDefaults.panelSizes.tree);
+assert.equal(cockpitNormalized.filters.entitySearch, '');
+
+// valid round-trip via save -> load
+const cockpitSaveStorage = makeFakeStorage();
+const cockpitDesired = { version: cockpit.WORKSPACE_LAYOUT_VERSION, selectedProjectId: 'proj-1', selectedSceneId: 'scene-1', selectedEntityId: 'hero', visiblePanels: { tree: false, inspector: true, integration: true, evidence: false }, panelSizes: { tree: 200, inspector: 400, integration: 300 }, filters: { entitySearch: 'enemy', evidenceSearch: 'verdict' } };
+const cockpitSaved = cockpit.saveWorkspaceLayout(cockpitSaveStorage, cockpitDesired);
+assert.equal(cockpitSaveStorage.store['ouroforge.studio.workspace'], JSON.stringify(cockpitSaved));
+assert.deepEqual(cockpit.loadWorkspaceLayout(cockpitSaveStorage), cockpitSaved);
+assert.equal(cockpitSaved.selectedEntityId, 'hero');
+assert.equal(cockpitSaved.visiblePanels.tree, false);
+
+// reset clears storage and returns defaults
+const cockpitResetResult = cockpit.resetWorkspaceLayout(cockpitSaveStorage);
+assert.deepEqual(cockpitResetResult, workspaceDefaults);
+assert.equal(cockpitSaveStorage.store['ouroforge.studio.workspace'], undefined);
+assert.deepEqual(cockpit.loadWorkspaceLayout(cockpitSaveStorage), workspaceDefaults);
+
+console.log('authoring cockpit workspace layout persistence test passed');

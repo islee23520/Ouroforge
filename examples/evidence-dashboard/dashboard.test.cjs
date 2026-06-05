@@ -1959,3 +1959,56 @@ assert.ok(!/<button/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboa
 assert.ok(!/data-action=/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render action hooks');
 assert.ok(!/href=["']javascript:/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render javascript links');
 assert.ok(!/command bridge/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not advertise a command bridge');
+
+// Studio workspace layout persistence (draft-only browser-local state; #769)
+function makeFakeStorage(seed) {
+  const store = Object.assign({}, seed || {});
+  return {
+    store,
+    getItem(key) { return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; },
+    setItem(key, value) { store[key] = String(value); },
+    removeItem(key) { delete store[key]; },
+  };
+}
+
+const dashWorkspaceDefaults = dashboard.defaultWorkspaceLayout();
+assert.equal(dashboard.WORKSPACE_LAYOUT_STORAGE_KEY, 'ouroforge.studio.workspace');
+assert.equal(dashWorkspaceDefaults.version, dashboard.WORKSPACE_LAYOUT_VERSION);
+assert.equal(dashWorkspaceDefaults.selectedEntityId, null);
+assert.equal(dashWorkspaceDefaults.visiblePanels.runList, true);
+assert.equal(dashWorkspaceDefaults.filters.runSearch, '');
+assert.notEqual(dashboard.defaultWorkspaceLayout(), dashboard.defaultWorkspaceLayout());
+
+// missing stored state -> defaults, never throws
+assert.deepEqual(dashboard.loadWorkspaceLayout(makeFakeStorage()), dashWorkspaceDefaults);
+assert.deepEqual(dashboard.loadWorkspaceLayout(undefined), dashWorkspaceDefaults);
+
+// malformed/invalid JSON -> defaults (fail closed)
+assert.deepEqual(dashboard.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '{not json' })), dashWorkspaceDefaults);
+assert.deepEqual(dashboard.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '"a string"' })), dashWorkspaceDefaults);
+assert.deepEqual(dashboard.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': '[1,2,3]' })), dashWorkspaceDefaults);
+// wrong/old layout version -> defaults
+assert.deepEqual(dashboard.loadWorkspaceLayout(makeFakeStorage({ 'ouroforge.studio.workspace': JSON.stringify({ version: 0, selectedEntityId: 'hero' }) })), dashWorkspaceDefaults);
+// invalid shape with correct version -> normalized to defaults for bad fields
+const dashNormalized = dashboard.normalizeWorkspaceLayout({ version: dashboard.WORKSPACE_LAYOUT_VERSION, selectedEntityId: 42, visiblePanels: 'nope', panelSizes: { runList: -5 }, filters: { runSearch: 7 } });
+assert.equal(dashNormalized.selectedEntityId, null);
+assert.equal(dashNormalized.visiblePanels.runList, true);
+assert.equal(dashNormalized.panelSizes.runList, dashWorkspaceDefaults.panelSizes.runList);
+assert.equal(dashNormalized.filters.runSearch, '');
+
+// valid round-trip via save -> load
+const dashSaveStorage = makeFakeStorage();
+const dashDesired = { version: dashboard.WORKSPACE_LAYOUT_VERSION, selectedProjectId: 'proj-1', selectedSceneId: 'scene-1', selectedEntityId: 'hero', visiblePanels: { runList: false, runDetail: true, evidence: false, replay: true }, panelSizes: { runList: 220, runDetail: 500, evidence: 300 }, filters: { runSearch: 'improved', evidenceSearch: 'verdict' } };
+const dashSaved = dashboard.saveWorkspaceLayout(dashSaveStorage, dashDesired);
+assert.equal(dashSaveStorage.store['ouroforge.studio.workspace'], JSON.stringify(dashSaved));
+assert.deepEqual(dashboard.loadWorkspaceLayout(dashSaveStorage), dashSaved);
+assert.equal(dashSaved.selectedEntityId, 'hero');
+assert.equal(dashSaved.visiblePanels.runList, false);
+
+// reset clears storage and returns defaults
+const dashResetResult = dashboard.resetWorkspaceLayout(dashSaveStorage);
+assert.deepEqual(dashResetResult, dashWorkspaceDefaults);
+assert.equal(dashSaveStorage.store['ouroforge.studio.workspace'], undefined);
+assert.deepEqual(dashboard.loadWorkspaceLayout(dashSaveStorage), dashWorkspaceDefaults);
+
+console.log('dashboard workspace layout persistence test passed');

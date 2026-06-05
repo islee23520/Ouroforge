@@ -3960,7 +3960,105 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  const WORKSPACE_LAYOUT_STORAGE_KEY = 'ouroforge.studio.workspace';
+  const WORKSPACE_LAYOUT_VERSION = 1;
+
+  function defaultWorkspaceLayout() {
+    return {
+      version: WORKSPACE_LAYOUT_VERSION,
+      selectedProjectId: null,
+      selectedSceneId: null,
+      selectedEntityId: null,
+      visiblePanels: { tree: true, inspector: true, integration: true, evidence: true },
+      panelSizes: { tree: 240, inspector: 360, integration: 320 },
+      filters: { entitySearch: '', evidenceSearch: '' },
+    };
+  }
+
+  function normalizeWorkspaceLayout(raw) {
+    const defaults = defaultWorkspaceLayout();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return defaults;
+    }
+    if (raw.version !== WORKSPACE_LAYOUT_VERSION) {
+      // Missing, older, or future layout versions fall back to defaults (draft-only browser state).
+      return defaults;
+    }
+    const normalizeString = (value) => (typeof value === 'string' ? value : null);
+    const visiblePanels = raw.visiblePanels && typeof raw.visiblePanels === 'object' && !Array.isArray(raw.visiblePanels) ? raw.visiblePanels : {};
+    const panelSizes = raw.panelSizes && typeof raw.panelSizes === 'object' && !Array.isArray(raw.panelSizes) ? raw.panelSizes : {};
+    const filters = raw.filters && typeof raw.filters === 'object' && !Array.isArray(raw.filters) ? raw.filters : {};
+    const normalizeSize = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback);
+    return {
+      version: WORKSPACE_LAYOUT_VERSION,
+      selectedProjectId: normalizeString(raw.selectedProjectId),
+      selectedSceneId: normalizeString(raw.selectedSceneId),
+      selectedEntityId: normalizeString(raw.selectedEntityId),
+      visiblePanels: {
+        tree: typeof visiblePanels.tree === 'boolean' ? visiblePanels.tree : defaults.visiblePanels.tree,
+        inspector: typeof visiblePanels.inspector === 'boolean' ? visiblePanels.inspector : defaults.visiblePanels.inspector,
+        integration: typeof visiblePanels.integration === 'boolean' ? visiblePanels.integration : defaults.visiblePanels.integration,
+        evidence: typeof visiblePanels.evidence === 'boolean' ? visiblePanels.evidence : defaults.visiblePanels.evidence,
+      },
+      panelSizes: {
+        tree: normalizeSize(panelSizes.tree, defaults.panelSizes.tree),
+        inspector: normalizeSize(panelSizes.inspector, defaults.panelSizes.inspector),
+        integration: normalizeSize(panelSizes.integration, defaults.panelSizes.integration),
+      },
+      filters: {
+        entitySearch: typeof filters.entitySearch === 'string' ? filters.entitySearch : defaults.filters.entitySearch,
+        evidenceSearch: typeof filters.evidenceSearch === 'string' ? filters.evidenceSearch : defaults.filters.evidenceSearch,
+      },
+    };
+  }
+
+  function loadWorkspaceLayout(storage) {
+    if (!storage || typeof storage.getItem !== 'function') {
+      return defaultWorkspaceLayout();
+    }
+    let rawText = null;
+    try {
+      rawText = storage.getItem(WORKSPACE_LAYOUT_STORAGE_KEY);
+    } catch (error) {
+      return defaultWorkspaceLayout();
+    }
+    if (typeof rawText !== 'string' || !rawText.length) {
+      return defaultWorkspaceLayout();
+    }
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (error) {
+      // Malformed JSON fails closed to defaults; never throw.
+      return defaultWorkspaceLayout();
+    }
+    return normalizeWorkspaceLayout(parsed);
+  }
+
+  function saveWorkspaceLayout(storage, state) {
+    const normalized = normalizeWorkspaceLayout(state);
+    if (storage && typeof storage.setItem === 'function') {
+      try {
+        storage.setItem(WORKSPACE_LAYOUT_STORAGE_KEY, JSON.stringify(normalized));
+      } catch (error) {
+        // Browser storage may be unavailable or full; draft-only state is best effort.
+      }
+    }
+    return normalized;
+  }
+
+  function resetWorkspaceLayout(storage) {
+    if (storage && typeof storage.removeItem === 'function') {
+      try {
+        storage.removeItem(WORKSPACE_LAYOUT_STORAGE_KEY);
+      } catch (error) {
+        // Ignore storage removal failures; defaults are returned regardless.
+      }
+    }
+    return defaultWorkspaceLayout();
+  }
+
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {
