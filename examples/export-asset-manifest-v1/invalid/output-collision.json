@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "export-asset-manifest-v1",
+  "projectId": "proj_export_bundle_fixture",
+  "entries": [
+    {
+      "assetId": "asset_hero",
+      "sourcePath": "examples/export-bundle-v1/fixture-game/assets/sprites/hero.json",
+      "outputPath": "assets/assets/sprites/hero.json",
+      "contentHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 184,
+      "url": "assets/assets/sprites/hero.json"
+    },
+    {
+      "assetId": "asset_hero_dup_output",
+      "sourcePath": "examples/export-bundle-v1/fixture-game/assets/sprites/hero-copy.json",
+      "outputPath": "assets/assets/sprites/hero.json",
+      "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "size": 184,
+      "url": "assets/assets/sprites/hero-copy.json"
+    }
+  ]
+}

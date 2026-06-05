@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "export-profile-v1",
+  "profileId": "profile_missing_asset_root",
+  "projectId": "proj_export_bundle_fixture",
+  "title": "Collect and Exit (Missing Asset Root)",
+  "version": "0.1.0",
+  "exportTarget": "web-static-bundle",
+  "entryScene": "examples/export-bundle-v1/fixture-game/scene/main.json",
+  "assetRoots": [
+    "examples/export-asset-manifest-v1/does-not-exist"
+  ],
+  "outputDir": "dist/export/missing-asset",
+  "runtimeProbeMode": "preserve",
+  "verificationScenarioIds": ["scenario_reach_exit"],
+  "packageMetadataRef": "examples/export-bundle-v1/package-metadata.fixture.json",
+  "boundary": "Local, evidence-backed export profile only; no publish, deploy, sign, or upload. Validation is fail closed against the export target matrix."
+}

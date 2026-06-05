@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "export-asset-manifest-v1",
+  "projectId": "proj_export_bundle_fixture",
+  "entries": [
+    {
+      "assetId": "assets_assets_sprites_hero.json",
+      "sourcePath": "examples/export-bundle-v1/fixture-game/assets/sprites/hero.json",
+      "outputPath": "assets/assets/sprites/hero.json",
+      "contentHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 184,
+      "url": "assets/assets/sprites/hero.json"
+    }
+  ]
+}
