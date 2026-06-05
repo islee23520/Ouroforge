@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "scenario-coverage-v15-build-export-packaging-v1",
+  "suiteId": "scenario_coverage_v15_build_export_packaging",
+  "issue": 735,
+  "status": "fixture-scoped",
+  "generatedStatePolicy": "Tracked scenario matrix only; generated export bundles, staging roots, checksums, logs, screenshots, temp servers, dashboard exports, and local tool state remain ignored unless explicitly fixture-scoped.",
+  "boundary": "Local evidence-backed export regression coverage only; no publish, deploy, sign, upload, mobile/console/store export, desktop wrapper, browser trusted writes, command bridge, production-ready export claim, or Godot replacement claim.",
+  "scenarios": [
+    { "id": "BEP15.success-local-web-export", "kind": "success", "evidenceRefs": ["examples/export-bundle-v1/export-profile.fixture.json"], "expected": "local web bundle stages only declared files" },
+    { "id": "BEP15.success-asset-manifest", "kind": "success", "evidenceRefs": ["examples/export-asset-manifest-v1/asset-manifest.valid.fixture.json"], "expected": "asset manifest hashes and rewrite map are deterministic" },
+    { "id": "BEP15.success-probe-preserved", "kind": "success", "evidenceRefs": ["examples/export-probe-v1/"], "expected": "window.__OUROFORGE__ probe remains compatible" },
+    { "id": "BEP15.success-verification-pass", "kind": "success", "evidenceRefs": ["examples/export-plan-v1/"], "expected": "verification steps are local metadata and allowlisted smokes" },
+    { "id": "BEP15.success-evidence-bundle", "kind": "success", "evidenceRefs": ["examples/build-export-packaging-regression-v15/coverage-matrix.fixture.json"], "expected": "evidence refs remain fixture-scoped and read-only" },
+    { "id": "BEP15.success-read-only-inspection", "kind": "success", "evidenceRefs": ["examples/evidence-dashboard/dashboard.test.cjs", "examples/authoring-cockpit/cockpit.test.cjs"], "expected": "dashboard and Studio inspect exported data without write controls" },
+    { "id": "BEP15.block-missing-asset", "kind": "blocked", "evidenceRefs": ["examples/export-asset-manifest-v1/missing-asset-profile.fixture.json"], "expected": "missing asset root diagnostic blocks promotion" },
+    { "id": "BEP15.block-unsafe-path", "kind": "blocked", "evidenceRefs": ["examples/export-profile-v1/invalid/path-traversal-output.json", "examples/export-asset-manifest-v1/invalid/path-traversal.json"], "expected": "unsafe paths and traversal fail closed before writes" },
+    { "id": "BEP15.block-publish-target", "kind": "blocked", "evidenceRefs": ["docs/export-target-matrix-v1.md"], "expected": "publish, deploy, sign, upload, and CI release targets are rejected" },
+    { "id": "BEP15.block-missing-probe", "kind": "blocked", "evidenceRefs": ["examples/export-probe-v1/invalid/no-probe-global-bootstrap.js", "examples/export-probe-v1/invalid/missing-getevents-bootstrap.js"], "expected": "missing probe global or method blocks compatibility claim" },
+    { "id": "BEP15.block-dirty-generated-output", "kind": "blocked", "evidenceRefs": ["docs/export-staging-policy-v1.md"], "expected": "generated outputs remain ignored or explicitly fixture-scoped" },
+    { "id": "BEP15.block-checksum-mismatch", "kind": "blocked", "evidenceRefs": ["examples/export-asset-manifest-v1/asset-manifest.valid.fixture.json"], "expected": "checksum drift is reported as blocked evidence, not accepted" },
+    { "id": "BEP15.block-desktop-mobile-store-target", "kind": "blocked", "evidenceRefs": ["docs/export-target-matrix-v1.md"], "expected": "desktop wrapper is design-gated and mobile/console/store targets are blocked" }
+  ]
+}
