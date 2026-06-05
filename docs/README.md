@@ -122,6 +122,7 @@ claims:
 - [`plugin-system-design.md`](plugin-system-design.md)
 - [`distributed-elixir-design.md`](distributed-elixir-design.md)
 - [`godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md)
+- [`godot-plus-demo-design-pillars-v1.md`](godot-plus-demo-design-pillars-v1.md)
 - [`post-launch-roadmap-triage-v1.md`](post-launch-roadmap-triage-v1.md) and [`post-launch-roadmap-response-snippets-v1.md`](post-launch-roadmap-response-snippets-v1.md)
 
 ## Generated-state and wording audits
