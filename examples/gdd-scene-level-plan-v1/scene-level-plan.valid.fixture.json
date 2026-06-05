@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "gdd-scene-level-plan-v1",
+  "planId": "gdd-level-collect-exit-ready",
+  "status": "ready",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "scaffoldPlanRef": "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+  "requirementIds": [
+    "req:collect-key",
+    "req:reach-exit"
+  ],
+  "mechanicsMappingIds": [
+    "map:collect",
+    "map:exit"
+  ],
+  "levelIntents": [
+    {
+      "intentId": "intent_collect_and_exit_intro",
+      "levelIntentRef": "examples/level-intent-v1/level-intent.valid.fixture.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:collect-key",
+          "mechanicsMappingId": "map:collect"
+        },
+        {
+          "requirementId": "req:reach-exit",
+          "mechanicsMappingId": "map:exit"
+        }
+      ],
+      "capabilityStatus": "supported",
+      "blockedReasons": []
+    }
+  ],
+  "sceneGenerationPlans": [
+    {
+      "scenePlanId": "plan_collect_and_exit_intro",
+      "sceneGenerationPlanRef": "examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json",
+      "intentId": "intent_collect_and_exit_intro",
+      "traceLinks": [
+        {
+          "requirementId": "req:collect-key",
+          "mechanicsMappingId": "map:collect"
+        },
+        {
+          "requirementId": "req:reach-exit",
+          "mechanicsMappingId": "map:exit"
+        }
+      ],
+      "capabilityStatus": "supported",
+      "blockedReasons": []
+    }
+  ],
+  "objectivePlacements": [
+    {
+      "placementId": "place-key-before-exit",
+      "objectiveId": "collect_key",
+      "requirementId": "req:collect-key",
+      "mechanicsMappingId": "map:collect",
+      "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "targetTilemapRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+      "proofExpectationRef": "evidence/gdd-scene-level-plan-v1/collect-key-scenario.json",
+      "blockedReasons": []
+    },
+    {
+      "placementId": "place-exit-after-key",
+      "objectiveId": "reach_exit",
+      "requirementId": "req:reach-exit",
+      "mechanicsMappingId": "map:exit",
+      "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "targetTilemapRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+      "proofExpectationRef": "evidence/gdd-scene-level-plan-v1/reach-exit-scenario.json",
+      "blockedReasons": []
+    }
+  ],
+  "progressionPlan": [
+    {
+      "stepId": "key-before-exit",
+      "afterObjectiveRefs": [
+        "collect_key"
+      ],
+      "beforeObjectiveRefs": [
+        "reach_exit"
+      ],
+      "rationale": "Require key collection proof before the exit objective can be considered satisfied."
+    }
+  ],
+  "targetRefs": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "kind": "scene",
+      "expectedHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+      "kind": "tilemap",
+      "expectedHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/level-intent-v1/level-intent.valid.fixture.json",
+      "kind": "level-intent",
+      "expectedHash": null,
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json",
+      "kind": "scene-generation-plan",
+      "expectedHash": null,
+      "staleTarget": false,
+      "blockedReasons": []
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "collect-key-scenario-proof",
+      "pathHint": "evidence/gdd-scene-level-plan-v1/collect-key-scenario.json",
+      "description": "Scenario proof should show key collection before exit."
+    },
+    {
+      "evidenceId": "level-plan-preview",
+      "pathHint": "evidence/gdd-scene-level-plan-v1/level-plan-preview.json",
+      "description": "Read-only preview of GDD-linked level intent and scene generation plan."
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Non-mutating GDD scene/level planning; untrusted until Rust/local validation; review-gated apply only; no direct scene or tilemap writes; no autonomous unrestricted game creation; browser read-only or draft-only"
+}
