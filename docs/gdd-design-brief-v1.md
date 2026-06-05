@@ -28,6 +28,10 @@ Rust validation rejects missing or one-step ready-state core loops, unsupported 
 - `examples/gdd-design-brief-v1/invalid/design-brief.unclear-win-loss.fixture.json`
 - `examples/gdd-design-brief-v1/invalid/design-brief.unsupported-asset-kind.fixture.json`
 
+## Read-model compatibility
+
+The display read model summarizes validated briefs with schema/version identity, status, target class, count fields, validation summary text, compatibility notes, blocked reason count, and the original boundary. It is intentionally display-only: malformed briefs fail before read-model creation, and browser/dashboard/Studio consumers must treat the model as inspection data rather than trusted persistence or generation authority.
+
 ## Boundaries
 
 This contract does not authorize requirement extraction, mechanics mapping, feasibility decisions, project scaffold generation, prototype draft bundles, review-gated apply, Studio UI, command bridges, source/script mutation, generated proprietary assets, native export, production-game claims, or current engine replacement claims.
