@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "qa-swarm-regression-suite-v13",
+  "issue": 697,
+  "milestoneAnchor": "#1",
+  "memoryAnchor": "#23",
+  "status": "documented-fixture",
+  "boundary": "Aggregate regression evidence only; this suite must not spawn workers, execute commands from browser or Studio, auto-fix, auto-apply, auto-merge, or treat QA output as trusted mutation.",
+  "generatedStatePolicy": "Generated runs, fuzz inputs, screenshots, videos, traces, dashboard exports, and local tool state remain untracked unless explicitly fixture-scoped.",
+  "coverageStages": [
+    { "id": "scenario-candidates", "positiveFixture": "examples/qa-scenario-candidate-v1/scenario-candidate.sample.json", "negativeFixture": "examples/qa-scenario-candidate-v1/invalid/overbroad-candidate.json", "validator": "QaScenarioCandidateArtifact::from_json_str" },
+    { "id": "fuzz-plans", "positiveFixture": "examples/adversarial-input-fuzzing-v1/fuzzing-plan.sample.json", "negativeFixture": "synthetic:maxRuns-over-budget", "validator": "AdversarialInputFuzzingPlanArtifact::from_json_str" },
+    { "id": "worker-assignments", "positiveFixture": "examples/qa-worker-assignment-v1/worker-assignment.sample.json", "negativeFixture": "examples/qa-worker-assignment-v1/invalid/unbounded-worker-assignment.json", "validator": "QaWorkerAssignmentArtifact::from_json_str" },
+    { "id": "runtime-invariants", "positiveFixture": "examples/runtime-invariant-checker-v1/invariant-model.sample.json", "negativeFixture": "examples/runtime-invariant-checker-v1/invalid/unsafe-expression.runtime-invariant.json", "validator": "RuntimeInvariantModel::from_json_str" },
+    { "id": "route-attempts", "positiveFixture": "examples/route-attempt-evidence-v1/route-attempt-success.sample.json", "negativeFixture": "examples/route-attempt-evidence-v1/invalid/malformed-route-attempt.json", "validator": "RouteAttemptEvidenceArtifact::from_json_str" },
+    { "id": "visual-comparisons", "positiveFixture": "examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json", "negativeFixture": "examples/visual-comparison-evidence-v1/invalid/missing-thresholds.json", "validator": "VisualComparisonEvidenceArtifact::from_json_str" },
+    { "id": "performance-budgets", "positiveFixture": "examples/qa-performance-budget-v1/budget.pass.fixture.json", "negativeFixture": "examples/qa-performance-budget-v1/invalid/budget.status-mismatch.fixture.json", "validator": "PerformanceBudgetArtifact::from_json_str" },
+    { "id": "error-classifications", "positiveFixture": "examples/qa-error-classifier-v1/classifier.classified.fixture.json", "negativeFixture": "examples/qa-error-classifier-v1/invalid/classifier.missing-console-evidence.fixture.json", "validator": "QaErrorClassifierArtifact::from_json_str" },
+    { "id": "flake-rerun-policy", "positiveFixture": "examples/qa-flake-rerun-policy-v1/policy.stable-pass.fixture.json", "negativeFixture": "examples/qa-flake-rerun-policy-v1/invalid/policy.unbounded-reruns.fixture.json", "validator": "FlakeRerunPolicyArtifact::from_json_str" },
+    { "id": "failure-backlog", "positiveFixture": "examples/qa-failure-backlog-v1/backlog.classified.fixture.json", "negativeFixture": "examples/qa-failure-backlog-v1/invalid/backlog.auto-fix-attempt.fixture.json", "validator": "QaFailureBacklogArtifact::from_json_str" },
+    { "id": "run-matrix", "positiveFixture": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json", "negativeFixture": "examples/qa-swarm-run-matrix-v1/invalid/matrix.missing-evidence.fixture.json", "validator": "QaRunMatrixArtifact::from_json_str" },
+    { "id": "evidence-bundle", "positiveFixture": "examples/qa-swarm-evidence-bundle-v1/bundle.complete.fixture.json", "negativeFixture": "examples/qa-swarm-evidence-bundle-v1/invalid/bundle.unresolved-output.fixture.json", "validator": "QaEvidenceBundleArtifact::from_json_str" },
+    { "id": "dashboard-studio-read-models", "positiveFixture": "docs/studio-qa-swarm-inspection-surface-v1.md", "negativeFixture": "synthetic:forbidden-browser-trusted-write", "validator": "documentation-boundary-audit" },
+    { "id": "malformed-missing-stale-unresolved-output", "positiveFixture": "examples/qa-swarm-evidence-bundle-v1/bundle.stale.fixture.json", "negativeFixture": "examples/qa-swarm-evidence-bundle-v1/invalid/bundle.unresolved-output.fixture.json", "validator": "fail-closed-negative-fixture-audit" }
+  ],
+  "knownGaps": [
+    "The matrix proves fixture-level compatibility and read-model boundaries; it does not execute a live browser swarm or mutate trusted project state."
+  ]
+}
