@@ -37,6 +37,7 @@ pub mod export_probe_check;
 pub mod source_apply_post_apply_rerun;
 pub use source_apply_post_apply_rerun::*;
 pub mod export_profile;
+pub mod export_staging;
 pub mod internal_sprite_audit;
 pub mod source_apply_highrisk_blocker;
 pub use source_apply_highrisk_blocker::*;
