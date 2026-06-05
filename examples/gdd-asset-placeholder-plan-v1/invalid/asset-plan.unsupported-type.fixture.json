@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "gdd-asset-placeholder-plan-v1",
+  "planId": "demo-gdd-asset-plan",
+  "status": "ready",
+  "feasibilityGateRef": "docs/gdd-feasibility-gate-v1.md",
+  "scaffoldPlanRef": "docs/gdd-project-scaffold-plan-v1.md",
+  "requirementIds": [
+    "REQ-player",
+    "REQ-collect"
+  ],
+  "mechanicsMappingIds": [
+    "MAP-player",
+    "MAP-collect"
+  ],
+  "manifestRefs": [
+    "examples/asset-manifest-v1/asset-manifest.valid.json"
+  ],
+  "assetEntries": [
+    {
+      "assetId": "ASSET-player-placeholder",
+      "assetType": "sprite",
+      "sourceKind": "placeholder",
+      "styleNotes": "Simple colored rectangle placeholder for player readability.",
+      "requiredMetadata": {
+        "width": 32,
+        "height": 32,
+        "format": "png"
+      },
+      "licenseSourceNote": "Placeholder license/source note: internally described placeholder only; no external asset source.",
+      "traceLinks": [
+        {
+          "requirementId": "REQ-player",
+          "mechanicsMappingId": "MAP-player"
+        }
+      ],
+      "staleRef": false,
+      "blockedReasons": []
+    },
+    {
+      "assetId": "ASSET-keycard-local",
+      "assetType": "model-3d",
+      "sourceKind": "local-fixture",
+      "assetRef": "examples/game-runtime/assets/key.png",
+      "styleNotes": "Local fixture keycard icon reference for prototype readability.",
+      "requiredMetadata": {
+        "width": 16,
+        "height": 16,
+        "format": "png"
+      },
+      "licenseSourceNote": "Local fixture license/source note from repository fixture; no proprietary source.",
+      "traceLinks": [
+        {
+          "requirementId": "REQ-collect",
+          "mechanicsMappingId": "MAP-collect"
+        }
+      ],
+      "staleRef": false,
+      "blockedReasons": []
+    },
+    {
+      "assetId": "ASSET-manifest-tiles",
+      "assetType": "tileset",
+      "sourceKind": "manifest-ref",
+      "manifestRef": "examples/asset-manifest-v1/asset-manifest.valid.json",
+      "styleNotes": "Reuse existing manifest tileset reference for bounded prototype planning.",
+      "requiredMetadata": {
+        "width": 64,
+        "height": 64,
+        "format": "png"
+      },
+      "licenseSourceNote": "Manifest ref license/source note follows existing local manifest fixture source.",
+      "traceLinks": [
+        {
+          "requirementId": "REQ-player",
+          "mechanicsMappingId": "MAP-player"
+        }
+      ],
+      "staleRef": false,
+      "blockedReasons": []
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "EVD-asset-plan",
+      "pathHint": "evidence/assets/asset-plan-audit.json",
+      "description": "Asset plan evidence records placeholders, local refs, manifest refs, and license/source notes."
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Use placeholder assets or known local refs only with license/source notes; GDD-derived output remains untrusted until Rust/local validation and review-gated apply; no asset generation, no remote fetch, no autonomous unrestricted game creation; browser read-only or draft-only surfaces only."
+}
