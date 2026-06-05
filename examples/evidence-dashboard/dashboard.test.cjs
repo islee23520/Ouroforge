@@ -1172,6 +1172,42 @@ const sceneTreeDashboardEmpty = dashboard.renderSceneTreeInspector({ scene_tree_
 assert.match(sceneTreeDashboardEmpty, /no scene tree fixture/);
 assert.doesNotMatch(sceneTreeDashboardEmpty, /<button|<form|<input/i);
 assert.match(dashboard.renderSceneTreeInspector({}), /No scene tree read model is exported/);
+// Studio command palette v1: allowed navigation/draft/copy only; privileged commands fail closed.
+const commandRegistry = dashboard.studioCommandRegistry();
+assert.ok(Array.isArray(commandRegistry) && commandRegistry.length >= 9);
+const allowedCommandIds = ['open-scene', 'focus-entity', 'show-evidence', 'show-export-status', 'show-plugin-status', 'create-draft-edit', 'discard-draft', 'copy-evidence-path', 'reset-layout'];
+for (const id of allowedCommandIds) {
+  const resolved = dashboard.resolveStudioCommand(id);
+  assert.ok(resolved.allowed === true, `expected ${id} allowed`);
+  assert.ok(['navigation', 'draft', 'copy'].includes(resolved.kind), `expected ${id} navigation/draft/copy only`);
+}
+const blockedCommandIds = ['run-shell', 'apply-source', 'auto-merge', 'publish', 'deploy', 'sign', 'upload', 'install-plugin', 'mutate-dependency', 'edit-ci', 'execute-plugin', 'network-install', 'network-update'];
+for (const id of blockedCommandIds) {
+  assert.ok(dashboard.isBlockedStudioCommand(id) === true, `expected ${id} blocked`);
+  const resolved = dashboard.resolveStudioCommand(id);
+  assert.ok(resolved.allowed === false, `expected ${id} refused`);
+  assert.match(resolved.reason, /privileged|refused/i);
+}
+const unknownResolved = dashboard.resolveStudioCommand('totally-unknown-command');
+assert.ok(unknownResolved.allowed === false);
+assert.match(unknownResolved.reason, /unknown|refused/i);
+assert.deepStrictEqual(dashboard.filterStudioCommands('').length, commandRegistry.length);
+assert.ok(dashboard.filterStudioCommands('draft').every((command) => /draft/i.test(`${command.id} ${command.label} ${command.description}`)));
+assert.strictEqual(dashboard.filterStudioCommands('no-such-token').length, 0);
+const commandPalette = dashboard.renderStudioCommandPaletteSurface(run);
+assert.match(commandPalette, /Command Palette/);
+assert.match(commandPalette, /role="listbox"/);
+assert.match(commandPalette, /role="option"/);
+assert.match(commandPalette, /aria-label="Studio command palette"/);
+assert.match(commandPalette, /Read-only/);
+assert.match(commandPalette, /Open scene/);
+assert.doesNotMatch(commandPalette, /<button|<form|<input/i);
+// The offered command options (the listbox items) contain no privileged/apply/merge actions.
+const commandPaletteOptions = commandPalette.slice(commandPalette.indexOf('<ul'));
+assert.doesNotMatch(commandPaletteOptions, /apply|merge|publish|deploy|run-shell|install|execute/i);
+for (const blocked of blockedCommandIds) {
+  assert.ok(!commandPaletteOptions.includes(`data-command-id="${blocked}"`), `palette must not offer ${blocked}`);
+}
 assert.match(dashboard.renderSemanticDiffSummary({}), /No semantic diff section/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [{ kind: 'fallback', severity: 'changed', summary: 'fallback semantic' }] } } }), /fallback semantic/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);

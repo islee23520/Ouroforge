@@ -2167,6 +2167,45 @@ const sceneTreeCockpitEmpty = cockpit.renderStudioSceneTreeInspectorSurface({ sc
 assert.match(sceneTreeCockpitEmpty, /no scene tree fixture/);
 assert.doesNotMatch(sceneTreeCockpitEmpty, /<button|<form|<input/i);
 assert.match(cockpit.renderStudioSceneTreeInspectorSurface({}), /No scene tree read model is available/);
+// Studio command palette v1: allowed navigation/draft/copy only; privileged commands fail closed.
+const commandRegistry = cockpit.studioCommandRegistry();
+assert.ok(Array.isArray(commandRegistry) && commandRegistry.length >= 9);
+const allowedCommandIds = ['open-scene', 'focus-entity', 'show-evidence', 'show-export-status', 'show-plugin-status', 'create-draft-edit', 'discard-draft', 'copy-evidence-path', 'reset-layout'];
+for (const id of allowedCommandIds) {
+  const resolved = cockpit.resolveStudioCommand(id);
+  assert.ok(resolved.allowed === true, `expected ${id} allowed`);
+  assert.ok(['navigation', 'draft', 'copy'].includes(resolved.kind), `expected ${id} navigation/draft/copy only`);
+}
+const blockedCommandIds = ['run-shell', 'apply-source', 'auto-merge', 'publish', 'deploy', 'sign', 'upload', 'install-plugin', 'mutate-dependency', 'edit-ci', 'execute-plugin', 'network-install', 'network-update'];
+for (const id of blockedCommandIds) {
+  assert.ok(cockpit.isBlockedStudioCommand(id) === true, `expected ${id} blocked`);
+  const resolved = cockpit.resolveStudioCommand(id);
+  assert.ok(resolved.allowed === false, `expected ${id} refused`);
+  assert.match(resolved.reason, /privileged|refused/i);
+}
+// Unknown id fails closed.
+const unknownResolved = cockpit.resolveStudioCommand('totally-unknown-command');
+assert.ok(unknownResolved.allowed === false);
+assert.match(unknownResolved.reason, /unknown|refused/i);
+// Client-side filter is pure.
+assert.deepStrictEqual(cockpit.filterStudioCommands('').length, commandRegistry.length);
+assert.ok(cockpit.filterStudioCommands('draft').every((command) => /draft/i.test(`${command.id} ${command.label} ${command.description}`)));
+assert.strictEqual(cockpit.filterStudioCommands('no-such-token').length, 0);
+// Rendered palette: keyboard roles, escaped, read-only, no privileged/apply/merge actions, no write controls.
+const commandPalette = cockpit.renderStudioCommandPaletteSurface(run);
+assert.match(commandPalette, /Command palette/);
+assert.match(commandPalette, /role="listbox"/);
+assert.match(commandPalette, /role="option"/);
+assert.match(commandPalette, /aria-label="Studio command palette"/);
+assert.match(commandPalette, /Read-only/);
+assert.match(commandPalette, /Open scene/);
+assert.doesNotMatch(commandPalette, /<button|<form|<input/i);
+// The offered command options (the listbox items) contain no privileged/apply/merge actions.
+const commandPaletteOptions = commandPalette.slice(commandPalette.indexOf('<ul'));
+assert.doesNotMatch(commandPaletteOptions, /apply|merge|publish|deploy|run-shell|install|execute/i);
+for (const blocked of blockedCommandIds) {
+  assert.ok(!commandPaletteOptions.includes(`data-command-id="${blocked}"`), `palette must not offer ${blocked}`);
+}
 assert.match(cockpit.renderReviewDecisionSurface({ stages: [] }, run), /No review decisions recorded/);
 
 assert.match(cockpit.renderLoopDryRunSurface(run), /Authoring loop dry-run/);

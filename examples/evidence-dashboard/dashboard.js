@@ -1096,6 +1096,54 @@ const OuroforgeDashboard = (() => {
     return `<p class="run-meta">Read-only scene tree inspection from exported JSON. Selection is presentation-only; the dashboard does not edit, apply, merge, or write trusted scene state.</p><h5>Scenes (selection is read-only)</h5><ul class="run-meta-list">${sceneRows}</ul><h5>Node hierarchy (authored vs runtime state)</h5><ul class="run-meta-list">${nodeRows}</ul>`;
   }
 
+  function studioCommandRegistry() {
+    return [
+      { id: 'open-scene', label: 'Open scene', kind: 'navigation', description: 'Navigate the dashboard to a scene view.' },
+      { id: 'focus-entity', label: 'Focus entity', kind: 'navigation', description: 'Scroll the inspector to a selected entity.' },
+      { id: 'show-evidence', label: 'Show evidence', kind: 'navigation', description: 'Jump to the read-only evidence pane.' },
+      { id: 'show-export-status', label: 'Show export status', kind: 'navigation', description: 'Reveal the exported run summary section.' },
+      { id: 'show-plugin-status', label: 'Show plugin status', kind: 'navigation', description: 'Reveal the read-only plugin registry surface.' },
+      { id: 'create-draft-edit', label: 'Create draft edit', kind: 'draft', description: 'Stage a local draft edit for offline review (no trusted write).' },
+      { id: 'discard-draft', label: 'Discard draft', kind: 'draft', description: 'Clear the local draft edit without persisting.' },
+      { id: 'copy-evidence-path', label: 'Copy evidence path', kind: 'copy', description: 'Copy a read-only evidence reference to the clipboard.' },
+      { id: 'reset-layout', label: 'Reset layout', kind: 'navigation', description: 'Restore the default dashboard panel layout (view only).' },
+    ];
+  }
+
+  const STUDIO_COMMAND_BLOCKLIST = [
+    'run-shell', 'apply-source', 'auto-merge', 'publish', 'deploy', 'sign', 'upload',
+    'install-plugin', 'mutate-dependency', 'edit-ci', 'execute-plugin', 'network-install', 'network-update',
+  ];
+
+  function isBlockedStudioCommand(id) {
+    return STUDIO_COMMAND_BLOCKLIST.includes(String(id || ''));
+  }
+
+  function filterStudioCommands(query) {
+    const needle = String(query || '').trim().toLowerCase();
+    const commands = studioCommandRegistry();
+    if (!needle) return commands;
+    return commands.filter((command) => `${command.id} ${command.label} ${command.description}`.toLowerCase().includes(needle));
+  }
+
+  function resolveStudioCommand(id) {
+    const key = String(id || '');
+    if (isBlockedStudioCommand(key)) {
+      return { allowed: false, reason: `Command "${key}" is privileged and is refused by the read-only command palette.` };
+    }
+    const command = studioCommandRegistry().find((item) => item.id === key);
+    if (!command) {
+      return { allowed: false, reason: `Command "${key}" is unknown and is refused by the read-only command palette.` };
+    }
+    return { allowed: true, kind: command.kind, command };
+  }
+
+  function renderStudioCommandPaletteSurface(run) {
+    const commands = filterStudioCommands('');
+    const options = commands.map((command) => `<li role="option" aria-label="${escapeText(command.label)}" data-command-id="${escapeText(command.id)}"><strong>${escapeText(command.label)}</strong> <span class="run-meta">(${escapeText(command.kind)})</span><br><small>${escapeText(command.description)}</small></li>`).join('');
+    return `<section class="panel"><h3>Command Palette</h3><p class="run-meta">Read-only. The palette only offers navigation, local draft, and copy commands. It does not run shell, apply source, merge, publish, deploy, install, or execute plugins, mutate dependencies/CI, or write trusted state.</p><ul class="run-meta-list" role="listbox" aria-label="Studio command palette">${options}</ul></section>`;
+  }
+
   function renderRunComparison(run) {
     const comparison = run?.comparison;
     if (!comparison || !comparison.present || !Array.isArray(comparison.artifacts) || !comparison.artifacts.length) {
@@ -2309,6 +2357,7 @@ const OuroforgeDashboard = (() => {
       ${renderProjectContext(run)}
       ${renderTransactionProvenance(run)}
       ${renderReplayControls(run, replayState)}
+      ${renderStudioCommandPaletteSurface(run)}
       ${renderRunComparison(run)}
       ${renderArtifacts('Screenshots', artifacts(run.screenshots), run, renderScreenshot)}
       ${renderArtifacts('World-state snapshots', artifacts(run.world_states), run, renderJsonArtifact)}
@@ -2476,7 +2525,7 @@ const OuroforgeDashboard = (() => {
     return defaultWorkspaceLayout();
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
