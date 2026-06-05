@@ -102,7 +102,7 @@ const run = {
       blockedCount: 1,
       blockedReasons: ['blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog'],
       plugins: [
-        { pluginId: 'read-only-dashboard-panel', manifestPath: 'plugins/read-only-dashboard-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:1111222233334444', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json'], blockedReasons: [] },
+        { pluginId: 'read-only-dashboard-panel', manifestPath: 'plugins/read-only-dashboard-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:1111222233334444', manifestVersion: '0.1.0', validationStatus: 'valid', compatibilityStatus: 'compatible', declaredCapabilities: ['dashboardPanel'], extensionPoints: ['dashboard.panels.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json'], dashboardPanels: [{ panelId: 'plugin-registry-summary', title: 'Plugin registry summary', dataSourceKey: 'pluginRegistry.summary', templateRef: 'pluginRegistrySummaryCard', layoutHint: 'summary', displayHints: ['compact', 'blocked-count'], boundary: 'Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes.' }], blockedReasons: [] },
         { pluginId: 'blocked-command-panel', manifestPath: 'plugins/blocked-command-panel/plugin.json', manifestHash: 'fnv1a64-canonical-json-v1:aaaabbbbccccdddd', manifestVersion: '0.1.0', validationStatus: 'blocked', compatibilityStatus: 'incompatible', declaredCapabilities: ['studioInspectorPanel'], extensionPoints: ['studio.inspector.readOnly'], evidenceRefs: ['runs/plugin-registry-fixture/plugin-evidence/blocked-command-panel.validation.json'], blockedReasons: ['manifest requested executable command authority outside the v1 declarative catalog'] },
       ],
     }],
@@ -1130,6 +1130,10 @@ assert.match(dashboard.renderPluginRegistry(run), /Plugin registry evidence refs
 assert.match(dashboard.renderPluginRegistry(run), /read-only-dashboard-panel/);
 assert.match(dashboard.renderPluginRegistry(run), /fnv1a64-canonical-json-v1:1111222233334444/);
 assert.match(dashboard.renderPluginRegistry(run), /dashboardPanel/);
+assert.match(dashboard.renderPluginRegistry(run), /plugin-registry-summary/);
+assert.match(dashboard.renderPluginRegistry(run), /pluginRegistrySummaryCard/);
+assert.match(dashboard.renderPluginRegistry(run), /pluginRegistry\.summary/);
+assert.match(dashboard.renderPluginRegistry(run), /no JavaScript execution/);
 assert.match(dashboard.renderPluginRegistry(run), /studio.inspector.readOnly/);
 assert.match(dashboard.renderPluginRegistry(run), /executable command authority/);
 assert.match(dashboard.renderSourceApplyWorktreeContext(run), /Source apply context evidence refs/);
@@ -1813,6 +1817,8 @@ assert.ok(!pluginRegistryXss.includes('<img src=x onerror=alert(1)>'), 'plugin r
 
 const pluginRegistrySmokeMarkup = dashboard.renderPluginRegistry(run);
 assert.match(pluginRegistrySmokeMarkup, /Plugin registry evidence refs/);
+assert.match(pluginRegistrySmokeMarkup, /plugin-registry-summary/);
+assert.match(pluginRegistrySmokeMarkup, /pluginRegistrySummaryCard/);
 assert.match(pluginRegistrySmokeMarkup, /read-only-dashboard-panel/);
 assert.match(pluginRegistrySmokeMarkup, /blocked-command-panel/);
 assert.match(pluginRegistrySmokeMarkup, /manifest requested executable command authority/);

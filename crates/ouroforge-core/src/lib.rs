@@ -52492,7 +52492,19 @@ pub struct RunDashboardPluginDescriptorRow {
     pub declared_capabilities: Vec<String>,
     pub extension_points: Vec<String>,
     pub evidence_refs: Vec<String>,
+    pub dashboard_panels: Vec<RunDashboardPluginPanelDescriptorRow>,
     pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginPanelDescriptorRow {
+    pub panel_id: String,
+    pub title: String,
+    pub data_source_key: String,
+    pub template_ref: String,
+    pub layout_hint: String,
+    pub display_hints: Vec<String>,
+    pub boundary: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -54051,6 +54063,19 @@ fn read_dashboard_plugin_registry(
                         .evidence_refs
                         .iter()
                         .map(|evidence| evidence.path.clone())
+                        .collect(),
+                    dashboard_panels: plugin
+                        .dashboard_panels
+                        .iter()
+                        .map(|panel| RunDashboardPluginPanelDescriptorRow {
+                            panel_id: panel.panel_id.clone(),
+                            title: panel.title.clone(),
+                            data_source_key: panel.data_source_key.clone(),
+                            template_ref: panel.template_ref.clone(),
+                            layout_hint: panel.layout_hint.clone(),
+                            display_hints: panel.display_hints.clone(),
+                            boundary: panel.boundary.clone(),
+                        })
                         .collect(),
                     blocked_reasons: plugin.blocked_reasons.clone(),
                 }
@@ -85916,6 +85941,15 @@ scenarios:
             dashboard_panel.evidence_refs,
             ["runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json"]
         );
+        assert_eq!(dashboard_panel.dashboard_panels.len(), 1);
+        let descriptor = &dashboard_panel.dashboard_panels[0];
+        assert_eq!(descriptor.panel_id, "plugin-registry-summary");
+        assert_eq!(descriptor.title, "Plugin registry summary");
+        assert_eq!(descriptor.data_source_key, "pluginRegistry.summary");
+        assert_eq!(descriptor.template_ref, "pluginRegistrySummaryCard");
+        assert_eq!(descriptor.layout_hint, "summary");
+        assert_eq!(descriptor.display_hints, ["compact", "blocked-count"]);
+        assert!(descriptor.boundary.contains("no JavaScript"));
 
         let blocked_panel = registry
             .plugins
