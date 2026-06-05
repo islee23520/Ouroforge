@@ -2135,6 +2135,67 @@ assert.match(dashboardReadme, /escaped, read-only data exported by trusted Rust\
 assert.match(dashboardReadme, /must not execute copied commands, create review\s+decisions, apply drafts, rerun scenarios, write files, upload\/fetch assets/);
 const cockpitSource = fs.readFileSync(require.resolve('./cockpit.js'), 'utf8');
 assert.ok(!/writeFile|localStorage|indexedDB|showSaveFilePicker|exec\(|spawn\(|child_process/.test(cockpitSource), 'cockpit browser code must not include direct persistence or command execution APIs');
+// Studio error boundary and diagnostics v1 (#773)
+// Diagnostics model must never throw on malformed/missing input and must fail closed to recorded diagnostics.
+for (const bad of [null, undefined, 42, 'not-an-object', [], { summary: null }, { evidence: 'oops', mutations: 7 }]) {
+  assert.doesNotThrow(() => cockpit.studioDiagnosticsModel(bad), 'studioDiagnosticsModel must never throw on malformed input');
+  const model = cockpit.studioDiagnosticsModel(bad);
+  assert.ok(Array.isArray(model.diagnostics), 'diagnostics must be a list');
+  assert.ok(model.counts && typeof model.counts.total === 'number', 'counts must be present');
+}
+const diagMissingCockpit = cockpit.studioDiagnosticsModel(undefined);
+assert.ok(diagMissingCockpit.diagnostics.some((d) => d.kind === 'missing-data'), 'missing run must record missing-data diagnostic');
+
+const diagRichCockpitRun = {
+  summary: { id: 'diag-run' },
+  evidence: [{ id: 'broken-ev', read_error: 'unreadable bundle' }, { id: 'gone-ev', exists: false }],
+  mutations: [{ id: 'blocked-mut', blockedReasons: ['privileged apply blocked'] }],
+  source_patch_stale_target_guards: [{ value: { validation: { status: 'stale' } } }],
+  plugin_registry: { registries: [{ plugins: [{ pluginId: 'bad-plugin', validationStatus: 'invalid' }] }] },
+  production_evidence_bundles: [{ id: 'pkg-1', status: 'incomplete' }],
+};
+const diagRichCockpit = cockpit.studioDiagnosticsModel(diagRichCockpitRun);
+const diagKindsCockpit = diagRichCockpit.diagnostics.map((d) => d.kind);
+for (const kind of ['blocked-operation', 'stale-source-apply-target', 'broken-evidence-bundle', 'malformed-plugin-descriptor', 'export-package-issue']) {
+  assert.ok(diagKindsCockpit.includes(kind), `diagnostics must classify ${kind}`);
+}
+const blockedDiagCockpit = diagRichCockpit.diagnostics.find((d) => d.kind === 'blocked-operation');
+assert.ok(blockedDiagCockpit.governing_guardrail, 'blocked operation diagnostic must name a governing guardrail');
+
+const diagSurfaceCockpit = cockpit.renderStudioDiagnosticsSurface(diagRichCockpitRun);
+assert.match(diagSurfaceCockpit, /Studio diagnostics/);
+assert.match(diagSurfaceCockpit, /blocked-operation/);
+assert.match(diagSurfaceCockpit, /Blocked operations/);
+assert.match(diagSurfaceCockpit, /trusted-persistence-boundary/);
+assert.match(diagSurfaceCockpit, /Stale-data warnings/);
+assert.match(diagSurfaceCockpit, /Read-only diagnostics/);
+assert.doesNotMatch(diagSurfaceCockpit, /<button|<form|<input/i);
+assert.doesNotMatch(diagSurfaceCockpit, /data-action=/i);
+
+// Diagnostics surface escapes hostile data and never throws on malformed input.
+const diagXssCockpit = cockpit.renderStudioDiagnosticsSurface({ summary: { id: 'x' }, mutations: [{ id: '<img src=x onerror=alert(1)>', blockedReasons: ['<script>alert(1)</script>'] }] });
+assert.doesNotMatch(diagXssCockpit, /<img src=x onerror=alert\(1\)>/);
+assert.doesNotMatch(diagXssCockpit, /<script>alert\(1\)<\/script>/);
+assert.doesNotThrow(() => cockpit.renderStudioDiagnosticsSurface(null), 'diagnostics surface must not throw on null run');
+assert.match(cockpit.renderStudioDiagnosticsSurface(null), /missing/i);
+
+// Diagnostics surface is wired into the Studio integration render.
+const integrationWithDiagnostics = cockpit.renderEvidencePane(diagRichCockpitRun);
+assert.match(integrationWithDiagnostics, /studio-diagnostics/);
+assert.match(integrationWithDiagnostics, /blocked-operation/);
+
+// Error boundary catches a throwing renderFn and surfaces an error panel, NOT a success/applied/privileged result.
+const boundaryOkCockpit = cockpit.studioErrorBoundary('Sample', () => '<section class="panel">healthy</section>');
+assert.match(boundaryOkCockpit, /healthy/);
+const boundaryFailCockpit = cockpit.studioErrorBoundary('Privileged apply', () => { throw new Error('apply detonated'); });
+assert.match(boundaryFailCockpit, /class="panel error-boundary"/);
+assert.match(boundaryFailCockpit, /Privileged apply could not render/);
+assert.match(boundaryFailCockpit, /apply detonated/);
+assert.match(boundaryFailCockpit, /not as a successful, applied, or privileged operation/);
+assert.ok(!/applied successfully|operation applied|merge complete|apply succeeded/i.test(boundaryFailCockpit), 'error boundary must not report a privileged operation as applied/success');
+assert.doesNotMatch(boundaryFailCockpit, /<button|<form|<input/i);
+assert.doesNotMatch(boundaryFailCockpit, /data-action=/i);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);

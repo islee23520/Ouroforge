@@ -2344,6 +2344,7 @@ const OuroforgeDashboard = (() => {
     return `<article>
       <h2>${escapeText(summary.id)}</h2>
       ${renderStudioAccessibilityNavSurface(run)}
+      ${renderStudioDiagnosticsSurface(run)}
       <div class="cards">
         <div class="card"><div class="card-label">Seed</div><div class="card-value">${escapeText(summary.seed)}</div></div>
         <div class="card"><div class="card-label">Run</div><div class="card-value"><span class="${statusClass(summary.runStatus)}">${escapeText(summary.runStatus)}</span></div></div>
@@ -2476,6 +2477,163 @@ const OuroforgeDashboard = (() => {
       detailEl.innerHTML = '<div class="empty-state">Generate dashboard data with the Rust CLI export command, then refresh.</div>';
     }
   }
+
+  function studioDiagnosticsModel(run) {
+    const diagnostics = [];
+    const record = (kind, severity, summary, governingGuardrail) => {
+      const entry = { kind: String(kind || 'unknown'), severity: String(severity || 'info'), summary: String(summary || '') };
+      if (governingGuardrail) entry.governing_guardrail = String(governingGuardrail);
+      diagnostics.push(entry);
+    };
+    const safeCheck = (kind, fn) => {
+      try {
+        fn();
+      } catch (error) {
+        record(kind, 'error', `Diagnostic check "${kind}" failed closed: ${error && error.message ? error.message : 'unknown error'}.`, 'fail-closed-on-malformed-input');
+      }
+    };
+
+    if (run === null || run === undefined || typeof run !== 'object') {
+      record('missing-data', 'error', 'No run data is available; the run object is missing or is not an object.', 'read-only-evidence-only');
+      return { diagnostics, counts: countBySeverity(diagnostics) };
+    }
+
+    safeCheck('missing-data', () => {
+      const summary = run.summary;
+      if (!summary || typeof summary !== 'object') {
+        record('missing-data', 'error', 'Run summary is missing or malformed; core run metadata cannot be displayed.', 'read-only-evidence-only');
+      } else if (!summary.id) {
+        record('missing-data', 'warning', 'Run summary is missing an id; the run cannot be reliably identified.', 'read-only-evidence-only');
+      }
+    });
+
+    safeCheck('invalid-schema', () => {
+      if ('evidence' in run && run.evidence !== undefined && !Array.isArray(run.evidence)) {
+        record('invalid-schema', 'error', 'Evidence index has an invalid schema; expected an array of evidence entries.', 'evidence-schema-contract');
+      }
+      if ('mutations' in run && run.mutations !== undefined && !Array.isArray(run.mutations)) {
+        record('invalid-schema', 'error', 'Mutations have an invalid schema; expected an array of mutation entries.', 'evidence-schema-contract');
+      }
+    });
+
+    safeCheck('blocked-operation', () => {
+      const sources = [
+        run.source_patch_apply_transactions, run.sourcePatchApplyTransactions,
+        run.source_apply, run.sourceApply,
+        run.mutations,
+      ];
+      sources.forEach((source) => {
+        const list = Array.isArray(source) ? source : (source && typeof source === 'object' ? [source] : []);
+        list.forEach((item) => {
+          if (!item || typeof item !== 'object') return;
+          const blocked = item.blockedReasons || item.blocked_reasons || (item.blocked === true ? ['blocked operation'] : null);
+          const reasons = Array.isArray(blocked) ? blocked.filter(Boolean) : (blocked ? [blocked] : []);
+          if (reasons.length) {
+            const target = item.id || item.targetPath || item.target_path || item.path || 'operation';
+            record('blocked-operation', 'warning', `Operation "${target}" is blocked: ${reasons.join('; ')}.`, 'trusted-persistence-boundary');
+          }
+        });
+      });
+    });
+
+    safeCheck('stale-source-apply-target', () => {
+      const guards = run.source_patch_stale_target_guards || run.sourcePatchStaleTargetGuards || run.stale_target_guards || run.staleTargetGuards || null;
+      const list = Array.isArray(guards) ? guards : (guards && typeof guards === 'object' ? [guards] : []);
+      list.forEach((guard) => {
+        if (!guard || typeof guard !== 'object') return;
+        const value = guard.value || guard;
+        const validation = value.validation || value;
+        const status = String(validation.status || value.status || '').toLowerCase();
+        if (status && status !== 'fresh' && status !== 'ok' && status !== 'current') {
+          record('stale-source-apply-target', 'warning', `Source-apply target is stale (${validation.status || value.status}); apply must be re-validated against the current base before trusting it.`, 'stale-target-guard');
+        }
+      });
+    });
+
+    safeCheck('broken-evidence-bundle', () => {
+      const evidence = Array.isArray(run.evidence) ? run.evidence : [];
+      evidence.forEach((item) => {
+        if (!item || typeof item !== 'object') return;
+        if (item.read_error || item.readError) {
+          record('broken-evidence-bundle', 'error', `Evidence "${item.id || item.path || 'entry'}" is broken: ${item.read_error || item.readError}.`, 'evidence-integrity');
+        } else if (item.exists === false) {
+          record('broken-evidence-bundle', 'warning', `Evidence "${item.id || item.path || 'entry'}" is missing on disk.`, 'evidence-integrity');
+        }
+      });
+    });
+
+    safeCheck('malformed-plugin-descriptor', () => {
+      const registry = run.plugin_registry || run.pluginRegistry || null;
+      const registries = Array.isArray(registry?.registries) ? registry.registries : [];
+      registries.forEach((reg) => {
+        const plugins = Array.isArray(reg?.plugins) ? reg.plugins : [];
+        plugins.forEach((plugin) => {
+          if (!plugin || typeof plugin !== 'object') return;
+          const validation = String(plugin.validationStatus || plugin.validation_status || '').toLowerCase();
+          if (validation && validation !== 'valid' && validation !== 'ok') {
+            record('malformed-plugin-descriptor', 'warning', `Plugin descriptor "${plugin.pluginId || plugin.plugin_id || 'plugin'}" is ${plugin.validationStatus || plugin.validation_status}.`, 'plugin-descriptor-contract');
+          }
+        });
+      });
+    });
+
+    safeCheck('export-package-issue', () => {
+      const bundles = run.production_evidence_bundles || run.productionEvidenceBundles || run.production_evidence_bundle || run.productionEvidenceBundle || null;
+      const list = Array.isArray(bundles) ? bundles : (bundles && typeof bundles === 'object' ? [bundles] : []);
+      list.forEach((bundle) => {
+        if (!bundle || typeof bundle !== 'object') return;
+        const status = String(bundle.status || '').toLowerCase();
+        if (status && status !== 'ready' && status !== 'ok' && status !== 'complete') {
+          record('export-package-issue', 'warning', `Export/package bundle "${bundle.id || bundle.path || 'bundle'}" is not ready (${bundle.status}).`, 'export-package-contract');
+        }
+      });
+    });
+
+    return { diagnostics, counts: countBySeverity(diagnostics) };
+  }
+
+  function countBySeverity(diagnostics) {
+    const counts = { total: diagnostics.length, error: 0, warning: 0, info: 0 };
+    diagnostics.forEach((diagnostic) => {
+      const severity = diagnostic.severity === 'error' || diagnostic.severity === 'warning' || diagnostic.severity === 'info' ? diagnostic.severity : 'info';
+      counts[severity] += 1;
+    });
+    return counts;
+  }
+
+  function studioErrorBoundary(label, renderFn) {
+    try {
+      const result = renderFn();
+      return typeof result === 'string' ? result : String(result ?? '');
+    } catch (error) {
+      const message = error && error.message ? error.message : 'unknown error';
+      return `<section class="panel error-boundary"><h3>${escapeText(label || 'Panel')} could not render</h3><p class="artifact-warning">This panel failed to render and was caught by the Studio error boundary: ${escapeText(message)}.</p><p class="run-meta">The failure is surfaced as an error, not as a successful, applied, or privileged operation. Studio remains read-only; no apply, merge, write, or command execution occurred.</p></section>`;
+    }
+  }
+
+  function renderStudioDiagnosticsSurface(run) {
+    return studioErrorBoundary('Studio diagnostics', () => {
+      const model = studioDiagnosticsModel(run);
+      const diagnostics = Array.isArray(model.diagnostics) ? model.diagnostics : [];
+      const counts = model.counts || countBySeverity(diagnostics);
+      if (!diagnostics.length) {
+        return '<section class="panel"><h3>Studio diagnostics</h3><p class="empty-state compact">No diagnostics detected in the exported run. This surface is read-only and renders no controls.</p></section>';
+      }
+      const blocked = diagnostics.filter((diagnostic) => diagnostic.kind === 'blocked-operation');
+      const stale = diagnostics.filter((diagnostic) => diagnostic.kind === 'stale-source-apply-target');
+      const rows = diagnostics.map((diagnostic) => `<li><span class="${statusClass(diagnostic.severity)}">${escapeText(diagnostic.severity)}</span> <strong>${escapeText(diagnostic.kind)}</strong>: ${escapeText(diagnostic.summary)}${diagnostic.governing_guardrail ? `<br><small>Governing guardrail: ${escapeText(diagnostic.governing_guardrail)}</small>` : ''}</li>`).join('');
+      const blockedRows = blocked.length
+        ? `<h4>Blocked operations</h4><ul class="run-meta-list">${blocked.map((diagnostic) => `<li>${escapeText(diagnostic.summary)} <small>(blocked by ${escapeText(diagnostic.governing_guardrail || 'unknown guardrail')})</small></li>`).join('')}</ul>`
+        : '';
+      const staleRows = stale.length
+        ? `<h4>Stale-data warnings</h4><ul class="run-meta-list">${stale.map((diagnostic) => `<li class="artifact-warning">${escapeText(diagnostic.summary)}</li>`).join('')}</ul>`
+        : '';
+      return `<section class="panel"><h3>Studio diagnostics</h3>
+        <p class="run-meta">Read-only diagnostics: ${escapeText(counts.total)} issue(s) — ${escapeText(counts.error)} error, ${escapeText(counts.warning)} warning, ${escapeText(counts.info)} info. No controls; Studio cannot apply, merge, write trusted state, or execute commands.</p>
+        <ul class="run-meta-list">${rows}</ul>${blockedRows}${staleRows}</section>`;
+    });
+  }
+
 
   const WORKSPACE_LAYOUT_STORAGE_KEY = 'ouroforge.studio.workspace';
   const WORKSPACE_LAYOUT_VERSION = 1;
@@ -2665,7 +2823,7 @@ const OuroforgeDashboard = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
