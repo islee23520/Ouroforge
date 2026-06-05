@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "demo-scenario-matrix-v1",
+  "id": "collect-and-exit-demo-scenario-matrix",
+  "issue": 787,
+  "projectId": "collect_and_exit_demo",
+  "description": "Scenario matrix for the Godot-Plus Collect-and-Exit demo. It maps acceptance coverage to executable or evidence-backed checks without granting source mutation, command execution, publication, dependency install, credential, or plugin runtime authority.",
+  "sourceRefs": {
+    "scene": "scenes/collect-and-exit.scene.json",
+    "scenarioPack": "scenarios/collect-and-exit.json",
+    "levelSet": "levels/level-set.json",
+    "behavior": "behaviors/hazard-drone.json",
+    "hudModel": "hud-model.json",
+    "assetManifest": "asset-manifest.json",
+    "assetProvenance": "asset-provenance.json",
+    "exportProfile": "export/export-profile.json",
+    "packageMetadata": "export/package-metadata.json",
+    "pluginDescriptor": "plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json"
+  },
+  "globalGuardrails": {
+    "generatedState": "Generated demo outputs, runs, dashboard data, screenshots, videos, package bundles, and temp servers stay ignored/untracked unless explicitly fixture-scoped.",
+    "trustedWriteBoundary": "Browser/Studio surfaces are read-only or draft-only; trusted source mutation remains review-gated through Safe Source Apply and is not part of this matrix.",
+    "releaseBoundary": "No commercial release, public deploy, signing, app-store/Steam/itch publishing, production-ready claim, native/mobile/console export, dependency install, credentials, CI/workflow mutation, executable plugin runtime, marketplace, or network plugin install/update.",
+    "wordingBoundary": "Godot-plus means scoped evidence-native workflow demonstration, not full Godot replacement, full parity, universal superiority, secure sandbox, or production readiness."
+  },
+  "forbiddenActions": [
+    "directTrustedSourceWrite",
+    "autoApply",
+    "autoMerge",
+    "selfApproval",
+    "reviewerBypass",
+    "browserCommandBridge",
+    "arbitraryShellExecution",
+    "dependencyInstall",
+    "credentialedOperation",
+    "ciWorkflowMutation",
+    "publicDeploy",
+    "releaseSigning",
+    "storePublishing",
+    "executablePluginRuntime",
+    "pluginMarketplace",
+    "networkPluginInstall"
+  ],
+  "scenarios": [
+    {
+      "id": "start-game",
+      "title": "Start game",
+      "category": "runtime",
+      "acceptanceCriteria": ["base scene loads", "player starts alive at deterministic spawn", "initial objective flags are false"],
+      "passCriteria": ["world_state.sceneId == collect-and-exit-scene", "goalFlags.player_alive == true", "metadata.startState.checkpointSlot == demo-start"],
+      "failCriteria": ["scene is missing", "player spawn is absent or nondeterministic", "initial flags drift"],
+      "evidenceArtifacts": ["world_state", "runtime_events"],
+      "verificationRefs": ["e2e-smoke.test.cjs", "scaffold-audit.test.cjs"]
+    },
+    {
+      "id": "move-player",
+      "title": "Move player",
+      "category": "runtime",
+      "acceptanceCriteria": ["right input advances player deterministically", "movement stays inside one-screen bounds"],
+      "passCriteria": ["player x position increases after deterministic right input", "bounds.width == 320"],
+      "failCriteria": ["player does not move", "movement depends on nondeterministic input", "player leaves bounded scene"],
+      "evidenceArtifacts": ["world_state", "comparison"],
+      "verificationRefs": ["gameplay-loop-smoke.test.cjs", "e2e-smoke.test.cjs"]
+    },
+    {
+      "id": "complete-level",
+      "title": "Complete level",
+      "category": "gameplay",
+      "acceptanceCriteria": ["key is collected", "door opens", "exit is reached", "player remains alive"],
+      "passCriteria": ["goalFlags.key_collected == true", "goalFlags.door_open == true", "goalFlags.exit_reached == true", "goalFlags.player_alive == true"],
+      "failCriteria": ["exit can be reached without key", "door flag never opens", "completion omits evidence"],
+      "evidenceArtifacts": ["world_state", "runtime_events", "frame_stats"],
+      "verificationRefs": ["e2e-smoke.test.cjs", "level-set-smoke.test.cjs"]
+    },
+    {
+      "id": "fail-restart",
+      "title": "Fail and restart/checkpoint",
+      "category": "gameplay",
+      "acceptanceCriteria": ["hazard failure is observable", "restart/checkpoint restores initial flags", "browser has no trusted write authority"],
+      "passCriteria": ["hazard-contact-fail sets player_alive == false", "runtime-save-artifact-v1 reload resets key_collected and exit_reached", "runtime_save.policy.browserWriteAccess == none"],
+      "failCriteria": ["failure state is hidden", "restart preserves stale completion flags", "restart writes trusted source"],
+      "evidenceArtifacts": ["world_state", "runtime_save", "runtime_events"],
+      "verificationRefs": ["behavior-smoke.test.cjs", "e2e-smoke.test.cjs"]
+    },
+    {
+      "id": "enemy-interaction",
+      "title": "Enemy / system interaction",
+      "category": "behavior",
+      "acceptanceCriteria": ["hazard drone has deterministic dormant/armed transition", "armed contact affects gameplay"],
+      "passCriteria": ["hazard-contact-fail loses after key collection", "hazard-dormant-pass remains winnable", "behavior schema is source-like and declarative"],
+      "failCriteria": ["behavior requires executable plugin code", "state transition is nondeterministic", "interaction has no gameplay effect"],
+      "evidenceArtifacts": ["world_state", "behavior_state", "runtime_events"],
+      "verificationRefs": ["behavior-smoke.test.cjs", "behaviors/hazard-drone.json"]
+    },
+    {
+      "id": "objective-update",
+      "title": "Objective update",
+      "category": "gameplay",
+      "acceptanceCriteria": ["key, door, and exit objective flags update in order", "objective evidence is inspectable"],
+      "passCriteria": ["changedFlags includes door_open, exit_reached, key_collected", "scenario assertions cover objective flags"],
+      "failCriteria": ["objective state is only visual", "scenario assertions do not bind to flags"],
+      "evidenceArtifacts": ["world_state", "comparison", "scenario_assertions"],
+      "verificationRefs": ["scenarios/collect-and-exit.json", "e2e-smoke.test.cjs"]
+    },
+    {
+      "id": "ui-state",
+      "title": "UI / HUD state",
+      "category": "ui",
+      "acceptanceCriteria": ["HUD shows objective, key, and health state", "feedback is derived from runtime flags"],
+      "passCriteria": ["HUD rows bind goal, key, health", "key HUD changes from 0/1 to 1/1", "lost state derives HP 0/3"],
+      "failCriteria": ["HUD is unbound decorative text", "feedback requires new untracked assets", "HUD writes trusted state"],
+      "evidenceArtifacts": ["world_state.componentModel.hudValues", "audio_evidence", "visual_feedback"],
+      "verificationRefs": ["hud-smoke.test.cjs", "hud-model.json"]
+    },
+    {
+      "id": "runtime-probe-state",
+      "title": "Runtime probe state",
+      "category": "evidence",
+      "acceptanceCriteria": ["runtime probe identifies level/objective/state", "probe output is bounded evidence"],
+      "passCriteria": ["runtimeState reports schemaVersion runtime-state-v1", "level-set smoke confirms current level id and scenario links"],
+      "failCriteria": ["probe omits current level", "probe needs browser command bridge or arbitrary shell"],
+      "evidenceArtifacts": ["runtime_probe", "world_state", "frame_stats"],
+      "verificationRefs": ["level-set-smoke.test.cjs", "gameplay-loop-smoke.test.cjs"]
+    },
+    {
+      "id": "export-smoke",
+      "title": "Export smoke",
+      "category": "export",
+      "acceptanceCriteria": ["local web export profile is declared", "package metadata is local-only", "release actions remain blocked"],
+      "passCriteria": ["exportTarget == web-local", "packageMetadataRef resolves", "boundary says no publish/deploy/sign/upload"],
+      "failCriteria": ["native/mobile/store target is enabled", "profile includes credentials or public deploy", "export claims production release"],
+      "evidenceArtifacts": ["export_profile", "package_metadata", "export_verification_report"],
+      "verificationRefs": ["export/export-profile.json", "export/package-metadata.json", "asset-evidence-smoke.test.cjs"]
+    },
+    {
+      "id": "studio-walkthrough",
+      "title": "Studio walkthrough",
+      "category": "studio",
+      "acceptanceCriteria": ["Studio/dashboard can inspect demo evidence", "surfaces stay read-only or draft-only"],
+      "passCriteria": ["asset inspector renders runtime load evidence", "dashboard renders HUD values and asset preview", "boundary text blocks upload/write/fetch/execute"],
+      "failCriteria": ["Studio directly writes trusted source", "browser surface executes commands", "walkthrough requires public deploy"],
+      "evidenceArtifacts": ["dashboard_read_model", "studio_inspector", "asset_preview"],
+      "verificationRefs": ["asset-evidence-smoke.test.cjs", "hud-smoke.test.cjs"]
+    },
+    {
+      "id": "plugin-validation",
+      "title": "Plugin validation",
+      "category": "plugin",
+      "acceptanceCriteria": ["demo plugin descriptor is inert/read-only", "no executable plugin runtime or marketplace behavior"],
+      "passCriteria": ["plugin descriptor resolves", "permissions are allowed/read-only", "no install/update/network/runtime command is required"],
+      "failCriteria": ["plugin descriptor requests executable permissions", "plugin install/update/network behavior appears", "marketplace behavior is required"],
+      "evidenceArtifacts": ["plugin_descriptor", "plugin_validation_report"],
+      "verificationRefs": ["plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json", "scaffold-audit.test.cjs"]
+    },
+    {
+      "id": "evidence-bundle",
+      "title": "Evidence bundle",
+      "category": "evidence",
+      "acceptanceCriteria": ["evidence links world state, logs/events, dashboard/Studio, assets, export/profile, and scenario verdicts", "generated state stays untracked"],
+      "passCriteria": ["all evidence artifact kinds are declared", "matrix smoke validates verification refs", "generated roots runs/target/dashboard-data/dist are absent from fixture"],
+      "failCriteria": ["evidence only exists as prose", "generated artifacts are committed", "evidence requires forbidden commands"],
+      "evidenceArtifacts": ["world_state", "runtime_events", "frame_stats", "dashboard_read_model", "studio_inspector", "asset_provenance", "scenario_verdicts"],
+      "verificationRefs": ["scenario-matrix-smoke.test.cjs", "asset-pack-smoke.test.cjs", "asset-evidence-smoke.test.cjs"]
+    }
+  ],
+  "qaSwarmUse": {
+    "status": "ready-for-read-only-regression-planning",
+    "note": "Future QA swarm/regression issues may select scenarios by id and run the listed verification refs, but this matrix does not grant auto-fix, auto-apply, merge, command bridge, dependency install, credential, release, or plugin runtime authority."
+  }
+}
