@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "build-export-packaging-demo-v1",
+  "issue": 734,
+  "milestone": "#1 Build / Export / Packaging: local-first evidence-backed playable artifact assembly",
+  "fixtureProfile": "examples/export-bundle-v1/export-profile.fixture.json",
+  "summary": "Read-only demo manifest that walks the full v1 build/export/packaging flow over one small fixture game: export profile, export plan, local web bundle, asset manifest, build fingerprint/checksums, runtime probe check, export verification, and evidence bundle. The demo is local-only and evidence-backed; it does not publish, deploy, sign, notarize, upload, or commit generated outputs outside fixtures.",
+  "stages": [
+    {
+      "id": "BEP734.profile",
+      "stage": "export-profile",
+      "coverage": "The fixture game declares an allowed web-static export profile.",
+      "check": "ExportProfile::from_json_str over the fixture profile.",
+      "expected": "Profile parses; export target is an allowed v1 web target."
+    },
+    {
+      "id": "BEP734.plan",
+      "stage": "export-plan",
+      "coverage": "The profile plans deterministically into source inputs and verification steps.",
+      "check": "ExportPlan::from_profile.",
+      "expected": "Plan lists the entry scene, assets, and allowlisted verification steps."
+    },
+    {
+      "id": "BEP734.web-bundle",
+      "stage": "web-bundle",
+      "coverage": "The plan assembles a local web package under ignored staging.",
+      "check": "assemble_web_bundle into a temp staging directory.",
+      "expected": "Bundle contains index.html, runtime bootstrap, styles, and the entry scene; the runtime probe is preserved."
+    },
+    {
+      "id": "BEP734.asset-manifest",
+      "stage": "asset-manifest",
+      "coverage": "Declared assets rewrite to packaged URLs with content hashes.",
+      "check": "build_asset_manifest.",
+      "expected": "Each entry carries a sha256 content hash and a deterministic output path."
+    },
+    {
+      "id": "BEP734.fingerprint-checksums",
+      "stage": "fingerprint-checksums",
+      "coverage": "The build fingerprint records per-artifact checksums and provenance.",
+      "check": "build_fingerprint over the assembled bundle.",
+      "expected": "Artifact checksums are non-empty and the toolchain id is recorded."
+    },
+    {
+      "id": "BEP734.probe-check",
+      "stage": "probe-check",
+      "coverage": "Runtime probe compatibility survives packaging in dev and packaged modes.",
+      "check": "verify_export_bundle / probe checks in DevProbeEnabled and PackagedProbeLimited.",
+      "expected": "The runtime probe global and required methods remain present."
+    },
+    {
+      "id": "BEP734.verification",
+      "stage": "verification",
+      "coverage": "Export verification runs allowlisted local checks only.",
+      "check": "verify_export_bundle report.",
+      "expected": "Verification passes on load/probe/scenario smoke; no network/install/credentialed command is introduced."
+    },
+    {
+      "id": "BEP734.evidence-bundle",
+      "stage": "evidence-bundle",
+      "coverage": "The evidence bundle aggregates profile, plan, manifest, checksums, verification, and verdict.",
+      "check": "build_export_evidence + read model.",
+      "expected": "Bundle verdict is pass; the read model serializes for read-only dashboard/Studio inspection."
+    }
+  ],
+  "guardrails": [
+    "This demo enables local, evidence-backed build/export/package assembly, not public release, deployment, store publishing, or production distribution.",
+    "No signing, notarization, app-store/Steam/itch publishing, upload, deploy, credential use, or release workflow mutation.",
+    "Export verification uses allowlisted local commands only; there is no arbitrary command runner, command bridge, hidden command execution, or network/install command.",
+    "Export outputs, staging folders, package bundles, verification logs, checksums, and temp servers stay generated and ignored unless fixture-scoped.",
+    "Browser/dashboard/Studio surfaces remain read-only inspection surfaces; they cannot publish, deploy, sign, upload, or run arbitrary commands.",
+    "No production-ready export, secure distribution, commercial release readiness, multi-platform export parity, or current Godot replacement claim."
+  ]
+}
