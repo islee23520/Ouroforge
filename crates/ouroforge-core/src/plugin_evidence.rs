@@ -1,6 +1,9 @@
+use crate::{add_evidence_artifact, list_evidence_artifacts, EvidenceArtifact};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
 
 pub const PLUGIN_REGISTRY_EVIDENCE_SCHEMA_VERSION: &str = "ouroforge.plugin-registry-evidence.v1";
 
@@ -222,6 +225,69 @@ impl PluginRegistryEvidenceArtifact {
             boundary: "Read-only plugin registry evidence summary; displays declarative descriptors without executing plugins, installing dependencies, running commands, mutating source, publishing, deploying, or writing trusted files.".to_string(),
         }
     }
+}
+
+pub fn write_plugin_registry_evidence(
+    run_dir: impl AsRef<Path>,
+    artifact: &PluginRegistryEvidenceArtifact,
+) -> Result<EvidenceArtifact> {
+    artifact.validate()?;
+    let run_dir = run_dir.as_ref();
+    let artifact_path = format!("evidence/plugins/{}.json", artifact.registry_id);
+    let evidence_id = format!("plugin-registry-{}", artifact.registry_id);
+    for existing in list_evidence_artifacts(run_dir)? {
+        if existing.id == evidence_id {
+            return Err(anyhow!(
+                "plugin registry evidence id already exists: {evidence_id}"
+            ));
+        }
+        if existing.path == artifact_path {
+            return Err(anyhow!(
+                "plugin registry evidence path already exists in evidence index: {artifact_path}"
+            ));
+        }
+    }
+    let output_path = run_dir.join(&artifact_path);
+    if output_path.exists() {
+        return Err(anyhow!(
+            "plugin registry evidence output already exists: {artifact_path}"
+        ));
+    }
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create plugin registry evidence directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    fs::write(
+        &output_path,
+        serde_json::to_string_pretty(artifact)
+            .context("failed to serialize plugin registry evidence")?,
+    )
+    .with_context(|| {
+        format!(
+            "failed to write plugin registry evidence {}",
+            output_path.display()
+        )
+    })?;
+    let read_model = artifact.read_model();
+    add_evidence_artifact(
+        run_dir,
+        &evidence_id,
+        "application/json",
+        &artifact_path,
+        serde_json::json!({
+            "artifact": "plugin_registry_evidence",
+            "schemaVersion": artifact.schema_version,
+            "registryId": artifact.registry_id,
+            "pluginCount": read_model.plugin_count,
+            "blockedCount": read_model.blocked_count,
+            "status": read_model.status,
+            "boundary": "validated declarative plugin registry evidence; no plugins were executed and no trusted files were written"
+        }),
+    )
 }
 
 impl PluginGeneratedStatePolicy {
