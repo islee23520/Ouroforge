@@ -61329,6 +61329,53 @@ scenarios:
     }
 
     #[test]
+    fn evaluator_depth_scope_contract_preserves_v1_boundaries() {
+        let doc = fs::read_to_string(repo_fixture_path("docs/evaluator-depth-v1.md"))
+            .expect("evaluator depth scope doc reads");
+
+        for required in [
+            "Issue: #1279",
+            "mechanical`, `runtime`, `visual`, and `semantic`",
+            "An undeclared gate is neutral and never an implicit fail",
+            "VisualComparisonEvidenceArtifact",
+            "runtime invariant checker from #686",
+            "existing two-gate verdicts remain byte-compatible",
+            "absent `visual` and `semantic` fields as empty/`unsupported` display state",
+            "#1283 visual, #1284 semantic",
+            "#1289 governance refresh",
+            "#1 remains the broad roadmap/final-goal anchor",
+            "#23 remains the repo-memory/design context anchor",
+        ] {
+            assert!(
+                doc.contains(required),
+                "Evaluator Depth scope doc is missing required boundary: {required}"
+            );
+        }
+
+        let non_goal_section = doc
+            .split("## Explicit non-goals")
+            .nth(1)
+            .expect("non-goals section exists");
+        for forbidden in [
+            "No new screenshot diff",
+            "No taste, beauty, fun",
+            "No claim that semantic gates prove a game is correct",
+            "No auto-fix, auto-apply, auto-merge",
+            "browser trusted writes",
+            "command bridge",
+            "arbitrary script execution",
+            "source mutation",
+            "native export",
+            "current engine replacement claim",
+        ] {
+            assert!(
+                non_goal_section.contains(forbidden),
+                "non-goals must keep {forbidden} out of scope"
+            );
+        }
+    }
+
+    #[test]
     fn gdd_to_playable_prototype_scope_contract_preserves_v1_boundaries() {
         let doc = fs::read_to_string(repo_fixture_path("docs/gdd-to-playable-prototype-v1.md"))
             .expect("gdd-to-prototype scope doc reads");
