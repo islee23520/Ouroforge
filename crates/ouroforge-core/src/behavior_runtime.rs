@@ -248,6 +248,8 @@ pub struct BehaviorExecutionReport {
     #[serde(rename = "sceneId")]
     pub scene_id: String,
     pub input: BehaviorExecutionInput,
+    #[serde(rename = "initialWorldState", default)]
+    pub initial_world_state: BehaviorWorldState,
     #[serde(rename = "appliedActions")]
     pub applied_actions: Vec<BehaviorAppliedAction>,
     pub diagnostics: Vec<BehaviorRuntimeDiagnostic>,
@@ -378,6 +380,8 @@ pub struct BehaviorExecutionEvidence {
     #[serde(rename = "appliedActionIds")]
     pub applied_action_ids: Vec<String>,
     pub diagnostics: Vec<BehaviorRuntimeDiagnostic>,
+    #[serde(rename = "initialWorldState", default)]
+    pub initial_world_state: BehaviorWorldState,
     #[serde(rename = "worldState")]
     pub world_state: BehaviorWorldState,
 }
@@ -621,6 +625,10 @@ impl BehaviorArtifact {
         input: BehaviorExecutionInput,
         world_state: BehaviorWorldState,
     ) -> BehaviorExecutionReport {
+        // Snapshot the starting world before mutation so the replay key identifies
+        // the input world state and the run can actually be replayed (two different
+        // initial states that converge to the same final report must stay distinct).
+        let initial_world_state = world_state.clone();
         let mut world_state = world_state;
         let mut applied_actions = Vec::new();
         let mut diagnostics = self.runtime_state().diagnostics;
@@ -670,6 +678,7 @@ impl BehaviorArtifact {
             artifact_id: self.artifact_id.clone(),
             scene_id: self.scene_id.clone(),
             input,
+            initial_world_state,
             applied_actions,
             diagnostics,
             world_state,
@@ -707,6 +716,7 @@ impl BehaviorArtifact {
                         .map(|action| action.action_id)
                         .collect(),
                     diagnostics: report.diagnostics,
+                    initial_world_state: report.initial_world_state,
                     world_state: report.world_state,
                 }
             })

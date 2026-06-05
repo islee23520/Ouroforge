@@ -380,3 +380,55 @@ fn rejects_malformed_or_untrusted_behavior_artifacts_at_loader_boundary() {
         assert!(format!("{error:?}").contains(expected_error), "{error:?}");
     }
 }
+
+#[test]
+fn replay_key_distinguishes_initial_world_states_that_converge() {
+    use ouroforge_core::behavior_runtime::{BehaviorExecutionInput, BehaviorWorldState};
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+
+    // Same trigger/input, but two different starting worlds that converge to the
+    // same post-execution report: one starts with `jumped: false`, the other has
+    // no `jumped` flag at all. The mark-jumped action sets it true in both.
+    let with_flag = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_flag("jumped", false)
+            .with_position("player", 2, 5),
+    );
+    let without_flag = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_position("player", 2, 5),
+    );
+
+    // The two runs produce identical applied actions and identical final world
+    // state, so a key derived only from the post-execution report would collide.
+    assert_eq!(
+        with_flag.world_state, without_flag.world_state,
+        "final world states converge"
+    );
+    assert_eq!(with_flag.applied_actions, without_flag.applied_actions);
+
+    let bundle = artifact.evidence_bundle(vec![with_flag, without_flag]);
+    // Different starting worlds must yield different replay keys so a consumer can
+    // tell which run (and therefore which input world) it is meant to replay.
+    assert_ne!(
+        bundle.reports[0].replay_key, bundle.reports[1].replay_key,
+        "differing initial world states must not share a replay key"
+    );
+    // The evidence carries the initial snapshot so the run is actually replayable.
+    assert_eq!(
+        bundle.reports[0].initial_world_state.flags.get("jumped"),
+        Some(&false)
+    );
+    assert!(!bundle.reports[1]
+        .initial_world_state
+        .flags
+        .contains_key("jumped"));
+}
