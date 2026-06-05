@@ -1958,6 +1958,46 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function behaviorEvidenceModel(run) {
+    return run?.behavior_evidence || run?.behaviorEvidence || {};
+  }
+
+  function behaviorEvidenceBundles(model) {
+    return Array.isArray(model?.bundles) ? model.bundles : [];
+  }
+
+  function renderBehaviorEvidenceLifecycle(run) {
+    const model = behaviorEvidenceModel(run);
+    const bundles = behaviorEvidenceBundles(model);
+    if (!model.present && !bundles.length) {
+      return '<section class="panel behavior-evidence-lifecycle"><h3>Behavior evidence lifecycle</h3><p class="empty-state">No behavior evidence bundle is indexed for this run.</p><p class="run-meta">Read-only dashboard surface. The browser cannot execute scripts, run command bridges, auto-apply changes, or write trusted files.</p></section>';
+    }
+    const cards = bundles.map((bundle) => {
+      const failures = Array.isArray(bundle.observed_failures || bundle.observedFailures) ? (bundle.observed_failures || bundle.observedFailures) : [];
+      const hypotheses = Array.isArray(bundle.next_step_hypotheses || bundle.nextStepHypotheses) ? (bundle.next_step_hypotheses || bundle.nextStepHypotheses) : [];
+      const blockers = Array.isArray(bundle.blocked_reasons || bundle.blockedReasons) ? (bundle.blocked_reasons || bundle.blockedReasons) : [];
+      const refs = Array.isArray(bundle.evidence_refs || bundle.evidenceRefs) ? (bundle.evidence_refs || bundle.evidenceRefs) : [];
+      const guardrails = Array.isArray(bundle.guardrails) ? bundle.guardrails : [];
+      const failureRows = failures.length ? failures.map((failure) => `<li><strong>${escapeText(failure.scenario_id || failure.scenarioId || 'scenario')}</strong>: ${escapeText(failure.summary || 'missing summary')}<br><span class="run-meta">Evidence: ${escapeText(failure.evidence_ref || failure.evidenceRef || 'missing')}</span></li>`).join('') : '<li>No observed failures recorded.</li>';
+      const hypothesisRows = hypotheses.length ? hypotheses.map((hypothesis) => `<li><strong>${escapeText(hypothesis.id || 'hypothesis')}</strong>: ${escapeText(hypothesis.summary || 'missing summary')}</li>`).join('') : '<li>No next-step hypotheses recorded.</li>';
+      return `<article class="artifact behavior-evidence-bundle">
+        <h4>${escapeText(bundle.bundle_id || bundle.bundleId || 'behavior evidence bundle')}</h4>
+        <div class="run-meta"><span class="${statusClass(bundle.status || 'unknown')}">${escapeText(bundle.status || 'unknown')}</span> · refs ${escapeText(bundle.lifecycle_ref_count ?? bundle.lifecycleRefCount ?? 0)} · ${escapeText(bundle.path || 'no path')}</div>
+        ${bundle.read_error || bundle.readError ? `<div class="artifact-warning">Malformed: ${escapeText(bundle.read_error || bundle.readError)}</div>` : ''}
+        ${blockers.length ? `<div class="artifact-warning">Blocked: ${escapeText(blockers.join(' · '))}</div>` : ''}
+        <h4>Observed failures</h4><ul class="run-meta-list">${failureRows}</ul>
+        <h4>Next-step hypotheses</h4><ul class="run-meta-list">${hypothesisRows}</ul>
+        <div class="run-meta">Evidence refs: ${escapeText(refs.join(' · ') || 'none')}</div>
+        <p class="run-meta">${escapeText(guardrails.join(' · ') || 'read-only rust/local untracked behavior evidence.')}</p>
+      </article>`;
+    }).join('');
+    return `<section class="panel behavior-evidence-lifecycle"><h3>Behavior evidence lifecycle</h3>
+      <p class="run-meta">Status ${escapeText(model.status || 'unknown')} · bundles ${escapeText(model.bundle_count ?? model.bundleCount ?? bundles.length)} · malformed ${escapeText(model.malformed_count ?? model.malformedCount ?? 0)} · lifecycle refs ${escapeText(model.lifecycle_ref_count ?? model.lifecycleRefCount ?? 0)} · failures ${escapeText(model.observed_failure_count ?? model.observedFailureCount ?? 0)} · hypotheses ${escapeText(model.next_step_hypothesis_count ?? model.nextStepHypothesisCount ?? 0)}</p>
+      <p class="run-meta">${escapeText(model.boundary || 'read-only structured behavior lifecycle evidence; no command bridge, auto-apply, or trusted writes.')}</p>
+      <div class="artifact-grid">${cards || '<p class="empty-state compact">No readable behavior evidence bundles.</p>'}</div>
+    </section>`;
+  }
+
   function sourcePatchApplyTransactions(run) {
     return artifacts(run?.mutation_artifacts).filter((artifact) => artifact.id === 'source-patch-apply-transaction' || artifact.path === 'mutation/source-patch-apply-transaction.json');
   }
@@ -2069,6 +2109,7 @@ const OuroforgeDashboard = (() => {
       <section class="panel"><h3>Runtime asset loading</h3>${renderAssetLoading(run)}</section>
       <section class="panel"><h3>Asset preview evidence</h3>${renderAssetPreview(run)}</section>
       <section class="panel"><h3>Plugin registry browser</h3>${renderPluginRegistry(run)}</section>
+      ${renderBehaviorEvidenceLifecycle(run)}
       <section class="panel"><h3>Source apply worktree context</h3>${renderSourceApplyWorktreeContext(run)}</section>
       <section class="panel"><h3>Runtime invariant evidence</h3>${renderRuntimeInvariants(run)}</section>
       <section class="panel"><h3>Route attempt evidence</h3>${renderRouteAttempts(run)}</section>
@@ -2174,7 +2215,7 @@ const OuroforgeDashboard = (() => {
     }
   }
 
-  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderPluginRegistry, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
+  return { artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

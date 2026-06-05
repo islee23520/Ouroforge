@@ -2304,6 +2304,57 @@ const sourcePatchBundleXssMarkup = cockpit.renderSourcePatchEvidenceBundleSurfac
 assert.match(sourcePatchBundleXssMarkup, /&lt;bundle-xss&gt;/);
 assert.match(sourcePatchBundleXssMarkup, /sandbox\/&lt;bad&gt;\/evidence\/report\.json/);
 assert.doesNotMatch(sourcePatchBundleXssMarkup, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
+const behaviorEvidenceRun = {
+  behavior_evidence: {
+    present: true,
+    status: 'ready',
+    bundle_count: 1,
+    malformed_count: 0,
+    lifecycle_ref_count: 8,
+    observed_failure_count: 1,
+    next_step_hypothesis_count: 1,
+    boundary: 'read-only behavior evidence; no command bridge, auto-apply, or trusted writes.',
+    bundles: [{
+      bundle_id: 'behavior-evidence-jump-boost',
+      status: 'complete',
+      path: 'evidence/behavior/behavior-evidence-bundle.json',
+      lifecycle_ref_count: 8,
+      observed_failures: [{ scenario_id: 'jump_boost_cooldown_regression', summary: 'Cooldown regressed', evidence_ref: 'evidence/scenarios/jump/scenario-result.json' }],
+      next_step_hypotheses: [{ id: 'hypothesis-rerun-after-rollback', summary: 'Rerun rollback comparison' }],
+      blocked_reasons: [],
+      evidence_refs: ['evidence/scenarios/jump/scenario-result.json'],
+      guardrails: ['read-only rust/local untracked evidence'],
+    }],
+  },
+};
+assert.match(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /Behavior evidence lifecycle/);
+assert.match(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /behavior-evidence-jump-boost/);
+assert.match(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /Cooldown regressed/);
+assert.match(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /hypothesis-rerun-after-rollback/);
+assert.match(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /no command bridge/);
+assert.doesNotMatch(cockpit.renderBehaviorEvidenceLifecycleSurface(behaviorEvidenceRun), /<button|applyCommand|mergeCommand|browserCommandBridge/);
+const behaviorEvidenceXssSurface = cockpit.renderBehaviorEvidenceLifecycleSurface({
+  behavior_evidence: {
+    present: true,
+    status: '<script>ready</script>',
+    boundary: '<script>boundary</script>',
+    bundles: [{
+      bundle_id: '<img src=x onerror=alert(1)>',
+      status: '<script>complete</script>',
+      path: 'evidence/<bad>/behavior.json',
+      read_error: '<script>malformed</script>',
+      observed_failures: [{ scenario_id: '<script>scenario</script>', summary: '<img src=x>', evidence_ref: 'evidence/<bad>/result.json' }],
+      next_step_hypotheses: [{ id: '<script>hypothesis</script>', summary: '<img src=x>' }],
+      blocked_reasons: ['<script>blocked</script>'],
+      evidence_refs: ['evidence/<bad>/result.json'],
+      guardrails: ['read-only <guardrail>'],
+    }],
+  },
+});
+assert.match(behaviorEvidenceXssSurface, /&lt;img src=x onerror=alert\(1\)&gt;/);
+assert.match(behaviorEvidenceXssSurface, /evidence\/&lt;bad&gt;\/result\.json/);
+assert.doesNotMatch(behaviorEvidenceXssSurface, /<script>|<img|<button|applyCommand|mergeCommand|browserCommandBridge|executeCommand/);
+assert.match(cockpit.renderEvidencePane({ ...run, ...behaviorEvidenceRun }), /Behavior evidence lifecycle/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /Source patch apply transaction/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /apply-tx-1/);
 assert.match(cockpit.renderSourcePatchApplyTransactionSurface(run), /ready_metadata_only_no_apply_authority/);
