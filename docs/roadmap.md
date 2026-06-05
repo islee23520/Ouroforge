@@ -50,19 +50,23 @@ Studio/dashboard inspection, a deterministic demo, Scenario Coverage v9, and a
 conservative governance refresh, a completed Evaluator Depth v1 milestone
 that adds bounded visual and semantic evaluator gates, additive four-category
 verdict/Journals, read-only inspection, deterministic demo evidence, Scenario
-Coverage v19, and conservative governance, and a completed Build / Export /
-Packaging v1 local export foundation: export target matrix, export profile,
-dry-run export plan, deterministic staging, local web bundle assembly, asset
-manifest/path rewriting,
-runtime probe preservation, checksums/provenance, export verification evidence,
-fixture-scoped Scenario Coverage v15, read-only inspection, and explicit
-release/publish blockers, and a completed Foundation Hardening v1 architecture
-hygiene milestone that extracted `ouroforge-ledger`, `ouroforge-evidence`, and
-`ouroforge-evaluator` behind the existing `ouroforge-core` public facade while
-preserving golden verdict parity:
+Coverage v19, and conservative governance, a completed Evolve Loop Depth v1 milestone
+that consumes the four-gate evaluator foundation so failed mechanical, runtime,
+visual, and semantic evidence can produce evidence-linked, failure-classified,
+bounded data/scene/scenario proposals, compare before/after reruns, surface the
+loop read-only in Studio, prove the lifecycle with deterministic demo fixtures,
+and lock Scenario Coverage v20, and a completed Build / Export / Packaging v1
+local export foundation: export target matrix, export profile, dry-run export
+plan, deterministic staging, local web bundle assembly, asset manifest/path
+rewriting, runtime probe preservation, checksums/provenance, export verification
+evidence, fixture-scoped Scenario Coverage v15, read-only inspection, and
+explicit release/publish blockers, and a completed Foundation Hardening v1
+architecture hygiene milestone that extracted `ouroforge-ledger`,
+`ouroforge-evidence`, and `ouroforge-evaluator` behind the existing
+`ouroforge-core` public facade while preserving golden verdict parity:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -80,6 +84,19 @@ evidence rather than aesthetic quality, semantic judgment is over declared
 invariants rather than general AI correctness, and no auto-fix/apply/merge,
 trusted mutation, command bridge, release-readiness claim, or engine-replacement
 claim is introduced.
+
+Evolve Loop Depth v1 (#1290/#1292-#1298) is now complete as the Milestone 5.1
+roadmap-alignment milestone. The merged evidence chain added per-gate,
+evidence-linked mutation proposal rationale; failure-classification-driven
+proposal selection; bounded data/scene/scenario mutation type mapping;
+four-gate before/after rerun deltas and Evolve Journal v2; read-only Studio
+inspection; deterministic demo fixtures; Scenario Coverage v20; and this
+governance refresh. This completion consumes the corrected Evaluator Depth v1
+four-gate foundation and #215 scene-only apply path, but it does not authorize
+arbitrary source patching, auto-accept, auto-apply, auto-merge, self-approval,
+reviewer bypass, command bridges, production-readiness claims, or current Godot
+replacement positioning. Confidence remains an evidence-derived bounded signal,
+not a correctness or quality guarantee.
 
 Build / Export / Packaging v1 (#720-#736) is now complete as a local-only export
 foundation. The merged evidence chain added the export target matrix, export
@@ -121,6 +138,11 @@ The current implementation has completed these documented milestone surfaces:
 - Scenario/Evaluator v1 (`docs/scenario-evaluator-v1.md`,
   `docs/scenario-evaluator-v1-demo.md`)
 - Evolve Loop v1 (`docs/evolve-loop-v1.md`, `docs/evolve-loop-v1-demo.md`)
+- Evolve Loop Depth v1 / evidence-linked proposals and four-gate rerun deltas
+  (`docs/evolve-loop-depth-v1.md`,
+  `docs/evolve-loop-depth-v1-demo.md`,
+  `docs/scenario-coverage-v20.md`,
+  `examples/evolve-loop-depth-v1/`)
 - Studio v1 (`docs/studio-v1.md`, `docs/studio-v1-demo.md`)
 - Engine Expansion v1 (`docs/engine-expansion-v1.md`,
   `docs/engine-expansion-v1-demo.md`)
@@ -259,6 +281,13 @@ The current implementation has completed these documented milestone surfaces:
   `examples/export-bundle-v1/export-profile.fixture.json`,
   `examples/export-asset-manifest-v1/asset-manifest.valid.fixture.json`,
   `examples/export-probe-v1/`)
+- Evolve Loop Depth v1 / evidence-linked bounded mutation loop
+  (`docs/evolve-loop-depth-v1.md`,
+  `docs/evolve-loop-depth-v1-demo.md`,
+  `docs/scenario-coverage-v20.md`,
+  `examples/evolve-loop-depth-v1/demo/`,
+  `examples/evolve-loop-depth-v1/scenario-coverage-v20/`,
+  `examples/evolve-loop-depth-v1/scenario-coverage-v20-evolve-depth.test.cjs`)
 - Foundation Hardening v1 / mechanical crate decomposition
   (`docs/foundation-hardening-v1.md`,
   `docs/refactor-parity-golden-baseline-v1.md`,
@@ -382,6 +411,27 @@ semantic correctness guarantee, no source mutation authority, no command bridge,
 no native export, no plugin runtime, no hosted/cloud behavior, no release
 readiness, and no engine-replacement claim.
 
+Evolve Loop Depth v1 (#1290/#1292-#1298) is complete after the merged
+evidence chain: #1290 defined the scope contract, #1292 added evidence-linked
+mutation proposal rationale, #1293 added failure-classification-driven bounded
+selection, #1294 added four-gate before/after rerun comparison plus Journal v2
+summaries, #1295 added read-only Studio/evidence dashboard inspection, #1296
+added the deterministic fixture-scoped demo, #1297 added Scenario Coverage v20
+with legacy evolve v0 compatibility, and #1298 records this governance refresh.
+The milestone completes #1 Milestone 5.1 under the disambiguated name **Evolve
+Loop Depth v1** rather than the closed #215 scene-only apply milestone it
+consumes. Proposals remain manual-review inputs; confidence is an evidence-
+derived bounded signal, not a correctness or quality guarantee; mutation types
+remain bounded to data, scene, and scenario artifacts; Rust/local validation owns
+trusted proposal/comparison persistence and serialization; browser/dashboard/
+Studio surfaces remain read-only evidence displays. This completion does not add
+arbitrary source patching, auto-accept, auto-apply, auto-merge, self-approval,
+reviewer bypass, browser trusted writes, command bridges, native export, plugin
+runtime, hosted/cloud behavior, release readiness, production readiness, or a
+current Godot replacement claim. Generated runs, proposals, comparisons,
+screenshots, and local tool outputs remain ignored unless explicitly fixture-
+scoped.
+
 Source Mutation Design Gate v1 is complete as a design/control milestone. Its
 outcome keeps source mutation apply blocked: the gate produced threat model,
 file-class, preview-artifact, review-gate, rollback/audit, sandbox/worktree, and
@@ -419,14 +469,34 @@ completion evidence is the merged implementation chain #1300, #1308, #1311,
 #1318, #1320, #1323, and #1325, with required local verification and CI evidence
 recorded on the linked issues. #1 and #23 remain open governance anchors.
 
-The recommended next technical milestone is **Milestone 5.1: Evolve Loop Depth
-v1** (#1290/#1292-#1298): evidence-linked, domain-aware mutation proposals that
-consume the corrected four-gate verdict foundation. After that sequence, Era C
-breadth (#660-#797), including QA/playtest swarm and Godot-Plus demo work, may
-continue on the corrected four-gate basis. Layer-3 expansion remains unchanged
-and deferred: distributed orchestration / Elixir per ADR #92, native export,
-plugin runtime, and hosted/cloud scope still require separate scoped issue
-sequences and governance approval.
+Milestone 5.1 is now complete as **Evolve Loop Depth v1** (#1290/#1292-#1298).
+The recommended next technical sequence is to continue **Era C** (#660-#797) on
+the corrected four-gate, evidence-linked evolve foundation, with Foundation
+Hardening (A.H/A.H2 candidates) treated only as a parallel hygiene track when a
+separate scope issue defines no-behavior-change parity gates. Layer-3 expansion
+remains unchanged and deferred: distributed orchestration / Elixir per ADR #92,
+native export, plugin runtime, and hosted/cloud scope still require separate
+scoped issue sequences and governance approval.
+
+### Evolve Loop Depth v1 governance refresh
+
+Evolve Loop Depth v1 is recorded as **complete for Milestone 5.1**, closing the
+Roadmap Alignment Addendum item that remained after #215. The completion
+evidence is the merged issue/PR chain #1290, #1292, #1293, #1294, #1295, #1296,
+#1297, and #1298, with final demo and Scenario Coverage v20 verification recorded
+on #1296/#1297 and this governance issue. #1 and #23 remain open governance
+anchors.
+
+The recommended next technical sequence is to continue **Era C (#660-#797)** on
+the corrected four-gate, evidence-linked evolve foundation. In practical order,
+this means QA/playtest swarm and Full Studio Editor/Godot-Plus demo work can
+consume bounded proposal confidence, data/scene/scenario mutation type mapping,
+and four-gate rerun deltas without weakening review gates. Foundation Hardening
+(A.H) remains a parallel hygiene track only; future A.H2 work still needs a
+separate scope issue before any extraction. Layer-3 scope remains unchanged and
+deferred: distributed orchestration / Elixir per ADR #92, native export, plugin
+runtime, and hosted/cloud still require separate design gates and governance
+approval.
 
 ### Foundation Hardening v1 governance refresh
 
@@ -603,6 +673,13 @@ remain separate maintainer actions.
   readiness, or engine-replacement status. Use Milestone 5.1 to consume these
   verdicts for evidence-linked mutation proposals rather than weakening the
   evaluator boundary.
+- Treat Evolve Loop Depth v1 as complete but bounded. Its artifacts authorize
+  evidence-linked, manual-review proposal inputs, bounded confidence signals,
+  data/scene/scenario mutation type mapping, and four-gate rerun delta evidence;
+  they do not authorize arbitrary source patching, auto-accept, auto-apply,
+  auto-merge, self-approval, reviewer bypass, command bridges, browser trusted
+  writes, native export, plugin runtime, hosted/cloud behavior, production
+  readiness, or current Godot replacement positioning.
 - Treat Build / Export / Packaging v1 as complete but local-only. Its artifacts
   authorize fixture-scoped local web package evidence, deterministic staging,
   profile/plan validation, asset manifests, runtime probe preservation,

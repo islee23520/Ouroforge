@@ -2,7 +2,7 @@
 
 Issue: #1290
 Roadmap anchor: #1 Milestone 5.1, completing the original Milestone 5 ("Evolve Loop").
-Status: scope contract only; no executable behavior.
+Status: complete after #1298 / PR evidence; this document is the scope and boundary contract for the completed Milestone 5.1 sequence.
 
 Evolve Loop Depth v1 deepens the existing v0 evolve path into evidence-linked, domain-aware mutation proposals, and adds the four-gate before/after rerun comparison that scene-only apply (#215) explicitly deferred. The original Milestone 5 thesis requires that failed evidence drive concrete, evidence-linked mutation proposals with before/after rerun comparison; this milestone completes that thesis.
 
@@ -58,6 +58,22 @@ Evaluator Depth v1 (#1279, especially #1283/#1284/#1285) is a prerequisite for t
 ```
 
 The contract lands first; the evidence-linked proposal and classification-driven selection proceed in parallel; the rerun comparison and journal join them; the surface, demo, and coverage proceed in parallel; the governance refresh closes the milestone.
+
+
+## Completion evidence
+
+Evolve Loop Depth v1 is complete for #1 Roadmap Alignment Addendum Milestone 5.1. The merged evidence chain is:
+
+- #1290 — scope and naming contract for Evolve Loop Depth v1, disambiguated from #215.
+- #1292 — evidence-linked mutation proposal rationale with per-gate citations and bounded confidence.
+- #1293 — failure-classification-driven proposal selection with bounded data/scene/scenario mutation types and backlog-only unsupported/unknown/flaky classes.
+- #1294 — four-gate rerun comparison and Evolve Journal v2, including visual/semantic deltas.
+- #1295 — read-only Studio Evolve Depth inspection surface.
+- #1296 — deterministic fixture-scoped demo showing visual fail-to-pass through a scene-only #215 apply operation.
+- #1297 — Scenario Coverage v20 regression fixtures and legacy evolve v0 golden compatibility.
+- #1298 — roadmap and #1 governance refresh.
+
+The milestone completed the original Milestone 5 thesis mechanically: failed evidence can now drive evidence-linked, manually reviewed proposals and a before/after rerun comparison can record four-gate deltas. This is not a claim that proposals are correct, fun, production-safe, auto-applicable, or source-patch authorized.
 
 ## Verification and closure gates
 
