@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "executable-capability",
+  "name": "Executable Capability",
+  "version": "1.0.0",
+  "description": "Attempts to declare an executable capability that is not allowlisted.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["executeScript"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

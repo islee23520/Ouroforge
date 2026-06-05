@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "unsafe-path-traversal",
+  "name": "Unsafe Path Traversal",
+  "version": "1.0.0",
+  "description": "Attempts to reference a file outside the plugin tree.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "paths": {
+    "docs": ["../../etc/passwd"]
+  },
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

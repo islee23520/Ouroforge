@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "executable-entrypoint-field",
+  "name": "Executable Entrypoint Field",
+  "version": "1.0.0",
+  "description": "Attempts to smuggle an executable entrypoint via an unknown field.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "entrypoint": "plugin.js",
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

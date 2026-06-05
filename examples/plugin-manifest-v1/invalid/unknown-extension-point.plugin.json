@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "unknown-extension-point",
+  "name": "Unknown Extension Point",
+  "version": "1.0.0",
+  "description": "Attempts to declare an extension point outside the v1 catalog.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.writeBack"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

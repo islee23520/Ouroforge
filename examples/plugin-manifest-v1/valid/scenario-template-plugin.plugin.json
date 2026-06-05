@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "read-only-scenario-template",
+  "name": "Read-Only Scenario Template",
+  "version": "0.2.1",
+  "description": "Declares a read-only scenario template descriptor for prototype coverage.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0",
+    "maxOuroforgeVersion": "1.0.0"
+  },
+  "declaredCapabilities": ["scenarioTemplate"],
+  "extensionPoints": ["scenario.templates.readOnly"],
+  "paths": {
+    "docs": ["docs/scenario.md"],
+    "examples": ["examples/sample-run.json"]
+  },
+  "descriptorRefs": [
+    {
+      "id": "prototype-scenario-template",
+      "kind": "scenarioTemplate",
+      "path": "descriptors/scenario-template.json"
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted scenario template descriptors only, with no executable code, no command execution, and no network install."
+}

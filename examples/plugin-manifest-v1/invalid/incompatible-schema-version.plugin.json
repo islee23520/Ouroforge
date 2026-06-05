@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v2",
+  "pluginId": "incompatible-schema-version",
+  "name": "Incompatible Schema Version",
+  "version": "1.0.0",
+  "description": "Declares an unsupported manifest schema version.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "boundary": "Declarative read-only plugin manifest with no executable code, no command execution, and no network install."
+}

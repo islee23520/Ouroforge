@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "read-only-dashboard-panel",
+  "name": "Read-Only Dashboard Panel",
+  "version": "1.0.0",
+  "description": "Declares a read-only dashboard panel descriptor for the plugin registry summary.",
+  "metadata": {
+    "author": "Ouroforge Sample Authors",
+    "project": "Ouroforge Plugin Samples",
+    "license": "Apache-2.0",
+    "summary": "A declarative, read-only dashboard panel example."
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "paths": {
+    "docs": ["docs/README.md"],
+    "assets": ["assets/icon.svg"]
+  },
+  "descriptorRefs": [
+    {
+      "id": "plugin-registry-summary-panel",
+      "kind": "dashboardPanel",
+      "path": "descriptors/dashboard-panel.json"
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
+}

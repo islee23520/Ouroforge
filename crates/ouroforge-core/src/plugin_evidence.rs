@@ -7,14 +7,14 @@ use std::path::Path;
 
 pub const PLUGIN_REGISTRY_EVIDENCE_SCHEMA_VERSION: &str = "ouroforge.plugin-registry-evidence.v1";
 
-const ALLOWED_CAPABILITIES: &[&str] = &[
+pub(crate) const ALLOWED_CAPABILITIES: &[&str] = &[
     "dashboardPanel",
     "studioInspectorPanel",
     "scenarioTemplate",
     "assetMetadataProvider",
 ];
 
-const ALLOWED_EXTENSION_POINTS: &[&str] = &[
+pub(crate) const ALLOWED_EXTENSION_POINTS: &[&str] = &[
     "dashboard.panels.readOnly",
     "studio.inspector.readOnly",
     "scenario.templates.readOnly",
@@ -675,7 +675,7 @@ impl PluginEvidenceRef {
     }
 }
 
-fn require_local_id(field: &str, value: &str) -> Result<()> {
+pub(crate) fn require_local_id(field: &str, value: &str) -> Result<()> {
     if value.trim().is_empty() {
         return Err(anyhow!("{field} must not be empty"));
     }
@@ -691,7 +691,7 @@ fn require_local_id(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn require_local_text(field: &str, value: &str) -> Result<()> {
+pub(crate) fn require_local_text(field: &str, value: &str) -> Result<()> {
     if value.trim().is_empty() {
         return Err(anyhow!("{field} must not be empty"));
     }
@@ -779,7 +779,11 @@ fn require_allowed_value(field: &str, value: &str, allowed: &[&str]) -> Result<(
     Ok(())
 }
 
-fn require_allowed_values(field: &str, values: &[String], allowed: &[&str]) -> Result<()> {
+pub(crate) fn require_allowed_values(
+    field: &str,
+    values: &[String],
+    allowed: &[&str],
+) -> Result<()> {
     if values.is_empty() {
         return Err(anyhow!("{field} must not be empty"));
     }
@@ -799,7 +803,10 @@ fn require_allowed_values(field: &str, values: &[String], allowed: &[&str]) -> R
     Ok(())
 }
 
-fn require_unique_ids<'a>(field: &str, values: impl IntoIterator<Item = &'a str>) -> Result<()> {
+pub(crate) fn require_unique_ids<'a>(
+    field: &str,
+    values: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
     let mut seen = BTreeSet::new();
     for value in values {
         if !seen.insert(value) {
