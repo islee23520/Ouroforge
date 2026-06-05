@@ -3487,3 +3487,78 @@ fn run_cli_expect_failure(current_dir: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&output.stderr)
     )
 }
+
+#[test]
+fn behavior_draft_cli_validates_previews_and_reports_stale_targets() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = unique_temp_dir("ouroforge-behavior-draft-cli-test");
+    fs::create_dir_all(&temp).expect("temp exists");
+    let scene_rel = "examples/3d-capability-gate-v1/scene-3d-nested-world-transform.scene.json";
+    let scene = read_scene(repo_root.join(scene_rel)).expect("scene reads");
+    let scene_hash = hash_scene_document(&scene).expect("scene hashes");
+    let mut draft: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../examples/behavior-draft-v1/valid/behavior-draft.valid.json"
+    ))
+    .expect("draft fixture parses");
+    draft["target"]["scenePath"] = serde_json::json!(scene_rel);
+    draft["target"]["sceneHash"] =
+        serde_json::json!(format!("{}:{}", scene_hash.algorithm, scene_hash.value));
+    let draft_path = temp.join("behavior-draft.valid.json");
+    fs::write(
+        &draft_path,
+        serde_json::to_string_pretty(&draft).expect("draft serializes"),
+    )
+    .expect("draft written");
+
+    let validated = run_cli(
+        &repo_root,
+        &[
+            "behavior",
+            "draft",
+            "validate",
+            draft_path.to_str().unwrap(),
+            "--project-root",
+            repo_root.to_str().unwrap(),
+        ],
+    );
+    assert!(validated.contains(r#""status": "valid""#));
+    assert!(validated.contains(r#""stale": false"#));
+    assert!(validated.contains("does not apply trusted files"));
+
+    let preview = run_cli(
+        &repo_root,
+        &[
+            "behavior",
+            "draft",
+            "preview",
+            draft_path.to_str().unwrap(),
+            "--project-root",
+            repo_root.to_str().unwrap(),
+        ],
+    );
+    assert!(preview.contains("ouroforge.behavior-draft-preview.v1"));
+    assert!(preview.contains("behaviorCount"));
+    assert!(preview.contains("read-only untrusted preview"));
+
+    draft["target"]["sceneHash"] = serde_json::json!("fnv1a64-canonical-json-v1:0000000000000000");
+    let stale_path = temp.join("behavior-draft.stale.json");
+    fs::write(
+        &stale_path,
+        serde_json::to_string_pretty(&draft).expect("stale draft serializes"),
+    )
+    .expect("stale draft written");
+    let stale = run_cli_expect_failure(
+        &repo_root,
+        &[
+            "behavior",
+            "draft",
+            "validate",
+            stale_path.to_str().unwrap(),
+            "--project-root",
+            repo_root.to_str().unwrap(),
+        ],
+    );
+    assert!(stale.contains("behavior draft target hash is stale"));
+
+    fs::remove_dir_all(temp).ok();
+}
