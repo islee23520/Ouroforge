@@ -31,6 +31,7 @@ pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
 pub mod export_asset_manifest;
 pub mod export_bundle;
+pub mod export_capability_report;
 pub mod export_evidence;
 pub mod export_fingerprint;
 pub mod export_hash;

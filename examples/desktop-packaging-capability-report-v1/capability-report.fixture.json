@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "desktop-packaging-capability-report-v1",
+  "capability": "desktop-packaging",
+  "status": "future",
+  "implemented": false,
+  "platforms": ["windows", "macos", "linux"],
+  "requirements": [
+    "native wrapper selection and IPC/security boundary",
+    "local runtime and asset bundling with offline load",
+    "code signing and notarization (currently blocked)",
+    "sandbox/security: file access, IPC, generated-evidence isolation",
+    "evidence parity with browser-worker QA"
+  ],
+  "boundary": "Desktop packaging is not implemented in v1: no native wrapper, installer, signing, or notarization. The desktop-wrapper target stays future/design-gated and blocked by export validation."
+}
