@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::Path;
 
@@ -134,6 +134,137 @@ pub struct BehaviorAction {
     pub target_entity_id: Option<String>,
     #[serde(default)]
     pub value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dx: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dy: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorExecutionInput {
+    #[serde(rename = "triggerKind")]
+    pub trigger_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(
+        rename = "inputAction",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub input_action: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorWorldState {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub flags: BTreeMap<String, bool>,
+    #[serde(
+        rename = "entityPositions",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub entity_positions: BTreeMap<String, BehaviorEntityPosition>,
+    #[serde(
+        rename = "entityHealth",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub entity_health: BTreeMap<String, i32>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub inventory: BTreeSet<String>,
+    #[serde(
+        rename = "activeStates",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub active_states: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<String>,
+    #[serde(
+        rename = "animationIntents",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub animation_intents: Vec<BehaviorIntent>,
+    #[serde(
+        rename = "audioIntents",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub audio_intents: Vec<BehaviorIntent>,
+    #[serde(
+        rename = "terminalState",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub terminal_state: Option<BehaviorTerminalState>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorEntityPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorIntent {
+    #[serde(rename = "behaviorId")]
+    pub behavior_id: String,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "targetEntityId")]
+    pub target_entity_id: String,
+    pub intent: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorTerminalState {
+    Win,
+    Loss,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorExecutionReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "artifactId")]
+    pub artifact_id: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub input: BehaviorExecutionInput,
+    #[serde(rename = "appliedActions")]
+    pub applied_actions: Vec<BehaviorAppliedAction>,
+    pub diagnostics: Vec<BehaviorRuntimeDiagnostic>,
+    #[serde(rename = "worldState")]
+    pub world_state: BehaviorWorldState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorAppliedAction {
+    #[serde(rename = "behaviorId")]
+    pub behavior_id: String,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub kind: String,
+    #[serde(rename = "targetEntityId")]
+    pub target_entity_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -357,6 +488,66 @@ impl BehaviorArtifact {
             },
         }
     }
+
+    pub fn execute(
+        &self,
+        input: BehaviorExecutionInput,
+        world_state: BehaviorWorldState,
+    ) -> BehaviorExecutionReport {
+        let mut world_state = world_state;
+        let mut applied_actions = Vec::new();
+        let mut diagnostics = self.runtime_state().diagnostics;
+        let mut queued_events = VecDeque::new();
+        if let Some(event) = &input.event {
+            queued_events.push_back(event.clone());
+        }
+
+        for behavior in &self.behaviors {
+            initialize_behavior_state(behavior, &mut world_state);
+            if !behavior_matches_input(behavior, &input) {
+                continue;
+            }
+            if !conditions_match(behavior, &input, &world_state) {
+                continue;
+            }
+
+            transition_state_machine(behavior, &input, &mut world_state, &mut applied_actions);
+            apply_actions(
+                &behavior.id,
+                &behavior.entity_id,
+                &behavior.actions,
+                &mut world_state,
+                &mut applied_actions,
+                &mut diagnostics,
+                &mut queued_events,
+            );
+            for ability in &behavior.abilities {
+                apply_actions(
+                    &behavior.id,
+                    &behavior.entity_id,
+                    &ability.actions,
+                    &mut world_state,
+                    &mut applied_actions,
+                    &mut diagnostics,
+                    &mut queued_events,
+                );
+            }
+        }
+
+        while let Some(event) = queued_events.pop_front() {
+            world_state.events.push(event);
+        }
+
+        BehaviorExecutionReport {
+            schema_version: "ouroforge.behavior-execution-report.v1".to_string(),
+            artifact_id: self.artifact_id.clone(),
+            scene_id: self.scene_id.clone(),
+            input,
+            applied_actions,
+            diagnostics,
+            world_state,
+        }
+    }
 }
 
 impl BehaviorValidationAuthority {
@@ -441,6 +632,18 @@ impl BehaviorAction {
         if let Some(value) = &self.value {
             require_local_text("action.value", value)?;
         }
+        if let Some(flag) = &self.flag {
+            require_local_id("action.flag", flag)?;
+        }
+        if let Some(state) = &self.state {
+            require_local_id("action.state", state)?;
+        }
+        if let Some(event) = &self.event {
+            require_local_id("action.event", event)?;
+        }
+        if let Some(item) = &self.item {
+            require_local_id("action.item", item)?;
+        }
         Ok(())
     }
 }
@@ -513,6 +716,334 @@ impl BehaviorAbility {
             action.validate()?;
         }
         Ok(())
+    }
+}
+
+impl BehaviorExecutionInput {
+    pub fn new(trigger_kind: impl Into<String>) -> Self {
+        Self {
+            trigger_kind: trigger_kind.into(),
+            event: None,
+            input_action: None,
+        }
+    }
+
+    pub fn with_event(mut self, event: impl Into<String>) -> Self {
+        self.event = Some(event.into());
+        self
+    }
+
+    pub fn with_input_action(mut self, input_action: impl Into<String>) -> Self {
+        self.input_action = Some(input_action.into());
+        self
+    }
+}
+
+impl BehaviorWorldState {
+    pub fn with_flag(mut self, flag: impl Into<String>, value: bool) -> Self {
+        self.flags.insert(flag.into(), value);
+        self
+    }
+
+    pub fn with_position(mut self, entity_id: impl Into<String>, x: i32, y: i32) -> Self {
+        self.entity_positions
+            .insert(entity_id.into(), BehaviorEntityPosition { x, y });
+        self
+    }
+
+    pub fn with_health(mut self, entity_id: impl Into<String>, health: i32) -> Self {
+        self.entity_health.insert(entity_id.into(), health);
+        self
+    }
+
+    pub fn with_item(mut self, item: impl Into<String>) -> Self {
+        self.inventory.insert(item.into());
+        self
+    }
+}
+
+fn behavior_matches_input(behavior: &BehaviorDefinition, input: &BehaviorExecutionInput) -> bool {
+    behavior.triggers.iter().any(|trigger| {
+        if trigger.kind != input.trigger_kind {
+            return false;
+        }
+        match trigger.kind.as_str() {
+            "onEvent" | "onCollision" | "onStateEnter" => {
+                trigger.event.as_ref() == input.event.as_ref()
+            }
+            "onInputAction" => trigger.event.as_ref() == input.input_action.as_ref(),
+            _ => true,
+        }
+    })
+}
+
+fn conditions_match(
+    behavior: &BehaviorDefinition,
+    input: &BehaviorExecutionInput,
+    world_state: &BehaviorWorldState,
+) -> bool {
+    behavior
+        .conditions
+        .iter()
+        .all(|condition| condition_matches(condition, behavior, input, world_state))
+}
+
+fn condition_matches(
+    condition: &BehaviorCondition,
+    behavior: &BehaviorDefinition,
+    input: &BehaviorExecutionInput,
+    world_state: &BehaviorWorldState,
+) -> bool {
+    match condition.kind.as_str() {
+        "always" => true,
+        "flagEquals" => condition
+            .field
+            .as_ref()
+            .and_then(|field| world_state.flags.get(field))
+            .is_some_and(|actual| {
+                condition
+                    .value
+                    .as_deref()
+                    .is_some_and(|value| bool_string(*actual) == value)
+            }),
+        "stateEquals" => world_state
+            .active_states
+            .get(&behavior.entity_id)
+            .is_some_and(|actual| condition.value.as_deref() == Some(actual.as_str())),
+        "eventEquals" => condition.value.as_ref() == input.event.as_ref(),
+        "hasItem" => condition
+            .value
+            .as_ref()
+            .is_some_and(|item| world_state.inventory.contains(item)),
+        "cooldownReady" => true,
+        _ => false,
+    }
+}
+
+fn initialize_behavior_state(behavior: &BehaviorDefinition, world_state: &mut BehaviorWorldState) {
+    if let Some(state_machine) = &behavior.state_machine {
+        world_state
+            .active_states
+            .entry(behavior.entity_id.clone())
+            .or_insert_with(|| state_machine.initial_state.clone());
+    }
+}
+
+fn transition_state_machine(
+    behavior: &BehaviorDefinition,
+    input: &BehaviorExecutionInput,
+    world_state: &mut BehaviorWorldState,
+    applied_actions: &mut Vec<BehaviorAppliedAction>,
+) {
+    let Some(state_machine) = &behavior.state_machine else {
+        return;
+    };
+    let Some(event) = input.event.as_ref() else {
+        return;
+    };
+    let Some(current_state_id) = world_state.active_states.get(&behavior.entity_id).cloned() else {
+        return;
+    };
+    let Some(current_state) = state_machine
+        .states
+        .iter()
+        .find(|state| state.id == current_state_id)
+    else {
+        return;
+    };
+    let Some(transition) = current_state
+        .transitions
+        .iter()
+        .find(|transition| transition.on_event.as_deref() == Some(event.as_str()))
+    else {
+        return;
+    };
+
+    world_state
+        .active_states
+        .insert(behavior.entity_id.clone(), transition.to.clone());
+    applied_actions.push(BehaviorAppliedAction {
+        behavior_id: behavior.id.clone(),
+        action_id: transition.id.clone(),
+        kind: "stateTransition".to_string(),
+        target_entity_id: behavior.entity_id.clone(),
+    });
+}
+
+fn apply_actions(
+    behavior_id: &str,
+    default_entity_id: &str,
+    actions: &[BehaviorAction],
+    world_state: &mut BehaviorWorldState,
+    applied_actions: &mut Vec<BehaviorAppliedAction>,
+    diagnostics: &mut Vec<BehaviorRuntimeDiagnostic>,
+    queued_events: &mut VecDeque<String>,
+) {
+    for action in actions {
+        if !SUPPORTED_ACTIONS.contains(&action.kind.as_str())
+            || !SUPPORTED_EFFECTS.contains(&action.effect_kind.as_str())
+        {
+            continue;
+        }
+        let target_entity_id = action
+            .target_entity_id
+            .as_deref()
+            .unwrap_or(default_entity_id)
+            .to_string();
+        let applied = apply_action(
+            action,
+            &target_entity_id,
+            behavior_id,
+            world_state,
+            queued_events,
+        );
+        if applied {
+            applied_actions.push(BehaviorAppliedAction {
+                behavior_id: behavior_id.to_string(),
+                action_id: action.id.clone(),
+                kind: action.kind.clone(),
+                target_entity_id,
+            });
+        } else {
+            diagnostics.push(BehaviorRuntimeDiagnostic {
+                severity: BehaviorDiagnosticSeverity::Warning,
+                code: "actionMissingRequiredField".to_string(),
+                message: format!(
+                    "behavior action `{}` missing required structured field",
+                    action.id
+                ),
+                behavior_id: Some(behavior_id.to_string()),
+                item_id: Some(action.id.clone()),
+            });
+        }
+    }
+}
+
+fn apply_action(
+    action: &BehaviorAction,
+    target_entity_id: &str,
+    behavior_id: &str,
+    world_state: &mut BehaviorWorldState,
+    queued_events: &mut VecDeque<String>,
+) -> bool {
+    match action.kind.as_str() {
+        "setFlag" => {
+            let Some(flag) = action.flag.as_ref().or(action.value.as_ref()) else {
+                return false;
+            };
+            world_state.flags.insert(flag.clone(), true);
+            true
+        }
+        "moveEntity" => {
+            let (dx, dy) = action_delta(action);
+            let position = world_state
+                .entity_positions
+                .entry(target_entity_id.to_string())
+                .or_default();
+            position.x += dx;
+            position.y += dy;
+            true
+        }
+        "changeState" => {
+            let Some(state) = action.state.as_ref().or(action.value.as_ref()) else {
+                return false;
+            };
+            world_state
+                .active_states
+                .insert(target_entity_id.to_string(), state.clone());
+            true
+        }
+        "emitEvent" => {
+            let Some(event) = action.event.as_ref().or(action.value.as_ref()) else {
+                return false;
+            };
+            queued_events.push_back(event.clone());
+            true
+        }
+        "damage" => {
+            let amount = action.amount.unwrap_or(1).max(0);
+            *world_state
+                .entity_health
+                .entry(target_entity_id.to_string())
+                .or_insert(0) -= amount;
+            true
+        }
+        "heal" => {
+            let amount = action.amount.unwrap_or(1).max(0);
+            *world_state
+                .entity_health
+                .entry(target_entity_id.to_string())
+                .or_insert(0) += amount;
+            true
+        }
+        "collectItem" => {
+            let Some(item) = action.item.as_ref().or(action.value.as_ref()) else {
+                return false;
+            };
+            world_state.inventory.insert(item.clone());
+            true
+        }
+        "removeItem" => {
+            let Some(item) = action.item.as_ref().or(action.value.as_ref()) else {
+                return false;
+            };
+            world_state.inventory.remove(item);
+            true
+        }
+        "startAnimationIntent" => {
+            let Some(intent) = action.value.as_ref() else {
+                return false;
+            };
+            world_state.animation_intents.push(BehaviorIntent {
+                behavior_id: behavior_id.to_string(),
+                action_id: action.id.clone(),
+                target_entity_id: target_entity_id.to_string(),
+                intent: intent.clone(),
+            });
+            true
+        }
+        "startAudioIntent" => {
+            let Some(intent) = action.value.as_ref() else {
+                return false;
+            };
+            world_state.audio_intents.push(BehaviorIntent {
+                behavior_id: behavior_id.to_string(),
+                action_id: action.id.clone(),
+                target_entity_id: target_entity_id.to_string(),
+                intent: intent.clone(),
+            });
+            true
+        }
+        "markWinState" => {
+            world_state.terminal_state = Some(BehaviorTerminalState::Win);
+            true
+        }
+        "markLossState" => {
+            world_state.terminal_state = Some(BehaviorTerminalState::Loss);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn action_delta(action: &BehaviorAction) -> (i32, i32) {
+    if action.dx.is_some() || action.dy.is_some() {
+        return (action.dx.unwrap_or(0), action.dy.unwrap_or(0));
+    }
+    match action.value.as_deref() {
+        Some("up-1") => (0, -1),
+        Some("down-1") => (0, 1),
+        Some("left-1") => (-1, 0),
+        Some("right-1") => (1, 0),
+        _ => (0, 0),
+    }
+}
+
+fn bool_string(value: bool) -> &'static str {
+    if value {
+        "true"
+    } else {
+        "false"
     }
 }
 

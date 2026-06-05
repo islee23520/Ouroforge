@@ -67,6 +67,94 @@ fn unsupported_behavior_parts_are_warning_recorded_not_silently_accepted() {
 }
 
 #[test]
+fn executes_supported_trigger_conditions_and_actions_deterministically() {
+    use ouroforge_core::behavior_runtime::{
+        BehaviorExecutionInput, BehaviorTerminalState, BehaviorWorldState,
+    };
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let input = BehaviorExecutionInput::new("onInputAction").with_input_action("jump");
+    let world = BehaviorWorldState::default()
+        .with_flag("grounded", true)
+        .with_position("player", 10, 10);
+
+    let first = artifact.execute(input.clone(), world.clone());
+    let replay = artifact.execute(input, world);
+
+    assert_eq!(
+        first, replay,
+        "same input and world replay deterministically"
+    );
+    assert_eq!(
+        first
+            .applied_actions
+            .iter()
+            .map(|action| action.action_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["mark-jumped", "jump-motion", "jump-audio"]
+    );
+    assert_eq!(first.world_state.flags.get("jumped"), Some(&true));
+    assert_eq!(first.world_state.entity_positions["player"].x, 10);
+    assert_eq!(first.world_state.entity_positions["player"].y, 8);
+    assert_eq!(first.world_state.audio_intents[0].intent, "jump");
+    assert_eq!(first.world_state.terminal_state, None);
+
+    let goal = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("goalReached"),
+        BehaviorWorldState::default().with_item("key"),
+    );
+
+    assert_eq!(
+        goal.applied_actions
+            .iter()
+            .map(|action| action.action_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["win", "victory-event"]
+    );
+    assert_eq!(
+        goal.world_state.terminal_state,
+        Some(BehaviorTerminalState::Win)
+    );
+    assert_eq!(goal.world_state.events, vec!["goalReached", "victory"]);
+}
+
+#[test]
+fn conditions_block_actions_and_unsupported_actions_remain_warning_only() {
+    use ouroforge_core::behavior_runtime::{BehaviorExecutionInput, BehaviorWorldState};
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let blocked = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default().with_flag("grounded", false),
+    );
+
+    assert!(blocked.applied_actions.is_empty());
+    assert!(!blocked.world_state.flags.contains_key("jumped"));
+
+    let unsupported = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.unsupported.json"
+    ))
+    .expect("unsupported kinds are loadable with warnings");
+    let report = unsupported.execute(
+        BehaviorExecutionInput::new("onScriptHook"),
+        BehaviorWorldState::default(),
+    );
+
+    assert!(report.applied_actions.is_empty());
+    assert_eq!(report.diagnostics.len(), 4);
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == "unsupportedAction"));
+}
+
+#[test]
 fn rejects_malformed_or_untrusted_behavior_artifacts_at_loader_boundary() {
     let invalid_cases = [
         (
