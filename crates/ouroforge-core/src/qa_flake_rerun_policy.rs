@@ -134,6 +134,14 @@ impl FlakeRerunPolicyArtifact {
             return None;
         }
         let counts = self.outcome_counts();
+        // Opposing pass/fail evidence is never stable, no matter how permissive
+        // the consistency threshold is; such runs fall through to flaky/exhausted
+        // classification (issue #691: pass-then-fail / fail-then-pass are flaky).
+        let has_pass = counts.get("passed").copied().unwrap_or(0) > 0;
+        let has_fail = counts.get("failed").copied().unwrap_or(0) > 0;
+        if has_pass && has_fail {
+            return None;
+        }
         let total = self.observed_outcomes.len() as f64;
         for candidate in ["passed", "failed"] {
             let count = counts.get(candidate).copied().unwrap_or(0) as f64;
@@ -450,16 +458,33 @@ fn require_text(field: &str, value: &str) -> Result<()> {
 }
 
 fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
-    value.contains(phrase)
-        && ![
-            "no ",
-            "not ",
-            "without ",
-            "avoid ",
-            "forbid ",
-            "forbidden ",
-            "not yet ",
-        ]
-        .iter()
-        .any(|prefix| value.contains(&format!("{prefix}{phrase}")))
+    const NEGATIONS: [&str; 7] = [
+        "no ",
+        "not ",
+        "without ",
+        "avoid ",
+        "forbid ",
+        "forbidden ",
+        "not yet ",
+    ];
+    let hay = value;
+    // Scope negation to the clause/sentence containing each occurrence so a
+    // negated mention in one sentence cannot whitelist a positive mention in
+    // another (fail-closed), while a single leading negation still covers a
+    // list such as `no auto-apply or self-approval`.
+    let mut search_start = 0;
+    while let Some(rel) = hay[search_start..].find(phrase) {
+        let idx = search_start + rel;
+        let clause_start = hay[..idx]
+            .rfind(['.', ';', '!', '\n', '\r'])
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let preceding = &hay[clause_start..idx];
+        let negated = NEGATIONS.iter().any(|n| preceding.contains(n));
+        if !negated {
+            return true;
+        }
+        search_start = idx + phrase.len();
+    }
+    false
 }

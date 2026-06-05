@@ -480,16 +480,61 @@ fn require_text(field: &str, value: &str) -> Result<()> {
 }
 
 fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
-    value.contains(phrase)
-        && ![
-            "no ",
-            "not ",
-            "without ",
-            "avoid ",
-            "forbid ",
-            "forbidden ",
-            "not yet ",
-        ]
-        .iter()
-        .any(|prefix| value.contains(&format!("{prefix}{phrase}")))
+    const NEGATIONS: [&str; 7] = [
+        "no ",
+        "not ",
+        "without ",
+        "avoid ",
+        "forbid ",
+        "forbidden ",
+        "not yet ",
+    ];
+    let hay = value;
+    // Scope negation to the clause/sentence containing each occurrence so a
+    // negated mention in one sentence cannot whitelist a positive mention in
+    // another (fail-closed), while a single leading negation still covers a
+    // list such as `no auto-apply or self-approval`.
+    let mut search_start = 0;
+    while let Some(rel) = hay[search_start..].find(phrase) {
+        let idx = search_start + rel;
+        let clause_start = hay[..idx]
+            .rfind(['.', ';', '!', '\n', '\r'])
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let preceding = &hay[clause_start..idx];
+        let negated = NEGATIONS.iter().any(|n| preceding.contains(n));
+        if !negated {
+            return true;
+        }
+        search_start = idx + phrase.len();
+    }
+    false
+}
+
+#[cfg(test)]
+mod negation_scope_tests {
+    use super::contains_positive_phrase;
+
+    #[test]
+    fn negated_then_positive_in_separate_sentences_is_flagged() {
+        // A negated mention in one sentence must not whitelist a positive mention
+        // in another (the prior fail-open bypass for issue #693).
+        let value = "no auto-fix is authorized. auto-fix enabled for passing rows.";
+        assert!(contains_positive_phrase(value, "auto-fix"));
+    }
+
+    #[test]
+    fn list_style_single_negation_is_preserved() {
+        // A single leading negation still covers a comma/or list of phrases.
+        let value = "no auto-fix, auto-merge, or production-ready claim is made.";
+        assert!(!contains_positive_phrase(value, "auto-fix"));
+        assert!(!contains_positive_phrase(value, "auto-merge"));
+        assert!(!contains_positive_phrase(value, "production-ready"));
+    }
+
+    #[test]
+    fn plain_positive_is_flagged_and_absent_is_not() {
+        assert!(contains_positive_phrase("auto-merge happens here", "auto-merge"));
+        assert!(!contains_positive_phrase("read-only evidence only", "auto-merge"));
+    }
 }

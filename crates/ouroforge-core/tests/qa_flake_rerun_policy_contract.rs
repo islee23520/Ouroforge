@@ -18,6 +18,7 @@ fn policy_fixtures_validate_and_classify() {
         ("policy.stable-pass.fixture.json", "stable-pass"),
         ("policy.stable-fail.fixture.json", "stable-fail"),
         ("policy.flaky.fixture.json", "flaky"),
+        ("policy.flaky-permissive.fixture.json", "flaky"),
         ("policy.inconclusive.fixture.json", "inconclusive"),
         ("policy.exhausted.fixture.json", "exhausted"),
         ("policy.unsupported.fixture.json", "unsupported"),
