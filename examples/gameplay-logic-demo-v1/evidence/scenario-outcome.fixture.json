@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "gameplay-logic-demo-scenario-outcome-v1",
+  "demoId": "gameplay-logic-demo-v1",
+  "status": "passed",
+  "scenarioResults": [
+    {
+      "scenarioId": "collect-key",
+      "status": "passed",
+      "assertions": ["key-action-executed", "key-collected", "key-event"]
+    },
+    {
+      "scenarioId": "open-door-and-exit",
+      "status": "passed",
+      "assertions": ["door-open-flag", "door-state-open", "win-state", "victory-event"]
+    },
+    {
+      "scenarioId": "dash-and-patrol",
+      "status": "passed",
+      "assertions": ["dash-ability-used", "dash-cooldown-evidence", "player-moved", "patrol-state-transition", "patrol-hazard-event"]
+    }
+  ],
+  "generatedState": {
+    "trackedBecause": "fixture-scoped expected evidence for GL10.13.2",
+    "untrackedRoots": ["runs", "dashboard-data", "screenshots", "browser-profiles", "tmp-evidence"]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "gameplay-logic-demo-review-decision-v1",
+  "decisionId": "review-gl10-13-2-evidence-flow",
+  "status": "accepted",
+  "summary": "Fixture evidence demonstrates structured key, door, dash, patrol, hazard, and win-condition outcomes with Rust/local validation ownership.",
+  "guardrails": ["read-only evidence", "no browser authority", "no auto-apply"]
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "gameplay-logic-demo-rerun-comparison-v1",
+  "comparisonId": "rerun-gl10-13-2-evidence-flow",
+  "status": "stable",
+  "beforeScenarioOutcomeRef": "examples/gameplay-logic-demo-v1/evidence/scenario-outcome.fixture.json",
+  "afterScenarioOutcomeRef": "examples/gameplay-logic-demo-v1/evidence/scenario-outcome.fixture.json",
+  "summary": "Fixture rerun remains deterministic for key, door, dash, patrol, hazard, and win-condition outcomes."
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "behavior-evidence-bundle-v1",
+  "bundleId": "gameplay-logic-demo-v1-evidence-flow",
+  "status": "complete",
+  "behaviorDefinitionRefs": [
+    { "kind": "behavior-definition", "path": "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json" }
+  ],
+  "runtimeEventRefs": [
+    { "kind": "runtime-event-log", "path": "examples/gameplay-logic-demo-v1/evidence/runtime-events.fixture.json" }
+  ],
+  "scenarioOutcomeRefs": [
+    { "kind": "scenario-outcome", "path": "examples/gameplay-logic-demo-v1/evidence/scenario-outcome.fixture.json" }
+  ],
+  "draftRefs": [
+    { "kind": "behavior-draft", "path": "examples/behavior-draft-v1/valid/behavior-draft.valid.json" }
+  ],
+  "reviewDecisionRefs": [
+    { "kind": "behavior-review-decision", "path": "examples/gameplay-logic-demo-v1/evidence/review-decision.fixture.json" }
+  ],
+  "applyTransactionRefs": [
+    { "kind": "behavior-apply-transaction", "path": "examples/behavior-apply-v1/valid/behavior-apply.ready.json" }
+  ],
+  "rollbackMetadataRefs": [
+    { "kind": "behavior-rollback-metadata", "path": "examples/gameplay-logic-demo-v1/evidence/rollback-metadata.fixture.json" }
+  ],
+  "rerunComparisonRefs": [
+    { "kind": "behavior-rerun-comparison", "path": "examples/gameplay-logic-demo-v1/evidence/rerun-comparison.fixture.json" }
+  ],
+  "observedFailures": [],
+  "nextStepHypotheses": [
+    {
+      "id": "inspect-read-model-next",
+      "summary": "Use GL10.13.3 to inspect this fixture bundle in dashboard and Studio read models."
+    }
+  ],
+  "linkedEvidence": [
+    { "kind": "behavior-definition", "path": "examples/gameplay-logic-demo-v1/behaviors/gameplay-logic-demo.behavior.json" },
+    { "kind": "runtime-event-log", "path": "examples/gameplay-logic-demo-v1/evidence/runtime-events.fixture.json" },
+    { "kind": "scenario-outcome", "path": "examples/gameplay-logic-demo-v1/evidence/scenario-outcome.fixture.json" },
+    { "kind": "behavior-draft", "path": "examples/behavior-draft-v1/valid/behavior-draft.valid.json" },
+    { "kind": "behavior-review-decision", "path": "examples/gameplay-logic-demo-v1/evidence/review-decision.fixture.json" },
+    { "kind": "behavior-apply-transaction", "path": "examples/behavior-apply-v1/valid/behavior-apply.ready.json" },
+    { "kind": "behavior-rollback-metadata", "path": "examples/gameplay-logic-demo-v1/evidence/rollback-metadata.fixture.json" },
+    { "kind": "behavior-rerun-comparison", "path": "examples/gameplay-logic-demo-v1/evidence/rerun-comparison.fixture.json" }
+  ],
+  "blockedReasons": [],
+  "guardrails": [
+    "behavior evidence bundle is read-only lifecycle audit data",
+    "no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, or browser trusted write",
+    "Rust/local validation owns trusted behavior draft/apply and generated evidence contracts",
+    "generated behavior evidence remains untracked unless fixture-scoped"
+  ]
+}

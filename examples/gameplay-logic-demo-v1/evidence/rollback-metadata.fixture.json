@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "gameplay-logic-demo-rollback-metadata-v1",
+  "rollbackId": "rollback-gl10-13-2-evidence-flow",
+  "status": "not_required_fixture_only",
+  "summary": "No source mutation is applied by this fixture; rollback metadata records that generated evidence can be discarded and regenerated from tracked structured inputs."
+}

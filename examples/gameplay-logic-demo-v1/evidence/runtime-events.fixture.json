@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "gameplay-logic-demo-runtime-events-v1",
+  "demoId": "gameplay-logic-demo-v1",
+  "source": "fixture-scoped structured behavior runtime evidence",
+  "events": [
+    { "type": "keyCollected", "scenarioId": "collect-key", "behaviorId": "key-pickup", "actionId": "emit-key-collected" },
+    { "type": "doorOpened", "scenarioId": "open-door-and-exit", "behaviorId": "door-unlock", "actionId": "emit-door-opened" },
+    { "type": "patrolHazard", "scenarioId": "dash-and-patrol", "behaviorId": "enemy-patrol-hazard", "actionId": "emit-patrol-hazard" },
+    { "type": "victory", "scenarioId": "open-door-and-exit", "behaviorId": "exit-win-condition", "actionId": "emit-victory" }
+  ],
+  "boundary": "Structured data evidence only; no eval, dynamic import, plugin loader, command bridge, browser trusted write, auto-apply, or hosted authority."
+}
