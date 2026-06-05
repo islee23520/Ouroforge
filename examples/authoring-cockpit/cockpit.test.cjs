@@ -1185,6 +1185,63 @@ assert.match(studioExportInspectionDoc, /Issue: #731/);
 assert.match(studioExportInspectionDoc, /cannot run export, publish, deploy, sign, upload/);
 assert.match(studioExportInspectionDoc, /#1 and #23 remain open/);
 
+// Studio project overview (#758): read-only aggregation with diagnostics.
+const projectOverviewRun = {
+  ...run,
+  project_overview: {
+    project: { id: 'proj_demo', title: 'Demo <Project>', version: '0.1.0' },
+    counts: { scenes: 3, assets: 7, scenarios: 2, evidenceRuns: 4 },
+    exportStatus: 'pending',
+    pluginRegistryStatus: 'validated',
+    validationSummary: ['scene schema valid', 'asset license recorded'],
+  },
+};
+const projectOverviewHtml = cockpit.renderProjectOverviewSurface(projectOverviewRun);
+assert.match(projectOverviewHtml, /Project overview/);
+assert.match(projectOverviewHtml, /Demo &lt;Project&gt;/);
+assert.match(projectOverviewHtml, /proj_demo/);
+assert.match(projectOverviewHtml, /Scenes/);
+assert.match(projectOverviewHtml, /Evidence runs/);
+assert.match(projectOverviewHtml, /scene schema valid/);
+assert.match(projectOverviewHtml, /no trusted writes, mutation controls, command bridge/);
+assert.doesNotMatch(projectOverviewHtml, /<button|type="button"|data-action|<Project>/);
+const partialOverview = cockpit.renderProjectOverviewSurface({ project_overview: { project: { id: 'p2' }, counts: { scenes: 1 } } });
+assert.match(partialOverview, /Diagnostics/);
+assert.match(partialOverview, /Assets count is missing or invalid/);
+assert.match(cockpit.renderProjectOverviewSurface({}), /No project overview is exported/);
+assert.equal(cockpit.projectOverviewReadModel(projectOverviewRun).sections.find((section) => section.id === 'assets').count, 7);
+assert.ok(cockpit.studioSurfaceSummary(projectOverviewRun).some((surface) => surface.id === 'project-overview' && surface.present));
+const studioProjectOverviewDoc = fs.readFileSync('docs/studio-project-overview-v1.md', 'utf8');
+assert.match(studioProjectOverviewDoc, /Issue: #758/);
+assert.match(studioProjectOverviewDoc, /never mutates trusted files or runs commands/);
+assert.match(studioProjectOverviewDoc, /#1 and #23 remain open/);
+
+// #758: missing export / plugin registry state must yield actionable diagnostics,
+// not a silent `unknown`, and keep the diagnostics block visible.
+const overviewMissingSubStates = cockpit.renderProjectOverviewSurface({
+  project_overview: {
+    project: { id: 'proj_nosub', title: 'No Sub-state', version: '0.2.0' },
+    counts: { scenes: 1, assets: 1, scenarios: 1, evidenceRuns: 1 },
+  },
+});
+assert.match(overviewMissingSubStates, /Diagnostics/);
+assert.match(overviewMissingSubStates, /Export status is missing or not exported/);
+assert.match(overviewMissingSubStates, /Plugin registry status is missing or not exported/);
+const missingSubStateModel = cockpit.projectOverviewReadModel({
+  project_overview: {
+    project: { id: 'proj_nosub' },
+    counts: { scenes: 1, assets: 1, scenarios: 1, evidenceRuns: 1 },
+    exportStatus: 'error',
+    pluginRegistryStatus: 'invalid',
+  },
+});
+assert.ok(missingSubStateModel.diagnostics.some((reason) => /Export status is error/.test(reason)));
+assert.ok(missingSubStateModel.diagnostics.some((reason) => /Plugin registry status is invalid/.test(reason)));
+// A healthy export/plugin status must not raise a sub-state diagnostic.
+const healthySubStateModel = cockpit.projectOverviewReadModel(projectOverviewRun);
+assert.ok(!healthySubStateModel.diagnostics.some((reason) => /Export status is/.test(reason)));
+assert.ok(!healthySubStateModel.diagnostics.some((reason) => /Plugin registry status is/.test(reason)));
+
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);

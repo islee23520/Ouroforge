@@ -483,6 +483,7 @@ const OuroforgeCockpit = (() => {
       { id: 'source-apply-context', label: 'Source apply context', present: Boolean(run?.source_apply_worktree_context?.present || run?.sourceApplyWorktreeContext?.present), detail: `${run?.source_apply_worktree_context?.target_count ?? run?.sourceApplyWorktreeContext?.targetCount ?? 0} target row(s)` },
       { id: 'source-apply-review', label: 'Source apply review', present: Boolean(sourceApplyReviewReadModel(run).present), detail: `${sourceApplyReviewReadModel(run).gates.filter((gate) => gate.present).length}/${sourceApplyReviewReadModel(run).gates.length} review gate(s) present` },
       { id: 'export-inspection', label: 'Export inspection', present: Boolean(exportInspectionReadModel(run).present), detail: exportInspectionReadModel(run).present ? `${exportInspectionReadModel(run).target} · ${exportInspectionReadModel(run).assetCount} asset(s)` : 'no export evidence bundle exported' },
+      { id: 'project-overview', label: 'Project overview', present: Boolean(projectOverviewReadModel(run).present), detail: projectOverviewReadModel(run).present ? `${projectOverviewReadModel(run).projectId}` : 'no project overview exported' },
       { id: 'route-attempt-evidence', label: 'Route attempt evidence', present: Boolean(run?.route_attempts?.present || run?.routeAttempts?.present), detail: `${run?.route_attempts?.attempt_count ?? run?.routeAttempts?.attemptCount ?? 0} attempt row(s)` },
       { id: 'visual-comparison-evidence', label: 'Visual comparison evidence', present: Boolean(run?.visual_comparisons?.present || run?.visualComparisons?.present), detail: `${run?.visual_comparisons?.comparison_count ?? run?.visualComparisons?.comparisonCount ?? 0} comparison row(s)` },
       { id: 'evaluator-depth-inspection', label: 'Evaluator depth inspection', present: Boolean(evaluatorDepthReadModel(run).present), detail: `${Object.keys(evaluatorDepthReadModel(run).categories || {}).length} gate categor(ies)` },
@@ -1565,6 +1566,108 @@ const OuroforgeCockpit = (() => {
         <li class="surface-row"><strong>Publish/release</strong> <span class="status-idle">blocked</span><small> · ${escapeText(model.publishBlocked)}</small></li>
         <li class="surface-row"><strong>Evidence bundle</strong> <small>${escapeText(model.evidenceFile)} (run ${escapeText(model.runId)}, project ${escapeText(model.projectId)})</small></li>
       </ul>
+    </section>`;
+  }
+
+  // Read-only project overview aggregation (#758). Side-effect free: it reads
+  // exported JSON only and never mutates trusted files or runs commands.
+  function projectOverviewReadModel(run = {}) {
+    const model = run?.project_overview || run?.projectOverview || null;
+    if (!model || typeof model !== 'object') {
+      return {
+        present: false,
+        diagnostics: ['No project overview read model is attached to dashboard-data.json.'],
+        sections: [],
+        boundary: 'Read-only Studio project overview; no trusted writes or command execution.',
+      };
+    }
+    const project = model.project || {};
+    const counts = model.counts || {};
+    const num = (...keys) => {
+      for (const key of keys) {
+        const value = counts[key] ?? model[key];
+        if (typeof value === 'number') return value;
+      }
+      return null;
+    };
+    const sections = [
+      { id: 'scenes', label: 'Scenes', count: num('scenes', 'sceneCount', 'scene_count') },
+      { id: 'assets', label: 'Assets', count: num('assets', 'assetCount', 'asset_count') },
+      { id: 'scenarios', label: 'Scenarios', count: num('scenarios', 'scenarioCount', 'scenario_count') },
+      { id: 'evidence-runs', label: 'Evidence runs', count: num('evidenceRuns', 'evidence_runs', 'runCount', 'run_count') },
+    ];
+    const rawExportStatus = model.exportStatus ?? model.export_status;
+    const rawPluginStatus = model.pluginRegistryStatus ?? model.plugin_registry_status;
+    const exportStatus = typeof rawExportStatus === 'string' && rawExportStatus ? rawExportStatus : 'unknown';
+    const pluginStatus = typeof rawPluginStatus === 'string' && rawPluginStatus ? rawPluginStatus : 'unknown';
+    const validationSummary = Array.isArray(model.validationSummary || model.validation_summary)
+      ? (model.validationSummary || model.validation_summary)
+      : [];
+    const diagnostics = Array.isArray(model.diagnostics) ? [...model.diagnostics] : [];
+    for (const section of sections) {
+      if (section.count === null) {
+        diagnostics.push(`${section.label} count is missing or invalid`);
+      }
+    }
+    // A run can omit export or plugin registry sub-state; surface an actionable
+    // diagnostic for each unhealthy status instead of silently rendering `unknown`.
+    const UNHEALTHY_STATUSES = ['unknown', 'missing', 'invalid', 'error', 'failed', 'unavailable'];
+    const statusDiagnostic = (label, status, action) => {
+      const normalized = String(status).toLowerCase();
+      if (!UNHEALTHY_STATUSES.includes(normalized)) {
+        return null;
+      }
+      const cause = normalized === 'unknown' ? 'missing or not exported' : normalized;
+      return `${label} is ${cause}; ${action}`;
+    };
+    const exportDiagnostic = statusDiagnostic('Export status', exportStatus, 'export the build/export summary to populate it.');
+    if (exportDiagnostic) {
+      diagnostics.push(exportDiagnostic);
+    }
+    const pluginDiagnostic = statusDiagnostic('Plugin registry status', pluginStatus, 'run plugin discovery to populate the registry status.');
+    if (pluginDiagnostic) {
+      diagnostics.push(pluginDiagnostic);
+    }
+    return {
+      present: Boolean(model.present ?? (project.id || project.projectId || sections.some((section) => section.count !== null))),
+      projectId: project.id || project.projectId || project.project_id || 'unlinked',
+      title: project.title || 'untitled project',
+      version: project.version || 'unversioned',
+      sections,
+      exportStatus,
+      pluginStatus,
+      validationSummary,
+      diagnostics,
+      boundary:
+        model.boundary || 'Read-only Studio project overview; no trusted writes or command execution.',
+    };
+  }
+
+  function renderProjectOverviewSurface(run) {
+    const model = projectOverviewReadModel(run);
+    const hint =
+      '<p class="hint">Read-only Studio project overview aggregated from exported JSON only; no trusted writes, mutation controls, command bridge, or hidden execution.</p>';
+    if (!model.present) {
+      const diagnostics = model.diagnostics.map((reason) => `<li class="surface-row">${escapeText(reason)}</li>`).join('');
+      return `<section id="project-overview" class="panel"><h2>Project overview</h2><p class="empty">No project overview is exported for this run.</p><ul>${diagnostics}</ul>${hint}</section>`;
+    }
+    const sectionRows = model.sections
+      .map((section) => `<li class="surface-row"><strong>${escapeText(section.label)}</strong> ${surfaceState(section.count !== null, section.count === null ? 'missing' : `${section.count}`)}</li>`)
+      .join('');
+    const validationRows = model.validationSummary.length
+      ? `<ul>${model.validationSummary.slice(0, 12).map((item) => `<li class="surface-row">${escapeText(item)}</li>`).join('')}</ul>`
+      : '<p class="empty compact">No validation summary exported.</p>';
+    const diagnosticsBlock = model.diagnostics.length
+      ? `<h3>Diagnostics</h3><ul>${model.diagnostics.map((reason) => `<li class="surface-row">${escapeText(reason)}</li>`).join('')}</ul>`
+      : '';
+    return `<section id="project-overview" class="panel"><h2>Project overview</h2>
+      ${hint}
+      <p><strong>${escapeText(model.title)}</strong> · ${escapeText(model.projectId)} · v${escapeText(model.version)}</p>
+      <h3>Counts</h3><ul>${sectionRows}</ul>
+      <h3>Export status</h3><p>${surfaceState(model.exportStatus !== 'unknown', model.exportStatus)}</p>
+      <h3>Plugin registry status</h3><p>${surfaceState(model.pluginStatus !== 'unknown', model.pluginStatus)}</p>
+      <h3>Validation summary</h3>${validationRows}
+      ${diagnosticsBlock}
     </section>`;
   }
 
@@ -3630,7 +3733,7 @@ const OuroforgeCockpit = (() => {
   }
 
   function renderEvidencePane(run) {
-    return `${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -3719,7 +3822,7 @@ const OuroforgeCockpit = (() => {
     paint();
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioSurfaceSummary, validateEdit };
 })();
 
 if (typeof window !== 'undefined') {
