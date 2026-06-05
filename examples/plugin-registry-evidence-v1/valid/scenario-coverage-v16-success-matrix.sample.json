@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "plugin-registry-scenario-coverage-v16-success",
+  "projectId": "demo_project",
+  "runId": "run-plugin-registry-scenario-coverage-v16-success",
+  "ledgerRef": "runs/plugin-registry-scenario-coverage-v16-success/ledger.jsonl",
+  "generatedState": {
+    "root": "runs/plugin-registry-scenario-coverage-v16-success/plugin-evidence",
+    "fixtureScoped": true,
+    "trackedPolicy": "fixture-scoped scenario coverage sample evidence may be tracked; generated runtime outputs remain ignored"
+  },
+  "plugins": [
+    {
+      "pluginId": "v16-valid-dashboard-panel",
+      "manifestPath": "plugins/v16-valid-dashboard-panel/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:1010101010101010",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["dashboardPanel"],
+      "extensionPoints": ["dashboard.panels.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "dashboard-panel-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-success/plugin-evidence/v16-valid-dashboard-panel.validation.json"
+        }
+      ],
+      "dashboardPanels": [
+        {
+          "panelId": "v16-plugin-summary",
+          "title": "Plugin scenario coverage summary",
+          "dataSourceKey": "pluginRegistry.summary",
+          "templateRef": "pluginRegistrySummaryCard",
+          "layoutHint": "summary",
+          "displayHints": ["compact", "blocked-count"],
+          "boundary": "Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": []
+    },
+    {
+      "pluginId": "v16-valid-studio-inspector",
+      "manifestPath": "plugins/v16-valid-studio-inspector/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:2020202020202020",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["studioInspectorPanel"],
+      "extensionPoints": ["studio.inspector.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "studio-inspector-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-success/plugin-evidence/v16-valid-studio-inspector.validation.json"
+        }
+      ],
+      "blockedReasons": []
+    },
+    {
+      "pluginId": "v16-valid-scenario-template",
+      "manifestPath": "plugins/v16-valid-scenario-template/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:3030303030303030",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["scenarioTemplate"],
+      "extensionPoints": ["scenario.templates.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "scenario-template-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-success/plugin-evidence/v16-valid-scenario-template.validation.json"
+        }
+      ],
+      "scenarioTemplates": [
+        {
+          "templateId": "v16-collect-goal-smoke",
+          "description": "Declarative scenario metadata for collecting a goal through the trusted runner.",
+          "parameters": [
+            {
+              "name": "goalId",
+              "type": "string",
+              "description": "Local scenario goal identifier to collect.",
+              "required": true
+            },
+            {
+              "name": "difficulty",
+              "type": "enum",
+              "description": "Fixture difficulty label for expected pacing.",
+              "required": false,
+              "allowedValues": ["easy", "normal", "hard"]
+            }
+          ],
+          "supportedGameTypes": ["platformer", "prototype"],
+          "tags": ["qa-smoke", "plugin-v16"],
+          "expectedEvidenceType": "scenarioPack",
+          "validationHints": [
+            "Require existing trusted scenario runner to own execution.",
+            "Record input replay and runtime probe evidence refs after trusted QA execution."
+          ],
+          "boundary": "Declarative read-only scenario template metadata only; no executable scripts, no command hooks, no network references, no source mutation hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": []
+    },
+    {
+      "pluginId": "v16-valid-asset-metadata",
+      "manifestPath": "plugins/v16-valid-asset-metadata/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:4040404040404040",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "valid",
+      "compatibilityStatus": "compatible",
+      "declaredCapabilities": ["assetMetadataProvider"],
+      "extensionPoints": ["assets.metadata.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "asset-metadata-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-success/plugin-evidence/v16-valid-asset-metadata.validation.json"
+        }
+      ],
+      "blockedReasons": []
+    }
+  ],
+  "blockedReasons": [],
+  "boundary": "Declarative plugin registry evidence only; no executable plugin runtime, no command execution, no network install, read-only dashboard and Studio display, no trusted source mutation, no publish or deploy authority."
+}

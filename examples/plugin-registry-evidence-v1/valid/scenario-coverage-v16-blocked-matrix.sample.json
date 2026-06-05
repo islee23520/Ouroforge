@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "plugin-registry-scenario-coverage-v16-blocked",
+  "projectId": "demo_project",
+  "runId": "run-plugin-registry-scenario-coverage-v16-blocked",
+  "ledgerRef": "runs/plugin-registry-scenario-coverage-v16-blocked/ledger.jsonl",
+  "generatedState": {
+    "root": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence",
+    "fixtureScoped": true,
+    "trackedPolicy": "fixture-scoped blocked scenario coverage sample evidence may be tracked; generated runtime outputs remain ignored"
+  },
+  "plugins": [
+    {
+      "pluginId": "blocked-process-runner",
+      "manifestPath": "plugins/blocked-process-runner/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5151515151515151",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["studioInspectorPanel"],
+      "extensionPoints": ["studio.inspector.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "process-runner-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-process-runner.validation.json"
+        }
+      ],
+      "blockedReasons": ["requested local process execution outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-package-installer",
+      "manifestPath": "plugins/blocked-package-installer/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5252525252525252",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["assetMetadataProvider"],
+      "extensionPoints": ["assets.metadata.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "package-installer-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-package-installer.validation.json"
+        }
+      ],
+      "blockedReasons": ["requested package installation outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-secret-reader",
+      "manifestPath": "plugins/blocked-secret-reader/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5353535353535353",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["dashboardPanel"],
+      "extensionPoints": ["dashboard.panels.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "secret-reader-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-secret-reader.validation.json"
+        }
+      ],
+      "dashboardPanels": [
+        {
+          "panelId": "blocked-secret-summary",
+          "title": "Blocked secret access summary",
+          "dataSourceKey": "pluginRegistry.blockedReasons",
+          "templateRef": "pluginBlockedReasonList",
+          "layoutHint": "list",
+          "displayHints": ["blocked"],
+          "boundary": "Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": ["requested secret access outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-release-actor",
+      "manifestPath": "plugins/blocked-release-actor/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5454545454545454",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["scenarioTemplate"],
+      "extensionPoints": ["scenario.templates.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "release-actor-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-release-actor.validation.json"
+        }
+      ],
+      "scenarioTemplates": [
+        {
+          "templateId": "blocked-release-smoke",
+          "description": "Declarative metadata preserved only to show a blocked release actor request.",
+          "parameters": [
+            {
+              "name": "artifactId",
+              "type": "string",
+              "description": "Local artifact identifier used only for blocked evidence display.",
+              "required": true
+            }
+          ],
+          "supportedGameTypes": ["prototype"],
+          "tags": ["blocked", "release"],
+          "expectedEvidenceType": "scenarioResult",
+          "validationHints": ["Show blocked release actor request without invoking any actor."],
+          "boundary": "Declarative read-only scenario template metadata only; no executable scripts, no command hooks, no network references, no source mutation hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": ["requested publish deploy signing upload authority outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-binary-loader",
+      "manifestPath": "plugins/blocked-binary-loader/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5555555555555555",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["studioInspectorPanel"],
+      "extensionPoints": ["studio.inspector.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "binary-loader-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-binary-loader.validation.json"
+        }
+      ],
+      "blockedReasons": ["requested binary module loading outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-ci-workflow-writer",
+      "manifestPath": "plugins/blocked-ci-workflow-writer/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5656565656565656",
+      "manifestVersion": "0.1.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["assetMetadataProvider"],
+      "extensionPoints": ["assets.metadata.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "ci-workflow-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-ci-workflow-writer.validation.json"
+        }
+      ],
+      "blockedReasons": ["requested workflow configuration mutation outside the v1 declarative catalog"]
+    },
+    {
+      "pluginId": "blocked-incompatible-version",
+      "manifestPath": "plugins/blocked-incompatible-version/plugin.json",
+      "manifestHash": "fnv1a64-canonical-json-v1:5757575757575757",
+      "manifestVersion": "99.0.0",
+      "validationStatus": "blocked",
+      "compatibilityStatus": "incompatible",
+      "declaredCapabilities": ["dashboardPanel"],
+      "extensionPoints": ["dashboard.panels.readOnly"],
+      "evidenceRefs": [
+        {
+          "id": "incompatible-version-validation",
+          "kind": "plugin-manifest-validation",
+          "path": "runs/plugin-registry-scenario-coverage-v16-blocked/plugin-evidence/blocked-incompatible-version.validation.json"
+        }
+      ],
+      "dashboardPanels": [
+        {
+          "panelId": "blocked-version-summary",
+          "title": "Blocked version summary",
+          "dataSourceKey": "pluginRegistry.blockedReasons",
+          "templateRef": "pluginBlockedReasonList",
+          "layoutHint": "list",
+          "displayHints": ["blocked"],
+          "boundary": "Declarative allowlisted read-only dashboard panel descriptor; no JavaScript execution, no command hooks, no trusted writes."
+        }
+      ],
+      "blockedReasons": ["unsupported manifest version for v1 compatibility"]
+    }
+  ],
+  "blockedReasons": ["blocked plugin descriptors remain visible as evidence without execution"],
+  "boundary": "Declarative plugin registry evidence only; no executable plugin runtime, no command execution, no network install, read-only dashboard and Studio display, no trusted source mutation, no publish or deploy authority."
+}

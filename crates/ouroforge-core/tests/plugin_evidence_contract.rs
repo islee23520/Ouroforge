@@ -24,6 +24,18 @@ fn scenario_template_fixture() -> &'static str {
     )
 }
 
+fn scenario_coverage_v16_success_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/valid/scenario-coverage-v16-success-matrix.sample.json"
+    )
+}
+
+fn scenario_coverage_v16_blocked_fixture() -> &'static str {
+    include_str!(
+        "../../../examples/plugin-registry-evidence-v1/valid/scenario-coverage-v16-blocked-matrix.sample.json"
+    )
+}
+
 fn unsafe_scenario_template_fixture() -> &'static str {
     include_str!("../../../examples/plugin-registry-evidence-v1/invalid/unsafe-scenario-template-network.json")
 }
@@ -147,6 +159,187 @@ fn scenario_coverage_v16_defines_plugin_extension_regression_matrix() {
             non_goals.contains(forbidden_scope),
             "Scenario Coverage v16 non-goals must retain {forbidden_scope}"
         );
+    }
+}
+
+#[test]
+fn scenario_coverage_v16_success_fixture_covers_allowed_plugin_descriptors() {
+    let artifact =
+        PluginRegistryEvidenceArtifact::from_json_str(scenario_coverage_v16_success_fixture())
+            .expect("Scenario Coverage v16 success fixture validates");
+
+    assert_eq!(
+        artifact.registry_id,
+        "plugin-registry-scenario-coverage-v16-success"
+    );
+    assert_eq!(artifact.plugins.len(), 4);
+    assert!(artifact.generated_state.fixture_scoped);
+    assert!(artifact
+        .generated_state
+        .tracked_policy
+        .contains("generated runtime outputs remain ignored"));
+
+    let read_model = artifact.read_model();
+    assert_eq!(read_model.status, "valid");
+    assert_eq!(read_model.plugin_count, 4);
+    assert_eq!(read_model.blocked_count, 0);
+    for expected in [
+        "v16-valid-dashboard-panel:dashboardPanel",
+        "v16-valid-studio-inspector:studioInspectorPanel",
+        "v16-valid-scenario-template:scenarioTemplate",
+        "v16-valid-asset-metadata:assetMetadataProvider",
+    ] {
+        assert!(
+            read_model
+                .capability_summary
+                .iter()
+                .any(|item| item == expected),
+            "missing capability summary {expected}"
+        );
+    }
+    for expected in [
+        "v16-valid-dashboard-panel:dashboard.panels.readOnly",
+        "v16-valid-studio-inspector:studio.inspector.readOnly",
+        "v16-valid-scenario-template:scenario.templates.readOnly",
+        "v16-valid-asset-metadata:assets.metadata.readOnly",
+    ] {
+        assert!(
+            read_model
+                .extension_point_summary
+                .iter()
+                .any(|item| item == expected),
+            "missing extension point summary {expected}"
+        );
+    }
+    assert!(read_model.dashboard_panel_summary.iter().any(
+        |item| item == "v16-valid-dashboard-panel:v16-plugin-summary:pluginRegistrySummaryCard"
+    ));
+
+    let scenario_plugin = artifact
+        .plugins
+        .iter()
+        .find(|plugin| plugin.plugin_id == "v16-valid-scenario-template")
+        .expect("scenario template plugin exists");
+    let template = &scenario_plugin.scenario_templates[0];
+    assert_eq!(template.template_id, "v16-collect-goal-smoke");
+    assert_eq!(template.expected_evidence_type, "scenarioPack");
+    assert!(template.boundary.contains("no executable scripts"));
+    assert!(template.boundary.contains("no source mutation hooks"));
+}
+
+#[test]
+fn scenario_coverage_v16_blocked_fixture_keeps_unsafe_requests_visible_without_authority() {
+    let artifact =
+        PluginRegistryEvidenceArtifact::from_json_str(scenario_coverage_v16_blocked_fixture())
+            .expect("Scenario Coverage v16 blocked fixture validates as evidence");
+
+    assert_eq!(
+        artifact.registry_id,
+        "plugin-registry-scenario-coverage-v16-blocked"
+    );
+    assert_eq!(artifact.plugins.len(), 7);
+    assert!(artifact.generated_state.fixture_scoped);
+
+    let read_model = artifact.read_model();
+    assert_eq!(read_model.status, "blocked");
+    assert_eq!(read_model.plugin_count, 7);
+    assert_eq!(read_model.blocked_count, 7);
+    for expected in [
+        "blocked-process-runner:requested local process execution outside the v1 declarative catalog",
+        "blocked-package-installer:requested package installation outside the v1 declarative catalog",
+        "blocked-secret-reader:requested secret access outside the v1 declarative catalog",
+        "blocked-release-actor:requested publish deploy signing upload authority outside the v1 declarative catalog",
+        "blocked-binary-loader:requested binary module loading outside the v1 declarative catalog",
+        "blocked-ci-workflow-writer:requested workflow configuration mutation outside the v1 declarative catalog",
+        "blocked-incompatible-version:unsupported manifest version for v1 compatibility",
+    ] {
+        assert!(
+            read_model
+                .blocked_reasons
+                .iter()
+                .any(|reason| reason == expected),
+            "missing blocked reason {expected}"
+        );
+    }
+    assert!(read_model.boundary.contains("without executing plugins"));
+    assert!(read_model.boundary.contains("installing dependencies"));
+    assert!(read_model.boundary.contains("publishing"));
+    assert!(read_model.boundary.contains("deploying"));
+}
+
+#[test]
+fn scenario_coverage_v16_rejects_additional_unsafe_fixture_drift() {
+    let base: serde_json::Value = serde_json::from_str(scenario_coverage_v16_success_fixture())
+        .expect("Scenario Coverage v16 success fixture parses");
+    let cases = [
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["declaredCapabilities"] =
+                    serde_json::json!(["dependencyInstall"]);
+                value
+            },
+            "declaredCapabilities value `dependencyInstall` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["declaredCapabilities"] = serde_json::json!(["publishDeploy"]);
+                value
+            },
+            "declaredCapabilities value `publishDeploy` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["declaredCapabilities"] =
+                    serde_json::json!(["ciWorkflowMutation"]);
+                value
+            },
+            "declaredCapabilities value `ciWorkflowMutation` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["declaredCapabilities"] =
+                    serde_json::json!(["nativeExtension"]);
+                value
+            },
+            "declaredCapabilities value `nativeExtension` is not in the v1 allowlist",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["blockedReasons"] =
+                    serde_json::json!(["requested credential access"]);
+                value["plugins"][0]["validationStatus"] = serde_json::json!("blocked");
+                value["plugins"][0]["compatibilityStatus"] = serde_json::json!("incompatible");
+                value
+            },
+            "credential",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][1]["pluginId"] = value["plugins"][0]["pluginId"].clone();
+                value
+            },
+            "must be unique",
+        ),
+        (
+            {
+                let mut value = base.clone();
+                value["plugins"][0]["evidenceRefs"][0]["path"] =
+                    serde_json::json!("runs/plugin-registry/../escape.json");
+                value
+            },
+            "without traversal",
+        ),
+    ];
+
+    for (value, expected) in cases {
+        let error = parse_value(value).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
     }
 }
 
