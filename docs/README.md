@@ -168,3 +168,4 @@ should remain ignored/untracked.
 - [Runtime State Invariant Checker v1](runtime-invariant-checker-v1.md) — QA14.5.1 invariant schema, statuses, fixtures, and guardrails.
 
 - [GDD Prototype Task Graph v1](gdd-prototype-task-graph-v1.md) — ordered dependency-checked prototype task graph before review-gated apply.
+- [GDD Prototype Apply v1](gdd-prototype-apply-v1.md) — accepted-review, rollback, rerun, and generated-state audit contract for scoped prototype apply.

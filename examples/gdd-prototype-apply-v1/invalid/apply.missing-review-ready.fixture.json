@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "gdd-prototype-apply-v1",
+  "applyId": "demo-prototype-apply",
+  "status": "ready_for_trusted_apply",
+  "gddRef": "docs/gdd-to-playable-prototype-v1.md",
+  "bundleRef": "examples/gdd-prototype-draft-bundle-v1/bundle.valid.fixture.json",
+  "taskGraphRef": "examples/gdd-prototype-task-graph-v1/task-graph.valid.fixture.json",
+  "reviewDecision": {
+    "decisionId": "review-demo-accepted",
+    "status": "missing",
+    "decisionRef": "runs/gdd-prototype-apply-v1/review/accepted.json",
+    "authorId": "agent-author",
+    "reviewerId": "agent-reviewer"
+  },
+  "transactions": [
+    {
+      "transactionId": "tx-scaffold",
+      "kind": "project-scaffold",
+      "targetRef": "examples/gdd-prototype-apply-v1/trusted/project-manifest.json",
+      "observedBeforeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedAfterHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceNoteRefs": [
+        "docs/gdd-project-scaffold-plan-v1.md"
+      ],
+      "assetSourceRefs": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "scenarioRefs": [],
+      "behaviorRefs": [],
+      "validationRefs": [
+        "runs/gdd-prototype-apply-v1/validation/scaffold.json"
+      ],
+      "stale": false,
+      "blockedReasons": []
+    },
+    {
+      "transactionId": "tx-scene",
+      "kind": "scene-level",
+      "targetRef": "examples/gdd-prototype-apply-v1/trusted/scenes/collect-exit.scene.json",
+      "observedBeforeHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expectedAfterHash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "sourceNoteRefs": [
+        "docs/gdd-scene-level-plan-v1.md"
+      ],
+      "assetSourceRefs": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "scenarioRefs": [],
+      "behaviorRefs": [],
+      "validationRefs": [
+        "runs/gdd-prototype-apply-v1/validation/scene.json"
+      ],
+      "stale": false,
+      "blockedReasons": []
+    },
+    {
+      "transactionId": "tx-behavior",
+      "kind": "behavior",
+      "targetRef": "examples/gdd-prototype-apply-v1/trusted/behavior/collect-exit.behavior.json",
+      "observedBeforeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "expectedAfterHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "sourceNoteRefs": [
+        "docs/gdd-gameplay-behavior-plan-v1.md"
+      ],
+      "assetSourceRefs": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "scenarioRefs": [],
+      "behaviorRefs": [
+        "docs/gdd-gameplay-behavior-plan-v1.md"
+      ],
+      "validationRefs": [
+        "runs/gdd-prototype-apply-v1/validation/behavior.json"
+      ],
+      "stale": false,
+      "blockedReasons": []
+    },
+    {
+      "transactionId": "tx-scenario",
+      "kind": "scenario",
+      "targetRef": "examples/gdd-prototype-apply-v1/trusted/scenarios/collect-exit.scenario.json",
+      "observedBeforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "expectedAfterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sourceNoteRefs": [
+        "docs/gdd-scenario-acceptance-plan-v1.md"
+      ],
+      "assetSourceRefs": [
+        "docs/gdd-asset-placeholder-plan-v1.md"
+      ],
+      "scenarioRefs": [
+        "docs/gdd-scenario-acceptance-plan-v1.md"
+      ],
+      "behaviorRefs": [
+        "docs/gdd-gameplay-behavior-plan-v1.md"
+      ],
+      "validationRefs": [
+        "runs/gdd-prototype-apply-v1/validation/scenario.json"
+      ],
+      "stale": false,
+      "blockedReasons": []
+    }
+  ],
+  "rollbackMetadata": {
+    "rollbackRef": "runs/gdd-prototype-apply-v1/rollback/rollback.json",
+    "preApplyCommit": "a3d7c4915d188e97b795ca1befc23325b3feafaf",
+    "targets": [
+      {
+        "transactionId": "tx-scaffold",
+        "targetRef": "examples/gdd-prototype-apply-v1/trusted/project-manifest.json",
+        "beforeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "afterHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "restoreStrategy": "copy before-hash rollback snapshot before any reapply"
+      },
+      {
+        "transactionId": "tx-scene",
+        "targetRef": "examples/gdd-prototype-apply-v1/trusted/scenes/collect-exit.scene.json",
+        "beforeHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "afterHash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "restoreStrategy": "copy before-hash rollback snapshot before any reapply"
+      },
+      {
+        "transactionId": "tx-behavior",
+        "targetRef": "examples/gdd-prototype-apply-v1/trusted/behavior/collect-exit.behavior.json",
+        "beforeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "afterHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "restoreStrategy": "copy before-hash rollback snapshot before any reapply"
+      },
+      {
+        "transactionId": "tx-scenario",
+        "targetRef": "examples/gdd-prototype-apply-v1/trusted/scenarios/collect-exit.scenario.json",
+        "beforeHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "afterHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "restoreStrategy": "copy before-hash rollback snapshot before any reapply"
+      }
+    ]
+  },
+  "rerunCommandContext": {
+    "contextRef": "runs/gdd-prototype-apply-v1/rerun/context.json",
+    "commands": [
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "ouroforge-core",
+          "--test",
+          "gdd_prototype_apply_contract",
+          "--",
+          "--nocapture"
+        ],
+        "evidenceRef": "runs/gdd-prototype-apply-v1/rerun/focused.json"
+      },
+      {
+        "argv": [
+          "node",
+          "examples/evidence-dashboard/dashboard.test.cjs"
+        ],
+        "evidenceRef": "runs/gdd-prototype-apply-v1/rerun/dashboard.json"
+      }
+    ]
+  },
+  "generatedStateAuditRefs": [
+    "runs/gdd-prototype-apply-v1/audit/generated-state.json"
+  ],
+  "autoApply": false,
+  "trustedPersistenceOwner": "rust-local-validation",
+  "blockedReasons": [],
+  "boundary": "Accepted review, rollback metadata, rerun command context, and Rust/local validation are required before trusted prototype writes; no auto-apply; no self-approval; no arbitrary source mutation; no arbitrary script execution; no browser trusted writes; no autonomous unrestricted game creation; GDD-derived output remains untrusted until Rust/local validation and review-gated apply; #1 remains open; #23 remains open."
+}
