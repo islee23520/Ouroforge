@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "demo-hud-model-v1",
+  "id": "collect-and-exit-hud",
+  "description": "Declarative HUD/feedback model for the Collect-and-Exit demo. Each row binds an objective flag to a read-only HUD display; win/lose game-state is derived from the same flags. The model reuses the existing scene HUD entities and runtime audio/visual feedback paths; it adds no new assets and no engine surface.",
+  "rows": [
+    {
+      "id": "goal",
+      "entityId": "hud_goal",
+      "kind": "goal",
+      "label": "Goal",
+      "bindFlag": "exit_reached",
+      "states": { "false": "Collect key and exit", "true": "Exit reached" }
+    },
+    {
+      "id": "key",
+      "entityId": "hud_key",
+      "kind": "key_count",
+      "label": "Key",
+      "bindFlag": "key_collected",
+      "states": { "false": "0/1", "true": "1/1" }
+    },
+    {
+      "id": "health",
+      "entityId": "hud_health",
+      "kind": "health",
+      "label": "HP",
+      "bindFlag": "player_alive",
+      "states": { "true": "3/3", "false": "0/3" }
+    }
+  ],
+  "gameState": {
+    "lost": "player_alive == false",
+    "won": "exit_reached == true",
+    "default": "in-progress"
+  },
+  "feedback": [
+    {
+      "on": "key_collected",
+      "kind": "visual",
+      "effect": "hideEntity:key",
+      "note": "The key entity is hidden on pickup via the existing runtime hideEntity trigger action."
+    },
+    {
+      "on": "scene_loaded",
+      "kind": "audio",
+      "asset": "collect_sound",
+      "note": "Reuses the existing collect.ogg audio intent (intent-only, muted browser playback); no new audio asset is added."
+    }
+  ],
+  "boundary": "Declarative read-only HUD/feedback model only. Reuses existing scene HUD entities and runtime feedback paths; adds no new assets, no engine surface, no trusted browser write, no production/native/store export, and no full Godot parity or replacement claim."
+}
