@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "ouroforge.behavior-apply-transaction.v1",
+  "transactionId": "behavior-apply-unsafe-output",
+  "draftId": "draft-jump-boost",
+  "reviewDecision": {
+    "reviewDecisionId": "review-behavior-jump-boost-accepted",
+    "status": "accepted",
+    "reviewerId": "human-reviewer",
+    "draftAuthorId": "agent-author",
+    "decisionRef": "runs/behavior-applies/behavior-apply-unsafe-output/review-decision.json"
+  },
+  "target": {
+    "projectId": "demo_project",
+    "scenePath": "scenes/main.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:abcdef1234567890"
+  },
+  "targetHashes": {
+    "expectedBeforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "observedBeforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "afterHash": "fnv1a64-canonical-json-v1:fedcba0987654321"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "behavior-runtime-execution-demo",
+    "sceneId": "scene-runtime-demo",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed",
+      "reviewDecisionId": "review-gl10-7-2"
+    },
+    "behaviors": [
+      {
+        "id": "player-jump",
+        "entityId": "player",
+        "triggers": [
+          {
+            "id": "jump-input",
+            "kind": "onInputAction",
+            "event": "jump"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "grounded",
+            "kind": "flagEquals",
+            "field": "grounded",
+            "value": "true"
+          }
+        ],
+        "actions": [
+          {
+            "id": "mark-jumped",
+            "kind": "setFlag",
+            "effectKind": "flag",
+            "flag": "jumped"
+          },
+          {
+            "id": "jump-motion",
+            "kind": "moveEntity",
+            "effectKind": "movement",
+            "targetEntityId": "player",
+            "dx": 0,
+            "dy": -2
+          },
+          {
+            "id": "jump-audio",
+            "kind": "startAudioIntent",
+            "effectKind": "audioIntent",
+            "value": "jump"
+          }
+        ],
+        "stateMachine": {
+          "initialState": "idle",
+          "states": [
+            {
+              "id": "idle",
+              "transitions": [
+                {
+                  "id": "begin-jump",
+                  "to": "airborne",
+                  "onEvent": "jumped"
+                }
+              ]
+            },
+            {
+              "id": "airborne",
+              "transitions": [
+                {
+                  "id": "land",
+                  "to": "idle",
+                  "onEvent": "landed"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "goal-finish",
+        "entityId": "goal",
+        "triggers": [
+          {
+            "id": "goal-event",
+            "kind": "onEvent",
+            "event": "goalReached"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "has-key",
+            "kind": "hasItem",
+            "value": "key"
+          }
+        ],
+        "actions": [
+          {
+            "id": "win",
+            "kind": "markWinState",
+            "effectKind": "terminalState"
+          },
+          {
+            "id": "victory-event",
+            "kind": "emitEvent",
+            "effectKind": "event",
+            "event": "victory"
+          }
+        ]
+      }
+    ]
+  },
+  "transactionOutputRef": "../runs/behavior-applies/unsafe.transaction.json",
+  "rollbackMetadata": {
+    "beforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "rollbackRef": "runs/behavior-applies/behavior-apply-unsafe-output/rollback.json",
+    "strategy": "restore trusted behavior target from beforeHash after manual review"
+  },
+  "rerunCommand": {
+    "command": "cargo run -p ouroforge-cli -- behavior apply transaction validate transaction.json",
+    "argv": [
+      "ouroforge",
+      "behavior",
+      "apply",
+      "transaction",
+      "validate",
+      "transaction.json"
+    ],
+    "allowlistPolicyId": "behavior-apply-local-rust-validation-v1"
+  },
+  "evidenceRefs": [
+    {
+      "id": "scenario-jump-boost",
+      "kind": "scenario-result",
+      "path": "runs/behavior-applies/behavior-apply-unsafe-output/evidence/scenario-jump-boost.json",
+      "summary": "Scenario evidence reviewed before trusted behavior apply."
+    }
+  ],
+  "status": "readyForTrustedApply",
+  "blockedReasons": [],
+  "trustedBoundary": "Accepted review and rollback metadata are required before trusted Rust/local behavior apply; no arbitrary script execution, no auto-apply, no self-approval, no browser trusted writes, no command bridge, no eval, no dynamic import, no plugin loader, and no local server bridge."
+}

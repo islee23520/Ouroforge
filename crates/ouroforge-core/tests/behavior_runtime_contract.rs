@@ -1,5 +1,6 @@
 use ouroforge_core::behavior_runtime::{
-    BehaviorArtifact, BehaviorDraftArtifact, BehaviorRuntimeStatus,
+    BehaviorApplyTransactionArtifact, BehaviorArtifact, BehaviorDraftArtifact,
+    BehaviorRuntimeStatus,
 };
 
 fn valid_fixture() -> &'static str {
@@ -660,6 +661,183 @@ fn behavior_draft_fixture_files_cover_valid_invalid_stale_missing_and_blocked() 
         ("malformed-operation", "action id must not be empty"),
     ] {
         let error = parse_behavior_draft_str(behavior_draft_fixture_str(name)).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
+}
+
+fn behavior_apply_fixture_str(name: &str) -> &'static str {
+    match name {
+        "ready" => {
+            include_str!("../../../examples/behavior-apply-v1/valid/behavior-apply.ready.json")
+        }
+        "stale" => {
+            include_str!("../../../examples/behavior-apply-v1/valid/behavior-apply.stale.json")
+        }
+        "unsafe-output" => include_str!(
+            "../../../examples/behavior-apply-v1/invalid/behavior-apply.unsafe-output.json"
+        ),
+        "output-collision" => include_str!(
+            "../../../examples/behavior-apply-v1/invalid/behavior-apply.output-collision.json"
+        ),
+        "unsupported-behavior" => include_str!(
+            "../../../examples/behavior-apply-v1/invalid/behavior-apply.unsupported-behavior.json"
+        ),
+        _ => panic!("unknown behavior apply fixture {name}"),
+    }
+}
+
+fn parse_behavior_apply_str(
+    input: &str,
+) -> Result<BehaviorApplyTransactionArtifact, anyhow::Error> {
+    BehaviorApplyTransactionArtifact::from_json_str(input)
+}
+
+fn behavior_apply_fixture_value() -> serde_json::Value {
+    serde_json::from_str(behavior_apply_fixture_str("ready")).expect("behavior apply fixture json")
+}
+
+fn parse_behavior_apply(
+    value: serde_json::Value,
+) -> Result<BehaviorApplyTransactionArtifact, anyhow::Error> {
+    BehaviorApplyTransactionArtifact::from_json_str(
+        &serde_json::to_string_pretty(&value).expect("apply fixture serializes"),
+    )
+}
+
+#[test]
+fn behavior_apply_transaction_accepts_ready_and_stale_fixture_contracts() {
+    use ouroforge_core::behavior_runtime::BehaviorApplyTransactionStatus;
+
+    let ready = parse_behavior_apply_str(behavior_apply_fixture_str("ready"))
+        .expect("ready behavior apply transaction validates");
+    assert_eq!(ready.transaction_id, "behavior-apply-jump-boost");
+    assert_eq!(ready.draft_id, "draft-jump-boost");
+    assert_eq!(
+        ready.review_decision.review_decision_id,
+        "review-behavior-jump-boost-accepted"
+    );
+    assert_eq!(
+        ready.status,
+        BehaviorApplyTransactionStatus::ReadyForTrustedApply
+    );
+    assert!(ready
+        .transaction_output_ref
+        .starts_with("runs/behavior-applies/"));
+    assert_eq!(
+        ready.target_hashes.expected_before_hash,
+        ready.target.scene_hash
+    );
+    assert_eq!(
+        ready.rollback_metadata.before_hash,
+        ready.target_hashes.observed_before_hash
+    );
+    assert!(ready
+        .trusted_boundary
+        .to_ascii_lowercase()
+        .contains("accepted review"));
+    assert!(ready
+        .trusted_boundary
+        .to_ascii_lowercase()
+        .contains("rollback"));
+    assert!(ready
+        .trusted_boundary
+        .to_ascii_lowercase()
+        .contains("no arbitrary"));
+
+    let stale = parse_behavior_apply_str(behavior_apply_fixture_str("stale"))
+        .expect("stale behavior apply transaction validates visibly");
+    assert_eq!(stale.status, BehaviorApplyTransactionStatus::Stale);
+    assert!(stale
+        .blocked_reasons
+        .join(" ")
+        .contains("stale target hash"));
+}
+
+#[test]
+fn behavior_apply_transaction_rejects_unsafe_outputs_and_unsupported_behavior() {
+    for (name, expected) in [
+        (
+            "unsafe-output",
+            "transactionOutputRef must stay inside the local project tree",
+        ),
+        ("output-collision", "not a scene source path"),
+        (
+            "unsupported-behavior",
+            "unsupported behavior must remain blocked before apply",
+        ),
+    ] {
+        let error = parse_behavior_apply_str(behavior_apply_fixture_str(name)).expect_err(expected);
+        assert!(format!("{error:?}").contains(expected), "{error:?}");
+    }
+}
+
+#[test]
+fn behavior_apply_transaction_rejects_missing_review_blocker_and_guardrail_drift() {
+    let cases = [
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["reviewDecision"]["reviewDecisionId"] = serde_json::json!("");
+                value
+            },
+            "reviewDecisionId must not be empty",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["transactionOutputRef"] = serde_json::json!("tmp/behavior-apply.json");
+                value
+            },
+            "transactionOutputRef must be under runs/ or .omx/",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["status"] = serde_json::json!("blocked");
+                value["blockedReasons"] = serde_json::json!([]);
+                value
+            },
+            "blocked status requires blockedReasons",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["trustedBoundary"] = serde_json::json!("accepted review only");
+                value
+            },
+            "trustedBoundary must state `rollback`",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["reviewDecision"]["reviewerId"] = serde_json::json!("agent-author");
+                value
+            },
+            "forbids self-approval",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["targetHashes"]["observedBeforeHash"] =
+                    serde_json::json!("fnv1a64-canonical-json-v1:1111222233334444");
+                value["rollbackMetadata"]["beforeHash"] =
+                    serde_json::json!("fnv1a64-canonical-json-v1:1111222233334444");
+                value
+            },
+            "requires fresh target hashes",
+        ),
+        (
+            {
+                let mut value = behavior_apply_fixture_value();
+                value["rerunCommand"]["command"] = serde_json::json!("bash -c eval");
+                value
+            },
+            "must stay on the local allowlist",
+        ),
+    ];
+
+    for (value, expected) in cases {
+        let error = parse_behavior_apply(value).expect_err(expected);
         assert!(format!("{error:?}").contains(expected), "{error:?}");
     }
 }

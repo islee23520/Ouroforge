@@ -8,6 +8,9 @@ pub const BEHAVIOR_ARTIFACT_SCHEMA_VERSION: &str = "ouroforge.behavior-artifact.
 
 pub const BEHAVIOR_DRAFT_SCHEMA_VERSION: &str = "ouroforge.behavior-draft.v1";
 
+pub const BEHAVIOR_APPLY_TRANSACTION_SCHEMA_VERSION: &str =
+    "ouroforge.behavior-apply-transaction.v1";
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BehaviorDraftArtifact {
@@ -75,6 +78,99 @@ pub struct BehaviorDraftAuthor {
 pub enum BehaviorDraftValidationStatus {
     Drafted,
     Valid,
+    Blocked,
+    Stale,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyTransactionArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "transactionId")]
+    pub transaction_id: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    #[serde(rename = "reviewDecision")]
+    pub review_decision: BehaviorApplyReviewDecision,
+    pub target: BehaviorDraftTarget,
+    #[serde(rename = "targetHashes")]
+    pub target_hashes: BehaviorApplyTargetHashes,
+    #[serde(rename = "proposedBehavior")]
+    pub proposed_behavior: BehaviorArtifact,
+    #[serde(rename = "transactionOutputRef")]
+    pub transaction_output_ref: String,
+    #[serde(rename = "rollbackMetadata")]
+    pub rollback_metadata: BehaviorApplyRollbackMetadata,
+    #[serde(rename = "rerunCommand")]
+    pub rerun_command: BehaviorApplyRerunCommand,
+    #[serde(rename = "evidenceRefs", default)]
+    pub evidence_refs: Vec<BehaviorDraftEvidenceRef>,
+    pub status: BehaviorApplyTransactionStatus,
+    #[serde(rename = "blockedReasons", default)]
+    pub blocked_reasons: Vec<String>,
+    #[serde(rename = "trustedBoundary")]
+    pub trusted_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyReviewDecision {
+    #[serde(rename = "reviewDecisionId")]
+    pub review_decision_id: String,
+    pub status: BehaviorApplyReviewDecisionStatus,
+    #[serde(rename = "reviewerId")]
+    pub reviewer_id: String,
+    #[serde(rename = "draftAuthorId")]
+    pub draft_author_id: String,
+    #[serde(rename = "decisionRef")]
+    pub decision_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorApplyReviewDecisionStatus {
+    Accepted,
+    Rejected,
+    Missing,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyTargetHashes {
+    #[serde(rename = "expectedBeforeHash")]
+    pub expected_before_hash: String,
+    #[serde(rename = "observedBeforeHash")]
+    pub observed_before_hash: String,
+    #[serde(rename = "afterHash")]
+    pub after_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyRollbackMetadata {
+    #[serde(rename = "beforeHash")]
+    pub before_hash: String,
+    #[serde(rename = "rollbackRef")]
+    pub rollback_ref: String,
+    pub strategy: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorApplyRerunCommand {
+    pub command: String,
+    pub argv: Vec<String>,
+    #[serde(rename = "allowlistPolicyId")]
+    pub allowlist_policy_id: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorApplyTransactionStatus {
+    ReadyForTrustedApply,
+    MissingReview,
+    Rejected,
     Blocked,
     Stale,
 }
@@ -788,6 +884,262 @@ impl BehaviorDraftAuthor {
         }
         if let Some(actor) = &self.actor {
             require_local_id("behavior draft author.actor", actor)?;
+        }
+        Ok(())
+    }
+}
+
+impl BehaviorApplyTransactionArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let artifact: Self = serde_json::from_str(input)
+            .context("failed to parse Behavior Apply Transaction Artifact JSON")?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != BEHAVIOR_APPLY_TRANSACTION_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "behavior apply transaction schemaVersion must be {BEHAVIOR_APPLY_TRANSACTION_SCHEMA_VERSION}"
+            ));
+        }
+        require_local_id(
+            "behavior apply transaction transactionId",
+            &self.transaction_id,
+        )?;
+        require_local_id("behavior apply transaction draftId", &self.draft_id)?;
+        self.review_decision.validate()?;
+        self.target.validate()?;
+        self.target_hashes.validate(&self.target.scene_hash)?;
+        self.proposed_behavior
+            .validate()
+            .context("behavior apply transaction proposedBehavior is invalid")?;
+        if !self
+            .proposed_behavior
+            .runtime_state()
+            .diagnostics
+            .is_empty()
+        {
+            return Err(anyhow!(
+                "behavior apply transaction unsupported behavior must remain blocked before apply"
+            ));
+        }
+        require_behavior_transaction_output_ref(
+            "behavior apply transaction transactionOutputRef",
+            &self.transaction_output_ref,
+            &self.target.scene_path,
+        )?;
+        self.rollback_metadata.validate(&self.target_hashes)?;
+        self.rerun_command.validate()?;
+        require_unique_ids(
+            "behavior apply transaction evidenceRefs.id",
+            self.evidence_refs.iter().map(|evidence| &evidence.id),
+        )?;
+        for evidence in &self.evidence_refs {
+            evidence.validate()?;
+        }
+        for reason in &self.blocked_reasons {
+            require_local_text("behavior apply transaction blockedReasons", reason)?;
+        }
+        require_local_text(
+            "behavior apply transaction trustedBoundary",
+            &self.trusted_boundary,
+        )?;
+        let trusted_boundary = self.trusted_boundary.to_ascii_lowercase();
+        for required in [
+            "accepted review",
+            "rollback",
+            "no arbitrary",
+            "no auto-apply",
+            "no self-approval",
+        ] {
+            if !trusted_boundary.contains(required) {
+                return Err(anyhow!(
+                    "behavior apply transaction trustedBoundary must state `{required}`"
+                ));
+            }
+        }
+
+        match self.status {
+            BehaviorApplyTransactionStatus::ReadyForTrustedApply => {
+                if !self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior apply transaction ready_for_trusted_apply status must not include blockedReasons"
+                    ));
+                }
+                if self.review_decision.status != BehaviorApplyReviewDecisionStatus::Accepted {
+                    return Err(anyhow!(
+                        "behavior apply transaction ready_for_trusted_apply requires accepted review"
+                    ));
+                }
+                if self.review_decision.reviewer_id == self.review_decision.draft_author_id {
+                    return Err(anyhow!(
+                        "behavior apply transaction ready_for_trusted_apply forbids self-approval"
+                    ));
+                }
+                if self.target_hashes.expected_before_hash
+                    != self.target_hashes.observed_before_hash
+                {
+                    return Err(anyhow!(
+                        "behavior apply transaction ready_for_trusted_apply requires fresh target hashes"
+                    ));
+                }
+            }
+            BehaviorApplyTransactionStatus::MissingReview => {
+                if self.review_decision.status != BehaviorApplyReviewDecisionStatus::Missing {
+                    return Err(anyhow!(
+                        "behavior apply transaction missing_review status requires missing review decision"
+                    ));
+                }
+                require_blocked_reason(
+                    "behavior apply transaction missing_review status",
+                    &self.blocked_reasons,
+                    "review",
+                )?;
+            }
+            BehaviorApplyTransactionStatus::Rejected => {
+                if self.review_decision.status != BehaviorApplyReviewDecisionStatus::Rejected {
+                    return Err(anyhow!(
+                        "behavior apply transaction rejected status requires rejected review decision"
+                    ));
+                }
+                require_blocked_reason(
+                    "behavior apply transaction rejected status",
+                    &self.blocked_reasons,
+                    "reject",
+                )?;
+            }
+            BehaviorApplyTransactionStatus::Blocked => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior apply transaction blocked status requires blockedReasons"
+                    ));
+                }
+            }
+            BehaviorApplyTransactionStatus::Stale => {
+                if self.blocked_reasons.is_empty() {
+                    return Err(anyhow!(
+                        "behavior apply transaction stale status requires blockedReasons"
+                    ));
+                }
+                if !blocked_reasons_contain(&self.blocked_reasons, "stale")
+                    && !blocked_reasons_contain(&self.blocked_reasons, "hash")
+                {
+                    return Err(anyhow!(
+                        "behavior apply transaction stale status blockedReasons must mention stale target or hash drift"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl BehaviorApplyReviewDecision {
+    fn validate(&self) -> Result<()> {
+        require_local_id(
+            "behavior apply transaction reviewDecision.reviewDecisionId",
+            &self.review_decision_id,
+        )?;
+        require_local_id(
+            "behavior apply transaction reviewDecision.reviewerId",
+            &self.reviewer_id,
+        )?;
+        require_local_id(
+            "behavior apply transaction reviewDecision.draftAuthorId",
+            &self.draft_author_id,
+        )?;
+        require_relative_json_path(
+            "behavior apply transaction reviewDecision.decisionRef",
+            &self.decision_ref,
+            ".json",
+        )
+    }
+}
+
+impl BehaviorApplyTargetHashes {
+    fn validate(&self, draft_target_hash: &str) -> Result<()> {
+        require_hash_text(
+            "behavior apply transaction targetHashes.expectedBeforeHash",
+            &self.expected_before_hash,
+        )?;
+        require_hash_text(
+            "behavior apply transaction targetHashes.observedBeforeHash",
+            &self.observed_before_hash,
+        )?;
+        require_hash_text(
+            "behavior apply transaction targetHashes.afterHash",
+            &self.after_hash,
+        )?;
+        if self.expected_before_hash != draft_target_hash {
+            return Err(anyhow!(
+                "behavior apply transaction targetHashes.expectedBeforeHash must match draft target.sceneHash"
+            ));
+        }
+        if self.after_hash == self.observed_before_hash {
+            return Err(anyhow!(
+                "behavior apply transaction targetHashes.afterHash must differ from observedBeforeHash"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl BehaviorApplyRollbackMetadata {
+    fn validate(&self, target_hashes: &BehaviorApplyTargetHashes) -> Result<()> {
+        require_hash_text(
+            "behavior apply transaction rollbackMetadata.beforeHash",
+            &self.before_hash,
+        )?;
+        if self.before_hash != target_hashes.observed_before_hash {
+            return Err(anyhow!(
+                "behavior apply transaction rollbackMetadata.beforeHash must match observedBeforeHash"
+            ));
+        }
+        require_relative_json_path(
+            "behavior apply transaction rollbackMetadata.rollbackRef",
+            &self.rollback_ref,
+            ".json",
+        )?;
+        require_local_text(
+            "behavior apply transaction rollbackMetadata.strategy",
+            &self.strategy,
+        )?;
+        let strategy = self.strategy.to_ascii_lowercase();
+        if !strategy.contains("beforehash") && !strategy.contains("before hash") {
+            return Err(anyhow!(
+                "behavior apply transaction rollbackMetadata.strategy must reference beforeHash rollback"
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl BehaviorApplyRerunCommand {
+    fn validate(&self) -> Result<()> {
+        require_local_text(
+            "behavior apply transaction rerunCommand.command",
+            &self.command,
+        )?;
+        require_local_id(
+            "behavior apply transaction rerunCommand.allowlistPolicyId",
+            &self.allowlist_policy_id,
+        )?;
+        if self.argv.is_empty() {
+            return Err(anyhow!(
+                "behavior apply transaction rerunCommand.argv must not be empty"
+            ));
+        }
+        for arg in &self.argv {
+            require_local_text("behavior apply transaction rerunCommand.argv", arg)?;
+        }
+        let command = self.command.to_ascii_lowercase();
+        for forbidden in ["eval", "dynamic import", "npm install", "curl ", "bash -c"] {
+            if command.contains(forbidden) {
+                return Err(anyhow!(
+                    "behavior apply transaction rerunCommand.command must stay on the local allowlist"
+                ));
+            }
         }
         Ok(())
     }
@@ -1823,6 +2175,16 @@ fn unsupported_diagnostic(
     }
 }
 
+fn require_blocked_reason(field: &str, reasons: &[String], needle: &str) -> Result<()> {
+    if reasons.is_empty() {
+        return Err(anyhow!("{field} requires blockedReasons"));
+    }
+    if !blocked_reasons_contain(reasons, needle) {
+        return Err(anyhow!("{field} blockedReasons must mention {needle}"));
+    }
+    Ok(())
+}
+
 fn blocked_reasons_contain(reasons: &[String], needle: &str) -> bool {
     reasons
         .iter()
@@ -1841,6 +2203,40 @@ fn require_hash_text(field: &str, value: &str) -> Result<()> {
             .all(|ch| ch.is_ascii_hexdigit() || ch == '-' || ch == '_')
     {
         return Err(anyhow!("{field}.digest must be a bounded local digest"));
+    }
+    Ok(())
+}
+
+fn require_behavior_transaction_output_ref(
+    field: &str,
+    value: &str,
+    target_scene_path: &str,
+) -> Result<()> {
+    require_relative_json_path(field, value, ".json")?;
+    if !value.starts_with("runs/") && !value.starts_with(".omx/") {
+        return Err(anyhow!("{field} must be under runs/ or .omx/"));
+    }
+    if value == target_scene_path {
+        return Err(anyhow!("{field} must not collide with target scenePath"));
+    }
+    if value.ends_with(".scene.json") {
+        return Err(anyhow!(
+            "{field} must be generated transaction evidence, not a scene source path"
+        ));
+    }
+    if value.contains("/seeds/")
+        || value.contains("/examples/")
+        || value.ends_with("Cargo.toml")
+        || value.ends_with("Cargo.lock")
+    {
+        return Err(anyhow!(
+            "{field} must not target source fixtures, dependency manifests, or trusted project files"
+        ));
+    }
+    if value.contains("/../") || value.starts_with("../") {
+        return Err(anyhow!(
+            "{field} must stay inside generated transaction output roots"
+        ));
     }
     Ok(())
 }

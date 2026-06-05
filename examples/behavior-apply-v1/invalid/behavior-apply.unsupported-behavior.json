@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "ouroforge.behavior-apply-transaction.v1",
+  "transactionId": "behavior-apply-unsupported-behavior",
+  "draftId": "draft-jump-boost",
+  "reviewDecision": {
+    "reviewDecisionId": "review-behavior-jump-boost-accepted",
+    "status": "accepted",
+    "reviewerId": "human-reviewer",
+    "draftAuthorId": "agent-author",
+    "decisionRef": "runs/behavior-applies/behavior-apply-unsupported-behavior/review-decision.json"
+  },
+  "target": {
+    "projectId": "demo_project",
+    "scenePath": "scenes/main.scene.json",
+    "sceneHash": "fnv1a64-canonical-json-v1:abcdef1234567890"
+  },
+  "targetHashes": {
+    "expectedBeforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "observedBeforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "afterHash": "fnv1a64-canonical-json-v1:fedcba0987654321"
+  },
+  "proposedBehavior": {
+    "schemaVersion": "ouroforge.behavior-artifact.v1",
+    "artifactId": "behavior-runtime-unsupported-demo",
+    "sceneId": "scene-runtime-demo",
+    "validatedBy": {
+      "authority": "ouroforge-rust-local-validator",
+      "validationStatus": "passed"
+    },
+    "behaviors": [
+      {
+        "id": "unsupported-demo",
+        "entityId": "npc",
+        "triggers": [
+          {
+            "id": "script-trigger",
+            "kind": "onScriptHook"
+          }
+        ],
+        "conditions": [
+          {
+            "id": "script-condition",
+            "kind": "jsExpression",
+            "value": "window.secret"
+          }
+        ],
+        "actions": [
+          {
+            "id": "script-action",
+            "kind": "evalScript",
+            "effectKind": "dynamicCode",
+            "value": "alert(1)"
+          }
+        ]
+      }
+    ]
+  },
+  "transactionOutputRef": "runs/behavior-applies/behavior-apply-unsupported.transaction.json",
+  "rollbackMetadata": {
+    "beforeHash": "fnv1a64-canonical-json-v1:abcdef1234567890",
+    "rollbackRef": "runs/behavior-applies/behavior-apply-unsupported-behavior/rollback.json",
+    "strategy": "restore trusted behavior target from beforeHash after manual review"
+  },
+  "rerunCommand": {
+    "command": "cargo run -p ouroforge-cli -- behavior apply transaction validate transaction.json",
+    "argv": [
+      "ouroforge",
+      "behavior",
+      "apply",
+      "transaction",
+      "validate",
+      "transaction.json"
+    ],
+    "allowlistPolicyId": "behavior-apply-local-rust-validation-v1"
+  },
+  "evidenceRefs": [
+    {
+      "id": "scenario-jump-boost",
+      "kind": "scenario-result",
+      "path": "runs/behavior-applies/behavior-apply-unsupported-behavior/evidence/scenario-jump-boost.json",
+      "summary": "Scenario evidence reviewed before trusted behavior apply."
+    }
+  ],
+  "status": "readyForTrustedApply",
+  "blockedReasons": [],
+  "trustedBoundary": "Accepted review and rollback metadata are required before trusted Rust/local behavior apply; no arbitrary script execution, no auto-apply, no self-approval, no browser trusted writes, no command bridge, no eval, no dynamic import, no plugin loader, and no local server bridge."
+}
