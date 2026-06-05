@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "gdd-feasibility-gate-v1",
+  "gateId": "gate-downgraded",
+  "state": "downgrade",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.partial.fixture.json",
+  "targetPrototypeSize": {
+    "maxScenes": 5,
+    "maxLevels": 4,
+    "maxEntities": 128,
+    "maxAssets": 64,
+    "maxMechanics": 10
+  },
+  "supportedMechanics": [
+    "MAP-move"
+  ],
+  "requiredPriorMilestones": [
+    {
+      "id": "milestone-12.4",
+      "docRef": "docs/gdd-mechanics-mapping-v1.md",
+      "satisfied": true
+    }
+  ],
+  "acceptanceCriteriaRefs": [
+    "docs/gdd-requirement-extraction-v1.md"
+  ],
+  "scenarioPlanRefs": [
+    "docs/scenario-coverage-v10-agentic-level-design.md"
+  ],
+  "riskFlags": [
+    {
+      "id": "risk-scope",
+      "kind": "scope-too-large",
+      "severity": "high",
+      "summary": "Requested prototype exceeds v1 local scope limits.",
+      "evidenceRef": "docs/gdd-mechanics-mapping-v1.md"
+    }
+  ],
+  "knownGaps": [
+    "full brief exceeds v1 limits"
+  ],
+  "sliceRecommendation": {
+    "id": "slice-downgrade",
+    "action": "downgrade to one-scene vertical slice",
+    "summary": "Use one local scene with supported movement and scenario evidence while deferring unsupported scope.",
+    "includedRequirementRefs": [
+      "REQ-move"
+    ],
+    "deferredRequirementRefs": [
+      "REQ-online-coop"
+    ],
+    "reviewRequired": true
+  },
+  "boundary": "prototype planning starts only after feasibility passes or accepted bounded slice; untrusted until Rust/local validation; review-gated apply; no autonomous unrestricted game creation; not generation authority; browser read-only or draft-only"
+}

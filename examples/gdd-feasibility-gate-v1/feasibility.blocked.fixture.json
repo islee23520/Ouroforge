@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "gdd-feasibility-gate-v1",
+  "gateId": "gate-blocked",
+  "state": "blocked",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.partial.fixture.json",
+  "targetPrototypeSize": {
+    "maxScenes": 1,
+    "maxLevels": 1,
+    "maxEntities": 16,
+    "maxAssets": 8,
+    "maxMechanics": 3
+  },
+  "supportedMechanics": [],
+  "requiredPriorMilestones": [
+    {
+      "id": "milestone-12.4",
+      "docRef": "docs/gdd-mechanics-mapping-v1.md",
+      "satisfied": true
+    }
+  ],
+  "acceptanceCriteriaRefs": [
+    "docs/gdd-requirement-extraction-v1.md"
+  ],
+  "scenarioPlanRefs": [
+    "docs/scenario-coverage-v10-agentic-level-design.md"
+  ],
+  "riskFlags": [
+    {
+      "id": "risk-asset",
+      "kind": "asset-source",
+      "severity": "blocking",
+      "summary": "Asset source is unclear for requested proprietary-looking sprite set.",
+      "evidenceRef": "docs/gdd-mechanics-mapping-v1.md",
+      "blockedReason": "asset source/license risk blocks planning"
+    },
+    {
+      "id": "risk-supported",
+      "kind": "unsupported-mechanic",
+      "severity": "blocking",
+      "summary": "No supported mechanic can be selected until mapping is resolved.",
+      "evidenceRef": "docs/gdd-mechanics-mapping-v1.md",
+      "blockedReason": "missing supported mechanic blocks planning"
+    }
+  ],
+  "knownGaps": [
+    "asset source and mechanic support both require review"
+  ],
+  "sliceRecommendation": null,
+  "boundary": "prototype planning starts only after feasibility passes or accepted bounded slice; untrusted until Rust/local validation; review-gated apply; no autonomous unrestricted game creation; not generation authority; browser read-only or draft-only"
+}

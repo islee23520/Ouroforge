@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "gdd-feasibility-gate-v1",
+  "gateId": "bad-mapping",
+  "state": "pass",
+  "mechanicsMappingRef": "",
+  "targetPrototypeSize": {
+    "maxScenes": 1,
+    "maxLevels": 1,
+    "maxEntities": 16,
+    "maxAssets": 8,
+    "maxMechanics": 3
+  },
+  "supportedMechanics": [
+    "MAP-move"
+  ],
+  "requiredPriorMilestones": [
+    {
+      "id": "milestone-12.4",
+      "docRef": "docs/gdd-mechanics-mapping-v1.md",
+      "satisfied": true
+    }
+  ],
+  "acceptanceCriteriaRefs": [
+    "docs/gdd-requirement-extraction-v1.md"
+  ],
+  "scenarioPlanRefs": [
+    "docs/scenario-coverage-v10-agentic-level-design.md"
+  ],
+  "riskFlags": [],
+  "knownGaps": [],
+  "sliceRecommendation": null,
+  "boundary": "prototype planning starts only after feasibility passes or accepted bounded slice; untrusted until Rust/local validation; review-gated apply; no autonomous unrestricted game creation; not generation authority; browser read-only or draft-only"
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "gdd-feasibility-gate-v1",
+  "gateId": "gate-infeasible",
+  "state": "fail",
+  "mechanicsMappingRef": "examples/gdd-mechanics-mapping-v1/mechanics.partial.fixture.json",
+  "targetPrototypeSize": {
+    "maxScenes": 1,
+    "maxLevels": 1,
+    "maxEntities": 16,
+    "maxAssets": 8,
+    "maxMechanics": 3
+  },
+  "supportedMechanics": [
+    "MAP-move"
+  ],
+  "requiredPriorMilestones": [
+    {
+      "id": "milestone-12.4",
+      "docRef": "docs/gdd-mechanics-mapping-v1.md",
+      "satisfied": true
+    }
+  ],
+  "acceptanceCriteriaRefs": [
+    "docs/gdd-requirement-extraction-v1.md"
+  ],
+  "scenarioPlanRefs": [
+    "docs/scenario-coverage-v10-agentic-level-design.md"
+  ],
+  "riskFlags": [
+    {
+      "id": "risk-online",
+      "kind": "unsupported-mechanic",
+      "severity": "blocking",
+      "summary": "Unsupported mechanic blocks prototype planning.",
+      "evidenceRef": "docs/gdd-mechanics-mapping-v1.md",
+      "blockedReason": "unsupported mechanic blocks full brief"
+    }
+  ],
+  "knownGaps": [
+    "networked co-op remains unsupported for this bounded local prototype gate"
+  ],
+  "sliceRecommendation": null,
+  "boundary": "prototype planning starts only after feasibility passes or accepted bounded slice; untrusted until Rust/local validation; review-gated apply; no autonomous unrestricted game creation; not generation authority; browser read-only or draft-only"
+}
