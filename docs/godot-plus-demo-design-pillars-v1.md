@@ -1,7 +1,7 @@
 # Godot-Plus Demo Game v1 Design Pillars
 
 Issue: #779  
-Status: **GPD12.2.1 design-pillar contract only**. This document chooses the bounded demo genre, mechanics, objective, feel, difficulty ramp, and implementation boundaries for the Godot-Plus Demonstration Game v1 track. It does not implement gameplay, add assets, run QA, export/package builds, mutate source through Studio, create executable plugins, publish a release, or change #1/#23 governance anchors.
+Status: **GPD12.2.2 playable-success contract**. This document chooses the bounded demo genre, mechanics, objective, feel, difficulty ramp, playable success criteria, and implementation boundaries for the Godot-Plus Demonstration Game v1 track. It does not implement gameplay, add assets, run QA, export/package builds, mutate source through Studio, create executable plugins, publish a release, or change #1/#23 governance anchors.
 
 ## Genre choice
 
@@ -57,17 +57,35 @@ The vertical slice uses a three-step ramp that later issues can map to levels/sc
 
 The ramp is deliberately small. It does not add boss fights, skill trees, procedural content, large asset packs, physics complexity, networking, or broad AI behavior.
 
-## Playable success criteria seed
+## Playable success criteria
 
-Later GPD12.2.2 may refine these, but implementation issues should preserve the following measurable criteria:
+GPD12.2.2 fixes the vertical-slice completion contract that later implementation issues must satisfy. The criteria are intentionally measurable and local; they do not authorize gameplay implementation in this PR unit.
 
-- A source-controlled project fixture loads locally through existing project/runtime paths.
-- Player can complete the key-gate-exit loop in deterministic local scenarios.
-- At least one failure scenario records useful evidence and journal/dashboard context.
-- Safe Source Apply remains review-gated for any source-changing agentic iteration.
-- Dashboard and Studio can inspect run evidence without direct trusted writes.
-- A local web package/export verification may be recorded later; no native/mobile/store publication is implied.
-- Final issue evidence confirms #1 and #23 remain open.
+### Completion criteria
+
+1. **Loadable local project fixture** — a source-controlled Signal Gate project fixture loads through existing project/runtime validation paths without generated-state or dependency-install requirements.
+2. **Deterministic win path** — a local scenario can prove the player collected the signal key, opened the gate, reached the exit trigger, and recorded a passing verdict with evidence refs.
+3. **Deterministic failure path** — at least one local scenario can prove a blocked gate, missing key, hazard contact, stale behavior, or unsafe draft/apply attempt and records useful journal/dashboard context.
+4. **Visible objective state** — key, gate, exit readiness, hazard/failure, and reset/rerun state are visible to scenario evidence plus dashboard/Studio read-only or draft-only surfaces.
+5. **Review-gated iteration proof** — any source-changing agentic fix must be represented as draft/preview evidence, independent review decision, source-apply transaction, rollback metadata, rerun comparison, and final verification.
+6. **Reproducible local package check** — later export/package issues may record a local web bundle smoke/checksum artifact, but native/mobile/console/store export, signing, publishing, deployment, and commercial release claims remain out of scope.
+7. **Governance confirmation** — final issue evidence confirms #1 and #23 remain open and repeats the no-overclaim/no-production/no-Godot-replacement boundary.
+
+### Acceptance matrix
+
+| Criterion | Later evidence source | Pass signal | Boundary |
+| --- | --- | --- | --- |
+| Loadable project | Project validation artifact and runtime smoke | Fixture loads locally with stable project metadata | No generated demo artifact committed unless fixture-scoped |
+| Win path | Scenario result, input replay, runtime probe, journal/dashboard refs | Key, gate, exit, and pass verdict are linked | No manual-only or hosted evidence required |
+| Failure path | Scenario failure result plus journal/dashboard context | Blocker is visible and actionable | Failure evidence does not auto-apply a fix |
+| Objective visibility | HUD/status read model plus Studio/dashboard surfaces | Key/gate/exit/hazard states are inspectable | Browser surfaces remain read-only or draft-only |
+| Review-gated iteration | Draft, review decision, source-apply transaction, rollback, rerun comparison | Independent review precedes trusted apply; rerun proves improvement | No self-approval, auto-apply, auto-merge, or hidden trusted writes |
+| Package reproducibility | Local web package verification/checksum evidence | Bundle smoke passes locally | No native/mobile/console/store export, signing, publishing, or deployment |
+| Governance | Issue comments and verification commands | #1/#23 remain open; claims stay scoped | No broad Godot parity, production readiness, secure sandbox, or commercial release claim |
+
+### Non-acceptance examples
+
+The vertical slice is not accepted by screenshots alone, a broad design document without scenario evidence, a manually played run without reproducible inputs, an unreviewed source mutation, a browser-side trusted write, an executable plugin, a hosted deployment, a native/mobile/store package, or language claiming full Godot replacement/parity.
 
 ## Godot-plus capability mapping
 
@@ -94,7 +112,7 @@ This document does **not** authorize:
 
 ## Implementation handoff for later issues
 
-- #780 should turn these pillars into a concise GDD and acceptance criteria.
+- #780 should turn these pillars and playable success criteria into a concise GDD and acceptance criteria.
 - #781 should scaffold the project without expanding the trusted boundary.
 - #782–#787 should implement mechanics, level, behavior, UI, assets, and scenario matrix in small verifiable PR units.
 - #788–#797 should demonstrate QA, agentic iteration, Studio walkthrough, package/export evidence, plugin descriptor usage, comparison matrix, performance budget, docs, regression coverage, and roadmap refresh.
