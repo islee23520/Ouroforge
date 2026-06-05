@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "export-profile-v1",
+  "profileId": "profile_traversal_output",
+  "projectId": "proj_collect_and_exit",
+  "title": "Collect and Exit (Traversal Output)",
+  "version": "0.1.0",
+  "exportTarget": "web-local",
+  "entryScene": "examples/game-runtime/scenes/intro.json",
+  "assetRoots": ["examples/game-runtime/assets"],
+  "outputDir": "dist/../../etc/export",
+  "runtimeProbeMode": "preserve",
+  "verificationScenarioIds": ["scenario_reach_exit"],
+  "packageMetadataRef": "examples/export-profile-v1/package-metadata.fixture.json",
+  "boundary": "Local, evidence-backed export profile only; no publish, deploy, sign, or upload. Validation is fail closed against the export target matrix."
+}

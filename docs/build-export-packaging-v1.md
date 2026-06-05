@@ -12,7 +12,7 @@ This document is the canonical contract for all follow-up build/export/package i
 
 The milestone covers the following bounded capabilities, each implemented and verified independently:
 
-- Export target matrix: the bounded set of supported local web export targets.
+- Export target matrix: the bounded set of supported local web export targets (`docs/export-target-matrix-v1.md`).
 - Export profile schema: a validated declaration of an export profile.
 - Export plan generator: a deterministic plan derived from a profile and project.
 - Local web bundle assembly: deterministic staging of a local, runnable web bundle.
