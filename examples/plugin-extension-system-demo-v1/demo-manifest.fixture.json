@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "plugin-extension-system-demo-v1",
+  "issue": 754,
+  "milestone": "#1 Plugin / Extension System: declarative local extension foundation, not executable plugin ecosystem",
+  "fixturePack": "examples/plugin-fixture-pack-v1",
+  "evidenceSamples": "examples/plugin-registry-evidence-v1",
+  "summary": "Read-only demo that walks the full v1 plugin/extension flow over the fixture plugin pack: local registry discovery, manifest validation, valid descriptor rendering, blocked diagnostics for invalid fixtures, plugin evidence output, and read-only dashboard/Studio inspection. The demo discovers declarative descriptors only; it never executes plugins, installs dependencies, contacts the network, mutates source, publishes, or deploys.",
+  "stages": [
+    {
+      "id": "BEP754.discover",
+      "stage": "registry-discovery",
+      "coverage": "Local registry discovery scans the fixture plugin pack read-only.",
+      "check": "discover_plugins_in_dir over examples/plugin-fixture-pack-v1.",
+      "expected": "Deterministic registry with valid, invalid, and incompatible entries; no plugin code is executed."
+    },
+    {
+      "id": "BEP754.validate-valid",
+      "stage": "valid-descriptors",
+      "coverage": "Valid plugins contribute declarative descriptors only.",
+      "check": "Valid entries expose declared capabilities and extension points.",
+      "expected": "Valid descriptors appear in the registry/read model; nothing is run."
+    },
+    {
+      "id": "BEP754.validate-invalid",
+      "stage": "blocked-diagnostics",
+      "coverage": "Invalid plugins (arbitrary JS, blocked capability, unsafe path) fail closed.",
+      "check": "Invalid entries report validation diagnostics and contribute no extension points.",
+      "expected": "Blocked diagnostics are visible; invalid plugins contribute nothing."
+    },
+    {
+      "id": "BEP754.incompatible",
+      "stage": "incompatible-version",
+      "coverage": "A legacy-schema plugin is reported as incompatible, not silently accepted.",
+      "check": "Registry read model incompatible count.",
+      "expected": "The incompatible plugin is surfaced without execution."
+    },
+    {
+      "id": "BEP754.evidence",
+      "stage": "plugin-evidence",
+      "coverage": "Plugin registry evidence validates and exposes a read model.",
+      "check": "PluginRegistryEvidenceArtifact::from_json_str over the valid evidence sample.",
+      "expected": "Evidence parses and read model serializes for read-only inspection."
+    },
+    {
+      "id": "BEP754.evidence-blocked",
+      "stage": "evidence-fail-closed",
+      "coverage": "Evidence that declares executable capability or unsafe descriptors fails closed.",
+      "check": "PluginRegistryEvidenceArtifact::from_json_str over an invalid evidence sample.",
+      "expected": "Validation rejects the unsafe evidence before it is treated as trusted."
+    },
+    {
+      "id": "BEP754.read-only-inspection",
+      "stage": "read-only-inspection",
+      "coverage": "Dashboard/Studio inspection of descriptors is read-only.",
+      "check": "Registry read model boundary string.",
+      "expected": "The boundary states read-only, declarative discovery only, with no plugin execution and no trusted writes."
+    }
+  ],
+  "guardrails": [
+    "This demo enables declarative, allowlisted, evidence-backed plugin discovery and extension descriptors, not arbitrary plugin execution.",
+    "No arbitrary JavaScript execution, native dynamic library loading, shell command execution, dependency installation, network plugin install/update, marketplace, or credential access.",
+    "No source mutation, export mutation, publish/deploy action, or CI/workflow mutation.",
+    "Browser/dashboard/Studio surfaces remain read-only inspection/rendering surfaces; they cannot install, update, enable executable code, run commands, publish, deploy, sign, or upload.",
+    "Plugin outputs, generated registries, validation reports, and evidence artifacts stay generated and ignored unless fixture-scoped.",
+    "No production-ready plugin ecosystem, secure plugin sandbox, marketplace readiness, command bridge, or current Godot replacement claim."
+  ]
+}
