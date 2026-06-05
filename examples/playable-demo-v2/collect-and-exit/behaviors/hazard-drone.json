@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "demo-behavior-archetype-v1",
+  "id": "hazard-drone",
+  "name": "Signal Gate Hazard Drone",
+  "kind": "gate-guard",
+  "description": "A deterministic gate-guard hazard archetype for the Collect-and-Exit demo. The drone is dormant until the signal key is collected; collecting the key arms it, and contact with an armed drone ends the run (player_alive -> false). It reuses the existing runtime trigger contract (sensor collider + requiredFlags + onEnter clearFlag); it adds no engine surface and no executable behavior code.",
+  "states": [
+    {
+      "id": "dormant",
+      "description": "Inactive until the signal key is collected; contact is harmless."
+    },
+    {
+      "id": "armed",
+      "description": "Activated once key_collected is true; contact ends the run (player_alive -> false)."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "dormant",
+      "to": "armed",
+      "when": "key_collected == true",
+      "deterministic": true
+    }
+  ],
+  "entityTemplate": {
+    "id": "hazard_drone",
+    "sprite": { "color": "#ef4444", "layer": "actors", "order": 7, "asset": "collect_and_exit_sheet" },
+    "components": {
+      "transform": { "x": 160, "y": 80 },
+      "velocity": { "x": 0, "y": 0 },
+      "size": { "width": 14, "height": 14 },
+      "collider": {
+        "shape": "aabb",
+        "body": "static",
+        "offset": { "x": 0, "y": 0 },
+        "size": { "width": 14, "height": 14 },
+        "sensor": true
+      },
+      "trigger": {
+        "id": "hazard_contact",
+        "kind": "overlap",
+        "requiredFlags": ["key_collected"],
+        "onEnter": [{ "kind": "clearFlag", "flag": "player_alive" }]
+      },
+      "status": { "hitPoints": 1, "maxHitPoints": 1, "flags": [], "states": ["dormant"] },
+      "controllable": false
+    },
+    "tags": ["hazard", "enemy", "gate-guard"]
+  },
+  "scenarios": [
+    {
+      "id": "hazard-contact-fail",
+      "description": "The drone sits past the key; collecting the key arms it and contact ends the run before the exit.",
+      "placement": { "x": 192, "y": 80 },
+      "expect": { "key_collected": true, "player_alive": false, "exit_reached": false }
+    },
+    {
+      "id": "hazard-dormant-pass",
+      "description": "The drone sits before the key; the player passes it while dormant, collects the key, and exits alive.",
+      "placement": { "x": 64, "y": 80 },
+      "expect": { "key_collected": true, "player_alive": true, "exit_reached": true }
+    }
+  ],
+  "boundary": "Deterministic source-like behavior archetype only; reuses the existing runtime trigger contract. No engine surface, no executable plugin/behavior code, no committed generated output, no trusted browser write, no production/native/store export, and no full Godot parity or replacement claim."
+}
