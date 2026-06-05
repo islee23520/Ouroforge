@@ -78,6 +78,76 @@ fn plugin_registry_evidence_accepts_fixture_and_read_model() {
 }
 
 #[test]
+fn plugin_registry_fixture_records_descriptor_evidence_fields() {
+    let artifact = PluginRegistryEvidenceArtifact::from_json_str(valid_fixture())
+        .expect("plugin registry evidence validates");
+
+    let dashboard_panel = artifact
+        .plugins
+        .iter()
+        .find(|plugin| plugin.plugin_id == "read-only-dashboard-panel")
+        .expect("read-only dashboard fixture plugin exists");
+    assert_eq!(
+        dashboard_panel.manifest_hash,
+        "fnv1a64-canonical-json-v1:1111222233334444"
+    );
+    assert_eq!(
+        dashboard_panel.validation_status,
+        PluginValidationStatus::Valid
+    );
+    assert_eq!(
+        dashboard_panel.compatibility_status,
+        PluginCompatibilityStatus::Compatible
+    );
+    assert_eq!(dashboard_panel.declared_capabilities, ["dashboardPanel"]);
+    assert_eq!(
+        dashboard_panel.extension_points,
+        ["dashboard.panels.readOnly"]
+    );
+    assert_eq!(dashboard_panel.evidence_refs.len(), 1);
+    assert_eq!(
+        dashboard_panel.evidence_refs[0].path,
+        "runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json"
+    );
+    assert!(dashboard_panel.blocked_reasons.is_empty());
+
+    let blocked_panel = artifact
+        .plugins
+        .iter()
+        .find(|plugin| plugin.plugin_id == "blocked-command-panel")
+        .expect("blocked fixture plugin remains visible as evidence");
+    assert_eq!(
+        blocked_panel.manifest_hash,
+        "fnv1a64-canonical-json-v1:aaaabbbbccccdddd"
+    );
+    assert_eq!(
+        blocked_panel.validation_status,
+        PluginValidationStatus::Blocked
+    );
+    assert_eq!(
+        blocked_panel.compatibility_status,
+        PluginCompatibilityStatus::Incompatible
+    );
+    assert_eq!(
+        blocked_panel.declared_capabilities,
+        ["studioInspectorPanel"]
+    );
+    assert_eq!(
+        blocked_panel.extension_points,
+        ["studio.inspector.readOnly"]
+    );
+    assert!(blocked_panel
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("executable command authority")));
+
+    let read_model = artifact.read_model();
+    assert_eq!(read_model.status, "blocked");
+    assert!(read_model.blocked_reasons.iter().any(|reason| reason
+        == "blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog"));
+}
+
+#[test]
 fn plugin_registry_evidence_rejects_executable_or_unsafe_descriptors() {
     let error = PluginRegistryEvidenceArtifact::from_json_str(invalid_fixture())
         .expect_err("executable capability is blocked");
@@ -165,9 +235,14 @@ fn plugin_registry_evidence_writer_persists_generated_evidence_without_execution
     assert_eq!(index["artifacts"].as_array().expect("artifacts").len(), 1);
     assert_eq!(index["artifacts"][0]["path"], evidence.path);
 
+    fs::remove_file(&written_path).expect("simulate missing generated artifact with indexed id");
     let duplicate = write_plugin_registry_evidence(&run_dir, &artifact)
-        .expect_err("duplicate output is blocked before rewriting evidence");
-    assert!(format!("{duplicate:?}").contains("output already exists"));
+        .expect_err("duplicate evidence id is blocked before rewriting evidence");
+    assert!(format!("{duplicate:?}").contains("id already exists"));
+    assert!(
+        !written_path.exists(),
+        "duplicate indexed evidence is rejected before rewriting the generated artifact"
+    );
 
     fs::remove_dir_all(run_dir).ok();
 }
