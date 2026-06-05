@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "agent-generated-behavior-draft-v1",
+  "draftId": "behavior_draft_collect_key_flow",
+  "target": {
+    "projectManifestRef": "examples/playable-demo-v2/collect-and-exit/project.json",
+    "sceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
+  },
+  "targetHashes": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/project.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "expectedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "proposedBehaviors": [
+    {
+      "operationId": "op_collect_key_sets_flag",
+      "kind": "flag_change",
+      "behaviorId": "collect_key_sets_flag",
+      "summary": "Set has_key after the key pickup event.",
+      "expectedScenarioImpact": "collect-and-exit scenario reaches exit after key pickup",
+      "status": "proposed"
+    },
+    {
+      "operationId": "op_exit_requires_key",
+      "kind": "state_transition",
+      "behaviorId": "exit_requires_key",
+      "summary": "Gate exit transition on the has_key flag.",
+      "expectedScenarioImpact": "exit transition is blocked before key pickup and allowed after pickup",
+      "status": "proposed"
+    }
+  ],
+  "rationale": "Behavior draft links runtime assertion evidence to a reviewable untrusted proposal.",
+  "linkedEvidence": [
+    "evidence/behavior-drafts/behavior_draft_collect_key_flow/assertion-result.json",
+    "evidence/behavior-drafts/behavior_draft_collect_key_flow/runtime-evidence.json"
+  ],
+  "author": {
+    "authorId": "agent_behavior_designer",
+    "source": "agent",
+    "generatedBy": "local deterministic fixture generator",
+    "untrusted": true
+  },
+  "validationStatus": "drafted",
+  "guardrails": [
+    "Draft is untrusted and inert until review-gated apply.",
+    "No arbitrary scripts, eval, dynamic imports, plugin loader, command bridge, browser trusted writes, auto-apply, or auto-merge."
+  ]
+}
