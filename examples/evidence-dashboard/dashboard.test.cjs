@@ -1759,3 +1759,13 @@ assert.match(dashboard.renderRunDetail({ ...run, performanceRegressionLanes: { p
 const pluginRegistryXss = dashboard.renderPluginRegistry({ plugin_registry: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], registries: [{ registryId: '<img src=x onerror=alert(1)>', projectId: '<script>project</script>', runId: '<script>run</script>', ledgerRef: '<script>ledger</script>', status: '<script>status</script>', blockedReasons: ['<script>blocked</script>'], plugins: [{ pluginId: '<img src=x onerror=alert(1)>', manifestPath: '<script>manifest</script>', manifestHash: '<script>hash</script>', manifestVersion: '<script>version</script>', validationStatus: '<script>valid</script>', compatibilityStatus: '<script>compat</script>', declaredCapabilities: ['<script>cap</script>'], extensionPoints: ['<script>point</script>'], blockedReasons: ['<script>reason</script>'] }] }] } });
 assert.ok(!pluginRegistryXss.includes('<script>blocked</script>'), 'plugin registry status must be escaped');
 assert.ok(!pluginRegistryXss.includes('<img src=x onerror=alert(1)>'), 'plugin registry rows must be escaped');
+
+const pluginRegistrySmokeMarkup = dashboard.renderPluginRegistry(run);
+assert.match(pluginRegistrySmokeMarkup, /Plugin registry evidence refs/);
+assert.match(pluginRegistrySmokeMarkup, /read-only-dashboard-panel/);
+assert.match(pluginRegistrySmokeMarkup, /blocked-command-panel/);
+assert.match(pluginRegistrySmokeMarkup, /manifest requested executable command authority/);
+assert.ok(!/<button/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render action buttons');
+assert.ok(!/data-action=/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render action hooks');
+assert.ok(!/href=["']javascript:/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render javascript links');
+assert.ok(!/command bridge/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not advertise a command bridge');

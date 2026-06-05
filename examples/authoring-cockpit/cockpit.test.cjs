@@ -2441,3 +2441,13 @@ assert.match(cockpit.renderEvidencePane({ ...run, performanceRegressionLane }), 
 const pluginRegistrySurfaceXss = cockpit.renderPluginRegistryBrowserSurface({ plugin_registry: { present: true, status: '<script>blocked</script>', boundary: '<script>boundary</script>', evidence_refs: ['javascript:alert(1)'], registries: [{ registryId: '<img src=x onerror=alert(1)>', plugins: [{ pluginId: '<img src=x onerror=alert(1)>', manifestPath: '<script>manifest</script>', manifestHash: '<script>hash</script>', manifestVersion: '<script>version</script>', validationStatus: '<script>valid</script>', compatibilityStatus: '<script>compat</script>', declaredCapabilities: ['<script>cap</script>'], extensionPoints: ['<script>point</script>'], blockedReasons: ['<script>reason</script>'] }] }] } });
 assert.ok(!pluginRegistrySurfaceXss.includes('<script>blocked</script>'), 'plugin registry Studio status must be escaped');
 assert.ok(!pluginRegistrySurfaceXss.includes('<img src=x onerror=alert(1)>'), 'plugin registry Studio rows must be escaped');
+
+const pluginRegistryBrowserSmokeMarkup = cockpit.renderPluginRegistryBrowserSurface(run);
+assert.match(pluginRegistryBrowserSmokeMarkup, /Plugin registry browser/);
+assert.match(pluginRegistryBrowserSmokeMarkup, /read-only-dashboard-panel/);
+assert.match(pluginRegistryBrowserSmokeMarkup, /blocked-command-panel/);
+assert.match(pluginRegistryBrowserSmokeMarkup, /manifest requested executable command authority/);
+assert.ok(!/<button/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render action buttons');
+assert.ok(!/data-action=/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render action hooks');
+assert.ok(!/href=["']javascript:/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render javascript links');
+assert.ok(!/command bridge/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not advertise a command bridge');
