@@ -11,6 +11,8 @@ const cockpitQaSwarmReadme = fs.readFileSync('examples/authoring-cockpit/README.
 const fullStudioDemoDoc = fs.readFileSync('docs/full-studio-editor-integrated-demo-v1.md', 'utf8');
 const fullStudioDemoReadme = fs.readFileSync('examples/full-studio-editor-demo-v1/README.md', 'utf8');
 const fullStudioDemoFixture = require('../full-studio-editor-demo-v1/demo.fixture.json');
+const fullStudioRegressionDoc = fs.readFileSync('docs/scenario-coverage-v17-full-studio-editor.md', 'utf8');
+const fullStudioRegression = require('../full-studio-editor-regression-v17/coverage-smoke.test.cjs');
 
 assert.match(behaviorDraftDocs, /untrusted data/i);
 assert.match(behaviorDraftDocs, /does not apply trusted files/i);
@@ -115,6 +117,28 @@ assert.match(cockpit.renderEvidencePane(fullStudioDemoFixture), /Safe Source App
 assert.equal(cockpit.resolveStudioCommand('apply-source').allowed, false);
 assert.equal(cockpit.resolveStudioCommand('execute-plugin').allowed, false);
 assert.equal(cockpit.resolveStudioCommand('publish').allowed, false);
+
+assert.match(fullStudioRegressionDoc, /Issue: #775/);
+assert.match(fullStudioRegressionDoc, /success scenarios/i);
+assert.match(fullStudioRegressionDoc, /failure scenarios/i);
+assert.match(fullStudioRegressionDoc, /#1 and #23 remain open/);
+assert.equal(fullStudioRegression.matrix.issue, 775);
+assert.equal(fullStudioRegression.matrix.successScenarios.length, 13);
+assert.equal(fullStudioRegression.matrix.failureScenarios.length, 10);
+assert.equal(fullStudioRegression.matrix.generatedStatePolicy.trackedFixtureOnly, true);
+assert.deepEqual(fullStudioRegression.matrix.failureScenarios.map((scenario) => scenario.blockedKind), [
+  'invalid scene reference',
+  'missing asset',
+  'malformed plugin descriptor',
+  'stale source apply target',
+  'blocked direct trusted write',
+  'blocked publish/deploy command',
+  'blocked shell command',
+  'broken evidence bundle',
+  'invalid workspace state',
+  'large fixture budget exceeded',
+]);
+assert.doesNotMatch(fullStudioRegressionDoc, /production-ready editor is available|current Godot replacement is implemented|full Godot editor parity is implemented|auto-apply enabled|auto-merge enabled|plugin runtime enabled|native export ready|secure sandbox is guaranteed/);
 
 const moved = cockpit.applyEdit(scene, 'player', 'components.transform.x', '48');
 assert.equal(cockpit.getValue(moved.entities[0], 'components.transform.x'), 48);

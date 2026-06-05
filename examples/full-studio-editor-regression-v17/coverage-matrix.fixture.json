@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "scenario-coverage-v17-full-studio-editor-v1",
+  "issue": 775,
+  "status": "ready",
+  "roadmapAnchor": "#1",
+  "memoryAnchor": "#23",
+  "fixtureRefs": {
+    "integratedDemo": "examples/full-studio-editor-demo-v1/demo.fixture.json",
+    "generatedRoot": "runs/generated/full-studio-editor-regression-v17"
+  },
+  "generatedStatePolicy": {
+    "trackedFixtureOnly": true,
+    "ignoredRoots": ["runs/", "target/", ".omx/", ".omc/", ".openchrome/"],
+    "noWorkspaceArtifactsCommitted": true
+  },
+  "guardrails": {
+    "directTrustedWrites": "blocked",
+    "commandExecution": "blocked",
+    "publishDeploySignUpload": "blocked",
+    "pluginExecution": "blocked",
+    "marketplaceNetworkInstall": "blocked",
+    "autoApplyMergeSelfApprove": "blocked",
+    "godotParityClaim": "blocked"
+  },
+  "successScenarios": [
+    { "id": "success.project-overview", "surface": "project overview", "fixturePath": "project_overview", "expectedText": "Full Studio Editor fixture", "evidence": ["docs/full-studio-editor-integrated-demo-v1.md"] },
+    { "id": "success.scene-tree", "surface": "scene tree", "fixturePath": "scene_tree_inspector", "expectedText": "scene tree", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.entity-inspector", "surface": "entity inspector", "fixturePath": "entity_component_inspector", "expectedText": "Entity", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.draft-edit-preview", "surface": "draft edit preview", "fixturePath": "studio_draft_authoring", "expectedText": "demo-player-color-draft", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.safe-source-apply-handoff", "surface": "Safe Source Apply handoff preview", "fixturePath": "studio_source_apply_handoff", "expectedText": "player-color.preview.json", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.visual-canvas", "surface": "visual canvas", "fixturePath": "studio_scene_canvas", "expectedText": "Visual scene canvas", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.asset-browser", "surface": "asset browser", "fixturePath": "asset_browser", "expectedText": "Asset browser", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.scenario-evidence-panel", "surface": "scenario/evidence panel", "fixturePath": "scenario_panel", "expectedText": "Scenario and playtest panel", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.evidence-timeline", "surface": "evidence timeline", "fixturePath": "evidence_timeline", "expectedText": "Evidence timeline", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.export-panel", "surface": "export panel", "fixturePath": "export_package_panel", "expectedText": "Export / package inspection", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.plugin-panel", "surface": "plugin panel", "fixturePath": "plugin_panel", "expectedText": "Plugin / extension panel", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] },
+    { "id": "success.workspace-persistence", "surface": "workspace persistence", "fixturePath": "workspace_layout", "expectedText": "workspace layout", "evidence": ["examples/authoring-cockpit/cockpit.test.cjs"] },
+    { "id": "success.command-palette", "surface": "command palette", "fixturePath": "command_palette", "expectedText": "Command palette", "evidence": ["examples/full-studio-editor-demo-v1/demo.fixture.json"] }
+  ],
+  "failureScenarios": [
+    { "id": "failure.invalid-scene-reference", "blockedKind": "invalid scene reference", "diagnostic": "Scene references must stay in fixture-scoped project paths.", "blockedControls": ["trustedWriteCommand"] },
+    { "id": "failure.missing-asset", "blockedKind": "missing asset", "diagnostic": "Missing assets remain visible as diagnostics and do not trigger imports or remote fetches.", "blockedControls": ["networkInstall", "uploadCommand"] },
+    { "id": "failure.malformed-plugin-descriptor", "blockedKind": "malformed plugin descriptor", "diagnostic": "Malformed descriptors fail closed as escaped read-only text.", "blockedControls": ["installPluginCommand", "pluginExecuteCommand"] },
+    { "id": "failure.stale-source-apply-target", "blockedKind": "stale source apply target", "diagnostic": "Stale targets require re-preview before any Safe Source Apply review.", "blockedControls": ["applySourceCommand"] },
+    { "id": "failure.direct-trusted-write", "blockedKind": "blocked direct trusted write", "diagnostic": "Studio cannot write trusted source files from the browser.", "blockedControls": ["trustedWriteCommand"] },
+    { "id": "failure.publish-deploy-command", "blockedKind": "blocked publish/deploy command", "diagnostic": "Publish, deploy, sign, and upload actions remain unavailable from Studio.", "blockedControls": ["publishCommand", "deployCommand", "signCommand", "uploadCommand"] },
+    { "id": "failure.shell-command", "blockedKind": "blocked shell command", "diagnostic": "The command palette rejects shell execution and browser command bridges.", "blockedControls": ["executeCommand", "browserCommandBridge"] },
+    { "id": "failure.broken-evidence-bundle", "blockedKind": "broken evidence bundle", "diagnostic": "Broken evidence is shown as a diagnostic rather than treated as passing evidence.", "blockedControls": ["rerunCommand"] },
+    { "id": "failure.invalid-workspace-state", "blockedKind": "invalid workspace state", "diagnostic": "Invalid workspace state falls back to defaults without trusted persistence.", "blockedControls": ["persistWorkspaceCommand"] },
+    { "id": "failure.large-fixture-budget", "blockedKind": "large fixture budget exceeded", "diagnostic": "Large fixtures are rejected as regression budget drift.", "blockedControls": ["loadLargeFixtureCommand"] }
+  ],
+  "requiredVerification": [
+    "gh issue view 775 --repo shaun0927/Ouroforge",
+    "gh issue view 1 --repo shaun0927/Ouroforge",
+    "gh issue view 23 --repo shaun0927/Ouroforge",
+    "cargo fmt --check",
+    "cargo test",
+    "cargo clippy --all-targets --all-features -- -D warnings",
+    "node --check examples/evidence-dashboard/dashboard.js",
+    "node examples/evidence-dashboard/dashboard.test.cjs",
+    "node --check examples/authoring-cockpit/cockpit.js",
+    "node examples/authoring-cockpit/cockpit.test.cjs",
+    "node --check examples/full-studio-editor-regression-v17/coverage-smoke.test.cjs",
+    "node examples/full-studio-editor-regression-v17/coverage-smoke.test.cjs",
+    "git diff --check",
+    "git status --short --ignored"
+  ]
+}
