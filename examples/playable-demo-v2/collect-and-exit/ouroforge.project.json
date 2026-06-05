@@ -20,14 +20,6 @@
     {
       "id": "collect-and-exit",
       "path": "scenarios/collect-and-exit.json"
-    },
-    {
-      "id": "collect-and-exit-demo-matrix",
-      "path": "scenarios/demo-scenario-matrix.json"
-    },
-    {
-      "id": "collect-and-exit-demo-scenario-matrix",
-      "path": "scenarios/demo-scenario-matrix.json"
     }
   ],
   "assetRoots": [
