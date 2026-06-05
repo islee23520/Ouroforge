@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "qa-playtest-demo-v1",
+  "demoId": "qa14.15-unbounded-fuzz",
+  "fixtureProjectRef": "examples/game-runtime",
+  "fuzzPlan": {
+    "seeds": [
+      "seed-00001",
+      "seed-00002",
+      "seed-00003"
+    ],
+    "maxInputs": 1000000,
+    "outputRoots": [
+      "runs/qa-playtest-demo/fuzz"
+    ]
+  },
+  "workerAssignments": [
+    {
+      "workerId": "worker-1",
+      "maxActions": 256,
+      "maxDurationMs": 60000
+    },
+    {
+      "workerId": "worker-2",
+      "maxActions": 256,
+      "maxDurationMs": 60000
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "stage-scenario",
+      "kind": "scenario-candidates",
+      "evidenceRef": "evidence/qa-playtest-demo/scenario-candidates.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-fuzz",
+      "kind": "fuzz-plan",
+      "evidenceRef": "evidence/qa-playtest-demo/fuzz-plan.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-worker",
+      "kind": "worker-assignment",
+      "evidenceRef": "evidence/qa-playtest-demo/worker-assignments.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-invariant",
+      "kind": "invariant-checks",
+      "evidenceRef": "evidence/qa-playtest-demo/invariant-checks.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-route",
+      "kind": "route-attempts",
+      "evidenceRef": "evidence/qa-playtest-demo/route-attempts.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-visual",
+      "kind": "visual-evidence",
+      "evidenceRef": "evidence/qa-playtest-demo/visual-comparisons.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-performance",
+      "kind": "performance-evidence",
+      "evidenceRef": "evidence/qa-playtest-demo/performance-budgets.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-error",
+      "kind": "error-evidence",
+      "evidenceRef": "evidence/qa-playtest-demo/error-classifications.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-flake",
+      "kind": "flake-handling",
+      "evidenceRef": "evidence/qa-playtest-demo/flake-policy.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-failure",
+      "kind": "failure-classification",
+      "evidenceRef": "evidence/qa-playtest-demo/failure-backlog.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-backlog",
+      "kind": "backlog",
+      "evidenceRef": "evidence/qa-playtest-demo/mutation-backlog.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-matrix",
+      "kind": "run-matrix",
+      "evidenceRef": "evidence/qa-playtest-demo/run-matrix.json",
+      "present": true
+    },
+    {
+      "stageId": "stage-bundle",
+      "kind": "evidence-bundle",
+      "evidenceRef": "evidence/qa-playtest-demo/evidence-bundle.json",
+      "present": true
+    }
+  ],
+  "commands": [
+    "cargo run -p ouroforge-cli -- qa-demo plan --manifest examples/qa-playtest-demo-v1/demo.manifest.json",
+    "cargo run -p ouroforge-cli -- qa-demo collect --manifest examples/qa-playtest-demo-v1/demo.manifest.json --out runs/qa-playtest-demo",
+    "cargo run -p ouroforge-cli -- qa-demo bundle --run runs/qa-playtest-demo"
+  ],
+  "expectedEvidenceRefs": [
+    "evidence/qa-playtest-demo/run-matrix.json",
+    "evidence/qa-playtest-demo/evidence-bundle.json"
+  ],
+  "knownGaps": [
+    "Runs on a bounded fixture project, not a full game; coverage is intentionally narrow.",
+    "Visual/performance/error signals are heuristic evidence inputs, not proof of fun, quality, or production safety.",
+    "Stage evidence is illustrative fixture data; live capture is left as a follow-up."
+  ],
+  "cleanupPolicy": "Generated runs, fuzz inputs, screenshots, traces, and bundle exports are written only under runs/qa-playtest-demo and deleted after review; nothing is tracked in git.",
+  "generatedOutputRoots": [
+    "runs/qa-playtest-demo/evidence",
+    "runs/qa-playtest-demo/screenshots"
+  ],
+  "boundary": "This demo shows bounded, evidence-gated QA/playtest exploration on a fixture project. Outputs are evidence and backlog inputs only and remain review-gated until reviewed. Reruns, fuzz inputs, and workers are bounded with an explicit cleanup policy. No auto-fix, no auto-apply, and no hidden workers. Browser read-only or draft-only."
+}
