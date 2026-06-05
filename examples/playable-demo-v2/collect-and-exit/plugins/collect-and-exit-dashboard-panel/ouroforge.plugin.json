@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "collect-and-exit-dashboard-panel",
+  "name": "Collect and Exit Dashboard Panel",
+  "version": "0.1.0",
+  "description": "Inert read-only dashboard panel descriptor placeholder for the Godot-Plus collect-and-exit demo scaffold.",
+  "metadata": {
+    "author": "Ouroforge Demo Authors",
+    "project": "Godot-Plus Demonstration Game v1"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": ["dashboardPanel"],
+  "extensionPoints": ["dashboard.panels.readOnly"],
+  "permissions": ["read_evidence", "contribute_dashboard_panel"],
+  "boundary": "Declarative read-only plugin manifest placeholder; allowlisted descriptors only, with no executable code, no command execution, and no network install. Plugin descriptor usage is owned by issue #792."
+}

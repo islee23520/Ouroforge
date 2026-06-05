@@ -128,4 +128,32 @@ node examples/playable-demo-v2/collect-and-exit/asset-evidence-smoke.test.cjs
 The smoke intentionally leaves `runs/`, `dashboard-data/`, screenshots, and other
 generated artifacts untracked.
 
+## Godot-Plus demo scaffold (#781)
+
+The Godot-Plus Demonstration Game v1 milestone (#1) uses this fixture as its
+project scaffold. #781 adds bounded export/plugin placeholders and a
+generated-state audit aligned to the GDD (`docs/godot-plus-demo-gdd-v1.md`) and
+acceptance matrix (`docs/godot-plus-demo-acceptance-criteria-v1.md`):
+
+- `export/export-profile.json` — local `web-local` export profile placeholder
+  (`export-profile-v1`). Actual package verification is owned by #791.
+- `export/package-metadata.json` — local package metadata placeholder
+  (`export-package-metadata-v1`).
+- `plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json` — inert
+  read-only dashboard panel descriptor placeholder (`ouroforge.plugin-manifest.v1`).
+  Actual descriptor usage is owned by #792.
+- `scaffold-audit.test.cjs` — read-only generated-state audit smoke.
+
+Scaffold verification:
+
+```bash
+cargo test -p ouroforge-core --test godot_plus_demo_scaffold_contract
+cargo run -p ouroforge-cli -- plugin validate examples/playable-demo-v2/collect-and-exit/plugins
+node examples/playable-demo-v2/collect-and-exit/scaffold-audit.test.cjs
+```
+
+These placeholders add no gameplay, no generated output tracking, no executable
+plugin runtime, no production/native/store export, and no trusted browser writes.
+Canonical scaffold notes: `docs/godot-plus-demo-scaffold-v1.md`.
+
 Canonical documentation: `docs/playable-demo-v2-collect-and-exit.md`.

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "export-package-metadata-v1",
+  "projectId": "collect_and_exit_demo",
+  "title": "Collect and Exit",
+  "version": "0.1.0",
+  "author": "Ouroforge local export",
+  "description": "Local web export package metadata placeholder for the Godot-Plus collect-and-exit demo scaffold.",
+  "icon": "assets/atlases/collect-and-exit.atlas.json",
+  "entryScene": "scenes/collect-and-exit.scene.json"
+}

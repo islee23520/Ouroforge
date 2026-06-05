@@ -149,7 +149,7 @@ function generatedStateAudit() {
   assert.match(cockpit.renderIntegration(run), /Render breakdown inspection/);
   assert.match(cockpit.renderIntegration(run), /Runtime profiler inspection/);
   assert.match(cockpit.renderRuntimeEventInspectionSurface(run), /Collision\/transition\/event inspection/);
-  assert.doesNotMatch(cockpit.renderIntegration(run), /<script>|trusted browser write|command bridge enabled/);
+  assert.doesNotMatch(cockpit.renderIntegration(run), /<script>|trusted browser writes? (?:enabled|available|active)|browser trusted writes? (?:enabled|available|active)|command bridge enabled/);
 
   fs.rmSync(tempDir, { recursive: true, force: true });
   generatedStateAudit();

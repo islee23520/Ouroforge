@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "export-profile-v1",
+  "profileId": "collect-and-exit-web-local",
+  "projectId": "collect_and_exit_demo",
+  "title": "Collect and Exit (Local Web Export Profile)",
+  "version": "0.1.0",
+  "exportTarget": "web-local",
+  "entryScene": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "assetRoots": ["examples/playable-demo-v2/collect-and-exit/assets"],
+  "outputDir": "dist/export/collect-and-exit",
+  "runtimeProbeMode": "preserve",
+  "verificationScenarioIds": [
+    "collect-key-hud-contract",
+    "collect-and-exit-source-smoke"
+  ],
+  "packageMetadataRef": "examples/playable-demo-v2/collect-and-exit/export/package-metadata.json",
+  "boundary": "Local, evidence-backed export profile placeholder for the Godot-Plus demo scaffold; no publish, deploy, sign, or upload. Validation is fail closed against the export target matrix. Actual package verification is owned by issue #791."
+}
