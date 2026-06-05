@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 ouroforge-evidence = { path = "../ouroforge-evidence" }
+ouroforge-evaluator = { path = "../ouroforge-evaluator" }
 ouroforge-ledger = { path = "../ouroforge-ledger" }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
