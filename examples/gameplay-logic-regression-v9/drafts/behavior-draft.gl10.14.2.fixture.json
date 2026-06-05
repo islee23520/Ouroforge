@@ -212,13 +212,13 @@
     {
       "id": "runtime-event-order",
       "kind": "runtime-event-log",
-      "path": "evidence/gameplay-logic-regression-v9/runtime-event-order.fixture.json",
+      "path": "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json",
       "summary": "Runtime event ordering proves input event precedes emitted signal."
     },
     {
       "id": "scenario-outcome",
       "kind": "scenario-result",
-      "path": "evidence/gameplay-logic-regression-v9/scenario-outcome.fixture.json",
+      "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json",
       "summary": "Scenario assertion evidence passes for GL10.14.1 behavior runtime coverage."
     }
   ],

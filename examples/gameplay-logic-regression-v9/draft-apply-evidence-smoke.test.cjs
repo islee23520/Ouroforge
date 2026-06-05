@@ -3,6 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const fixtureDir = __dirname;
+// Repo root is two levels up from examples/gameplay-logic-regression-v9, used to
+// resolve repo-relative evidence refs (examples/.../evidence/...).
+const repoRoot = path.resolve(fixtureDir, '..', '..');
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(fixtureDir, relativePath), 'utf8'));
 }
@@ -25,6 +28,16 @@ assert.equal(draft.target.scenePath, 'scenes/gameplay-logic-regression-v9.scene.
 assert.equal(draft.proposedBehavior.artifactId, 'gameplay-logic-regression-v9');
 assert.ok(draft.untrustedBoundary.includes('does not apply trusted files'));
 assert.equal(draft.linkedEvidence.length, 2);
+// Each linked evidence ref must resolve to an actual fixture-scoped artifact so a
+// draft/evidence reader can follow it (regression for the stale-path defect where
+// linkedEvidence pointed at evidence/gameplay-logic-regression-v9/... instead of
+// the real examples/gameplay-logic-regression-v9/evidence/... files).
+for (const link of draft.linkedEvidence) {
+  assert.ok(
+    fs.existsSync(path.join(repoRoot, link.path)),
+    `linked evidence ${link.id} path resolves to a fixture artifact: ${link.path}`,
+  );
+}
 assertNoForbiddenAuthority(draft.proposedBehavior);
 
 assert.equal(apply.schemaVersion, 'ouroforge.behavior-apply-transaction.v1');
