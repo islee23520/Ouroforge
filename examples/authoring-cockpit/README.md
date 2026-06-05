@@ -214,6 +214,26 @@ reviews, execute scripts, open command bridges, or treat preview metadata as a
 review decision. Rust/local validation and review-gated flows remain the trusted
 authority. See `../../docs/behavior-draft-v1.md`.
 
+## Studio Behavior Inspection Surface v1
+
+When `dashboard-data.json` includes `behavior_inspection` or compatible
+behavior/event/state/ability/review-apply read models, the cockpit displays
+escaped read-only panels for behavior rows, event/signal queue rows, state
+machines, ability/action rows, behavior draft status, and review/apply status.
+The panels may show ids, statuses, targets, triggers, transition summaries,
+cost/cooldown/effect metadata, blocked reasons, rollback refs, evidence refs,
+and inert preview command text where a Rust/local validation command is already
+scoped.
+
+The browser does not execute scripts, `eval`, dynamic imports, plugin loaders,
+local command bridges, local server bridges, direct file writes, trusted browser
+writes, localStorage/indexedDB persistence, source mutation, review approval,
+behavior apply, auto-apply, auto-merge, self-approval, network/install/credential
+behavior, hosted/cloud behavior, native export, or production editor behavior.
+Rust/local validation remains the trusted authority for behavior draft/apply
+persistence, generated evidence writing, rollback metadata, and CLI behavior.
+See `../../docs/studio-behavior-inspection-surface-v1.md`.
+
 ## QA and evidence loop
 
 The cockpit includes Run QA and project workspace panels with local display-only commands:
