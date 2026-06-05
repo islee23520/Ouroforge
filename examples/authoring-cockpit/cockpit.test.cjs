@@ -1152,6 +1152,39 @@ assert.match(studioSourceApplyReviewDoc, /Issue: #712/);
 assert.match(studioSourceApplyReviewDoc, /No apply \/ no command \/ no merge \/ no browser write/);
 assert.match(studioSourceApplyReviewDoc, /#1 and #23 remain open/);
 
+// Studio export inspection surface (#731): read-only export evidence display.
+const exportInspectionRun = {
+  ...run,
+  export_evidence: {
+    links: { runId: 'run_export_1', projectId: 'proj_export_bundle_fixture' },
+    profile: { exportTarget: 'web-static-bundle', projectId: 'proj_export_bundle_fixture' },
+    plan: { outputDir: 'dist/export/<demo>' },
+    assetManifest: { entries: [{ assetId: 'hero' }] },
+    fingerprint: { artifactChecksums: [{ packagePath: 'index.html' }, { packagePath: 'runtime/bootstrap.js' }] },
+    verification: { verdict: 'pass', checks: [{ id: 'bundle-present' }, { id: 'scene-loads' }] },
+    verdict: 'pass',
+  },
+};
+const exportInspectionHtml = cockpit.renderExportInspectionSurface(exportInspectionRun);
+assert.match(exportInspectionHtml, /Export inspection/);
+assert.match(exportInspectionHtml, /web-static-bundle/);
+assert.match(exportInspectionHtml, /dist\/export\/&lt;demo&gt;/);
+assert.match(exportInspectionHtml, /1 packaged asset/);
+assert.match(exportInspectionHtml, /2 artifact checksum/);
+assert.match(exportInspectionHtml, /Publish\/release/);
+assert.match(exportInspectionHtml, /blocked/);
+assert.match(exportInspectionHtml, /the browser cannot run export, publish, deploy, sign, upload/);
+assert.doesNotMatch(exportInspectionHtml, /<button|type="button"|data-action|Run export/);
+assert.doesNotMatch(exportInspectionHtml, /<demo>/);
+assert.match(cockpit.renderExportInspectionSurface({}), /No export evidence bundle is exported/);
+assert.equal(cockpit.exportInspectionReadModel(exportInspectionRun).assetCount, 1);
+assert.equal(cockpit.exportInspectionReadModel(exportInspectionRun).verdict, 'pass');
+assert.ok(cockpit.studioSurfaceSummary(exportInspectionRun).some((surface) => surface.id === 'export-inspection' && surface.present));
+const studioExportInspectionDoc = fs.readFileSync('docs/studio-export-inspection-surface-v1.md', 'utf8');
+assert.match(studioExportInspectionDoc, /Issue: #731/);
+assert.match(studioExportInspectionDoc, /cannot run export, publish, deploy, sign, upload/);
+assert.match(studioExportInspectionDoc, /#1 and #23 remain open/);
+
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
