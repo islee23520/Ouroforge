@@ -77,6 +77,7 @@ pub mod qa_error_classifier;
 pub mod qa_flake_rerun_policy;
 pub mod qa_failure_backlog;
 pub mod qa_run_matrix;
+pub mod qa_evidence_bundle;
 pub mod runtime_frame_budget;
 pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,

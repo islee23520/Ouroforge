@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "qa-swarm-evidence-bundle-v1",
+  "bundleId": "qa14.13-flaky",
+  "status": "partial",
+  "runRef": "runs/qa-swarm/run-501/run.json",
+  "components": [
+    {
+      "componentType": "scenario-candidates",
+      "ref": "evidence/qa-swarm/run-501/scenario-candidates.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "fuzz-plans",
+      "ref": "evidence/qa-swarm/run-501/fuzz-plans.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "worker-assignments",
+      "ref": "evidence/qa-swarm/run-501/worker-assignments.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "invariant-checks",
+      "ref": "evidence/qa-swarm/run-501/invariant-checks.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "route-attempts",
+      "ref": "evidence/qa-swarm/run-501/route-attempts.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "visual-comparisons",
+      "ref": "evidence/qa-swarm/run-501/visual-comparisons.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "performance-budgets",
+      "ref": "evidence/qa-swarm/run-501/performance-budgets.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "error-classifications",
+      "ref": "evidence/qa-swarm/run-501/error-classifications.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "flake-policy",
+      "ref": "evidence/qa-swarm/run-501/flake-policy.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "failure-classifications",
+      "ref": "evidence/qa-swarm/run-501/failure-classifications.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "mutation-backlog",
+      "ref": "evidence/qa-swarm/run-501/mutation-backlog.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    },
+    {
+      "componentType": "run-matrix",
+      "ref": "evidence/qa-swarm/run-501/run-matrix.json",
+      "present": true,
+      "stale": false,
+      "resolved": true
+    }
+  ],
+  "outputRoots": [
+    "runs/qa-swarm/run-501/out"
+  ],
+  "cleanupConfirmed": true,
+  "budgetsConfirmed": true,
+  "matrixRowsConsistent": true,
+  "flakyResolved": false,
+  "finalSummary": "All QA artifacts for run-501 are present, resolved, and consistent; results remain evidence inputs for review.",
+  "dashboardExport": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "fields": [
+      "component",
+      "status"
+    ]
+  },
+  "blockedReasons": [
+    "Flaky states are unresolved; reruns are still inconclusive and need reviewer triage."
+  ],
+  "boundary": "The QA evidence bundle is evidence inputs only, not trusted truth, and remains review-gated until reviewed. Generated outputs follow an explicit cleanup policy and bounded budgets. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}
