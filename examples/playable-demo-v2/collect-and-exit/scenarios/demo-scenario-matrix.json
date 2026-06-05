@@ -1,0 +1,284 @@
+{
+  "schemaVersion": "demo-scenario-matrix-v1",
+  "id": "collect-and-exit-demo-scenario-matrix",
+  "issue": 787,
+  "title": "Collect and Exit demo scenario matrix v1",
+  "description": "Acceptance-to-evidence matrix for the canonical playable-demo-v2 Collect and Exit vertical slice. The matrix is read-only policy data for QA/regression planning; it does not execute commands, mutate source, publish builds, install plugins, or grant auto-fix authority.",
+  "scope": {
+    "fixtureRoot": "examples/playable-demo-v2/collect-and-exit",
+    "canonicalScene": "scenes/collect-and-exit.scene.json",
+    "canonicalScenarioPack": "scenarios/collect-and-exit.json",
+    "boundedDemo": true,
+    "governanceAnchors": ["#1", "#23"]
+  },
+  "blockedActions": [
+    "commercial release",
+    "public deployment",
+    "native/mobile/console export",
+    "app-store/Steam/itch publishing",
+    "signing or credentialed upload",
+    "full Godot replacement or parity claim",
+    "production-ready claim",
+    "direct trusted Studio source write",
+    "source mutation bypass",
+    "auto-apply",
+    "auto-merge",
+    "self-approval",
+    "executable plugin runtime",
+    "marketplace or network plugin install/update",
+    "dependency install/update",
+    "CI/workflow mutation",
+    "browser command bridge",
+    "arbitrary shell execution"
+  ],
+  "scenarioFixtures": [
+    {
+      "id": "collect-and-exit-pack",
+      "path": "scenarios/collect-and-exit.json",
+      "type": "scenario-pack-v1",
+      "purpose": "Executable fixture scenario pack for source contract checks."
+    },
+    {
+      "id": "collect-and-exit-scene",
+      "path": "scenes/collect-and-exit.scene.json",
+      "type": "scene-v1",
+      "purpose": "Canonical one-screen scene used by all focused demo smokes."
+    },
+    {
+      "id": "collect-and-exit-level-set",
+      "path": "levels/level-set.json",
+      "type": "demo-level-set-v1",
+      "purpose": "Per-level deterministic configuration fixture."
+    },
+    {
+      "id": "hazard-drone",
+      "path": "behaviors/hazard-drone.json",
+      "type": "demo-behavior-archetype-v1",
+      "purpose": "Enemy/system behavior fixture."
+    },
+    {
+      "id": "hud-model",
+      "path": "hud-model.json",
+      "type": "demo-hud-model-v1",
+      "purpose": "Read-only HUD/feedback model fixture."
+    },
+    {
+      "id": "asset-manifest",
+      "path": "asset-manifest.json",
+      "type": "asset-manifest-v1",
+      "purpose": "Asset hash and provenance target."
+    },
+    {
+      "id": "asset-provenance",
+      "path": "asset-provenance.json",
+      "type": "demo-asset-provenance-v1",
+      "purpose": "Fixture-scoped asset provenance and license record."
+    },
+    {
+      "id": "export-profile",
+      "path": "export/export-profile.json",
+      "type": "export-profile-v1",
+      "purpose": "Local web package/export evidence target; no public release."
+    },
+    {
+      "id": "plugin-descriptor",
+      "path": "plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json",
+      "type": "plugin-manifest-v1",
+      "purpose": "Inert read-only plugin descriptor validation target."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "demo-start-game",
+      "area": "start game",
+      "description": "Load the canonical scene, seed, project manifest, and initial world state.",
+      "acceptanceCriteria": ["Scene id is collect-and-exit-scene", "Initial checkpoint is demo-start", "Player starts alive with exit unreached"],
+      "passCriteria": ["runtime world state is readable", "player_alive is true", "exit_reached is false", "frame budget is within-budget"],
+      "failCriteria": ["scene or seed is missing", "initial world state is malformed", "runtime budget is violated"],
+      "evidenceExpectations": [
+        { "kind": "world_state", "path": "metadata.startState.checkpointSlot", "expected": "demo-start" },
+        { "kind": "frame_stats", "path": "runtimeFrameBudgetStatus", "expected": "within-budget" }
+      ],
+      "fixtureRefs": ["scenes/collect-and-exit.scene.json", "seeds/collect-and-exit.yaml", "e2e-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs"],
+      "forbiddenActions": []
+    },
+    {
+      "id": "demo-move-player",
+      "area": "move player",
+      "description": "Move the player deterministically across the one-screen arena without source writes.",
+      "acceptanceCriteria": ["Right input changes player x", "movement remains bounded by scene bounds"],
+      "passCriteria": ["player x increases after deterministic input", "player remains in bounds"],
+      "failCriteria": ["movement is nondeterministic", "player escapes scene bounds", "browser command bridge is required"],
+      "evidenceExpectations": [
+        { "kind": "world_state", "path": "object.x", "expected": "monotonic after right input" },
+        { "kind": "runtime_events", "path": "events", "expected": "bounded runtime events only" }
+      ],
+      "fixtureRefs": ["e2e-smoke.test.cjs", "gameplay-loop-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs"],
+      "forbiddenActions": ["browser command bridge", "arbitrary shell execution"]
+    },
+    {
+      "id": "demo-complete-level",
+      "area": "complete level",
+      "description": "Collect the key, open the gate, and reach the exit through the core loop.",
+      "acceptanceCriteria": ["key_collected becomes true", "door_open becomes true", "exit_reached becomes true"],
+      "passCriteria": ["win state is reached with player_alive true", "HUD and world-state evidence agree"],
+      "failCriteria": ["exit is reached without key", "door opens without required flag", "win claim lacks world-state evidence"],
+      "evidenceExpectations": [
+        { "kind": "world_state", "path": "goalFlags.key_collected", "expected": true },
+        { "kind": "world_state", "path": "goalFlags.door_open", "expected": true },
+        { "kind": "world_state", "path": "goalFlags.exit_reached", "expected": true }
+      ],
+      "fixtureRefs": ["gameplay-loop-smoke.test.cjs", "scenarios/collect-and-exit.json"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs"],
+      "forbiddenActions": []
+    },
+    {
+      "id": "demo-fail-restart",
+      "area": "fail/restart",
+      "description": "Exercise a deterministic lose state and require restart evidence to be explicit rather than inferred.",
+      "acceptanceCriteria": ["hazard contact can set player_alive false", "restart expectation is recorded as separate explicit evidence"],
+      "passCriteria": ["lose state is observable before exit", "restart evidence requirements are documented for QA swarm"],
+      "failCriteria": ["loss is nondeterministic", "restart is claimed without replay/world-state evidence", "auto-fix or source apply is required"],
+      "evidenceExpectations": [
+        { "kind": "world_state", "path": "goalFlags.player_alive", "expected": false },
+        { "kind": "scenario_matrix", "path": "restartEvidenceRequired", "expected": true }
+      ],
+      "fixtureRefs": ["behavior-smoke.test.cjs", "behaviors/hazard-drone.json"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/behavior-smoke.test.cjs"],
+      "forbiddenActions": ["auto-apply", "auto-merge", "source mutation bypass"]
+    },
+    {
+      "id": "demo-enemy-interaction",
+      "area": "enemy interaction",
+      "description": "Validate the Signal Gate Hazard Drone dormant-to-armed behavior and contact effect.",
+      "acceptanceCriteria": ["drone starts dormant", "key collection arms the drone", "armed contact clears player_alive"],
+      "passCriteria": ["hazard lose frame is deterministic", "dormant pass still wins"],
+      "failCriteria": ["behavior requires executable plugin/runtime code", "contact result is nondeterministic"],
+      "evidenceExpectations": [
+        { "kind": "runtime_probe", "path": "entities.hazard_drone.status.states", "expected": "dormant" },
+        { "kind": "world_state", "path": "goalFlags.player_alive", "expected": "false on armed contact" }
+      ],
+      "fixtureRefs": ["behaviors/hazard-drone.json", "behavior-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/behavior-smoke.test.cjs"],
+      "forbiddenActions": ["executable plugin runtime"]
+    },
+    {
+      "id": "demo-objective-update",
+      "area": "objective update",
+      "description": "Track objective flags and HUD values as key, door, and exit state changes.",
+      "acceptanceCriteria": ["goal flags update in order", "HUD key/goal rows reflect the flags"],
+      "passCriteria": ["HUD row text and flag values match world-state flags"],
+      "failCriteria": ["objective progress exists only visually", "HUD claims success without world-state flag"],
+      "evidenceExpectations": [
+        { "kind": "world_state", "path": "componentModel.hudValues", "expected": "flag-bound HUD rows" },
+        { "kind": "world_state", "path": "goalFlags.exit_reached", "expected": true }
+      ],
+      "fixtureRefs": ["hud-model.json", "hud-smoke.test.cjs", "gameplay-loop-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/hud-smoke.test.cjs"],
+      "forbiddenActions": []
+    },
+    {
+      "id": "demo-ui-state",
+      "area": "UI state",
+      "description": "Expose key, goal, and HP UI state through read-only HUD evidence.",
+      "acceptanceCriteria": ["Goal, Key, and HP HUD rows bind declared flags", "lose state is represented as HP 0/3"],
+      "passCriteria": ["HUD smoke proves row binding and dashboard rendering"],
+      "failCriteria": ["UI state requires browser write authority", "HUD state cannot be tied to flags"],
+      "evidenceExpectations": [
+        { "kind": "dashboard", "path": "gameplay.hudValues", "expected": "read-only rendered HUD evidence" },
+        { "kind": "world_state", "path": "componentModel.hudValues", "expected": "Goal/Key/HP rows" }
+      ],
+      "fixtureRefs": ["hud-model.json", "hud-smoke.test.cjs", "examples/evidence-dashboard/dashboard.js"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/hud-smoke.test.cjs", "node examples/evidence-dashboard/dashboard.test.cjs"],
+      "forbiddenActions": ["direct trusted Studio source write", "browser command bridge"]
+    },
+    {
+      "id": "demo-runtime-probe-state",
+      "area": "runtime probe state",
+      "description": "Runtime probes expose scene, level, entity, flag, and behavior state for agents/Studio inspection.",
+      "acceptanceCriteria": ["runtimeState returns schemaVersion runtime-state-v1", "current level metadata is visible", "hazard entity state is visible"],
+      "passCriteria": ["probe evidence links level ids and objective metadata", "probe remains read-only"],
+      "failCriteria": ["probe mutates source", "probe hides malformed or missing state"],
+      "evidenceExpectations": [
+        { "kind": "runtime_probe", "path": "schemaVersion", "expected": "runtime-state-v1" },
+        { "kind": "runtime_probe", "path": "level.id", "expected": "current level id" },
+        { "kind": "runtime_probe", "path": "entities", "expected": "hazard entity listed when present" }
+      ],
+      "fixtureRefs": ["level-set-smoke.test.cjs", "behavior-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/level-set-smoke.test.cjs", "node examples/playable-demo-v2/collect-and-exit/behavior-smoke.test.cjs"],
+      "forbiddenActions": ["direct trusted Studio source write"]
+    },
+    {
+      "id": "demo-export-smoke",
+      "area": "export smoke",
+      "description": "Tie the demo to local web export/package evidence without public release claims.",
+      "acceptanceCriteria": ["local web export profile exists", "package metadata avoids publish/release fields", "probe checks remain local"],
+      "passCriteria": ["export fixture validates as local package evidence", "no signing/deploy/store fields exist"],
+      "failCriteria": ["commercial release/public deployment is required", "native/mobile/console export is claimed"],
+      "evidenceExpectations": [
+        { "kind": "export_profile", "path": "export/export-profile.json", "expected": "local web target only" },
+        { "kind": "package_metadata", "path": "export/package-metadata.json", "expected": "no publish/sign/deploy fields" }
+      ],
+      "fixtureRefs": ["export/export-profile.json", "export/package-metadata.json"],
+      "verificationRefs": ["cargo test -- --test-threads=1"],
+      "forbiddenActions": ["commercial release", "public deployment", "native/mobile/console export", "signing or credentialed upload"]
+    },
+    {
+      "id": "demo-studio-walkthrough",
+      "area": "Studio walkthrough",
+      "description": "Inspect demo evidence through read-only dashboard/cockpit surfaces.",
+      "acceptanceCriteria": ["dashboard renders evidence summaries", "cockpit remains read-only/draft-only for trusted source"],
+      "passCriteria": ["dashboard and cockpit node checks pass", "walkthrough evidence does not require source write authority"],
+      "failCriteria": ["Studio writes trusted source directly", "browser command bridge is required"],
+      "evidenceExpectations": [
+        { "kind": "dashboard", "path": "examples/evidence-dashboard/dashboard.test.cjs", "expected": "pass" },
+        { "kind": "cockpit", "path": "examples/authoring-cockpit/cockpit.test.cjs", "expected": "pass" }
+      ],
+      "fixtureRefs": ["examples/evidence-dashboard/dashboard.js", "examples/authoring-cockpit/cockpit.js"],
+      "verificationRefs": ["node examples/evidence-dashboard/dashboard.test.cjs", "node examples/authoring-cockpit/cockpit.test.cjs"],
+      "forbiddenActions": ["direct trusted Studio source write", "browser command bridge"]
+    },
+    {
+      "id": "demo-plugin-validation",
+      "area": "plugin validation",
+      "description": "Validate the inert collect-and-exit dashboard panel descriptor as metadata only.",
+      "acceptanceCriteria": ["plugin descriptor is present", "descriptor is read-only/inert", "no executable plugin runtime is introduced"],
+      "passCriteria": ["plugin validation tests pass", "descriptor has no install/update/run authority"],
+      "failCriteria": ["plugin requires executable runtime", "marketplace/network install is needed"],
+      "evidenceExpectations": [
+        { "kind": "plugin_descriptor", "path": "plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json", "expected": "inert read-only descriptor" },
+        { "kind": "cargo_test", "path": "tests/plugin_commands.rs", "expected": "no install or run commands exist" }
+      ],
+      "fixtureRefs": ["plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json"],
+      "verificationRefs": ["cargo test -- --test-threads=1"],
+      "forbiddenActions": ["executable plugin runtime", "marketplace or network plugin install/update"]
+    },
+    {
+      "id": "demo-evidence-bundle",
+      "area": "evidence bundle",
+      "description": "Aggregate world-state, HUD, asset, scenario, export, plugin, and governance evidence for QA/regression consumers.",
+      "acceptanceCriteria": ["evidence expectations are explicit", "generated outputs remain ignored", "#1 and #23 are governance anchors"],
+      "passCriteria": ["asset/read-model/e2e smokes pass", "matrix smoke validates every scenario", "protected issue states are reconfirmed before closure"],
+      "failCriteria": ["evidence is inferred from docs only", "generated output is committed outside fixture scope", "#1 or #23 is closed"],
+      "evidenceExpectations": [
+        { "kind": "asset_evidence", "path": "asset-evidence-smoke.test.cjs", "expected": "pass" },
+        { "kind": "matrix_evidence", "path": "scenario-matrix-smoke.test.cjs", "expected": "pass" },
+        { "kind": "governance", "path": "#1/#23", "expected": "open" }
+      ],
+      "fixtureRefs": ["asset-evidence-smoke.test.cjs", "evidence-read-model-smoke.test.cjs", "scenario-matrix-smoke.test.cjs"],
+      "verificationRefs": ["node examples/playable-demo-v2/collect-and-exit/scenario-matrix-smoke.test.cjs"],
+      "forbiddenActions": ["auto-apply", "auto-merge", "self-approval"]
+    }
+  ],
+  "qaSwarmReadiness": {
+    "status": "ready-for-read-only-planning",
+    "notes": "QA swarm/regression issues may consume this matrix for scenario selection and expected evidence. It does not authorize autonomous fixes, direct source writes, publish/deploy operations, plugin execution, or command expansion."
+  },
+  "restartEvidenceRequired": true,
+  "governance": {
+    "protectedIssuesMustRemainOpen": [1, 23],
+    "wordingBoundary": "Scoped playable vertical-slice evidence only; no Godot replacement/parity/production-ready/commercial-release claim."
+  }
+}

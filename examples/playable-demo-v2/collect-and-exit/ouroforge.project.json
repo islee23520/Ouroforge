@@ -20,11 +20,25 @@
     {
       "id": "collect-and-exit",
       "path": "scenarios/collect-and-exit.json"
+    },
+    {
+      "id": "collect-and-exit-demo-matrix",
+      "path": "scenarios/demo-scenario-matrix.json"
+    },
+    {
+      "id": "collect-and-exit-demo-scenario-matrix",
+      "path": "scenarios/demo-scenario-matrix.json"
     }
   ],
-  "assetRoots": ["assets"],
+  "assetRoots": [
+    "assets"
+  ],
   "runsRoot": "runs",
   "generated": {
-    "roots": ["runs", "target", "dashboard-data"]
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ]
   }
 }
