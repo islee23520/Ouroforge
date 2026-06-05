@@ -79,3 +79,63 @@ fn verdict_schema_preserves_existing_gate_field_names() {
     );
     assert_eq!(value["semantic"][0]["targetPath"], "player.health");
 }
+
+#[test]
+fn evaluator_crate_owns_top_level_run_verdict_writer() {
+    let run_dir = std::env::temp_dir().join(format!(
+        "ouroforge-evaluator-run-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(run_dir.join("evidence/scenarios/bootstrap"))
+        .expect("run evidence dir writes");
+    std::fs::write(
+        run_dir.join("evidence/scenarios/bootstrap/world-state.json"),
+        "{}\n",
+    )
+    .expect("world state writes");
+    std::fs::write(
+        run_dir.join("evidence/scenarios/bootstrap/frame-stats.json"),
+        "{}\n",
+    )
+    .expect("frame stats writes");
+    std::fs::write(
+        run_dir.join("evidence/scenarios/bootstrap/scenario-result.json"),
+        serde_json::to_string_pretty(&json!({
+            "scenario_id": "bootstrap",
+            "status": "passed",
+            "assertions": [],
+            "evidence": {
+                "world_state": "evidence/scenarios/bootstrap/world-state.json",
+                "frame_stats": "evidence/scenarios/bootstrap/frame-stats.json"
+            }
+        }))
+        .expect("scenario serializes"),
+    )
+    .expect("scenario writes");
+    std::fs::write(
+        run_dir.join("evidence/index.json"),
+        serde_json::to_string_pretty(&json!({
+            "artifacts": [{
+                "id": "bootstrap-result",
+                "kind": "application/json",
+                "path": "evidence/scenarios/bootstrap/scenario-result.json",
+                "metadata": { "artifact": "scenario_result" },
+                "added_at_unix_ms": 1
+            }]
+        }))
+        .expect("index serializes"),
+    )
+    .expect("index writes");
+
+    let verdict = ouroforge_evaluator::evaluate_run_with_config(&run_dir, None)
+        .expect("evaluator crate evaluates run");
+
+    assert_eq!(verdict.status, "passed");
+    assert_eq!(verdict.metadata["evaluator"], "ouroforge-evaluator-v0");
+    assert!(run_dir.join("verdict.json").is_file());
+    std::fs::remove_dir_all(run_dir).expect("temp run cleanup");
+}
