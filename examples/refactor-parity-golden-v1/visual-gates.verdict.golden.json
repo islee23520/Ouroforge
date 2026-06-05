@@ -43,10 +43,41 @@
       "threshold_summary": []
     }
   ],
+  "gateCategories": {
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    },
+    "mechanical": {
+      "declared": true,
+      "failureCount": 0,
+      "resultCount": 1,
+      "status": "pass"
+    },
+    "runtime": {
+      "declared": false,
+      "failureCount": 0,
+      "resultCount": 0,
+      "status": "pass"
+    },
+    "semantic": {
+      "declared": false,
+      "failureCount": 0,
+      "resultCount": 0,
+      "status": "pass"
+    },
+    "visual": {
+      "declared": true,
+      "failureCount": 2,
+      "resultCount": 3,
+      "status": "fail"
+    }
+  },
   "metadata": {
     "behavior_evaluator_results": 0,
     "evaluator": "ouroforge-evaluator-v0",
     "scenario_results": 1,
+    "semantic_gate_results": 0,
     "suite_summaries": 0,
     "visual_gate_results": 3
   },
