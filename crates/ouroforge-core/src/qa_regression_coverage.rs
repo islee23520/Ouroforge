@@ -267,16 +267,85 @@ fn require_text(field: &str, value: &str) -> Result<()> {
 }
 
 fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
-    value.contains(phrase)
-        && ![
-            "no ",
-            "not ",
-            "without ",
-            "avoid ",
-            "forbid ",
-            "forbidden ",
-            "not yet ",
-        ]
-        .iter()
-        .any(|prefix| value.contains(&format!("{prefix}{phrase}")))
+    const NEGATIONS: [&str; 7] = [
+        "no ",
+        "not ",
+        "without ",
+        "avoid ",
+        "forbid ",
+        "forbidden ",
+        "not yet ",
+    ];
+    let hay = value;
+    // Scope negation to the clause/sentence containing each occurrence so a
+    // negated mention in one sentence cannot whitelist a positive mention in
+    // another (fail-closed), while a single leading negation still covers a
+    // list such as `no auto-apply or self-approval`. A contrastive conjunction
+    // ends the negation's scope so wording like `no auto-fix, but auto-fix
+    // enabled` still fails closed.
+    const CONTRASTS: [&str; 6] = [
+        " but ",
+        " however ",
+        " yet ",
+        " whereas ",
+        " nevertheless ",
+        " though ",
+    ];
+    let mut search_start = 0;
+    while let Some(rel) = hay[search_start..].find(phrase) {
+        let idx = search_start + rel;
+        let mut clause_start = hay[..idx]
+            .rfind(['.', ';', '!', '\n', '\r'])
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        if let Some(reset) = CONTRASTS
+            .iter()
+            .filter_map(|c| {
+                hay[clause_start..idx]
+                    .rfind(c)
+                    .map(|p| clause_start + p + c.len())
+            })
+            .max()
+        {
+            clause_start = reset;
+        }
+        let preceding = &hay[clause_start..idx];
+        let negated = NEGATIONS.iter().any(|n| preceding.contains(n));
+        if !negated {
+            return true;
+        }
+        search_start = idx + phrase.len();
+    }
+    false
+}
+
+#[cfg(test)]
+mod negation_scope_tests {
+    use super::contains_positive_phrase;
+
+    #[test]
+    fn negated_then_positive_in_separate_sentences_is_flagged() {
+        // A negated mention in one sentence must not whitelist a positive
+        // mention in another (the prior fail-open bypass for issue #697).
+        let value = "no auto-fix is authorized. auto-fix enabled for passing rows.";
+        assert!(contains_positive_phrase(value, "auto-fix"));
+    }
+
+    #[test]
+    fn contrastive_clause_after_negation_is_flagged() {
+        // A contrastive conjunction ends the negation's scope, so a later
+        // positive claim in the same sentence still fails closed.
+        assert!(contains_positive_phrase(
+            "no auto-fix, but auto-fix enabled for passing rows",
+            "auto-fix"
+        ));
+    }
+
+    #[test]
+    fn list_style_single_negation_is_preserved() {
+        // A single leading negation still covers a contrast-free comma/or list.
+        let value = "no auto-fix, auto-merge, or self-approval is performed.";
+        assert!(!contains_positive_phrase(value, "auto-fix"));
+        assert!(!contains_positive_phrase(value, "auto-merge"));
+    }
 }

@@ -602,13 +602,37 @@ fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
     // negated mention in one sentence cannot whitelist a positive mention in
     // another (fail-closed), while a single leading negation still covers a
     // list such as `no auto-apply or self-approval`.
+    const CONTRASTS: [&str; 6] = [
+        " but ",
+        " however ",
+        " yet ",
+        " whereas ",
+        " nevertheless ",
+        " though ",
+    ];
     let mut search_start = 0;
     while let Some(rel) = hay[search_start..].find(phrase) {
         let idx = search_start + rel;
-        let clause_start = hay[..idx]
+        let mut clause_start = hay[..idx]
             .rfind(['.', ';', '!', '\n', '\r'])
             .map(|p| p + 1)
             .unwrap_or(0);
+        // A contrastive conjunction ends the preceding negation's scope so a
+        // negated mention cannot whitelist a later positive mention in the same
+        // sentence (e.g. `no auto-fix, but auto-fix enabled` fails closed),
+        // while simple comma/or lists such as `no auto-apply or self-approval`
+        // stay negated.
+        if let Some(reset) = CONTRASTS
+            .iter()
+            .filter_map(|c| {
+                hay[clause_start..idx]
+                    .rfind(c)
+                    .map(|p| clause_start + p + c.len())
+            })
+            .max()
+        {
+            clause_start = reset;
+        }
         let preceding = &hay[clause_start..idx];
         let negated = NEGATIONS.iter().any(|n| preceding.contains(n));
         if !negated {

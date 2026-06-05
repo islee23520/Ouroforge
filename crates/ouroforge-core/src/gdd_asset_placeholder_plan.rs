@@ -592,17 +592,42 @@ fn contains_positive_phrase(value: &str, phrase: &str) -> bool {
         "forbidden ",
         "out of scope ",
     ];
-    // Judge every occurrence independently: an occurrence is allowed only when it
-    // is locally negated (immediately preceded by a negation prefix). A later
-    // positive copy must not be suppressed by an earlier negated one, so e.g.
-    // `no remote fetch; remote fetch enabled` still fails closed.
+    let hay = value;
+    // Scope negation to the clause/sentence containing each occurrence so a
+    // negated mention in one sentence cannot whitelist a positive mention in
+    // another (fail-closed), while a single leading negation still covers a
+    // list such as `no auto-apply or self-approval`. A contrastive conjunction
+    // ends the negation's scope so wording like `no auto-fix, but auto-fix
+    // enabled` still fails closed.
+    const CONTRASTS: [&str; 6] = [
+        " but ",
+        " however ",
+        " yet ",
+        " whereas ",
+        " nevertheless ",
+        " though ",
+    ];
     let mut search_start = 0;
-    while let Some(rel) = value[search_start..].find(phrase) {
+    while let Some(rel) = hay[search_start..].find(phrase) {
         let idx = search_start + rel;
-        let locally_negated = NEGATIONS
+        let mut clause_start = hay[..idx]
+            .rfind(['.', ';', '!', '\n', '\r'])
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        if let Some(reset) = CONTRASTS
             .iter()
-            .any(|prefix| value[..idx].ends_with(prefix));
-        if !locally_negated {
+            .filter_map(|c| {
+                hay[clause_start..idx]
+                    .rfind(c)
+                    .map(|p| clause_start + p + c.len())
+            })
+            .max()
+        {
+            clause_start = reset;
+        }
+        let preceding = &hay[clause_start..idx];
+        let negated = NEGATIONS.iter().any(|n| preceding.contains(n));
+        if !negated {
             return true;
         }
         search_start = idx + phrase.len();
