@@ -40707,6 +40707,9 @@ fn render_journal(
     out.push_str(&render_scene3d_scenario_assertions_journal_section(
         run_dir, evidence,
     ));
+    out.push_str(&render_behavior_assertions_journal_section(
+        run_dir, evidence, verdict,
+    ));
 
     out.push_str("## Evidence\n\n");
     if evidence.artifacts.is_empty() {
@@ -40930,6 +40933,220 @@ fn read_dashboard_scenario_assertions(
         evidence_refs,
         targets,
         boundary: "Display-only assertion summary; browser/dashboard surfaces do not perform trusted writes or production 3D engine validation.".to_string(),
+    }
+}
+
+fn render_behavior_assertions_journal_section(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    verdict: &serde_json::Value,
+) -> String {
+    let mut out = String::new();
+    out.push_str("## Behavior Assertion Evidence\n\n");
+    let results = match select_dashboard_artifacts(
+        run_dir,
+        &evidence.artifacts,
+        dashboard_artifact_is_behavior_assertion_result,
+    ) {
+        Ok(results) => results,
+        Err(error) => {
+            out.push_str(&format!(
+                "- Behavior assertion evidence could not be read: {error}\n\n"
+            ));
+            return out;
+        }
+    };
+    let summary = read_dashboard_behavior_assertions(&results);
+    if !summary.present {
+        out.push_str("- No behavior assertion result artifacts were recorded.\n\n");
+        return out;
+    }
+
+    out.push_str(&format!("- Boundary: {}\n", summary.boundary));
+    out.push_str(&format!(
+        "- Behavior assertion result artifacts: `{}` (`{}` malformed/missing).\n",
+        summary.result_count, summary.malformed_count
+    ));
+    out.push_str(&format!(
+        "- Behavior assertions: `{}` total (`{}` passed, `{}` failed).\n",
+        summary.total_count, summary.passed_count, summary.failed_count
+    ));
+    out.push_str(&format!(
+        "- Result refs: {}; evidence refs: {}\n",
+        join_or_none(&summary.result_refs),
+        join_or_none(&summary.evidence_refs)
+    ));
+    out.push_str("- Suites:\n");
+    for suite in &summary.suites {
+        out.push_str(&format!(
+            "  - Suite `{}` status `{}` scenario `{}` result `{}` evidence `{}` (`{}` passed, `{}` failed)\n",
+            suite.suite_id,
+            suite.status,
+            suite.scenario_id.as_deref().unwrap_or("none"),
+            suite.result_ref,
+            suite.evidence_ref.as_deref().unwrap_or("none"),
+            suite.passed_count,
+            suite.failed_count
+        ));
+        for failure in &suite.failures {
+            out.push_str(&format!(
+                "    - Failed behavior assertion `{}`: {}\n",
+                failure.assertion_id, failure.message
+            ));
+        }
+    }
+
+    let behavior_failures = verdict
+        .get("failures")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter(|failure| {
+            matches!(
+                failure.get("kind").and_then(|value| value.as_str()),
+                Some("behavior_assertion_failed")
+                    | Some("missing_behavior_evidence")
+                    | Some("malformed_behavior_evidence")
+                    | Some("malformed_behavior_assertion_suite")
+            )
+        })
+        .collect::<Vec<_>>();
+    if behavior_failures.is_empty() {
+        out.push_str("- Verdict-linked behavior failures: none.\n\n");
+    } else {
+        out.push_str("- Verdict-linked behavior failures:\n");
+        for failure in behavior_failures {
+            out.push_str(&format!(
+                "  - `{}`: result `{}` evidence `{}` message `{}`\n",
+                failure
+                    .get("kind")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("behavior_failure"),
+                failure
+                    .get("result_ref")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("none"),
+                failure
+                    .get("evidence_ref")
+                    .or_else(|| failure.get("path"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("none"),
+                failure
+                    .get("message")
+                    .or_else(|| failure.get("reason"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("none")
+            ));
+        }
+        out.push('\n');
+    }
+    out
+}
+
+fn read_dashboard_behavior_assertions(
+    result_artifacts: &[RunDashboardArtifact],
+) -> RunDashboardBehaviorAssertions {
+    let mut suites = Vec::new();
+    let mut total_count = 0usize;
+    let mut passed_count = 0usize;
+    let mut failed_count = 0usize;
+    let mut malformed_count = 0usize;
+    let mut result_refs = Vec::new();
+    let mut evidence_refs = Vec::new();
+
+    for artifact in result_artifacts {
+        if !artifact.exists || artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = artifact.value.as_ref() else {
+            malformed_count += 1;
+            continue;
+        };
+        let assertions = value
+            .get("assertions")
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let mut suite_passed = 0usize;
+        let mut suite_failed = 0usize;
+        let mut suite_failures = Vec::new();
+        for assertion in assertions {
+            total_count += 1;
+            let status = assertion
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown");
+            if status == "passed" {
+                passed_count += 1;
+                suite_passed += 1;
+            } else {
+                failed_count += 1;
+                suite_failed += 1;
+                suite_failures.push(RunDashboardBehaviorAssertionFailure {
+                    assertion_id: assertion
+                        .get("assertionId")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    message: assertion
+                        .get("message")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("No behavior assertion message recorded.")
+                        .to_string(),
+                });
+            }
+        }
+        result_refs.push(artifact.path.clone());
+        let evidence_ref = value
+            .get("evidenceRef")
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        if let Some(reference) = &evidence_ref {
+            evidence_refs.push(reference.clone());
+        }
+        suites.push(RunDashboardBehaviorAssertionSuite {
+            suite_id: value
+                .get("suiteId")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            scenario_id: value
+                .get("scenarioId")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            status: value
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            result_ref: artifact.path.clone(),
+            evidence_ref,
+            total_count: suite_passed + suite_failed,
+            passed_count: suite_passed,
+            failed_count: suite_failed,
+            failures: suite_failures,
+        });
+    }
+
+    dedupe_sorted(&mut result_refs);
+    dedupe_sorted(&mut evidence_refs);
+    RunDashboardBehaviorAssertions {
+        present: !result_artifacts.is_empty(),
+        empty_state: if result_artifacts.is_empty() {
+            "No behavior assertion result artifacts were found.".to_string()
+        } else {
+            String::new()
+        },
+        result_count: result_artifacts.len(),
+        malformed_count,
+        total_count,
+        passed_count,
+        failed_count,
+        result_refs,
+        evidence_refs,
+        suites,
+        boundary: "Display-only structured behavior assertion summary; no arbitrary script execution, dynamic imports, browser trusted writes, command bridge, or production scripting API.".to_string(),
     }
 }
 
@@ -52093,6 +52310,7 @@ pub struct RunDashboardReadModel {
     pub performance_metrics: Vec<RunDashboardArtifact>,
     pub scenario_results: Vec<RunDashboardArtifact>,
     pub scenario_assertions: RunDashboardScenarioAssertions,
+    pub behavior_assertions: RunDashboardBehaviorAssertions,
     pub mutation_artifacts: Vec<RunDashboardArtifact>,
     pub mutation_lifecycle: RunDashboardMutationLifecycle,
     pub review_cockpit: RunDashboardReviewCockpit,
@@ -52165,6 +52383,40 @@ pub struct RunDashboardScenarioAssertionTarget {
     pub passed_count: usize,
     pub failed_count: usize,
     pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardBehaviorAssertions {
+    pub present: bool,
+    pub empty_state: String,
+    pub result_count: usize,
+    pub malformed_count: usize,
+    pub total_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub result_refs: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub suites: Vec<RunDashboardBehaviorAssertionSuite>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardBehaviorAssertionSuite {
+    pub suite_id: String,
+    pub scenario_id: Option<String>,
+    pub status: String,
+    pub result_ref: String,
+    pub evidence_ref: Option<String>,
+    pub total_count: usize,
+    pub passed_count: usize,
+    pub failed_count: usize,
+    pub failures: Vec<RunDashboardBehaviorAssertionFailure>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardBehaviorAssertionFailure {
+    pub assertion_id: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -52890,6 +53142,12 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let scenario_results =
         select_dashboard_artifacts(run_dir, &evidence, dashboard_artifact_is_scenario_result)?;
     let scenario_assertions = read_dashboard_scenario_assertions(&scenario_results);
+    let behavior_assertion_results = select_dashboard_artifacts(
+        run_dir,
+        &evidence,
+        dashboard_artifact_is_behavior_assertion_result,
+    )?;
+    let behavior_assertions = read_dashboard_behavior_assertions(&behavior_assertion_results);
     let mutation_artifacts = select_dashboard_mutation_artifacts(run_dir)?;
     let mutation_lifecycle = read_dashboard_mutation_lifecycle(run_dir, &mutations);
     let regression_promotions = read_regression_promotion_records(run_dir);
@@ -52959,6 +53217,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         performance_metrics,
         scenario_results,
         scenario_assertions,
+        behavior_assertions,
         mutation_artifacts,
         mutation_lifecycle,
         review_cockpit,
@@ -54954,6 +55213,16 @@ fn dashboard_artifact_is_scenario_result(artifact: &EvidenceArtifact) -> bool {
         == Some("scenario_result")
         || artifact.id.contains("scenario-result")
         || artifact.path.contains("scenario-result")
+}
+
+fn dashboard_artifact_is_behavior_assertion_result(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("behavior_assertion_result")
+        || artifact.id.contains("behavior-assertion-result")
+        || artifact.path.contains("behavior-assertions")
 }
 
 fn dashboard_artifact_is_input_replay(artifact: &EvidenceArtifact) -> bool {
@@ -76797,6 +77066,47 @@ scenarios:
     }
 
     #[test]
+    fn journal_summarizes_behavior_assertion_failures_and_refs() {
+        let (root, artifacts) = create_test_run("behavior-assertion-journal-test");
+        write_behavior_assertion_suite_fixture(
+            &artifacts.run_dir,
+            "behavior-fail-suite",
+            "missing-action",
+            "evidence/behavior/runtime-evidence.json",
+        );
+        let verdict = evaluate_run(&artifacts.run_dir).expect("evaluation succeeds");
+        assert_eq!(verdict.status, "failed");
+
+        let journal = update_journal(&artifacts.run_dir).expect("journal updates");
+
+        assert!(journal.contains("## Behavior Assertion Evidence"));
+        assert!(journal.contains("`behavior-fail-suite`"));
+        assert!(journal.contains("Failed behavior assertion `jump-action`"));
+        assert!(journal.contains("evidence/behavior/runtime-evidence.json"));
+        assert!(journal.contains("evidence/behavior-assertions/behavior-fail-suite-result.json"));
+        assert!(journal.contains("no arbitrary script execution"));
+
+        let dashboard = read_dashboard_run(&artifacts.run_dir).expect("dashboard reads");
+        let behavior_entry = dashboard
+            .journal_view
+            .entries
+            .iter()
+            .find(|entry| entry.heading == "Behavior Assertion Evidence")
+            .expect("behavior journal entry present");
+        assert!(behavior_entry
+            .evidence_refs
+            .iter()
+            .any(|reference| reference == "evidence/behavior/runtime-evidence.json"));
+        assert!(behavior_entry
+            .evidence_refs
+            .iter()
+            .any(|reference| reference
+                == "evidence/behavior-assertions/behavior-fail-suite-result.json"));
+        assert_eq!(behavior_entry.verdict_refs, vec!["verdict.json"]);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn evaluator_marks_run_pending_without_scenario_results() {
         let (root, artifacts) = create_test_run("ouroforge-eval-pending-test");
 
@@ -87641,6 +87951,14 @@ scenarios:
         )]);
         write_json(&run_dir.join(evidence_ref), &json!(evidence))
             .expect("behavior evidence written");
+        add_evidence_artifact(
+            run_dir,
+            &format!("fixture-{suite_id}-runtime-evidence"),
+            "application/json",
+            evidence_ref,
+            json!({ "artifact": "behavior_runtime_evidence", "scenario_id": "bootstrap-smoke" }),
+        )
+        .expect("behavior runtime evidence indexed");
         write_behavior_assertion_suite_json(run_dir, suite_id, evidence_ref, action_id);
     }
 
