@@ -1,121 +1,127 @@
 #!/usr/bin/env node
 'use strict';
 
-// Godot-Plus demo scenario matrix smoke (#787).
-//
-// Validates that the checked-in matrix maps required acceptance areas to
-// pass/fail criteria, evidence artifacts, executable/read-only verification
-// refs, and explicit forbidden-action boundaries. It does not execute trusted
-// source writes, browser command bridges, installs, releases, or plugin code.
+// Demo Scenario Matrix v1 smoke (#787).
+// Validates the read-only acceptance-to-evidence matrix for the canonical
+// playable-demo-v2 Collect and Exit fixture. The smoke performs no command
+// execution beyond local validation and never writes generated state.
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const fixtureDir = __dirname;
+const repoRoot = path.resolve(fixtureDir, '..', '..', '..');
+const matrixPath = path.join(fixtureDir, 'scenarios', 'demo-scenario-matrix.json');
+const projectPath = path.join(fixtureDir, 'ouroforge.project.json');
 
-function readJson(relativePath) {
-  return JSON.parse(fs.readFileSync(path.join(fixtureDir, relativePath), 'utf8'));
+const requiredAreas = new Set([
+  'start game',
+  'move player',
+  'complete level',
+  'fail/restart',
+  'enemy interaction',
+  'objective update',
+  'UI state',
+  'runtime probe state',
+  'export smoke',
+  'Studio walkthrough',
+  'plugin validation',
+  'evidence bundle',
+]);
+
+const blockedTokens = [
+  'commercial release',
+  'public deployment',
+  'native/mobile/console export',
+  'app-store/Steam/itch publishing',
+  'signing or credentialed upload',
+  'full Godot replacement or parity claim',
+  'production-ready claim',
+  'direct trusted Studio source write',
+  'source mutation bypass',
+  'auto-apply',
+  'auto-merge',
+  'self-approval',
+  'executable plugin runtime',
+  'marketplace or network plugin install/update',
+  'dependency install/update',
+  'CI/workflow mutation',
+  'browser command bridge',
+  'arbitrary shell execution',
+];
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function exists(relativePath) {
-  return fs.existsSync(path.join(fixtureDir, relativePath));
+function assertRepoRefExists(ref) {
+  if (ref.startsWith('#')) return;
+  if (/^[a-z]+ test /.test(ref) || ref.startsWith('node ') || ref.startsWith('cargo ')) return;
+  const candidates = [
+    path.join(fixtureDir, ref),
+    path.join(repoRoot, ref),
+  ];
+  assert.ok(candidates.some((candidate) => fs.existsSync(candidate)), `fixture ref exists: ${ref}`);
 }
 
-const matrix = readJson('scenarios/demo-scenario-matrix.json');
-const project = readJson('ouroforge.project.json');
+const matrix = readJson(matrixPath);
+const project = readJson(projectPath);
 
 assert.equal(matrix.schemaVersion, 'demo-scenario-matrix-v1');
 assert.equal(matrix.issue, 787);
-assert.equal(matrix.projectId, 'collect_and_exit_demo');
-assert.ok(project.scenarioPacks.some((pack) => pack.id === 'collect-and-exit-demo-matrix'));
+assert.equal(matrix.scope.fixtureRoot, 'examples/playable-demo-v2/collect-and-exit');
+assert.deepEqual(matrix.governance.protectedIssuesMustRemainOpen, [1, 23]);
+assert.equal(matrix.restartEvidenceRequired, true);
 
-const requiredScenarioIds = [
-  'start-game',
-  'move-player',
-  'complete-level',
-  'fail-restart',
-  'enemy-interaction',
-  'objective-update',
-  'ui-state',
-  'runtime-probe-state',
-  'export-smoke',
-  'studio-walkthrough',
-  'plugin-validation',
-  'evidence-bundle',
-];
-assert.deepEqual(matrix.scenarios.map((scenario) => scenario.id), requiredScenarioIds);
-
-for (const [name, relativePath] of Object.entries(matrix.sourceRefs)) {
-  assert.equal(exists(relativePath), true, `sourceRef ${name} resolves to ${relativePath}`);
+for (const token of blockedTokens) {
+  assert.ok(matrix.blockedActions.includes(token), `blocked action listed: ${token}`);
 }
 
-const forbidden = new Set(matrix.forbiddenActions);
-for (const required of [
-  'directTrustedSourceWrite',
-  'autoApply',
-  'autoMerge',
-  'browserCommandBridge',
-  'arbitraryShellExecution',
-  'dependencyInstall',
-  'credentialedOperation',
-  'publicDeploy',
-  'releaseSigning',
-  'storePublishing',
-  'executablePluginRuntime',
-  'pluginMarketplace',
-  'networkPluginInstall',
-]) {
-  assert.equal(forbidden.has(required), true, `forbidden action ${required} is explicit`);
+assert.ok(
+  project.scenarioPacks.some((pack) => pack.id === matrix.id && pack.path === 'scenarios/demo-scenario-matrix.json'),
+  'project manifest registers the demo scenario matrix pack'
+);
+
+assert.ok(Array.isArray(matrix.scenarioFixtures) && matrix.scenarioFixtures.length >= 8, 'scenario fixtures are declared');
+for (const fixture of matrix.scenarioFixtures) {
+  assert.ok(fixture.id && fixture.path && fixture.type && fixture.purpose, `fixture shape: ${fixture.id}`);
+  assertRepoRefExists(fixture.path);
 }
 
-const categories = new Set(matrix.scenarios.map((scenario) => scenario.category));
-for (const required of ['runtime', 'gameplay', 'behavior', 'ui', 'evidence', 'export', 'studio', 'plugin']) {
-  assert.equal(categories.has(required), true, `category ${required} covered`);
-}
-
-const evidenceKinds = new Set();
+assert.equal(matrix.scenarios.length, requiredAreas.size, 'one scenario per required acceptance area');
+const seenIds = new Set();
+const coveredAreas = new Set();
+let scenariosWithForbiddenGuard = 0;
 for (const scenario of matrix.scenarios) {
-  assert.ok(scenario.title, `${scenario.id}: title`);
-  assert.ok(scenario.acceptanceCriteria.length > 0, `${scenario.id}: acceptance criteria`);
-  assert.ok(scenario.passCriteria.length > 0, `${scenario.id}: pass criteria`);
-  assert.ok(scenario.failCriteria.length > 0, `${scenario.id}: fail criteria`);
-  assert.ok(scenario.evidenceArtifacts.length > 0, `${scenario.id}: evidence artifacts`);
-  assert.ok(scenario.verificationRefs.length > 0, `${scenario.id}: verification refs`);
-  for (const artifact of scenario.evidenceArtifacts) evidenceKinds.add(artifact);
-  for (const ref of scenario.verificationRefs) {
-    assert.equal(exists(ref), true, `${scenario.id}: verification ref ${ref} exists`);
-    assert.equal(ref.includes('..'), false, `${scenario.id}: verification ref stays inside fixture`);
+  assert.ok(scenario.id && /^demo-/.test(scenario.id), `scenario id prefix: ${scenario.id}`);
+  assert.equal(seenIds.has(scenario.id), false, `unique scenario id: ${scenario.id}`);
+  seenIds.add(scenario.id);
+  coveredAreas.add(scenario.area);
+
+  assert.ok(requiredAreas.has(scenario.area), `required area covered: ${scenario.area}`);
+  assert.ok(scenario.description && scenario.description.length > 20, `${scenario.id}: description`);
+  assert.ok(Array.isArray(scenario.acceptanceCriteria) && scenario.acceptanceCriteria.length > 0, `${scenario.id}: acceptance criteria`);
+  assert.ok(Array.isArray(scenario.passCriteria) && scenario.passCriteria.length > 0, `${scenario.id}: pass criteria`);
+  assert.ok(Array.isArray(scenario.failCriteria) && scenario.failCriteria.length > 0, `${scenario.id}: fail criteria`);
+  assert.ok(Array.isArray(scenario.evidenceExpectations) && scenario.evidenceExpectations.length > 0, `${scenario.id}: evidence expectations`);
+  assert.ok(Array.isArray(scenario.fixtureRefs) && scenario.fixtureRefs.length > 0, `${scenario.id}: fixture refs`);
+  assert.ok(Array.isArray(scenario.verificationRefs) && scenario.verificationRefs.length > 0, `${scenario.id}: verification refs`);
+  assert.ok(Array.isArray(scenario.forbiddenActions), `${scenario.id}: forbidden actions array`);
+
+  for (const expectation of scenario.evidenceExpectations) {
+    assert.ok(expectation.kind && expectation.path && Object.hasOwn(expectation, 'expected'), `${scenario.id}: evidence expectation shape`);
   }
-  const joined = JSON.stringify(scenario).toLowerCase();
-  for (const blocked of ['publish', 'credential', 'marketplace', 'auto-merge', 'automerge']) {
-    if (joined.includes(blocked)) {
-      assert.match(joined, /no|not|required|blocked|forbid|without|fail|none/, `${scenario.id}: ${blocked} mention is bounded`);
-    }
+  for (const ref of scenario.fixtureRefs) assertRepoRefExists(ref);
+  for (const action of scenario.forbiddenActions) {
+    assert.ok(matrix.blockedActions.includes(action), `${scenario.id}: forbidden action inherits matrix guardrail: ${action}`);
   }
+  if (scenario.forbiddenActions.length > 0) scenariosWithForbiddenGuard += 1;
 }
 
-for (const requiredArtifact of [
-  'world_state',
-  'runtime_events',
-  'frame_stats',
-  'runtime_probe',
-  'dashboard_read_model',
-  'studio_inspector',
-  'plugin_descriptor',
-  'export_profile',
-  'asset_provenance',
-  'scenario_verdicts',
-]) {
-  assert.equal(evidenceKinds.has(requiredArtifact), true, `evidence artifact ${requiredArtifact} covered`);
-}
+assert.deepEqual([...coveredAreas].sort(), [...requiredAreas].sort(), 'all required scenario areas covered');
+assert.ok(scenariosWithForbiddenGuard >= 8, 'most scenarios carry explicit forbidden-action guardrails');
+assert.match(matrix.qaSwarmReadiness.notes, /does not authorize autonomous fixes/i);
+assert.match(matrix.governance.wordingBoundary, /no Godot replacement\/parity\/production-ready\/commercial-release claim/i);
 
-for (const generatedName of ['runs', 'target', 'dashboard-data', 'dist', 'screenshots']) {
-  assert.equal(exists(generatedName), false, `${generatedName} remains generated/untracked`);
-}
-
-assert.equal(matrix.qaSwarmUse.status, 'ready-for-read-only-regression-planning');
-assert.match(matrix.qaSwarmUse.note, /does not grant auto-fix, auto-apply, merge, command bridge, dependency install, credential, release, or plugin runtime authority/);
-assert.match(matrix.globalGuardrails.wordingBoundary, /not full Godot replacement/);
-
-console.log(`collect-and-exit scenario matrix smoke passed; ${matrix.scenarios.length} scenarios verified`);
+console.log(`demo scenario matrix smoke passed; ${matrix.scenarios.length} scenarios validated`);
