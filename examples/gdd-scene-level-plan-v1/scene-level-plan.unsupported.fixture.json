@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "gdd-scene-level-plan-v1",
+  "planId": "gdd-level-unsupported-patrol",
+  "status": "blocked",
+  "feasibilityGateRef": "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
+  "scaffoldPlanRef": "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
+  "requirementIds": [
+    "req:avoid-patrol"
+  ],
+  "mechanicsMappingIds": [
+    "map:enemy-patrol"
+  ],
+  "levelIntents": [
+    {
+      "intentId": "intent_blocked_patrol_arena",
+      "levelIntentRef": "examples/level-intent-v1/level-intent.blocked.fixture.json",
+      "traceLinks": [
+        {
+          "requirementId": "req:avoid-patrol",
+          "mechanicsMappingId": "map:enemy-patrol"
+        }
+      ],
+      "capabilityStatus": "unsupported",
+      "blockedReasons": [
+        "Enemy patrol level capability is unsupported for this GDD slice."
+      ]
+    }
+  ],
+  "sceneGenerationPlans": [
+    {
+      "scenePlanId": "plan_blocked_patrol_arena",
+      "sceneGenerationPlanRef": "examples/scene-generation-plan-v1/scene-generation-plan.blocked.fixture.json",
+      "intentId": "intent_blocked_patrol_arena",
+      "traceLinks": [
+        {
+          "requirementId": "req:avoid-patrol",
+          "mechanicsMappingId": "map:enemy-patrol"
+        }
+      ],
+      "capabilityStatus": "unsupported",
+      "blockedReasons": [
+        "Patrol scene plan waits for approved capability evidence."
+      ]
+    }
+  ],
+  "objectivePlacements": [
+    {
+      "placementId": "place-patrol-safe-zone",
+      "objectiveId": "avoid_patrol",
+      "requirementId": "req:avoid-patrol",
+      "mechanicsMappingId": "map:enemy-patrol",
+      "targetSceneRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "targetTilemapRef": null,
+      "proofExpectationRef": "evidence/gdd-scene-level-plan-v1/patrol-scenario.json",
+      "blockedReasons": [
+        "Patrol objective placement is unsupported without patrol fixtures."
+      ]
+    }
+  ],
+  "progressionPlan": [
+    {
+      "stepId": "patrol-after-spawn",
+      "afterObjectiveRefs": [
+        "avoid_patrol"
+      ],
+      "beforeObjectiveRefs": [],
+      "rationale": "Blocked patrol objective remains visible for review."
+    }
+  ],
+  "targetRefs": [
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "kind": "scene",
+      "expectedHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/playable-demo-v2/collect-and-exit/assets/tilemaps/collect-and-exit.tilemap.json",
+      "kind": "tilemap",
+      "expectedHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/level-intent-v1/level-intent.valid.fixture.json",
+      "kind": "level-intent",
+      "expectedHash": null,
+      "staleTarget": false,
+      "blockedReasons": []
+    },
+    {
+      "targetRef": "examples/scene-generation-plan-v1/scene-generation-plan.valid.fixture.json",
+      "kind": "scene-generation-plan",
+      "expectedHash": null,
+      "staleTarget": false,
+      "blockedReasons": []
+    }
+  ],
+  "expectedEvidence": [
+    {
+      "evidenceId": "collect-key-scenario-proof",
+      "pathHint": "evidence/gdd-scene-level-plan-v1/collect-key-scenario.json",
+      "description": "Scenario proof should show key collection before exit."
+    },
+    {
+      "evidenceId": "level-plan-preview",
+      "pathHint": "evidence/gdd-scene-level-plan-v1/level-plan-preview.json",
+      "description": "Read-only preview of GDD-linked level intent and scene generation plan."
+    }
+  ],
+  "blockedReasons": [
+    "Unsupported patrol capability blocks scene/level planning."
+  ],
+  "boundary": "Non-mutating GDD scene/level planning; untrusted until Rust/local validation; review-gated apply only; no direct scene or tilemap writes; no autonomous unrestricted game creation; browser read-only or draft-only"
+}
