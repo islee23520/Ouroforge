@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "gdd-requirement-extraction-v1",
+  "extractionId": "conflicting-platform-requirements",
+  "status": "blocked",
+  "sourceArtifactRef": "examples/gdd-design-brief-v1/design-brief.blocked.fixture.json",
+  "sourceSections": [
+    {
+      "id": "platform",
+      "title": "Platform constraints",
+      "sourceRef": "gdd:platform",
+      "text": "The prototype must be a keyboard-only web demo. The same prototype must require touch-only mobile gestures."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-CTRL-KEYBOARD-ONLY",
+      "category": "control",
+      "sourceSectionRef": "platform",
+      "sourceExcerpt": "keyboard-only web demo",
+      "priority": "must",
+      "confidence": 0.88,
+      "ambiguityFlags": [],
+      "dependencyLinks": [],
+      "conflictsWith": ["REQ-CTRL-TOUCH-ONLY"],
+      "blockedReasons": ["conflicts with touch-only control requirement"],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    },
+    {
+      "id": "REQ-CTRL-TOUCH-ONLY",
+      "category": "control",
+      "sourceSectionRef": "platform",
+      "sourceExcerpt": "touch-only mobile gestures",
+      "priority": "must",
+      "confidence": 0.88,
+      "ambiguityFlags": [],
+      "dependencyLinks": [],
+      "conflictsWith": ["REQ-CTRL-KEYBOARD-ONLY"],
+      "blockedReasons": ["conflicts with keyboard-only control requirement"],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    }
+  ],
+  "boundary": "manual or structured extraction first; llm extraction advisory only; untrusted until rust/local validation; review-gated apply required later; no autonomous unrestricted game creation; not prototype generation authority."
+}

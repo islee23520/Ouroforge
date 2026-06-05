@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "gdd-requirement-extraction-v1",
+  "extractionId": "ambiguous-camera-requirements",
+  "status": "partial",
+  "sourceArtifactRef": "examples/gdd-design-brief-v1/design-brief.partial.fixture.json",
+  "sourceSections": [
+    {
+      "id": "camera",
+      "title": "Camera",
+      "sourceRef": "gdd:camera",
+      "text": "The camera should feel cinematic and follow the hero comfortably."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-CAMERA-FOLLOW",
+      "category": "level",
+      "sourceSectionRef": "camera",
+      "sourceExcerpt": "follow the hero comfortably",
+      "priority": "should",
+      "confidence": 0.55,
+      "ambiguityFlags": ["comfortably is underspecified"],
+      "dependencyLinks": [],
+      "conflictsWith": [],
+      "blockedReasons": ["camera tuning requires reviewer-defined bounds before prototype planning"],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    }
+  ],
+  "boundary": "manual or structured extraction first; llm extraction advisory only; untrusted until rust/local validation; review-gated apply required later; no autonomous unrestricted game creation; not prototype generation authority."
+}

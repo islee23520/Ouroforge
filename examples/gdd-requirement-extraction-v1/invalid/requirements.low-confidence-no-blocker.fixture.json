@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "gdd-requirement-extraction-v1",
+  "extractionId": "low-confidence-no-blocker",
+  "status": "ready",
+  "sourceArtifactRef": "examples/gdd-design-brief-v1/design-brief.valid.fixture.json",
+  "sourceSections": [
+    {
+      "id": "core-loop",
+      "title": "Core loop",
+      "sourceRef": "gdd:core-loop",
+      "text": "The player explores one compact level, collects three gems, avoids a patrolling slime, and reaches the exit door."
+    },
+    {
+      "id": "controls",
+      "title": "Controls",
+      "sourceRef": "gdd:controls",
+      "text": "Keyboard controls include left, right, jump, and interact."
+    },
+    {
+      "id": "acceptance",
+      "title": "Acceptance goals",
+      "sourceRef": "gdd:acceptance",
+      "text": "A valid prototype proves gem collection, slime contact damage, and exit unlock after all gems are collected."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-MECH-COLLECT-GEMS",
+      "category": "mechanic",
+      "sourceSectionRef": "core-loop",
+      "sourceExcerpt": "collects three gems",
+      "priority": "must",
+      "confidence": 0.2,
+      "ambiguityFlags": [],
+      "dependencyLinks": [],
+      "conflictsWith": [],
+      "blockedReasons": [],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    },
+    {
+      "id": "REQ-CTRL-KEYBOARD",
+      "category": "control",
+      "sourceSectionRef": "controls",
+      "sourceExcerpt": "left, right, jump, and interact",
+      "priority": "must",
+      "confidence": 0.93,
+      "ambiguityFlags": [],
+      "dependencyLinks": [
+        "REQ-MECH-COLLECT-GEMS"
+      ],
+      "conflictsWith": [],
+      "blockedReasons": [],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    },
+    {
+      "id": "REQ-ACCEPT-EXIT",
+      "category": "acceptance",
+      "sourceSectionRef": "acceptance",
+      "sourceExcerpt": "exit unlock after all gems are collected",
+      "priority": "must",
+      "confidence": 0.9,
+      "ambiguityFlags": [],
+      "dependencyLinks": [
+        "REQ-MECH-COLLECT-GEMS"
+      ],
+      "conflictsWith": [],
+      "blockedReasons": [],
+      "evidenceBoundary": "source-linked requirement; not generated authority; review required before any prototype draft or apply."
+    }
+  ],
+  "boundary": "manual or structured extraction first; llm extraction advisory only; untrusted until rust/local validation; review-gated apply required later; no autonomous unrestricted game creation; not prototype generation authority."
+}
