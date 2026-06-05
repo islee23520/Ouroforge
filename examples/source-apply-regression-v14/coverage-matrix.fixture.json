@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "scenario-coverage-v14-source-apply-v1",
+  "issue": 714,
+  "milestone": "#1 Milestone 15: Safe Source Mutation Apply",
+  "summary": "Read-only regression matrix that exercises each source-apply safety gate (high-risk blocker, review enforcement, sandbox promotion, rollback snapshot, verification runner, rerun comparison, emergency hold, audit ledger, evidence bundle) so critical failures cannot hide inside one demo. Generated outputs stay ignored unless fixture-scoped; no publish, deploy, sign, upload, credential, or command bridge is introduced.",
+  "scenarios": [
+    {
+      "id": "SA14.success-valid-apply-transaction",
+      "kind": "success",
+      "coverage": "An allowed source-like target passes the high-risk blocker, the review is accepted and independent, and the sandbox promotion is ready.",
+      "check": "SourceApplyHighRiskBlocker::is_allowed + SourceApplyReviewEnforcement::is_ready + SourceApplySandboxPromotion::evaluate.",
+      "expected": "All gates report ready/allowed; no apply or merge command is emitted."
+    },
+    {
+      "id": "SA14.block-missing-review",
+      "kind": "blocked",
+      "coverage": "A decision in the Missing state blocks apply.",
+      "check": "SourceApplyReviewEnforcement::evaluate with decision_state = Missing.",
+      "expected": "Status is not ready; apply stays blocked until an accepted decision exists."
+    },
+    {
+      "id": "SA14.block-self-review",
+      "kind": "blocked",
+      "coverage": "A reviewer equal to the proposer is not an independent review.",
+      "check": "SourceApplyReviewEnforcement::evaluate with reviewer_id == proposer_id.",
+      "expected": "Status is not ready; self-approval is rejected."
+    },
+    {
+      "id": "SA14.block-stale-target",
+      "kind": "blocked",
+      "coverage": "A sandbox base revision that drifts from the transaction base revision is stale.",
+      "check": "SourceApplySandboxPromotion::evaluate with sandbox_base_revision != transaction_base_revision.",
+      "expected": "Status is not ready; the stale base is surfaced before any trusted apply."
+    },
+    {
+      "id": "SA14.block-sandbox-mismatch",
+      "kind": "blocked",
+      "coverage": "A sandbox after-hash that disagrees with the expected after-hash is a mismatch.",
+      "check": "SourceApplySandboxPromotion::evaluate with sandbox_after_hash != expected_after_hash.",
+      "expected": "Status is not ready; the mismatched diff is surfaced."
+    },
+    {
+      "id": "SA14.block-forbidden-file-class",
+      "kind": "blocked",
+      "coverage": "A dependency lockfile is a forbidden high-risk class.",
+      "check": "SourceApplyHighRiskBlocker::is_allowed over a Cargo.lock candidate.",
+      "expected": "Status is blocked; the forbidden class is named and apply is refused."
+    },
+    {
+      "id": "SA14.block-missing-rollback",
+      "kind": "blocked",
+      "coverage": "A target with no before-content reference and no reverse patch has no recovery path.",
+      "check": "SourceApplyRollbackSnapshot::evaluate with before_content_ref = None and reverse_patch_ref = None.",
+      "expected": "Snapshot is not complete; a recovery gap is recorded before apply is allowed."
+    },
+    {
+      "id": "SA14.record-verification-failure",
+      "kind": "record",
+      "coverage": "A failed allowlisted verification command is recorded, not hidden.",
+      "check": "SourceApplyVerificationRun::evaluate with a Failed command status.",
+      "expected": "Run is not passed; the failure is visible as evidence."
+    },
+    {
+      "id": "SA14.record-rerun-regression",
+      "kind": "record",
+      "coverage": "A regressed rerun dimension blocks a promotion claim.",
+      "check": "SourceApplyRerunComparison::promotion_claim_allowed with a Regressed dimension.",
+      "expected": "Promotion claim is not allowed; the regression is recorded."
+    },
+    {
+      "id": "SA14.block-emergency-hold",
+      "kind": "blocked",
+      "coverage": "A global emergency hold blocks all apply locally.",
+      "check": "SourceApplyHold::evaluate_against a query while a global, disabled hold is active.",
+      "expected": "Apply is blocked; the local hold cannot be bypassed and has no remote kill switch."
+    },
+    {
+      "id": "SA14.success-audit-append-only",
+      "kind": "success",
+      "coverage": "The audit ledger is append-only and rejects history rewrites.",
+      "check": "SourceApplyAuditLedger::validate_is_append_of for a valid append and a rewritten/truncated history.",
+      "expected": "Valid appends pass; rewritten or truncated histories fail closed."
+    },
+    {
+      "id": "SA14.success-evidence-bundle",
+      "kind": "success",
+      "coverage": "A complete evidence bundle aggregates every gate reference read-only.",
+      "check": "SourceApplyEvidenceBundle::is_complete for a complete bundle.",
+      "expected": "Bundle is complete and consistent; it applies nothing."
+    },
+    {
+      "id": "SA14.block-malformed-evidence",
+      "kind": "blocked",
+      "coverage": "A bundle with an unresolved rollback and a failed component is incomplete.",
+      "check": "SourceApplyEvidenceBundle::evaluate with rollback_resolved = false and a failed component status.",
+      "expected": "Bundle is not complete; the unresolved/missing/stale evidence is surfaced."
+    },
+    {
+      "id": "SA14.success-read-only-inspection",
+      "kind": "success",
+      "coverage": "Gate evaluations are read-only for dashboard/Studio inspection.",
+      "check": "Serialized review/rollback evaluation has no applyCommand/mergeCommand keys and lists forbidden actions.",
+      "expected": "Browser/dashboard/Studio surfaces inspect JSON only; no accept/apply/write/merge/publish/deploy controls."
+    },
+    {
+      "id": "SA14.block-malformed-bundle-ref",
+      "kind": "blocked",
+      "coverage": "A bundle missing a required reference fails structural validation.",
+      "check": "SourceApplyEvidenceBundle::validate with an empty required ref.",
+      "expected": "Validation fails closed before the bundle is treated as evidence."
+    }
+  ],
+  "guardrails": [
+    "Source apply is review-gated for explicitly allowed source-like classes, not unrestricted source mutation.",
+    "No auto-apply, no self-approval, no reviewer bypass, and no hidden trusted writes.",
+    "Verification commands are allowlisted and bounded; there is no command bridge, no network/install command, and no credential use.",
+    "Browser/dashboard/Studio surfaces remain read-only; they cannot apply, merge, publish, deploy, sign, or upload.",
+    "Generated previews, sandbox outputs, rollback snapshots, verification logs, runs, and evidence bundles stay generated and ignored unless fixture-scoped.",
+    "No production-ready claim, no secure sandbox guarantee, and no current Godot replacement claim."
+  ]
+}
