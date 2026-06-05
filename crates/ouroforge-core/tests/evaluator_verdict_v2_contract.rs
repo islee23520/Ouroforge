@@ -99,6 +99,53 @@ fn declared_visual_and_semantic_gates_aggregate_and_journalize_failures() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn declared_gate_mix_of_passing_and_failing_gates_fails_under_and_aggregation() {
+    // Issue #1285 requires coverage where declared gates disagree: one declared
+    // gate passes while another fails, and declared-gate-AND must still fail.
+    let (root, run_dir) = create_fixture_run("verdict-v2-mixed");
+    write_world_state(&run_dir, 3); // health >= 0 keeps the declared semantic gate passing
+    write_scenario_result(&run_dir, "collect-and-exit", "passed");
+    write_declared_visual_gate_parse_failure(&run_dir); // declared visual gate fails
+    write_declared_semantic_model(&run_dir); // declared semantic gate passes
+
+    let verdict = evaluate_run(&run_dir).expect("mixed-gate evaluation completes");
+    assert_eq!(verdict.status, "failed");
+    let categories = verdict.gate_categories.as_ref().unwrap();
+    assert_eq!(categories["aggregation"]["operator"], "declared-gate-and");
+    assert_eq!(categories["aggregation"]["undeclaredGatePolicy"], "neutral");
+    assert_eq!(categories["mechanical"]["status"], "pass");
+    assert_eq!(categories["visual"]["declared"], true);
+    assert_eq!(categories["visual"]["status"], "fail");
+    assert_eq!(categories["semantic"]["declared"], true);
+    assert_eq!(categories["semantic"]["status"], "pass");
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn undeclared_gate_stays_neutral_while_declared_gate_determines_verdict() {
+    // Issue #1285 requires a run where an undeclared gate remains neutral while the
+    // declared gates determine the verdict. Only the semantic gate is declared (and
+    // passes); the visual and runtime gates are undeclared and must not fail the run.
+    let (root, run_dir) = create_fixture_run("verdict-v2-neutral");
+    write_world_state(&run_dir, 3); // health >= 0 keeps the declared semantic gate passing
+    write_scenario_result(&run_dir, "collect-and-exit", "passed");
+    write_declared_semantic_model(&run_dir); // only the semantic gate is declared
+
+    let verdict = evaluate_run(&run_dir).expect("neutral-gate evaluation completes");
+    assert_eq!(verdict.status, "passed");
+    let categories = verdict.gate_categories.as_ref().unwrap();
+    assert_eq!(categories["aggregation"]["undeclaredGatePolicy"], "neutral");
+    assert_eq!(categories["semantic"]["declared"], true);
+    assert_eq!(categories["semantic"]["status"], "pass");
+    // The undeclared visual gate stays neutral and never fails the verdict.
+    assert_eq!(categories["visual"]["declared"], false);
+    assert_ne!(categories["visual"]["status"], "fail");
+
+    fs::remove_dir_all(root).unwrap();
+}
+
 fn create_fixture_run(prefix: &str) -> (PathBuf, PathBuf) {
     let root = std::env::temp_dir().join(format!("ouroforge-{prefix}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
