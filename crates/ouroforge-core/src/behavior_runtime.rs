@@ -418,6 +418,12 @@ pub struct BehaviorExecutionEvidence {
     pub input_action: Option<String>,
     #[serde(rename = "appliedActionIds")]
     pub applied_action_ids: Vec<String>,
+    #[serde(
+        rename = "cooldownBehaviorIds",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub cooldown_behavior_ids: Vec<String>,
     pub diagnostics: Vec<BehaviorRuntimeDiagnostic>,
     #[serde(rename = "initialWorldState", default)]
     pub initial_world_state: BehaviorWorldState,
@@ -743,6 +749,13 @@ impl BehaviorArtifact {
                 summary.diagnostic_count += report.diagnostics.len() as u64;
                 summary.terminal_state_count +=
                     u64::from(report.world_state.terminal_state.is_some());
+                let mut cooldown_behavior_ids: Vec<String> = report
+                    .applied_actions
+                    .iter()
+                    .map(|action| action.behavior_id.clone())
+                    .collect();
+                cooldown_behavior_ids.sort();
+                cooldown_behavior_ids.dedup();
                 BehaviorExecutionEvidence {
                     report_index: index as u64,
                     replay_key: replay_key_for_report(&report),
@@ -754,6 +767,7 @@ impl BehaviorArtifact {
                         .into_iter()
                         .map(|action| action.action_id)
                         .collect(),
+                    cooldown_behavior_ids,
                     diagnostics: report.diagnostics,
                     initial_world_state: report.initial_world_state,
                     world_state: report.world_state,
@@ -877,7 +891,11 @@ impl BehaviorScenarioAssertion {
                     })
                 })
             }
-            BehaviorScenarioAssertionKind::CooldownActive => false,
+            BehaviorScenarioAssertionKind::CooldownActive => reports.iter().any(|report| {
+                self.behavior_id
+                    .as_ref()
+                    .is_some_and(|behavior_id| report.cooldown_behavior_ids.contains(behavior_id))
+            }),
             BehaviorScenarioAssertionKind::EntityAffected => reports.iter().any(|report| {
                 self.entity_id.as_ref().is_some_and(|entity_id| {
                     report.world_state.entity_positions.contains_key(entity_id)

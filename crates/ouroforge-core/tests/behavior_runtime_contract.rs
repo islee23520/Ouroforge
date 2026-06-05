@@ -300,6 +300,71 @@ fn behavior_scenario_assertions_validate_and_pass_against_evidence() {
 }
 
 #[test]
+fn behavior_cooldown_active_assertion_passes_for_fired_behavior_evidence() {
+    use ouroforge_core::behavior_runtime::{
+        BehaviorExecutionInput, BehaviorScenarioAssertion, BehaviorScenarioAssertionKind,
+        BehaviorScenarioAssertionStatus, BehaviorWorldState,
+    };
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let jump = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_position("player", 2, 5),
+    );
+    let goal = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("goalReached"),
+        BehaviorWorldState::default().with_item("key"),
+    );
+    let evidence = artifact.evidence_bundle(vec![jump, goal]);
+
+    // The cooldown of a behavior is recorded as active once it applies actions, so the
+    // assertion must observe the firing behavior in its own report's evidence.
+    assert!(evidence.reports[0]
+        .cooldown_behavior_ids
+        .contains(&"player-jump".to_string()));
+
+    let cooldown_template = |behavior_id: &str, report_index: u64| BehaviorScenarioAssertion {
+        assertion_id: "cooldown-active".to_string(),
+        kind: BehaviorScenarioAssertionKind::CooldownActive,
+        report_index: Some(report_index),
+        behavior_id: Some(behavior_id.to_string()),
+        action_id: None,
+        event: None,
+        flag: None,
+        expected_flag: None,
+        state: None,
+        entity_id: None,
+        item: None,
+        terminal_state: None,
+    };
+
+    let passing = cooldown_template("player-jump", 0);
+    passing.validate().expect("cooldown assertion validates");
+    assert_eq!(
+        passing
+            .evaluate(&evidence)
+            .expect("cooldown assertion evaluates")
+            .status,
+        BehaviorScenarioAssertionStatus::Passed,
+    );
+
+    // A behavior that did not fire in the targeted report has no active cooldown evidence.
+    let failing = cooldown_template("goal-finish", 0);
+    assert_eq!(
+        failing
+            .evaluate(&evidence)
+            .expect("cooldown assertion evaluates")
+            .status,
+        BehaviorScenarioAssertionStatus::Failed,
+    );
+}
+
+#[test]
 fn behavior_scenario_assertions_fail_and_reject_malformed_shapes() {
     use ouroforge_core::behavior_runtime::{
         BehaviorExecutionInput, BehaviorScenarioAssertion, BehaviorScenarioAssertionKind,
