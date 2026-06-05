@@ -270,6 +270,81 @@ pub struct BehaviorRuntimeEvidenceBundle {
     pub trusted_boundary: BehaviorRuntimeBoundary,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorScenarioAssertion {
+    #[serde(rename = "assertionId")]
+    pub assertion_id: String,
+    pub kind: BehaviorScenarioAssertionKind,
+    #[serde(
+        rename = "reportIndex",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub report_index: Option<u64>,
+    #[serde(
+        rename = "behaviorId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub behavior_id: Option<String>,
+    #[serde(rename = "actionId", default, skip_serializing_if = "Option::is_none")]
+    pub action_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flag: Option<String>,
+    #[serde(
+        rename = "expectedFlag",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expected_flag: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    #[serde(rename = "entityId", default, skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<String>,
+    #[serde(
+        rename = "terminalState",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub terminal_state: Option<BehaviorTerminalState>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorScenarioAssertionKind {
+    BehaviorExecuted,
+    EventEmitted,
+    FlagChanged,
+    StateTransitionOccurred,
+    AbilityUsed,
+    CooldownActive,
+    EntityAffected,
+    ItemCollected,
+    TerminalStateReached,
+    UnsupportedBehaviorBlocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorScenarioAssertionVerdict {
+    #[serde(rename = "assertionId")]
+    pub assertion_id: String,
+    pub status: BehaviorScenarioAssertionStatus,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BehaviorScenarioAssertionStatus {
+    Passed,
+    Failed,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BehaviorRuntimeEvidenceSummary {
@@ -645,6 +720,167 @@ impl BehaviorArtifact {
             reports: evidence_reports,
             trusted_boundary: runtime_state.trusted_boundary,
         }
+    }
+}
+
+impl BehaviorScenarioAssertion {
+    pub fn validate(&self) -> Result<()> {
+        require_local_id("behavior assertion assertionId", &self.assertion_id)?;
+        if let Some(behavior_id) = &self.behavior_id {
+            require_local_id("behavior assertion behaviorId", behavior_id)?;
+        }
+        if let Some(action_id) = &self.action_id {
+            require_local_id("behavior assertion actionId", action_id)?;
+        }
+        if let Some(event) = &self.event {
+            require_local_id("behavior assertion event", event)?;
+        }
+        if let Some(flag) = &self.flag {
+            require_local_id("behavior assertion flag", flag)?;
+        }
+        if let Some(state) = &self.state {
+            require_local_id("behavior assertion state", state)?;
+        }
+        if let Some(entity_id) = &self.entity_id {
+            require_local_id("behavior assertion entityId", entity_id)?;
+        }
+        if let Some(item) = &self.item {
+            require_local_id("behavior assertion item", item)?;
+        }
+
+        match self.kind {
+            BehaviorScenarioAssertionKind::BehaviorExecuted
+            | BehaviorScenarioAssertionKind::AbilityUsed => require_some(
+                "behavior assertion actionId is required for executed/ability assertions",
+                self.action_id.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::EventEmitted => require_some(
+                "behavior assertion event is required for event assertions",
+                self.event.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::FlagChanged => {
+                require_some(
+                    "behavior assertion flag is required for flag assertions",
+                    self.flag.as_ref(),
+                )?;
+                require_some(
+                    "behavior assertion expectedFlag is required for flag assertions",
+                    self.expected_flag.as_ref(),
+                )
+            }
+            BehaviorScenarioAssertionKind::StateTransitionOccurred => {
+                require_some(
+                    "behavior assertion entityId is required for state assertions",
+                    self.entity_id.as_ref(),
+                )?;
+                require_some(
+                    "behavior assertion state is required for state assertions",
+                    self.state.as_ref(),
+                )
+            }
+            BehaviorScenarioAssertionKind::CooldownActive => require_some(
+                "behavior assertion behaviorId is required for cooldown assertions",
+                self.behavior_id.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::EntityAffected => require_some(
+                "behavior assertion entityId is required for entity assertions",
+                self.entity_id.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::ItemCollected => require_some(
+                "behavior assertion item is required for item assertions",
+                self.item.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::TerminalStateReached => require_some(
+                "behavior assertion terminalState is required for terminal assertions",
+                self.terminal_state.as_ref(),
+            ),
+            BehaviorScenarioAssertionKind::UnsupportedBehaviorBlocked => Ok(()),
+        }
+    }
+
+    pub fn evaluate(
+        &self,
+        evidence: &BehaviorRuntimeEvidenceBundle,
+    ) -> Result<BehaviorScenarioAssertionVerdict> {
+        self.validate()?;
+        let reports = matching_reports(self.report_index, evidence);
+        let passed = match self.kind {
+            BehaviorScenarioAssertionKind::BehaviorExecuted
+            | BehaviorScenarioAssertionKind::AbilityUsed => reports.iter().any(|report| {
+                self.action_id
+                    .as_ref()
+                    .is_some_and(|action_id| report.applied_action_ids.contains(action_id))
+            }),
+            BehaviorScenarioAssertionKind::EventEmitted => reports.iter().any(|report| {
+                self.event
+                    .as_ref()
+                    .is_some_and(|event| report.world_state.events.contains(event))
+            }),
+            BehaviorScenarioAssertionKind::FlagChanged => reports.iter().any(|report| {
+                self.flag.as_ref().is_some_and(|flag| {
+                    report.world_state.flags.get(flag) == self.expected_flag.as_ref()
+                })
+            }),
+            BehaviorScenarioAssertionKind::StateTransitionOccurred => {
+                reports.iter().any(|report| {
+                    self.entity_id.as_ref().is_some_and(|entity_id| {
+                        report.world_state.active_states.get(entity_id) == self.state.as_ref()
+                    })
+                })
+            }
+            BehaviorScenarioAssertionKind::CooldownActive => false,
+            BehaviorScenarioAssertionKind::EntityAffected => reports.iter().any(|report| {
+                self.entity_id.as_ref().is_some_and(|entity_id| {
+                    report.world_state.entity_positions.contains_key(entity_id)
+                        || report.world_state.entity_health.contains_key(entity_id)
+                        || report
+                            .world_state
+                            .animation_intents
+                            .iter()
+                            .any(|intent| &intent.target_entity_id == entity_id)
+                        || report
+                            .world_state
+                            .audio_intents
+                            .iter()
+                            .any(|intent| &intent.target_entity_id == entity_id)
+                })
+            }),
+            BehaviorScenarioAssertionKind::ItemCollected => reports.iter().any(|report| {
+                self.item
+                    .as_ref()
+                    .is_some_and(|item| report.world_state.inventory.contains(item))
+            }),
+            BehaviorScenarioAssertionKind::TerminalStateReached => reports
+                .iter()
+                .any(|report| report.world_state.terminal_state == self.terminal_state),
+            BehaviorScenarioAssertionKind::UnsupportedBehaviorBlocked => {
+                reports.iter().any(|report| {
+                    report.diagnostics.iter().any(|diagnostic| {
+                        matches!(
+                            diagnostic.code.as_str(),
+                            "unsupportedAction"
+                                | "unsupportedEffect"
+                                | "unsupportedTrigger"
+                                | "unsupportedCondition"
+                        )
+                    }) && report.applied_action_ids.is_empty()
+                })
+            }
+        };
+
+        Ok(BehaviorScenarioAssertionVerdict {
+            assertion_id: self.assertion_id.clone(),
+            status: if passed {
+                BehaviorScenarioAssertionStatus::Passed
+            } else {
+                BehaviorScenarioAssertionStatus::Failed
+            },
+            message: if passed {
+                format!("behavior assertion `{}` passed", self.assertion_id)
+            } else {
+                format!("behavior assertion `{}` failed", self.assertion_id)
+            },
+        })
     }
 }
 
@@ -1153,6 +1389,25 @@ fn replay_key_for_report(report: &BehaviorExecutionReport) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("behavior-replay-{hash:016x}")
+}
+
+fn matching_reports(
+    report_index: Option<u64>,
+    evidence: &BehaviorRuntimeEvidenceBundle,
+) -> Vec<&BehaviorExecutionEvidence> {
+    evidence
+        .reports
+        .iter()
+        .filter(|report| report_index.is_none_or(|index| report.report_index == index))
+        .collect()
+}
+
+fn require_some<T>(message: &str, value: Option<&T>) -> Result<()> {
+    if value.is_some() {
+        Ok(())
+    } else {
+        Err(anyhow!(message.to_string()))
+    }
 }
 
 pub fn read_behavior_artifact(path: impl AsRef<Path>) -> Result<BehaviorArtifact> {

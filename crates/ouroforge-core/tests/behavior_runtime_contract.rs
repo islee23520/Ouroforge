@@ -211,6 +211,151 @@ fn evidence_bundle_exposes_runtime_reports_replay_keys_and_boundary() {
 }
 
 #[test]
+fn behavior_scenario_assertions_validate_and_pass_against_evidence() {
+    use ouroforge_core::behavior_runtime::{
+        BehaviorExecutionInput, BehaviorScenarioAssertion, BehaviorScenarioAssertionKind,
+        BehaviorScenarioAssertionStatus, BehaviorTerminalState, BehaviorWorldState,
+    };
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let jump = artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default()
+            .with_flag("grounded", true)
+            .with_position("player", 2, 5),
+    );
+    let goal = artifact.execute(
+        BehaviorExecutionInput::new("onEvent").with_event("goalReached"),
+        BehaviorWorldState::default().with_item("key"),
+    );
+    let evidence = artifact.evidence_bundle(vec![jump, goal]);
+    let assertions = vec![
+        BehaviorScenarioAssertion {
+            assertion_id: "behavior-executed".to_string(),
+            kind: BehaviorScenarioAssertionKind::BehaviorExecuted,
+            report_index: Some(0),
+            behavior_id: None,
+            action_id: Some("jump-motion".to_string()),
+            event: None,
+            flag: None,
+            expected_flag: None,
+            state: None,
+            entity_id: None,
+            item: None,
+            terminal_state: None,
+        },
+        BehaviorScenarioAssertion {
+            assertion_id: "flag-changed".to_string(),
+            kind: BehaviorScenarioAssertionKind::FlagChanged,
+            report_index: Some(0),
+            behavior_id: None,
+            action_id: None,
+            event: None,
+            flag: Some("jumped".to_string()),
+            expected_flag: Some(true),
+            state: None,
+            entity_id: None,
+            item: None,
+            terminal_state: None,
+        },
+        BehaviorScenarioAssertion {
+            assertion_id: "event-emitted".to_string(),
+            kind: BehaviorScenarioAssertionKind::EventEmitted,
+            report_index: Some(1),
+            behavior_id: None,
+            action_id: None,
+            event: Some("victory".to_string()),
+            flag: None,
+            expected_flag: None,
+            state: None,
+            entity_id: None,
+            item: None,
+            terminal_state: None,
+        },
+        BehaviorScenarioAssertion {
+            assertion_id: "terminal-state".to_string(),
+            kind: BehaviorScenarioAssertionKind::TerminalStateReached,
+            report_index: Some(1),
+            behavior_id: None,
+            action_id: None,
+            event: None,
+            flag: None,
+            expected_flag: None,
+            state: None,
+            entity_id: None,
+            item: None,
+            terminal_state: Some(BehaviorTerminalState::Win),
+        },
+    ];
+
+    for assertion in assertions {
+        assertion.validate().expect("assertion validates");
+        let verdict = assertion.evaluate(&evidence).expect("assertion evaluates");
+
+        assert_eq!(verdict.status, BehaviorScenarioAssertionStatus::Passed);
+    }
+}
+
+#[test]
+fn behavior_scenario_assertions_fail_and_reject_malformed_shapes() {
+    use ouroforge_core::behavior_runtime::{
+        BehaviorExecutionInput, BehaviorScenarioAssertion, BehaviorScenarioAssertionKind,
+        BehaviorScenarioAssertionStatus, BehaviorWorldState,
+    };
+
+    let artifact = BehaviorArtifact::from_json_str(include_str!(
+        "../../../examples/behavior-runtime-v1/valid/behavior-artifact.execution.json"
+    ))
+    .expect("execution fixture parses");
+    let evidence = artifact.evidence_bundle(vec![artifact.execute(
+        BehaviorExecutionInput::new("onInputAction").with_input_action("jump"),
+        BehaviorWorldState::default().with_flag("grounded", false),
+    )]);
+    let failed = BehaviorScenarioAssertion {
+        assertion_id: "missing-action".to_string(),
+        kind: BehaviorScenarioAssertionKind::BehaviorExecuted,
+        report_index: Some(0),
+        behavior_id: None,
+        action_id: Some("jump-motion".to_string()),
+        event: None,
+        flag: None,
+        expected_flag: None,
+        state: None,
+        entity_id: None,
+        item: None,
+        terminal_state: None,
+    }
+    .evaluate(&evidence)
+    .expect("failed assertion still evaluates");
+
+    assert_eq!(failed.status, BehaviorScenarioAssertionStatus::Failed);
+
+    let malformed = BehaviorScenarioAssertion {
+        assertion_id: "bad-flag".to_string(),
+        kind: BehaviorScenarioAssertionKind::FlagChanged,
+        report_index: None,
+        behavior_id: None,
+        action_id: None,
+        event: None,
+        flag: Some("jumped".to_string()),
+        expected_flag: None,
+        state: None,
+        entity_id: None,
+        item: None,
+        terminal_state: None,
+    };
+
+    assert!(format!(
+        "{:?}",
+        malformed.validate().expect_err("missing expectedFlag")
+    )
+    .contains("expectedFlag is required"));
+}
+
+#[test]
 fn rejects_malformed_or_untrusted_behavior_artifacts_at_loader_boundary() {
     let invalid_cases = [
         (
