@@ -26,6 +26,8 @@ pub mod behavior_draft;
 pub mod source_apply_rollback_snapshot;
 pub use source_apply_rollback_snapshot::*;
 mod behavior_draft_validation;
+pub mod source_apply_verification_runner;
+pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
 pub mod export_profile;
 pub mod internal_sprite_audit;
