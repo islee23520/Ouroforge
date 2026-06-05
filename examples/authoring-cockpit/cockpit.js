@@ -2870,6 +2870,181 @@ const OuroforgeCockpit = (() => {
     return `<div class="scene-tree-inspector"><h3>Studio scene tree inspector</h3><p class="hint">Read-only scene tree inspection from exported JSON. Selection is presentation-only; Studio does not edit, apply, merge, execute commands, or write trusted scene state.</p><h4>Scenes (selection is read-only)</h4><ul class="scene-tree-scenes">${sceneRows}</ul><h4>Node hierarchy (authored vs runtime state)</h4>${nodeTree}${detachedSection}</div>`;
   }
 
+  const ENTITY_COMPONENT_SUPPORTED_TYPES = ['string', 'number', 'boolean', 'enum', 'vector'];
+
+  function entityComponentSupportedType(type) {
+    return ENTITY_COMPONENT_SUPPORTED_TYPES.includes(String(type || ''));
+  }
+
+  function entityComponentInspectorModel(run) {
+    const source = run?.entity_component_inspector || run?.entityComponentInspector || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      return {
+        present: false,
+        empty_state: source?.empty_state || source?.emptyState || 'No entity/component inspector read model is available for this run.',
+        boundary: 'Read-only entity/component inspection from exported JSON; Studio does not write trusted component files, execute commands, or apply edits.',
+        selectedEntity: '',
+        entities: [],
+        components: [],
+        supportedTypes: ENTITY_COMPONENT_SUPPORTED_TYPES.slice(),
+      };
+    }
+    const entities = Array.isArray(source.entities) ? source.entities.map((entity, index) => ({
+      id: entity?.id || entity?.entity_id || `entity-${index + 1}`,
+      name: entity?.name || entity?.id || `Entity ${index + 1}`,
+      selected: entity?.selected === true,
+    })) : [];
+    const selectedEntity = source.selected_entity || source.selectedEntity || (entities.find((entity) => entity.selected)?.id) || '';
+    const components = Array.isArray(source.components) ? source.components.map((component, cIndex) => {
+      const fields = Array.isArray(component?.fields) ? component.fields.map((field, fIndex) => {
+        const type = String(field?.type || 'unknown');
+        const supported = entityComponentSupportedType(type);
+        const editable = field?.editable !== false && field?.unsafe !== true && supported;
+        return {
+          name: field?.name || `field-${fIndex + 1}`,
+          type,
+          value: field?.value,
+          options: Array.isArray(field?.options) ? field.options : [],
+          supported,
+          editable,
+          unsafe: field?.unsafe === true,
+          reason: field?.reason || (supported ? '' : `Field type "${type}" is outside primitive draft editing.`),
+        };
+      }) : [];
+      return {
+        entityId: component?.entity_id || component?.entityId || selectedEntity || 'unknown',
+        component: component?.component || component?.name || `component-${cIndex + 1}`,
+        path: component?.path || component?.source_path || component?.sourcePath || 'unknown',
+        beforeHash: component?.before_hash || component?.beforeHash || 'unknown',
+        fields,
+      };
+    }) : [];
+    return {
+      present: true,
+      empty_state: source.empty_state || source.emptyState || 'No entity/component inspector read model is available for this run.',
+      boundary: source.boundary || 'Read-only entity/component inspection from exported JSON; Studio does not write trusted component files, execute commands, or apply edits.',
+      selectedEntity,
+      entities,
+      components,
+      supportedTypes: ENTITY_COMPONENT_SUPPORTED_TYPES.slice(),
+    };
+  }
+
+  function entityComponentValidateValue(field, newValue) {
+    const type = String(field?.type || 'unknown');
+    const reasons = [];
+    if (!entityComponentSupportedType(type)) {
+      reasons.push(`Unsupported field type "${type}" is outside primitive draft editing.`);
+      return reasons;
+    }
+    if (field?.editable === false) reasons.push('Field is read-only and cannot produce a draft edit.');
+    if (field?.unsafe === true) reasons.push(field?.reason || 'Field is flagged unsafe and is blocked.');
+    switch (type) {
+      case 'number':
+        if (typeof newValue !== 'number' || !Number.isFinite(newValue)) reasons.push('Number field requires a finite numeric value.');
+        break;
+      case 'boolean':
+        if (typeof newValue !== 'boolean') reasons.push('Boolean field requires a true/false value.');
+        break;
+      case 'enum': {
+        const options = Array.isArray(field?.options) ? field.options.map(String) : [];
+        if (!options.includes(String(newValue))) reasons.push(`Enum field requires one of: ${options.join(', ') || '(no options)'}.`);
+        break;
+      }
+      case 'vector':
+        if (!Array.isArray(newValue) || newValue.length === 0 || !newValue.every((n) => typeof n === 'number' && Number.isFinite(n))) {
+          reasons.push('Vector field requires a non-empty tuple of finite numbers.');
+        }
+        break;
+      case 'string':
+      default:
+        if (typeof newValue !== 'string') reasons.push('String field requires a string value.');
+        break;
+    }
+    return reasons;
+  }
+
+  function entityComponentDraftEdit(target, field, newValue) {
+    const reasons = entityComponentValidateValue(field, newValue);
+    const fieldName = String(field?.name || 'unknown-field');
+    const path = String((target && (target.path || target.source_path || target.sourcePath)) || 'unknown');
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(path) || path.startsWith('/') || /[;&|`$<>]/.test(path)) {
+      reasons.push('Target path is not an allowlisted in-project source path.');
+    }
+    const entityId = (target && (target.id || target.entity_id || target.entityId)) || 'unknown';
+    const component = (target && (target.component || target.name)) || 'unknown';
+    const before = field?.value;
+    const baseTarget = { type: 'component', path, id: entityId, component, field: fieldName };
+    if (reasons.length) {
+      return {
+        draftId: `entity-component-draft-${entityId}-${fieldName}-blocked`,
+        schemaVersion: 'visual-edit-draft-v1',
+        target: baseTarget,
+        proposedOperations: [],
+        validationStatus: 'blocked',
+        blockedReasons: reasons,
+        requiresSafeSourceApplyHandoff: true,
+        applyCapability: false,
+      };
+    }
+    return {
+      draftId: `entity-component-draft-${entityId}-${fieldName}`,
+      schemaVersion: 'visual-edit-draft-v1',
+      target: baseTarget,
+      proposedOperations: [{
+        id: `set-${fieldName}`,
+        kind: 'set_component_field',
+        path: fieldName,
+        beforeValue: before,
+        value: newValue,
+        summary: `Set ${fieldName} from ${JSON.stringify(before)} to ${JSON.stringify(newValue)} (draft only; trusted apply requires Safe Source Apply handoff)`,
+      }],
+      beforeHash: (target && (target.before_hash || target.beforeHash)) || 'unknown',
+      expectedAfterSummary: `Draft proposes setting ${fieldName}; no trusted write occurs without Safe Source Apply review.`,
+      validationStatus: 'validated',
+      blockedReasons: [],
+      requiresSafeSourceApplyHandoff: true,
+      applyCapability: false,
+      linkedEvidence: [],
+    };
+  }
+
+  function renderEntityComponentInspectorSurface(run) {
+    const model = entityComponentInspectorModel(run);
+    if (!model.present) {
+      return `<section id="entity-component-inspector" class="panel"><h2>Entity / component inspector</h2><p class="empty">${escapeText(model.empty_state)}</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const entityRows = model.entities.length
+      ? model.entities.map((entity) => {
+          const isSelected = entity.selected || entity.id === model.selectedEntity;
+          return `<li class="surface-row"><strong>${escapeText(entity.name)}</strong> ${surfaceState(isSelected, isSelected ? 'selected' : 'not selected')}<br><small>${escapeText(entity.id)}</small></li>`;
+        }).join('')
+      : '<li class="surface-row">No entities recorded.</li>';
+    const componentRows = model.components.length
+      ? model.components.map((component) => {
+          const fieldRows = component.fields.length
+            ? component.fields.map((field) => {
+                const valueText = field.value === undefined ? '(no value)' : JSON.stringify(field.value);
+                const editLabel = field.editable ? 'editable (draft only)' : (field.unsafe ? 'unsafe · blocked' : (field.supported ? 'read-only' : 'unsupported type · blocked'));
+                const optionsText = field.type === 'enum' && field.options.length ? ` · options: ${field.options.join(', ')}` : '';
+                const reasonText = !field.editable && field.reason ? `<br><small class="warn">${escapeText(field.reason)}</small>` : '';
+                const control = field.editable
+                  ? `<input type="text" value="${escapeText(valueText)}" disabled readonly data-component-field="${escapeText(field.name)}">`
+                  : '';
+                return `<li class="surface-row"><strong>${escapeText(field.name)}</strong> ${surfaceState(field.editable, editLabel)}<br><small>type ${escapeText(field.type)} · value ${escapeText(valueText)}${escapeText(optionsText)}</small>${reasonText}${control}</li>`;
+              }).join('')
+            : '<li class="surface-row">No fields recorded.</li>';
+          return `<article class="surface-row"><strong>${escapeText(component.component)}</strong> <small>entity ${escapeText(component.entityId)} · ${escapeText(component.path)}</small><ul>${fieldRows}</ul></article>`;
+        }).join('')
+      : '<p class="empty compact">No components recorded for the selected entity.</p>';
+    return `<section id="entity-component-inspector" class="panel"><h2>Entity / component inspector</h2>
+      <p class="hint">${escapeText(model.boundary)} Selection and inputs are presentation-only; valid primitive edits produce draft operations consumed by the Studio draft authoring model, never trusted writes. Trusted apply requires Safe Source Apply handoff.</p>
+      <p class="hint">Supported primitive field types: ${escapeText(model.supportedTypes.join(', '))}.</p>
+      <h4>Entities (selection is read-only)</h4><ul>${entityRows}</ul>
+      <h4>Components and primitive fields</h4>${componentRows}
+    </section>`;
+  }
+
   function studioCommandRegistry() {
     return [
       { id: 'open-scene', label: 'Open scene', kind: 'navigation', description: 'Navigate the cockpit to a scene view.' },
@@ -4267,7 +4442,7 @@ const OuroforgeCockpit = (() => {
 
   function renderEvidencePane(run) {
 
-    return `${renderStudioDiagnosticsSurface(run)}${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderPrototypePlanningInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderStudioSourceApplyHandoffSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
+    return `${renderStudioDiagnosticsSurface(run)}${renderProjectOverviewSurface(run)}${renderProjectWorkspaceSurface(run)}${renderProjectRunSurface(run)}${renderEvidenceFidelitySurface(run)}${renderEvidenceTimelineSurface(run)}${renderEvidenceBrowser(run)}${renderAuthoringProvenanceSurface(run)}${renderEngineExpansionSurface(run)}${renderStudio3dInspectionSurface(run)}${renderCameraLayerInspectionSurface(run)}${renderRenderBreakdownInspectionSurface(run)}${renderRuntimeProfilerInspectionSurface(run)}${renderRuntimeStateInspectionSurface(run)}${renderInputActionInspectionSurface(run)}${renderExpressiveComponentHudSurface(run)}${renderRuntimeEventInspectionSurface(run)}${renderRuntimeAssetLoadingSurface(run)}${renderAssetPreviewEvidenceSurface(run)}${renderPluginRegistryBrowserSurface(run)}${renderBehaviorEvidenceLifecycleSurface(run)}${renderSourceApplyWorktreeContextSurface(run)}${renderRouteAttemptEvidenceSurface(run)}${renderVisualComparisonEvidenceSurface(run)}${renderEvaluatorDepthInspectionSurface(run)}${renderPrototypePlanningInspectionSurface(run)}${renderStudioLevelDesignInspectionSurface(run)}${renderBehaviorDraftStatusSurface(run)}${renderBehaviorListPanel(run)}${renderBehaviorEventSignalPanel(run)}${renderBehaviorStateMachinePanel(run)}${renderBehaviorAbilityActionPanel(run)}${renderBehaviorReviewApplyStatusSurface(run)}${renderSourceApplyReviewSurface(run)}${renderExportInspectionSurface(run)}${renderSourcePatchEvidenceBundleSurface(run)}${renderSourcePatchApplyTransactionSurface(run)}${renderSourcePatchStaleTargetGuardSurface(run)}${renderStudioDraftAuthoringSurface(run)}${renderStudioSourceApplyHandoffSurface(run)}${renderEntityComponentInspectorSurface(run)}${renderVisualDiffPreviewSurface(run)}${renderTilemapDraftPreviewSurface(run)}${renderStudioAssetInspectorSurface(run)}${renderJournalSurface(run)}${renderLoopDryRunSurface(run)}${renderLoopExecutionSurface(run)}${renderLoopRecoverySurface(run)}${renderStudioLoopCockpitSurface(run)}${renderStudioMultiAgentPipelineInspectionSurface(run)}${renderProductionTaskBoardSurface(run)}${renderOwnershipPolicySurface(run)}${renderAgentRoleModelSurface(run)}${renderAgentWorkPackageSurface(run)}${renderQaSwarmInspectionSurface(run)}${renderQaAgentWorkQueueSurface(run)}${renderPerformanceRegressionLaneSurface(run)}${renderAgentHandoffSurface(run)}${renderReviewCriticGateSurface(run)}${renderProductionEvidenceBundleSurface(run)}${renderLoopEvidenceBundleSurface(run)}${renderMutationReviewSurface(run)}${renderRegressionPromotionSurface(run)}${renderRegressionMatrixSurface(run)}${renderReplaySurface(run)}${renderComparisonSurface(run)}`;
   }
 
   function renderIntegration(run, previewState = null) {
@@ -4546,7 +4721,7 @@ const OuroforgeCockpit = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioSourceApplyHandoffModel, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

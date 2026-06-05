@@ -2242,6 +2242,46 @@ const OuroforgeDashboard = (() => {
       </article>`;
   }
 
+  function renderEntityComponentInspector(run) {
+    const SUPPORTED = ['string', 'number', 'boolean', 'enum', 'vector'];
+    const source = run?.entity_component_inspector || run?.entityComponentInspector || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No entity/component inspector inputs are exported for this run.';
+      return `<section class="panel entity-component-inspector"><h3>Entity / component inspector</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only dashboard surface. Studio inspects component fields and produces draft operations only; the browser cannot write trusted files, execute commands, or apply edits.</p></section>`;
+    }
+    const selectedEntity = source.selected_entity || source.selectedEntity || '';
+    const entities = Array.isArray(source.entities) ? source.entities : [];
+    const components = Array.isArray(source.components) ? source.components : [];
+    const entityRows = entities.length
+      ? entities.map((entity) => {
+          const id = entity?.id || entity?.entity_id || 'unknown';
+          const isSelected = entity?.selected === true || id === selectedEntity;
+          return `<div class="run-meta"><span class="${statusClass(isSelected ? 'passed' : 'unknown')}">${escapeText(isSelected ? 'selected' : 'not selected')}</span> ${escapeText(entity?.name || id)} · ${escapeText(id)}</div>`;
+        }).join('')
+      : '<div class="run-meta">No entities recorded.</div>';
+    const componentRows = components.length
+      ? components.map((component) => {
+          const fields = Array.isArray(component?.fields) ? component.fields : [];
+          const fieldRows = fields.length
+            ? fields.map((field) => {
+                const type = String(field?.type || 'unknown');
+                const supported = SUPPORTED.includes(type);
+                const editable = field?.editable !== false && field?.unsafe !== true && supported;
+                const valueText = field?.value === undefined ? '(no value)' : JSON.stringify(field.value);
+                const label = editable ? 'editable (draft only)' : (field?.unsafe ? 'unsafe · blocked' : (supported ? 'read-only' : 'unsupported type · blocked'));
+                return `<li><span class="${statusClass(editable ? 'passed' : 'unknown')}">${escapeText(label)}</span> ${escapeText(field?.name || 'field')} · type ${escapeText(type)} · value ${escapeText(valueText)}</li>`;
+              }).join('')
+            : '<li>No fields recorded.</li>';
+          return `<article class="artifact entity-component"><h4>${escapeText(component?.component || component?.name || 'component')}</h4><div class="run-meta">entity ${escapeText(component?.entity_id || component?.entityId || selectedEntity || 'unknown')} · ${escapeText(component?.path || component?.source_path || 'unknown')}</div><ul class="run-meta-list">${fieldRows}</ul></article>`;
+        }).join('')
+      : '<div class="run-meta">No components recorded.</div>';
+    return `<section class="panel entity-component-inspector"><h3>Entity / component inspector</h3>
+      <p class="run-meta">Read-only inspection of exported entity/component fields. Supported primitive types: ${escapeText(SUPPORTED.join(', '))}. Valid edits produce draft operations only; trusted apply requires Safe Source Apply handoff. The browser cannot write trusted files, execute commands, or apply edits.</p>
+      <div class="run-meta">Entities (selection read-only):</div>${entityRows}
+      ${componentRows}
+    </section>`;
+  }
+
   function studioKeyboardNavModel(run = null) {
     const hasRun = Boolean(run);
     const regions = [
@@ -2384,6 +2424,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
+      ${renderEntityComponentInspector(run)}
       <section class="panel"><h3>Verdict summary</h3><pre>${escapeText(JSON.stringify(verdict, null, 2))}</pre></section>
       ${renderCommandContext(run)}
       ${renderLoopDryRunSummary(run.loop_dry_run || run.loopDryRun || null)}
@@ -2892,7 +2933,7 @@ const OuroforgeDashboard = (() => {
       <h4>Recorded gaps</h4>${gapSummary}</section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

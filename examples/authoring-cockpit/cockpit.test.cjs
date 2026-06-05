@@ -963,6 +963,34 @@ run.scene_tree_inspector = {
   ],
 };
 
+run.entity_component_inspector = {
+  present: true,
+  empty_state: 'No entity/component inspector read model is available for this run.',
+  selected_entity: 'player',
+  entities: [
+    { id: 'player', name: 'Player', selected: true },
+    { id: 'enemy', name: 'Enemy', selected: false },
+  ],
+  components: [
+    {
+      entity_id: 'player',
+      component: 'Transform',
+      path: 'scenes/main.scene.json',
+      before_hash: 'fnv1a64:abc123',
+      fields: [
+        { name: 'name', type: 'string', value: 'Player', editable: true },
+        { name: 'speed', type: 'number', value: 4.5, editable: true },
+        { name: 'visible', type: 'boolean', value: true, editable: true },
+        { name: 'facing', type: 'enum', value: 'left', options: ['left', 'right', 'up', 'down'], editable: true },
+        { name: 'position', type: 'vector', value: [1, 2], editable: true },
+        { name: 'locked_id', type: 'string', value: 'player', editable: false, reason: 'Identity field is read-only.' },
+        { name: 'script_ref', type: 'reference', value: 'scripts/player.gd', unsafe: true, reason: 'Reference/script fields are blocked from primitive draft editing.' },
+        { name: 'inventory', type: 'object', value: { slots: 4 }, reason: 'Object fields are outside primitive draft editing.' },
+      ],
+    },
+  ],
+};
+
 run.route_attempts = {
   present: true,
   status: 'passed',
@@ -2494,6 +2522,51 @@ assert.match(sourceApplyHandoffMarkup, /disabled/);
 assert.doesNotMatch(sourceApplyHandoffMarkup, /<button|<form|<input/i);
 assert.doesNotMatch(sourceApplyHandoffMarkup, /onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
 assert.match(cockpit.renderStudioSourceApplyHandoffSurface({}), /No Studio source apply handoff inputs/);
+// #760 Entity / component inspector
+const inspectorModel = cockpit.entityComponentInspectorModel(run);
+assert.strictEqual(inspectorModel.present, true);
+assert.strictEqual(inspectorModel.selectedEntity, 'player');
+assert.ok(inspectorModel.components[0].fields.find((f) => f.name === 'speed').editable);
+assert.strictEqual(inspectorModel.components[0].fields.find((f) => f.name === 'locked_id').editable, false);
+assert.strictEqual(inspectorModel.components[0].fields.find((f) => f.name === 'script_ref').editable, false);
+assert.strictEqual(inspectorModel.components[0].fields.find((f) => f.name === 'inventory').supported, false);
+const inspectorMarkup = cockpit.renderEntityComponentInspectorSurface(run);
+assert.match(inspectorMarkup, /Entity \/ component inspector/);
+assert.match(inspectorMarkup, /Player/);
+assert.match(inspectorMarkup, /editable \(draft only\)/);
+assert.match(inspectorMarkup, /unsupported type · blocked|unsafe · blocked/);
+assert.match(inspectorMarkup, /Safe Source Apply handoff/);
+assert.doesNotMatch(inspectorMarkup, /<button|<form|onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
+assert.match(cockpit.renderEntityComponentInspectorSurface({}), /No entity\/component inspector read model/);
+// Valid primitive edits produce draft operations only
+const target = { id: 'player', component: 'Transform', path: 'scenes/main.scene.json' };
+const numField = inspectorModel.components[0].fields.find((f) => f.name === 'speed');
+const validDraft = cockpit.entityComponentDraftEdit(target, numField, 6.0);
+assert.strictEqual(validDraft.validationStatus, 'validated');
+assert.strictEqual(validDraft.applyCapability, false);
+assert.strictEqual(validDraft.requiresSafeSourceApplyHandoff, true);
+assert.strictEqual(validDraft.proposedOperations[0].kind, 'set_component_field');
+assert.strictEqual(validDraft.target.type, 'component');
+// Draft output is consumable by the draft authoring model
+const consumed = cockpit.studioDraftAuthoringState({ studio_draft_authoring: { drafts: [validDraft] } });
+assert.strictEqual(consumed.drafts[0].validationStatus, 'validated');
+assert.strictEqual(consumed.drafts[0].proposedOperations[0].kind, 'set_component_field');
+// Invalid / unsafe edits produce diagnostics and no trusted write (no operations)
+const enumField = inspectorModel.components[0].fields.find((f) => f.name === 'facing');
+const badEnum = cockpit.entityComponentDraftEdit(target, enumField, 'sideways');
+assert.strictEqual(badEnum.validationStatus, 'blocked');
+assert.strictEqual(badEnum.proposedOperations.length, 0);
+assert.ok(badEnum.blockedReasons.some((r) => /Enum field/.test(r)));
+const badNumber = cockpit.entityComponentDraftEdit(target, numField, 'fast');
+assert.strictEqual(badNumber.validationStatus, 'blocked');
+assert.ok(badNumber.blockedReasons.some((r) => /Number field/.test(r)));
+const unsafeField = inspectorModel.components[0].fields.find((f) => f.name === 'script_ref');
+const blockedUnsafe = cockpit.entityComponentDraftEdit(target, unsafeField, 'scripts/evil.gd');
+assert.strictEqual(blockedUnsafe.validationStatus, 'blocked');
+assert.strictEqual(blockedUnsafe.proposedOperations.length, 0);
+const traversal = cockpit.entityComponentDraftEdit({ id: 'player', component: 'Transform', path: '../../etc/passwd' }, numField, 1);
+assert.strictEqual(traversal.validationStatus, 'blocked');
+assert.ok(traversal.blockedReasons.some((r) => /allowlisted in-project source path/.test(r)));
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);

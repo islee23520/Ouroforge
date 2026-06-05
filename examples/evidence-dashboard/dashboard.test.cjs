@@ -846,6 +846,27 @@ run.scene_tree_inspector = {
   ],
 };
 
+run.entity_component_inspector = {
+  present: true,
+  selected_entity: 'player',
+  entities: [
+    { id: 'player', name: 'Player', selected: true },
+    { id: 'enemy', name: 'Enemy', selected: false },
+  ],
+  components: [
+    {
+      entity_id: 'player',
+      component: 'Transform',
+      path: 'scenes/main.scene.json',
+      fields: [
+        { name: 'speed', type: 'number', value: 4.5, editable: true },
+        { name: 'facing', type: 'enum', value: 'left', options: ['left', 'right'], editable: true },
+        { name: 'script_ref', type: 'reference', value: 'scripts/player.gd', unsafe: true },
+      ],
+    },
+  ],
+};
+
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
   kind: 'application/json',
@@ -1910,6 +1931,15 @@ const sourceApplyHandoffExported = dashboard.renderSourceApplyHandoff({ source_a
 assert.match(sourceApplyHandoffExported, /docs\/example\.md/);
 assert.match(sourceApplyHandoffExported, /stale \(re-preview required\)/);
 assert.match(sourceApplyHandoffExported, /Docs preview diff only/);
+// #760 Entity / component inspector
+const entityInspectorMarkup = dashboard.renderEntityComponentInspector(run);
+assert.match(entityInspectorMarkup, /Entity \/ component inspector/);
+assert.match(entityInspectorMarkup, /Player/);
+assert.match(entityInspectorMarkup, /editable \(draft only\)/);
+assert.match(entityInspectorMarkup, /unsafe · blocked|unsupported type · blocked/);
+assert.match(entityInspectorMarkup, /Safe Source Apply handoff/);
+assert.doesNotMatch(entityInspectorMarkup, /<button|<form|onclick|applyCommand|auto-merge|auto-apply/i);
+assert.match(dashboard.renderEntityComponentInspector({}), /No entity\/component inspector inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);
