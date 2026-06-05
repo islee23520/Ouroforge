@@ -1482,6 +1482,60 @@ const rawMalformedCommandContextRun = {
 const rawMalformedCommandContextDetail = dashboard.renderRunDetail(rawMalformedCommandContextRun);
 assert.match(rawMalformedCommandContextDetail, /No run command context is recorded/);
 assert.ok(!rawMalformedCommandContextDetail.includes('untrusted raw command'), 'raw malformed run_command_context must not render');
+// Studio error boundary and diagnostics v1 (#773)
+// Diagnostics model must never throw on malformed/missing input and must fail closed to recorded diagnostics.
+for (const bad of [null, undefined, 42, 'not-an-object', [], { summary: null }, { evidence: 'oops', mutations: 7 }]) {
+  assert.doesNotThrow(() => dashboard.studioDiagnosticsModel(bad), 'studioDiagnosticsModel must never throw on malformed input');
+  const model = dashboard.studioDiagnosticsModel(bad);
+  assert.ok(Array.isArray(model.diagnostics), 'diagnostics must be a list');
+  assert.ok(model.counts && typeof model.counts.total === 'number', 'counts must be present');
+}
+const diagMissing = dashboard.studioDiagnosticsModel(null);
+assert.ok(diagMissing.diagnostics.some((d) => d.kind === 'missing-data'), 'missing run must record missing-data diagnostic');
+
+const diagRichRun = {
+  summary: { id: 'diag-run' },
+  evidence: [{ id: 'broken-ev', read_error: 'unreadable bundle' }, { id: 'gone-ev', exists: false }],
+  mutations: [{ id: 'blocked-mut', blockedReasons: ['privileged apply blocked'] }],
+  source_patch_stale_target_guards: [{ value: { validation: { status: 'stale' } } }],
+  plugin_registry: { registries: [{ plugins: [{ pluginId: 'bad-plugin', validationStatus: 'invalid' }] }] },
+  production_evidence_bundles: [{ id: 'pkg-1', status: 'incomplete' }],
+};
+const diagRich = dashboard.studioDiagnosticsModel(diagRichRun);
+const diagKinds = diagRich.diagnostics.map((d) => d.kind);
+for (const kind of ['blocked-operation', 'stale-source-apply-target', 'broken-evidence-bundle', 'malformed-plugin-descriptor', 'export-package-issue']) {
+  assert.ok(diagKinds.includes(kind), `diagnostics must classify ${kind}`);
+}
+const blockedDiag = diagRich.diagnostics.find((d) => d.kind === 'blocked-operation');
+assert.ok(blockedDiag.governing_guardrail, 'blocked operation diagnostic must name a governing guardrail');
+
+const diagSurface = dashboard.renderStudioDiagnosticsSurface(diagRichRun);
+assert.match(diagSurface, /Studio diagnostics/);
+assert.match(diagSurface, /blocked-operation/);
+assert.match(diagSurface, /Blocked operations/);
+assert.match(diagSurface, /trusted-persistence-boundary/);
+assert.match(diagSurface, /Stale-data warnings/);
+assert.match(diagSurface, /Read-only diagnostics/);
+assert.doesNotMatch(diagSurface, /<button|<form|<input/i);
+
+// Diagnostics surface escapes hostile data and never throws on malformed input.
+const diagXss = dashboard.renderStudioDiagnosticsSurface({ summary: { id: 'x' }, mutations: [{ id: '<img src=x onerror=alert(1)>', blockedReasons: ['<script>alert(1)</script>'] }] });
+assert.doesNotMatch(diagXss, /<img src=x onerror=alert\(1\)>/);
+assert.doesNotMatch(diagXss, /<script>alert\(1\)<\/script>/);
+assert.doesNotThrow(() => dashboard.renderStudioDiagnosticsSurface(undefined), 'diagnostics surface must not throw on undefined run');
+assert.match(dashboard.renderStudioDiagnosticsSurface(undefined), /missing/i);
+
+// Error boundary catches a throwing renderFn and surfaces an error panel, NOT a success/applied/privileged result.
+const boundaryOk = dashboard.studioErrorBoundary('Sample', () => '<section class="panel">healthy</section>');
+assert.match(boundaryOk, /healthy/);
+const boundaryFail = dashboard.studioErrorBoundary('Privileged apply', () => { throw new Error('apply detonated'); });
+assert.match(boundaryFail, /class="panel error-boundary"/);
+assert.match(boundaryFail, /Privileged apply could not render/);
+assert.match(boundaryFail, /apply detonated/);
+assert.match(boundaryFail, /not as a successful, applied, or privileged operation/);
+assert.ok(!/applied successfully|operation applied|merge complete|apply succeeded/i.test(boundaryFail), 'error boundary must not report a privileged operation as applied/success');
+assert.doesNotMatch(boundaryFail, /<button|<form|<input/i);
+
 console.log('dashboard smoke test passed');
 
 assert.match(dashboard.renderLoopDryRunSummary(run.loop_dry_run), /Authoring loop dry-run/);
