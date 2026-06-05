@@ -1,6 +1,6 @@
 # Studio v3 Project Workspace Cockpit
 
-Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, Asset Pipeline v1 inspector panels, tilemap draft preview read models, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
+Static local browser UI for composing Project Workspace Loop v1 surfaces: project manifest context, project-bound run evidence, expressive component/trigger/HUD inspection, collision/transition/runtime-event inspection, Asset Pipeline v1 inspector panels, tilemap draft preview read models, behavior draft status read models, scene edit command generation, transaction provenance, journal viewing, project semantic comparison, project-scoped scene-only mutation lifecycle state, replay evidence, live preview controls, and Rust-validated command strings.
 
 Run locally from the repo root:
 
@@ -96,6 +96,9 @@ The cockpit composes completed local surfaces only:
   collision/trigger, and scenario-impact notes from Rust-exported read models;
 - tilemap draft preview summaries, affected-cell counts, hashes, and
   collision/trigger metadata from Rust-exported read models;
+- behavior draft status cards for target hash freshness, validation status,
+  blocked reasons, diagnostics, and inert copyable CLI preview command text from
+  Rust-exported read models;
 - scene edit command generation for Rust-validated fields;
 - transaction-bound QA command generation;
 - semantic run comparison artifact surface, including Project Comparison v1 context, when comparison artifacts exist;
@@ -197,6 +200,19 @@ and generated evidence writing.
 
 See `../../docs/studio-level-design-inspection-surface-v1.md` for the #639
 boundary audit and verification checklist.
+
+
+## Behavior Draft v1 inspection
+
+When `dashboard-data.json` includes `behavior_drafts` or `behaviorDrafts`, the
+cockpit displays Behavior Draft v1 status as escaped read-only diagnostics:
+draft id, target project/scene/hash, stale target status, behavior/evidence/
+scenario-impact counts, blocked reasons, diagnostics, and inert copyable
+`ouroforge behavior draft preview` command text. The browser does not run CLI
+commands, write files, persist trusted draft state, apply drafts, approve
+reviews, execute scripts, open command bridges, or treat preview metadata as a
+review decision. Rust/local validation and review-gated flows remain the trusted
+authority. See `../../docs/behavior-draft-v1.md`.
 
 ## QA and evidence loop
 

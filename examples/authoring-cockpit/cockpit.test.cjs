@@ -2,6 +2,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const cockpit = require('./cockpit.js');
 const scene = require('../game-runtime/scene.json');
+const behaviorDraftDocs = fs.readFileSync('docs/behavior-draft-v1.md', 'utf8');
+const behaviorDraftFixtureDocs = fs.readFileSync('examples/behavior-draft-v1/README.md', 'utf8');
+
+assert.match(behaviorDraftDocs, /untrusted data/i);
+assert.match(behaviorDraftDocs, /does not apply trusted files/i);
+assert.match(behaviorDraftDocs, /No arbitrary script execution/);
+assert.match(behaviorDraftDocs, /generated behavior drafts remain untracked/i);
+assert.match(behaviorDraftFixtureDocs, /fixture-scoped/i);
+assert.match(behaviorDraftFixtureDocs, /read-only validate\/preview/i);
 
 const moved = cockpit.applyEdit(scene, 'player', 'components.transform.x', '48');
 assert.equal(cockpit.getValue(moved.entities[0], 'components.transform.x'), 48);
@@ -384,6 +393,35 @@ const run = {
       validationStatus: 'partial',
       blockedReasons: ['awaiting Rust preview'],
       author: { type: 'studio', id: 'browser-memory', source: 'in-memory' },
+    }],
+  },
+  behavior_drafts: {
+    present: true,
+    status: 'preview-only',
+    boundary: 'Behavior draft read model is read-only; browser cannot apply drafts, write trusted files, execute scripts, open command bridges, or persist draft state.',
+    records: [{
+      draftId: 'draft-jump-boost',
+      draftPath: 'examples/behavior-draft-v1/valid/behavior-draft.valid.json',
+      validationStatus: 'drafted',
+      target: { projectId: 'demo_project', scenePath: 'scenes/main.scene.json', sceneHash: 'fnv1a64-canonical-json-v1:expectedhash' },
+      linkedEvidenceCount: 1,
+      expectedScenarioImpactCount: 1,
+      behaviorCount: 2,
+      targetCheck: { stale: false, expectedHash: 'fnv1a64-canonical-json-v1:expectedhash', actualHash: 'fnv1a64-canonical-json-v1:expectedhash' },
+      blockedReasons: [],
+      diagnostics: [],
+      guardrail: 'read-only untrusted preview; does not apply trusted files, execute scripts, open command bridges, or grant browser writes',
+    }, {
+      draftId: 'draft-stale-target',
+      validationStatus: 'stale',
+      target: { projectId: 'demo_project', scenePath: 'scenes/stale.scene.json', sceneHash: 'fnv1a64-canonical-json-v1:oldhash' },
+      linkedEvidenceCount: 1,
+      expectedScenarioImpactCount: 1,
+      behaviorCount: 2,
+      targetCheck: { stale: true, expectedHash: 'fnv1a64-canonical-json-v1:oldhash', actualHash: 'fnv1a64-canonical-json-v1:newhash' },
+      blockedReasons: ['stale target hash: refresh before review'],
+      diagnostics: [{ kind: 'stale-target', message: 'target hash differs' }],
+      guardrail: 'stale behavior draft status only; no apply',
     }],
   },
   asset_inspector: {
@@ -923,7 +961,7 @@ assert.match(cockpit.renderRouteAttemptEvidenceSurface(run), /Studio must not ru
 assert.match(cockpit.renderStudioNavigation(run), /Studio v2 demo surfaces/);
 assert.match(cockpit.renderStudioNavigation(run), /Visual comparison evidence/);
 assert.match(cockpit.renderStudioNavigation(run), /Level design inspection/);
-assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 29);
+assert.equal(cockpit.studioSurfaceSummary(run).filter((surface) => surface.present).length, 30);
 assert.match(cockpit.renderEvidenceBrowser(run), /Open full evidence dashboard/);
 assert.equal(cockpit.projectRunCommand('seeds/platformer.yaml', 'examples/project/ouroforge.project.json', 4, 'smoke'), 'cargo run -p ouroforge-cli -- run seeds/platformer.yaml --project examples/project/ouroforge.project.json --workers 4 --scenario-pack smoke');
 assert.equal(cockpit.compareRunsCommand('runs/before', 'runs/after', 'runs/after/comparisons'), 'cargo run -p ouroforge-cli -- compare runs/before runs/after --output-dir runs/after/comparisons');
@@ -1909,6 +1947,25 @@ assert.match(assetReferenceControlsMarkup, /does not upload assets, fetch remote
 assert.doesNotMatch(assetReferenceControlsMarkup, /<button|onclick|localStorage|fetch\(|showOpenFilePicker/i);
 assert.equal(cockpit.studioDraftControlModel(assetReferenceControlRun.studio_draft_authoring.drafts[0]).kind, 'asset-reference-draft-controls');
 assert.match(cockpit.renderStudioDraftAuthoringSurface({}), /No Studio draft authoring read model/);
+const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
+assert.match(behaviorDraftMarkup, /Behavior draft status/);
+assert.match(behaviorDraftMarkup, /draft-jump-boost/);
+assert.match(behaviorDraftMarkup, /draft-stale-target/);
+assert.match(behaviorDraftMarkup, /stale target hash/);
+assert.match(behaviorDraftMarkup, /behavior draft preview/);
+assert.match(behaviorDraftMarkup, /browser cannot run CLI commands, apply drafts, write files/);
+assert.match(behaviorDraftMarkup, /does not apply trusted files, execute scripts/);
+assert.doesNotMatch(behaviorDraftMarkup, /<button|onclick|localStorage|fetch\(/i);
+assert.equal(cockpit.behaviorDraftReadModel(run).drafts.length, 2);
+assert.ok(cockpit.studioSurfaceSummary(run).some((surface) => surface.id === 'behavior-draft-status' && surface.present), 'Studio surface summary should include behavior draft status');
+assert.match(cockpit.renderEvidencePane(run), /id="behavior-draft-status"/);
+assert.match(cockpit.renderBehaviorDraftStatusSurface({}), /No behavior draft read model/);
+const xssBehaviorDraft = { behavior_drafts: { present: true, boundary: '<script>boundary</script>', records: [{ draftId: '<img src=x onerror=alert(1)>', draftPath: '<script>draft</script>', validationStatus: '<script>status</script>', target: { projectId: '<script>project</script>', scenePath: '<b>scene</b>', sceneHash: '<i>hash</i>' }, targetCheck: { stale: true, expectedHash: '<script>expected</script>', actualHash: '<script>actual</script>' }, blockedReasons: ['<script>blocked</script>'], diagnostics: [{ message: '<script>diagnostic</script>' }], guardrail: '<script>guardrail</script>' }] } };
+const xssBehaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(xssBehaviorDraft);
+assert.ok(!xssBehaviorDraftMarkup.includes('<script>diagnostic</script>'), 'behavior draft diagnostics must be escaped');
+assert.ok(!xssBehaviorDraftMarkup.includes('<img src=x onerror=alert(1)>'), 'behavior draft ids must be escaped');
+assert.match(xssBehaviorDraftMarkup, /&lt;script&gt;diagnostic&lt;\/script&gt;/);
+assert.doesNotMatch(xssBehaviorDraftMarkup, /<button|onclick|localStorage|fetch\(/i);
 const xssStudioDraft = { studio_draft_authoring: { present: true, boundary: '<script>boundary</script>', drafts: [{ draftId: '<img src=x onerror=alert(1)>', target: { type: '<script>scene</script>', path: '<b>path</b>' }, proposedOperations: [{ id: '<script>op</script>', kind: '<b>update</b>', path: '<i>path</i>', summary: '<script>summary</script>' }], expectedAfterSummary: '<script>after</script>', validationStatus: '<script>status</script>', blockedReasons: ['<script>blocked</script>'] }] } };
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<script>summary</script>'), 'studio draft summaries must be escaped');
 assert.ok(!cockpit.renderStudioDraftAuthoringSurface(xssStudioDraft).includes('<img src=x onerror=alert(1)>'), 'studio draft ids must be escaped');
