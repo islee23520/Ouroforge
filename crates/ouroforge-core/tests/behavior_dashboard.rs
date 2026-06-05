@@ -96,6 +96,86 @@ fn dashboard_read_model_keeps_malformed_behavior_evidence_visible() {
     std::fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn dashboard_read_model_exposes_gameplay_logic_regression_v9_compatibility() {
+    let root = unique_temp_dir("behavior-dashboard-gl10-14-3");
+    let seed_path = root.join("seed.yaml");
+    std::fs::write(&seed_path, VALID_SEED).expect("seed written");
+    let artifacts = create_run(&seed_path, root.join("runs")).expect("run created");
+    let fixtures = [
+        (
+            "behavior-evidence-bundle-gl10-14-2-complete",
+            "evidence/behavior/behavior-evidence-bundle.gl10.14.2.fixture.json",
+            include_str!(
+                "../../../examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.gl10.14.2.fixture.json"
+            ),
+        ),
+        (
+            "behavior-evidence-bundle-gl10-14-2-stale",
+            "evidence/behavior/behavior-evidence-bundle.stale.fixture.json",
+            include_str!(
+                "../../../examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.stale.fixture.json"
+            ),
+        ),
+    ];
+    std::fs::create_dir_all(artifacts.run_dir.join("evidence/behavior")).expect("evidence dir");
+    for (id, path, contents) in fixtures {
+        std::fs::write(artifacts.run_dir.join(path), contents).expect("bundle fixture written");
+        add_evidence_artifact(
+            &artifacts.run_dir,
+            id,
+            "application/json",
+            path,
+            serde_json::json!({ "artifact": "behavior_evidence_bundle", "issue": 624 }),
+        )
+        .expect("behavior evidence indexed");
+    }
+
+    let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+
+    assert!(model.behavior_evidence.present);
+    assert_eq!(model.behavior_evidence.bundle_count, 2);
+    assert_eq!(model.behavior_evidence.complete_count, 1);
+    assert_eq!(model.behavior_evidence.stale_count, 1);
+    assert_eq!(model.behavior_evidence.lifecycle_ref_count, 12);
+    assert_eq!(model.behavior_evidence.observed_failure_count, 2);
+    assert_eq!(model.behavior_evidence.next_step_hypothesis_count, 2);
+    assert_eq!(model.behavior_evidence.status, "blocked");
+    assert!(model
+        .behavior_evidence
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason.contains("stale")));
+    assert!(model
+        .behavior_evidence
+        .boundary
+        .contains("dashboard/Studio surfaces"));
+    assert!(model
+        .behavior_evidence
+        .boundary
+        .contains("must not execute scripts"));
+    assert!(model
+        .behavior_evidence
+        .bundles
+        .iter()
+        .any(
+            |bundle| bundle.bundle_id == "gameplay-logic-regression-v9-draft-apply-evidence"
+                && bundle.status == "complete"
+                && bundle.apply_transaction_ref_count == 1
+                && bundle.rerun_comparison_ref_count == 1
+        ));
+    assert!(model
+        .behavior_evidence
+        .bundles
+        .iter()
+        .any(
+            |bundle| bundle.bundle_id == "gameplay-logic-regression-v9-stale-evidence"
+                && bundle.status == "stale"
+                && bundle.apply_transaction_ref_count == 0
+        ));
+    std::fs::remove_dir_all(root).ok();
+}
+
 fn unique_temp_dir(prefix: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "ouroforge-{prefix}-{}-{}",

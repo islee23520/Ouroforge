@@ -1,0 +1,246 @@
+{
+  "schemaVersion": "scenario-coverage-v9-read-model-compatibility-v1",
+  "issue": 624,
+  "status": "covered",
+  "matrixRef": "examples/gameplay-logic-regression-v9/coverage-matrix.json",
+  "run": {
+    "summary": {
+      "id": "scenario-coverage-v9-read-model-compatibility",
+      "run_status": "passed",
+      "verdict_status": "passed",
+      "scenario_status": "passed"
+    },
+    "behavior_evidence": {
+      "status": "complete",
+      "boundary": "read-only structured behavior lifecycle evidence; no command bridge, auto-apply, or trusted writes.",
+      "bundles": [
+        {
+          "schemaVersion": "behavior-evidence-bundle-v1",
+          "bundleId": "gameplay-logic-regression-v9-draft-apply-evidence",
+          "status": "complete",
+          "behaviorDefinitionRefs": [
+            {
+              "kind": "behavior-definition",
+              "path": "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+              "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "runtimeEventRefs": [
+            {
+              "kind": "runtime-event-log",
+              "path": "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json"
+            }
+          ],
+          "scenarioOutcomeRefs": [
+            {
+              "kind": "scenario-outcome",
+              "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+            }
+          ],
+          "draftRefs": [
+            {
+              "kind": "behavior-draft",
+              "path": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json"
+            }
+          ],
+          "reviewDecisionRefs": [
+            {
+              "kind": "behavior-review-decision",
+              "path": "examples/gameplay-logic-regression-v9/evidence/review-decision.fixture.json"
+            }
+          ],
+          "applyTransactionRefs": [
+            {
+              "kind": "behavior-apply-transaction",
+              "path": "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+            }
+          ],
+          "rollbackMetadataRefs": [
+            {
+              "kind": "behavior-rollback-metadata",
+              "path": "examples/gameplay-logic-regression-v9/evidence/rollback-metadata.fixture.json"
+            }
+          ],
+          "rerunComparisonRefs": [
+            {
+              "kind": "behavior-rerun-comparison",
+              "path": "examples/gameplay-logic-regression-v9/evidence/rerun-comparison.fixture.json"
+            }
+          ],
+          "observedFailures": [
+            {
+              "scenarioId": "behavior-model-runtime-regression",
+              "summary": "No current failure; fixture records the regression signal that would fail if event ordering, cooldown evidence, or state transitions drift.",
+              "evidenceRef": {
+                "kind": "scenario-outcome",
+                "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+              }
+            }
+          ],
+          "nextStepHypotheses": [
+            {
+              "id": "inspect-read-model-next",
+              "summary": "Use GL10.14.3 to inspect this draft/apply/evidence lifecycle in dashboard and Studio read models."
+            }
+          ],
+          "linkedEvidence": [
+            {
+              "kind": "behavior-definition",
+              "path": "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+              "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            {
+              "kind": "runtime-event-log",
+              "path": "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json"
+            },
+            {
+              "kind": "scenario-outcome",
+              "path": "examples/gameplay-logic-regression-v9/evidence/scenario-outcome.fixture.json"
+            },
+            {
+              "kind": "behavior-draft",
+              "path": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json"
+            },
+            {
+              "kind": "behavior-review-decision",
+              "path": "examples/gameplay-logic-regression-v9/evidence/review-decision.fixture.json"
+            },
+            {
+              "kind": "behavior-apply-transaction",
+              "path": "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json"
+            },
+            {
+              "kind": "behavior-rollback-metadata",
+              "path": "examples/gameplay-logic-regression-v9/evidence/rollback-metadata.fixture.json"
+            },
+            {
+              "kind": "behavior-rerun-comparison",
+              "path": "examples/gameplay-logic-regression-v9/evidence/rerun-comparison.fixture.json"
+            }
+          ],
+          "blockedReasons": [],
+          "guardrails": [
+            "behavior evidence bundle is read-only lifecycle audit data",
+            "no arbitrary script execution, eval, dynamic import, plugin loader, command bridge, local server bridge, or browser trusted write",
+            "Rust/local validation owns trusted behavior draft/apply and generated evidence contracts",
+            "generated behavior evidence remains untracked unless fixture-scoped",
+            "#1 and #23 remain open"
+          ]
+        }
+      ]
+    },
+    "behavior_drafts": {
+      "present": true,
+      "status": "drafted",
+      "boundary": "read-only behavior draft status; does not apply trusted files or execute scripts",
+      "drafts": [
+        {
+          "draftId": "draft-gameplay-logic-regression-v9-routing",
+          "status": "drafted",
+          "draftPath": "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json",
+          "target": "scenes/gameplay-logic-regression-v9.scene.json",
+          "behaviorCount": 4,
+          "linkedEvidenceCount": 2,
+          "expectedScenarioImpactCount": 1,
+          "guardrail": "does not apply trusted files or execute scripts"
+        }
+      ]
+    },
+    "behavior_inspection": {
+      "present": true,
+      "status": "ready",
+      "boundary": "Studio behavior inspection is escaped read-only local evidence. It does not execute scripts, eval, dynamic import, load plugins, run a command bridge, write trusted files, mutate source, auto-apply, auto-merge, self-approve, or persist browser state.",
+      "behaviors": [
+        {
+          "id": "pressure-plate-signal",
+          "status": "ready",
+          "summary": "event routing behavior",
+          "target": {
+            "entityId": "pressure-plate"
+          },
+          "triggers": [
+            {
+              "kind": "onCollision",
+              "event": "platePressed"
+            }
+          ],
+          "conditions": [
+            {
+              "kind": "flagEquals",
+              "field": "playerOnPlate"
+            }
+          ],
+          "actions": [
+            {
+              "kind": "emitEvent",
+              "event": "gateSignal"
+            }
+          ],
+          "evidenceRefs": [
+            "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json"
+          ]
+        }
+      ],
+      "stateMachines": [
+        {
+          "id": "pressure-plate-state",
+          "entityId": "pressure-plate",
+          "states": [
+            "idle",
+            "pressed"
+          ],
+          "transitions": [
+            "plate-enters-pressed"
+          ]
+        }
+      ],
+      "abilities": [
+        {
+          "id": "dash-vfx",
+          "status": "covered",
+          "actions": [
+            "dash-vfx-intent"
+          ],
+          "cooldown": "dash-ability-regression"
+        }
+      ],
+      "reviewApply": {
+        "reviews": [
+          {
+            "id": "review-gameplay-logic-regression-v9-accepted",
+            "status": "accepted",
+            "reviewerId": "human-reviewer"
+          }
+        ],
+        "applies": [
+          {
+            "id": "behavior-apply-gameplay-logic-regression-v9-routing",
+            "status": "readyForTrustedApply",
+            "rollbackRef": "runs/behavior-applies/gameplay-logic-regression-v9/rollback.json"
+          }
+        ]
+      },
+      "eventSignals": {
+        "status": "ready",
+        "events": [
+          {
+            "id": "gateSignal",
+            "status": "covered",
+            "source": "pressure-plate-signal",
+            "target": "review-gated apply evidence",
+            "evidenceRefs": [
+              "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "guardrails": [
+    "no arbitrary script execution",
+    "no command bridge",
+    "no browser trusted writes",
+    "no auto-apply or self-approval",
+    "#1 and #23 remain open"
+  ]
+}

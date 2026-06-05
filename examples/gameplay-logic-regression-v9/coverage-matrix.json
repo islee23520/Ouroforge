@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "scenario-coverage-v9-gameplay-logic-coverage-v1",
+  "issue": 624,
+  "id": "scenario-coverage-v9-gameplay-logic-matrix",
+  "scope": "Source-like regression coverage for structured gameplay logic behavior, draft/apply evidence, and read-only dashboard/Studio compatibility; not arbitrary executable scripting or production engine maturity.",
+  "guardrails": [
+    "structured gameplay logic remains data-only, not unrestricted code execution",
+    "Rust/local validation owns trusted persistence, draft/apply validation, generated evidence writing, and CLI contracts",
+    "browser dashboard and Studio surfaces remain read-only or draft-only; no command bridge, browser trusted writes, auto-apply, auto-merge, or self-approval",
+    "existing gameplay demo fixtures remain backward-compatible",
+    "#1 and #23 remain open"
+  ],
+  "features": [
+    {
+      "id": "behavior-validation-regressions",
+      "status": "covered",
+      "prUnit": "GL10.14.1",
+      "scenarioIds": [
+        "behavior-model-runtime-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/behaviors/gameplay-logic-regression-v9.behavior.json",
+        "crates/ouroforge-core/tests/behavior_runtime_contract.rs"
+      ]
+    },
+    {
+      "id": "event-ordering-signal-routing",
+      "status": "covered",
+      "prUnit": "GL10.14.1",
+      "scenarioIds": [
+        "behavior-model-runtime-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/evidence/runtime-event-order.fixture.json",
+        "examples/gameplay-logic-regression-v9/scenarios/gameplay-logic-regression-v9.behavior-assertions.json"
+      ]
+    },
+    {
+      "id": "state-machine-transitions",
+      "status": "covered",
+      "prUnit": "GL10.14.1",
+      "scenarioIds": [
+        "behavior-model-runtime-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/scenarios/gameplay-logic-regression-v9.behavior-assertions.json"
+      ]
+    },
+    {
+      "id": "ability-cooldown-effects",
+      "status": "covered",
+      "prUnit": "GL10.14.1",
+      "scenarioIds": [
+        "behavior-model-runtime-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/behavior-model-runtime-smoke.test.cjs"
+      ]
+    },
+    {
+      "id": "runtime-execution-evidence",
+      "status": "covered",
+      "prUnit": "GL10.14.1",
+      "scenarioIds": [
+        "behavior-model-runtime-regression"
+      ],
+      "evidenceRefs": [
+        "crates/ouroforge-core/tests/behavior_runtime_contract.rs"
+      ]
+    },
+    {
+      "id": "draft-validation",
+      "status": "covered",
+      "prUnit": "GL10.14.2",
+      "scenarioIds": [
+        "draft-apply-evidence-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/drafts/behavior-draft.gl10.14.2.fixture.json",
+        "crates/ouroforge-core/tests/behavior_runtime_contract.rs"
+      ]
+    },
+    {
+      "id": "review-gated-apply",
+      "status": "covered",
+      "prUnit": "GL10.14.2",
+      "scenarioIds": [
+        "draft-apply-evidence-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/applies/behavior-apply.gl10.14.2.fixture.json",
+        "crates/ouroforge-core/tests/behavior_runtime_contract.rs"
+      ]
+    },
+    {
+      "id": "evidence-journal-lifecycle",
+      "status": "covered",
+      "prUnit": "GL10.14.2",
+      "scenarioIds": [
+        "draft-apply-evidence-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.gl10.14.2.fixture.json",
+        "examples/gameplay-logic-regression-v9/journal/behavior-draft-apply-evidence.fragment.md",
+        "crates/ouroforge-core/tests/behavior_journal.rs"
+      ]
+    },
+    {
+      "id": "stale-evidence-visibility",
+      "status": "covered",
+      "prUnit": "GL10.14.2",
+      "scenarioIds": [
+        "draft-apply-evidence-regression"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/evidence/behavior-evidence-bundle.stale.fixture.json",
+        "crates/ouroforge-core/tests/behavior_evidence_bundle.rs"
+      ]
+    },
+    {
+      "id": "dashboard-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "GL10.14.3",
+      "scenarioIds": [
+        "coverage-read-model-compatibility"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/coverage-read-model-compatibility.test.cjs",
+        "examples/evidence-dashboard/dashboard.js"
+      ]
+    },
+    {
+      "id": "studio-read-model-compatibility",
+      "status": "covered",
+      "prUnit": "GL10.14.3",
+      "scenarioIds": [
+        "coverage-read-model-compatibility"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/coverage-read-model-compatibility.test.cjs",
+        "examples/authoring-cockpit/cockpit.js"
+      ]
+    },
+    {
+      "id": "generated-state-audit",
+      "status": "covered",
+      "prUnit": "GL10.14.3",
+      "scenarioIds": [
+        "coverage-read-model-compatibility"
+      ],
+      "evidenceRefs": [
+        "examples/gameplay-logic-regression-v9/.gitignore",
+        "examples/gameplay-logic-regression-v9/coverage-read-model-compatibility.test.cjs"
+      ]
+    }
+  ],
+  "knownGaps": [
+    {
+      "id": "arbitrary-executable-scripting",
+      "status": "out-of-scope",
+      "reason": "#624 preserves structured data-only behavior and does not authorize arbitrary JS/Rust/Python/Lua/WASM execution."
+    },
+    {
+      "id": "production-scripting-api",
+      "status": "out-of-scope",
+      "reason": "Scenario Coverage v9 is fixture-scoped regression evidence, not production-stable scripting API maturity."
+    },
+    {
+      "id": "trusted-browser-writes",
+      "status": "out-of-scope",
+      "reason": "Dashboard and Studio read models are read-only or draft-only and cannot write trusted state."
+    }
+  ]
+}
