@@ -54,6 +54,7 @@ pub mod plugin_extension_catalog;
 pub mod plugin_manifest;
 pub mod plugin_permission;
 pub mod plugin_registry;
+pub mod plugin_threat_model;
 pub mod source_apply_audit_ledger;
 pub use source_apply_audit_ledger::*;
 pub mod runtime_frame_budget;
