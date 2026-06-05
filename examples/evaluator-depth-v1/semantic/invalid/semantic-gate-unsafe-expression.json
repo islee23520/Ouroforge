@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "runtime-invariant-model-v1",
+  "modelId": "semantic_gate_unsafe_expression",
+  "runId": "__RUN_ID__",
+  "scenarioId": "collect-and-exit",
+  "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+  "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+  "evidenceIndexPath": "evidence/index.json",
+  "invariants": [
+    {
+      "invariantId": "unsafe-expression",
+      "invariantType": "health_non_negative",
+      "targetPath": "player.health",
+      "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json",
+      "expression": "eval('player.health >= 0')"
+    }
+  ]
+}

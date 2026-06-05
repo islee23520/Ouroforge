@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "runtime-invariant-model-v1",
+  "modelId": "semantic_gate_unsupported_source",
+  "runId": "__RUN_ID__",
+  "scenarioId": "collect-and-exit",
+  "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+  "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+  "evidenceIndexPath": "evidence/index.json",
+  "invariants": [
+    {
+      "invariantId": "manual-placeholder",
+      "invariantType": "no_impossible_state",
+      "targetPath": "world.impossible",
+      "evidencePath": "invariants/manual-placeholder.json"
+    }
+  ]
+}

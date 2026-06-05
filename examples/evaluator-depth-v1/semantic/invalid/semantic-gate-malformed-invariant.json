@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "runtime-invariant-model-v1",
+  "modelId": "semantic_gate_malformed_invariant",
+  "runId": "__RUN_ID__",
+  "scenarioId": "collect-and-exit",
+  "worldStatePath": "evidence/scenarios/collect-and-exit/world-state.json",
+  "scenarioResultPath": "evidence/scenarios/collect-and-exit/scenario-result.json",
+  "evidenceIndexPath": "evidence/index.json",
+  "invariants": [
+    {
+      "invariantId": "player-in-bounds",
+      "invariantType": "player_in_bounds",
+      "targetPath": "player.transform",
+      "evidencePath": "evidence/scenarios/collect-and-exit/world-state.json"
+    }
+  ]
+}
