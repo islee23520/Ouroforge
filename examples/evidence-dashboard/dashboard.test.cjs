@@ -903,6 +903,13 @@ run.export_package_panel = {
   artifacts: [{ name: 'build/game.wasm', checksum: 'fnv1a64:abc', size: 102400, status: 'verified' }],
   generated_state_warnings: ['build/ output is generated and ignored unless fixture-scoped'],
 };
+run.plugin_panel = {
+  present: true,
+  plugins: [
+    { id: 'core-inspector', name: 'Core Inspector', validation_status: 'validated', compatible: true, compatibility: 'compatible', capabilities: ['read-evidence'], extension_points: ['studio.panel'], blocked_reasons: [], contributed_panels: [{ descriptor_type: 'info-panel', title: 'Plugin info', text: 'Read-only info <script>alert(1)</script>' }, { descriptor_type: 'executable-widget', title: 'Run widget' }] },
+    { id: 'broken-plugin', name: 'Broken Plugin', validation_status: 'invalid', compatible: false, compatibility: 'incompatible', blocked_reasons: ['Manifest schema invalid'], contributed_panels: [] },
+  ],
+};
 
 run.mutation_artifacts.push({
   id: 'source-patch-stale-target-guard',
@@ -2042,6 +2049,19 @@ assert.doesNotMatch(exportPkgMarkup, /<button|<form|onclick|run export|publish n
 assert.strictEqual(typeof dashboard.runExport, 'undefined');
 assert.strictEqual(typeof dashboard.publishPackage, 'undefined');
 assert.match(dashboard.renderExportPackagePanel({}), /No export\/package inspection inputs/);
+// #768 Plugin / extension panel
+const pluginPanelMarkup = dashboard.renderPluginPanel(run);
+assert.match(pluginPanelMarkup, /Plugin \/ extension panel/);
+assert.match(pluginPanelMarkup, /Core Inspector/);
+assert.match(pluginPanelMarkup, /Plugin info/);
+assert.match(pluginPanelMarkup, /not allowlisted/);
+assert.match(pluginPanelMarkup, /Manifest schema invalid/);
+assert.doesNotMatch(pluginPanelMarkup, /<button|<form|<input|onclick|XMLHttpRequest|fetch\(|auto-merge/i);
+assert.doesNotMatch(pluginPanelMarkup, /<script>alert\(1\)<\/script>/);
+assert.match(pluginPanelMarkup, /&lt;script&gt;/);
+assert.strictEqual(typeof dashboard.installPlugin, 'undefined');
+assert.strictEqual(typeof dashboard.runPlugin, 'undefined');
+assert.match(dashboard.renderPluginPanel({}), /No plugin panel inputs/);
 
 assert.match(dashboard.renderQaAgentWorkQueues(run), /QA queue items/);
 assert.match(dashboard.renderQaAgentWorkQueues(run), /&lt;qa-item&gt;/);

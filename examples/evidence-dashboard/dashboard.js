@@ -2465,6 +2465,7 @@ const OuroforgeDashboard = (() => {
       ${renderSourcePatchApplyTransactions(run)}
       ${renderSourcePatchStaleTargetGuards(run)}
       ${renderSourceApplyHandoff(run)}
+      ${renderPluginPanel(run)}
       ${renderExportPackagePanel(run)}
       ${renderScenarioPanel(run)}
       ${renderAssetBrowser(run)}
@@ -3149,7 +3150,47 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  function renderPluginPanel(run) {
+    const ALLOWED = ['info-panel', 'metadata-panel', 'readonly-table', 'key-value-panel', 'text-panel'];
+    const source = run?.plugin_panel || run?.pluginPanel || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No plugin panel inputs are exported for this run.';
+      return `<section class="panel plugin-panel"><h3>Plugin / extension panel</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only. Studio inspects the plugin registry and descriptors; the browser does not install, update, delete, enable, or run plugins.</p></section>`;
+    }
+    const plugins = Array.isArray(source.plugins) ? source.plugins : [];
+    const cards = plugins.map((plugin, index) => {
+      const id = plugin?.id || plugin?.plugin_id || `plugin-${index + 1}`;
+      const validation = plugin?.validation_status || plugin?.validationStatus || 'unknown';
+      const validated = /^(valid|validated|ok|passed)$/i.test(String(validation));
+      const compatible = plugin?.compatible === true;
+      const capabilities = Array.isArray(plugin?.capabilities) ? plugin.capabilities : [];
+      const extensionPoints = Array.isArray(plugin?.extension_points) ? plugin.extension_points : (Array.isArray(plugin?.extensionPoints) ? plugin.extensionPoints : []);
+      const blockedReasons = Array.isArray(plugin?.blocked_reasons) ? plugin.blocked_reasons : (Array.isArray(plugin?.blockedReasons) ? plugin.blockedReasons : []);
+      const contributed = Array.isArray(plugin?.contributed_panels) ? plugin.contributed_panels : (Array.isArray(plugin?.contributedPanels) ? plugin.contributedPanels : []);
+      const blockedRows = blockedReasons.length ? blockedReasons.map((r) => `<li><span class="${statusClass('blocked')}">${escapeText(r)}</span></li>`).join('') : '<li>No blocked reasons recorded.</li>';
+      const panelRows = contributed.length
+        ? contributed.map((panel) => {
+            const type = String(panel?.descriptor_type || panel?.descriptorType || panel?.type || 'unknown');
+            const allowed = ALLOWED.includes(type);
+            const title = panel?.title || panel?.label || 'Untitled panel';
+            const text = typeof panel?.text === 'string' ? panel.text : '';
+            return `<li><span class="${statusClass(allowed ? 'passed' : 'blocked')}">${escapeText(title)}</span> (${escapeText(type)})${allowed ? (text ? ` — ${escapeText(text)}` : '') : ' — descriptor type not allowlisted'}</li>`;
+          }).join('')
+        : '<li>No descriptor-contributed panels.</li>';
+      return `<article class="artifact plugin-card" data-plugin="${escapeText(id)}"><h4>${escapeText(plugin?.name || id)}</h4>
+        <div class="run-meta"><span class="${statusClass(validated ? 'passed' : 'blocked')}">${escapeText(validation)}</span> · <span class="${statusClass(compatible ? 'passed' : 'unknown')}">${escapeText(plugin?.compatibility || (compatible ? 'compatible' : 'unknown'))}</span></div>
+        <div class="run-meta">capabilities: ${escapeText(capabilities.length ? capabilities.join(', ') : 'none')} · extension points: ${escapeText(extensionPoints.length ? extensionPoints.map((e) => typeof e === 'string' ? e : (e.id || JSON.stringify(e))).join(', ') : 'none')}</div>
+        <ul class="run-meta-list">${blockedRows}</ul>
+        <div class="run-meta">Descriptor-contributed panels (allowlisted, read-only):</div><ul class="run-meta-list">${panelRows}</ul>
+      </article>`;
+    }).join('') || '<div class="run-meta">No plugins recorded.</div>';
+    return `<section class="panel plugin-panel"><h3>Plugin / extension panel</h3>
+      <p class="run-meta">Read-only inspection of the plugin registry and descriptor-contributed panels (allowlisted types only, rendered as escaped text). There are no install/update/delete/enable/run controls and no plugin code executes in the browser.</p>
+      ${cards}
+    </section>`;
+  }
+
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

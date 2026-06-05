@@ -1049,6 +1049,27 @@ run.export_package_panel = {
   ],
   generated_state_warnings: ['build/ output is generated and ignored unless fixture-scoped'],
 };
+run.plugin_panel = {
+  present: true,
+  plugins: [
+    {
+      id: 'core-inspector', name: 'Core Inspector', validation_status: 'validated', compatible: true, compatibility: 'compatible',
+      capabilities: ['read-evidence', 'contribute-panel'],
+      extension_points: ['studio.panel'],
+      blocked_reasons: [],
+      contributed_panels: [
+        { descriptor_type: 'info-panel', title: 'Plugin info', fields: { version: '1.0.0' }, text: 'Read-only info <script>alert(1)</script>' },
+        { descriptor_type: 'executable-widget', title: 'Run widget', fields: {} },
+      ],
+    },
+    {
+      id: 'broken-plugin', name: 'Broken Plugin', validation_status: 'invalid', compatible: false, compatibility: 'incompatible',
+      capabilities: [], extension_points: [],
+      blocked_reasons: ['Manifest schema invalid', 'Incompatible engine version'],
+      contributed_panels: [],
+    },
+  ],
+};
 
 run.route_attempts = {
   present: true,
@@ -2765,6 +2786,27 @@ assert.doesNotMatch(exportPkgMarkup, /<button|<form|onclick|localStorage|fetch\(
 assert.strictEqual(typeof cockpit.runExport, 'undefined');
 assert.strictEqual(typeof cockpit.publishPackage, 'undefined');
 assert.match(cockpit.renderStudioExportPackageInspectionSurface({}), /No export\/package inspection read model/);
+// #768 Plugin / extension panel
+const pluginPanelModel = cockpit.studioPluginPanelModel(run);
+assert.strictEqual(pluginPanelModel.present, true);
+assert.strictEqual(pluginPanelModel.plugins.length, 2);
+const corePlugin = pluginPanelModel.plugins.find((p) => p.id === 'core-inspector');
+assert.strictEqual(corePlugin.contributedPanels.find((p) => p.type === 'info-panel').allowed, true);
+assert.strictEqual(corePlugin.contributedPanels.find((p) => p.type === 'executable-widget').allowed, false);
+const pluginPanelMarkup = cockpit.renderStudioPluginPanelSurface(run);
+assert.match(pluginPanelMarkup, /Plugin \/ extension panel/);
+assert.match(pluginPanelMarkup, /Core Inspector/);
+assert.match(pluginPanelMarkup, /Plugin info/);
+assert.match(pluginPanelMarkup, /not allowlisted/);
+assert.match(pluginPanelMarkup, /Manifest schema invalid/);
+// No plugin execution: no controls, no exported run/install fns, descriptor content is escaped (no live <script>)
+assert.doesNotMatch(pluginPanelMarkup, /<button|<form|<input|onclick|localStorage|fetch\(|XMLHttpRequest|auto-merge/i);
+assert.doesNotMatch(pluginPanelMarkup, /<script>alert\(1\)<\/script>/);
+assert.match(pluginPanelMarkup, /&lt;script&gt;/);
+assert.strictEqual(typeof cockpit.installPlugin, 'undefined');
+assert.strictEqual(typeof cockpit.runPlugin, 'undefined');
+assert.strictEqual(typeof cockpit.enablePlugin, 'undefined');
+assert.match(cockpit.renderStudioPluginPanelSurface({}), /No plugin panel read model/);
 const behaviorDraftMarkup = cockpit.renderBehaviorDraftStatusSurface(run);
 assert.match(behaviorDraftMarkup, /Behavior draft status/);
 assert.match(behaviorDraftMarkup, /draft-jump-boost/);
