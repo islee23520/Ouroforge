@@ -1685,6 +1685,20 @@ assert.match(dashboard.renderRunDetail(run), /QA agent work queues/);
 assert.match(dashboard.renderRunDetail(run), /Source patch evidence bundle/);
 
 
+const pluginExtensionCoverageMatrix = fs.readFileSync(require.resolve('../../docs/scenario-coverage-v16-plugin-extension.md'), 'utf8');
+assert.match(pluginExtensionCoverageMatrix, /Scenario Coverage v16: Plugin Extension Regression Suite/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.3 integrates the Scenario Coverage v16 matrix with local verification/);
+assert.match(pluginExtensionCoverageMatrix, /dashboard and cockpit Node smoke tests now read this document as an\s+integration sentinel/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.dashboard-panel/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-arbitrary-js/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-command-execution/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-network-install-update/);
+assert.match(pluginExtensionCoverageMatrix, /PES10\.16\.block-export-publish-deploy/);
+assert.match(pluginExtensionCoverageMatrix, /cargo test/);
+assert.match(pluginExtensionCoverageMatrix, /node examples\/evidence-dashboard\/dashboard\.test\.cjs/);
+assert.match(pluginExtensionCoverageMatrix, /node examples\/authoring-cockpit\/cockpit\.test\.cjs/);
+assert.match(pluginExtensionCoverageMatrix, /#1 remains the broad roadmap\/governance anchor and #23 remains the protected/);
+
 const sourcePatchCoverageMatrix = fs.readFileSync(require.resolve('../../docs/source-patch-preview-coverage-matrix-v1.md'), 'utf8');
 assert.match(sourcePatchCoverageMatrix, /Scenario Coverage v6 \/ SMP1\.11\.3 coverage matrix/);
 assert.match(sourcePatchCoverageMatrix, /Forbidden file classes/);
