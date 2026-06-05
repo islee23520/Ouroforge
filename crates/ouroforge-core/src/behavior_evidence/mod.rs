@@ -1,9 +1,11 @@
+mod journal;
 mod rules;
 mod validation;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+pub use journal::render_behavior_evidence_journal_section;
 pub use validation::{inspect_behavior_evidence_bundle, validate_behavior_evidence_bundle};
 
 pub const BEHAVIOR_EVIDENCE_BUNDLE_SCHEMA_VERSION: &str = "behavior-evidence-bundle-v1";

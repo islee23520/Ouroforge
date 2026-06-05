@@ -40467,6 +40467,8 @@ pub fn update_journal(run_dir: impl AsRef<Path>) -> Result<String> {
     let mut journal = render_journal(
         run_dir, &seed, &evidence, &ledger, &verdict, &proposals, &run,
     );
+    journal
+        .push_str(&behavior_evidence::render_behavior_evidence_journal_section(run_dir, &evidence));
     journal.push_str(&render_authoring_governance_journal_section(
         &proposals,
         &reviews,
