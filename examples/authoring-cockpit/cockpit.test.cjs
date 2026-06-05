@@ -1585,8 +1585,10 @@ assert.match(roadmapDoc, /does not add a full 3D\s+editor, production 3D rendere
 assert.match(roadmapDoc, /native export, plugin runtime, hosted\/cloud\/server\/auth behavior, browser\s+trusted writes, command bridges, unrestricted source apply/);
 assert.match(roadmapDoc, /current Godot replacement positioning/);
 assert.match(roadmapDoc, /Agentic Scene and Level Designer v1 completion covers the #627-#642 evidence\s+chain/);
-assert.match(roadmapDoc, /After #642, the recommended next milestone candidate is the remaining Gameplay\s+Scripting \/ Logic System v1 sequence \(#614-#625\)/);
-assert.match(roadmapDoc, /must not become arbitrary third-party code\s+loading, plugin runtime, browser command bridge, hosted execution, production\s+scripting, source-apply authority, public-launch approval, or Godot replacement\s+scope/);
+assert.match(roadmapDoc, /After #625, Gameplay Scripting \/ Logic System v1 \(#611-#625\) is complete/);
+assert.match(roadmapDoc, /not arbitrary\s+third-party code loading, plugin runtime, browser command bridge, hosted\s+execution, production scripting, source-apply authority, public-launch approval,\s+or Godot replacement scope/);
+assert.match(roadmapDoc, /GDD-to-Playable Prototype v1 \(#644-#661\)/);
+assert.match(roadmapDoc, /#611-#625 do\s+not authorize arbitrary executable scripts/);
 assert.match(roadmapDoc, /#1 remains the broad vision and implementation-roadmap anchor/);
 assert.match(roadmapDoc, /#23 remains open as the repo-memory\/design context anchor/);
 const production2dCoreDoc = fs.readFileSync(require.resolve('../../docs/production-2d-engine-core-v1.md'), 'utf8');
