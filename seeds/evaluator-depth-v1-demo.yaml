@@ -1,0 +1,25 @@
+id: evaluator-depth-v1.demo
+title: Evaluator Depth v1 Deterministic Demo Seed
+goal: Demonstrate four-gate evaluation with one pure visual failure and one pure semantic invariant failure from fixture-scoped evidence.
+constraints:
+  target: local-fixture
+acceptance:
+  - Visual mismatch scenario passes mechanical and runtime evidence while failing only the declared visual gate.
+  - Semantic invariant scenario passes mechanical, runtime, and visual evidence while failing only the declared semantic gate.
+  - Demo verdicts are reproducible from tracked fixtures without network access or a live browser.
+  - Browser and Studio surfaces remain read-only; no auto-fix, auto-apply, auto-merge, self-approval, or trusted mutation is authorized.
+scenarios:
+  - id: visual-mismatch
+    description: Mechanical scenario result and runtime evidence pass, and declared visual comparison fails because changed pixels exceed the declared threshold.
+    visualAcceptance:
+      comparisonRef: examples/evaluator-depth-v1/demo/visual-fail-run/evidence/scenarios/visual-mismatch/visual/visual-comparison.json
+      baselineScreenshotRef: examples/evaluator-depth-v1/demo/visual-fail-run/evidence/scenarios/visual-mismatch/visual/baseline.png
+      actualScreenshotRef: examples/evaluator-depth-v1/demo/visual-fail-run/evidence/scenarios/visual-mismatch/visual/actual.png
+      maxChangedPixels: 0
+      maxChangedPercentX1000: 0
+  - id: semantic-invariant
+    description: Mechanical scenario result, runtime evidence, and visual comparison pass, and declared semantic invariant fails because player.health is negative.
+    semanticAcceptance:
+      modelRef: examples/evaluator-depth-v1/demo/semantic-fail-run/evidence/scenarios/semantic-invariant/semantic/runtime-invariant-model.json
+      worldStateRef: examples/evaluator-depth-v1/demo/semantic-fail-run/evidence/scenarios/semantic-invariant/world-state.json
+      expectedStatus: pass

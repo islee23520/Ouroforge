@@ -1,0 +1,14 @@
+{
+  "modelId": "evaluator_depth_demo_visual_semantic_pass",
+  "scenarioId": "visual-mismatch",
+  "invariants": [
+    {
+      "id": "health-non-negative",
+      "invariantType": "health_non_negative",
+      "targetPath": "player.health",
+      "expected": "non_negative",
+      "observed": 3,
+      "state": "pass"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "scenarioId": "semantic-invariant",
+  "status": "passed",
+  "mechanicalStatus": "pass",
+  "reason": "Scenario execution fixture passed; semantic gate is evaluated separately.",
+  "fixtureScoped": true
+}

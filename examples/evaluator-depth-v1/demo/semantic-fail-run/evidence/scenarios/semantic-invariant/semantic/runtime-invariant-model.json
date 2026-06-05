@@ -1,0 +1,15 @@
+{
+  "modelId": "evaluator_depth_demo_semantic_fail",
+  "scenarioId": "semantic-invariant",
+  "invariants": [
+    {
+      "id": "health-non-negative",
+      "invariantType": "health_non_negative",
+      "targetPath": "player.health",
+      "expected": "non_negative",
+      "observed": -1,
+      "state": "fail",
+      "reason": "player.health is -1"
+    }
+  ]
+}

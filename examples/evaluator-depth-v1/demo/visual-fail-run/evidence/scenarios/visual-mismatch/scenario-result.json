@@ -1,0 +1,7 @@
+{
+  "scenarioId": "visual-mismatch",
+  "status": "passed",
+  "mechanicalStatus": "pass",
+  "reason": "Scenario execution fixture passed; visual gate is evaluated separately.",
+  "fixtureScoped": true
+}

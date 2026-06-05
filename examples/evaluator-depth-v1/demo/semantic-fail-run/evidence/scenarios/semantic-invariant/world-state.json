@@ -1,0 +1,7 @@
+{
+  "scenarioId": "semantic-invariant",
+  "player": {
+    "health": -1
+  },
+  "fixtureScoped": true
+}

@@ -1,0 +1,23 @@
+{
+  "scenarioId": "visual-mismatch",
+  "checkpointId": "hud-score",
+  "outcome": "changed",
+  "pixelDiffSummary": {
+    "changedPixels": 1,
+    "changedPercentX1000": 1000,
+    "changedRegionCount": 1
+  },
+  "thresholds": [
+    {
+      "id": "demo-pixel-threshold",
+      "maxChangedPixels": 0,
+      "maxChangedPercentX1000": 0
+    }
+  ],
+  "baselineRef": "baseline.png",
+  "actualRef": "actual.png",
+  "guardrails": [
+    "fixture scoped only",
+    "no aesthetic, fun, production, or mutation claim"
+  ]
+}

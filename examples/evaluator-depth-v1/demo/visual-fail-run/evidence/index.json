@@ -1,0 +1,11 @@
+{
+  "runId": "visual-fail-run",
+  "fixtureScoped": true,
+  "refs": [
+    "evidence/scenarios/visual-mismatch/scenario-result.json",
+    "evidence/scenarios/visual-mismatch/runtime/runtime-pass.json",
+    "evidence/scenarios/visual-mismatch/visual/visual-comparison.json",
+    "evidence/scenarios/visual-mismatch/semantic/runtime-invariant-model.json",
+    "evidence/scenarios/visual-mismatch/world-state.json"
+  ]
+}

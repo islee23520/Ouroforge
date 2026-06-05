@@ -1,0 +1,101 @@
+{
+  "status": "failed",
+  "summary": "1 pure visual gate failure found across 1 scenario result; mechanical, runtime, and semantic gates passed.",
+  "failures": [
+    {
+      "kind": "visual_gate_failed",
+      "scenario_id": "visual-mismatch",
+      "checkpoint_id": "hud-score",
+      "state": "fail",
+      "path": "evidence/scenarios/visual-mismatch/visual/visual-comparison.json",
+      "reason": "visual gate failed at evidence/scenarios/visual-mismatch/visual/visual-comparison.json: 1 changed pixels (1000 x1000) exceeded demo-pixel-threshold <= 0 px and 0 x1000",
+      "changed_pixels": 1,
+      "changed_percent_x1000": 1000,
+      "changed_region_count": 1,
+      "threshold_summary": [
+        "demo-pixel-threshold <= 0 px and 0 x1000"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence/scenarios/visual-mismatch/scenario-result.json",
+    "evidence/scenarios/visual-mismatch/runtime/runtime-pass.json",
+    "evidence/scenarios/visual-mismatch/visual/visual-comparison.json",
+    "evidence/scenarios/visual-mismatch/semantic/runtime-invariant-model.json"
+  ],
+  "metadata": {
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "suite_summaries": 0,
+    "behavior_evaluator_results": 1,
+    "visual_gate_results": 1,
+    "semantic_gate_results": 1,
+    "fixture_scope": "examples/evaluator-depth-v1/demo/visual-fail-run"
+  },
+  "gateCategories": {
+    "mechanical": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "runtime": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "visual": {
+      "declared": true,
+      "status": "fail",
+      "resultCount": 1,
+      "failureCount": 1
+    },
+    "semantic": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    }
+  },
+  "visual": [
+    {
+      "scenarioId": "visual-mismatch",
+      "checkpointId": "hud-score",
+      "state": "fail",
+      "reason": "visual gate failed at evidence/scenarios/visual-mismatch/visual/visual-comparison.json: 1 changed pixels (1000 x1000) exceeded demo-pixel-threshold <= 0 px and 0 x1000",
+      "comparisonRef": "evidence/scenarios/visual-mismatch/visual/visual-comparison.json",
+      "changedPixels": 1,
+      "changedPercentX1000": 1000,
+      "changedRegionCount": 1,
+      "thresholdSummary": [
+        "demo-pixel-threshold <= 0 px and 0 x1000"
+      ],
+      "evidenceRefs": [
+        "evidence/scenarios/visual-mismatch/visual/baseline.png",
+        "evidence/scenarios/visual-mismatch/visual/actual.png"
+      ],
+      "outputRoot": "evidence/scenarios/visual-mismatch/visual"
+    }
+  ],
+  "semantic": [
+    {
+      "scenarioId": "visual-mismatch",
+      "modelId": "evaluator_depth_demo_visual_semantic_pass",
+      "invariantId": "health-non-negative",
+      "invariantType": "health_non_negative",
+      "state": "pass",
+      "reason": "invariant health-non-negative passed for player.health",
+      "modelRef": "evidence/scenarios/visual-mismatch/semantic/runtime-invariant-model.json",
+      "worldStateRef": "evidence/scenarios/visual-mismatch/world-state.json",
+      "targetPath": "player.health",
+      "evidenceRefs": [
+        "evidence/scenarios/visual-mismatch/world-state.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "scenarioId": "visual-mismatch",
+  "status": "pass",
+  "frameBudget": "within-demo-threshold",
+  "consoleErrors": 0,
+  "fixtureScoped": true
+}

@@ -1,0 +1,7 @@
+{
+  "scenarioId": "visual-mismatch",
+  "player": {
+    "health": 3
+  },
+  "fixtureScoped": true
+}

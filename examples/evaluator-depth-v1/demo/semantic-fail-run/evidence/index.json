@@ -1,0 +1,11 @@
+{
+  "runId": "semantic-fail-run",
+  "fixtureScoped": true,
+  "refs": [
+    "evidence/scenarios/semantic-invariant/scenario-result.json",
+    "evidence/scenarios/semantic-invariant/runtime/runtime-pass.json",
+    "evidence/scenarios/semantic-invariant/visual/visual-comparison.json",
+    "evidence/scenarios/semantic-invariant/semantic/runtime-invariant-model.json",
+    "evidence/scenarios/semantic-invariant/world-state.json"
+  ]
+}

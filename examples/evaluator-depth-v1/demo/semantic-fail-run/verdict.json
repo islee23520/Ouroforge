@@ -1,0 +1,99 @@
+{
+  "status": "failed",
+  "summary": "1 pure semantic gate failure found across 1 scenario result; mechanical, runtime, and visual gates passed.",
+  "failures": [
+    {
+      "kind": "semantic_gate_failed",
+      "scenario_id": "semantic-invariant",
+      "model_id": "evaluator_depth_demo_semantic_fail",
+      "invariant_id": "health-non-negative",
+      "invariant_type": "health_non_negative",
+      "state": "fail",
+      "model_ref": "evidence/scenarios/semantic-invariant/semantic/runtime-invariant-model.json",
+      "world_state_ref": "evidence/scenarios/semantic-invariant/world-state.json",
+      "target_path": "player.health",
+      "reason": "health-non-negative failed because player.health is -1"
+    }
+  ],
+  "evidence_refs": [
+    "evidence/scenarios/semantic-invariant/scenario-result.json",
+    "evidence/scenarios/semantic-invariant/runtime/runtime-pass.json",
+    "evidence/scenarios/semantic-invariant/visual/visual-comparison.json",
+    "evidence/scenarios/semantic-invariant/semantic/runtime-invariant-model.json"
+  ],
+  "metadata": {
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "suite_summaries": 0,
+    "behavior_evaluator_results": 1,
+    "visual_gate_results": 1,
+    "semantic_gate_results": 1,
+    "fixture_scope": "examples/evaluator-depth-v1/demo/semantic-fail-run"
+  },
+  "gateCategories": {
+    "mechanical": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "runtime": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "visual": {
+      "declared": true,
+      "status": "pass",
+      "resultCount": 1,
+      "failureCount": 0
+    },
+    "semantic": {
+      "declared": true,
+      "status": "fail",
+      "resultCount": 1,
+      "failureCount": 1
+    },
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    }
+  },
+  "visual": [
+    {
+      "scenarioId": "semantic-invariant",
+      "checkpointId": "hud-score",
+      "state": "pass",
+      "reason": "visual gate passed at evidence/scenarios/semantic-invariant/visual/visual-comparison.json: 0 changed pixels within demo-pixel-threshold <= 0 px and 0 x1000",
+      "comparisonRef": "evidence/scenarios/semantic-invariant/visual/visual-comparison.json",
+      "changedPixels": 0,
+      "changedPercentX1000": 0,
+      "changedRegionCount": 0,
+      "thresholdSummary": [
+        "demo-pixel-threshold <= 0 px and 0 x1000"
+      ],
+      "evidenceRefs": [
+        "evidence/scenarios/semantic-invariant/visual/baseline.png",
+        "evidence/scenarios/semantic-invariant/visual/actual.png"
+      ],
+      "outputRoot": "evidence/scenarios/semantic-invariant/visual"
+    }
+  ],
+  "semantic": [
+    {
+      "scenarioId": "semantic-invariant",
+      "modelId": "evaluator_depth_demo_semantic_fail",
+      "invariantId": "health-non-negative",
+      "invariantType": "health_non_negative",
+      "state": "fail",
+      "reason": "health-non-negative failed because player.health is -1",
+      "modelRef": "evidence/scenarios/semantic-invariant/semantic/runtime-invariant-model.json",
+      "worldStateRef": "evidence/scenarios/semantic-invariant/world-state.json",
+      "targetPath": "player.health",
+      "evidenceRefs": [
+        "evidence/scenarios/semantic-invariant/world-state.json"
+      ]
+    }
+  ]
+}
