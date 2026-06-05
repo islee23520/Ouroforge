@@ -29195,7 +29195,12 @@ fn backlog_candidate_is_better(
 ) -> bool {
     severity_rank(&current.severity)
         .cmp(&severity_rank(&candidate.severity))
-        .then_with(|| current.evidence_refs.len().cmp(&candidate.evidence_refs.len()))
+        .then_with(|| {
+            current
+                .evidence_refs
+                .len()
+                .cmp(&candidate.evidence_refs.len())
+        })
         .then_with(|| candidate.id.cmp(&current.id))
         .is_lt()
 }
