@@ -44,7 +44,7 @@
       "on": "scene_loaded",
       "kind": "audio",
       "asset": "collect_sound",
-      "note": "Reuses the existing collect.ogg audio intent (intent-only, muted browser playback); no new audio asset is added."
+      "note": "Documents the existing player_spawn scene-load audio intent (intent-only, muted browser playback); no pickup audio is modeled or added."
     }
   ],
   "boundary": "Declarative read-only HUD/feedback model only. Reuses existing scene HUD entities and runtime feedback paths; adds no new assets, no engine surface, no trusted browser write, no production/native/store export, and no full Godot parity or replacement claim."

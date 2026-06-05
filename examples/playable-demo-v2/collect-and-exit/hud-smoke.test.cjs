@@ -5,8 +5,9 @@
 //
 // Validates the declarative HUD model against the live runtime: every HUD row
 // binds an objective flag and reflects gameplay state (objective, key, health);
-// win/lose game-state is derivable from the same flags; and the existing visual
-// (key hidden on pickup) and audio (collect_sound intent) feedback paths fire.
+// win/lose game-state is derivable from the same flags; the existing visual
+// key-pickup feedback fires; and the existing scene-load spawn audio intent is
+// modeled without implying pickup audio.
 // Also confirms the read-only dashboard renders the HUD evidence. Pure read-only
 // harness: temp dir only, removed before exit.
 
@@ -65,12 +66,27 @@ function rowDisplay(model, rowId, flags) {
   return row.states[String(flagValue)];
 }
 
+function feedbackRows(model, kind) {
+  return model.feedback.filter((row) => row.kind === kind);
+}
+
 (async () => {
   const model = readJson(path.join(fixtureDir, 'hud-model.json'));
   const scene = readJson(path.join(fixtureDir, 'scenes', 'collect-and-exit.scene.json'));
 
   assert.equal(model.schemaVersion, 'demo-hud-model-v1', 'hud model schema');
   assert.deepEqual(model.rows.map((r) => r.id).sort(), ['goal', 'health', 'key'], 'hud model rows');
+  const audioFeedback = feedbackRows(model, 'audio');
+  assert.deepEqual(
+    audioFeedback.map((row) => ({ on: row.on, asset: row.asset })),
+    [{ on: 'scene_loaded', asset: 'collect_sound' }],
+    'model: audio feedback is scene-load spawn intent'
+  );
+  assert.equal(
+    audioFeedback.some((row) => row.on === 'key_collected'),
+    false,
+    'model: no pickup audio feedback is declared'
+  );
 
   const api = createRuntime(scene);
   await api.whenReady();
@@ -105,10 +121,22 @@ function rowDisplay(model, rowId, flags) {
   const keyEntity = won.entities.find((entity) => entity.id === 'key');
   assert.equal(keyEntity.sprite.visible, false, 'visual feedback: key hidden on pickup');
 
-  // Audio feedback: the existing collect_sound intent fired.
-  assert.ok(
-    won.audioEvents.some((event) => event.asset === 'collect_sound'),
-    'audio feedback: collect_sound intent present'
+  // Audio feedback: the existing collect_sound intent is scene-load spawn audio.
+  const spawnAudioEvent = won.audioEvents.find((event) => event.asset === 'collect_sound');
+  assert.deepEqual(
+    {
+      name: spawnAudioEvent && spawnAudioEvent.name,
+      trigger: spawnAudioEvent && spawnAudioEvent.trigger,
+      asset: spawnAudioEvent && spawnAudioEvent.asset,
+      playback: spawnAudioEvent && spawnAudioEvent.playback,
+    },
+    {
+      name: 'player_spawn',
+      trigger: 'scene_loaded',
+      asset: 'collect_sound',
+      playback: 'intent',
+    },
+    'audio feedback: collect_sound is player_spawn scene-load intent'
   );
 
   // Lose-state HUD derivation (model-level; no new assets needed).

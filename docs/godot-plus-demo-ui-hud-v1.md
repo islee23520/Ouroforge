@@ -41,8 +41,9 @@ To avoid asset bloat, feedback reuses existing runtime paths:
 
 - **Visual** — the key entity is hidden on pickup via the existing `hideEntity`
   trigger action.
-- **Audio** — the existing `collect_sound` (`collect.ogg`) audio intent fires
-  (intent-only, muted browser playback); no new audio asset is added.
+- **Audio** — the existing `collect_sound` (`collect.ogg`) audio intent is
+  modeled as `scene_loaded` / `player_spawn` evidence (intent-only, muted browser
+  playback); no pickup audio is modeled or added.
 
 ## Verification
 
@@ -53,9 +54,10 @@ node examples/playable-demo-v2/collect-and-exit/hud-smoke.test.cjs
 `hud-smoke.test.cjs` asserts: every HUD model row maps to a live HUD row and
 binds the right flag; the HUD reflects key collection and objective completion on
 the win path; the lose-state display is derivable (`HP 0/3`); the key is hidden on
-pickup and the `collect_sound` intent fires; and the read-only dashboard renders
-the HUD evidence. It writes only to a temp dir outside the repository and fails
-closed on any committed generated root.
+pickup; `collect_sound` is asserted as the `scene_loaded` / `player_spawn` audio
+intent, with no declared pickup audio; and the read-only dashboard renders the HUD
+evidence. It writes only to a temp dir outside the repository and fails closed on
+any committed generated root.
 
 ## Boundaries
 
