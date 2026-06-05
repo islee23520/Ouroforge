@@ -8,6 +8,7 @@ use serde_json::json;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct EvaluationVerdict {
@@ -1104,6 +1105,18 @@ fn run_id_from_run_dir(run_dir: &Path) -> String {
         .to_string()
 }
 
+fn run_id_from_run_file(run_dir: &Path) -> Result<String> {
+    let run = read_json_value(run_dir.join("run.json"))?;
+    Ok(json_string(&run, "id").unwrap_or_else(|| run_id_from_run_dir(run_dir)))
+}
+
+fn unix_millis() -> Result<u128> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX_EPOCH")?
+        .as_millis())
+}
+
 fn write_json(path: &Path, value: &serde_json::Value) -> Result<()> {
     let body = serde_json::to_string_pretty(value).context("failed to serialize JSON")?;
     fs::write(path, format!("{body}\n"))
@@ -1636,6 +1649,336 @@ impl VisualComparisonThreshold {
             ));
         }
         Ok(())
+    }
+}
+
+pub fn evaluate_semantic_gate(
+    run_dir: &Path,
+    evidence: &EvidenceIndex,
+    failures: &mut Vec<serde_json::Value>,
+    evidence_refs: &mut Vec<String>,
+) -> Result<Vec<SemanticGateVerdict>> {
+    let mut verdicts = Vec::new();
+    for artifact in evidence
+        .artifacts
+        .iter()
+        .filter(|artifact| semantic_gate_artifact_declared(artifact))
+    {
+        let verdict = evaluate_declared_semantic_model(run_dir, artifact)?;
+        if !matches!(verdict.state, SemanticGateState::Pass) {
+            failures.push(json!({
+                "kind": "semantic_gate_failed",
+                "scenario_id": verdict.scenario_id,
+                "model_id": verdict.model_id,
+                "invariant_id": verdict.invariant_id,
+                "invariant_type": verdict.invariant_type,
+                "state": verdict.state,
+                "model_ref": verdict.model_ref,
+                "world_state_ref": verdict.world_state_ref,
+                "target_path": verdict.target_path,
+                "reason": verdict.reason,
+                "evidence_refs": verdict.evidence_refs
+            }));
+        }
+        push_unique_evidence_ref(evidence_refs, &verdict.model_ref);
+        for evidence_ref in &verdict.evidence_refs {
+            push_unique_evidence_ref(evidence_refs, evidence_ref);
+        }
+        verdicts.push(verdict);
+    }
+    Ok(verdicts)
+}
+
+fn semantic_gate_artifact_declared(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("runtime_invariant_model")
+        && (artifact
+            .metadata
+            .get("gate")
+            .and_then(|value| value.as_str())
+            == Some("semantic")
+            || artifact
+                .metadata
+                .get("declaredAcceptance")
+                .or_else(|| artifact.metadata.get("declared_acceptance"))
+                .and_then(|value| value.as_bool())
+                == Some(true))
+}
+
+pub fn evaluate_declared_semantic_model(
+    run_dir: &Path,
+    artifact: &EvidenceArtifact,
+) -> Result<SemanticGateVerdict> {
+    let model_ref = artifact.path.clone();
+    let value = read_json_value(run_dir.join(&model_ref)).with_context(|| {
+        format!(
+            "failed to read declared semantic invariant model {}",
+            artifact.path
+        )
+    })?;
+    let fallback_model_id = json_string(&value, "modelId")
+        .or_else(|| json_string(&value, "model_id"))
+        .or_else(|| {
+            artifact
+                .metadata
+                .get("modelId")
+                .or_else(|| artifact.metadata.get("model_id"))
+                .and_then(|value| value.as_str())
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| "unknown-model".to_string());
+    let fallback_scenario_id = json_string(&value, "scenarioId")
+        .or_else(|| json_string(&value, "scenario_id"))
+        .or_else(|| {
+            artifact
+                .metadata
+                .get("scenarioId")
+                .or_else(|| artifact.metadata.get("scenario_id"))
+                .and_then(|value| value.as_str())
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| "unknown-scenario".to_string());
+
+    if semantic_model_contains_unsafe_expression(&value) {
+        return Ok(SemanticGateVerdict {
+            scenario_id: fallback_scenario_id,
+            model_id: fallback_model_id,
+            invariant_id: "unsafe-expression".to_string(),
+            invariant_type: None,
+            state: SemanticGateState::UnsafeExpression,
+            reason: "semantic invariant model contains an expression/eval field; semantic gates use bounded invariant types only".to_string(),
+            model_ref,
+            world_state_ref: None,
+            target_path: None,
+            evidence_refs: Vec::new(),
+        });
+    }
+
+    let model = match serde_json::from_value::<RuntimeInvariantModel>(value)
+        .context("failed to parse Runtime Invariant Model JSON")
+        .and_then(|model| {
+            model.validate()?;
+            Ok(model)
+        }) {
+        Ok(model) => model,
+        Err(error) => {
+            let reason = error.to_string();
+            return Ok(semantic_gate_parse_error_verdict(
+                fallback_scenario_id,
+                fallback_model_id,
+                model_ref,
+                reason,
+            ));
+        }
+    };
+
+    let current_run_id = run_id_from_run_file(run_dir)?;
+    if model.run_id != current_run_id {
+        return Ok(SemanticGateVerdict {
+            scenario_id: model
+                .scenario_id
+                .clone()
+                .unwrap_or_else(|| fallback_scenario_id.clone()),
+            model_id: model.model_id,
+            invariant_id: "model-run-id".to_string(),
+            invariant_type: None,
+            state: SemanticGateState::StaleRef,
+            reason: format!(
+                "semantic invariant model runId is stale: {} != {current_run_id}",
+                model.run_id
+            ),
+            model_ref,
+            world_state_ref: Some(model.world_state_path),
+            target_path: None,
+            evidence_refs: Vec::new(),
+        });
+    }
+
+    let world_state = match read_json_value(run_dir.join(&model.world_state_path)) {
+        Ok(world_state) => world_state,
+        Err(error) => {
+            return Ok(SemanticGateVerdict {
+                scenario_id: model
+                    .scenario_id
+                    .clone()
+                    .unwrap_or_else(|| fallback_scenario_id.clone()),
+                model_id: model.model_id,
+                invariant_id: "world-state".to_string(),
+                invariant_type: None,
+                state: SemanticGateState::MissingTargetState,
+                reason: format!(
+                    "semantic invariant target world-state was missing or unreadable at {}: {error}",
+                    model.world_state_path
+                ),
+                model_ref,
+                world_state_ref: Some(model.world_state_path),
+                target_path: None,
+                evidence_refs: Vec::new(),
+            });
+        }
+    };
+    let scenario_result = match &model.scenario_result_path {
+        Some(path) => read_json_value(run_dir.join(path)).ok(),
+        None => None,
+    };
+    let evidence = evaluate_runtime_invariants(
+        &model,
+        &world_state,
+        scenario_result.as_ref(),
+        unix_millis()?,
+    )?;
+    Ok(semantic_gate_verdict_from_evidence(
+        model_ref, &model, &evidence,
+    ))
+}
+
+fn semantic_model_contains_unsafe_expression(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(map) => map.iter().any(|(key, value)| {
+            let lowered = key.to_ascii_lowercase();
+            lowered.contains("expression")
+                || lowered.contains("eval")
+                || lowered.contains("script")
+                || semantic_model_contains_unsafe_expression(value)
+        }),
+        serde_json::Value::Array(items) => {
+            items.iter().any(semantic_model_contains_unsafe_expression)
+        }
+        serde_json::Value::String(value) => {
+            let lowered = value.to_ascii_lowercase();
+            lowered.contains("eval(") || lowered.contains("<script")
+        }
+        _ => false,
+    }
+}
+
+fn semantic_gate_parse_error_verdict(
+    scenario_id: String,
+    model_id: String,
+    model_ref: String,
+    reason: String,
+) -> SemanticGateVerdict {
+    let state = classify_semantic_gate_parse_error(&reason);
+    SemanticGateVerdict {
+        scenario_id,
+        model_id,
+        invariant_id: "model-parse".to_string(),
+        invariant_type: None,
+        state,
+        reason,
+        model_ref,
+        world_state_ref: None,
+        target_path: None,
+        evidence_refs: Vec::new(),
+    }
+}
+
+fn classify_semantic_gate_parse_error(reason: &str) -> SemanticGateState {
+    let lowered = reason.to_ascii_lowercase();
+    if lowered.contains("expression")
+        || lowered.contains("eval")
+        || lowered.contains("script")
+        || lowered.contains("command")
+    {
+        SemanticGateState::UnsafeExpression
+    } else if lowered.contains("unknown variant") || lowered.contains("unsupported") {
+        SemanticGateState::Unsupported
+    } else if lowered.contains("stale") {
+        SemanticGateState::StaleRef
+    } else {
+        SemanticGateState::MalformedInvariant
+    }
+}
+
+fn semantic_gate_verdict_from_evidence(
+    model_ref: String,
+    model: &RuntimeInvariantModel,
+    evidence: &RuntimeInvariantEvidence,
+) -> SemanticGateVerdict {
+    let selected = evidence
+        .checks
+        .iter()
+        .find(|check| check.status != RuntimeInvariantStatus::Passed)
+        .or_else(|| evidence.checks.first());
+    let Some(check) = selected else {
+        return SemanticGateVerdict {
+            scenario_id: model
+                .scenario_id
+                .clone()
+                .unwrap_or_else(|| "unknown-scenario".to_string()),
+            model_id: model.model_id.clone(),
+            invariant_id: "no-invariants".to_string(),
+            invariant_type: None,
+            state: SemanticGateState::MalformedInvariant,
+            reason: "semantic invariant model produced no checks".to_string(),
+            model_ref,
+            world_state_ref: Some(model.world_state_path.clone()),
+            target_path: None,
+            evidence_refs: Vec::new(),
+        };
+    };
+    let state = match check.status {
+        RuntimeInvariantStatus::Passed => SemanticGateState::Pass,
+        RuntimeInvariantStatus::Failed => SemanticGateState::Fail,
+        RuntimeInvariantStatus::Unsupported => SemanticGateState::Unsupported,
+        RuntimeInvariantStatus::Missing => SemanticGateState::MissingTargetState,
+        RuntimeInvariantStatus::Malformed => SemanticGateState::MalformedInvariant,
+        RuntimeInvariantStatus::Stale => SemanticGateState::StaleRef,
+    };
+    let reason = match check.status {
+        RuntimeInvariantStatus::Passed => format!(
+            "semantic gate passed: invariant {} over {}",
+            check.invariant_id, check.target_path
+        ),
+        _ => format!(
+            "semantic gate {}: invariant {} over {}: {}",
+            semantic_gate_state_label(state),
+            check.invariant_id,
+            check.target_path,
+            check
+                .message
+                .as_deref()
+                .unwrap_or("runtime invariant check did not pass")
+        ),
+    };
+    SemanticGateVerdict {
+        scenario_id: evidence
+            .scenario_id
+            .clone()
+            .unwrap_or_else(|| "unknown-scenario".to_string()),
+        model_id: evidence.model_id.clone(),
+        invariant_id: check.invariant_id.clone(),
+        invariant_type: Some(check.invariant_type),
+        state,
+        reason,
+        model_ref,
+        world_state_ref: Some(evidence.world_state_path.clone()),
+        target_path: Some(check.target_path.clone()),
+        evidence_refs: check.evidence_refs.clone(),
+    }
+}
+
+fn semantic_gate_state_label(state: SemanticGateState) -> &'static str {
+    match state {
+        SemanticGateState::Pass => "passed",
+        SemanticGateState::Fail => "failed",
+        SemanticGateState::Unsupported => "unsupported",
+        SemanticGateState::MissingTargetState => "missing target state",
+        SemanticGateState::MalformedInvariant => "malformed invariant",
+        SemanticGateState::UnsafeExpression => "unsafe expression",
+        SemanticGateState::StaleRef => "stale ref",
+    }
+}
+
+fn push_unique_evidence_ref(evidence_refs: &mut Vec<String>, evidence_ref: &str) {
+    if !evidence_refs
+        .iter()
+        .any(|existing| existing == evidence_ref)
+    {
+        evidence_refs.push(evidence_ref.to_string());
     }
 }
 
