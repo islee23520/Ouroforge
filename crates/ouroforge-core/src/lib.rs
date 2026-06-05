@@ -52297,6 +52297,49 @@ pub struct RegressionRunMatrixContext {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginRegistry {
+    pub present: bool,
+    pub empty_state: String,
+    pub status: String,
+    pub registry_count: usize,
+    pub plugin_count: usize,
+    pub blocked_count: usize,
+    pub malformed_count: usize,
+    pub evidence_refs: Vec<String>,
+    pub registries: Vec<RunDashboardPluginRegistryRecord>,
+    pub artifacts: Vec<RunDashboardArtifact>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginRegistryRecord {
+    pub registry_id: String,
+    pub project_id: String,
+    pub run_id: String,
+    pub ledger_ref: String,
+    pub generated_state: serde_json::Value,
+    pub status: String,
+    pub plugin_count: usize,
+    pub blocked_count: usize,
+    pub blocked_reasons: Vec<String>,
+    pub plugins: Vec<RunDashboardPluginDescriptorRow>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RunDashboardPluginDescriptorRow {
+    pub plugin_id: String,
+    pub manifest_path: String,
+    pub manifest_hash: String,
+    pub manifest_version: String,
+    pub validation_status: String,
+    pub compatibility_status: String,
+    pub declared_capabilities: Vec<String>,
+    pub extension_points: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub blocked_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RunDashboardReadModel {
     pub summary: RunDashboardSummary,
     pub run: serde_json::Value,
@@ -52327,6 +52370,7 @@ pub struct RunDashboardReadModel {
     pub asset_loading: RunDashboardAssetLoading,
     pub asset_preview: RunDashboardAssetPreview,
     pub asset_inspector: RunDashboardAssetInspector,
+    pub plugin_registry: RunDashboardPluginRegistry,
     pub source_apply_worktree_context: RunDashboardSourceApplyWorktreeContext,
     pub runtime_invariants: RunDashboardRuntimeInvariants,
     pub qa_worker_assignments: RunDashboardQaWorkerAssignments,
@@ -53167,6 +53211,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
     let asset_preview = read_dashboard_asset_preview(run_dir, &evidence)?;
     let asset_inspector =
         dashboard_asset_inspector(&asset_integrity, &asset_loading, &asset_preview);
+    let plugin_registry = read_dashboard_plugin_registry(run_dir, &evidence)?;
     let source_apply_worktree_context =
         read_dashboard_source_apply_worktree_context(run_dir, &evidence)?;
     let runtime_invariants = read_dashboard_runtime_invariants(run_dir, &evidence, &run)?;
@@ -53234,6 +53279,7 @@ pub fn read_dashboard_run(run_dir: impl AsRef<Path>) -> Result<RunDashboardReadM
         asset_loading,
         asset_preview,
         asset_inspector,
+        plugin_registry,
         source_apply_worktree_context,
         runtime_invariants,
         qa_worker_assignments,
@@ -53754,6 +53800,148 @@ fn read_dashboard_fuzzing_plans(
         malformed_count,
         evidence_refs,
         plans,
+        artifacts,
+        boundary,
+    })
+}
+
+fn dashboard_artifact_is_plugin_registry_evidence(artifact: &EvidenceArtifact) -> bool {
+    artifact
+        .metadata
+        .get("artifact")
+        .and_then(|value| value.as_str())
+        == Some("plugin_registry_evidence")
+        || artifact.id.contains("plugin-registry")
+        || artifact.path.contains("evidence/plugins/")
+}
+
+fn read_dashboard_plugin_registry(
+    run_dir: &Path,
+    evidence: &[EvidenceArtifact],
+) -> Result<RunDashboardPluginRegistry> {
+    let artifacts = select_dashboard_artifacts(
+        run_dir,
+        evidence,
+        dashboard_artifact_is_plugin_registry_evidence,
+    )?;
+    let boundary = "Read-only plugin registry browser data; dashboard/Studio surfaces must not install, update, delete, enable executable plugins, run commands, load arbitrary JavaScript or native extensions, access credentials, mutate source or trusted files, publish, deploy, sign, upload, or write generated registry state.".to_string();
+    if artifacts.is_empty() {
+        return Ok(RunDashboardPluginRegistry {
+            present: false,
+            empty_state: "No plugin registry evidence is indexed for this run.".to_string(),
+            status: "missing".to_string(),
+            registry_count: 0,
+            plugin_count: 0,
+            blocked_count: 0,
+            malformed_count: 0,
+            evidence_refs: Vec::new(),
+            registries: Vec::new(),
+            artifacts,
+            boundary,
+        });
+    }
+
+    let mut evidence_refs = Vec::new();
+    let mut registries = Vec::new();
+    let mut malformed_count = 0usize;
+    for artifact in &artifacts {
+        evidence_refs.push(artifact.path.clone());
+        if artifact.read_error.is_some() {
+            malformed_count += 1;
+            continue;
+        }
+        let Some(value) = &artifact.value else {
+            malformed_count += 1;
+            continue;
+        };
+        let Ok(registry) = serde_json::from_value::<plugin_evidence::PluginRegistryEvidenceArtifact>(
+            value.clone(),
+        ) else {
+            malformed_count += 1;
+            continue;
+        };
+        if registry.validate().is_err() {
+            malformed_count += 1;
+            continue;
+        }
+        let read_model = registry.read_model();
+        evidence_refs.push(registry.ledger_ref.clone());
+        let mut plugin_rows = registry
+            .plugins
+            .iter()
+            .map(|plugin| {
+                evidence_refs.extend(
+                    plugin
+                        .evidence_refs
+                        .iter()
+                        .map(|evidence| evidence.path.clone()),
+                );
+                RunDashboardPluginDescriptorRow {
+                    plugin_id: plugin.plugin_id.clone(),
+                    manifest_path: plugin.manifest_path.clone(),
+                    manifest_hash: plugin.manifest_hash.clone(),
+                    manifest_version: plugin.manifest_version.clone(),
+                    validation_status: format!("{:?}", plugin.validation_status)
+                        .to_ascii_lowercase(),
+                    compatibility_status: format!("{:?}", plugin.compatibility_status)
+                        .to_ascii_lowercase(),
+                    declared_capabilities: plugin.declared_capabilities.clone(),
+                    extension_points: plugin.extension_points.clone(),
+                    evidence_refs: plugin
+                        .evidence_refs
+                        .iter()
+                        .map(|evidence| evidence.path.clone())
+                        .collect(),
+                    blocked_reasons: plugin.blocked_reasons.clone(),
+                }
+            })
+            .collect::<Vec<_>>();
+        plugin_rows.sort_by(|left, right| left.plugin_id.cmp(&right.plugin_id));
+        registries.push(RunDashboardPluginRegistryRecord {
+            registry_id: registry.registry_id,
+            project_id: registry.project_id,
+            run_id: registry.run_id,
+            ledger_ref: registry.ledger_ref,
+            generated_state: serde_json::to_value(registry.generated_state)
+                .unwrap_or_else(|_| json!({})),
+            status: read_model.status,
+            plugin_count: read_model.plugin_count,
+            blocked_count: read_model.blocked_count,
+            blocked_reasons: read_model.blocked_reasons,
+            plugins: plugin_rows,
+        });
+    }
+    registries.sort_by(|left, right| left.registry_id.cmp(&right.registry_id));
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    let registry_count = registries.len();
+    let plugin_count = registries
+        .iter()
+        .map(|registry| registry.plugin_count)
+        .sum();
+    let blocked_count = registries
+        .iter()
+        .map(|registry| registry.blocked_count)
+        .sum();
+    let status = if malformed_count > 0 {
+        "malformed"
+    } else if blocked_count > 0 {
+        "blocked"
+    } else if registry_count > 0 {
+        "ready"
+    } else {
+        "missing"
+    };
+    Ok(RunDashboardPluginRegistry {
+        present: true,
+        empty_state: String::new(),
+        status: status.to_string(),
+        registry_count,
+        plugin_count,
+        blocked_count,
+        malformed_count,
+        evidence_refs,
+        registries,
         artifacts,
         boundary,
     })
@@ -85424,6 +85612,94 @@ scenarios:
             .evidence_categories
             .iter()
             .any(|category| category.id == "mutation_artifacts" && category.count == 1));
+
+        fs::remove_dir_all(root).expect("fixture removed");
+    }
+
+    #[test]
+    fn dashboard_plugin_registry_read_model_exposes_read_only_fixture_shape() {
+        let (root, artifacts) = create_test_run("dashboard-plugin-registry");
+        let plugin_fixture = read_json_fixture(
+            "examples/plugin-registry-evidence-v1/valid/plugin-registry.sample.json",
+        );
+        let plugin_artifact =
+            plugin_evidence::PluginRegistryEvidenceArtifact::from_json_str(&plugin_fixture)
+                .expect("plugin registry fixture validates");
+        plugin_evidence::write_plugin_registry_evidence(&artifacts.run_dir, &plugin_artifact)
+            .expect("plugin evidence writes and indexes");
+
+        let model = read_dashboard_run(&artifacts.run_dir).expect("dashboard run reads");
+        assert!(model.plugin_registry.present);
+        assert_eq!(model.plugin_registry.status, "blocked");
+        assert_eq!(model.plugin_registry.registry_count, 1);
+        assert_eq!(model.plugin_registry.plugin_count, 2);
+        assert_eq!(model.plugin_registry.blocked_count, 1);
+        assert_eq!(model.plugin_registry.malformed_count, 0);
+        assert!(model
+            .plugin_registry
+            .boundary
+            .contains("must not install, update, delete"));
+        assert!(model.plugin_registry.boundary.contains("run commands"));
+        assert!(model
+            .plugin_registry
+            .evidence_refs
+            .contains(&"evidence/plugins/plugin-registry-fixture.json".to_string()));
+
+        let registry = model
+            .plugin_registry
+            .registries
+            .first()
+            .expect("registry row exists");
+        assert_eq!(registry.registry_id, "plugin-registry-fixture");
+        assert_eq!(registry.project_id, "demo_project");
+        assert_eq!(registry.run_id, "run-plugin-registry-fixture");
+        assert_eq!(
+            registry.generated_state["trackedPolicy"],
+            json!("fixture-scoped sample evidence may be tracked; generated runtime outputs remain ignored")
+        );
+        assert!(registry.blocked_reasons.iter().any(|reason| reason
+            == "blocked-command-panel:manifest requested executable command authority outside the v1 declarative catalog"));
+
+        let dashboard_panel = registry
+            .plugins
+            .iter()
+            .find(|plugin| plugin.plugin_id == "read-only-dashboard-panel")
+            .expect("dashboard plugin row exists");
+        assert_eq!(
+            dashboard_panel.manifest_hash,
+            "fnv1a64-canonical-json-v1:1111222233334444"
+        );
+        assert_eq!(dashboard_panel.validation_status, "valid");
+        assert_eq!(dashboard_panel.compatibility_status, "compatible");
+        assert_eq!(dashboard_panel.declared_capabilities, ["dashboardPanel"]);
+        assert_eq!(
+            dashboard_panel.extension_points,
+            ["dashboard.panels.readOnly"]
+        );
+        assert_eq!(
+            dashboard_panel.evidence_refs,
+            ["runs/plugin-registry-fixture/plugin-evidence/read-only-dashboard-panel.validation.json"]
+        );
+
+        let blocked_panel = registry
+            .plugins
+            .iter()
+            .find(|plugin| plugin.plugin_id == "blocked-command-panel")
+            .expect("blocked plugin row exists");
+        assert_eq!(blocked_panel.validation_status, "blocked");
+        assert_eq!(blocked_panel.compatibility_status, "incompatible");
+        assert_eq!(
+            blocked_panel.declared_capabilities,
+            ["studioInspectorPanel"]
+        );
+        assert_eq!(
+            blocked_panel.extension_points,
+            ["studio.inspector.readOnly"]
+        );
+        assert!(blocked_panel
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("executable command authority")));
 
         fs::remove_dir_all(root).expect("fixture removed");
     }
