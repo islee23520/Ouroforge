@@ -11,8 +11,9 @@
 
 use crate::plugin_evidence::{
     require_allowed_values, require_local_id, require_local_text, require_unique_ids,
-    ALLOWED_CAPABILITIES, ALLOWED_EXTENSION_POINTS,
+    ALLOWED_CAPABILITIES,
 };
+use crate::plugin_extension_catalog;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -27,14 +28,6 @@ pub const SUPPORTED_MANIFEST_SCHEMA_VERSIONS: &[&str] = &[PLUGIN_MANIFEST_SCHEMA
 /// allowlist: a descriptor reference is only meaningful for a declared
 /// capability.
 pub const ALLOWED_DESCRIPTOR_KINDS: &[&str] = ALLOWED_CAPABILITIES;
-
-/// Maps each declared capability to the single extension point it requires.
-const CAPABILITY_EXTENSION_POINTS: &[(&str, &str)] = &[
-    ("dashboardPanel", "dashboard.panels.readOnly"),
-    ("studioInspectorPanel", "studio.inspector.readOnly"),
-    ("scenarioTemplate", "scenario.templates.readOnly"),
-    ("assetMetadataProvider", "assets.metadata.readOnly"),
-];
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -162,8 +155,13 @@ impl PluginManifest {
         require_allowed_values(
             "plugin manifest extensionPoints",
             &self.extension_points,
-            ALLOWED_EXTENSION_POINTS,
+            plugin_extension_catalog::ALLOWED_EXTENSION_POINT_IDS,
         )?;
+        // Defense in depth: route every declared extension point through the
+        // catalog so blocked categories fail closed with an actionable reason.
+        for point in &self.extension_points {
+            plugin_extension_catalog::validate_extension_point(point)?;
+        }
         self.validate_capability_extension_pairs()?;
 
         require_unique_ids(
@@ -186,16 +184,14 @@ impl PluginManifest {
         Ok(())
     }
 
-    /// Enforce the bijection between declared capabilities and extension points:
-    /// every declared capability requires its mapped extension point and every
-    /// declared extension point requires its capability. Prevents a manifest
-    /// from claiming an extension surface it has not declared a capability for.
+    /// Enforce consistency between declared capabilities and extension points
+    /// using the extension point catalog (#741): every declared capability
+    /// requires its mapped extension point, and every capability-backed
+    /// extension point requires its capability. Capability-less catalog points
+    /// (e.g. evidence viewer, docs/examples) may be declared standalone.
     fn validate_capability_extension_pairs(&self) -> Result<()> {
         for capability in &self.declared_capabilities {
-            let expected = CAPABILITY_EXTENSION_POINTS
-                .iter()
-                .find(|(cap, _)| cap == capability)
-                .map(|(_, point)| *point)
+            let expected = plugin_extension_catalog::capability_extension_point(capability)
                 .ok_or_else(|| {
                     anyhow!(
                         "plugin manifest capability `{capability}` has no mapped extension point"
@@ -208,17 +204,12 @@ impl PluginManifest {
             }
         }
         for point in &self.extension_points {
-            let expected = CAPABILITY_EXTENSION_POINTS
-                .iter()
-                .find(|(_, p)| p == point)
-                .map(|(cap, _)| *cap)
-                .ok_or_else(|| {
-                    anyhow!("plugin manifest extension point `{point}` has no mapped capability")
-                })?;
-            if !self.declared_capabilities.iter().any(|c| c == expected) {
-                return Err(anyhow!(
-                    "plugin manifest extension point `{point}` requires declared capability `{expected}`"
-                ));
+            if let Some(expected) = plugin_extension_catalog::required_capability(point) {
+                if !self.declared_capabilities.iter().any(|c| c == expected) {
+                    return Err(anyhow!(
+                        "plugin manifest extension point `{point}` requires declared capability `{expected}`"
+                    ));
+                }
             }
         }
         Ok(())
@@ -493,6 +484,30 @@ mod tests {
         manifest["declaredCapabilities"] = serde_json::json!(["dashboardPanel"]);
         manifest["extensionPoints"] = serde_json::json!(["scenario.templates.readOnly"]);
         expect_invalid(manifest, "requires extension point");
+    }
+
+    #[test]
+    fn accepts_capability_less_catalog_extension_point() {
+        // A capability-backed point plus a standalone catalog point (#741).
+        let mut manifest = base_manifest();
+        manifest["extensionPoints"] =
+            serde_json::json!(["dashboard.panels.readOnly", "docs.examples.readOnly"]);
+        let json = manifest.to_string();
+        let parsed =
+            PluginManifest::from_json_str(&json).expect("capability-less catalog point validates");
+        assert!(parsed
+            .extension_points
+            .contains(&"docs.examples.readOnly".to_string()));
+    }
+
+    #[test]
+    fn rejects_blocked_extension_point_from_catalog() {
+        let mut manifest = base_manifest();
+        manifest["declaredCapabilities"] = serde_json::json!(["dashboardPanel"]);
+        manifest["extensionPoints"] =
+            serde_json::json!(["dashboard.panels.readOnly", "source.write.unsafe"]);
+        // Blocked categories are rejected by the catalog membership check.
+        expect_invalid(manifest, "not in the v1 allowlist");
     }
 
     #[test]
