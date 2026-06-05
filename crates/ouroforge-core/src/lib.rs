@@ -24,10 +24,13 @@ pub mod behavior_evidence;
 pub mod internal_sprite_audit;
 pub mod plugin_evidence;
 pub mod runtime_frame_budget;
+pub use ouroforge_evidence::{
+    add_evidence_artifact, list_evidence_artifacts, read_evidence_index,
+    validate_evidence_artifact_path, write_evidence_index, EvidenceArtifact, EvidenceIndex,
+};
 pub use ouroforge_ledger::{append_ledger_event, read_ledger_events, write_ledger_created};
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
 
-static EVIDENCE_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static MUTATION_INDEX_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -27792,94 +27795,6 @@ fn require_http_url(field: &str, value: &str) -> Result<()> {
     } else {
         Err(anyhow!("{field} must use http:// or https://"))
     }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct EvidenceArtifact {
-    pub id: String,
-    pub kind: String,
-    pub path: String,
-    #[serde(default)]
-    pub metadata: serde_json::Value,
-    pub added_at_unix_ms: u128,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct EvidenceIndex {
-    pub artifacts: Vec<EvidenceArtifact>,
-}
-
-pub fn add_evidence_artifact(
-    run_dir: impl AsRef<Path>,
-    id: &str,
-    kind: &str,
-    path: &str,
-    metadata: serde_json::Value,
-) -> Result<EvidenceArtifact> {
-    require_text("evidence artifact id", id)?;
-    require_text("evidence artifact kind", kind)?;
-    require_text("evidence artifact path", path)?;
-    validate_evidence_artifact_path(path)?;
-
-    let _guard = EVIDENCE_INDEX_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .map_err(|_| anyhow!("evidence index lock poisoned"))?;
-    let mut index = read_evidence_index(&run_dir)?;
-    if index.artifacts.iter().any(|artifact| artifact.id == id) {
-        return Err(anyhow!("evidence artifact id already exists: {id}"));
-    }
-
-    let artifact = EvidenceArtifact {
-        id: id.to_string(),
-        kind: kind.to_string(),
-        path: path.to_string(),
-        metadata,
-        added_at_unix_ms: unix_millis()?,
-    };
-    index.artifacts.push(artifact.clone());
-    write_evidence_index(run_dir, &index)?;
-    Ok(artifact)
-}
-
-pub fn list_evidence_artifacts(run_dir: impl AsRef<Path>) -> Result<Vec<EvidenceArtifact>> {
-    Ok(read_evidence_index(run_dir)?.artifacts)
-}
-
-fn validate_evidence_artifact_path(path: &str) -> Result<()> {
-    let evidence_path = Path::new(path);
-    if evidence_path.is_absolute() {
-        return Err(anyhow!("evidence artifact path must be relative"));
-    }
-    if !path.starts_with("evidence/") {
-        return Err(anyhow!("evidence artifact path must start with evidence/"));
-    }
-    for component in evidence_path.components() {
-        match component {
-            Component::Normal(_) | Component::CurDir => {}
-            _ => {
-                return Err(anyhow!(
-                    "evidence artifact path must stay inside the run evidence tree"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn read_evidence_index(run_dir: impl AsRef<Path>) -> Result<EvidenceIndex> {
-    let index_path = run_dir.as_ref().join("evidence/index.json");
-    let input = fs::read_to_string(&index_path)
-        .with_context(|| format!("failed to read evidence index {}", index_path.display()))?;
-    let index: EvidenceIndex = serde_json::from_str(&input)
-        .with_context(|| format!("failed to parse evidence index {}", index_path.display()))?;
-    Ok(index)
-}
-
-fn write_evidence_index(run_dir: impl AsRef<Path>, index: &EvidenceIndex) -> Result<()> {
-    write_json_atomic(&run_dir.as_ref().join("evidence/index.json"), &json!(index))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
