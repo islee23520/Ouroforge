@@ -24,6 +24,7 @@ pub mod gdd_mechanics_mapping;
 pub mod gdd_project_scaffold_plan;
 pub mod gdd_prototype_draft_bundle;
 pub mod gdd_requirement_extraction;
+pub mod gdd_scenario_acceptance_plan;
 pub mod gdd_scene_level_plan;
 pub mod source_apply_sandbox_promotion;
 use behavior_runtime::{
