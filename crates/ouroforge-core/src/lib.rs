@@ -40,6 +40,7 @@ pub mod internal_sprite_audit;
 pub mod source_apply_highrisk_blocker;
 pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
+pub mod plugin_manifest;
 pub mod source_apply_audit_ledger;
 pub use source_apply_audit_ledger::*;
 pub mod runtime_frame_budget;
