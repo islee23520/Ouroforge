@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "qa-swarm-run-matrix-v1",
+  "matrixId": "qa14.12-stale",
+  "status": "stale",
+  "runRef": "runs/qa-swarm/run-406/run.json",
+  "staleEvidenceRefs": ["evidence/qa-swarm/run-406/row-1.json"],
+  "rows": [
+    {
+      "rowId": "row-1",
+      "scenarioId": "collect-and-exit",
+      "candidateId": "cand-001",
+      "workerId": "worker-1",
+      "attempt": 1,
+      "rerunGroup": "grp-1",
+      "verdict": "passed",
+      "flakeStatus": "stable",
+      "evidenceRefs": ["evidence/qa-swarm/run-406/row-1.json"],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 12, "maxDurationMs": 5000, "durationMs": 1200}
+    }
+  ],
+  "dashboardCompat": {"readOnly": true, "surface": "evidence-dashboard", "columns": ["scenario", "verdict"]},
+  "blockedReasons": ["Run evidence is stale; the matrix must be re-collected before triage."],
+  "boundary": "The run matrix is evidence inputs only, not trusted truth, and remains review-gated until reviewed. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}

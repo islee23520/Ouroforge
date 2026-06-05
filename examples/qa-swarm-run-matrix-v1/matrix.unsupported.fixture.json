@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-swarm-run-matrix-v1",
+  "matrixId": "qa14.12-unsupported",
+  "status": "partial",
+  "runRef": "runs/qa-swarm/run-407/run.json",
+  "rows": [
+    {
+      "rowId": "row-1",
+      "scenarioId": "ray-traced-reflections",
+      "candidateId": "cand-005",
+      "workerId": "worker-4",
+      "attempt": 1,
+      "rerunGroup": "grp-1",
+      "verdict": "unsupported",
+      "flakeStatus": "not-evaluated",
+      "evidenceRefs": [],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 0, "maxDurationMs": 5000, "durationMs": 0}
+    }
+  ],
+  "dashboardCompat": {"readOnly": true, "surface": "evidence-dashboard", "columns": ["scenario", "verdict"]},
+  "blockedReasons": [],
+  "boundary": "The run matrix is evidence inputs only, not trusted truth, and remains review-gated until reviewed. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}

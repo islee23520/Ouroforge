@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "qa-swarm-run-matrix-v1",
+  "matrixId": "qa14.12-missing",
+  "status": "partial",
+  "runRef": "runs/qa-swarm/run-405/run.json",
+  "rows": [
+    {
+      "rowId": "row-1",
+      "scenarioId": "collect-and-exit",
+      "candidateId": "cand-001",
+      "workerId": "worker-1",
+      "attempt": 1,
+      "rerunGroup": "grp-1",
+      "verdict": "passed",
+      "flakeStatus": "stable",
+      "evidenceRefs": ["evidence/qa-swarm/run-405/row-1.json"],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 12, "maxDurationMs": 5000, "durationMs": 1200}
+    },
+    {
+      "rowId": "row-2",
+      "scenarioId": "avoid-hazard",
+      "candidateId": "cand-002",
+      "workerId": "worker-2",
+      "attempt": 1,
+      "rerunGroup": "grp-2",
+      "verdict": "missing_evidence",
+      "flakeStatus": "not-evaluated",
+      "evidenceRefs": [],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 8, "maxDurationMs": 5000, "durationMs": 900},
+      "blockedReasons": ["Evidence artifact was not captured for this row; it must be re-run."]
+    }
+  ],
+  "dashboardCompat": {"readOnly": true, "surface": "evidence-dashboard", "columns": ["scenario", "verdict", "evidence"]},
+  "blockedReasons": [],
+  "boundary": "The run matrix is evidence inputs only, not trusted truth, and remains review-gated until reviewed. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}

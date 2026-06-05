@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-swarm-run-matrix-v1",
+  "matrixId": "qa14.12-missing-evidence",
+  "status": "complete",
+  "runRef": "runs/qa-swarm/run-414/run.json",
+  "rows": [
+    {
+      "rowId": "row-1",
+      "scenarioId": "collect-and-exit",
+      "candidateId": "cand-001",
+      "workerId": "worker-1",
+      "attempt": 1,
+      "rerunGroup": "grp-1",
+      "verdict": "passed",
+      "flakeStatus": "stable",
+      "evidenceRefs": [],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 12, "maxDurationMs": 5000, "durationMs": 1200}
+    }
+  ],
+  "dashboardCompat": {"readOnly": true, "surface": "evidence-dashboard", "columns": ["scenario", "verdict"]},
+  "blockedReasons": [],
+  "boundary": "The run matrix is evidence inputs only, not trusted truth, and remains review-gated until reviewed. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}

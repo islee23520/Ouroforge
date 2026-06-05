@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "qa-swarm-run-matrix-v1",
+  "matrixId": "qa14.12-inconclusive",
+  "status": "partial",
+  "runRef": "runs/qa-swarm/run-404/run.json",
+  "rows": [
+    {
+      "rowId": "row-1",
+      "scenarioId": "timing-puzzle",
+      "candidateId": "cand-004",
+      "workerId": "worker-3",
+      "attempt": 1,
+      "rerunGroup": "grp-1",
+      "verdict": "inconclusive",
+      "flakeStatus": "inconclusive",
+      "evidenceRefs": ["evidence/qa-swarm/run-404/row-1.json"],
+      "budgetUsed": {"maxActions": 64, "actionsUsed": 30, "maxDurationMs": 5000, "durationMs": 2500}
+    }
+  ],
+  "dashboardCompat": {"readOnly": true, "surface": "evidence-dashboard", "columns": ["scenario", "verdict"]},
+  "blockedReasons": [],
+  "boundary": "The run matrix is evidence inputs only, not trusted truth, and remains review-gated until reviewed. No auto-fix, no auto-apply, and no hidden workers. Browser/dashboard/Studio surfaces remain read-only or draft-only."
+}
