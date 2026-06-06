@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "trust-gradient-auto-apply-v1",
+  "proposalRef": "proposal/source-affecting-manual",
+  "tier": "high",
+  "eligibility": "manual-only",
+  "confidence": 0.99,
+  "rerunGates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "budget": {
+    "remaining": 3,
+    "cost": 1
+  },
+  "autonomyEnabled": true,
+  "rollbackHandle": {
+    "applyTransactionId": "txn-source-003",
+    "reverseRef": "examples/trust-gradient-v1/fixtures/reverse/txn-source-003.json"
+  }
+}

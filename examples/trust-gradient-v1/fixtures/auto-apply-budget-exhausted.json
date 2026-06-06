@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "trust-gradient-auto-apply-v1",
+  "proposalRef": "proposal/scene-only-budget-exhausted",
+  "tier": "low",
+  "eligibility": "auto-apply-eligible",
+  "confidence": 0.96,
+  "rerunGates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "budget": {
+    "remaining": 0,
+    "cost": 1
+  },
+  "autonomyEnabled": true,
+  "rollbackHandle": {
+    "applyTransactionId": "txn-scene-002",
+    "reverseRef": "examples/trust-gradient-v1/fixtures/reverse/txn-scene-002.json"
+  }
+}
