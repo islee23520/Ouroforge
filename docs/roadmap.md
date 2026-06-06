@@ -99,7 +99,11 @@ integration, a read-only Studio plugin browser and read-only
 dashboard/scenario/asset descriptors, a fixture plugin pack, a security/threat-
 model gate that fails closed on executable/credentialed/network capabilities,
 load-order/conflict detection, CLI inspection, Scenario Coverage v16, a
-deterministic demo, and conservative governance refresh, and a completed Game
+deterministic demo, and conservative governance refresh, and a completed
+Loop Coverage Metric v1 / Era E Milestone 20 governance chain: scope and
+contract, provenance attribution, Rust/local computation/verdict/regression,
+read-only Studio and dashboard inspection, fixture-scoped demo evidence,
+Scenario Coverage v21, and this roadmap/#1 handoff, and a completed Game
 Complexity Ladder v1 / Era E Milestone 24 governance chain: scope and contract,
 ladder model and capability gates, engine-growth demand justification, a
 fixture-scoped rung demo, Scenario Coverage v25, and this docs-only roadmap/#1
@@ -109,7 +113,7 @@ local replayability, read-only audit surface, deterministic fixture demo,
 Scenario Coverage v26, and this conservative roadmap/#1 refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance -> End-to-End Provenance v1 additive bundle/replay/read-only audit/demo/v26 regression/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Loop Coverage Metric v1 attribution/computation/read-only inspection/demo/v21 regression/governance -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance -> End-to-End Provenance v1 additive bundle/replay/read-only audit/demo/v26 regression/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -255,6 +259,27 @@ installation, network plugin install/update, marketplace, credential access,
 source mutation, export/publish/deploy mutation, CI/workflow mutation, secure
 plugin sandbox guarantee, Godot-equivalent extension parity, production-ready
 plugin ecosystem, or current Godot replacement claim is introduced.
+
+Loop Coverage Metric v1 / Era E Milestone 20 (#1458/#1460-#1465) is now
+complete as a conservative descriptive metric milestone. The merged evidence
+chain added the #1458 scope and contract in PR #1537, #1460 provenance
+attribution model in PR #1540, and #1461 computation/verdict/regression, #1462
+read-only Studio and dashboard surfaces, #1463 fixture-scoped demo, and #1464
+Scenario Coverage v21 in PR #1548. #1465 records only this roadmap/#1
+governance refresh. Completion is valid only after that merged evidence chain:
+loop coverage describes what fraction of trusted artifacts were produced by or
+verified through the loop. It is not a quality guarantee, fun guarantee, accessibility guarantee,
+production guarantee, release guarantee, commercial-readiness guarantee, or Godot
+replacement guarantee. It grants no
+source mutation authority, trusted browser writes, command bridge, auto-fix,
+auto-apply, auto-merge, self-approval, or reviewer bypass. The full
+intent-to-promotion provenance bundle remains Milestone 25 scope and must not be
+backfilled into Milestone 20. The recommended next milestone from this point is
+Era E Milestone 21: Second Game Class and Loop Generalization, using the loop
+coverage metric to quantify generalization. Layer-3 distributed orchestration /
+Elixir per ADR #92, native export, plugin runtime, and hosted/cloud scope remain
+deferred and unchanged, to be re-evaluated only at Milestone 26. #1 and #23
+remain open governance anchors.
 
 Game Complexity Ladder v1 / Era E Milestone 24 (#1493-#1498) is now complete as
 a conservative governance milestone after the required implementation evidence
@@ -478,6 +503,14 @@ The current implementation has completed these documented milestone surfaces:
   `docs/studio-plugin-extension-panel-v1.md`,
   `docs/plugin-extension-system-demo-v1.md`,
   `docs/scenario-coverage-v16-plugin-extension.md`)
+- Loop Coverage Metric v1 / Era E Milestone 20
+  (`docs/loop-coverage-metric-v1.md`,
+  `docs/loop-coverage-metric-v1-demo.md`,
+  `docs/loop-coverage-metric-v1-governance-handoff.md`,
+  `docs/scenario-coverage-v21.md`,
+  `crates/ouroforge-core/src/loop_coverage_metric.rs`,
+  `crates/ouroforge-core/tests/loop_coverage_metric_contract.rs`,
+  `examples/loop-coverage-v1/`)
 - Game Complexity Ladder v1 / Era E Milestone 24
   (`docs/game-complexity-ladder-v1.md`,
   `docs/game-complexity-ladder-v1-demo.md`,
@@ -769,6 +802,30 @@ editor extensibility, command execution, source/export/publish/deploy mutation,
 CI/workflow mutation, secure plugin sandbox guarantees, Godot-equivalent
 extension parity, and a production-ready plugin ecosystem. #1 and #23 remain open
 governance anchors.
+
+### Loop Coverage Metric v1 governance refresh
+
+Loop Coverage Metric v1 is recorded as **complete for Era E Milestone 20** as a
+conservative descriptive metric milestone under #1. The completion evidence
+chain is #1458 scope and contract in PR #1537, #1460 provenance attribution
+model in PR #1540, and #1461 computation/verdict/regression, #1462 read-only
+Studio and dashboard inspection, #1463 fixture-scoped demo, and #1464 Scenario
+Coverage v21 in PR #1548. #1465 records only this roadmap/#1 refresh. #1 and
+#23 remain open governance anchors.
+
+The remaining boundaries stay explicit: loop coverage is an authorship and
+verification fraction for trusted artifacts, not a quality guarantee, fun
+guarantee, accessibility guarantee, production guarantee, release guarantee,
+commercial-readiness guarantee, or Godot replacement guarantee. It
+does not authorize source mutation, trusted browser writes, command bridges,
+auto-fix, auto-apply, auto-merge, self-approval, or reviewer bypass. The full
+intent-to-promotion provenance bundle remains Era E Milestone 25 scope. The
+recommended next milestone from Milestone 20 is **Era E Milestone 21: Second
+Game Class and Loop Generalization**, using loop coverage to quantify
+generalization across a second bounded game class. Layer-3 distributed
+orchestration / Elixir per ADR #92, native export, plugin runtime, and
+hosted/cloud scope remain deferred and unchanged, to be re-evaluated only at
+Milestone 26.
 
 ### Game Complexity Ladder v1 governance refresh
 
@@ -1123,17 +1180,21 @@ remain separate maintainer actions.
   extensibility, source/export/publish/deploy mutation, CI/workflow mutation,
   secure plugin sandbox guarantees, Godot-equivalent extension parity, a
   production-ready plugin ecosystem, or current Godot replacement positioning.
-- Treat Loop Coverage Metric v1 as draft implementation evidence in the current
-  PR context until merge evidence exists. The current wave adds Rust/local
-  loop-coverage computation and validation, fixture-scoped computed,
-  insufficient-data, regressed/manual-drop, stale-ref, and unsupported examples,
-  an offline demo smoke test, and read-only dashboard/Studio inspection. This is
-  a descriptive metric only: no quality guarantee, no production-ready claim, no
-  Godot replacement claim, no trusted browser writes, no source mutation
-  authority, no auto-apply, no auto-merge, and no reviewer bypass. Because #1465
-  is the governance handoff after prior gates are merged and verified, a PR that
-  contains this implementation evidence should use `Refs #1465` unless a final
-  #1 governance comment is posted after merge evidence exists. #1 and #23 remain
+- Treat Loop Coverage Metric v1 as complete for Era E Milestone 20 after the
+  merged #1458/#1460-#1464 evidence chain. Its artifacts authorize only a
+  descriptive authorship/verification fraction over trusted artifacts:
+  provenance attribution, Rust/local computation/verdict/regression,
+  fixture-scoped computed, insufficient-data, regressed/manual-drop, stale-ref,
+  and unsupported examples, offline demo smoke coverage, Scenario Coverage v21,
+  and read-only dashboard/Studio inspection. They do not authorize quality, fun,
+  accessibility, production, release, or Godot replacement guarantees; trusted
+  browser writes; source mutation authority; command bridges; auto-fix;
+  auto-apply; auto-merge; self-approval; reviewer bypass; or the full
+  intent-to-promotion provenance bundle, which remains Milestone 25 scope. From
+  this milestone, the recommended next milestone is Era E Milestone 21: Second
+  Game Class and Loop Generalization. Layer-3 distributed orchestration / Elixir
+  per ADR #92, native export, plugin runtime, and hosted/cloud scope remain
+  deferred and unchanged until Milestone 26 re-evaluation. #1 and #23 remain
   open.
 
 ## Active anchors

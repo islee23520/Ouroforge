@@ -273,6 +273,11 @@ Trigger. Engine growth remains demand-driven and rung-justified; Layer-3
 distributed orchestration / Elixir per ADR #92 remains deferred for
 re-evaluation at Milestone 26.
 
+Loop Coverage Metric v1 / Era E Milestone 20 is recorded in the roadmap as a
+descriptive authorship/verification fraction only; at that completion point, the
+recommended follow-on was Era E Milestone 21: Second Game Class and Loop
+Generalization.
+
 ## Contributor guide
 
 - Contribution workflow and review expectations: [`CONTRIBUTING.md`](CONTRIBUTING.md)
