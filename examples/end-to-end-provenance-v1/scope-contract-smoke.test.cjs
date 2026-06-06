@@ -1,0 +1,14 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..', '..');
+const doc = fs.readFileSync(path.join(root, 'docs/end-to-end-provenance-v1.md'), 'utf8');
+assert.match(doc, /End-to-End Provenance v1/i);
+assert.match(doc, /provenance bundle/i);
+assert.match(doc, /read-only audit/i);
+assert.match(doc, /replay/i);
+assert.match(doc, /compos(e|ition).*reference|by reference/i);
+assert.match(doc, /additive/i);
+assert.match(doc, /#1 and #23 remain open/i);
+assert.doesNotMatch(doc, /production-ready|Godot replacement|parallel provenance engine/i);
+console.log('end-to-end provenance v1 scope contract smoke passed');
