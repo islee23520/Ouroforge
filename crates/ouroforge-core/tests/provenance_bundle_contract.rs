@@ -1,4 +1,6 @@
-use ouroforge_core::provenance_bundle::{ProvenanceBundleArtifact, ProvenanceBundleStatus};
+use ouroforge_core::provenance_bundle::{
+    ProvenanceBundleArtifact, ProvenanceBundleLinkKind, ProvenanceBundleStatus,
+};
 use serde_json::Value;
 use std::{fs, path::PathBuf};
 
@@ -148,6 +150,62 @@ fn stale_reference_yields_stale_state() {
 }
 
 #[test]
+fn explicit_stale_reference_must_resolve_to_a_readable_file() {
+    let mut bundle = read_bundle("bundle.complete.fixture.json");
+    bundle.status = ProvenanceBundleStatus::Dangling;
+    let link = bundle
+        .chain_links
+        .iter_mut()
+        .find(|link| link.kind == ProvenanceBundleLinkKind::ValidationResult)
+        .expect("validation link");
+    link.reference = "missing/stale-validation.json".to_string();
+    link.expected_digest = None;
+    link.stale = true;
+    link.stale_reason = Some("fixture marks this stale ref missing".to_string());
+
+    let evaluation = bundle.evaluate_with_root(&fixture_root());
+
+    assert_eq!(evaluation.computed_status, ProvenanceBundleStatus::Dangling);
+    assert!(evaluation.status_consistent, "{evaluation:#?}");
+    assert_eq!(
+        evaluation
+            .link_states
+            .get("validation-result")
+            .map(String::as_str),
+        Some("dangling")
+    );
+    assert!(!evaluation
+        .issues
+        .iter()
+        .any(|issue| issue.contains("stale ref: validation-result")));
+}
+
+#[test]
+fn directory_references_are_dangling_not_present() {
+    let mut bundle = read_bundle("bundle.complete.fixture.json");
+    bundle.status = ProvenanceBundleStatus::Dangling;
+    let link = bundle
+        .chain_links
+        .iter_mut()
+        .find(|link| link.kind == ProvenanceBundleLinkKind::ValidationResult)
+        .expect("validation link");
+    link.reference = ".".to_string();
+    link.expected_digest = None;
+
+    let evaluation = bundle.evaluate_with_root(&fixture_root());
+
+    assert_eq!(evaluation.computed_status, ProvenanceBundleStatus::Dangling);
+    assert!(evaluation.status_consistent, "{evaluation:#?}");
+    assert_eq!(
+        evaluation
+            .link_states
+            .get("validation-result")
+            .map(String::as_str),
+        Some("dangling")
+    );
+}
+
+#[test]
 fn unresolved_review_reason_keeps_bundle_incomplete_without_dangling_refs() {
     let bundle = read_bundle("bundle.incomplete-state.fixture.json");
     let evaluation = bundle.evaluate_with_root(&fixture_root());
@@ -165,6 +223,27 @@ fn unresolved_review_reason_keeps_bundle_incomplete_without_dangling_refs() {
         .issues
         .iter()
         .any(|issue| issue.contains("human review decision pending")));
+}
+
+#[test]
+fn incomplete_reason_words_do_not_drive_stale_or_dangling_status() {
+    let mut bundle = read_bundle("bundle.complete.fixture.json");
+    bundle.status = ProvenanceBundleStatus::Incomplete;
+    bundle.incomplete_reasons = vec![
+        "human review note mentions dangling and stale wording without broken refs".to_string(),
+    ];
+
+    let evaluation = bundle.evaluate_with_root(&fixture_root());
+
+    assert_eq!(
+        evaluation.computed_status,
+        ProvenanceBundleStatus::Incomplete
+    );
+    assert!(evaluation.status_consistent, "{evaluation:#?}");
+    assert!(evaluation
+        .link_states
+        .values()
+        .all(|state| state == "present"));
 }
 
 #[test]

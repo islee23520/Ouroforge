@@ -202,10 +202,14 @@ impl ProvenanceBundleArtifact {
     pub fn evaluate_with_root(&self, root: &Path) -> ProvenanceBundleEvaluation {
         let mut issues = Vec::new();
         let mut link_states = BTreeMap::new();
+        let mut has_incomplete = false;
+        let mut has_dangling = false;
+        let mut has_stale = false;
         let present: BTreeSet<_> = self.chain_links.iter().map(|link| link.kind).collect();
 
         for required in REQUIRED_LINK_KINDS {
             if !present.contains(required) {
+                has_incomplete = true;
                 issues.push(format!(
                     "missing chain link: {}",
                     link_kind_label(*required)
@@ -219,24 +223,25 @@ impl ProvenanceBundleArtifact {
 
         for link in &self.chain_links {
             let label = link_kind_label(link.kind).to_string();
-            if link.stale {
-                issues.push(format!(
-                    "stale ref: {} -> {}",
-                    link_kind_label(link.kind),
-                    link.reference
-                ));
-                link_states.insert(label, "stale".to_string());
-                continue;
-            }
-
             match resolve_local_ref(root, &link.reference) {
-                Ok(path) if path.exists() => {
+                Ok(path) if path.is_file() => {
                     if let Some(expected) = &link.expected_digest {
                         match sha256_file_digest(&path) {
                             Ok(actual) if &actual == expected => {
-                                link_states.insert(label, "present".to_string());
+                                if link.stale {
+                                    has_stale = true;
+                                    issues.push(format!(
+                                        "stale ref: {} -> {}",
+                                        link_kind_label(link.kind),
+                                        link.reference
+                                    ));
+                                    link_states.insert(label, "stale".to_string());
+                                } else {
+                                    link_states.insert(label, "present".to_string());
+                                }
                             }
                             Ok(actual) => {
+                                has_stale = true;
                                 issues.push(format!(
                                     "stale ref: {} expected digest `{}` but found `{}`",
                                     link.reference, expected, actual
@@ -244,6 +249,7 @@ impl ProvenanceBundleArtifact {
                                 link_states.insert(label, "stale".to_string());
                             }
                             Err(error) => {
+                                has_dangling = true;
                                 issues.push(format!(
                                     "dangling reference: {} could not be read: {error}",
                                     link.reference
@@ -251,15 +257,32 @@ impl ProvenanceBundleArtifact {
                                 link_states.insert(label, "dangling".to_string());
                             }
                         }
+                    } else if let Err(error) = fs::File::open(&path) {
+                        has_dangling = true;
+                        issues.push(format!(
+                            "dangling reference: {} could not be read: {error}",
+                            link.reference
+                        ));
+                        link_states.insert(label, "dangling".to_string());
+                    } else if link.stale {
+                        has_stale = true;
+                        issues.push(format!(
+                            "stale ref: {} -> {}",
+                            link_kind_label(link.kind),
+                            link.reference
+                        ));
+                        link_states.insert(label, "stale".to_string());
                     } else {
                         link_states.insert(label, "present".to_string());
                     }
                 }
                 Ok(_) => {
+                    has_dangling = true;
                     issues.push(format!("dangling reference: {}", link.reference));
                     link_states.insert(label, "dangling".to_string());
                 }
                 Err(error) => {
+                    has_dangling = true;
                     issues.push(format!("dangling reference: {} ({error})", link.reference));
                     link_states.insert(label, "dangling".to_string());
                 }
@@ -267,23 +290,22 @@ impl ProvenanceBundleArtifact {
         }
 
         if self.status == ProvenanceBundleStatus::Incomplete && self.incomplete_reasons.is_empty() {
+            has_incomplete = true;
             issues.push("incomplete bundle state lacks explicit incompleteReasons".to_string());
         }
         for reason in &self.incomplete_reasons {
+            has_incomplete = true;
             issues.push(format!("incomplete bundle state: {reason}"));
         }
 
-        let computed_status = if issues
-            .iter()
-            .any(|issue| issue.contains("dangling reference"))
-        {
+        let computed_status = if has_dangling {
             ProvenanceBundleStatus::Dangling
-        } else if issues.iter().any(|issue| issue.contains("stale ref")) {
+        } else if has_stale {
             ProvenanceBundleStatus::Stale
-        } else if issues.is_empty() {
-            ProvenanceBundleStatus::Complete
-        } else {
+        } else if has_incomplete {
             ProvenanceBundleStatus::Incomplete
+        } else {
+            ProvenanceBundleStatus::Complete
         };
 
         let status_consistent = computed_status == self.status;

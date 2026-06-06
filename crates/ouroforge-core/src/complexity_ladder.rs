@@ -360,6 +360,9 @@ fn evaluate_rung(rung: &ComplexityRung) -> Result<ComplexityRungEvaluation> {
     if !gate.loop_produced_demo || gate.demo_ref.is_none() {
         reasons.push("loop-produced demo evidence is required".to_string());
     }
+    if gate.demo_ref.is_some() && gate.demo_ref_state != EvidenceRefState::Current {
+        reasons.push("demoRef evidence must be current".to_string());
+    }
     let Some(four_gate) = &gate.four_gate else {
         reasons.push("four-gate evidence is required".to_string());
         return Ok(rung_evaluation(

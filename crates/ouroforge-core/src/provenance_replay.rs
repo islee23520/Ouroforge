@@ -5,7 +5,9 @@
 //! caller-provided workspace and reuses the existing run evaluator.
 
 use crate::evaluate_run;
-use crate::provenance_bundle::{ProvenanceBundleArtifact, ProvenanceBundleStatus};
+use crate::provenance_bundle::{
+    ProvenanceBundleArtifact, ProvenanceBundleLinkKind, ProvenanceBundleStatus,
+};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -67,6 +69,7 @@ fn replay_provenance_bundle_inner(
     bundle_root: &Path,
     replay_workspace: &Path,
 ) -> Result<ProvenanceReplayResult> {
+    bundle.validate_shape()?;
     let mut issues = Vec::new();
     let bundle_evaluation = bundle.evaluate_with_root(bundle_root);
     if bundle_evaluation.computed_status != ProvenanceBundleStatus::Complete {
@@ -99,6 +102,20 @@ fn replay_provenance_bundle_inner(
         );
     }
 
+    let evaluator_verdict_ref = bundle
+        .chain_links
+        .iter()
+        .find(|link| link.kind == ProvenanceBundleLinkKind::EvaluatorVerdict)
+        .map(|link| link.reference.as_str());
+    match evaluator_verdict_ref {
+        Some(reference) if reference == replay_inputs.expected_verdict_ref => {}
+        Some(reference) => issues.push(format!(
+            "expectedVerdictRef must match evaluator-verdict chain link ref: expected `{}` but found `{}`",
+            reference, replay_inputs.expected_verdict_ref
+        )),
+        None => issues.push("missing replay input: evaluator-verdict link is absent".to_string()),
+    }
+
     for reference in &replay_inputs.deterministic_metadata_refs {
         let path = resolve_local_ref(bundle_root, reference)?;
         if !path.is_file() {
@@ -126,9 +143,7 @@ fn replay_provenance_bundle_inner(
         return Ok(not_replayable(bundle, issues));
     }
 
-    let replay_run_dir = replay_workspace
-        .join(&bundle.bundle_id)
-        .join("reconstructed-run");
+    let replay_run_dir = safe_replay_run_dir(replay_workspace, &bundle.bundle_id)?;
     if replay_run_dir.exists() {
         fs::remove_dir_all(&replay_run_dir)
             .with_context(|| format!("failed to clear {}", replay_run_dir.display()))?;
@@ -187,6 +202,17 @@ fn replay_boundary() -> String {
         .to_string()
 }
 
+fn safe_replay_run_dir(replay_workspace: &Path, bundle_id: &str) -> Result<PathBuf> {
+    require_replay_path_segment("provenance replay bundleId", bundle_id)?;
+    let replay_run_dir = replay_workspace.join(bundle_id).join("reconstructed-run");
+    if !replay_run_dir.starts_with(replay_workspace) {
+        return Err(anyhow!(
+            "provenance replay run directory must stay inside replay workspace"
+        ));
+    }
+    Ok(replay_run_dir)
+}
+
 fn resolve_local_ref(root: &Path, reference: &str) -> Result<PathBuf> {
     let path = Path::new(reference);
     if path.is_absolute()
@@ -203,6 +229,22 @@ fn resolve_local_ref(root: &Path, reference: &str) -> Result<PathBuf> {
         ));
     }
     Ok(root.join(path))
+}
+
+fn require_replay_path_segment(field: &str, value: &str) -> Result<()> {
+    let valid = !value.trim().is_empty()
+        && value.len() <= 128
+        && value != "."
+        && value != ".."
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'));
+    if !valid {
+        return Err(anyhow!(
+            "{field} must be a bounded local id using alphanumeric, dash, underscore, or dot"
+        ));
+    }
+    Ok(())
 }
 
 fn copy_dir_all(source: &Path, destination: &Path) -> Result<()> {

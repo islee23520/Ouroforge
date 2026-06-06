@@ -1,5 +1,5 @@
 use ouroforge_core::complexity_ladder::{
-    evaluate_complexity_ladder, ComplexityLadder, ComplexityRungStatus,
+    evaluate_complexity_ladder, ComplexityLadder, ComplexityRungStatus, EvidenceRefState,
 };
 
 const FIXTURE: &str =
@@ -64,6 +64,22 @@ fn missing_loop_coverage_is_insufficient_evidence() {
 }
 
 #[test]
+fn demo_ref_must_be_current_to_satisfy_a_rung() {
+    let mut ladder = satisfied_ladder();
+    ladder.rungs[0].capability_gate.demo_ref_state = EvidenceRefState::Missing;
+
+    let evaluation = evaluate_complexity_ladder(&ladder).expect("ladder evaluates");
+
+    assert_eq!(
+        evaluation.rungs[0].status,
+        ComplexityRungStatus::InsufficientEvidence
+    );
+    assert!(evaluation.rungs[0]
+        .reasons
+        .contains(&"demoRef evidence must be current".to_string()));
+}
+
+#[test]
 fn out_of_order_satisfied_claims_are_rejected() {
     let mut ladder = satisfied_ladder();
     ladder.rungs.insert(0, missing_rung(1, "missing-first"));
@@ -79,8 +95,7 @@ fn out_of_order_satisfied_claims_are_rejected() {
 #[test]
 fn stale_refs_are_rejected() {
     let mut ladder = satisfied_ladder();
-    ladder.rungs[0].capability_gate.demo_ref_state =
-        ouroforge_core::complexity_ladder::EvidenceRefState::StaleRef;
+    ladder.rungs[0].capability_gate.demo_ref_state = EvidenceRefState::StaleRef;
 
     let err = evaluate_complexity_ladder(&ladder).expect_err("stale refs are rejected");
 

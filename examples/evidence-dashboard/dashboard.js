@@ -918,14 +918,59 @@ const OuroforgeDashboard = (() => {
   }
 
   function provenanceAuditRefs(source) {
-    return Array.isArray(source.evidence_refs) ? source.evidence_refs
-      : Array.isArray(source.evidenceRefs) ? source.evidenceRefs
-      : [];
+    const refs = Array.isArray(source.evidence_refs) ? source.evidence_refs
+      : Array.isArray(source.evidenceRefs) ? source.evidenceRefs : [];
+    if (refs.length) return refs;
+    const bundleRefs = provenanceBundleLinks(source).map((link) => link.ref || link.reference).filter(Boolean);
+    const replay = provenanceBundleReplayInputs(source);
+    return bundleRefs
+      .concat(replay.runRef || replay.run_ref || [])
+      .concat(replay.expectedVerdictRef || replay.expected_verdict_ref || [])
+      .concat(Array.isArray(replay.deterministicMetadataRefs) ? replay.deterministicMetadataRefs : [])
+      .concat(Array.isArray(replay.deterministic_metadata_refs) ? replay.deterministic_metadata_refs : [])
+      .filter(Boolean);
   }
 
   function provenanceAuditChanges(source) {
     const changes = source.trusted_changes || source.trustedChanges || source.changes || [];
-    return Array.isArray(changes) ? changes : [];
+    if (Array.isArray(changes) && changes.length) return changes;
+    const bundleChange = normalizeProvenanceBundleChange(source);
+    return bundleChange ? [bundleChange] : [];
+  }
+
+  function provenanceBundleLinks(source) {
+    const links = source.chain_links || source.chainLinks || [];
+    return Array.isArray(links) ? links : [];
+  }
+
+  function provenanceBundleReplayInputs(source) {
+    const replayInputs = source.replay_inputs || source.replayInputs || {};
+    return replayInputs && typeof replayInputs === 'object' && !Array.isArray(replayInputs) ? replayInputs : {};
+  }
+
+  function normalizeProvenanceBundleChange(source) {
+    const bundleId = source.bundle_id || source.bundleId;
+    const changeId = source.change_id || source.changeId;
+    const links = provenanceBundleLinks(source);
+    if (!bundleId || !changeId || !links.length) return null;
+    const replayInputs = provenanceBundleReplayInputs(source);
+    return {
+      change_id: changeId,
+      status: source.status || 'recorded',
+      summary: `Provenance bundle ${bundleId}`,
+      chain: links.map((link) => ({
+        kind: link.kind,
+        ref: link.ref || link.reference,
+        artifact_id: link.artifact_id || link.artifactId,
+        expected_digest: link.expected_digest || link.expectedDigest,
+      })),
+      replay_status: {
+        status: source.replay_status || source.replayStatus || 'recorded',
+        run_ref: replayInputs.run_ref || replayInputs.runRef,
+        expected_verdict_ref: replayInputs.expected_verdict_ref || replayInputs.expectedVerdictRef,
+        deterministic_inputs: replayInputs.deterministic_inputs ?? replayInputs.deterministicInputs,
+      },
+    };
   }
 
   function provenanceAuditChain(change, source) {
@@ -961,9 +1006,9 @@ const OuroforgeDashboard = (() => {
       const chainRows = chain.length
         ? chain.map((step, stepIndex) => {
             const label = step.label || step.kind || step.stage || step.id || `step-${stepIndex + 1}`;
-            const artifact = step.artifact_ref || step.artifactRef || step.path || step.evidence_ref || step.evidenceRef || 'unrecorded';
-            const digest = step.digest || step.hash || step.checksum || '';
-            const actor = step.actor || step.owner || step.source || '';
+            const artifact = step.artifact_ref || step.artifactRef || step.ref || step.reference || step.path || step.evidence_ref || step.evidenceRef || 'unrecorded';
+            const digest = step.digest || step.expected_digest || step.expectedDigest || step.hash || step.checksum || '';
+            const actor = step.actor || step.artifact_id || step.artifactId || step.owner || step.source || '';
             return `<li><strong>${escapeText(label)}</strong>: ${escapeText(artifact)}${digest ? ` · ${escapeText(typeof digest === 'object' ? JSON.stringify(digest) : digest)}` : ''}${actor ? ` · ${escapeText(actor)}` : ''}</li>`;
           }).join('')
         : '<li>No full provenance chain entries exported.</li>';
@@ -971,7 +1016,9 @@ const OuroforgeDashboard = (() => {
       const replayRows = [
         ['Replay status', replayStatus],
         ['Scenario', replay.scenario_id || replay.scenarioId || 'unknown'],
-        ['Replay run', replay.run_id || replay.runId || 'unknown'],
+        ['Replay run', replay.run_id || replay.runId || replay.run_ref || replay.runRef || 'unknown'],
+        ['Expected verdict ref', replay.expected_verdict_ref || replay.expectedVerdictRef || 'unknown'],
+        ['Deterministic inputs', replay.deterministic_inputs ?? replay.deterministicInputs ?? 'unknown'],
         ['Input digest', replay.input_digest || replay.inputDigest || replay.digest || 'unknown'],
         ['Matched frames', replay.matched_frames ?? replay.matchedFrames ?? replay.frame_count ?? replay.frameCount ?? 'unknown'],
       ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');

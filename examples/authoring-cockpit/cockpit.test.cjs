@@ -1567,6 +1567,33 @@ assert.match(provenanceAuditMarkup, /Read-only provenance bundle from exported J
 assert.match(provenanceAuditMarkup, /no write, promote, approve, mutation, command, or auto-approval affordance/);
 assert.doesNotMatch(provenanceAuditMarkup, /<button|<form|<input|data-action=|data-promote|data-approve|writeCommand|promoteCommand|approveCommand|autoApprovalCommand|browserCommandBridge/i);
 assert.match(cockpit.renderEvidencePane({ ...run, provenance_audit: provenanceAuditRun.provenance_audit }), /provenance-bundle-1503/);
+const provenanceBundleArtifactMarkup = cockpit.renderProvenanceAuditPanel({
+  provenance_bundle: {
+    schemaVersion: 'provenance-bundle-v1',
+    bundleId: 'provenance-bundle-actual',
+    changeId: 'change-actual-1',
+    status: 'complete',
+    chainLinks: [
+      { kind: 'intent-design-brief', ref: 'intent/design.json', artifactId: 'intent-design', expectedDigest: 'sha256:abc123' },
+      { kind: 'evaluator-verdict', ref: 'verdict/evaluator.json', artifactId: 'evaluator-verdict' },
+    ],
+    replayInputs: {
+      runRef: 'runs/replay-source',
+      expectedVerdictRef: 'verdict/evaluator.json',
+      deterministicInputs: true,
+      deterministicMetadataRefs: ['metadata/input.json'],
+    },
+  },
+});
+assert.match(provenanceBundleArtifactMarkup, /provenance-bundle-actual/);
+assert.match(provenanceBundleArtifactMarkup, /change-actual-1/);
+assert.match(provenanceBundleArtifactMarkup, /intent-design-brief/);
+assert.match(provenanceBundleArtifactMarkup, /intent\/design\.json/);
+assert.match(provenanceBundleArtifactMarkup, /evaluator-verdict/);
+assert.match(provenanceBundleArtifactMarkup, /verdict\/evaluator\.json/);
+assert.match(provenanceBundleArtifactMarkup, /runs\/replay-source/);
+assert.match(provenanceBundleArtifactMarkup, /Expected verdict ref/);
+assert.match(provenanceBundleArtifactMarkup, /Deterministic inputs/);
 const escapedProvenanceAudit = cockpit.renderProvenanceAuditPanel({ provenance_audit: { present: true, trusted_changes: [{ change_id: '<script>alert(1)</script>', full_chain: [{ stage: '<img>', artifact_ref: '<bad>' }], replay_status: { status: '<script>replay</script>' }, sign_off: { reviewer: '<script>reviewer</script>' } }] } });
 assert.ok(!escapedProvenanceAudit.includes('<script>alert(1)</script>'), 'provenance audit change ids must be escaped');
 assert.match(escapedProvenanceAudit, /&lt;script&gt;alert/);

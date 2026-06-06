@@ -123,6 +123,49 @@ fn stale_refs_are_not_replayable() {
 }
 
 #[test]
+fn unsafe_bundle_id_is_rejected_before_replay_path_construction() {
+    let mut bundle = read_bundle("bundle.reproduced.fixture.json");
+    bundle.bundle_id = "..".to_string();
+    let workspace = replay_workspace("unsafe-bundle-id");
+
+    let result = replay_provenance_bundle(&bundle, fixture_root(), &workspace);
+
+    assert_eq!(result.status, ProvenanceReplayStatus::NotReplayable);
+    assert!(result.replay_run_dir.is_none());
+    assert!(result
+        .issues
+        .iter()
+        .any(|issue| issue.contains("bundleId") && issue.contains("bounded local id")));
+    assert!(!workspace.join("reconstructed-run").exists());
+}
+
+#[test]
+fn expected_verdict_ref_must_match_evaluator_verdict_chain_link() {
+    let mut bundle = read_bundle("bundle.reproduced.fixture.json");
+    let alternate_ref = bundle
+        .chain_links
+        .iter()
+        .find(|link| link.kind == ProvenanceBundleLinkKind::IntentDesignBrief)
+        .expect("intent link")
+        .reference
+        .clone();
+    bundle
+        .replay_inputs
+        .as_mut()
+        .expect("replay inputs")
+        .expected_verdict_ref = alternate_ref;
+    let workspace = replay_workspace("expected-verdict-mismatch");
+
+    let result = replay_provenance_bundle(&bundle, fixture_root(), &workspace);
+
+    assert_eq!(result.status, ProvenanceReplayStatus::NotReplayable);
+    assert!(result.replay_run_dir.is_none());
+    assert!(result.issues.iter().any(|issue| {
+        issue.contains("expectedVerdictRef") && issue.contains("evaluator-verdict chain link ref")
+    }));
+}
+
+#[test]
 fn replay_docs_preserve_generated_state_wording_compatibility_and_governance_boundaries() {
     let docs = fs::read_to_string(repo_root().join("docs/provenance-replay-v1.md"))
         .expect("read replay docs");
