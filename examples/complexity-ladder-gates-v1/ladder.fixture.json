@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "complexity-ladder-gates-v1",
+  "ladderId": "complexity-ladder-gates-v1-fixture",
+  "rungs": [
+    {
+      "order": 1,
+      "rungId": "arcade-platformer",
+      "gameClass": "Arcade Platformer",
+      "requiredCapabilities": [
+        "deterministic-input",
+        "collision-response",
+        "scenario-replay"
+      ],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "evidence/demos/arcade-platformer/demo.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "verdict.json",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "evidence/coverage/arcade-platformer.json",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "order": 2,
+      "rungId": "physics-puzzler",
+      "gameClass": "Physics Puzzler",
+      "requiredCapabilities": [
+        "deterministic-physics",
+        "object-interaction"
+      ],
+      "capabilityGate": {
+        "claimedStatus": "unsatisfied",
+        "loopProducedDemo": true,
+        "demoRef": "evidence/demos/physics-puzzler/demo.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "verdict.json",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "fail",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "evidence/coverage/physics-puzzler.json",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "order": 3,
+      "rungId": "systems-sandbox",
+      "gameClass": "Systems Sandbox",
+      "requiredCapabilities": [
+        "emergent-systems",
+        "long-running-simulation"
+      ],
+      "capabilityGate": {
+        "claimedStatus": "insufficient-evidence"
+      }
+    }
+  ],
+  "boundary": "Rust/local read model only; browser surfaces are read-only and no engine runtime is expanded."
+}
