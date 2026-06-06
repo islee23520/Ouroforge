@@ -99,10 +99,14 @@ integration, a read-only Studio plugin browser and read-only
 dashboard/scenario/asset descriptors, a fixture plugin pack, a security/threat-
 model gate that fails closed on executable/credentialed/network capabilities,
 load-order/conflict detection, CLI inspection, Scenario Coverage v16, a
-deterministic demo, and conservative governance refresh:
+deterministic demo, and conservative governance refresh, and a completed Game
+Complexity Ladder v1 / Era E Milestone 24 governance chain: scope and contract,
+ladder model and capability gates, engine-growth demand justification, a
+fixture-scoped rung demo, Scenario Coverage v25, and this docs-only roadmap/#1
+handoff:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -248,6 +252,24 @@ installation, network plugin install/update, marketplace, credential access,
 source mutation, export/publish/deploy mutation, CI/workflow mutation, secure
 plugin sandbox guarantee, Godot-equivalent extension parity, production-ready
 plugin ecosystem, or current Godot replacement claim is introduced.
+
+Game Complexity Ladder v1 / Era E Milestone 24 (#1493-#1498) is now complete as
+a conservative governance milestone after the required implementation evidence
+merged. #1493 supplied the scope and contract in PR #1522; #1494 added the
+ladder model and capability gates in PR #1526; #1495 added the engine-growth
+demand justification gate in PR #1527; #1496 added the fixture-scoped rung demo
+in PR #1529; and #1497 added Scenario Coverage v25 in PR #1530. #1498 records
+only this roadmap/#1 refresh and does not add runtime behavior. Completion is
+valid only after the #1494-#1497 merged evidence chain: engine growth remains
+demand-driven and rung-justified, the roadmap pre-authorizes no broad engine
+breadth, generated artifacts remain ignored unless fixture-scoped and reviewed,
+browser/Studio/dashboard surfaces remain read-only, no auto-promotion or
+reviewer bypass is introduced, and no production readiness, broad compatibility,
+shipped-game completeness, or Godot replacement claim is made. Layer-3
+distributed orchestration / Elixir remains deferred under ADR #92 and should be
+re-evaluated only at Milestone 26. The recommended next milestone is Era E
+Milestone 25: End-to-End Provenance Bundle and Audit Surface. #1 and #23 remain
+open governance anchors.
 
 ## Completed evidence-native milestones
 
@@ -434,6 +456,15 @@ The current implementation has completed these documented milestone surfaces:
   `docs/studio-plugin-extension-panel-v1.md`,
   `docs/plugin-extension-system-demo-v1.md`,
   `docs/scenario-coverage-v16-plugin-extension.md`)
+- Game Complexity Ladder v1 / Era E Milestone 24
+  (`docs/game-complexity-ladder-v1.md`,
+  `docs/game-complexity-ladder-v1-demo.md`,
+  `docs/scenario-coverage-v25.md`,
+  `docs/game-complexity-ladder-v1-governance-handoff.md`,
+  `crates/ouroforge-core/tests/complexity_ladder_contract.rs`,
+  `crates/ouroforge-core/tests/engine_growth_justification_contract.rs`,
+  `examples/game-complexity-ladder-v1/`,
+  `examples/engine-growth-justification-v1/`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -703,6 +734,28 @@ editor extensibility, command execution, source/export/publish/deploy mutation,
 CI/workflow mutation, secure plugin sandbox guarantees, Godot-equivalent
 extension parity, and a production-ready plugin ecosystem. #1 and #23 remain open
 governance anchors.
+
+### Game Complexity Ladder v1 governance refresh
+
+Game Complexity Ladder v1 is recorded as **complete for Era E Milestone 24** as
+a conservative governance/docs milestone under #1. The completion evidence chain
+is #1493 as scope and contract in PR #1522, #1494 ladder model and capability
+gates in PR #1526, #1495 engine-growth demand justification in PR #1527, #1496
+fixture-scoped rung demo in PR #1529, #1497 Scenario Coverage v25 in PR #1530,
+and #1498 as this roadmap/#1 refresh. #1 and #23 remain open governance anchors.
+
+The remaining boundaries stay explicit: engine growth is demand-driven and
+rung-justified, no broad engine breadth is pre-authorized, generated artifacts
+remain ignored unless fixture-scoped and reviewed, Rust/local code and the local
+filesystem own trusted state, browser/Studio/dashboard surfaces remain read-only,
+and there is no production readiness, shipped-game completeness, broad
+compatibility, Godot replacement positioning, auto-promotion, auto-apply,
+auto-merge, self-approval, reviewer bypass, or Layer-3 implementation. Layer-3
+distributed orchestration / Elixir remains deferred under ADR #92 and should be
+re-evaluated only at Milestone 26.
+
+The recommended next milestone is **Era E Milestone 25: End-to-End Provenance
+Bundle and Audit Surface**.
 
 ### Foundation Hardening v1 governance refresh
 

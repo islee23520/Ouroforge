@@ -99,18 +99,13 @@ pub enum ComplexityRungStatus {
     InsufficientEvidence,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum EvidenceRefState {
     Current,
+    #[default]
     Missing,
     StaleRef,
-}
-
-impl Default for EvidenceRefState {
-    fn default() -> Self {
-        Self::Missing
-    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -177,8 +172,7 @@ impl ComplexityLadder {
 
         let mut seen_orders = BTreeSet::new();
         let mut seen_rungs = BTreeSet::new();
-        let mut expected_order = 1;
-        for rung in &self.rungs {
+        for (expected_order, rung) in (1..).zip(self.rungs.iter()) {
             rung.validate()?;
             if !seen_orders.insert(rung.order) {
                 return Err(anyhow!(
@@ -197,7 +191,6 @@ impl ComplexityLadder {
                     "complexity ladder rungs must be ordered contiguously from 1"
                 ));
             }
-            expected_order += 1;
         }
         Ok(())
     }
