@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "trust-gradient-demo-v1",
+  "scenario": "budget-exhausted-fallback",
+  "description": "A low-risk, eligible proposal that would otherwise auto-apply is refused because the explicit risk budget is exhausted; it falls back to manual review.",
+  "request": {
+    "proposalRef": "proposal/scene-only-late-edit",
+    "tier": "low",
+    "eligibility": "auto-apply-eligible",
+    "confidence": 0.96,
+    "rerunGates": {
+      "mechanical": "pass",
+      "runtime": "pass",
+      "visual": "pass",
+      "semantic": "pass"
+    },
+    "budget": {
+      "remaining": 0,
+      "cost": 1
+    },
+    "autonomyEnabled": true,
+    "rollbackHandle": {
+      "applyTransactionId": "txn-scene-003",
+      "reverseRef": "examples/trust-gradient-v1/demo/reverse/txn-scene-003.json"
+    }
+  },
+  "expectedOutcome": "manual-fallback",
+  "boundary": "Bounded, reversible, audited auto-apply: not auto-merge, not self-approval, not a quality guarantee; exhausting the explicit risk budget forces manual review; Rust/local owned, browser read-only."
+}

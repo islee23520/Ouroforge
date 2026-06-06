@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "trust-gradient-demo-v1",
+  "scenario": "kill-switch-halt",
+  "description": "With the emergency kill switch engaged, autonomy is halted: an otherwise low-risk, eligible, in-budget proposal still falls back to manual review, restoring the default no-auto-apply posture.",
+  "request": {
+    "proposalRef": "proposal/scene-only-during-halt",
+    "tier": "low",
+    "eligibility": "auto-apply-eligible",
+    "confidence": 0.96,
+    "rerunGates": {
+      "mechanical": "pass",
+      "runtime": "pass",
+      "visual": "pass",
+      "semantic": "pass"
+    },
+    "budget": {
+      "remaining": 3,
+      "cost": 1
+    },
+    "autonomyEnabled": false,
+    "rollbackHandle": {
+      "applyTransactionId": "txn-scene-004",
+      "reverseRef": "examples/trust-gradient-v1/demo/reverse/txn-scene-004.json"
+    }
+  },
+  "killSwitch": {
+    "engaged": true,
+    "reason": "operator emergency halt"
+  },
+  "expectedOutcome": "manual-fallback",
+  "boundary": "Bounded, reversible, audited auto-apply: not auto-merge, not self-approval, not a quality guarantee; the emergency kill switch halts all autonomy; Rust/local owned, browser read-only."
+}

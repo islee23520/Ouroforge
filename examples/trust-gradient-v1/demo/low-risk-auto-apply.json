@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "trust-gradient-demo-v1",
+  "scenario": "low-risk-auto-apply",
+  "description": "A low-risk scene-only data proposal that passes all four gates on rerun at high confidence, within budget and rollback-backed, auto-applies and is recorded in the append-only audit log.",
+  "request": {
+    "proposalRef": "proposal/scene-only-color-tweak",
+    "tier": "low",
+    "eligibility": "auto-apply-eligible",
+    "confidence": 0.96,
+    "rerunGates": {
+      "mechanical": "pass",
+      "runtime": "pass",
+      "visual": "pass",
+      "semantic": "pass"
+    },
+    "budget": {
+      "remaining": 3,
+      "cost": 1
+    },
+    "autonomyEnabled": true,
+    "rollbackHandle": {
+      "applyTransactionId": "txn-scene-001",
+      "reverseRef": "examples/trust-gradient-v1/demo/reverse/txn-scene-001.json"
+    }
+  },
+  "expectedOutcome": "auto-applied",
+  "expectedRollbackCommand": "ouroforge rollback --transaction txn-scene-001 --reverse examples/trust-gradient-v1/demo/reverse/txn-scene-001.json",
+  "auditEntry": {
+    "sequence": 0,
+    "proposalRef": "proposal/scene-only-color-tweak",
+    "tier": "low",
+    "gates": {
+      "mechanical": "pass",
+      "runtime": "pass",
+      "visual": "pass",
+      "semantic": "pass"
+    },
+    "budgetRemaining": 2,
+    "applyResult": "auto-applied",
+    "rollbackHandle": {
+      "applyTransactionId": "txn-scene-001",
+      "reverseRef": "examples/trust-gradient-v1/demo/reverse/txn-scene-001.json"
+    }
+  },
+  "boundary": "Bounded, reversible, audited auto-apply: not auto-merge, not self-approval, not a quality guarantee; low-risk scene-only data only, Rust/local owned, browser read-only."
+}
