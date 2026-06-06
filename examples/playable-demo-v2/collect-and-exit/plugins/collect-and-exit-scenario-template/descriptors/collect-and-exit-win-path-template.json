@@ -6,7 +6,7 @@
     { "name": "scenarioId", "type": "string", "description": "Existing scenario id to inspect.", "required": true },
     { "name": "evidenceKind", "type": "enum", "description": "Expected local evidence class.", "required": true, "allowedValues": ["world_state", "runtime_events", "frame_stats", "scenarioPack"] }
   ],
-  "supportedGameTypes": ["small2d-prototype", "local-web-demo"],
+  "supportedGameTypes": ["prototype"],
   "tags": ["collect-and-exit", "qa-smoke", "read-only-template"],
   "expectedEvidenceType": "scenarioPack",
   "validationHints": [
