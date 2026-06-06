@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1",
+  "id": "signal-gate-platformer-scene",
+  "bounds": {
+    "width": 320,
+    "height": 180
+  },
+  "metadata": {
+    "fixture": "m21-signal-gate-platformer",
+    "scope": "one-screen source fixture; generated run evidence remains untracked",
+    "title": "Signal Gate Platformer Demo",
+    "scenarioId": "signal-gate-source-smoke",
+    "startState": {
+      "playerEntityId": "player",
+      "spawn": {
+        "x": 24,
+        "y": 128
+      },
+      "initialFlags": {
+        "signal_open": false,
+        "hazard_cleared": false,
+        "exit_reached": false
+      }
+    },
+    "runtimeDebug": {
+      "frameBudget": {
+        "updateMs": 8,
+        "renderMs": 16,
+        "evidenceMs": 4,
+        "totalMs": 20
+      },
+      "frameTimings": {
+        "updateMs": 2,
+        "renderMs": 5,
+        "evidenceMs": 1,
+        "totalMs": 8
+      }
+    }
+  },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      {
+        "id": "signal_open",
+        "initial": false,
+        "label": "Signal open"
+      },
+      {
+        "id": "hazard_cleared",
+        "initial": false,
+        "label": "Hazard cleared"
+      },
+      {
+        "id": "exit_reached",
+        "initial": false,
+        "label": "Exit reached"
+      }
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "kind": "avatar",
+      "components": {
+        "transform": {
+          "x": 24,
+          "y": 128
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "controllable": true
+      }
+    },
+    {
+      "id": "hazard_lane",
+      "kind": "obstacle",
+      "components": {
+        "transform": {
+          "x": 112,
+          "y": 144
+        },
+        "size": {
+          "width": 40,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "signal_gate",
+      "kind": "timed_gate",
+      "opensAtFrame": 30,
+      "components": {
+        "transform": {
+          "x": 216,
+          "y": 112
+        },
+        "size": {
+          "width": 16,
+          "height": 40
+        }
+      }
+    },
+    {
+      "id": "exit",
+      "kind": "exit_trigger",
+      "components": {
+        "transform": {
+          "x": 288,
+          "y": 128
+        },
+        "size": {
+          "width": 16,
+          "height": 24
+        }
+      }
+    }
+  ],
+  "evidenceIntent": {
+    "world_state": {
+      "sceneId": "signal-gate-platformer-scene",
+      "goalFlags": {
+        "signal_open": true,
+        "hazard_cleared": true,
+        "exit_reached": true
+      }
+    },
+    "animation_evidence": [
+      {
+        "name": "player_jump",
+        "mode": "sprite_frame"
+      }
+    ],
+    "audio_evidence": [
+      {
+        "name": "signal_gate_open"
+      }
+    ],
+    "frame_stats": {
+      "runtimeFrameBudgetStatus": "within-budget"
+    },
+    "runtime_events": {
+      "events": [
+        {
+          "type": "signal.gate.opened",
+          "frame": 30
+        },
+        {
+          "type": "player.exit.reached",
+          "frame": 48
+        }
+      ]
+    }
+  }
+}

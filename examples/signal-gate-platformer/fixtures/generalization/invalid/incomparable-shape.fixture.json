@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "second-game-generalization-comparison-v1",
+  "fixtureScoped": true,
+  "comparisonId": "invalid-incomparable-shape",
+  "status": "comparable",
+  "classes": [
+    {
+      "id": "collect-and-exit",
+      "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+      "scenarioRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/collect-and-exit-loop-coverage.golden.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    },
+    {
+      "id": "signal-gate-platformer",
+      "seedRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "scenarioRef": "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/loop-coverage.fixture.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "verify",
+        "journal"
+      ]
+    }
+  ],
+  "findings": []
+}

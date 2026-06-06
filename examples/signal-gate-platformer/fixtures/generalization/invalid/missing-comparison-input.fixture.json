@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "second-game-generalization-comparison-v1",
+  "fixtureScoped": true,
+  "comparisonId": "invalid-missing-input",
+  "status": "comparable",
+  "classes": [
+    {
+      "id": "signal-gate-platformer",
+      "seedRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "scenarioRef": "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/loop-coverage.fixture.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    }
+  ],
+  "findings": []
+}

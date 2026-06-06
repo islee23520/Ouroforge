@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "fixtureScoped": true,
+  "projectId": "signal_gate_platformer_demo",
+  "runId": "m21-signal-gate-loop-demo",
+  "inputs": [
+    {
+      "artifactRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "artifactKind": "seed",
+      "sourceRef": "docs/signal-gate-platformer-gdd-v1.md",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "seed"
+      ],
+      "trustedValidationRef": "Seed::from_path"
+    },
+    {
+      "artifactRef": "examples/signal-gate-platformer/scenes/signal-gate-platformer.scene.json",
+      "artifactKind": "scene",
+      "sourceRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "build",
+        "observe"
+      ],
+      "trustedValidationRef": "ProjectManifest::from_path"
+    },
+    {
+      "artifactRef": "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json",
+      "artifactKind": "verdict",
+      "sourceRef": "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+      "provenanceClass": "loop-verified",
+      "loopStageRefs": [
+        "verify"
+      ],
+      "trustedValidationRef": "scenario-coverage-v22-loop-generalization.test.cjs"
+    },
+    {
+      "artifactRef": "examples/signal-gate-platformer/fixtures/journal/signal-gate-journal.fixture.md",
+      "artifactKind": "journal",
+      "sourceRef": "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "journal",
+        "evolve"
+      ],
+      "trustedValidationRef": "scenario-coverage-v22-loop-generalization.test.cjs"
+    }
+  ],
+  "summary": {
+    "totalInputs": 4,
+    "loopProduced": 3,
+    "loopVerified": 1,
+    "manual": 0,
+    "coverageFraction": 1.0,
+    "status": "computed"
+  },
+  "boundary": "Descriptive fixture-scoped authorship attribution only; not a quality score and no auto-apply authority."
+}

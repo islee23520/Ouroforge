@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "second-game-generalization-comparison-v1",
+  "fixtureScoped": true,
+  "comparisonId": "m21-generalization-gaps",
+  "status": "gap-found",
+  "classes": [
+    {
+      "id": "collect-and-exit",
+      "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+      "scenarioRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/collect-and-exit-loop-coverage.golden.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    },
+    {
+      "id": "signal-gate-platformer",
+      "seedRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "scenarioRef": "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/loop-coverage.fixture.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "gap-no-live-runtime-demo-committed",
+      "severity": "warn",
+      "evidenceRefs": [
+        "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json",
+        "docs/second-game-class-loop-generalization-v1-demo.md"
+      ],
+      "summary": "The committed Milestone 21 evidence is deterministic and fixture-scoped; generated runtime runs remain untracked."
+    },
+    {
+      "id": "gap-roadmap-governance-pending-merge",
+      "severity": "warn",
+      "evidenceRefs": [
+        "docs/second-game-class-loop-generalization-v1.md",
+        "docs/scenario-coverage-v22.md"
+      ],
+      "summary": "Roadmap completion and the #1 governance comment remain pending until merged PR evidence exists."
+    }
+  ],
+  "boundary": "Explicit gap evidence; gaps are not silently patched and do not create per-game escape hatches."
+}

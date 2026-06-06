@@ -1,0 +1,44 @@
+id: signal-gate-platformer
+title: Signal Gate Platformer Second Game Class Fixture
+goal: Validate a one-screen obstacle-and-signal platformer through the existing loop-shaped contracts without per-game evaluator bypasses.
+constraints:
+  target: game-runtime
+acceptance:
+  - Project manifest, scene, Seed, and scenario pack fixtures validate as source-like inputs.
+  - The deterministic path crosses a hazard lane only after the signal gate opens.
+  - Four-gate evidence reports mechanical, runtime, visual, and semantic verdicts with comparable refs.
+  - Loop coverage records Seed, Build, Observe, Verify, Journal, and Evolve stages using local fixture evidence.
+scenarios:
+  - id: signal-gate-source-smoke
+    description: End-to-end source and evidence contract for the one-screen signal gate platformer fixture.
+    steps:
+      - input:
+          right: true
+      - wait:
+          frames: 12
+      - input:
+          actions:
+            jump: true
+      - wait:
+          frames: 18
+      - input:
+          right: true
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: signal-gate-platformer-scene
+      - world_state:
+          path: goalFlags.signal_open
+          equals: true
+      - world_state:
+          path: goalFlags.hazard_cleared
+          equals: true
+      - world_state:
+          path: goalFlags.exit_reached
+          equals: true
+      - animation_evidence:
+          path: "0.mode"
+          equals: sprite_frame
+      - audio_evidence:
+          path: "0.name"
+          equals: signal_gate_open

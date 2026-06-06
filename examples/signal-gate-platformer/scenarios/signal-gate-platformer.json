@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "signal-gate-platformer",
+  "description": "Scenario pack for the Milestone 21 one-screen signal gate platformer fixture.",
+  "seed": "seeds/signal-gate-platformer.yaml",
+  "scenes": [
+    "scenes/signal-gate-platformer.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "source-contract",
+      "description": "Bounded source and evidence contracts for the signal gate fixture.",
+      "scenarios": [
+        {
+          "id": "signal-gate-source-smoke",
+          "description": "The demo reaches signal-open, hazard-cleared, and exit evidence with matching runtime and audiovisual refs.",
+          "steps": [
+            {
+              "input": {
+                "right": true
+              }
+            },
+            {
+              "wait": {
+                "frames": 12
+              }
+            },
+            {
+              "input": {
+                "actions": {
+                  "jump": true
+                }
+              }
+            },
+            {
+              "wait": {
+                "frames": 18
+              }
+            },
+            {
+              "input": {
+                "right": true
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "world_state": {
+                "path": "sceneId",
+                "equals": "signal-gate-platformer-scene"
+              }
+            },
+            {
+              "world_state": {
+                "path": "goalFlags.signal_open",
+                "equals": true
+              }
+            },
+            {
+              "world_state": {
+                "path": "goalFlags.hazard_cleared",
+                "equals": true
+              }
+            },
+            {
+              "world_state": {
+                "path": "goalFlags.exit_reached",
+                "equals": true
+              }
+            },
+            {
+              "world_state": {
+                "path": "metadata.title",
+                "equals": "Signal Gate Platformer Demo"
+              }
+            },
+            {
+              "frame_stats": {
+                "path": "runtimeFrameBudgetStatus",
+                "equals": "within-budget"
+              }
+            },
+            {
+              "runtime_events": {
+                "path": "events",
+                "containsType": "signal.gate.opened"
+              }
+            },
+            {
+              "animation_evidence": {
+                "path": "0.mode",
+                "equals": "sprite_frame"
+              }
+            },
+            {
+              "audio_evidence": {
+                "path": "0.name",
+                "equals": "signal_gate_open"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

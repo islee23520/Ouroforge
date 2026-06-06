@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "fixtureScoped": true,
+  "projectId": "collect_and_exit_demo",
+  "runId": "m21-collect-and-exit-comparison-golden",
+  "inputs": [
+    {
+      "artifactRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+      "artifactKind": "seed",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "seed"
+      ],
+      "trustedValidationRef": "Seed::from_path"
+    },
+    {
+      "artifactRef": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+      "artifactKind": "scene",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "build",
+        "observe"
+      ],
+      "trustedValidationRef": "ProjectManifest::from_path"
+    },
+    {
+      "artifactRef": "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json",
+      "artifactKind": "verdict",
+      "sourceRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+      "provenanceClass": "loop-verified",
+      "loopStageRefs": [
+        "verify"
+      ],
+      "trustedValidationRef": "scenario-coverage-v22-loop-generalization.test.cjs"
+    }
+  ],
+  "summary": {
+    "totalInputs": 3,
+    "loopProduced": 2,
+    "loopVerified": 1,
+    "manual": 0,
+    "coverageFraction": 1.0,
+    "status": "computed"
+  },
+  "boundary": "Descriptive comparison golden only; not a quality score."
+}

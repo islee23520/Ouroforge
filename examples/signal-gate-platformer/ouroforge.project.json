@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "signal_gate_platformer_demo",
+    "name": "Signal Gate Platformer Demo"
+  },
+  "scenes": [
+    {
+      "id": "signal-gate-platformer",
+      "path": "scenes/signal-gate-platformer.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "signal-gate-platformer",
+      "path": "seeds/signal-gate-platformer.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "signal-gate-platformer",
+      "path": "scenarios/signal-gate-platformer.json"
+    }
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ]
+  }
+}

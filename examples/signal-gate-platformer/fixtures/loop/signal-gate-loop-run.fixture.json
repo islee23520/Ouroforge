@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "authoring-loop-run-v1",
+  "fixtureScoped": true,
+  "runId": "m21-signal-gate-loop-demo",
+  "gameClass": "signal-gate-platformer",
+  "loopShape": [
+    "seed",
+    "build",
+    "observe",
+    "verify",
+    "journal",
+    "evolve"
+  ],
+  "stages": [
+    {
+      "id": "seed",
+      "artifactRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml"
+    },
+    {
+      "id": "build",
+      "artifactRef": "examples/signal-gate-platformer/scenes/signal-gate-platformer.scene.json"
+    },
+    {
+      "id": "observe",
+      "artifactRef": "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json"
+    },
+    {
+      "id": "verify",
+      "artifactRef": "examples/signal-gate-platformer/fixtures/evidence/four-gate-verdict.fixture.json"
+    },
+    {
+      "id": "journal",
+      "artifactRef": "examples/signal-gate-platformer/fixtures/journal/signal-gate-journal.fixture.md"
+    },
+    {
+      "id": "evolve",
+      "artifactRef": "examples/signal-gate-platformer/fixtures/generalization/gap-found.fixture.json"
+    }
+  ],
+  "boundary": "Fixture-scoped loop evidence only; no generated run output is committed."
+}

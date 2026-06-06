@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "four-gate-verdict-v1",
+  "fixtureScoped": true,
+  "runId": "m21-signal-gate-loop-demo",
+  "gameClass": "signal-gate-platformer",
+  "scenarioId": "signal-gate-source-smoke",
+  "verdict": "pass",
+  "gates": [
+    {
+      "id": "mechanical",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+        "examples/signal-gate-platformer/scenes/signal-gate-platformer.scene.json"
+      ],
+      "finding": "Replay reaches exit only after signal_open is true."
+    },
+    {
+      "id": "runtime",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/signal-gate-platformer/scenes/signal-gate-platformer.scene.json"
+      ],
+      "finding": "Fixture frame budget status is within-budget."
+    },
+    {
+      "id": "visual",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/signal-gate-platformer/scenes/signal-gate-platformer.scene.json"
+      ],
+      "finding": "Scene includes player, hazard lane, signal gate, and exit marker."
+    },
+    {
+      "id": "semantic",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+        "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json"
+      ],
+      "finding": "Scenario assertions cover signal_open, hazard_cleared, and exit_reached flags."
+    }
+  ],
+  "trustedValidationRef": "cargo test second_game_class_loop_generalization_contract",
+  "boundary": "Fixture-scoped verdict shape; no production-readiness claim."
+}
