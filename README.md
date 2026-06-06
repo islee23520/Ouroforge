@@ -265,13 +265,13 @@ trusted writes, command bridges, auto-fix, auto-apply, auto-merge, native export
 plugin runtime, hosted/cloud behavior, production readiness, public launch,
 secure-sandbox guarantees, autonomous source repair, or a current Godot
 replacement claim. With Safe Source Mutation Apply v1, Full Studio Editor v1,
-Plugin / Extension System v1, and Godot-Plus Demo Game v1 now recorded as
-complete, and with Game
-Complexity Ladder v1 / Era E Milestone 24 now recorded as complete after #1494
-through #1497 merged evidence, the next recommended governance milestone is Era
-E Milestone 25: End-to-End Provenance Bundle and Audit Surface. Engine growth
-remains demand-driven and rung-justified; Layer-3 distributed orchestration /
-Elixir per ADR #92 remains deferred for re-evaluation only at Milestone 26.
+Plugin / Extension System v1, Godot-Plus Demo Game v1, Game Complexity Ladder v1
+/ Era E Milestone 24, and End-to-End Provenance Bundle and Audit Surface v1 /
+Era E Milestone 25 now recorded as complete, the next recommended governance
+milestone is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation
+Trigger. Engine growth remains demand-driven and rung-justified; Layer-3
+distributed orchestration / Elixir per ADR #92 remains deferred for
+re-evaluation at Milestone 26.
 
 ## Contributor guide
 

@@ -2,7 +2,7 @@
 
 Issue: **#1499** (Era E Milestone 25 scope and contract)
 
-End-to-End Provenance v1 unifies existing provenance and evidence artifacts into one **per-change provenance bundle** a human can audit in read-only surfaces and replay for re-verification. This contract is **composition by reference** over scene/transaction provenance, rollback metadata, evidence links, review decisions, and regression promotion records. It does **not** introduce a parallel provenance engine or new trusted browser write paths.
+End-to-End Provenance v1 unifies existing provenance and evidence artifacts into one **per-change provenance bundle** a human can audit in read-only surfaces and replay for re-verification. This contract is **composition by reference** over scene/transaction provenance, rollback metadata, evidence links, review decisions, and regression promotion records. It does **not** introduce a separate provenance authority or new trusted browser write paths.
 
 ## Provenance bundle (additive schema)
 
@@ -36,6 +36,7 @@ A merged change SHOULD be reconstructable from its bundle references and re-veri
 
 ## Boundaries
 
-Conservative wording: audit/replay workflow evidence, not production readiness, quality guarantees, or Godot replacement.
+Conservative wording: audit/replay workflow evidence, not production readiness,
+quality guarantees, or engine-replacement positioning.
 
 **#1 and #23 remain open.**

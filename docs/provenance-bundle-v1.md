@@ -10,6 +10,6 @@ Missing links, dangling references, stale references, and declared incomplete st
 
 Generated bundles remain untracked unless fixture-scoped.
 
-Compatibility boundary: existing artifacts remain valid without a bundle, and browser/Studio/dashboard consumers inspect exported bundles read-only. Rust/local tooling owns validation and any later scoped replay reconstruction. This is not a quality guarantee, production-readiness claim, or Godot replacement claim.
+Compatibility boundary: existing artifacts remain valid without a bundle, and browser/Studio/dashboard consumers inspect exported bundles read-only. Rust/local tooling owns validation and any later scoped replay reconstruction. This is not a quality guarantee, production-readiness claim, or engine-replacement claim.
 
 Governance: #1 remains open and #23 remains open. This document is scoped to #1500 only and does not implement #1502, #1503, #1504, #1505, or #1506.

@@ -2,6 +2,10 @@
 
 This handoff records the docs-only governance refresh for issue #1498 after the Game Complexity Ladder v1 sequence. It is intended as local evidence for the roadmap and as quote-ready wording for the later Roadmap Hub (#1) comment. It does not close or modify #1 or #23.
 
+Note: this is historical Milestone 24 handoff evidence. The current roadmap
+supersedes the next-milestone recommendation after End-to-End Provenance Bundle
+and Audit Surface v1 / Era E Milestone 25 completed.
+
 ## Completion evidence
 
 Game Complexity Ladder v1 / Era E Milestone 24 is complete only because the implementation evidence for #1494 through #1497 has merged. Issue #1493 supplied the scope and contract; #1498 records the final governance refresh.
@@ -25,9 +29,11 @@ Game Complexity Ladder v1 / Era E Milestone 24 is complete only because the impl
 - This milestone does not claim production readiness, shipped-game completeness, broad game compatibility, or Godot replacement status.
 - This milestone does not implement Layer-3 distributed orchestration. ADR #92 remains deferred and should be re-evaluated only at Milestone 26.
 
-## Recommended next milestone
+## Historical next milestone recommendation
 
-The next recommended governance milestone is Era E Milestone 25: End-to-End Provenance Bundle and Audit Surface.
+At the time of the Milestone 24 handoff, the next recommended governance
+milestone was Era E Milestone 25: End-to-End Provenance Bundle and Audit
+Surface.
 
 Milestone 25 should package the already-local evidence path into an auditable bundle and read-only audit surface before any Layer-3 reconsideration. It should preserve the same boundaries: Rust/local trusted ownership, browser/dashboard read-only display, fixture-scoped generated evidence only, and no broad engine or production claims.
 
@@ -37,4 +43,9 @@ Game Complexity Ladder v1 / Era E Milestone 24 is now recorded as complete after
 
 The completion remains conservative: engine growth is demand-driven and rung-justified, the roadmap does not pre-authorize broad engine breadth, generated artifacts are ignored unless fixture-scoped and reviewed, browser/Studio/dashboard surfaces remain read-only, and there is no production readiness, shipped-game completeness, broad compatibility, or Godot replacement claim.
 
-The recommended next milestone is Era E Milestone 25: End-to-End Provenance Bundle and Audit Surface. Layer-3 distributed orchestration / Elixir remains deferred under ADR #92 and should be re-evaluated only at Milestone 26. Roadmap Hub #1 and Repo Memory #23 remain open.
+At that time, the recommended next milestone was Era E Milestone 25:
+End-to-End Provenance Bundle and Audit Surface. The current roadmap now records
+that milestone as complete and recommends Era E Milestone 26: Era E Refresh and
+Layer-3 Re-evaluation Trigger. Layer-3 distributed orchestration / Elixir
+remains deferred under ADR #92 and should be re-evaluated only at Milestone 26.
+Roadmap Hub #1 and Repo Memory #23 remain open.

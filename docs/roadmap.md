@@ -103,10 +103,13 @@ deterministic demo, and conservative governance refresh, and a completed Game
 Complexity Ladder v1 / Era E Milestone 24 governance chain: scope and contract,
 ladder model and capability gates, engine-growth demand justification, a
 fixture-scoped rung demo, Scenario Coverage v25, and this docs-only roadmap/#1
-handoff:
+handoff, and a completed End-to-End Provenance Bundle and Audit Surface v1 /
+Era E Milestone 25 governance chain: parent scope, additive bundle model,
+local replayability, read-only audit surface, deterministic fixture demo,
+Scenario Coverage v26, and this conservative roadmap/#1 refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance -> End-to-End Provenance v1 additive bundle/replay/read-only audit/demo/v26 regression/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -267,9 +270,28 @@ browser/Studio/dashboard surfaces remain read-only, no auto-promotion or
 reviewer bypass is introduced, and no production readiness, broad compatibility,
 shipped-game completeness, or Godot replacement claim is made. Layer-3
 distributed orchestration / Elixir remains deferred under ADR #92 and should be
-re-evaluated only at Milestone 26. The recommended next milestone is Era E
-Milestone 25: End-to-End Provenance Bundle and Audit Surface. #1 and #23 remain
-open governance anchors.
+re-evaluated only at Milestone 26. The follow-on Era E Milestone 25 governance
+chain is now recorded below. #1 and #23 remain open governance anchors.
+
+End-to-End Provenance Bundle and Audit Surface v1 / Era E Milestone 25 is now
+complete as a conservative, additive provenance/audit milestone after the
+required evidence chain merged. Parent scope #1524 framed the milestone; #1531
+added the bundle model; #1533 added local replayability; #1538 added the
+read-only audit surface and human sign-off display; #1541 added the deterministic
+fixture-scoped demo; #1542 added Scenario Coverage v26; and repair #1545 is
+recognized only as supporting evidence for the final chain. Completion is valid
+only for composition by reference over existing provenance, evidence, review,
+rollback, and regression-promotion artifacts. It does not introduce a parallel
+provenance engine, auto-promotion, auto-approval, auto-merge, reviewer bypass,
+trusted browser writes, command bridges, production-readiness claims, quality
+guarantees, or Godot replacement positioning. Rust/local tooling retains trusted
+ownership; dashboard, Studio, and browser surfaces remain read-only; existing
+contracts stay backward-compatible; and generated provenance, replay, dashboard,
+browser, temp, and local tool artifacts remain untracked unless explicitly
+fixture-scoped. Layer-3 distributed orchestration / Elixir remains deferred
+under ADR #92 and should be re-evaluated at Milestone 26. The recommended next
+milestone is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation
+Trigger. #1 and #23 remain open governance anchors.
 
 ## Completed evidence-native milestones
 
@@ -465,6 +487,19 @@ The current implementation has completed these documented milestone surfaces:
   `crates/ouroforge-core/tests/engine_growth_justification_contract.rs`,
   `examples/game-complexity-ladder-v1/`,
   `examples/engine-growth-justification-v1/`)
+- End-to-End Provenance Bundle and Audit Surface v1 / Era E Milestone 25
+  (`docs/end-to-end-provenance-v1.md`,
+  `docs/provenance-bundle-v1.md`,
+  `docs/provenance-replay-v1.md`,
+  `docs/end-to-end-provenance-v1-demo.md`,
+  `docs/scenario-coverage-v26.md`,
+  `examples/end-to-end-provenance-v1/`,
+  `examples/evidence-dashboard/dashboard.test.cjs`,
+  `examples/authoring-cockpit/cockpit.test.cjs`,
+  `crates/ouroforge-core/tests/provenance_bundle_contract.rs`,
+  `crates/ouroforge-core/tests/provenance_replay_contract.rs`,
+  `crates/ouroforge-core/tests/end_to_end_provenance_demo_contract.rs`,
+  `crates/ouroforge-core/tests/scenario_coverage_v26_provenance.rs`)
 
 These milestones are still MVP contracts, not public compatibility promises.
 Generated run evidence remains ignored local state unless an issue explicitly
@@ -754,8 +789,35 @@ auto-merge, self-approval, reviewer bypass, or Layer-3 implementation. Layer-3
 distributed orchestration / Elixir remains deferred under ADR #92 and should be
 re-evaluated only at Milestone 26.
 
-The recommended next milestone is **Era E Milestone 25: End-to-End Provenance
-Bundle and Audit Surface**.
+Era E Milestone 25 is now recorded as complete below. The recommended next
+milestone is **Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation
+Trigger**.
+
+### End-to-End Provenance Bundle and Audit Surface v1 governance refresh
+
+End-to-End Provenance Bundle and Audit Surface v1 is recorded as **complete for
+Era E Milestone 25** as a conservative additive provenance/audit milestone under
+#1. The completion evidence chain is parent scope #1524, #1531 bundle model,
+#1533 local replayability, #1538 read-only audit surface and human sign-off
+display, #1541 deterministic fixture-scoped demo, #1542 Scenario Coverage v26,
+and #1545 as supporting repair evidence only. #1 and #23 remain open governance
+anchors.
+
+The remaining boundaries stay explicit: bundles compose existing provenance,
+evidence, review, rollback, and regression-promotion artifacts by reference and
+do not create a parallel provenance engine. Audit surfaces are read-only, human
+sign-off remains a human decision, and no auto-promotion, auto-approval,
+auto-merge, self-approval, reviewer bypass, trusted browser writes, command
+bridges, production-readiness claim, quality guarantee, or Godot replacement
+positioning is introduced. Rust/local tooling and the local filesystem retain
+trusted ownership; browser/Studio/dashboard surfaces remain read-only; existing
+contracts remain backward-compatible; generated provenance, replay, dashboard,
+browser, temp, and local tool artifacts remain ignored unless explicitly
+fixture-scoped. Layer-3 distributed orchestration / Elixir remains deferred
+under ADR #92 and should be re-evaluated at Milestone 26.
+
+The recommended next milestone is **Era E Milestone 26: Era E Refresh and
+Layer-3 Re-evaluation Trigger**.
 
 ### Foundation Hardening v1 governance refresh
 
