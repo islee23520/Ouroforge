@@ -1278,6 +1278,73 @@ assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons:
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: { relation: 'legacy', changed: false, changes: [] } } } }), /No project context changes recorded/);
 assert.match(dashboard.renderSemanticDiffSummary({ value: { semantic: { reasons: [], project: '<bad>' } } }), /No project comparison fields/);
 assert.match(dashboard.renderTransactionProvenance({}), /No scene edit transaction provenance/);
+const provenanceAuditRun = {
+  summary: { id: 'run-1', run_dir: 'runs/run-1' },
+  provenance_audit: {
+    present: true,
+    bundle_id: 'provenance-bundle-1503',
+    status: 'ready_for_audit',
+    evidence_refs: ['evidence/provenance/provenance-bundle.json', 'evidence/replay/replay-status.json'],
+    trusted_changes: [{
+      change_id: 'trusted-change-player-color',
+      status: 'trusted_recorded',
+      summary: 'Player color accepted after replay.',
+      full_chain: [
+        { stage: 'intent', artifact_ref: 'intent/player-color.intent.json', digest: 'fnv1a64:intenthash', actor: 'author' },
+        { stage: 'proposal', artifact_ref: 'mutation/player-color.proposal.json', digest: 'fnv1a64:proposalhash', actor: 'rust-cli' },
+        { stage: 'review', artifact_ref: 'mutation/review-decision.json', digest: 'fnv1a64:reviewhash', actor: 'human-reviewer' },
+        { stage: 'promotion', artifact_ref: 'promotion/trusted-change-record.json', digest: 'fnv1a64:promotionhash', actor: 'rust-local' },
+      ],
+      replay_status: {
+        status: 'deterministic-match',
+        scenario_id: 'collect-and-exit',
+        run_id: 'replay-run-1',
+        input_digest: 'sha256:replayinput',
+        matched_frames: 42,
+      },
+      sign_off: {
+        decision: 'accepted',
+        reviewer: 'human-reviewer',
+        recorded_at: '2026-06-06T00:00:00Z',
+        rationale: 'Replay matched expected outcome.',
+      },
+    }],
+  },
+};
+const provenanceAuditMarkup = dashboard.renderProvenanceAuditSurface(provenanceAuditRun);
+assert.match(provenanceAuditMarkup, /Provenance audit/);
+assert.match(provenanceAuditMarkup, /provenance-bundle-1503/);
+assert.match(provenanceAuditMarkup, /Full intent-to-promotion chain/);
+assert.match(provenanceAuditMarkup, /intent\/player-color\.intent\.json/);
+assert.match(provenanceAuditMarkup, /mutation\/player-color\.proposal\.json/);
+assert.match(provenanceAuditMarkup, /mutation\/review-decision\.json/);
+assert.match(provenanceAuditMarkup, /promotion\/trusted-change-record\.json/);
+assert.match(provenanceAuditMarkup, /Replay status/);
+assert.match(provenanceAuditMarkup, /deterministic-match/);
+assert.match(provenanceAuditMarkup, /collect-and-exit/);
+assert.match(provenanceAuditMarkup, /sha256:replayinput/);
+assert.match(provenanceAuditMarkup, /Matched frames/);
+assert.match(provenanceAuditMarkup, /Human decision record/);
+assert.match(provenanceAuditMarkup, /Decision accepted/);
+assert.match(provenanceAuditMarkup, /reviewer human-reviewer/);
+assert.match(provenanceAuditMarkup, /Read-only provenance bundle from exported JSON/);
+assert.match(provenanceAuditMarkup, /no write, promote, approve, mutation, command, or auto-approval affordance/);
+assert.doesNotMatch(provenanceAuditMarkup, /<button|<form|<input|data-action=|data-promote|data-approve|writeCommand|promoteCommand|approveCommand|autoApprovalCommand|browserCommandBridge/i);
+assert.match(dashboard.renderRunDetail({ ...run, provenance_audit: provenanceAuditRun.provenance_audit }), /provenance-bundle-1503/);
+const escapedProvenanceAudit = dashboard.renderProvenanceAuditSurface({ provenance_audit: { present: true, trusted_changes: [{ change_id: '<script>alert(1)</script>', full_chain: [{ stage: '<img>', artifact_ref: '<bad>' }], replay_status: { status: '<script>replay</script>' }, sign_off: { reviewer: '<script>reviewer</script>' } }] } });
+assert.ok(!escapedProvenanceAudit.includes('<script>alert(1)</script>'), 'provenance audit change ids must be escaped');
+assert.match(escapedProvenanceAudit, /&lt;script&gt;alert/);
+const provenanceAuditGovernance = {
+  generatedState: 'Generated provenance/replay exports remain Rust/local-owned and ignored unless explicitly checked in as fixture-scoped evidence.',
+  wording: 'Read-only audit surface for exported JSON; no production-ready engine, Godot replacement, auto-approval, or browser trusted-write claim.',
+  compatibility: 'Existing dashboard contracts still render while provenance_audit/provenanceAudit/provenance_bundle/provenanceBundle are accepted as optional read models.',
+  anchors: ['#1 remains open', '#23 remains open'],
+};
+assert.match(provenanceAuditGovernance.generatedState, /fixture-scoped/);
+assert.match(provenanceAuditGovernance.wording, /Read-only audit surface/);
+assert.doesNotMatch(provenanceAuditGovernance.wording, /production-ready engine is available|current Godot replacement is implemented|auto-approval enabled|browser trusted writes are enabled/);
+assert.match(provenanceAuditGovernance.compatibility, /Existing dashboard contracts/);
+assert.deepEqual(provenanceAuditGovernance.anchors, ['#1 remains open', '#23 remains open']);
 assert.match(dashboard.renderProjectContext({}), /No project workspace metadata/);
 assert.match(dashboard.renderProjectContext(run), /Scenario pack/);
 assert.match(dashboard.renderCommandContext({}), /No run command context/);

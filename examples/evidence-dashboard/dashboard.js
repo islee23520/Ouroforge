@@ -912,6 +912,90 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function provenanceAuditSource(run = {}) {
+    const source = run.provenance_audit || run.provenanceAudit || run.provenance_bundle || run.provenanceBundle || {};
+    return source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+  }
+
+  function provenanceAuditRefs(source) {
+    return Array.isArray(source.evidence_refs) ? source.evidence_refs
+      : Array.isArray(source.evidenceRefs) ? source.evidenceRefs
+      : [];
+  }
+
+  function provenanceAuditChanges(source) {
+    const changes = source.trusted_changes || source.trustedChanges || source.changes || [];
+    return Array.isArray(changes) ? changes : [];
+  }
+
+  function provenanceAuditChain(change, source) {
+    const chain = change.full_chain || change.fullChain || change.chain || change.provenance_chain || change.provenanceChain || [];
+    if (Array.isArray(chain) && chain.length) return chain;
+    const fallback = source.full_chain || source.fullChain || source.chain || [];
+    return Array.isArray(fallback) ? fallback : [];
+  }
+
+  function provenanceAuditReplay(change, source) {
+    const replay = change.replay_status || change.replayStatus || change.replay || source.replay_status || source.replayStatus || {};
+    return replay && typeof replay === 'object' && !Array.isArray(replay) ? replay : {};
+  }
+
+  function provenanceAuditSignoff(change, source) {
+    const signoff = change.sign_off || change.signOff || change.signoff || source.sign_off || source.signOff || source.signoff || {};
+    return signoff && typeof signoff === 'object' && !Array.isArray(signoff) ? signoff : {};
+  }
+
+  function renderProvenanceAuditSurface(run = {}) {
+    const source = provenanceAuditSource(run);
+    const changes = provenanceAuditChanges(source);
+    const refs = provenanceAuditRefs(source);
+    if (!source.present && !changes.length) {
+      return '<section class="panel provenance-audit"><h3>Provenance audit</h3><p class="empty-state">No provenance audit bundle is exported for this run.</p><p class="run-meta">Read-only dashboard surface. The browser reads exported JSON only and cannot write, promote, approve, mutate, or execute commands.</p></section>';
+    }
+    const rows = changes.map((change, index) => {
+      const id = change.change_id || change.changeId || change.id || `trusted-change-${index + 1}`;
+      const status = change.status || source.status || 'recorded';
+      const chain = provenanceAuditChain(change, source);
+      const replay = provenanceAuditReplay(change, source);
+      const signoff = provenanceAuditSignoff(change, source);
+      const chainRows = chain.length
+        ? chain.map((step, stepIndex) => {
+            const label = step.label || step.kind || step.stage || step.id || `step-${stepIndex + 1}`;
+            const artifact = step.artifact_ref || step.artifactRef || step.path || step.evidence_ref || step.evidenceRef || 'unrecorded';
+            const digest = step.digest || step.hash || step.checksum || '';
+            const actor = step.actor || step.owner || step.source || '';
+            return `<li><strong>${escapeText(label)}</strong>: ${escapeText(artifact)}${digest ? ` · ${escapeText(typeof digest === 'object' ? JSON.stringify(digest) : digest)}` : ''}${actor ? ` · ${escapeText(actor)}` : ''}</li>`;
+          }).join('')
+        : '<li>No full provenance chain entries exported.</li>';
+      const replayStatus = replay.status || replay.verdict || 'unknown';
+      const replayRows = [
+        ['Replay status', replayStatus],
+        ['Scenario', replay.scenario_id || replay.scenarioId || 'unknown'],
+        ['Replay run', replay.run_id || replay.runId || 'unknown'],
+        ['Input digest', replay.input_digest || replay.inputDigest || replay.digest || 'unknown'],
+        ['Matched frames', replay.matched_frames ?? replay.matchedFrames ?? replay.frame_count ?? replay.frameCount ?? 'unknown'],
+      ].map(([label, value]) => `<div><strong>${escapeText(label)}</strong><br>${escapeText(value)}</div>`).join('');
+      const reviewer = signoff.reviewer || signoff.actor || signoff.by || 'unrecorded';
+      const decision = signoff.decision || signoff.status || 'recorded';
+      const rationale = signoff.rationale || signoff.reason || signoff.note || '';
+      return `<article class="artifact provenance-change" data-change-id="${escapeText(id)}">
+        <h4>${escapeText(id)}</h4>
+        <div class="run-meta"><span class="${statusClass(status)}">${escapeText(status)}</span> · ${escapeText(change.summary || change.title || 'trusted change record')}</div>
+        <h5>Full intent-to-promotion chain</h5><ol class="run-meta-list">${chainRows}</ol>
+        <h5>Replay status</h5><div class="field-grid">${replayRows}</div>
+        <h5>Human decision record</h5>
+        <p class="run-meta">Decision ${escapeText(decision)} · reviewer ${escapeText(reviewer)}${signoff.recorded_at || signoff.recordedAt ? ` · ${escapeText(signoff.recorded_at || signoff.recordedAt)}` : ''}</p>
+        ${rationale ? `<p class="run-meta">Rationale: ${escapeText(rationale)}</p>` : ''}
+      </article>`;
+    }).join('');
+    return `<section class="panel provenance-audit"><h3>Provenance audit</h3>
+      <p class="run-meta">Read-only provenance bundle from exported JSON. Sign-off is shown as a human decision record; this dashboard has no write, promote, approve, mutation, command, or auto-approval affordance.</p>
+      <div class="run-meta">Bundle ${escapeText(source.bundle_id || source.bundleId || 'unknown')} · status <span class="${statusClass(source.status || 'recorded')}">${escapeText(source.status || 'recorded')}</span> · changes ${escapeText(changes.length)}</div>
+      ${refs.length ? renderRefLinks('Provenance refs', refs, run) : ''}
+      ${rows || '<p class="empty-state compact">No trusted changes are recorded in the provenance bundle.</p>'}
+    </section>`;
+  }
+
 
   function commandContext(run) {
     const context = run?.command_context || run?.summary?.command_context || null;
@@ -2494,6 +2578,7 @@ const OuroforgeDashboard = (() => {
       ${renderRegressionMatrix(regressionMatrix)}
       ${renderProjectContext(run)}
       ${renderTransactionProvenance(run)}
+      ${renderProvenanceAuditSurface(run)}
       ${renderReplayControls(run, replayState)}
       ${renderStudioCommandPaletteSurface(run)}
       ${renderRunComparison(run)}
@@ -3190,7 +3275,7 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {
