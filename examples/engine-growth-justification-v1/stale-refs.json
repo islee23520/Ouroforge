@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "engine-growth-justification-v1",
+  "artifactId": "engine-growth-justification.stale-refs",
+  "knownRungGateRefs": [
+    "rung-gate.current.v1"
+  ],
+  "knownPrerequisiteRefs": [
+    "engine.prerequisite.current"
+  ],
+  "satisfiedPrerequisiteRefs": [
+    "engine.prerequisite.current"
+  ],
+  "capabilities": [
+    {
+      "capabilityId": "engine.capability.search-index",
+      "state": "proposed",
+      "summary": "Adds search indexing but points at stale governance refs.",
+      "rungGateRef": "rung-gate.deleted.v1",
+      "prerequisiteRefs": [
+        "engine.prerequisite.deleted"
+      ],
+      "evidenceRefs": [
+        "issue-1495.stale-ref-fixture"
+      ]
+    }
+  ]
+}

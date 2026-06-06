@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "engine-growth-justification-v1",
+  "artifactId": "engine-growth-justification.missing-prerequisite",
+  "knownRungGateRefs": [
+    "rung-gate.parallelism.v1"
+  ],
+  "knownPrerequisiteRefs": [
+    "engine.prerequisite.scheduler-safety"
+  ],
+  "satisfiedPrerequisiteRefs": [],
+  "capabilities": [
+    {
+      "capabilityId": "engine.capability.parallel-scheduler",
+      "state": "proposed",
+      "summary": "Adds parallel scheduling only after scheduler safety evidence exists.",
+      "rungGateRef": "rung-gate.parallelism.v1",
+      "prerequisiteRefs": [
+        "engine.prerequisite.scheduler-safety"
+      ],
+      "evidenceRefs": [
+        "issue-1495.missing-prerequisite-fixture"
+      ]
+    }
+  ]
+}

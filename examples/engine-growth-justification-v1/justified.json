@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "engine-growth-justification-v1",
+  "artifactId": "engine-growth-justification.justified",
+  "knownRungGateRefs": [
+    "rung-gate.authoring-scale.v1"
+  ],
+  "knownPrerequisiteRefs": [
+    "engine.prerequisite.audit-ledger"
+  ],
+  "satisfiedPrerequisiteRefs": [
+    "engine.prerequisite.audit-ledger"
+  ],
+  "capabilities": [
+    {
+      "capabilityId": "engine.capability.plan-pruner",
+      "state": "proposed",
+      "summary": "Reduce repeated planning artifacts only when authoring scale requires it.",
+      "rungGateRef": "rung-gate.authoring-scale.v1",
+      "prerequisiteRefs": [
+        "engine.prerequisite.audit-ledger"
+      ],
+      "evidenceRefs": [
+        "issue-1495.final-implementation-scope"
+      ]
+    }
+  ]
+}

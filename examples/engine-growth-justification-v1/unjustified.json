@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "engine-growth-justification-v1",
+  "artifactId": "engine-growth-justification.unjustified",
+  "knownRungGateRefs": [
+    "rung-gate.authoring-scale.v1"
+  ],
+  "knownPrerequisiteRefs": [],
+  "satisfiedPrerequisiteRefs": [],
+  "capabilities": [
+    {
+      "capabilityId": "engine.capability.runtime-expander",
+      "state": "added",
+      "summary": "Expands engine runtime without a cited demand rung.",
+      "prerequisiteRefs": [],
+      "evidenceRefs": [
+        "issue-1495.unjustified-growth-fixture"
+      ]
+    }
+  ]
+}

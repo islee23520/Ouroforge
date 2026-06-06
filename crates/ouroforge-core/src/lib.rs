@@ -15,6 +15,7 @@ use tungstenite::client::IntoClientRequest;
 
 pub mod behavior_runtime;
 pub mod complexity_ladder;
+pub mod engine_growth_justification;
 pub mod source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod gdd_asset_placeholder_plan;
