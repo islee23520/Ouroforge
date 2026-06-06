@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "complexity-ladder-rung-gate-regression-v25",
+  "caseId": "collect-and-exit-satisfied",
+  "rung": "collect-and-exit",
+  "rungOrder": 1,
+  "gateState": "satisfied",
+  "claimState": "claimable-from-existing-source-fixtures",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "evidence": {
+    "loopProducedDemoRef": "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "verificationRefs": [
+      "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+      "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs",
+      "docs/playable-demo-v2-collect-and-exit.md",
+      "docs/game-complexity-ladder-v1.md"
+    ],
+    "requiredObservations": [
+      "bounded-play-space",
+      "player-movement",
+      "collectible-or-objective-state",
+      "exit-or-win-condition",
+      "deterministic-scenario-observation"
+    ]
+  },
+  "expected": {
+    "rungClaimAllowed": true,
+    "nextRungClaimAllowed": false,
+    "blocker": null
+  },
+  "boundary": "Fixture records a satisfied first rung shape only; it does not claim shipped-game quality, broad compatibility, or later rung completion."
+}

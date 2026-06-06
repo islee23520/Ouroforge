@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "scenario-coverage-v25-complexity-ladder-v1",
+  "issue": 1497,
+  "fixtureScoped": true,
+  "generatedState": false,
+  "scope": "Game Complexity Ladder v1 regression coverage for rung gate states, engine-growth justification states, and source-controlled demo compatibility.",
+  "boundary": "Deterministic fixture coverage only; asserts states and shapes only; no subjective quality assertions; no browser trusted writes; no command bridge; no auto-fix, no auto-apply, and no auto-merge.",
+  "ladderContractRef": "docs/game-complexity-ladder-v1.md",
+  "rungGateStateRefs": [
+    "rung-gate-states/collect-and-exit-satisfied.json",
+    "rung-gate-states/platformer-unsatisfied.json",
+    "rung-gate-states/top-down-insufficient-evidence.json",
+    "rung-gate-states/multi-scene-out-of-order.json"
+  ],
+  "engineGrowthJustificationRefs": [
+    "engine-growth/jump-collision-justified.json",
+    "engine-growth/broad-renderer-unjustified.json",
+    "engine-growth/multi-scene-transition-missing-prerequisite.json"
+  ],
+  "backwardCompatibilityRefs": [
+    "backward-compatibility/signal-gate-collect-and-exit-source-compatibility.json"
+  ],
+  "allowedRungGateStates": [
+    "satisfied",
+    "unsatisfied",
+    "insufficient-evidence",
+    "out-of-order"
+  ],
+  "allowedEngineGrowthStates": [
+    "justified",
+    "unjustified",
+    "missing-prerequisite"
+  ],
+  "guardrails": {
+    "assertionMode": "states-and-shapes-only",
+    "networkRequired": false,
+    "browserRequired": false,
+    "trustedWritesFromBrowser": false,
+    "commandBridge": false,
+    "autoFix": false,
+    "autoApply": false,
+    "autoMerge": false,
+    "modifyIssue1Or23": false,
+    "broadEngineClaim": false
+  }
+}

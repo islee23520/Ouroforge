@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "complexity-ladder-engine-growth-regression-v25",
+  "caseId": "broad-renderer-unjustified",
+  "justificationState": "unjustified",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "requestedCapability": "general renderer expansion for future game classes",
+  "rungGate": null,
+  "evidenceGap": null,
+  "minimalImplementation": null,
+  "prerequisites": [],
+  "expected": {
+    "engineGrowthAllowed": false,
+    "blocker": "Engine growth must cite a specific rung gate and evidence gap."
+  },
+  "nonGoals": [
+    "roadmap-preauthorization",
+    "broad-renderer-runtime",
+    "future-rung-bundling",
+    "browser-command-bridge"
+  ],
+  "boundary": "Fixture records an unjustified state because useful-later engine breadth is not enough."
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "complexity-ladder-rung-gate-regression-v25",
+  "caseId": "multi-scene-out-of-order",
+  "rung": "multi-scene-objective-game",
+  "rungOrder": 4,
+  "gateState": "out-of-order",
+  "claimState": "blocked-by-prior-rung",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "evidence": {
+    "loopProducedDemoRef": null,
+    "scenarioPackRef": null,
+    "verificationRefs": [
+      "docs/game-complexity-ladder-v1.md"
+    ],
+    "requiredObservations": [
+      "multiple-manifest-declared-scenes-or-areas",
+      "bounded-transitions",
+      "persistent-or-transferred-objective-state",
+      "complete-objective-path",
+      "transition-and-state-continuity-observable"
+    ],
+    "priorRungStates": [
+      {
+        "rung": "collect-and-exit",
+        "gateState": "satisfied"
+      },
+      {
+        "rung": "one-screen-platformer",
+        "gateState": "unsatisfied"
+      },
+      {
+        "rung": "top-down-objective-game",
+        "gateState": "insufficient-evidence"
+      }
+    ]
+  },
+  "expected": {
+    "rungClaimAllowed": false,
+    "nextRungClaimAllowed": false,
+    "blocker": "Later rungs cannot be claimed before prior rung gates are satisfied."
+  },
+  "boundary": "Fixture records dependency ordering only; it does not add multi-scene runtime behavior."
+}

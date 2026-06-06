@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "complexity-ladder-rung-gate-regression-v25",
+  "caseId": "top-down-insufficient-evidence",
+  "rung": "top-down-objective-game",
+  "rungOrder": 3,
+  "gateState": "insufficient-evidence",
+  "claimState": "blocked-by-missing-loop-evidence",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "evidence": {
+    "loopProducedDemoRef": null,
+    "scenarioPackRef": null,
+    "verificationRefs": [
+      "docs/game-complexity-ladder-v1.md"
+    ],
+    "requiredObservations": [
+      "single-bounded-top-down-play-space",
+      "navigation",
+      "collision-or-blocking-geometry",
+      "pickups-or-interactions",
+      "objective-state",
+      "progress-blocked-path-and-completion-assertions"
+    ],
+    "missingEvidenceKinds": [
+      "loop-produced-demo",
+      "scenario-pack",
+      "four-gate-evidence",
+      "loop-coverage-verdict"
+    ]
+  },
+  "expected": {
+    "rungClaimAllowed": false,
+    "nextRungClaimAllowed": false,
+    "blocker": "No loop-produced top-down objective demo evidence is cited."
+  },
+  "boundary": "Fixture records missing evidence as a visible state; absence of evidence is not treated as pass evidence."
+}

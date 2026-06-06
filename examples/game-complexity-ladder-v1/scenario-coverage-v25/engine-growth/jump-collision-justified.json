@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "complexity-ladder-engine-growth-regression-v25",
+  "caseId": "jump-collision-justified",
+  "justificationState": "justified",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "requestedCapability": "bounded jump-relevant collision assertion fixture support",
+  "rungGate": "one-screen-platformer",
+  "evidenceGap": "The platformer rung requires gravity or jump-relevant collision behavior plus observable success and failure states.",
+  "minimalImplementation": "Small local verifier fixture support for declaring jump-relevant collision evidence; no renderer, physics, or runtime breadth beyond the rung gap.",
+  "prerequisites": [
+    {
+      "rung": "collect-and-exit",
+      "gateState": "satisfied"
+    }
+  ],
+  "expected": {
+    "engineGrowthAllowed": true,
+    "blocker": null
+  },
+  "nonGoals": [
+    "broad-physics-engine",
+    "production-platformer-runtime",
+    "browser-trusted-write-path",
+    "auto-apply-or-auto-merge"
+  ],
+  "boundary": "Fixture records an allowed demand shape only; it does not implement or claim the capability."
+}

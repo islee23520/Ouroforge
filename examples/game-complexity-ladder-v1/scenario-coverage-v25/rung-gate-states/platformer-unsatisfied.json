@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "complexity-ladder-rung-gate-regression-v25",
+  "caseId": "platformer-unsatisfied",
+  "rung": "one-screen-platformer",
+  "rungOrder": 2,
+  "gateState": "unsatisfied",
+  "claimState": "blocked-by-failing-required-observation",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "evidence": {
+    "loopProducedDemoRef": "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "verificationRefs": [
+      "docs/game-complexity-ladder-v1.md"
+    ],
+    "requiredObservations": [
+      "single-bounded-play-space",
+      "platformer-style-movement",
+      "gravity-or-jump-relevant-collision",
+      "hazards-or-obstacles",
+      "success-and-failure-states-observable"
+    ],
+    "missingObservations": [
+      "gravity-or-jump-relevant-collision",
+      "success-and-failure-states-observable"
+    ]
+  },
+  "expected": {
+    "rungClaimAllowed": false,
+    "nextRungClaimAllowed": false,
+    "blocker": "Required platformer observations are not all satisfied by the cited source fixtures."
+  },
+  "boundary": "Fixture records an unsatisfied rung state only; it does not judge gameplay quality or authorize engine work."
+}

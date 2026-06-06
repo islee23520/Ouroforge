@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "complexity-ladder-backward-compatibility-regression-v25",
+  "caseId": "signal-gate-collect-and-exit-source-compatibility",
+  "compatibilityState": "valid",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "sourceRefs": [
+    "docs/game-complexity-ladder-v1.md",
+    "docs/playable-demo-v2-collect-and-exit.md",
+    "docs/godot-plus-demo-qa-swarm-v1.md",
+    "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+    "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+    "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+    "examples/playable-demo-v2/collect-and-exit/evidence-read-model-smoke.test.cjs",
+    "examples/gameplay-event-signal-system-v1/event-signal.valid.fixture.json"
+  ],
+  "expected": {
+    "existingDemoRefsRemainReadable": true,
+    "existingEvidenceRefsRemainReadable": true,
+    "requiresIssue1494To1496Branches": false,
+    "modifiesExistingDemo": false,
+    "modifiesIssue1Or23": false
+  },
+  "boundary": "Backward compatibility asserts existing source-controlled refs are still present and readable; it does not rerun demos, fetch remote issue state, or bless generated outputs."
+}

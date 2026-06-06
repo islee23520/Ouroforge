@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "complexity-ladder-engine-growth-regression-v25",
+  "caseId": "multi-scene-transition-missing-prerequisite",
+  "justificationState": "missing-prerequisite",
+  "generatedState": false,
+  "fixtureScoped": true,
+  "requestedCapability": "bounded multi-scene transition persistence evidence",
+  "rungGate": "multi-scene-objective-game",
+  "evidenceGap": "The multi-scene rung requires observable transitions and state continuity.",
+  "minimalImplementation": "No implementation is authorized until prior rung evidence is satisfied.",
+  "prerequisites": [
+    {
+      "rung": "collect-and-exit",
+      "gateState": "satisfied"
+    },
+    {
+      "rung": "one-screen-platformer",
+      "gateState": "unsatisfied"
+    },
+    {
+      "rung": "top-down-objective-game",
+      "gateState": "insufficient-evidence"
+    }
+  ],
+  "expected": {
+    "engineGrowthAllowed": false,
+    "blocker": "The cited rung is out of order because prior rung gates are not satisfied."
+  },
+  "nonGoals": [
+    "multi-scene-runtime-claim",
+    "native-export-claim",
+    "issue-1498-governance-refresh",
+    "modifying-issue-1-or-23"
+  ],
+  "boundary": "Fixture records prerequisite failure only; it does not authorize multi-scene engine work."
+}
