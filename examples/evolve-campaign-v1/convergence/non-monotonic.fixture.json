@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "evolve-campaign-v1",
+  "campaignId": "campaign-non-monotonic",
+  "seedRef": "seeds/signal-gate.seed.yaml",
+  "acceptanceTarget": ["mechanical", "runtime", "visual", "semantic"],
+  "budget": {
+    "maxIterations": 6,
+    "maxCostUnits": 100,
+    "noProgressWindow": 2
+  },
+  "stopConditions": [
+    {
+      "conditionId": "stop-acceptance",
+      "reason": "acceptance-reached",
+      "description": "stop when the rerun verdict passes every acceptance gate"
+    },
+    {
+      "conditionId": "stop-budget",
+      "reason": "budget-exhausted",
+      "description": "stop when the iteration or cost budget is reached"
+    }
+  ],
+  "iterations": [
+    {
+      "index": 0,
+      "hypothesis": "baseline run fails every gate",
+      "mutationRef": "runs/campaign/iteration-0/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "fail" },
+        { "gate": "runtime", "status": "fail" },
+        { "gate": "visual", "status": "fail" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-0/verdict.json"]
+    },
+    {
+      "index": 1,
+      "hypothesis": "trigger rewiring fixes the mechanical and runtime gates",
+      "mutationRef": "runs/campaign/iteration-1/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "fail" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-1/verdict.json"]
+    },
+    {
+      "index": 2,
+      "hypothesis": "the visual fix regresses the mechanical gate while fixing the visual gate (noise)",
+      "mutationRef": "runs/campaign/iteration-2/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "fail" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-2/verdict.json"]
+    },
+    {
+      "index": 3,
+      "hypothesis": "restoring the trigger and tightening the goal copy passes every gate",
+      "mutationRef": "runs/campaign/iteration-3/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "pass" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-3/verdict.json"]
+    }
+  ],
+  "termination": {
+    "reason": "acceptance-reached",
+    "conditionId": "stop-acceptance",
+    "acceptedIteration": 3
+  },
+  "boundary": "descriptive read-only audit of a bounded multi-iteration evolve campaign; iterations are manual-review unless within the milestone 22 bounded auto-apply budget; no auto-merge; not quality or correctness guarantee"
+}

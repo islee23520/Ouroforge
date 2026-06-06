@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "evolve-campaign-v1",
+  "campaignId": "v24-single-shot-evolve",
+  "seedRef": "seeds/signal-gate.seed.yaml",
+  "acceptanceTarget": ["mechanical", "runtime", "visual", "semantic"],
+  "budget": { "maxIterations": 1, "maxCostUnits": 50, "noProgressWindow": 1 },
+  "stopConditions": [
+    { "conditionId": "stop-acceptance", "reason": "acceptance-reached", "description": "stop when the rerun verdict passes every acceptance gate" },
+    { "conditionId": "stop-budget", "reason": "budget-exhausted", "description": "stop when the iteration or cost budget is reached" }
+  ],
+  "iterations": [
+    {
+      "index": 0,
+      "hypothesis": "a single proposal-then-rerun passes every gate, equal to a single-shot evolve",
+      "mutationRef": "runs/single-shot/iteration-0/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "pass" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/single-shot/iteration-0/verdict.json"]
+    }
+  ],
+  "termination": { "reason": "acceptance-reached", "conditionId": "stop-acceptance", "acceptedIteration": 0 },
+  "boundary": "descriptive read-only audit of a bounded multi-iteration evolve campaign; iterations are manual-review unless within the milestone 22 bounded auto-apply budget; no auto-merge; not quality or correctness guarantee"
+}

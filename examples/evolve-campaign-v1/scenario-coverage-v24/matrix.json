@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "scenario-coverage-v24-evolve-campaign-v1",
+  "issue": 1491,
+  "fixtureScoped": true,
+  "boundary": "Deterministic fixture coverage only; asserts states and shapes; no subjective quality assertions; no auto-fix, no auto-apply, no auto-merge; descriptive read-only.",
+  "requiredFourGates": ["mechanical", "runtime", "visual", "semantic"],
+  "terminationCases": [
+    {
+      "caseId": "v24.termination-acceptance-reached",
+      "fixture": "acceptance.fixture.json",
+      "expectStopReason": "acceptance-reached",
+      "expectOutcome": "converged",
+      "narrativeCovered": true
+    },
+    {
+      "caseId": "v24.termination-budget-exhausted",
+      "fixture": "budget.fixture.json",
+      "expectStopReason": "budget-exhausted",
+      "expectOutcome": "not-converged",
+      "narrativeCovered": true
+    },
+    {
+      "caseId": "v24.termination-no-progress",
+      "fixture": "no-progress.fixture.json",
+      "expectStopReason": "no-progress",
+      "expectOutcome": "not-converged",
+      "narrativeCovered": true
+    }
+  ],
+  "backwardCompatCases": [
+    {
+      "caseId": "v24.backward-compat-single-shot-evolve",
+      "fixture": "single-shot.fixture.json",
+      "expectStopReason": "acceptance-reached",
+      "expectOutcome": "converged",
+      "note": "a one-iteration campaign is equivalent to a single-shot evolve and remains valid"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "evolve-campaign-v1",
+  "campaignId": "campaign-journal-not-converged",
+  "seedRef": "seeds/signal-gate.seed.yaml",
+  "acceptanceTarget": ["mechanical", "runtime", "visual", "semantic"],
+  "budget": {
+    "maxIterations": 3,
+    "maxCostUnits": 100,
+    "noProgressWindow": 2
+  },
+  "stopConditions": [
+    {
+      "conditionId": "stop-acceptance",
+      "reason": "acceptance-reached",
+      "description": "stop when the rerun verdict passes every acceptance gate"
+    },
+    {
+      "conditionId": "stop-budget",
+      "reason": "budget-exhausted",
+      "description": "stop when the iteration or cost budget is reached"
+    }
+  ],
+  "iterations": [
+    {
+      "index": 0,
+      "hypothesis": "baseline run fails the mechanical and semantic gates",
+      "mutationRef": "runs/campaign/iteration-0/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "fail" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-0/verdict.json"]
+    },
+    {
+      "index": 1,
+      "hypothesis": "trigger rewiring fixes the mechanical gate but the semantic gate still fails",
+      "mutationRef": "runs/campaign/iteration-1/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-1/verdict.json"]
+    },
+    {
+      "index": 2,
+      "hypothesis": "goal copy edit does not yet satisfy the semantic invariant",
+      "mutationRef": "runs/campaign/iteration-2/mutation-proposal.json",
+      "costUnits": 10,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/campaign/iteration-2/verdict.json"]
+    }
+  ],
+  "termination": {
+    "reason": "budget-exhausted",
+    "conditionId": "stop-budget",
+    "diagnosis": "iteration budget reached with the semantic gate still failing; last delta showed no gate movement, evidence runs/campaign/iteration-2/verdict.json"
+  },
+  "boundary": "descriptive read-only audit of a bounded multi-iteration evolve campaign; iterations are manual-review unless within the milestone 22 bounded auto-apply budget; no auto-merge; not quality or correctness guarantee"
+}
