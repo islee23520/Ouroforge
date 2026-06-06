@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "provenance-bundle-1500-dangling",
+  "changeId": "change-1500-fixture",
+  "status": "dangling",
+  "chainLinks": [
+    {
+      "kind": "intent-design-brief",
+      "ref": "refs/intent-design-brief.json",
+      "artifactId": "design-brief-1500-fixture"
+    },
+    {
+      "kind": "generated-edited-artifact",
+      "ref": "refs/generated-artifact.json",
+      "artifactId": "generated-artifact-1500-fixture"
+    },
+    {
+      "kind": "validation-result",
+      "ref": "refs/missing-validation-result.json",
+      "artifactId": "validation-result-1500-fixture"
+    },
+    {
+      "kind": "runtime-observation",
+      "ref": "refs/runtime-observation.json",
+      "artifactId": "runtime-observation-1500-fixture"
+    },
+    {
+      "kind": "evaluator-verdict",
+      "ref": "refs/evaluator-verdict.json",
+      "artifactId": "evaluator-verdict-1500-fixture"
+    },
+    {
+      "kind": "regression-comparison",
+      "ref": "refs/regression-comparison.json",
+      "artifactId": "regression-comparison-1500-fixture"
+    },
+    {
+      "kind": "journal-review-decision",
+      "ref": "refs/journal-review-decision.json",
+      "artifactId": "journal-review-decision-1500-fixture"
+    },
+    {
+      "kind": "promotion-rollback-record",
+      "ref": "refs/promotion-rollback-record.json",
+      "artifactId": "promotion-rollback-record-1500-fixture"
+    }
+  ],
+  "generatedState": {
+    "generated": false,
+    "tracked": false,
+    "fixtureScoped": true
+  },
+  "incompleteReasons": [
+    "validation result ref is dangling"
+  ],
+  "compatibilityNotes": [
+    "dangling refs are surfaced explicitly"
+  ],
+  "boundary": "Read-only audit and replay surface only; no production quality guarantee and no Godot replacement claim.",
+  "guardrails": [
+    "#1 remains open",
+    "#23 remains open"
+  ]
+}

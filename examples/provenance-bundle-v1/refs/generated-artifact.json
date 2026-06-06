@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "generated-artifact-reference-v1",
+  "id": "generated-artifact-1500-fixture",
+  "path": "generated/fixture.scene.json",
+  "generated": true,
+  "fixtureScoped": true
+}

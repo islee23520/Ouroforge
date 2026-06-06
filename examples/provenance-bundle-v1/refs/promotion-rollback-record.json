@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "promotion-rollback-record-v1",
+  "id": "promotion-rollback-record-1500-fixture",
+  "rollbackRef": "refs/rollback-snapshot.json",
+  "promotionRef": "refs/regression-promotion.json"
+}
