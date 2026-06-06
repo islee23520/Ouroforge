@@ -188,7 +188,9 @@ append-only sequences must be contiguous",
             }
         }
         if self.kill_switch.engaged && kill_switch_reason_is_blank(&self.kill_switch.reason) {
-            return Err(anyhow!("engaged kill switch must record a non-empty reason"));
+            return Err(anyhow!(
+                "engaged kill switch must record a non-empty reason"
+            ));
         }
         Ok(())
     }
@@ -227,7 +229,9 @@ append-only sequences must be contiguous",
     pub fn engage_kill_switch(&mut self, reason: impl Into<String>) -> Result<()> {
         let reason = reason.into();
         if reason.trim().is_empty() {
-            return Err(anyhow!("kill switch reason must be a non-empty operator reason"));
+            return Err(anyhow!(
+                "kill switch reason must be a non-empty operator reason"
+            ));
         }
         self.kill_switch = KillSwitch {
             engaged: true,

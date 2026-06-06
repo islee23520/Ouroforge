@@ -10,12 +10,15 @@
 //! `decide_auto_apply`, and `AutoApplyAuditLog::validate` so the trusted guard is
 //! Rust-owned.
 
-use ouroforge_core::trust_gradient_audit::{AutoApplyAuditLog, TRUST_GRADIENT_AUDIT_SCHEMA_VERSION};
+use ouroforge_core::trust_gradient_audit::{
+    AutoApplyAuditLog, TRUST_GRADIENT_AUDIT_SCHEMA_VERSION,
+};
 use ouroforge_core::trust_gradient_auto_apply::{
     decide_auto_apply, AutoApplyRequest, TRUST_GRADIENT_AUTO_APPLY_SCHEMA_VERSION,
 };
 use ouroforge_core::trust_gradient_risk_tier::{
-    classify_mutation_risk_tier, MutationProposalDescriptor, TRUST_GRADIENT_RISK_TIER_SCHEMA_VERSION,
+    classify_mutation_risk_tier, MutationProposalDescriptor,
+    TRUST_GRADIENT_RISK_TIER_SCHEMA_VERSION,
 };
 use serde_json::{json, Value};
 
@@ -74,7 +77,8 @@ fn auto_apply_cases_drive_production_decision() {
         request["proposalRef"] = json!(format!("coverage-v23/{id}"));
         let parsed = AutoApplyRequest::from_json_str(&request.to_string())
             .unwrap_or_else(|err| panic!("{id}: request parses: {err}"));
-        let decision = decide_auto_apply(&parsed).unwrap_or_else(|err| panic!("{id}: decides: {err}"));
+        let decision =
+            decide_auto_apply(&parsed).unwrap_or_else(|err| panic!("{id}: decides: {err}"));
         assert_eq!(
             serde_json::to_value(decision.outcome).unwrap(),
             case["expectedOutcome"],
