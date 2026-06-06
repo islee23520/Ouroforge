@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "collect-and-exit-asset-metadata",
+  "name": "Collect and Exit Asset Metadata",
+  "version": "0.1.0",
+  "description": "Inert asset metadata contributor for demo manifest-backed assets.",
+  "declaredCapabilities": ["assetMetadata"],
+  "extensionPoints": ["assets.metadata.readOnly"],
+  "permissions": ["read_evidence"],
+  "boundary": "Declarative read-only asset metadata; no import, upload, or trusted writes."
+}

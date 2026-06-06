@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname,'../..');
+const doc = fs.readFileSync(path.join(root,'docs/godot-plus-demo-performance-budget-v1.md'),'utf8');
+const scene = fs.readFileSync(path.join(root,'examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json'),'utf8');
+assert.match(doc, /Performance.*Budget/i);
+assert.match(doc, /frameBudget|Frame budget/i);
+assert.match(scene, /frameBudget/);
+assert.match(doc, /Known gaps/);
+console.log('performance budget v794 smoke passed');

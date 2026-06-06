@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.plugin-manifest.v1",
+  "pluginId": "collect-and-exit-scenario-template",
+  "name": "Collect and Exit Scenario Template",
+  "version": "0.1.0",
+  "description": "Inert scenario template descriptor for Signal Gate demo.",
+  "declaredCapabilities": ["scenarioTemplate"],
+  "extensionPoints": ["scenarios.templates.readOnly"],
+  "permissions": ["read_evidence"],
+  "boundary": "Declarative read-only scenario template; no executable code or command execution."
+}

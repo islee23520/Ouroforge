@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ouroforge.plugin-registry-evidence.v1",
+  "registryId": "collect-and-exit-demo-plugins",
+  "projectId": "collect_and_exit_demo",
+  "generatedState": { "fixtureScoped": true, "trackedPolicy": "source-like demo fixture only" },
+  "plugins": [
+    { "pluginId": "collect-and-exit-dashboard-panel", "manifestPath": "plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json", "validationStatus": "valid" },
+    { "pluginId": "collect-and-exit-scenario-template", "manifestPath": "plugins/collect-and-exit-scenario-template/ouroforge.plugin.json", "validationStatus": "valid" },
+    { "pluginId": "collect-and-exit-asset-metadata", "manifestPath": "plugins/collect-and-exit-asset-metadata/ouroforge.plugin.json", "validationStatus": "valid" }
+  ],
+  "boundary": "Demo plugin registry evidence; descriptors only, no executable plugins."
+}
