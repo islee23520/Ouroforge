@@ -81,6 +81,7 @@ pub mod plugin_threat_model;
 pub mod provenance_bundle;
 pub mod provenance_replay;
 pub mod source_apply_audit_ledger;
+pub mod trust_gradient_audit;
 pub use source_apply_audit_ledger::*;
 pub mod qa_error_classifier;
 pub mod qa_evidence_bundle;

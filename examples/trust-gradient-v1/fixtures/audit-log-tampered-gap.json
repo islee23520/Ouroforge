@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "trust-gradient-audit-v1",
+  "entries": [
+    {
+      "sequence": 0,
+      "proposalRef": "proposal/scene-only-color-tweak",
+      "tier": "low",
+      "gates": {
+        "mechanical": "pass",
+        "runtime": "pass",
+        "visual": "pass",
+        "semantic": "pass"
+      },
+      "budgetRemaining": 2,
+      "applyResult": "auto-applied",
+      "rollbackHandle": {
+        "applyTransactionId": "txn-scene-001",
+        "reverseRef": "examples/trust-gradient-v1/fixtures/reverse/txn-scene-001.json"
+      }
+    },
+    {
+      "sequence": 2,
+      "proposalRef": "proposal/scene-only-layout-nudge",
+      "tier": "low",
+      "gates": {
+        "mechanical": "pass",
+        "runtime": "pass",
+        "visual": "pass",
+        "semantic": "pass"
+      },
+      "budgetRemaining": 1,
+      "applyResult": "auto-applied",
+      "rollbackHandle": {
+        "applyTransactionId": "txn-scene-002",
+        "reverseRef": "examples/trust-gradient-v1/fixtures/reverse/txn-scene-002.json"
+      }
+    }
+  ],
+  "killSwitch": {
+    "engaged": false
+  }
+}

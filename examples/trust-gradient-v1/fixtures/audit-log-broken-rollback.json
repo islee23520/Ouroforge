@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "trust-gradient-audit-v1",
+  "entries": [
+    {
+      "sequence": 0,
+      "proposalRef": "proposal/scene-only-color-tweak",
+      "tier": "low",
+      "gates": {
+        "mechanical": "pass",
+        "runtime": "pass",
+        "visual": "pass",
+        "semantic": "pass"
+      },
+      "budgetRemaining": 2,
+      "applyResult": "auto-applied",
+      "rollbackHandle": {
+        "applyTransactionId": "txn-scene-001",
+        "reverseRef": ""
+      }
+    }
+  ],
+  "killSwitch": {
+    "engaged": false
+  }
+}
