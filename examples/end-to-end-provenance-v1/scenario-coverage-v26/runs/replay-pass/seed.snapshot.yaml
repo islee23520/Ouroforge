@@ -1,0 +1,10 @@
+id: provenance.replay.fixture
+title: Provenance Replay Fixture
+goal: Re-evaluate referenced evidence deterministically.
+constraints:
+  target: local-fixture
+acceptance:
+  - Four-gate replay stays deterministic.
+scenarios:
+  - id: collect-and-exit
+    description: Fixture-backed replay scenario.

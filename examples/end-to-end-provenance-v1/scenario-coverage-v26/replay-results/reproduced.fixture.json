@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "provenance-replay-result-v1",
+  "bundleId": "scenario-coverage-v26-complete",
+  "status": "reproduced",
+  "expectedVerdict": {
+    "status": "passed"
+  },
+  "actualVerdict": {
+    "status": "passed"
+  },
+  "diff": [],
+  "issues": [],
+  "replayRunDir": "fixture-scoped-temp-workspace",
+  "boundary": "Local Rust replay only; no command execution or source mutation."
+}

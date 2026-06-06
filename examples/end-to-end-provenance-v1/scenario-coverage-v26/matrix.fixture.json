@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "scenario-coverage-v26-provenance-matrix-v1",
+  "issue": 1505,
+  "scope": "End-to-end provenance regression coverage over fixture-scoped bundle and replay states.",
+  "generatedStatePolicy": "Generated runs, replay workspaces, dashboard exports, temporary files, browser profiles, command logs, and local tool state remain ignored unless explicitly fixture-scoped. This matrix and its fixtures are tracked source-like regression artifacts.",
+  "bundleCases": [
+    {
+      "id": "V26.bundle.complete",
+      "fixture": "bundles/complete.fixture.json",
+      "expectedStatus": "complete",
+      "requiredLinkStates": {
+        "intent-design-brief": "present",
+        "generated-edited-artifact": "present",
+        "validation-result": "present",
+        "runtime-observation": "present",
+        "evaluator-verdict": "present",
+        "regression-comparison": "present",
+        "journal-review-decision": "present",
+        "promotion-rollback-record": "present"
+      }
+    },
+    {
+      "id": "V26.bundle.incomplete",
+      "fixture": "bundles/incomplete.fixture.json",
+      "expectedStatus": "incomplete",
+      "requiresIncompleteReasons": true,
+      "requiredLinkStates": {
+        "intent-design-brief": "present",
+        "generated-edited-artifact": "present",
+        "validation-result": "present",
+        "runtime-observation": "present",
+        "evaluator-verdict": "present",
+        "regression-comparison": "present",
+        "journal-review-decision": "present",
+        "promotion-rollback-record": "present"
+      }
+    },
+    {
+      "id": "V26.bundle.dangling",
+      "fixture": "bundles/dangling.fixture.json",
+      "expectedStatus": "dangling",
+      "requiredLinkStates": {
+        "validation-result": "dangling"
+      }
+    }
+  ],
+  "replayCases": [
+    {
+      "id": "V26.replay.reproduced",
+      "bundleFixture": "bundles/complete.fixture.json",
+      "resultFixture": "replay-results/reproduced.fixture.json",
+      "expectedStatus": "reproduced"
+    },
+    {
+      "id": "V26.replay.diverged",
+      "bundleFixture": "bundles/diverged.fixture.json",
+      "resultFixture": "replay-results/diverged.fixture.json",
+      "expectedStatus": "diverged",
+      "requiresDiff": true
+    },
+    {
+      "id": "V26.replay.not-replayable",
+      "bundleFixture": "bundles/not-replayable.fixture.json",
+      "resultFixture": "replay-results/not-replayable.fixture.json",
+      "expectedStatus": "not-replayable",
+      "requiresIssues": true
+    }
+  ],
+  "compatibilityCases": [
+    {
+      "id": "V26.compat.no-bundle-additive",
+      "fixture": "compatibility/no-bundle-change.golden.json",
+      "expectedStatus": "valid",
+      "mustOmitField": "provenanceBundle"
+    }
+  ],
+  "audits": {
+    "requiredPhrases": [
+      "Generated state remains untracked unless explicitly fixture-scoped",
+      "#1 remains open",
+      "#23 remains open"
+    ],
+    "forbiddenPhrases": [
+      "closes #1",
+      "closed #1",
+      "closes #23",
+      "closed #23",
+      "auto-promote enabled",
+      "auto-approval enabled",
+      "auto-merge enabled",
+      "production-ready",
+      "production grade",
+      "quality guarantee",
+      "Godot replacement"
+    ]
+  },
+  "boundaries": [
+    "States and shapes only.",
+    "No timing, browser, network, command execution, write, promote, approve, or merge behavior.",
+    "Rust/local owns persistence and serialization."
+  ]
+}

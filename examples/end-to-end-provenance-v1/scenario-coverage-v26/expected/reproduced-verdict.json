@@ -1,0 +1,64 @@
+{
+  "status": "passed",
+  "summary": "1 scenario result(s) passed with consistent evidence.",
+  "failures": [],
+  "evidence_refs": [
+    "evidence/scenarios/collect-and-exit/scenario-result.json",
+    "evidence/scenarios/collect-and-exit/semantic/pass/runtime-invariant-model.json",
+    "evidence/scenarios/collect-and-exit/world-state.json"
+  ],
+  "metadata": {
+    "behavior_evaluator_results": 0,
+    "evaluator": "ouroforge-evaluator-v0",
+    "scenario_results": 1,
+    "semantic_gate_results": 1,
+    "suite_summaries": 0,
+    "visual_gate_results": 0
+  },
+  "gateCategories": {
+    "aggregation": {
+      "operator": "declared-gate-and",
+      "undeclaredGatePolicy": "neutral"
+    },
+    "mechanical": {
+      "declared": true,
+      "failureCount": 0,
+      "resultCount": 1,
+      "status": "pass"
+    },
+    "runtime": {
+      "declared": false,
+      "failureCount": 0,
+      "resultCount": 0,
+      "status": "pass"
+    },
+    "semantic": {
+      "declared": true,
+      "failureCount": 0,
+      "resultCount": 1,
+      "status": "pass"
+    },
+    "visual": {
+      "declared": false,
+      "failureCount": 0,
+      "resultCount": 0,
+      "status": "pass"
+    }
+  },
+  "semantic": [
+    {
+      "evidenceRefs": [
+        "evidence/scenarios/collect-and-exit/world-state.json"
+      ],
+      "invariantId": "health-non-negative",
+      "invariantType": "health_non_negative",
+      "modelId": "semantic_gate_pass_health",
+      "modelRef": "evidence/scenarios/collect-and-exit/semantic/pass/runtime-invariant-model.json",
+      "reason": "semantic gate passed: invariant health-non-negative over player.health",
+      "scenarioId": "collect-and-exit",
+      "state": "pass",
+      "targetPath": "player.health",
+      "worldStateRef": "evidence/scenarios/collect-and-exit/world-state.json"
+    }
+  ]
+}

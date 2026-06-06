@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "legacy-change-read-model-v1",
+  "changeId": "scenario-coverage-v26-legacy-no-bundle-change",
+  "status": "valid",
+  "summary": "Older change read model remains valid without a provenance bundle.",
+  "artifactRefs": [
+    {
+      "kind": "change-summary",
+      "ref": "refs/generated-artifact.json"
+    },
+    {
+      "kind": "validation-result",
+      "ref": "refs/validation-result.json"
+    }
+  ],
+  "compatibilityNotes": [
+    "Provenance bundles are additive.",
+    "Absence of provenanceBundle does not invalidate older change/read-model artifacts."
+  ],
+  "boundary": "Read-only compatibility golden; no trusted write, promotion, browser, network, or command behavior."
+}

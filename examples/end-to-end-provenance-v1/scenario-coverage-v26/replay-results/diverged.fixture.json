@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "provenance-replay-result-v1",
+  "bundleId": "scenario-coverage-v26-diverged",
+  "status": "diverged",
+  "expectedVerdict": {
+    "status": "failed"
+  },
+  "actualVerdict": {
+    "status": "passed"
+  },
+  "diff": [
+    {
+      "path": "$.status",
+      "expected": "failed",
+      "actual": "passed"
+    }
+  ],
+  "issues": [],
+  "replayRunDir": "fixture-scoped-temp-workspace",
+  "boundary": "Local Rust replay only; no command execution or source mutation."
+}

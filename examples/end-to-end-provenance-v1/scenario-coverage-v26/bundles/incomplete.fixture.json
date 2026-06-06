@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "scenario-coverage-v26-incomplete",
+  "changeId": "scenario-coverage-v26-incomplete-change",
+  "status": "incomplete",
+  "chainLinks": [
+    {
+      "kind": "intent-design-brief",
+      "ref": "refs/intent-design-brief.json",
+      "artifactId": "v26-intent-design-brief"
+    },
+    {
+      "kind": "generated-edited-artifact",
+      "ref": "refs/generated-artifact.json",
+      "artifactId": "v26-generated-artifact"
+    },
+    {
+      "kind": "validation-result",
+      "ref": "refs/validation-result.json",
+      "artifactId": "v26-validation-result"
+    },
+    {
+      "kind": "runtime-observation",
+      "ref": "refs/runtime-observation.json",
+      "artifactId": "v26-runtime-observation"
+    },
+    {
+      "kind": "evaluator-verdict",
+      "ref": "expected/reproduced-verdict.json",
+      "artifactId": "v26-reproduced-verdict"
+    },
+    {
+      "kind": "regression-comparison",
+      "ref": "refs/regression-comparison.json",
+      "artifactId": "v26-regression-comparison"
+    },
+    {
+      "kind": "journal-review-decision",
+      "ref": "refs/journal-review-decision.json",
+      "artifactId": "v26-journal-review-decision"
+    },
+    {
+      "kind": "promotion-rollback-record",
+      "ref": "refs/promotion-rollback-record.json",
+      "artifactId": "v26-promotion-rollback-record"
+    }
+  ],
+  "generatedState": {
+    "generated": true,
+    "tracked": true,
+    "fixtureScoped": true
+  },
+  "incompleteReasons": [
+    "human review decision remains pending for this regression fixture"
+  ],
+  "compatibilityNotes": [
+    "Incomplete bundles remain valid read-only audit artifacts when the reason is explicit."
+  ],
+  "boundary": "Read-only audit and replay regression fixture over local evidence only.",
+  "guardrails": [
+    "Generated state remains untracked unless explicitly fixture-scoped.",
+    "No promotion, auto-approval, merge, source mutation, command execution, browser, or network behavior is covered.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}

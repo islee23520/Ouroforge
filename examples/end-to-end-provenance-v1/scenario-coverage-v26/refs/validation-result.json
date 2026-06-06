@@ -1,0 +1,8 @@
+{
+  "id": "validation-result",
+  "status": "passed",
+  "checks": [
+    "shape",
+    "local refs"
+  ]
+}

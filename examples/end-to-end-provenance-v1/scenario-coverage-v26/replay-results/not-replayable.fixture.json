@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "provenance-replay-result-v1",
+  "bundleId": "scenario-coverage-v26-not-replayable",
+  "status": "not-replayable",
+  "expectedVerdict": null,
+  "actualVerdict": null,
+  "diff": [],
+  "issues": [
+    "missing replay input: runRef runs/missing-replay-pass",
+    "non-deterministic inputs: deterministic metadata refs are required for replay"
+  ],
+  "replayRunDir": null,
+  "boundary": "Local Rust replay only; no command execution or source mutation."
+}

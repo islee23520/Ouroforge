@@ -1,0 +1,5 @@
+{
+  "id": "deterministic-metadata",
+  "inputs": "fixture-local playable-demo-v2 collect-and-exit replay snapshot",
+  "commandsExecuted": false
+}
