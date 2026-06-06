@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "game-complexity-ladder-rung-demo-v1",
+  "id": "gcl-v1-signal-gate-collect-and-exit-rung-demo",
+  "name": "Signal Gate Collect-and-Exit rung demo",
+  "issue": "#1496",
+  "demo": {
+    "rootRef": "examples/playable-demo-v2/collect-and-exit",
+    "projectRef": "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+    "scenarioPackRef": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+    "seedRef": "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+    "canonicalDocs": [
+      "docs/game-complexity-ladder-v1.md",
+      "docs/godot-plus-demo-gameplay-loop-v1.md",
+      "docs/godot-plus-demo-agentic-iteration-v1.md",
+      "docs/godot-plus-demo-acceptance-criteria-v1.md"
+    ],
+    "supersededTreesRecreated": false
+  },
+  "rungGate": {
+    "ladderId": "game-complexity-ladder-v1",
+    "rungId": "collect-and-exit",
+    "gateId": "game-complexity-ladder-v1.collect-and-exit",
+    "status": "satisfied",
+    "claim": "The first ladder rung is satisfied by existing loop-produced Signal Gate / collect-and-exit evidence."
+  },
+  "loopProducedEvidence": [
+    {
+      "id": "collect-and-exit-core-loop-smoke",
+      "kind": "node-smoke",
+      "ref": "examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs",
+      "producedByLoop": true,
+      "covers": ["spawn", "move", "collect", "open_gate", "exit", "restart"]
+    },
+    {
+      "id": "collect-and-exit-e2e-evidence-smoke",
+      "kind": "node-smoke",
+      "ref": "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+      "producedByLoop": true,
+      "covers": ["scenario_assertions", "world_state", "runtime_events", "generated_state_audit"]
+    },
+    {
+      "id": "collect-and-exit-agentic-iteration",
+      "kind": "review-gated-loop-fixture",
+      "ref": "examples/playable-demo-v2/collect-and-exit/agentic-iteration-smoke.test.cjs",
+      "producedByLoop": true,
+      "covers": ["controlled_failure", "review_gated_apply", "rerun_comparison", "journal_linkage"]
+    },
+    {
+      "id": "collect-and-exit-scenario-pack",
+      "kind": "scenario-fixture",
+      "ref": "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json",
+      "producedByLoop": true,
+      "covers": ["objective_completion", "deterministic_assertions"]
+    },
+    {
+      "id": "game-complexity-ladder-demo-fixture",
+      "kind": "rung-claim-fixture",
+      "ref": "examples/game-complexity-ladder-v1/demo/rung-demo.fixture.json",
+      "producedByLoop": true,
+      "covers": ["rung_gate_state", "evidence_refs", "engine_growth_justification"]
+    }
+  ],
+  "fourGateEvidence": {
+    "validation": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+        "examples/playable-demo-v2/collect-and-exit/seeds/collect-and-exit.yaml",
+        "examples/playable-demo-v2/collect-and-exit/scenarios/collect-and-exit.json"
+      ]
+    },
+    "runtimeScenarioBehavior": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs",
+        "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+        "docs/godot-plus-demo-gameplay-loop-v1.md"
+      ]
+    },
+    "reviewGovernance": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/agentic-iteration/failure-seed.json",
+        "examples/playable-demo-v2/collect-and-exit/agentic-iteration/draft-proposal.json",
+        "examples/playable-demo-v2/collect-and-exit/agentic-iteration/review-decision.json",
+        "examples/playable-demo-v2/collect-and-exit/agentic-iteration/journal.json",
+        "docs/godot-plus-demo-agentic-iteration-v1.md"
+      ]
+    },
+    "generatedStateTrustBoundary": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/README.md",
+        "docs/godot-plus-demo-gameplay-loop-v1.md",
+        "docs/godot-plus-demo-agentic-iteration-v1.md",
+        "docs/game-complexity-ladder-v1-demo.md"
+      ]
+    }
+  },
+  "loopCoverage": {
+    "status": "satisfied",
+    "verdict": "pass",
+    "surface": "milestone-20-loop-coverage",
+    "coveredPath": "Signal Gate / collect-and-exit local authoring loop",
+    "evidenceRefs": [
+      "docs/godot-plus-demo-gameplay-loop-v1.md",
+      "examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs",
+      "examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs",
+      "examples/playable-demo-v2/collect-and-exit/agentic-iteration-smoke.test.cjs"
+    ]
+  },
+  "engineGrowthJustification": {
+    "status": "none",
+    "newEngineCapabilities": [],
+    "unjustifiedCapabilities": [],
+    "justificationRefs": [
+      "docs/game-complexity-ladder-v1.md",
+      "docs/game-complexity-ladder-v1-demo.md"
+    ],
+    "rationale": "No new renderer, physics, audio, animation, runtime, editor, Studio, plugin runtime, or browser authority is requested for this rung demo."
+  },
+  "guardrails": {
+    "deterministic": true,
+    "fixtureScoped": true,
+    "generatedState": false,
+    "sourceControlled": true,
+    "network": false,
+    "liveBrowser": false,
+    "browserTrustedWrites": false,
+    "browserCommandBridge": false,
+    "autoApply": false,
+    "autoMerge": false,
+    "modifiesIssue1": false,
+    "modifiesIssue23": false,
+    "touchesFutureIssues1497Or1498": false
+  }
+}
