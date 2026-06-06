@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "projectId": "signal-gate",
+  "runId": "stale-ref",
+  "inputs": [
+    {
+      "artifactRef": "runs/stale/evidence/loop-scene.json",
+      "artifactKind": "trusted-change",
+      "attributionStatus": "stale-ref",
+      "trustedValidationRef": "runs/stale/verdict.json"
+    }
+  ],
+  "counts": {
+    "loopProduced": 0,
+    "loopVerified": 0,
+    "manual": 0,
+    "totalTrusted": 0
+  },
+  "fractions": {
+    "loopProduced": 0.0,
+    "loopVerified": 0.0,
+    "manual": 0.0,
+    "loopCovered": 0.0
+  },
+  "verdict": {
+    "state": "insufficient-data",
+    "currentLoopCovered": 0.0,
+    "dropThreshold": 0.1,
+    "reasons": [
+      "artifact `runs/stale/evidence/loop-scene.json` has attribution status `stale-ref`"
+    ]
+  },
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, not production readiness, no auto-apply authority, and read-only in dashboard and Studio surfaces."
+}

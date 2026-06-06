@@ -2599,6 +2599,7 @@ const OuroforgeDashboard = (() => {
       ${renderPluginPanel(run)}
       ${renderExportPackagePanel(run)}
       ${renderScenarioPanel(run)}
+      ${renderLoopCoverageSummary(run)}
       ${renderAssetBrowser(run)}
       ${renderSceneCanvas(run)}
       ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
@@ -3246,6 +3247,77 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function loopCoverageModel(run = {}) {
+    const source = run?.loop_coverage || run?.loopCoverage || run?.summary?.loop_coverage || run?.summary?.loopCoverage || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      return {
+        present: false,
+        emptyState: source?.empty_state || source?.emptyState || 'No loop coverage evidence is exported for this run.',
+        verdict: 'insufficient-data',
+        counts: { loopProduced: 0, loopVerified: 0, manual: 0, totalTrusted: 0 },
+        fractions: { loopProduced: 0, loopVerified: 0, manual: 0, loopCovered: 0 },
+        reasons: [],
+        boundary: 'Read-only loop coverage inspection; dashboard does not compute trusted attribution, write files, apply edits, or execute commands.',
+      };
+    }
+    const counts = source.counts || {};
+    const fractions = source.fractions || {};
+    const verdict = source.verdict && typeof source.verdict === 'object' ? source.verdict : {};
+    return {
+      present: true,
+      schemaVersion: source.schemaVersion || source.schema_version || 'unknown',
+      projectId: source.projectId || source.project_id || '',
+      runId: source.runId || source.run_id || '',
+      baselineRef: source.baselineRef || source.baseline_ref || '',
+      verdict: verdict.state || source.state || 'unknown',
+      baselineLoopCovered: verdict.baselineLoopCovered ?? verdict.baseline_loop_covered ?? null,
+      currentLoopCovered: verdict.currentLoopCovered ?? verdict.current_loop_covered ?? fractions.loopCovered ?? fractions.loop_covered ?? null,
+      dropThreshold: verdict.dropThreshold ?? verdict.drop_threshold ?? null,
+      reasons: Array.isArray(verdict.reasons) ? verdict.reasons : [],
+      counts: {
+        loopProduced: counts.loopProduced ?? counts.loop_produced ?? 0,
+        loopVerified: counts.loopVerified ?? counts.loop_verified ?? 0,
+        manual: counts.manual ?? 0,
+        totalTrusted: counts.totalTrusted ?? counts.total_trusted ?? 0,
+      },
+      fractions: {
+        loopProduced: fractions.loopProduced ?? fractions.loop_produced ?? 0,
+        loopVerified: fractions.loopVerified ?? fractions.loop_verified ?? 0,
+        manual: fractions.manual ?? 0,
+        loopCovered: fractions.loopCovered ?? fractions.loop_covered ?? 0,
+      },
+      boundary: source.boundary || 'Read-only loop coverage evidence inspection; dashboard does not write trusted state.',
+    };
+  }
+
+  function pct(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : 'n/a';
+  }
+
+  function renderLoopCoverageSummary(run = {}) {
+    const model = loopCoverageModel(run);
+    if (!model.present) {
+      return `<section class="panel loop-coverage-panel"><h3>Loop coverage</h3><p class="empty-state">${escapeText(model.emptyState)}</p><p class="run-meta">${escapeText(model.boundary)}</p></section>`;
+    }
+    const verdictStatus = model.verdict === 'regressed' || model.verdict === 'unsupported' ? 'blocked' : (model.verdict === 'computed' ? 'passed' : 'unknown');
+    const reasonRows = model.reasons.length
+      ? model.reasons.map((reason) => `<li>${escapeText(reason)}</li>`).join('')
+      : '<li>No verdict reasons recorded.</li>';
+    return `<section class="panel loop-coverage-panel"><h3>Loop coverage</h3>
+      <p class="run-meta">Read-only loop coverage evidence. The dashboard only displays exported JSON and cannot compute trusted attribution, write files, apply edits, execute commands, or promote regressions.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Verdict</div><div class="card-value"><span class="${statusClass(verdictStatus)}">${escapeText(model.verdict)}</span></div></div>
+        <div class="card"><div class="card-label">Loop covered</div><div class="card-value">${escapeText(pct(model.fractions.loopCovered))}</div></div>
+        <div class="card"><div class="card-label">Loop produced</div><div class="card-value">${escapeText(String(model.counts.loopProduced))}</div></div>
+        <div class="card"><div class="card-label">Loop verified</div><div class="card-value">${escapeText(String(model.counts.loopVerified))}</div></div>
+        <div class="card"><div class="card-label">Manual</div><div class="card-value">${escapeText(String(model.counts.manual))}</div></div>
+      </div>
+      <div class="run-meta">baseline ${escapeText(model.baselineRef || 'none')} · current ${escapeText(pct(model.currentLoopCovered))} · baseline ${escapeText(pct(model.baselineLoopCovered))} · drop threshold ${escapeText(pct(model.dropThreshold))}</div>
+      <ul class="run-meta-list">${reasonRows}</ul>
+      <p class="run-meta">${escapeText(model.boundary)}</p>
+    </section>`;
+  }
+
   function renderExportPackagePanel(run) {
     const source = run?.export_package_panel || run?.exportPackagePanel || null;
     if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
@@ -3322,7 +3394,7 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, loopCoverageModel, renderLoopCoverageSummary, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "projectId": "signal-gate",
+  "runId": "manual-drop-regressed",
+  "baselineRef": "examples/loop-coverage-v1/fixtures/baseline-loop-covered.json",
+  "inputs": [
+    {
+      "artifactRef": "runs/manual-drop/evidence/loop-scene.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "loop-produced",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/manual-drop/verdict.json"
+    },
+    {
+      "artifactRef": "runs/manual-drop/evidence/manual-tweak-a.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "manual",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/manual-drop/verdict.json"
+    },
+    {
+      "artifactRef": "runs/manual-drop/evidence/manual-tweak-b.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "manual",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/manual-drop/verdict.json"
+    }
+  ],
+  "counts": {
+    "loopProduced": 1,
+    "loopVerified": 0,
+    "manual": 2,
+    "totalTrusted": 3
+  },
+  "fractions": {
+    "loopProduced": 0.3333333333333333,
+    "loopVerified": 0.0,
+    "manual": 0.6666666666666666,
+    "loopCovered": 0.3333333333333333
+  },
+  "verdict": {
+    "state": "regressed",
+    "baselineLoopCovered": 0.6666666666666666,
+    "currentLoopCovered": 0.3333333333333333,
+    "dropThreshold": 0.1,
+    "reasons": [
+      "loop-covered fraction dropped by 0.333333, exceeding threshold 0.100000"
+    ]
+  },
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, not production readiness, no auto-apply authority, and read-only in dashboard and Studio surfaces."
+}

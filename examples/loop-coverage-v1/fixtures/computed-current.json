@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "projectId": "signal-gate",
+  "runId": "computed-current",
+  "baselineRef": "examples/loop-coverage-v1/fixtures/baseline-loop-covered.json",
+  "inputs": [
+    {
+      "artifactRef": "runs/computed-current/evidence/loop-scene.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "loop-produced",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/computed-current/verdict.json"
+    },
+    {
+      "artifactRef": "runs/computed-current/evidence/loop-verdict.json",
+      "artifactKind": "verdict",
+      "provenanceClass": "loop-verified",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/computed-current/verdict.json"
+    },
+    {
+      "artifactRef": "runs/computed-current/evidence/manual-note.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "manual",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/computed-current/verdict.json"
+    }
+  ],
+  "counts": {
+    "loopProduced": 1,
+    "loopVerified": 1,
+    "manual": 1,
+    "totalTrusted": 3
+  },
+  "fractions": {
+    "loopProduced": 0.3333333333333333,
+    "loopVerified": 0.3333333333333333,
+    "manual": 0.3333333333333333,
+    "loopCovered": 0.6666666666666666
+  },
+  "verdict": {
+    "state": "computed",
+    "baselineLoopCovered": 0.6666666666666666,
+    "currentLoopCovered": 0.6666666666666666,
+    "dropThreshold": 0.1,
+    "reasons": [
+      "loop coverage computed against baseline without regression"
+    ]
+  },
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, not production readiness, no auto-apply authority, and read-only in dashboard and Studio surfaces."
+}

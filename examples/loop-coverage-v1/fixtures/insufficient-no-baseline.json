@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "projectId": "signal-gate",
+  "runId": "insufficient-no-baseline",
+  "inputs": [
+    {
+      "artifactRef": "runs/no-baseline/evidence/loop-scene.json",
+      "artifactKind": "trusted-change",
+      "provenanceClass": "loop-produced",
+      "attributionStatus": "classified",
+      "trustedValidationRef": "runs/no-baseline/verdict.json"
+    }
+  ],
+  "counts": {
+    "loopProduced": 1,
+    "loopVerified": 0,
+    "manual": 0,
+    "totalTrusted": 1
+  },
+  "fractions": {
+    "loopProduced": 1.0,
+    "loopVerified": 0.0,
+    "manual": 0.0,
+    "loopCovered": 1.0
+  },
+  "verdict": {
+    "state": "insufficient-data",
+    "currentLoopCovered": 1.0,
+    "dropThreshold": 0.1,
+    "reasons": [
+      "no baseline loop coverage evidence was supplied"
+    ]
+  },
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, not production readiness, no auto-apply authority, and read-only in dashboard and Studio surfaces."
+}

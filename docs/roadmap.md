@@ -1123,6 +1123,18 @@ remain separate maintainer actions.
   extensibility, source/export/publish/deploy mutation, CI/workflow mutation,
   secure plugin sandbox guarantees, Godot-equivalent extension parity, a
   production-ready plugin ecosystem, or current Godot replacement positioning.
+- Treat Loop Coverage Metric v1 as draft implementation evidence in the current
+  PR context until merge evidence exists. The current wave adds Rust/local
+  loop-coverage computation and validation, fixture-scoped computed,
+  insufficient-data, regressed/manual-drop, stale-ref, and unsupported examples,
+  an offline demo smoke test, and read-only dashboard/Studio inspection. This is
+  a descriptive metric only: no quality guarantee, no production-ready claim, no
+  Godot replacement claim, no trusted browser writes, no source mutation
+  authority, no auto-apply, no auto-merge, and no reviewer bypass. Because #1465
+  is the governance handoff after prior gates are merged and verified, a PR that
+  contains this implementation evidence should use `Refs #1465` unless a final
+  #1 governance comment is posted after merge evidence exists. #1 and #23 remain
+  open.
 
 ## Active anchors
 

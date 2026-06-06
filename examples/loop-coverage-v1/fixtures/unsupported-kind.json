@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "projectId": "signal-gate",
+  "runId": "unsupported-kind",
+  "inputs": [
+    {
+      "artifactRef": "runs/unsupported/evidence/freeform.txt",
+      "artifactKind": "freeform-note",
+      "attributionStatus": "unsupported-kind"
+    }
+  ],
+  "counts": {
+    "loopProduced": 0,
+    "loopVerified": 0,
+    "manual": 0,
+    "totalTrusted": 0
+  },
+  "fractions": {
+    "loopProduced": 0.0,
+    "loopVerified": 0.0,
+    "manual": 0.0,
+    "loopCovered": 0.0
+  },
+  "verdict": {
+    "state": "unsupported",
+    "currentLoopCovered": 0.0,
+    "dropThreshold": 0.1,
+    "reasons": [
+      "artifact `runs/unsupported/evidence/freeform.txt` has unsupported attribution kind"
+    ]
+  },
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, not production readiness, no auto-apply authority, and read-only in dashboard and Studio surfaces."
+}

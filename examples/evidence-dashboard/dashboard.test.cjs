@@ -2347,6 +2347,34 @@ assert.ok(!/data-action=/i.test(pluginRegistrySmokeMarkup), 'plugin registry das
 assert.ok(!/href=["']javascript:/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not render javascript links');
 assert.ok(!/command bridge/i.test(pluginRegistrySmokeMarkup), 'plugin registry dashboard smoke must not advertise a command bridge');
 
+// Loop Coverage Metric v1: read-only inspection across computed/insufficient/regressed/unsupported states.
+function loopCoverageFixture(name) {
+  return JSON.parse(fs.readFileSync(`examples/loop-coverage-v1/fixtures/${name}`, 'utf8'));
+}
+
+const dashboardLoopCases = [
+  ['computed-current.json', 'computed', /66\.7%/],
+  ['insufficient-no-baseline.json', 'insufficient-data', /no baseline loop coverage evidence was supplied/],
+  ['manual-drop-regressed.json', 'regressed', /dropped by 0\.333333/],
+  ['unsupported-kind.json', 'unsupported', /unsupported attribution kind/],
+];
+for (const [fixtureName, expectedState, expectedMarkup] of dashboardLoopCases) {
+  const loopCoverage = loopCoverageFixture(fixtureName);
+  const loopModel = dashboard.loopCoverageModel({ loop_coverage: loopCoverage });
+  assert.equal(loopModel.present, true, fixtureName);
+  assert.equal(loopModel.verdict, expectedState, fixtureName);
+  assert.equal(loopModel.counts.totalTrusted, loopCoverage.counts.totalTrusted, fixtureName);
+  assert.equal(loopModel.fractions.loopCovered, loopCoverage.fractions.loopCovered, fixtureName);
+  const loopMarkup = dashboard.renderLoopCoverageSummary({ loop_coverage: loopCoverage });
+  assert.match(loopMarkup, /Loop coverage/);
+  assert.match(loopMarkup, /Read-only loop coverage evidence/);
+  assert.match(loopMarkup, expectedMarkup);
+  assert.doesNotMatch(loopMarkup, /<button|<form|<input|data-action=|applyCommand|writeCommand|mutationCommand|executeCommand|browserCommandBridge/i);
+}
+const missingDashboardLoopMarkup = dashboard.renderLoopCoverageSummary({});
+assert.match(missingDashboardLoopMarkup, /No loop coverage evidence is exported/);
+assert.match(dashboard.renderRunDetail({ ...run, loop_coverage: loopCoverageFixture('computed-current.json') }), /Loop coverage/);
+
 // Studio workspace layout persistence (draft-only browser-local state; #769)
 function makeFakeStorage(seed) {
   const store = Object.assign({}, seed || {});

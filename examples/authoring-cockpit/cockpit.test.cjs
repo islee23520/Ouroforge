@@ -3686,6 +3686,34 @@ assert.ok(!/data-action=/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin regis
 assert.ok(!/href=["']javascript:/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not render javascript links');
 assert.ok(!/command bridge/i.test(pluginRegistryBrowserSmokeMarkup), 'plugin registry Studio smoke must not advertise a command bridge');
 
+// Loop Coverage Metric v1: read-only Studio inspection across computed/insufficient/regressed/unsupported states.
+function cockpitLoopCoverageFixture(name) {
+  return JSON.parse(fs.readFileSync(`examples/loop-coverage-v1/fixtures/${name}`, 'utf8'));
+}
+
+const cockpitLoopCases = [
+  ['computed-current.json', 'computed', /66\.7%/],
+  ['insufficient-no-baseline.json', 'insufficient-data', /no baseline loop coverage evidence was supplied/],
+  ['manual-drop-regressed.json', 'regressed', /dropped by 0\.333333/],
+  ['unsupported-kind.json', 'unsupported', /unsupported attribution kind/],
+];
+for (const [fixtureName, expectedState, expectedMarkup] of cockpitLoopCases) {
+  const loopCoverage = cockpitLoopCoverageFixture(fixtureName);
+  const loopModel = cockpit.loopCoverageInspectionModel({ loopCoverage });
+  assert.equal(loopModel.present, true, fixtureName);
+  assert.equal(loopModel.verdict.state, expectedState, fixtureName);
+  assert.equal(loopModel.counts.totalTrusted, loopCoverage.counts.totalTrusted, fixtureName);
+  assert.equal(loopModel.fractions.loopCovered, loopCoverage.fractions.loopCovered, fixtureName);
+  const loopMarkup = cockpit.renderLoopCoverageInspectionSurface({ loopCoverage });
+  assert.match(loopMarkup, /Loop coverage/);
+  assert.match(loopMarkup, /read-only/);
+  assert.match(loopMarkup, expectedMarkup);
+  assert.doesNotMatch(loopMarkup, /<button|<form|<input|data-action=|applyCommand|writeCommand|mutationCommand|executeCommand|browserCommandBridge/i);
+}
+const missingCockpitLoopMarkup = cockpit.renderLoopCoverageInspectionSurface({});
+assert.match(missingCockpitLoopMarkup, /No loop coverage evidence is attached/);
+assert.match(cockpit.renderEvidencePane({ ...run, loopCoverage: cockpitLoopCoverageFixture('computed-current.json') }), /loop-coverage-inspection/);
+
 // Studio workspace layout persistence (draft-only browser-local state; #769)
 function makeFakeStorage(seed) {
   const store = Object.assign({}, seed || {});

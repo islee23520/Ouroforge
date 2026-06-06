@@ -63,6 +63,8 @@ pub use source_apply_post_apply_rerun::*;
 pub mod internal_sprite_audit;
 pub mod loop_coverage_attribution;
 pub use loop_coverage_attribution::*;
+pub mod loop_coverage_metric;
+pub use loop_coverage_metric::*;
 pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;
 pub mod plugin_conflicts;
