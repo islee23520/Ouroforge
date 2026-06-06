@@ -69,6 +69,7 @@ pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;
 pub mod plugin_conflicts;
 pub mod source_apply_highrisk_blocker;
+pub mod trust_gradient_risk_tier;
 pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;

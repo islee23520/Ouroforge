@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "trust-gradient-risk-tier-v1",
+  "proposalRef": "proposal/manifest-transition-edit",
+  "mutationKind": "manifest",
+  "scopePaths": [
+    "examples/demo-game/manifest.json"
+  ],
+  "confidence": 0.97,
+  "gates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "refsFresh": true
+}

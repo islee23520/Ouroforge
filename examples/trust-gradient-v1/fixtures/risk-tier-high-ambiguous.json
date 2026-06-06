@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "trust-gradient-risk-tier-v1",
+  "proposalRef": "proposal/unclassifiable",
+  "mutationKind": "ambiguous",
+  "scopePaths": [
+    "examples/demo-game/scenes/level-2.json"
+  ],
+  "confidence": 0.99,
+  "gates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "refsFresh": true
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "trust-gradient-risk-tier-v1",
+  "proposalRef": "proposal/scene-only-color-tweak",
+  "mutationKind": "scene-only-data",
+  "scopePaths": [
+    "examples/demo-game/scenes/level-1.json"
+  ],
+  "confidence": 0.96,
+  "gates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "refsFresh": true
+}

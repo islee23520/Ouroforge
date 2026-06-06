@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "trust-gradient-risk-tier-v1",
+  "proposalRef": "proposal/scene-edit-no-confidence",
+  "mutationKind": "scene-only-data",
+  "scopePaths": [
+    "examples/demo-game/scenes/level-1.json"
+  ],
+  "gates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "refsFresh": true
+}

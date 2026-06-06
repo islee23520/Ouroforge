@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "trust-gradient-risk-tier-v1",
+  "proposalRef": "proposal/source-patch",
+  "mutationKind": "source-code",
+  "scopePaths": [
+    "crates/ouroforge-core/src/lib.rs"
+  ],
+  "confidence": 0.99,
+  "gates": {
+    "mechanical": "pass",
+    "runtime": "pass",
+    "visual": "pass",
+    "semantic": "pass"
+  },
+  "refsFresh": true
+}
