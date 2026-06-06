@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "runs/run-4/artifacts/conflict.json",
+  "status": "ambiguous",
+  "sourceSignals": [
+    {
+      "signalKind": "generation-provenance",
+      "sourceRef": "runs/run-4/generated.json",
+      "classHint": "loop-produced"
+    },
+    {
+      "signalKind": "manual-declaration",
+      "sourceRef": "runs/run-4/manual.json",
+      "classHint": "manual"
+    }
+  ],
+  "evidenceRefs": [
+    "runs/run-4/evidence/observe.json"
+  ],
+  "verdictRefs": [
+    "runs/run-4/evidence/verdict.json"
+  ],
+  "transactionRefs": [],
+  "blockedReasons": [
+    "conflicting sourceSignals class hints are ambiguous"
+  ]
+}

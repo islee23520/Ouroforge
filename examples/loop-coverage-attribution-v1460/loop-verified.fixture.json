@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "src/manual-change.rs",
+  "status": "classified",
+  "provenanceClass": "loop-verified",
+  "sourceSignals": [
+    {
+      "signalKind": "review-verdict",
+      "sourceRef": "runs/run-2/evidence/review.json",
+      "classHint": "loop-verified"
+    }
+  ],
+  "evidenceRefs": [
+    "runs/run-2/evidence/observe.json"
+  ],
+  "verdictRefs": [
+    "runs/run-2/evidence/verdict.json"
+  ],
+  "transactionRefs": [
+    "runs/run-2/transactions/manual-acceptance.json"
+  ]
+}
