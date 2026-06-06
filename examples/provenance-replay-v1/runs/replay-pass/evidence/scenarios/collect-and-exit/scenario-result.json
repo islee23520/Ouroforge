@@ -1,0 +1,12 @@
+{
+  "scenario_id": "collect-and-exit",
+  "status": "passed",
+  "assertions": [],
+  "evidence": {
+    "world_state": "evidence/scenarios/collect-and-exit/world-state.json",
+    "frame_stats": "evidence/scenarios/collect-and-exit/frame-stats.json",
+    "input_replays": [
+      "evidence/scenarios/collect-and-exit/input-replay.json"
+    ]
+  }
+}

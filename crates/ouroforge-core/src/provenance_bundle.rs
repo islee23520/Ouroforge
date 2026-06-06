@@ -65,6 +65,12 @@ pub struct ProvenanceBundleArtifact {
     pub incomplete_reasons: Vec<String>,
     #[serde(default, rename = "compatibilityNotes")]
     pub compatibility_notes: Vec<String>,
+    #[serde(
+        default,
+        rename = "replayInputs",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub replay_inputs: Option<ProvenanceBundleReplayInputs>,
     pub boundary: String,
     pub guardrails: Vec<String>,
 }
@@ -100,6 +106,19 @@ pub struct ProvenanceBundleGeneratedState {
     pub tracked: bool,
     #[serde(rename = "fixtureScoped")]
     pub fixture_scoped: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProvenanceBundleReplayInputs {
+    #[serde(rename = "runRef")]
+    pub run_ref: String,
+    #[serde(rename = "expectedVerdictRef")]
+    pub expected_verdict_ref: String,
+    #[serde(rename = "deterministicInputs")]
+    pub deterministic_inputs: bool,
+    #[serde(default, rename = "deterministicMetadataRefs")]
+    pub deterministic_metadata_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -164,6 +183,9 @@ impl ProvenanceBundleArtifact {
             &self.compatibility_notes,
             false,
         )?;
+        if let Some(replay_inputs) = &self.replay_inputs {
+            replay_inputs.validate()?;
+        }
         require_text("provenance bundle boundary", &self.boundary)?;
         let boundary = self.boundary.to_ascii_lowercase();
         for required in ["audit", "replay", "read-only"] {
@@ -298,6 +320,23 @@ impl ProvenanceBundleArtifact {
     pub fn evaluation_json_with_root(&self, root: &Path) -> Result<String> {
         serde_json::to_string_pretty(&self.evaluate_with_root(root))
             .context("failed to serialize provenance bundle evaluation JSON")
+    }
+}
+
+impl ProvenanceBundleReplayInputs {
+    fn validate(&self) -> Result<()> {
+        require_local_ref("provenance bundle replayInputs.runRef", &self.run_ref)?;
+        require_local_ref(
+            "provenance bundle replayInputs.expectedVerdictRef",
+            &self.expected_verdict_ref,
+        )?;
+        for reference in &self.deterministic_metadata_refs {
+            require_local_ref(
+                "provenance bundle replayInputs.deterministicMetadataRefs",
+                reference,
+            )?;
+        }
+        Ok(())
     }
 }
 

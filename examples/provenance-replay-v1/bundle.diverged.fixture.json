@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "provenance-replay-diverged-fixture",
+  "changeId": "1502-diverged",
+  "status": "complete",
+  "chainLinks": [
+    {
+      "kind": "intent-design-brief",
+      "ref": "refs/intent-design-brief.json",
+      "artifactId": "intent-design-brief"
+    },
+    {
+      "kind": "generated-edited-artifact",
+      "ref": "refs/generated-artifact.json",
+      "artifactId": "generated-artifact"
+    },
+    {
+      "kind": "validation-result",
+      "ref": "refs/validation-result.json",
+      "artifactId": "validation-result"
+    },
+    {
+      "kind": "runtime-observation",
+      "ref": "refs/runtime-observation.json",
+      "artifactId": "runtime-observation"
+    },
+    {
+      "kind": "evaluator-verdict",
+      "ref": "expected/diverged-verdict.json",
+      "artifactId": "diverged-verdict"
+    },
+    {
+      "kind": "regression-comparison",
+      "ref": "refs/regression-comparison.json",
+      "artifactId": "regression-comparison"
+    },
+    {
+      "kind": "journal-review-decision",
+      "ref": "refs/journal-review-decision.json",
+      "artifactId": "journal-review-decision"
+    },
+    {
+      "kind": "promotion-rollback-record",
+      "ref": "refs/promotion-rollback-record.json",
+      "artifactId": "promotion-rollback-record"
+    }
+  ],
+  "generatedState": {
+    "generated": true,
+    "tracked": true,
+    "fixtureScoped": true
+  },
+  "incompleteReasons": [],
+  "compatibilityNotes": [
+    "Replay inputs are additive to provenance-bundle-v1.",
+    "This fixture intentionally diverges to verify diff reporting."
+  ],
+  "replayInputs": {
+    "runRef": "runs/replay-pass",
+    "expectedVerdictRef": "expected/diverged-verdict.json",
+    "deterministicInputs": true,
+    "deterministicMetadataRefs": [
+      "refs/deterministic-metadata.json"
+    ]
+  },
+  "boundary": "Audit and replay are read-only local fixture actions over referenced evidence.",
+  "guardrails": [
+    "Reuse evaluate_run for verification.",
+    "Report divergence with a diff.",
+    "Generated replay outputs remain untracked unless fixture-scoped.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}
