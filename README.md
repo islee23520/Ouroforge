@@ -278,6 +278,13 @@ descriptive authorship/verification fraction only; at that completion point, the
 recommended follow-on was Era E Milestone 21: Second Game Class and Loop
 Generalization.
 
+Second Game Class and Loop Generalization v1 / Era E Milestone 21 is now recorded
+in the roadmap as complete: the loop generalized to a second game class — the
+Signal Gate Platformer — measured by the loop coverage metric, demonstrating
+loop-produced generalization rather than broad genre support, production
+readiness, or a Godot replacement. At that completion point the recommended
+follow-on was Era E Milestone 22: Trust Gradient Design Gate.
+
 ## Contributor guide
 
 - Contribution workflow and review expectations: [`CONTRIBUTING.md`](CONTRIBUTING.md)
