@@ -3889,3 +3889,44 @@ for (const forbiddenPrototypePlanningPhrase of [
 ]) {
   assert.doesNotMatch(prototypePlanningReadme, new RegExp(forbiddenPrototypePlanningPhrase), `forbidden wording: ${forbiddenPrototypePlanningPhrase}`);
 }
+
+// Regression (#1437): the prototype planning model must not crash on a null/primitive panel entry.
+// `panels: [null]` previously dereferenced `panel.evidenceRefs` before any guard.
+const prototypeMalformedPanels = cockpit.prototypePlanningInspectionModel({
+  gdd_prototype_inspection: {
+    present: true,
+    status: 'ready',
+    panels: [null, 'not-an-object', { panelId: 'p-ok', title: 'Real panel', status: 'ready', evidenceRefs: ['evidence/p-ok.json'] }],
+  },
+});
+assert.equal(prototypeMalformedPanels.panels.length, 3, 'all panel entries normalized');
+assert.ok(
+  prototypeMalformedPanels.panels.some((panel) => panel.malformedReasons.includes('prototype panel entry must be a non-null object')),
+  'null/primitive panel entry produces a malformed placeholder',
+);
+assert.ok(prototypeMalformedPanels.panels.some((panel) => panel.panelId === 'p-ok'), 'well-formed panel preserved');
+const prototypeMalformedSurface = cockpit.renderPrototypePlanningInspectionSurface({
+  gdd_prototype_inspection: {
+    present: true,
+    status: 'ready',
+    panels: [null, { panelId: 'p-ok', title: 'Real panel', status: 'ready', evidenceRefs: ['evidence/p-ok.json'] }],
+  },
+});
+assert.match(prototypeMalformedSurface, /prototype-planning-inspection/, 'prototype surface renders despite malformed panel');
+assert.match(prototypeMalformedSurface, /must be a non-null object/, 'malformed placeholder surfaced to read-only UI');
+console.log('cockpit prototype-planning null-panel regression test passed');
+
+// Regression (#1429): the Studio export/package inspection surface must tolerate null/primitive plan steps.
+const exportMalformedPlanSurface = cockpit.renderStudioExportPackageInspectionSurface({
+  export_package_panel: {
+    present: true,
+    profile: 'web',
+    package_status: 'ready',
+    verification_verdict: 'passed',
+    plan: [null, 7, { label: 'plan-step-a' }, 'literal-plan-step'],
+  },
+});
+assert.match(exportMalformedPlanSurface, /unknown step/, 'null/primitive plan step degrades to placeholder');
+assert.match(exportMalformedPlanSurface, /plan-step-a/, 'object plan step label preserved');
+assert.match(exportMalformedPlanSurface, /literal-plan-step/, 'string plan step preserved');
+console.log('cockpit export-package null-plan-step regression test passed');

@@ -4729,6 +4729,20 @@ const OuroforgeCockpit = (() => {
       };
     }
     const panels = rawPanels.map((panel) => {
+      if (!panel || typeof panel !== 'object') {
+        return {
+          panelId: 'prototype-panel',
+          title: 'Prototype planning panel',
+          status: 'malformed',
+          artifactKind: 'prototype-artifact',
+          itemCount: 0,
+          evidenceRefs: [],
+          commands: [],
+          malformedReasons: ['prototype panel entry must be a non-null object'],
+          blockedReasons: [],
+          summary: '',
+        };
+      }
       const refs = Array.isArray(panel.evidenceRefs || panel.evidence_refs) ? (panel.evidenceRefs || panel.evidence_refs) : [];
       const commands = Array.isArray(panel.commands || panel.copyableCommands || panel.copyable_commands) ? (panel.commands || panel.copyableCommands || panel.copyable_commands) : [];
       const malformedReasons = Array.isArray(panel.malformedReasons || panel.malformed_reasons) ? (panel.malformedReasons || panel.malformed_reasons) : [];
@@ -5506,7 +5520,7 @@ const OuroforgeCockpit = (() => {
       return `<section id="studio-export-package-panel" class="panel"><h2>Export / package inspection</h2><p class="empty">${escapeText(model.empty_state)}</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
     }
     const planRows = model.plan.length
-      ? `<ol>${model.plan.map((step) => `<li>${escapeText(typeof step === 'string' ? step : (step.label || step.id || JSON.stringify(step)))}</li>`).join('')}</ol>`
+      ? `<ol>${model.plan.map((step) => `<li>${escapeText(typeof step === 'string' ? step : (step && typeof step === 'object' ? (step.label || step.id || JSON.stringify(step)) : 'unknown step'))}</li>`).join('')}</ol>`
       : '<p class="hint">No export plan steps recorded.</p>';
     const artifactRows = model.artifacts.length
       ? model.artifacts.map((artifact) => `<li class="surface-row"><strong>${escapeText(artifact.name)}</strong> ${surfaceState(artifact.status === 'verified' || artifact.status === 'ok', artifact.status)}<br><small>checksum ${escapeText(artifact.checksum)}${artifact.size != null ? ` · ${escapeText(String(artifact.size))} bytes` : ''}</small></li>`).join('')

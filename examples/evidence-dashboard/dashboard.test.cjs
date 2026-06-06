@@ -2548,3 +2548,31 @@ assert.doesNotMatch(a11ySurface, /\b(apply|merge|execute|commit) /i);
 assert.match(dashboard.renderRunDetail(run), /studio-accessibility-nav/);
 const a11yXss = dashboard.renderStudioAccessibilityNavSurface({ id: '<script>alert(1)</script>' });
 assert.doesNotMatch(a11yXss, /<script>alert\(1\)<\/script>/);
+
+// Regression (#1428): the scenario panel must tolerate null/primitive evidence_links entries.
+// `typeof null === 'object'`, so an unguarded `link.missing`/`link.ref` deref crashes the render path.
+const scenarioMalformedLinks = dashboard.renderScenarioPanel({
+  scenario_panel: {
+    present: true,
+    scenarios: [{ id: 'sc-null-links', verdict: 'failed', evidence_links: [null, 42, { broken: true, ref: 'evidence/broken.json' }, 'evidence/ok.json'] }],
+  },
+});
+assert.match(scenarioMalformedLinks, /sc-null-links/, 'scenario panel renders despite malformed evidence link');
+assert.match(scenarioMalformedLinks, /broken\/missing evidence reference/, 'object-shaped broken link still counted');
+assert.match(scenarioMalformedLinks, /evidence\/ok\.json/, 'string evidence link preserved');
+console.log('dashboard scenario null-evidence-link regression test passed');
+
+// Regression (#1429): the export/package panel must tolerate null/primitive plan steps.
+const exportMalformedPlan = dashboard.renderExportPackagePanel({
+  export_package_panel: {
+    present: true,
+    profile: 'web',
+    package_status: 'ready',
+    verification_verdict: 'passed',
+    plan: [null, 7, { label: 'plan-step-a' }, 'literal-plan-step'],
+  },
+});
+assert.match(exportMalformedPlan, /unknown step/, 'null/primitive plan step degrades to placeholder');
+assert.match(exportMalformedPlan, /plan-step-a/, 'object plan step label preserved');
+assert.match(exportMalformedPlan, /literal-plan-step/, 'string plan step preserved');
+console.log('dashboard export-package null-plan-step regression test passed');

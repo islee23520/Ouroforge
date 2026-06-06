@@ -3224,12 +3224,12 @@ const OuroforgeDashboard = (() => {
       const failure = scenario?.failure_classification || scenario?.failureClassification || '';
       const warnings = [];
       if (stale) warnings.push('Stale evidence: re-run required');
-      const broken = evidenceLinks.filter((link) => typeof link === 'object' && (link.missing === true || link.broken === true));
+      const broken = evidenceLinks.filter((link) => link && typeof link === 'object' && (link.missing === true || link.broken === true));
       if (broken.length) warnings.push(`${broken.length} broken/missing evidence reference(s)`);
       const evidenceRows = evidenceLinks.length
         ? evidenceLinks.map((link) => {
-            const isBroken = typeof link === 'object' && (link.missing === true || link.broken === true);
-            const ref = typeof link === 'string' ? link : (link.ref || link.path || 'unknown');
+            const isBroken = link && typeof link === 'object' && (link.missing === true || link.broken === true);
+            const ref = typeof link === 'string' ? link : (link && typeof link === 'object' ? (link.ref || link.path || 'unknown') : 'unknown');
             return `<li><span class="${statusClass(isBroken ? 'blocked' : 'passed')}">${escapeText(ref)}</span>${isBroken ? ' (broken/missing)' : ''}</li>`;
           }).join('')
         : '<li>No evidence links recorded.</li>';
@@ -3341,7 +3341,7 @@ const OuroforgeDashboard = (() => {
       ? warnings.map((w) => `<li><span class="${statusClass('blocked')}">${escapeText(typeof w === 'string' ? w : JSON.stringify(w))}</span></li>`).join('')
       : '<li>No generated-state warnings.</li>';
     const planRows = plan.length
-      ? `<ol class="run-meta-list">${plan.map((step) => `<li>${escapeText(typeof step === 'string' ? step : (step.label || step.id || JSON.stringify(step)))}</li>`).join('')}</ol>`
+      ? `<ol class="run-meta-list">${plan.map((step) => `<li>${escapeText(typeof step === 'string' ? step : (step && typeof step === 'object' ? (step.label || step.id || JSON.stringify(step)) : 'unknown step'))}</li>`).join('')}</ol>`
       : '<div class="run-meta">No export plan steps recorded.</div>';
     return `<section class="panel export-package-panel"><h3>Export / package inspection</h3>
       <p class="run-meta">Read-only inspection of export evidence and package descriptors. Execution stays in trusted CLI/harness paths; the browser cannot execute export, publish, deploy, sign, upload, or arbitrary commands.</p>
