@@ -407,6 +407,47 @@ under ADR #92 and should be re-evaluated at Milestone 26. The recommended next
 milestone is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation
 Trigger. #1 and #23 remain open governance anchors.
 
+Era E (Milestones 20-25) is now complete as an evidence-native milestone arc
+after each milestone's implementation evidence merged: Milestone 20 Loop Coverage
+Metric v1 (#1458/#1460-#1465), Milestone 21 Second Game Class and Loop
+Generalization v1 (#1467-#1472), Milestone 22 Trust Gradient v1 (#1476-#1483),
+Milestone 23 Multi-Iteration Evolve Campaigns v1 (#1486-#1491), Milestone 24 Game
+Complexity Ladder v1 (#1493-#1498), and Milestone 25 End-to-End Provenance Bundle
+and Audit Surface v1 (#1524/#1531-#1542). #1507 records only this consolidated
+Era E roadmap/#1 governance refresh and adds no runtime behavior.
+
+North-star assessment (#1's loop coverage x game complexity x trust) is
+descriptive and evidence-cited, not a maturity claim:
+
+- Loop coverage x game classes: the loop-coverage metric (Milestone 20)
+  quantifies the fraction of trusted artifacts produced by or verified through the
+  loop. It is evidenced across two game classes — the collect-and-exit baseline
+  and the Signal Gate Platformer second class (Milestone 21,
+  `examples/signal-gate-platformer/`) — demonstrating loop-produced
+  generalization measured by that metric.
+- Game complexity: the Game Complexity Ladder v1 (Milestone 24) records exactly
+  one rung satisfied (`game-complexity-ladder-v1.collect-and-exit`); engine growth
+  stays demand-driven and rung-justified, with no later rung, breadth, or parity
+  claimed.
+- Trust: the Trust Gradient (Milestone 22) is GO for bounded, reversible,
+  audited, default-off auto-apply (narrow scope only); evolve campaigns
+  (Milestone 23) remain bounded and audited and respect that gradient; end-to-end
+  provenance (Milestone 25) composes a read-only bundle/replay/audit surface by
+  reference over existing artifacts.
+
+Known gaps and boundaries (unchanged): the metrics are descriptive, not quality,
+fun, production, or commercial guarantees; only one complexity rung and two game
+classes are evidenced; autonomy stays bounded, reversible, audited, and
+default-off with no auto-merge, self-approval, source-affecting auto-apply, or
+reviewer bypass; browser/Studio/dashboard surfaces remain read-only and
+Rust/local retains ownership; contracts stay backward-compatible; generated
+artifacts remain ignored unless fixture-scoped. No production readiness, broad
+genre/engine breadth, or Godot replacement is claimed. The recommended next
+milestone is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation; the
+go/defer decision on Layer-3 distributed orchestration / Elixir (deferred under
+ADR #92) is made in the paired Layer-3 Re-evaluation Design Gate (#1508). #1 and
+#23 remain open governance anchors.
+
 ## Completed evidence-native milestones
 
 The current implementation has completed these documented milestone surfaces:

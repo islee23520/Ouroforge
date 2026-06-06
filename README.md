@@ -303,6 +303,19 @@ campaigns respect the Trust Gradient, add no unsupervised unbounded looping, and
 grant no auto-merge or reviewer bypass. At that completion point the recommended
 follow-on was Era E Milestone 24: Game Complexity Ladder.
 
+Era E (Milestones 20-25) is now recorded in the roadmap as complete across Loop
+Coverage Metric v1 (M20), Second Game Class and Loop Generalization v1 (M21),
+Trust Gradient v1 (M22), Multi-Iteration Evolve Campaigns v1 (M23), Game
+Complexity Ladder v1 (M24), and End-to-End Provenance Bundle and Audit Surface v1
+(M25). Against #1's north-star (loop coverage x game complexity x trust), the
+descriptive, evidence-cited posture is: loop coverage evidenced across two game
+classes (collect-and-exit and the Signal Gate Platformer); one Game Complexity
+Ladder rung satisfied (collect-and-exit); and a GO Trust Gradient for bounded,
+reversible, audited, default-off auto-apply. These are descriptive metrics, not a
+maturity, production, or Godot replacement claim. The recommended next milestone
+is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation, with the Layer-3
+go/defer decision made in the paired design gate.
+
 ## Contributor guide
 
 - Contribution workflow and review expectations: [`CONTRIBUTING.md`](CONTRIBUTING.md)
