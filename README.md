@@ -285,6 +285,15 @@ loop-produced generalization rather than broad genre support, production
 readiness, or a Godot replacement. At that completion point the recommended
 follow-on was Era E Milestone 22: Trust Gradient Design Gate.
 
+Trust Gradient v1 / Era E Milestone 22 is now recorded in the roadmap as complete
+after a GO design-gate decision: bounded, reversible, audited, default-off
+auto-apply for a narrow scope only (low-risk scene-only-data, high-confidence,
+all-gates-pass, in-budget proposals with a one-command rollback handle). It is
+not auto-merge, self-approval, source-affecting auto-apply, or a quality/Godot
+replacement claim, and autonomy stays opt-in behind a kill switch. At that
+completion point the recommended follow-on was Era E Milestone 23:
+Multi-Iteration Evolve Campaigns.
+
 ## Contributor guide
 
 - Contribution workflow and review expectations: [`CONTRIBUTING.md`](CONTRIBUTING.md)

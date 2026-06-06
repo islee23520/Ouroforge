@@ -107,7 +107,12 @@ Scenario Coverage v21, and this roadmap/#1 handoff, and a completed Second Game
 Class and Loop Generalization v1 / Era E Milestone 21 governance chain: scope and
 contract, second game seed and GDD, loop-produced second game implementation,
 loop generalization gap evidence, a deterministic demo, Scenario Coverage v22,
-and this roadmap/#1 handoff, and a completed Game
+and this roadmap/#1 handoff, and a completed Trust Gradient v1 / Era E
+Milestone 22 governance chain: a GO design gate for bounded, reversible, audited,
+default-off auto-apply (narrow scope only), a risk-tier classifier,
+rollback-backed bounded auto-apply, an audit log and kill switch, read-only
+Studio inspection, a deterministic demo, Scenario Coverage v23, and this
+roadmap/#1 handoff, and a completed Game
 Complexity Ladder v1 / Era E Milestone 24 governance chain: scope and contract,
 ladder model and capability gates, engine-growth demand justification, a
 fixture-scoped rung demo, Scenario Coverage v25, and this docs-only roadmap/#1
@@ -117,7 +122,7 @@ local replayability, read-only audit surface, deterministic fixture demo,
 Scenario Coverage v26, and this conservative roadmap/#1 refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Loop Coverage Metric v1 attribution/computation/read-only inspection/demo/v21 regression/governance -> Second Game Class and Loop Generalization v1 signal-gate seed/GDD/loop-produced build/generalization evidence/demo/v22 regression/governance -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance -> End-to-End Provenance v1 additive bundle/replay/read-only audit/demo/v26 regression/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation -> Loop Coverage Metric v1 attribution/computation/read-only inspection/demo/v21 regression/governance -> Second Game Class and Loop Generalization v1 signal-gate seed/GDD/loop-produced build/generalization evidence/demo/v22 regression/governance -> Trust Gradient v1 design-gate GO/risk-tier classifier/rollback-backed bounded auto-apply/audit log + kill switch/read-only inspection/demo/v23 regression/governance -> Game Complexity Ladder v1 rung gates/engine-growth demand/demo/v25 regression/governance -> End-to-End Provenance v1 additive bundle/replay/read-only audit/demo/v26 regression/governance
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -306,6 +311,32 @@ milestone from this point is Era E Milestone 22: Trust Gradient Design Gate.
 Layer-3 distributed orchestration / Elixir per ADR #92, native export, plugin
 runtime, and hosted/cloud scope remain deferred and unchanged, to be re-evaluated
 only at Milestone 26. #1 and #23 remain open governance anchors.
+
+Trust Gradient v1 / Era E Milestone 22 (#1476-#1483) is now complete as a
+conservative bounded-autonomy milestone after a **GO** design-gate decision and
+the required implementation evidence merged. #1476 recorded the design gate in PR
+#1549: **GO for bounded, reversible, audited, default-off auto-apply, narrow
+scope only** (`docs/trust-gradient-design.md`). The implementation chain then
+merged #1477 risk-tier classifier in PR #1552, #1478 rollback-backed bounded
+auto-apply in PR #1553, #1479 auto-apply audit log and kill switch in PR #1555,
+#1480 read-only Studio Trust Gradient inspection surface in PR #1558, #1481
+deterministic demo in PR #1559, and #1483 Scenario Coverage v23 in PR #1561
+(Rust-owned regression guard driving the production classify/decide/validate
+paths). #1484 records only this roadmap/#1 governance refresh and adds no runtime
+behavior. Completion is valid only after that merged evidence chain: autonomy is
+**bounded** (only low-risk, scene-only-data, high-confidence, all-gates-pass,
+in-budget proposals), **reversible** (every auto-apply carries a one-command
+rollback handle), **audited** (append-only log), and **default-off** (autonomy
+opt-in, kill switch halts it). It is not auto-merge, not self-approval, not
+source-affecting auto-apply, and not a quality, fun, production, or commercial
+guarantee; it grants no trusted browser writes, command bridge, or reviewer
+bypass. Rust/local retains ownership; browser/Studio/dashboard surfaces remain
+read-only; contracts stay backward-compatible; generated artifacts remain ignored
+unless fixture-scoped. The recommended next milestone from this point is Era E
+Milestone 23: Multi-Iteration Evolve Campaigns. Layer-3 distributed orchestration
+/ Elixir per ADR #92, native export, plugin runtime, and hosted/cloud scope
+remain deferred and unchanged, to be re-evaluated only at Milestone 26. #1 and #23
+remain open governance anchors.
 
 Game Complexity Ladder v1 / Era E Milestone 24 (#1493-#1498) is now complete as
 a conservative governance milestone after the required implementation evidence
