@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "demo-plugin-usage-evidence-v1",
+  "issue": 792,
+  "id": "collect-and-exit-plugin-usage-evidence",
+  "projectId": "collect_and_exit_demo",
+  "registryRoot": "examples/playable-demo-v2/collect-and-exit/plugins",
+  "plugins": [
+    {
+      "pluginId": "collect-and-exit-dashboard-panel",
+      "manifestPath": "plugins/collect-and-exit-dashboard-panel/ouroforge.plugin.json",
+      "capability": "dashboardPanel",
+      "extensionPoint": "dashboard.panels.readOnly",
+      "evidenceRole": "read-only dashboard panel metadata"
+    },
+    {
+      "pluginId": "collect-and-exit-scenario-template",
+      "manifestPath": "plugins/collect-and-exit-scenario-template/ouroforge.plugin.json",
+      "capability": "scenarioTemplate",
+      "extensionPoint": "scenario.templates.readOnly",
+      "evidenceRole": "read-only scenario template metadata"
+    },
+    {
+      "pluginId": "collect-and-exit-asset-metadata",
+      "manifestPath": "plugins/collect-and-exit-asset-metadata/ouroforge.plugin.json",
+      "capability": "assetMetadataProvider",
+      "extensionPoint": "assets.metadata.readOnly",
+      "evidenceRole": "read-only asset metadata descriptor"
+    }
+  ],
+  "studioDashboardIntegration": {
+    "status": "read-only-descriptor-metadata",
+    "dashboardRefs": ["examples/evidence-dashboard/dashboard.test.cjs"],
+    "studioRefs": ["examples/authoring-cockpit/cockpit.test.cjs"],
+    "trustedWrites": 0,
+    "browserCommandBridge": false
+  },
+  "guardrails": {
+    "noExecutablePluginRuntime": true,
+    "noMarketplace": true,
+    "noNetworkInstallUpdate": true,
+    "noDependencyInstall": true,
+    "noCredentialedOperation": true,
+    "noPublishDeploySignUpload": true,
+    "noDirectTrustedSourceWrite": true,
+    "noAutoApply": true,
+    "noAutoMerge": true,
+    "wordingBoundary": "Scoped demo plugin descriptor metadata only; no Godot replacement, full parity, production-ready, native export, executable plugin runtime, marketplace, or commercial release claim."
+  },
+  "governance": {
+    "protectedIssuesMustRemainOpen": [1, 23]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.plugin-scenario-template.v1",
+  "templateId": "collect-and-exit-win-path-template",
+  "description": "Read-only template metadata for planning the trusted Collect and Exit key-door-exit scenario; execution remains owned by existing local scenario/runtime smokes.",
+  "parameters": [
+    { "name": "scenarioId", "type": "string", "description": "Existing scenario id to inspect.", "required": true },
+    { "name": "evidenceKind", "type": "enum", "description": "Expected local evidence class.", "required": true, "allowedValues": ["world_state", "runtime_events", "frame_stats", "scenarioPack"] }
+  ],
+  "supportedGameTypes": ["small2d-prototype", "local-web-demo"],
+  "tags": ["collect-and-exit", "qa-smoke", "read-only-template"],
+  "expectedEvidenceType": "scenarioPack",
+  "validationHints": [
+    "Use existing trusted local scenario/runtime smoke commands for execution.",
+    "Record generated evidence under ignored runs/ or temp output roots only."
+  ],
+  "boundary": "Declarative read-only scenario template metadata only; no executable scripts, no command hooks, no network references, no source mutation hooks, no trusted writes."
+}

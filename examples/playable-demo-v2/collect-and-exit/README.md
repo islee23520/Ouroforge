@@ -157,3 +157,17 @@ plugin runtime, no production/native/store export, and no trusted browser writes
 Canonical scaffold notes: `docs/godot-plus-demo-scaffold-v1.md`.
 
 Canonical documentation: `docs/playable-demo-v2-collect-and-exit.md`.
+
+## Plugin descriptor usage (#792)
+
+`plugins/collect-and-exit-dashboard-panel/`, `plugins/collect-and-exit-scenario-template/`, and `plugins/collect-and-exit-asset-metadata/` demonstrate Plugin / Extension System v1 through declarative descriptors only. `plugin-usage-evidence.json` records read-only registry/evidence linkage for dashboard panel, scenario template, and asset metadata contributions.
+
+Validation:
+
+```bash
+node examples/playable-demo-v2/collect-and-exit/plugin-usage-smoke.test.cjs
+cargo test -p ouroforge-core --test godot_plus_demo_plugin_usage_contract
+cargo run -p ouroforge-cli -- plugin validate examples/playable-demo-v2/collect-and-exit/plugins
+```
+
+The descriptors add no executable plugin runtime, marketplace, network install/update, dependency install, command bridge, direct trusted source write, auto-apply, auto-merge, publish/deploy/sign/upload, native export, or production-ready/Godot replacement claim.

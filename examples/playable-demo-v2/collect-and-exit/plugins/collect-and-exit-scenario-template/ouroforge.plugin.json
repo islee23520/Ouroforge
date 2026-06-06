@@ -3,9 +3,30 @@
   "pluginId": "collect-and-exit-scenario-template",
   "name": "Collect and Exit Scenario Template",
   "version": "0.1.0",
-  "description": "Inert scenario template descriptor for Signal Gate demo.",
-  "declaredCapabilities": ["scenarioTemplate"],
-  "extensionPoints": ["scenarios.templates.readOnly"],
-  "permissions": ["read_evidence"],
-  "boundary": "Declarative read-only scenario template; no executable code or command execution."
+  "description": "Declarative read-only scenario template descriptor for the Godot-Plus collect-and-exit demo.",
+  "metadata": {
+    "author": "Ouroforge Demo Authors",
+    "project": "Godot-Plus Demonstration Game v1"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": [
+    "scenarioTemplate"
+  ],
+  "extensionPoints": [
+    "scenario.templates.readOnly"
+  ],
+  "permissions": [
+    "read_docs",
+    "contribute_scenario_template"
+  ],
+  "descriptorRefs": [
+    {
+      "id": "collect-and-exit-win-path-template",
+      "kind": "scenarioTemplate",
+      "path": "descriptors/collect-and-exit-win-path-template.json"
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
 }

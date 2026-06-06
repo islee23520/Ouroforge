@@ -3,9 +3,60 @@
   "pluginId": "collect-and-exit-asset-metadata",
   "name": "Collect and Exit Asset Metadata",
   "version": "0.1.0",
-  "description": "Inert asset metadata contributor for demo manifest-backed assets.",
-  "declaredCapabilities": ["assetMetadata"],
-  "extensionPoints": ["assets.metadata.readOnly"],
-  "permissions": ["read_evidence"],
-  "boundary": "Declarative read-only asset metadata; no import, upload, or trusted writes."
+  "description": "Inert read-only asset metadata descriptor for Collect-and-Exit demo package assets.",
+  "metadata": {
+    "author": "Ouroforge Demo Authors",
+    "project": "Godot-Plus Demonstration Game v1"
+  },
+  "compatibility": {
+    "minOuroforgeVersion": "0.1.0"
+  },
+  "declaredCapabilities": [
+    "assetMetadataProvider"
+  ],
+  "extensionPoints": [
+    "assets.metadata.readOnly"
+  ],
+  "permissions": [
+    "contribute_asset_metadata"
+  ],
+  "assetMetadata": [
+    {
+      "descriptorId": "collect-and-exit-demo-asset-metadata",
+      "assetType": "sprite",
+      "fields": [
+        {
+          "name": "fixtureRole",
+          "type": "enum",
+          "label": "Fixture Role",
+          "required": true,
+          "allowedValues": [
+            "player",
+            "key",
+            "door",
+            "hazard",
+            "exit",
+            "hud"
+          ],
+          "validationHint": "Choose one bounded local demo role label."
+        },
+        {
+          "name": "assetManifestId",
+          "type": "string",
+          "label": "Asset Manifest Id",
+          "required": false,
+          "validationHint": "Record the checked-in asset manifest id as metadata only."
+        }
+      ],
+      "manifestIntegrationKeys": [
+        "assetManifestId",
+        "fixtureRole"
+      ],
+      "validationHints": [
+        "metadata values are advisory read-only labels"
+      ],
+      "boundary": "Declarative read-only asset metadata descriptor with no asset generation, no command execution, and no network access."
+    }
+  ],
+  "boundary": "Declarative read-only plugin manifest; allowlisted descriptors only, with no executable code, no command execution, and no network install."
 }
