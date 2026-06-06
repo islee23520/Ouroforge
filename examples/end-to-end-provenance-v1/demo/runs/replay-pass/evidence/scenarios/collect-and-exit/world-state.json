@@ -1,0 +1,17 @@
+{
+  "level": {
+    "bounds": {
+      "maxX": 10,
+      "maxY": 10,
+      "minX": 0,
+      "minY": 0
+    }
+  },
+  "player": {
+    "health": 3,
+    "transform": {
+      "x": 2,
+      "y": 3
+    }
+  }
+}

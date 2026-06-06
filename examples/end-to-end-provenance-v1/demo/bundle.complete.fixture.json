@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "end-to-end-provenance-v1-complete-demo",
+  "changeId": "playable-demo-v2-collect-and-exit-provenance-demo",
+  "status": "complete",
+  "chainLinks": [
+    {
+      "kind": "intent-design-brief",
+      "ref": "refs/intent-design-brief.json",
+      "artifactId": "e2e-demo-intent-design-brief"
+    },
+    {
+      "kind": "generated-edited-artifact",
+      "ref": "refs/generated-artifact.json",
+      "artifactId": "e2e-demo-generated-artifact"
+    },
+    {
+      "kind": "validation-result",
+      "ref": "refs/validation-result.json",
+      "artifactId": "e2e-demo-validation-result"
+    },
+    {
+      "kind": "runtime-observation",
+      "ref": "refs/runtime-observation.json",
+      "artifactId": "e2e-demo-runtime-observation"
+    },
+    {
+      "kind": "evaluator-verdict",
+      "ref": "expected/reproduced-verdict.json",
+      "artifactId": "e2e-demo-reproduced-verdict"
+    },
+    {
+      "kind": "regression-comparison",
+      "ref": "refs/regression-comparison.json",
+      "artifactId": "e2e-demo-regression-comparison"
+    },
+    {
+      "kind": "journal-review-decision",
+      "ref": "refs/journal-review-decision.json",
+      "artifactId": "e2e-demo-journal-review-decision"
+    },
+    {
+      "kind": "promotion-rollback-record",
+      "ref": "refs/promotion-rollback-record.json",
+      "artifactId": "e2e-demo-promotion-rollback-record"
+    }
+  ],
+  "generatedState": {
+    "generated": true,
+    "tracked": true,
+    "fixtureScoped": true
+  },
+  "incompleteReasons": [],
+  "compatibilityNotes": [
+    "End-to-end demo fixture is additive to provenance-bundle-v1 and provenance-replay-result-v1.",
+    "All evidence refs are fixture-scoped under examples/end-to-end-provenance-v1/demo.",
+    "The referenced run snapshot is derived from playable-demo-v2 collect-and-exit evidence."
+  ],
+  "replayInputs": {
+    "runRef": "runs/replay-pass",
+    "expectedVerdictRef": "expected/reproduced-verdict.json",
+    "deterministicInputs": true,
+    "deterministicMetadataRefs": [
+      "refs/deterministic-metadata.json"
+    ]
+  },
+  "boundary": "Read-only audit and replay demo over local fixture evidence only.",
+  "guardrails": [
+    "No network or live browser is required.",
+    "Rust/local replay owns the trusted verification decision.",
+    "Generated replay workspaces remain untracked unless fixture-scoped.",
+    "No promotion, auto-approval, merge, source mutation, or command execution is performed.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}
