@@ -3714,6 +3714,38 @@ const missingCockpitLoopMarkup = cockpit.renderLoopCoverageInspectionSurface({})
 assert.match(missingCockpitLoopMarkup, /No loop coverage evidence is attached/);
 assert.match(cockpit.renderEvidencePane({ ...run, loopCoverage: cockpitLoopCoverageFixture('computed-current.json') }), /loop-coverage-inspection/);
 
+// Trust gradient inspection surface (read-only; #1480)
+const cockpitTrustGradientEvidence = {
+  autonomyEnabled: true,
+  killSwitch: { engaged: false },
+  riskBudget: { remaining: 2, cost: 1 },
+  entries: [
+    { sequence: 0, proposalRef: 'proposal/scene-only-color-tweak', tier: 'low', applyResult: 'auto-applied', rollbackHandle: { applyTransactionId: 'txn-scene-001', reverseRef: 'reverse/txn-scene-001.json' } },
+    { sequence: 1, proposalRef: 'proposal/source-affecting', tier: 'high', applyResult: 'manual-fallback', rollbackHandle: {} },
+  ],
+};
+const cockpitTrustGradientModel = cockpit.trustGradientInspectionModel({ trust_gradient: cockpitTrustGradientEvidence });
+assert.equal(cockpitTrustGradientModel.present, true);
+assert.equal(cockpitTrustGradientModel.entries.length, 2);
+const cockpitTrustGradientHtml = cockpit.renderTrustGradientInspectionSurface({ trust_gradient: cockpitTrustGradientEvidence });
+assert.match(cockpitTrustGradientHtml, /Trust gradient/);
+assert.match(cockpitTrustGradientHtml, /auto-applied/);
+assert.match(cockpitTrustGradientHtml, /proposal\/scene-only-color-tweak/);
+assert.match(cockpitTrustGradientHtml, /tier low/);
+assert.match(cockpitTrustGradientHtml, /Risk budget/);
+assert.match(cockpitTrustGradientHtml, /disengaged/);
+assert.match(cockpitTrustGradientHtml, /txn-scene-001/);
+assert.match(cockpitTrustGradientHtml, /kill switch is not browser-actuated/i);
+assert.doesNotMatch(cockpitTrustGradientHtml, /<button|<form|<input|data-action=|toggleKill|engageKill|applyCommand|writeCommand|mutationCommand|executeCommand|browserCommandBridge/i);
+
+const cockpitTrustGradientKillEngaged = cockpit.renderTrustGradientInspectionSurface({ trust_gradient: { autonomyEnabled: true, killSwitch: { engaged: true, reason: 'operator halt' }, riskBudget: { remaining: 0, cost: 1 }, entries: [] } });
+assert.match(cockpitTrustGradientKillEngaged, /engaged · autonomy halted/);
+assert.match(cockpitTrustGradientKillEngaged, /operator halt/);
+assert.doesNotMatch(cockpitTrustGradientKillEngaged, /<button|data-action=|toggleKill|engageKill/i);
+
+assert.match(cockpit.renderTrustGradientInspectionSurface({}), /No trust-gradient auto-apply evidence is available/);
+assert.match(cockpit.renderEvidencePane({ ...run, trust_gradient: cockpitTrustGradientEvidence }), /studio-trust-gradient-panel/);
+
 // Studio workspace layout persistence (draft-only browser-local state; #769)
 function makeFakeStorage(seed) {
   const store = Object.assign({}, seed || {});

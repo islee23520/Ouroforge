@@ -2600,6 +2600,7 @@ const OuroforgeDashboard = (() => {
       ${renderExportPackagePanel(run)}
       ${renderScenarioPanel(run)}
       ${renderLoopCoverageSummary(run)}
+      ${renderTrustGradientSummary(run)}
       ${renderAssetBrowser(run)}
       ${renderSceneCanvas(run)}
       ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
@@ -3294,6 +3295,46 @@ const OuroforgeDashboard = (() => {
     return typeof value === 'number' && Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : 'n/a';
   }
 
+  function renderTrustGradientSummary(run = {}) {
+    const source = run?.trust_gradient || run?.trustGradient || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No trust-gradient auto-apply evidence is exported for this run.';
+      return `<section class="panel trust-gradient-panel"><h3>Trust gradient</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only. The dashboard displays exported JSON only; it cannot enable autonomy, toggle the kill switch, apply, merge, or execute commands. The kill switch is not browser-actuated.</p></section>`;
+    }
+    const killSwitch = source.kill_switch || source.killSwitch || {};
+    const killEngaged = killSwitch.engaged === true;
+    const autonomyEnabled = source.autonomy_enabled === true || source.autonomyEnabled === true;
+    const budget = source.risk_budget || source.riskBudget || {};
+    const budgetRemaining = budget.remaining === undefined || budget.remaining === null ? 'unknown' : String(budget.remaining);
+    const budgetCost = budget.cost === undefined || budget.cost === null ? 'unknown' : String(budget.cost);
+    const entries = Array.isArray(source.entries) ? source.entries : [];
+    const entryRows = entries.length
+      ? entries.map((entry, index) => {
+          const tier = entry?.tier || 'unknown';
+          const result = entry?.apply_result || entry?.applyResult || 'unknown';
+          const proposal = entry?.proposal_ref || entry?.proposalRef || `entry-${index + 1}`;
+          const handle = entry?.rollback_handle || entry?.rollbackHandle || {};
+          const txn = handle.apply_transaction_id || handle.applyTransactionId || 'none';
+          const applied = result === 'auto-applied' || result === 'autoApplied';
+          return `<li><span class="${statusClass(applied ? 'passed' : 'unknown')}">${escapeText(result)}</span> seq ${escapeText(String(entry?.sequence ?? index))} · ${escapeText(proposal)} · tier ${escapeText(tier)} · rollback ${escapeText(txn)}</li>`;
+        }).join('')
+      : '<li>No auto-apply audit entries recorded.</li>';
+    return `<section class="panel trust-gradient-panel"><h3>Trust gradient</h3>
+      <p class="run-meta">Read-only inspection of exported trust-gradient evidence. The dashboard cannot enable autonomy, toggle the kill switch, apply, merge, or execute commands; bounded auto-apply decisions and the kill switch are owned by trusted Rust/local paths. The kill switch is not browser-actuated.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Autonomy</div><div class="card-value"><span class="${statusClass(autonomyEnabled && !killEngaged ? 'passed' : 'unknown')}">${escapeText(autonomyEnabled ? 'enabled (opt-in)' : 'disabled (default no auto-apply)')}</span></div></div>
+        <div class="card"><div class="card-label">Kill switch</div><div class="card-value"><span class="${statusClass(killEngaged ? 'blocked' : 'passed')}">${escapeText(killEngaged ? 'engaged · autonomy halted' : 'disengaged')}</span></div></div>
+        <div class="card"><div class="card-label">Budget remaining</div><div class="card-value">${escapeText(budgetRemaining)}</div></div>
+        <div class="card"><div class="card-label">Budget cost</div><div class="card-value">${escapeText(budgetCost)}</div></div>
+        <div class="card"><div class="card-label">Audit entries</div><div class="card-value">${escapeText(String(entries.length))}</div></div>
+      </div>
+      <div class="run-meta">Kill-switch reason: ${escapeText(killSwitch.reason || (killEngaged ? 'unspecified' : 'none'))}</div>
+      <div class="run-meta">Append-only auto-apply audit log (read-only):</div>
+      <ul class="run-meta-list">${entryRows}</ul>
+      <p class="run-meta">Bounded, reversible, audited autonomy is not auto-merge, self-approval, or a quality guarantee. Studio remains read-only.</p>
+    </section>`;
+  }
+
   function renderLoopCoverageSummary(run = {}) {
     const model = loopCoverageModel(run);
     if (!model.present) {
@@ -3394,7 +3435,7 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, loopCoverageModel, renderLoopCoverageSummary, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, loopCoverageModel, renderLoopCoverageSummary, renderTrustGradientSummary, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

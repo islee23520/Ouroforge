@@ -2375,6 +2375,37 @@ const missingDashboardLoopMarkup = dashboard.renderLoopCoverageSummary({});
 assert.match(missingDashboardLoopMarkup, /No loop coverage evidence is exported/);
 assert.match(dashboard.renderRunDetail({ ...run, loop_coverage: loopCoverageFixture('computed-current.json') }), /Loop coverage/);
 
+// Trust gradient inspection surface (read-only; #1480)
+const trustGradientEvidence = {
+  autonomyEnabled: true,
+  killSwitch: { engaged: false },
+  riskBudget: { remaining: 2, cost: 1 },
+  entries: [
+    { sequence: 0, proposalRef: 'proposal/scene-only-color-tweak', tier: 'low', applyResult: 'auto-applied', rollbackHandle: { applyTransactionId: 'txn-scene-001', reverseRef: 'reverse/txn-scene-001.json' } },
+    { sequence: 1, proposalRef: 'proposal/source-affecting', tier: 'high', applyResult: 'manual-fallback', rollbackHandle: {} },
+  ],
+};
+const trustGradientMarkup = dashboard.renderTrustGradientSummary({ trust_gradient: trustGradientEvidence });
+assert.match(trustGradientMarkup, /Trust gradient/);
+assert.match(trustGradientMarkup, /auto-applied/);
+assert.match(trustGradientMarkup, /proposal\/scene-only-color-tweak/);
+assert.match(trustGradientMarkup, /tier low/);
+assert.match(trustGradientMarkup, /Budget remaining/);
+assert.match(trustGradientMarkup, /disengaged/);
+assert.match(trustGradientMarkup, /enabled \(opt-in\)/);
+assert.match(trustGradientMarkup, /txn-scene-001/);
+assert.match(trustGradientMarkup, /kill switch is not browser-actuated/i);
+assert.doesNotMatch(trustGradientMarkup, /<button|<form|<input|data-action=|toggleKill|engageKill|applyCommand|writeCommand|mutationCommand|executeCommand|browserCommandBridge/i);
+
+const trustGradientKillEngaged = dashboard.renderTrustGradientSummary({ trust_gradient: { autonomyEnabled: true, killSwitch: { engaged: true, reason: 'operator halt' }, riskBudget: { remaining: 0, cost: 1 }, entries: [] } });
+assert.match(trustGradientKillEngaged, /engaged · autonomy halted/);
+assert.match(trustGradientKillEngaged, /operator halt/);
+assert.doesNotMatch(trustGradientKillEngaged, /<button|data-action=|toggleKill|engageKill/i);
+
+const missingTrustGradientMarkup = dashboard.renderTrustGradientSummary({});
+assert.match(missingTrustGradientMarkup, /No trust-gradient auto-apply evidence is exported/);
+assert.match(dashboard.renderRunDetail({ ...run, trust_gradient: trustGradientEvidence }), /Trust gradient/);
+
 // Studio workspace layout persistence (draft-only browser-local state; #769)
 function makeFakeStorage(seed) {
   const store = Object.assign({}, seed || {});
