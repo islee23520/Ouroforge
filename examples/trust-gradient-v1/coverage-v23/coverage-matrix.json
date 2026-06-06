@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "trust-gradient-coverage-v23",
+  "description": "Scenario Coverage v23 regression matrix for Trust Gradient v1: risk-tier classification, bounded auto-apply, audit completeness, kill-switch halt, and the autonomy-off backward-compatibility golden.",
+  "highConfidenceThreshold": 0.9,
+  "riskTierCases": [
+    {
+      "id": "TG23.tier-low-eligible",
+      "descriptor": { "mutationKind": "scene-only-data", "scopePaths": ["examples/demo-game/scenes/level-1.json"], "confidence": 0.96, "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "low",
+      "expectedEligibility": "auto-apply-eligible"
+    },
+    {
+      "id": "TG23.tier-medium-manifest",
+      "descriptor": { "mutationKind": "manifest", "scopePaths": ["examples/demo-game/manifest.json"], "confidence": 0.97, "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "medium",
+      "expectedEligibility": "manual-only"
+    },
+    {
+      "id": "TG23.tier-high-source",
+      "descriptor": { "mutationKind": "source-code", "scopePaths": ["crates/ouroforge-core/src/lib.rs"], "confidence": 0.99, "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "high",
+      "expectedEligibility": "manual-only"
+    },
+    {
+      "id": "TG23.tier-high-ambiguous",
+      "descriptor": { "mutationKind": "ambiguous", "scopePaths": ["examples/demo-game/scenes/level-2.json"], "confidence": 0.99, "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "high",
+      "expectedEligibility": "manual-only"
+    },
+    {
+      "id": "TG23.tier-source-affecting-scope-overrides-kind",
+      "descriptor": { "mutationKind": "scene-only-data", "scopePaths": ["scripts/build.sh"], "confidence": 0.99, "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "high",
+      "expectedEligibility": "manual-only"
+    },
+    {
+      "id": "TG23.tier-missing-confidence-manual",
+      "descriptor": { "mutationKind": "scene-only-data", "scopePaths": ["examples/demo-game/scenes/level-1.json"], "gates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "refsFresh": true },
+      "expectedTier": "medium",
+      "expectedEligibility": "manual-only"
+    }
+  ],
+  "autoApplyCases": [
+    {
+      "id": "TG23.apply-success",
+      "request": { "tier": "low", "eligibility": "auto-apply-eligible", "confidence": 0.96, "rerunGates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 3, "cost": 1 }, "autonomyEnabled": true, "rollbackHandle": { "applyTransactionId": "txn-001", "reverseRef": "reverse/txn-001.json" } },
+      "expectedOutcome": "auto-applied",
+      "expectedRollback": true
+    },
+    {
+      "id": "TG23.apply-rollback-present",
+      "request": { "tier": "low", "eligibility": "auto-apply-eligible", "confidence": 0.95, "rerunGates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 1, "cost": 1 }, "autonomyEnabled": true, "rollbackHandle": { "applyTransactionId": "txn-002", "reverseRef": "reverse/txn-002.json" } },
+      "expectedOutcome": "auto-applied",
+      "expectedRollback": true
+    },
+    {
+      "id": "TG23.apply-budget-exhausted",
+      "request": { "tier": "low", "eligibility": "auto-apply-eligible", "confidence": 0.96, "rerunGates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 0, "cost": 1 }, "autonomyEnabled": true, "rollbackHandle": { "applyTransactionId": "txn-003", "reverseRef": "reverse/txn-003.json" } },
+      "expectedOutcome": "manual-fallback",
+      "expectedRollback": false
+    },
+    {
+      "id": "TG23.apply-ineligible",
+      "request": { "tier": "high", "eligibility": "manual-only", "confidence": 0.99, "rerunGates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 3, "cost": 1 }, "autonomyEnabled": true, "rollbackHandle": { "applyTransactionId": "txn-004", "reverseRef": "reverse/txn-004.json" } },
+      "expectedOutcome": "manual-fallback",
+      "expectedRollback": false
+    },
+    {
+      "id": "TG23.apply-gate-regression",
+      "request": { "tier": "low", "eligibility": "auto-apply-eligible", "confidence": 0.96, "rerunGates": { "mechanical": "pass", "runtime": "fail", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 3, "cost": 1 }, "autonomyEnabled": true, "rollbackHandle": { "applyTransactionId": "txn-005", "reverseRef": "reverse/txn-005.json" } },
+      "expectedOutcome": "manual-fallback",
+      "expectedRollback": false
+    }
+  ],
+  "auditCases": [
+    {
+      "id": "TG23.audit-complete-valid",
+      "log": { "entries": [ { "sequence": 0, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-001", "reverseRef": "reverse/txn-001.json" } }, { "sequence": 1, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-002", "reverseRef": "reverse/txn-002.json" } } ], "killSwitch": { "engaged": false } },
+      "expectValid": true
+    },
+    {
+      "id": "TG23.audit-tampered-gap-invalid",
+      "log": { "entries": [ { "sequence": 0, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-001", "reverseRef": "reverse/txn-001.json" } }, { "sequence": 2, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-002", "reverseRef": "reverse/txn-002.json" } } ], "killSwitch": { "engaged": false } },
+      "expectValid": false
+    },
+    {
+      "id": "TG23.audit-broken-rollback-invalid",
+      "log": { "entries": [ { "sequence": 0, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-001", "reverseRef": "" } } ], "killSwitch": { "engaged": false } },
+      "expectValid": false
+    },
+    {
+      "id": "TG23.audit-kill-switch-engaged-halts",
+      "log": { "entries": [ { "sequence": 0, "applyResult": "auto-applied", "rollbackHandle": { "applyTransactionId": "txn-001", "reverseRef": "reverse/txn-001.json" } } ], "killSwitch": { "engaged": true, "reason": "operator halt" } },
+      "expectValid": true,
+      "expectHalted": true
+    }
+  ],
+  "backwardCompatAutonomyOff": {
+    "id": "TG23.backward-compat-autonomy-off",
+    "request": { "tier": "low", "eligibility": "auto-apply-eligible", "confidence": 0.96, "rerunGates": { "mechanical": "pass", "runtime": "pass", "visual": "pass", "semantic": "pass" }, "budget": { "remaining": 3, "cost": 1 }, "autonomyEnabled": false, "rollbackHandle": { "applyTransactionId": "txn-off", "reverseRef": "reverse/txn-off.json" } },
+    "expectedOutcome": "manual-fallback"
+  },
+  "boundary": "Asserts states and shapes only; no subjective quality, no flaky/timing assertions. Default-off autonomy keeps review-gated manual apply unchanged. Not auto-merge, not self-approval; Rust/local owned, browser read-only."
+}
