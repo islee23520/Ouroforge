@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "binary-blob",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "runs/run-6/artifacts/unsupported.bin",
+  "status": "unsupported-kind",
+  "sourceSignals": [
+    {
+      "signalKind": "manual-declaration",
+      "sourceRef": "runs/run-6/artifacts/unsupported.bin",
+      "classHint": "manual"
+    }
+  ],
+  "evidenceRefs": [],
+  "verdictRefs": [],
+  "transactionRefs": [],
+  "blockedReasons": [
+    "unsupported artifactKind `binary-blob`"
+  ]
+}

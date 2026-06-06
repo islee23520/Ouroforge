@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "docs/manual-note.md",
+  "status": "classified",
+  "provenanceClass": "manual",
+  "sourceSignals": [
+    {
+      "signalKind": "manual-declaration",
+      "sourceRef": "docs/manual-note.md",
+      "classHint": "manual"
+    }
+  ],
+  "evidenceRefs": [],
+  "verdictRefs": [],
+  "transactionRefs": []
+}

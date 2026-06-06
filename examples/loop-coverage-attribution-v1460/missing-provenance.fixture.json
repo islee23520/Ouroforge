@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "docs/unknown.md",
+  "status": "missing-provenance",
+  "sourceSignals": [],
+  "evidenceRefs": [],
+  "verdictRefs": [],
+  "transactionRefs": [],
+  "blockedReasons": [
+    "no provenance, evidence, or verdict refs are present"
+  ]
+}

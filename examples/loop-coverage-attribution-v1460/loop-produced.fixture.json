@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "runs/run-1/artifacts/generated-scene.json",
+  "status": "classified",
+  "provenanceClass": "loop-produced",
+  "sourceSignals": [
+    {
+      "signalKind": "generation-provenance",
+      "sourceRef": "runs/run-1/loop/generation.json",
+      "classHint": "loop-produced"
+    }
+  ],
+  "evidenceRefs": [
+    "runs/run-1/evidence/observe.json"
+  ],
+  "verdictRefs": [
+    "runs/run-1/evidence/verdict.json"
+  ],
+  "transactionRefs": []
+}

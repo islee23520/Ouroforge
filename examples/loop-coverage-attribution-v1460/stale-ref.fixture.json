@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactKind": "trusted-change",
+  "boundary": "descriptive authorship attribution only; not quality, no auto-apply, no auto-merge, read-only browser/dashboard/Studio surfaces",
+  "artifactRef": "runs/run-5/artifacts/stale.json",
+  "status": "stale-ref",
+  "sourceSignals": [
+    {
+      "signalKind": "verdict-ref",
+      "sourceRef": "runs/run-old/evidence/verdict.json",
+      "classHint": "loop-verified",
+      "stale": true
+    }
+  ],
+  "evidenceRefs": [
+    "runs/run-old/evidence/observe.json"
+  ],
+  "verdictRefs": [
+    "runs/run-old/evidence/verdict.json"
+  ],
+  "transactionRefs": [],
+  "blockedReasons": [
+    "one or more sourceSignals are stale"
+  ]
+}
