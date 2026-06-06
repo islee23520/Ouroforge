@@ -50,6 +50,12 @@ fn demo_export_profile_is_a_local_web_target() {
         profile.output_dir.starts_with("dist/"),
         "export output must land in an ignored staging root"
     );
+    let gitignore =
+        std::fs::read_to_string(repo_root().join(".gitignore")).expect("root .gitignore reads");
+    assert!(
+        gitignore.lines().any(|line| line.trim() == "/dist/"),
+        "generated export output root must be ignored by the repo root .gitignore"
+    );
 }
 
 #[test]

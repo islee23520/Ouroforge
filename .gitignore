@@ -1,4 +1,5 @@
 /target/
+/dist/
 /runs/
 examples/evidence-dashboard/dashboard-data.json
 /dashboard-data/

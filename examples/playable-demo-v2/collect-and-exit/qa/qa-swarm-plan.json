@@ -20,8 +20,8 @@
     {
       "id": "qa-win-path",
       "worker": "worker-1",
-      "description": "Hold right to collect the key and reach the exit.",
-      "inputReplay": [{ "atStep": 0, "input": { "right": true } }],
+      "description": "Start moving right after a scheduled nonzero replay step to collect the key and reach the exit.",
+      "inputReplay": [{ "atStep": 5, "input": { "right": true } }],
       "budgetSteps": 250,
       "stopWhen": "exit_reached == true",
       "expectedVerdict": "pass",

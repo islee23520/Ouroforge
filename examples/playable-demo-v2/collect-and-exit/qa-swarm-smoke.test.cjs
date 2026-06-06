@@ -68,13 +68,24 @@ function sceneForRoute(baseScene, archetypeCache, route) {
 async function runRoute(baseScene, archetypeCache, route) {
   const api = createRuntime(sceneForRoute(baseScene, archetypeCache, route));
   await api.whenReady();
+  const replayByStep = new Map();
   for (const step of route.inputReplay) {
-    if (step.atStep === 0) api.setInput(step.input);
+    if (!replayByStep.has(step.atStep)) replayByStep.set(step.atStep, []);
+    replayByStep.get(step.atStep).push(step.input);
   }
+  const appliedReplaySteps = [];
+  const applyScheduledInputs = (frame) => {
+    for (const input of replayByStep.get(frame) || []) {
+      api.setInput(input);
+      appliedReplaySteps.push(frame);
+    }
+  };
+  applyScheduledInputs(0);
   let world = api.getWorldState();
   let classification = 'budget_exhausted';
   let stoppedAtStep = route.budgetSteps;
   for (let frame = 1; frame <= route.budgetSteps; frame += 1) {
+    applyScheduledInputs(frame);
     world = api.step(1);
     const flags = world.componentModel.goalFlags;
     if (flags.player_alive === false) { classification = 'hazard_contact_loss'; stoppedAtStep = frame; break; }
@@ -97,6 +108,7 @@ async function runRoute(baseScene, archetypeCache, route) {
       world_state: { goalFlags: flags, sceneId: world.sceneId },
       frame_stats: { runtimeFrameBudgetStatus: api.getFrameStats().runtimeFrameBudgetStatus },
       runtime_events: { count: api.getEvents().length },
+      input_replay: { appliedSteps: appliedReplaySteps },
     },
   };
 }
@@ -127,8 +139,13 @@ async function runRoute(baseScene, archetypeCache, route) {
     assert.equal(result.classification, route.expectedClassification, `${route.id}: classification`);
     assert.ok(plan.classifications.includes(result.classification), `${route.id}: known classification`);
     assert.equal(result.evidence.frame_stats.runtimeFrameBudgetStatus, 'within-budget', `${route.id}: perf`);
+    assert.deepEqual(result.evidence.input_replay.appliedSteps, route.inputReplay.map((step) => step.atStep),
+      `${route.id}: scheduled replay steps honored`);
     results.push(result);
   }
+
+  assert.ok(results.find((r) => r.routeId === 'qa-win-path')
+    .evidence.input_replay.appliedSteps.includes(5), 'nonzero scheduled replay entry honored');
 
   // Determinism: rerun the hazard route and confirm an identical verdict.
   const hazardRoute = plan.routes.find((r) => r.id === 'qa-hazard-contact');
@@ -157,6 +174,8 @@ async function runRoute(baseScene, archetypeCache, route) {
   fs.writeFileSync(tempReport, JSON.stringify(report, null, 2));
   assert.equal(readJson(tempReport).summary.pass, 1, 'one win route');
   assert.equal(readJson(tempReport).summary.fail, 2, 'two classified failure routes');
+  assert.ok(readJson(tempReport).results.find((r) => r.routeId === 'qa-win-path')
+    .evidence.input_replay.appliedSteps.includes(5), 'report includes nonzero scheduled replay evidence');
   fs.rmSync(tempDir, { recursive: true, force: true });
 
   for (const name of ['runs', 'target', 'dashboard-data', 'dist']) {

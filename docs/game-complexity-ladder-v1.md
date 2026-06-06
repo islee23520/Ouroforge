@@ -146,10 +146,12 @@ documents a concrete blocker and replacement ordering:
    gates.
 4. #1496 — next follow-up implementation issue after #1495 satisfies its closure
    gates.
-5. #1497 — final authorized follow-up in this contract sequence after #1496
+5. #1497 — next follow-up implementation issue after #1496
    satisfies its closure gates.
-6. Stop before #1498. This contract does not authorize implementing, modifying,
-   closing, or claiming #1498.
+6. #1498 — Roadmap and #1 Governance Refresh after #1497 satisfies its closure
+   gates. This ordering records the governed follow-up chain only; it does not
+   authorize implementing, modifying, closing, or claiming #1498 from this
+   contract alone.
 
 Closure gates for each follow-up issue:
 
@@ -172,4 +174,3 @@ Future work that proposes to change either anchor must be a separate explicit
 governance decision. That decision must identify the replacement source of
 truth, record maintainer approval, and avoid implying that this ladder contract
 itself authorized the change.
-
