@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "evolve-campaign-demo-v1",
+  "issue": 1490,
+  "demo": "multi-iteration-evolve-campaign",
+  "buildsAgainst": "playable-demo-v2/collect-and-exit (Signal Gate)",
+  "deterministic": true,
+  "fixtureScoped": true,
+  "requiredFourGates": ["mechanical", "runtime", "visual", "semantic"],
+  "cases": [
+    {
+      "caseId": "demo.converging",
+      "fixture": "converging.fixture.json",
+      "expectStopReason": "acceptance-reached",
+      "expectOutcome": "converged",
+      "expectAcceptedIteration": 3,
+      "summary": "a failing signal-gate game converges to passing acceptance over four bounded iterations with a full per-iteration audit trail"
+    },
+    {
+      "caseId": "demo.non-converging",
+      "fixture": "non-converging.fixture.json",
+      "expectStopReason": "budget-exhausted",
+      "expectOutcome": "not-converged",
+      "expectAcceptedIteration": null,
+      "summary": "a stalled signal-gate game stops safely at the iteration budget with an evidence-linked non-convergence diagnosis"
+    }
+  ],
+  "boundary": "Deterministic fixture coverage only; descriptive read-only audit of bounded multi-iteration evolve campaigns; iterations are manual-review unless within the milestone 22 bounded auto-apply budget; no network or live browser; no auto-fix, no auto-apply, no auto-merge; not a quality or correctness guarantee"
+}

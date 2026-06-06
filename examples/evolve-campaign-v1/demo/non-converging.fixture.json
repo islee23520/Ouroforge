@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "evolve-campaign-v1",
+  "campaignId": "demo-signal-gate-non-converging",
+  "seedRef": "seeds/signal-gate.seed.yaml",
+  "acceptanceTarget": ["mechanical", "runtime", "visual", "semantic"],
+  "budget": {
+    "maxIterations": 4,
+    "maxCostUnits": 120,
+    "noProgressWindow": 2
+  },
+  "stopConditions": [
+    {
+      "conditionId": "stop-acceptance",
+      "reason": "acceptance-reached",
+      "description": "stop when the rerun verdict passes every acceptance gate"
+    },
+    {
+      "conditionId": "stop-budget",
+      "reason": "budget-exhausted",
+      "description": "stop when the iteration or cost budget is reached"
+    },
+    {
+      "conditionId": "stop-noprogress",
+      "reason": "no-progress",
+      "description": "stop when the trailing window shows no gate improvement"
+    }
+  ],
+  "iterations": [
+    {
+      "index": 0,
+      "hypothesis": "baseline signal-gate collect-and-exit run fails every gate: the exit gate never opens",
+      "mutationRef": "runs/demo-non-converging/iteration-0/mutation-proposal.json",
+      "costUnits": 20,
+      "fourGate": [
+        { "gate": "mechanical", "status": "fail" },
+        { "gate": "runtime", "status": "fail" },
+        { "gate": "visual", "status": "fail" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/demo-non-converging/iteration-0/verdict.json"]
+    },
+    {
+      "index": 1,
+      "hypothesis": "wiring the collectible signal to the gate trigger satisfies the mechanical gate",
+      "mutationRef": "runs/demo-non-converging/iteration-1/mutation-proposal.json",
+      "costUnits": 20,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "fail" },
+        { "gate": "visual", "status": "fail" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/demo-non-converging/iteration-1/verdict.json"]
+    },
+    {
+      "index": 2,
+      "hypothesis": "debouncing the gate trigger fixes the runtime crash on repeated collect events",
+      "mutationRef": "runs/demo-non-converging/iteration-2/mutation-proposal.json",
+      "costUnits": 20,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "fail" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/demo-non-converging/iteration-2/verdict.json"]
+    },
+    {
+      "index": 3,
+      "hypothesis": "redrawing the gate sprite fixes the visual gate but the goal copy still does not state the collect-then-exit invariant",
+      "mutationRef": "runs/demo-non-converging/iteration-3/mutation-proposal.json",
+      "costUnits": 20,
+      "fourGate": [
+        { "gate": "mechanical", "status": "pass" },
+        { "gate": "runtime", "status": "pass" },
+        { "gate": "visual", "status": "pass" },
+        { "gate": "semantic", "status": "fail" }
+      ],
+      "decision": "manual-review",
+      "evidenceRefs": ["runs/demo-non-converging/iteration-3/verdict.json"]
+    }
+  ],
+  "termination": {
+    "reason": "budget-exhausted",
+    "conditionId": "stop-budget",
+    "diagnosis": "iteration budget reached after four iterations with the semantic gate still failing; the last delta improved only the visual gate while the collect-then-exit goal invariant remained unmet, evidence runs/demo-non-converging/iteration-3/verdict.json"
+  },
+  "boundary": "descriptive read-only audit of a bounded multi-iteration evolve campaign; iterations are manual-review unless within the milestone 22 bounded auto-apply budget; no auto-merge; not quality or correctness guarantee"
+}
