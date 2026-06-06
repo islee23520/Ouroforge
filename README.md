@@ -248,16 +248,26 @@ complete in `docs/roadmap.md`, `docs/safe-source-mutation-apply-v1.md`, and
 explicitly allowed low-risk source-like file classes only: validated previews,
 sandbox evidence, independent review, stale-target checks, rollback metadata,
 allowlisted verification, post-apply evidence, audit ledger entries, and
-emergency hold controls remain mandatory. These milestones do not authorize
+emergency hold controls remain mandatory. Plugin / Extension System v1 is
+recorded as complete in `docs/roadmap.md`, `docs/plugin-extension-system-v1.md`,
+`docs/plugin-threat-model-v1.md`, `docs/plugin-extension-system-demo-v1.md`, and
+`docs/scenario-coverage-v16-plugin-extension.md` as a bounded declarative,
+allowlisted, evidence-backed extension foundation: declarative manifests, local
+registry/discovery, an allowlisted extension point catalog, capability/
+compatibility validation, descriptor evidence, read-only dashboard/Studio
+inspection, a fixture plugin pack, a fail-closed threat-model gate, CLI
+inspection, and regression coverage, with plugins declaring metadata only and
+never executing code. These milestones do not authorize
 autonomous unrestricted game creation, uncontrolled asset generation, hidden
 workers, remote/cloud swarm orchestration, unrestricted source/script mutation,
 forbidden file-class mutation, dependency/CI/build-script mutation, browser
 trusted writes, command bridges, auto-fix, auto-apply, auto-merge, native export,
 plugin runtime, hosted/cloud behavior, production readiness, public launch,
 secure-sandbox guarantees, autonomous source repair, or a current Godot
-replacement claim. The next recommended governance step is the remaining bounded
-Full Studio Editor sequence, then Plugin / Extension System and Godot-Plus Demo
-scope only where already accepted by issue evidence.
+replacement claim. With Plugin / Extension System v1 and Godot-Plus Demo Game v1
+now recorded as complete, the next recommended governance step is the remaining
+bounded Full Studio Editor sequence, pursued only where already accepted by
+issue evidence.
 
 ## Contributor guide
 

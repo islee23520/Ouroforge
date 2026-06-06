@@ -91,10 +91,18 @@ agentic iteration evidence, Safe Source Apply chain evidence, QA swarm evidence
 and QA/playtest swarm evidence, local web export/package verification, plugin
 descriptors used as metadata, Godot-plus comparison matrix,
 documentation/reproducibility notes, performance budget evidence, regression
-suite, and conservative governance refresh:
+suite, and conservative governance refresh, and a completed Plugin / Extension
+System v1 declarative extension foundation: a declarative plugin manifest
+schema, local registry/discovery, an allowlisted extension point catalog,
+capability/permission and version-compatibility validation, descriptor evidence
+integration, a read-only Studio plugin browser and read-only
+dashboard/scenario/asset descriptors, a fixture plugin pack, a security/threat-
+model gate that fails closed on executable/credentialed/network capabilities,
+load-order/conflict detection, CLI inspection, Scenario Coverage v16, a
+deterministic demo, and conservative governance refresh:
 
 ```text
-project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance
+project manifest -> scaffold/scene/seed/scenario pack -> run -> evidence -> compare -> proposal/review/application -> regression promotion/matrix -> loop plan/dry-run/step/handoff -> expressive scene/demo regression -> asset manifest/loading/preview/regression -> visual edit draft/preflight/diff/review evidence -> Production 2D runtime/replay/profiling/regression -> multi-agent role/task/handoff/review/QA/regression/evidence bundle -> journal/Studio inspection -> bounded 3D capability evidence/read-only inspection -> evidence-gated agentic scene/level design -> structured gameplay logic -> bounded GDD-to-prototype planning/draft/apply/evidence -> four-gate evaluator depth/evidence -> evidence-linked bounded evolve depth proposals/rerun deltas -> review-gated Safe Source Mutation Apply evidence -> local web export/package evidence -> Foundation Hardening v1 crate seams with golden parity -> Full Studio Editor v1 local authoring cockpit evidence/governance -> Signal Gate Godot-Plus Demo Game v1 evidence/governance -> declarative Plugin / Extension System v1 descriptor/evidence foundation
 ```
 
 The trusted boundary remains Rust and the local filesystem. Browser examples
@@ -221,6 +229,25 @@ Godot replacement positioning. Generated demo outputs, exports, QA runs,
 evidence bundles, screenshots, videos, temp servers, package bundles, and local
 tool state remain ignored unless a later issue explicitly scopes deterministic
 source-like fixtures. #1 remains open. #23 remains open.
+
+Plugin / Extension System v1 (#738-#754) is now complete as a bounded
+declarative, allowlisted, evidence-backed extension foundation. The merged
+evidence chain added the #738 scope and contract, #739 plugin manifest schema,
+#740 local registry and discovery, #741 extension point catalog, #742
+capability declaration and permission model, #743 version compatibility, #744
+descriptor evidence integration, #745 read-only Studio plugin browser, #746
+read-only dashboard panel descriptor, #747 scenario template descriptor, #748
+asset metadata descriptor, #749 fixture plugin pack, #750 security/threat-model
+gate, #751 load-order and conflict detection, #752 CLI inspection, #753 Scenario
+Coverage v16 regression suite, and #754 deterministic demo. Plugins declare
+extension points and metadata only within the explicitly allowed v1 catalog and
+never execute code. This completion authorizes only that bounded declarative
+chain: no executable plugins, arbitrary JavaScript, native/dynamic library
+loading, runtime script execution, shell command execution, dependency
+installation, network plugin install/update, marketplace, credential access,
+source mutation, export/publish/deploy mutation, CI/workflow mutation, secure
+plugin sandbox guarantee, Godot-equivalent extension parity, production-ready
+plugin ecosystem, or current Godot replacement claim is introduced.
 
 ## Completed evidence-native milestones
 
@@ -399,6 +426,13 @@ The current implementation has completed these documented milestone surfaces:
   `docs/autonomous-qa-playtest-swarm-v1.md`,
   `docs/safe-source-mutation-apply-v1.md`,
   `docs/scenario-coverage-v15-build-export-packaging.md`,
+  `docs/scenario-coverage-v16-plugin-extension.md`)
+- Plugin / Extension System v1 / declarative local extension foundation
+  (`docs/plugin-extension-system-v1.md`,
+  `docs/plugin-system-design.md`,
+  `docs/plugin-threat-model-v1.md`,
+  `docs/studio-plugin-extension-panel-v1.md`,
+  `docs/plugin-extension-system-demo-v1.md`,
   `docs/scenario-coverage-v16-plugin-extension.md`)
 
 These milestones are still MVP contracts, not public compatibility promises.
@@ -643,6 +677,32 @@ credential/network/cloud/release/export mutation, browser trusted writes,
 command bridges, autonomous source repair, executable script repair, production
 secure-sandbox claims, and production-ready mutation guarantees. #1 and #23
 remain open governance anchors.
+
+### Plugin / Extension System v1 governance refresh
+
+Plugin / Extension System v1 is recorded as **complete as a bounded,
+declarative, allowlisted, evidence-backed extension foundation**, closing the
+Plugin / Extension System milestone governance chain without closing #1 or #23.
+The completion evidence is the merged issue sequence #738-#754: scope and
+contract, plugin manifest schema, local registry and discovery, extension point
+catalog, capability/permission model, version compatibility, descriptor
+evidence integration, read-only Studio plugin browser, read-only dashboard
+panel/scenario template/asset metadata descriptors, fixture plugin pack,
+security/threat-model gate, load-order and conflict detection, CLI inspection,
+Scenario Coverage v16, and the deterministic demo. Plugins declare extension
+points and metadata only within the explicitly allowed v1 catalog; Rust/local
+validation owns discovery, manifest validation, registry persistence, capability
+and compatibility checks, and evidence writing; browser/dashboard/Studio
+surfaces remain read-only rendering of inert descriptors.
+
+The remaining plugin gaps stay explicit and require separate scoped governance
+issues before implementation: executable plugins, scripting plugin runtime,
+arbitrary JavaScript, native/dynamic extensions, marketplace, network
+install/update, dependency installation, third-party package trust model, full
+editor extensibility, command execution, source/export/publish/deploy mutation,
+CI/workflow mutation, secure plugin sandbox guarantees, Godot-equivalent
+extension parity, and a production-ready plugin ecosystem. #1 and #23 remain open
+governance anchors.
 
 ### Foundation Hardening v1 governance refresh
 
@@ -933,6 +993,21 @@ remain separate maintainer actions.
   public deployment, direct Studio trusted writes, command bridges, unreviewed
   source mutation, auto-apply, auto-merge, self-approval, reviewer bypass,
   secure sandbox guarantees, or current Godot replacement positioning.
+- Treat Plugin / Extension System v1 as complete but declarative-only. Its
+  artifacts authorize claims about a bounded, allowlisted, evidence-backed
+  extension foundation only: a declarative plugin manifest schema, local
+  registry/discovery, an allowlisted extension point catalog, capability/
+  permission and version-compatibility validation, descriptor evidence, a
+  read-only Studio plugin browser and read-only dashboard/scenario/asset
+  descriptors, a fixture plugin pack, a fail-closed security/threat-model gate,
+  load-order/conflict detection, CLI inspection, Scenario Coverage v16, and a
+  deterministic demo. They do not authorize executable plugins, arbitrary
+  JavaScript, native/dynamic library loading, runtime script execution, shell
+  command execution, dependency installation, network plugin install/update,
+  marketplace, credential access, third-party package trust, full editor
+  extensibility, source/export/publish/deploy mutation, CI/workflow mutation,
+  secure plugin sandbox guarantees, Godot-equivalent extension parity, a
+  production-ready plugin ecosystem, or current Godot replacement positioning.
 
 ## Active anchors
 
