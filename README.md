@@ -294,6 +294,15 @@ replacement claim, and autonomy stays opt-in behind a kill switch. At that
 completion point the recommended follow-on was Era E Milestone 23:
 Multi-Iteration Evolve Campaigns.
 
+Multi-Iteration Evolve Campaigns v1 / Era E Milestone 23 is now recorded in the
+roadmap as complete: a campaign is a bounded, audited, multi-iteration sequence
+of evolve proposals that stops on a declared acceptance condition or an exhausted
+budget, with convergence reported descriptively and a journal narrative over the
+iterations. Convergence is descriptive, not a quality or Godot replacement claim;
+campaigns respect the Trust Gradient, add no unsupervised unbounded looping, and
+grant no auto-merge or reviewer bypass. At that completion point the recommended
+follow-on was Era E Milestone 24: Game Complexity Ladder.
+
 ## Contributor guide
 
 - Contribution workflow and review expectations: [`CONTRIBUTING.md`](CONTRIBUTING.md)
