@@ -131,6 +131,45 @@ fn rejects_stale_or_unsafe_refs() {
 }
 
 #[test]
+fn rejects_missing_repo_relative_seed_ref() {
+    let mut artifact = fixture("acceptance-reached.fixture.json");
+    artifact.seed_ref = "examples/evolve-campaign-v1/contract/missing-seed.yaml".to_string();
+    let err = validate_evolve_campaign(&artifact).expect_err("must reject");
+    assert!(
+        err.to_string().contains(
+            "missing repo-relative ref `examples/evolve-campaign-v1/contract/missing-seed.yaml`"
+        ),
+        "{err}"
+    );
+}
+
+#[test]
+fn rejects_missing_repo_relative_mutation_ref() {
+    let mut artifact = fixture("acceptance-reached.fixture.json");
+    artifact.iterations[0].mutation_ref =
+        "examples/evolve-campaign-v1/contract/missing-mutation.json".to_string();
+    let err = validate_evolve_campaign(&artifact).expect_err("must reject");
+    assert!(
+        err.to_string()
+            .contains("missing repo-relative ref `examples/evolve-campaign-v1/contract/missing-mutation.json`"),
+        "{err}"
+    );
+}
+
+#[test]
+fn rejects_missing_repo_relative_evidence_ref() {
+    let mut artifact = fixture("acceptance-reached.fixture.json");
+    artifact.iterations[0].evidence_refs =
+        vec!["examples/evolve-campaign-v1/contract/missing-evidence.json".to_string()];
+    let err = validate_evolve_campaign(&artifact).expect_err("must reject");
+    assert!(
+        err.to_string()
+            .contains("missing repo-relative ref `examples/evolve-campaign-v1/contract/missing-evidence.json`"),
+        "{err}"
+    );
+}
+
+#[test]
 fn rejects_iteration_missing_a_gate() {
     let mut artifact = fixture("acceptance-reached.fixture.json");
     artifact.iterations[2].four_gate = vec![EvolveGateVerdict {

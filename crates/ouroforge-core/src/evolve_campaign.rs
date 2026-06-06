@@ -541,7 +541,27 @@ fn validate_ref(label: &str, value: &str) -> Result<()> {
             "{label} must be a safe repo-relative or run-relative ref"
         ));
     }
+    validate_tracked_fixture_ref(label, value)?;
     Ok(())
+}
+
+fn validate_tracked_fixture_ref(label: &str, value: &str) -> Result<()> {
+    if !requires_tracked_fixture_ref(value) {
+        return Ok(());
+    }
+
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let path = workspace_root.join(value);
+    if !path.exists() {
+        return Err(anyhow!(
+            "{label} points to missing repo-relative ref `{value}`"
+        ));
+    }
+    Ok(())
+}
+
+fn requires_tracked_fixture_ref(value: &str) -> bool {
+    value.starts_with("examples/evolve-campaign-v1/contract/")
 }
 
 fn validate_id(label: &str, value: &str) -> Result<()> {
