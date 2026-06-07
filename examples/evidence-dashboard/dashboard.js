@@ -2601,6 +2601,7 @@ const OuroforgeDashboard = (() => {
       ${renderScenarioPanel(run)}
       ${renderLoopCoverageSummary(run)}
       ${renderTrustGradientSummary(run)}
+      ${renderDesignRegressionSummary(run)}
       ${renderAssetBrowser(run)}
       ${renderSceneCanvas(run)}
       ${renderDraftOperationModel(run)}${renderEntityComponentInspector(run)}
@@ -3335,6 +3336,53 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
+  function renderDesignRegressionSummary(run = {}) {
+    const source = run?.design_regression || run?.designRegression || null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || source.present === false) {
+      const empty = source?.empty_state || source?.emptyState || 'No design-regression harness verdict is exported for this run.';
+      return `<section class="panel design-regression-panel"><h3>Design regression</h3><p class="empty-state">${escapeText(empty)}</p><p class="run-meta">Read-only. The dashboard displays the exported regression verdict only; it cannot re-run the harness, apply, auto-fix, promote, merge, execute commands, or self-approve.</p></section>`;
+    }
+    const verdict = source.overall_verdict || source.overallVerdict || 'unknown';
+    const verdictStatus = verdict === 'regressed' ? 'blocked' : (verdict === 'clean' ? 'passed' : 'unknown');
+    const regressionCount = source.regression_count ?? source.regressionCount ?? 0;
+    const levels = Array.isArray(source.levels) ? source.levels : [];
+    const blocked = Array.isArray(source.blocked_reasons) ? source.blocked_reasons
+      : Array.isArray(source.blockedReasons) ? source.blockedReasons : [];
+    const levelRows = levels.length
+      ? levels.map((level, index) => {
+          const outcome = level?.outcome || 'unknown';
+          const outcomeClass = outcome === 'newly-broken' ? 'blocked'
+            : outcome === 'improved' ? 'passed'
+            : outcome === 'inconclusive' ? 'unknown' : 'passed';
+          const levelId = level?.levelId || level?.level_id || `level-${index + 1}`;
+          const current = level?.current || {};
+          const overCount = current.oversolutionCount ?? current.oversolution_count ?? 'unknown';
+          const trace = Array.isArray(level?.trace) ? level.trace : null;
+          const traceKind = level?.traceKind || level?.trace_kind || null;
+          const traceText = trace
+            ? `<br><small>Replayable trace (${escapeText(traceKind || 'trace')}): ${escapeText(trace.join(' → '))}</small>`
+            : '';
+          const detail = level?.detail ? `<br><small>${escapeText(level.detail)}</small>` : '';
+          return `<li><span class="${statusClass(outcomeClass)}">${escapeText(outcome)}</span> ${escapeText(levelId)} · over-solutions ${escapeText(String(overCount))}${traceText}${detail}</li>`;
+        }).join('')
+      : '<li>No affected levels recorded.</li>';
+    const blockedRows = blocked.length
+      ? `<ul class="run-meta-list">${blocked.map((reason) => `<li><span class="${statusClass('blocked')}">${escapeText(reason)}</span></li>`).join('')}</ul>`
+      : '';
+    return `<section class="panel design-regression-panel"><h3>Design regression</h3>
+      <p class="run-meta">Read-only design-regression verdict. The harness re-runs the existing solver, over-solution detector, and difficulty suite in trusted Rust/local; the dashboard only displays the exported verdict and replayable traces. It cannot re-run, apply, auto-fix, promote, merge, execute commands, or self-approve.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Verdict</div><div class="card-value"><span class="${statusClass(verdictStatus)}">${escapeText(verdict)}</span></div></div>
+        <div class="card"><div class="card-label">Newly broken</div><div class="card-value">${escapeText(String(regressionCount))}</div></div>
+        <div class="card"><div class="card-label">Affected levels</div><div class="card-value">${escapeText(String(levels.length))}</div></div>
+      </div>
+      <div class="run-meta">edit ${escapeText(source.edit_ref || source.editRef || 'none')}</div>
+      <ul class="run-meta-list">${levelRows}</ul>
+      ${blockedRows}
+      <p class="run-meta">Detection only, human-in-the-loop. A regression verdict is not auto-applied, auto-merged, or a quality/fun guarantee; trusted writes stay on the review/apply/trust-gradient path. Studio remains read-only.</p>
+    </section>`;
+  }
+
   function renderLoopCoverageSummary(run = {}) {
     const model = loopCoverageModel(run);
     if (!model.present) {
@@ -3435,7 +3483,7 @@ const OuroforgeDashboard = (() => {
     </section>`;
   }
 
-  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, loopCoverageModel, renderLoopCoverageSummary, renderTrustGradientSummary, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
+  return { WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout, artifactHref, commandContext, comparisonRefHref, createReplayState, currentReplayView, init, jumpReplayToCheckpoint, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioErrorBoundary, countBySeverity, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, renderStudioMultiAgentPipelineInspection, renderAgentRoleModels, renderAgentWorkPackages, renderAgentHandoffs, renderOwnershipPolicies, renderProductionTaskBoards, renderProductionEvidenceBundles, renderReviewCriticGates, renderAnimationVfxSummary, renderAudioEvidenceSummary, renderAssetIntegrity, renderAssetLoading, renderAssetPreview, renderBehaviorEvidenceLifecycle, renderPluginRegistry, renderEvaluatorDepthInspection, renderRuntimeInvariants, renderRuntimeProfilerSummary, renderRouteAttempts, renderVisualComparisons, renderFuzzingPlans, renderQaAgentWorkQueues, renderPerformanceRegressionLanes, renderSourceApplyWorktreeContext, renderSourceApplyHandoff, loopCoverageModel, renderLoopCoverageSummary, renderTrustGradientSummary, renderDesignRegressionSummary, renderPluginPanel, renderExportPackagePanel, renderScenarioPanel, renderAssetBrowser, renderSceneCanvas, renderDraftOperationModel, renderEntityComponentInspector, renderSourcePatchEvidenceBundles, renderSourcePatchApplyTransactions, renderSourcePatchStaleTargetGuards, renderCameraLayerSummary, renderCategorySummary, renderCommandContext, renderGameplaySummary, renderInputActionSummary, renderProvenanceAuditSurface, renderRenderBreakdownSummary, renderTilemapSummary, renderJournalViewer, renderLoopDryRunSummary, renderLoopExecutionSummary, renderLoopEvidenceBundles, renderLoopRecoveryStatus, renderMutationLifecycle, renderProposalRationaleList, renderProbeContractStatus, renderProjectContext, renderQaScenarioCandidates, renderQaWorkerAssignments, renderRegressionMatrix, renderRegressionPromotions, renderReplayControls, renderRunComparison, renderSceneTreeInspector, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderRunDetail, renderRunDetailWithState, renderRunList, renderSemanticDiffSummary, renderStudioAccessibilityNavSurface, renderTransactionProvenance, resetReplay, runRelativeHref, statusClass, stepReplayForward, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, summarizeRun };
 })();
 
 if (typeof window !== 'undefined') {

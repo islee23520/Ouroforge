@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "design-regression-harness-v1",
+  "editRef": "edits/grid-puzzle-rule-tweak-v1",
+  "generatedOutputRoot": "runs/design-regression/grid-puzzle-rule-tweak-v1",
+  "note": "Fixture-scoped design-regression harness (#1588). A single content/rule edit is re-run across three affected grid-puzzle levels: one the edit newly broke by opening an unintended over-solution, one the edit fixed, and one untouched (no-op). Specs reuse the shared ouroforge.grid-puzzle.v1 model from grid-puzzle-scene-v1.json and grid-puzzle-oversolution-v1.json. The harness orchestrates the existing #1580 solver, #1581 over-solution detector, and #1582 difficulty suite; it does not apply, promote, or auto-fix anything.",
+  "levels": [
+    {
+      "levelId": "level-newly-broken",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-oversolution-micro-v1",
+        "width": 5,
+        "height": 4,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "#####",
+          "#@*P#",
+          "#...#",
+          "#####"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["down", "up", "left"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 0
+      }
+    },
+    {
+      "levelId": "level-improved",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-micro-v1",
+        "width": 6,
+        "height": 5,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "######",
+          "#@...#",
+          "#.*P.#",
+          "#....#",
+          "######"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["left", "down", "left", "up"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 2
+      }
+    },
+    {
+      "levelId": "level-unchanged",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-micro-v1",
+        "width": 6,
+        "height": 5,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "######",
+          "#@...#",
+          "#.*P.#",
+          "#....#",
+          "######"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["left", "down", "left", "up"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 0,
+        "evidenceWitness": ["left", "down", "left", "up"]
+      }
+    }
+  ],
+  "guardrails": [
+    "Re-runs the existing #1580 solver, #1581 over-solution detector, and #1582 difficulty suite; it adds no new comparison engine.",
+    "Every flagged regression carries a replayable trace.",
+    "Detection only: the harness never applies, auto-applies, promotes, merges, or self-approves; trusted writes stay on the existing review/apply/trust-gradient path.",
+    "Generated re-run artifacts stay untracked under generatedOutputRoot."
+  ]
+}

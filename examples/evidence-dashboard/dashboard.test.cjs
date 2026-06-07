@@ -2406,6 +2406,33 @@ const missingTrustGradientMarkup = dashboard.renderTrustGradientSummary({});
 assert.match(missingTrustGradientMarkup, /No trust-gradient auto-apply evidence is exported/);
 assert.match(dashboard.renderRunDetail({ ...run, trust_gradient: trustGradientEvidence }), /Trust gradient/);
 
+// Design regression verdict inspection surface (read-only; #1588)
+const designRegressionEvidence = {
+  schemaVersion: 'design-regression-harness-v1',
+  editRef: 'edits/grid-puzzle-rule-tweak-v1',
+  overallVerdict: 'regressed',
+  regressionCount: 1,
+  levels: [
+    { levelId: 'level-newly-broken', outcome: 'newly-broken', current: { oversolutionCount: 1, clean: false }, trace: ['left'], traceKind: 'shorter-than-intended', detail: 'edit opened 1 unintended over-solution(s); shortest bypass is replayable' },
+    { levelId: 'level-improved', outcome: 'improved', current: { oversolutionCount: 0, clean: true }, detail: 'previously-broken level is now design-clean after the edit' },
+    { levelId: 'level-unchanged', outcome: 'unchanged', current: { oversolutionCount: 0, clean: true }, detail: 'level remains design-clean after the edit' },
+  ],
+  blockedReasons: ['design regression detected in 1 level(s); promotion blocked pending human review'],
+};
+const designRegressionMarkup = dashboard.renderDesignRegressionSummary({ design_regression: designRegressionEvidence });
+assert.match(designRegressionMarkup, /Design regression/);
+assert.match(designRegressionMarkup, /regressed/);
+assert.match(designRegressionMarkup, /newly-broken/);
+assert.match(designRegressionMarkup, /Replayable trace \(shorter-than-intended\): left/);
+assert.match(designRegressionMarkup, /improved/);
+assert.match(designRegressionMarkup, /promotion blocked pending human review/);
+assert.match(designRegressionMarkup, /Detection only, human-in-the-loop/);
+assert.doesNotMatch(designRegressionMarkup, /<button|<form|<input|data-action=|applyCommand|writeCommand|mutationCommand|executeCommand|browserCommandBridge|autoFix/i);
+
+const missingDesignRegressionMarkup = dashboard.renderDesignRegressionSummary({});
+assert.match(missingDesignRegressionMarkup, /No design-regression harness verdict is exported/);
+assert.match(dashboard.renderRunDetail({ ...run, design_regression: designRegressionEvidence }), /Design regression/);
+
 // Studio workspace layout persistence (draft-only browser-local state; #769)
 function makeFakeStorage(seed) {
   const store = Object.assign({}, seed || {});

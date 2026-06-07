@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "design-regression-harness-v1",
+  "editRef": "edits/grid-puzzle-rule-tweak-stale-v1",
+  "generatedOutputRoot": "runs/design-regression/grid-puzzle-rule-tweak-stale-v1",
+  "note": "Fixture-scoped design-regression harness with a stale baseline reference (#1588). The recorded baseline carries an evidenceWitness that no longer solves the current (post-edit) level, so the comparison cannot be trusted and the harness fails closed with an inconclusive verdict — never a false improved/unchanged.",
+  "levels": [
+    {
+      "levelId": "level-stale-baseline",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-oversolution-micro-v1",
+        "width": 5,
+        "height": 4,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "#####",
+          "#@*P#",
+          "#...#",
+          "#####"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["down", "up", "left"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 0,
+        "evidenceWitness": ["down", "down"]
+      }
+    }
+  ],
+  "guardrails": [
+    "Stale or untrustworthy baseline references fail closed as inconclusive; promotion is blocked pending fresh evidence.",
+    "Detection only: the harness never applies, auto-applies, promotes, merges, or self-approves."
+  ]
+}
