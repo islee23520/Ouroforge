@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "audio-qa-v1",
+  "checkId": "v35-audio-qa-provenance-fail",
+  "status": "fail",
+  "assetRef": "audio-generation/v35-no-provenance-sfx-v1",
+  "format": "ogg",
+  "kind": "sfx",
+  "channels": 1,
+  "durationMs": 450,
+  "license": {
+    "licenseId": "CC0-1.0",
+    "holder": "Ouroforge local fixtures",
+    "source": "audio-generation-v1"
+  },
+  "provenanceRefs": [],
+  "loudness": {
+    "integratedLufs": -16.0,
+    "truePeakDbtp": -2.0,
+    "minLufs": -23.0,
+    "maxLufs": -9.0,
+    "maxTruePeakDbtp": -1.0
+  },
+  "baselineRefs": [],
+  "staleBaselineRefs": [],
+  "maxLoudnessDriftLu": 2.0,
+  "verdict": "Audio fails QA: no generation-provenance references; provenance is mandatory.",
+  "blockedReasons": [],
+  "boundary": "Read-only audio-QA check evidence; no auto-apply, no auto-merge, no quality/taste judgement; Rust/local owned, browser read-only."
+}

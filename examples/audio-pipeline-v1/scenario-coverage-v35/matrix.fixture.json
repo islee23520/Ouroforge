@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "scenario-coverage-v35-audio-pipeline-matrix-v1",
+  "issue": 1646,
+  "proposalCases": [
+    { "id": "proposal-valid", "fixture": "proposal/valid.json", "expectedOutcome": "proposed" },
+    { "id": "proposal-missing-license", "fixture": "proposal/missing-license.json", "expectedOutcome": "rejected", "rejectReason": "requires a license" },
+    { "id": "proposal-malformed", "fixture": "proposal/malformed.json", "expectedOutcome": "rejected", "rejectReason": "unsupported" }
+  ],
+  "qaCases": [
+    { "id": "qa-pass", "fixture": "qa/pass.json", "expectedStatus": "pass" },
+    { "id": "qa-loudness-fail", "fixture": "qa/loudness-fail.json", "expectedStatus": "fail" },
+    { "id": "qa-provenance-fail", "fixture": "qa/provenance-fail.json", "expectedStatus": "fail" }
+  ],
+  "hookCases": [
+    { "id": "hook-calm", "signalLabel": "calm", "expectedIntents": ["ambient_loop"] },
+    { "id": "hook-combat", "signalLabel": "combat", "expectedIntents": ["music_combat", "ambient_loop"] }
+  ]
+}

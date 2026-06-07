@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.audio-generation.v1",
+  "briefId": "v35-coin-pickup-sfx-v1",
+  "title": "Coin pickup chime",
+  "description": "A short, bright two-note chime played when the player collects a coin.",
+  "audioKind": "sfx",
+  "audioId": "v35-coin-pickup",
+  "format": "ogg",
+  "durationMs": 450,
+  "channels": 1,
+  "license": {
+    "licenseId": "CC0-1.0",
+    "holder": "Ouroforge local fixtures",
+    "source": "audio-generation-v1"
+  }
+}

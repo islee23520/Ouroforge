@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.audio-generation.v1",
+  "briefId": "v35-no-license-sfx-v1",
+  "title": "Unlicensed chime",
+  "description": "A pickup chime brief that omits the mandatory license block.",
+  "audioKind": "sfx",
+  "audioId": "v35-no-license",
+  "format": "ogg",
+  "durationMs": 450,
+  "channels": 1
+}

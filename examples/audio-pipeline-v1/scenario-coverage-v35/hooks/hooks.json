@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "audio-hooks-v1",
+  "hookSet": {
+    "schemaVersion": "audio-hooks-v1",
+    "hooks": [
+      {
+        "hookId": "ambient-loop",
+        "priority": 1,
+        "when": { "kind": "always" },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "ambient-loop",
+          "targetEntityId": "music-bus",
+          "intent": "ambient_loop"
+        }
+      },
+      {
+        "hookId": "combat-music",
+        "priority": 10,
+        "when": { "kind": "numberAtLeast", "signal": "enemyCount", "threshold": 1 },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "combat-music",
+          "targetEntityId": "music-bus",
+          "intent": "music_combat"
+        }
+      }
+    ]
+  },
+  "signalSequence": [
+    {
+      "label": "calm",
+      "flags": {},
+      "numbers": { "enemyCount": 0 },
+      "events": [],
+      "expectedIntents": ["ambient_loop"]
+    },
+    {
+      "label": "combat",
+      "flags": {},
+      "numbers": { "enemyCount": 2 },
+      "events": [],
+      "expectedIntents": ["music_combat", "ambient_loop"]
+    }
+  ]
+}
