@@ -210,6 +210,12 @@ Platformer), one Game Complexity Ladder rung satisfied (collect-and-exit), and a
 GO Trust Gradient for bounded, reversible, audited, default-off auto-apply. These
 are descriptive metrics, not maturity, production, or Godot-replacement claims.
 
+**Earlier foundations remain recorded.** The **GDD-to-Playable Prototype v1**
+milestone is complete (including **Autonomous QA / Playtest Swarm v1**), while the
+#1 and #23 anchors are deliberately kept open as ongoing north-star tracks. The
+full per-era completion history and evidence chains live in
+[`docs/roadmap.md`](docs/roadmap.md) and the matching `docs/*.md` contracts.
+
 **Next.** Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation. Engine
 growth stays demand-driven and rung-justified. The Layer-3 go/defer decision
 (native export, plugin runtime, hosted/cloud, and distributed orchestration /
