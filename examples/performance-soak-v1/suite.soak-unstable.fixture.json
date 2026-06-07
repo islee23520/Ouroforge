@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "performance-soak-v1",
+  "suiteId": "soak-unstable-001",
+  "status": "complete",
+  "verdict": "unstable",
+  "gameBuildRef": "runs/build-collect-and-exit-003",
+  "budgetRef": "examples/qa-performance-budget-v1/budget.pass.fixture.json",
+  "metricKind": "frameTimeMs",
+  "comparator": "lte",
+  "budgetX1000": 16000,
+  "stabilityToleranceX1000": 3000,
+  "segments": [
+    {
+      "segmentId": "seg-00m",
+      "sequence": 1,
+      "sessionElapsedMs": 0,
+      "valueX1000": 10000,
+      "frameBudgetRef": "runs/soak/seg-00m/frame-budget.json",
+      "evidenceRefs": ["runs/soak/seg-00m/sample.json"]
+    },
+    {
+      "segmentId": "seg-30m",
+      "sequence": 2,
+      "sessionElapsedMs": 1800000,
+      "valueX1000": 12500,
+      "frameBudgetRef": "runs/soak/seg-30m/frame-budget.json",
+      "evidenceRefs": ["runs/soak/seg-30m/sample.json"]
+    },
+    {
+      "segmentId": "seg-60m",
+      "sequence": 3,
+      "sessionElapsedMs": 3600000,
+      "valueX1000": 15000,
+      "frameBudgetRef": "runs/soak/seg-60m/frame-budget.json",
+      "evidenceRefs": ["runs/soak/seg-60m/sample.json"]
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["sequence", "sessionElapsedMs", "valueX1000"]
+  },
+  "boundary": "Soak samples are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; reuses the frame-budget surface with no new profiler."
+}

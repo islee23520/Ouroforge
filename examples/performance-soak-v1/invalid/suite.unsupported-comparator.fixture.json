@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "performance-soak-v1",
+  "suiteId": "soak-bad-comparator",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-x",
+  "budgetRef": "examples/qa-performance-budget-v1/budget.pass.fixture.json",
+  "metricKind": "frameTimeMs",
+  "comparator": "gte",
+  "budgetX1000": 16000,
+  "stabilityToleranceX1000": 4000,
+  "segments": [
+    {
+      "segmentId": "seg-1",
+      "sequence": 1,
+      "sessionElapsedMs": 0,
+      "valueX1000": 12000,
+      "frameBudgetRef": "runs/soak/a.json",
+      "evidenceRefs": ["runs/soak/a-sample.json"]
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["valueX1000"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only; reuses the frame-budget surface"
+}

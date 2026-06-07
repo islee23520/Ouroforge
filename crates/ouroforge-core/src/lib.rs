@@ -82,6 +82,7 @@ pub use source_apply_highrisk_blocker::*;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;
 pub mod plugin_manifest;
+pub mod performance_soak;
 pub mod plugin_permission;
 pub mod plugin_registry;
 pub mod plugin_threat_model;

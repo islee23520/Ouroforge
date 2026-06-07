@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "performance-soak-v1",
+  "suiteId": "soak-regression-001",
+  "status": "complete",
+  "verdict": "regressed",
+  "gameBuildRef": "runs/build-collect-and-exit-002",
+  "budgetRef": "examples/qa-performance-budget-v1/budget.fail.fixture.json",
+  "metricKind": "frameTimeMs",
+  "comparator": "lte",
+  "budgetX1000": 16000,
+  "stabilityToleranceX1000": 6000,
+  "segments": [
+    {
+      "segmentId": "seg-00m",
+      "sequence": 1,
+      "sessionElapsedMs": 0,
+      "valueX1000": 12000,
+      "frameBudgetRef": "runs/soak/seg-00m/frame-budget.json",
+      "evidenceRefs": ["runs/soak/seg-00m/sample.json"]
+    },
+    {
+      "segmentId": "seg-large-content",
+      "sequence": 2,
+      "sessionElapsedMs": 1200000,
+      "valueX1000": 21000,
+      "frameBudgetRef": "runs/soak/seg-large-content/frame-budget.json",
+      "evidenceRefs": ["runs/soak/seg-large-content/sample.json", "runs/soak/seg-large-content/profile.json"]
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["sequence", "sessionElapsedMs", "valueX1000"]
+  },
+  "boundary": "Soak samples are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; reuses the frame-budget surface with no new profiler."
+}
