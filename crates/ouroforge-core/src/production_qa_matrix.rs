@@ -121,6 +121,66 @@ pub struct DetectedRegression {
     pub evidence_refs: Vec<String>,
 }
 
+/// Deterministic, Rust-owned execution plan for the declared production QA
+/// matrix. This is a driver model only: every item delegates to an existing QA
+/// run matrix or scenario-coverage evidence ref and carries replayable evidence
+/// refs. It does not start workers or write generated run artifacts.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionQaMatrixExecutionPlan {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "matrixId")]
+    pub matrix_id: String,
+    #[serde(rename = "gameBuildRef")]
+    pub game_build_ref: String,
+    #[serde(rename = "baselineVariant")]
+    pub baseline_variant: String,
+    #[serde(rename = "expectedWorkItemCount")]
+    pub expected_work_item_count: usize,
+    #[serde(rename = "workItems")]
+    pub work_items: Vec<ProductionQaMatrixWorkItem>,
+    #[serde(rename = "detectedRegressions")]
+    pub detected_regressions: Vec<ProductionQaMatrixRegressionEvidence>,
+    #[serde(rename = "reuseBoundary")]
+    pub reuse_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionQaMatrixWorkItem {
+    #[serde(rename = "workItemId")]
+    pub work_item_id: String,
+    #[serde(rename = "cellId")]
+    pub cell_id: String,
+    #[serde(rename = "contentVariant")]
+    pub content_variant: String,
+    pub seed: String,
+    pub target: String,
+    pub verdict: String,
+    #[serde(rename = "runnerRef")]
+    pub runner_ref: String,
+    #[serde(rename = "replayEvidenceRefs")]
+    pub replay_evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionQaMatrixRegressionEvidence {
+    pub seed: String,
+    pub target: String,
+    #[serde(rename = "contentVariant")]
+    pub content_variant: String,
+    #[serde(rename = "baselineWorkItemId")]
+    pub baseline_work_item_id: String,
+    #[serde(rename = "variantWorkItemId")]
+    pub variant_work_item_id: String,
+    #[serde(rename = "baselineEvidenceRefs")]
+    pub baseline_evidence_refs: Vec<String>,
+    #[serde(rename = "variantEvidenceRefs")]
+    pub variant_evidence_refs: Vec<String>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ProductionQaMatrixReadModel {
@@ -202,6 +262,156 @@ impl ProductionQaMatrixArtifact {
     pub fn read_model_json(&self) -> Result<String> {
         serde_json::to_string_pretty(&self.read_model())
             .context("failed to serialize production QA matrix read model JSON")
+    }
+
+    /// Builds the executable driver model for the declared cartesian matrix.
+    ///
+    /// This deliberately fails closed unless every declared
+    /// `contentVariant x seed x target` coordinate has exactly one validated
+    /// cell, a reused runner ref, and replayable evidence refs. The returned
+    /// work items are sorted by declared dimension order and only reference
+    /// existing runner/evidence artifacts; no workers are spawned here.
+    pub fn execution_plan(&self) -> Result<ProductionQaMatrixExecutionPlan> {
+        self.validate()?;
+        if !self.stale_evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "production QA matrix cannot produce an execution plan with stale evidence refs"
+            ));
+        }
+        if self.blocked_count() > 0 {
+            return Err(anyhow!(
+                "production QA matrix cannot produce an execution plan while blocked"
+            ));
+        }
+        if self.cells.len() != self.expected_cell_count() {
+            return Err(anyhow!(
+                "production QA matrix cannot produce complete runner work items: expected {} coordinates but found {} cells",
+                self.expected_cell_count(),
+                self.cells.len()
+            ));
+        }
+
+        let mut by_coord: BTreeMap<(&str, &str, &str), &ProductionQaMatrixCell> = BTreeMap::new();
+        for cell in &self.cells {
+            by_coord.insert(
+                (
+                    cell.content_variant.as_str(),
+                    cell.seed.as_str(),
+                    cell.target.as_str(),
+                ),
+                cell,
+            );
+        }
+
+        let mut work_items = Vec::with_capacity(self.expected_cell_count());
+        for variant in &self.content_variants {
+            for seed in &self.seeds {
+                for target in &self.targets {
+                    let cell = by_coord
+                        .get(&(variant.as_str(), seed.as_str(), target.as_str()))
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "production QA matrix missing complete runner work item for coordinate {variant}/{seed}/{target}"
+                            )
+                        })?;
+                    if cell.evidence_refs.is_empty() {
+                        return Err(anyhow!(
+                            "production QA matrix cell `{}` cannot be executable without replayable evidence refs",
+                            cell.cell_id
+                        ));
+                    }
+                    work_items.push(ProductionQaMatrixWorkItem {
+                        work_item_id: format!("{}:{}:{}:{}", self.matrix_id, variant, seed, target),
+                        cell_id: cell.cell_id.clone(),
+                        content_variant: variant.clone(),
+                        seed: seed.clone(),
+                        target: target.clone(),
+                        verdict: cell.verdict.clone(),
+                        runner_ref: cell.qa_run_matrix_ref.clone(),
+                        replay_evidence_refs: cell.evidence_refs.clone(),
+                    });
+                }
+            }
+        }
+
+        let work_item_by_coord: BTreeMap<(&str, &str, &str), &ProductionQaMatrixWorkItem> =
+            work_items
+                .iter()
+                .map(|item| {
+                    (
+                        (
+                            item.content_variant.as_str(),
+                            item.seed.as_str(),
+                            item.target.as_str(),
+                        ),
+                        item,
+                    )
+                })
+                .collect();
+        let mut detected_regressions = Vec::new();
+        for regression in self.detect_regressions() {
+            let baseline = work_item_by_coord
+                .get(&(
+                    self.baseline_variant.as_str(),
+                    regression.seed.as_str(),
+                    regression.target.as_str(),
+                ))
+                .ok_or_else(|| {
+                    anyhow!(
+                        "production QA matrix regression lacks baseline runner work item for {}/{}",
+                        regression.seed,
+                        regression.target
+                    )
+                })?;
+            let variant = work_item_by_coord
+                .get(&(
+                    regression.content_variant.as_str(),
+                    regression.seed.as_str(),
+                    regression.target.as_str(),
+                ))
+                .ok_or_else(|| {
+                    anyhow!(
+                        "production QA matrix regression lacks variant runner work item for {}/{}/{}",
+                        regression.content_variant,
+                        regression.seed,
+                        regression.target
+                    )
+                })?;
+            if baseline.replay_evidence_refs.is_empty() || variant.replay_evidence_refs.is_empty() {
+                return Err(anyhow!(
+                    "production QA matrix regression for {}/{}/{} is missing replayable baseline or variant evidence",
+                    regression.content_variant,
+                    regression.seed,
+                    regression.target
+                ));
+            }
+            detected_regressions.push(ProductionQaMatrixRegressionEvidence {
+                seed: regression.seed.clone(),
+                target: regression.target.clone(),
+                content_variant: regression.content_variant.clone(),
+                baseline_work_item_id: baseline.work_item_id.clone(),
+                variant_work_item_id: variant.work_item_id.clone(),
+                baseline_evidence_refs: baseline.replay_evidence_refs.clone(),
+                variant_evidence_refs: variant.replay_evidence_refs.clone(),
+            });
+        }
+        detected_regressions.sort();
+
+        Ok(ProductionQaMatrixExecutionPlan {
+            schema_version: self.schema_version.clone(),
+            matrix_id: self.matrix_id.clone(),
+            game_build_ref: self.game_build_ref.clone(),
+            baseline_variant: self.baseline_variant.clone(),
+            expected_work_item_count: self.expected_cell_count(),
+            work_items,
+            detected_regressions,
+            reuse_boundary: concat!(
+                "driver model only; each work item reuses an existing qaRunMatrixRef ",
+                "or scenario-coverage evidence ref; no new engine, hidden workers, ",
+                "or trusted mutation"
+            )
+            .to_string(),
+        })
     }
 
     /// Full cartesian size of the declared dimensions.

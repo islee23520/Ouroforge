@@ -62,6 +62,57 @@ fn complete_fixture_aggregates_full_coverage() {
 }
 
 #[test]
+fn complete_fixture_yields_deterministic_runner_work_items() {
+    let artifact =
+        ProductionQaMatrixArtifact::from_json_str(&read_fixture("matrix.complete.fixture.json"))
+            .expect("complete");
+    let plan = artifact.execution_plan().expect("execution plan");
+    let mut reversed = artifact.clone();
+    reversed.cells.reverse();
+    let reversed_plan = reversed.execution_plan().expect("reversed execution plan");
+    assert_eq!(plan, reversed_plan);
+
+    assert_eq!(plan.expected_work_item_count, 8);
+    assert_eq!(plan.work_items.len(), 8);
+    assert_eq!(plan.detected_regressions.len(), 0);
+    assert!(plan.reuse_boundary.contains("qaRunMatrixRef"));
+    assert!(plan.reuse_boundary.contains("no new engine"));
+
+    let coordinates: Vec<_> = plan
+        .work_items
+        .iter()
+        .map(|item| {
+            (
+                item.content_variant.as_str(),
+                item.seed.as_str(),
+                item.target.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        coordinates,
+        vec![
+            ("base", "seed-1", "web"),
+            ("base", "seed-1", "desktop"),
+            ("base", "seed-2", "web"),
+            ("base", "seed-2", "desktop"),
+            ("variant-a", "seed-1", "web"),
+            ("variant-a", "seed-1", "desktop"),
+            ("variant-a", "seed-2", "web"),
+            ("variant-a", "seed-2", "desktop"),
+        ]
+    );
+    assert!(plan
+        .work_items
+        .iter()
+        .all(|item| item.runner_ref.contains("qa-swarm-run-matrix-v1")));
+    assert!(plan
+        .work_items
+        .iter()
+        .all(|item| !item.replay_evidence_refs.is_empty()));
+}
+
+#[test]
 fn planted_cross_variant_regression_is_detected() {
     let artifact =
         ProductionQaMatrixArtifact::from_json_str(&read_fixture("matrix.regression.fixture.json"))
@@ -94,6 +145,30 @@ fn planted_cross_variant_regression_is_detected() {
 }
 
 #[test]
+fn planted_cross_variant_regression_has_replayable_baseline_and_variant_evidence() {
+    let artifact =
+        ProductionQaMatrixArtifact::from_json_str(&read_fixture("matrix.regression.fixture.json"))
+            .expect("regression");
+    let plan = artifact.execution_plan().expect("execution plan");
+
+    assert_eq!(plan.detected_regressions.len(), 2);
+    let first = &plan.detected_regressions[0];
+    assert_eq!(first.seed, "seed-1");
+    assert_eq!(first.target, "web");
+    assert_eq!(first.content_variant, "variant-a");
+    assert!(first.baseline_work_item_id.contains(":base:seed-1:web"));
+    assert!(first.variant_work_item_id.contains(":variant-a:seed-1:web"));
+    assert!(first
+        .baseline_evidence_refs
+        .iter()
+        .any(|r| r.contains("base-s1-web")));
+    assert!(first
+        .variant_evidence_refs
+        .iter()
+        .any(|r| r.contains("va-s1-web")));
+}
+
+#[test]
 fn read_model_is_deterministic_regardless_of_cell_order() {
     let raw = read_fixture("matrix.regression.fixture.json");
     let forward = ProductionQaMatrixArtifact::from_json_str(&raw).expect("forward");
@@ -118,6 +193,36 @@ fn partial_fixture_reports_incomplete_coverage() {
     assert!(read_model.cell_count < read_model.expected_cell_count);
     // A flaky (non-failing) variant cell is not a cross-variant regression.
     assert_eq!(read_model.regression_count, 0);
+}
+
+#[test]
+fn incomplete_or_missing_runner_evidence_is_not_executable() {
+    let partial =
+        ProductionQaMatrixArtifact::from_json_str(&read_fixture("matrix.partial.fixture.json"))
+            .expect("partial");
+    let partial_error = partial
+        .execution_plan()
+        .expect_err("partial is not executable");
+    assert!(
+        partial_error
+            .to_string()
+            .contains("cannot produce complete runner work items"),
+        "{partial_error}"
+    );
+
+    let mut missing_evidence =
+        ProductionQaMatrixArtifact::from_json_str(&read_fixture("matrix.complete.fixture.json"))
+            .expect("complete");
+    missing_evidence.cells[0].evidence_refs.clear();
+    let evidence_error = missing_evidence
+        .execution_plan()
+        .expect_err("missing replay evidence is not executable");
+    assert!(
+        evidence_error
+            .to_string()
+            .contains("missing evidence for verdict"),
+        "{evidence_error}"
+    );
 }
 
 #[test]
