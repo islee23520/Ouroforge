@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-promotion-pass-v1",
+  "title": "Single-crate sokoban micro (promotable)",
+  "description": "A tiny block-pushing puzzle whose only winning path is the intended four-move solution; it passes the engine room and is promotable.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "sokoban-promotion-pass-v1",
+  "rows": [
+    "######",
+    "#@...#",
+    "#.*P.#",
+    "#....#",
+    "######"
+  ],
+  "intendedSolution": ["left", "down", "left", "up"]
+}

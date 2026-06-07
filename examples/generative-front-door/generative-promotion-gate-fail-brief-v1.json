@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-promotion-gate-fail-v1",
+  "title": "Sokoban micro with a non-winning intent (gate fail)",
+  "description": "A structurally well-formed puzzle whose declared intended solution never covers the target, so it fails the engine room's intent-satisfaction gate and is blocked from promotion.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "sokoban-promotion-gate-fail-v1",
+  "rows": [
+    "######",
+    "#@...#",
+    "#.*P.#",
+    "#....#",
+    "######"
+  ],
+  "intendedSolution": ["right"]
+}

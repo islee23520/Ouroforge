@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-promotion-oversolution-v1",
+  "title": "Sokoban micro with a shortcut (over-solution)",
+  "description": "The crate sits one push from the target, so a single move wins, yet the brief's intended solution takes a longer scenic route; a strictly shorter unintended solution exists, so the engine room blocks promotion.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "sokoban-promotion-oversolution-v1",
+  "rows": [
+    "#####",
+    "#@*P#",
+    "#...#",
+    "#####"
+  ],
+  "intendedSolution": ["down", "up", "left"]
+}
