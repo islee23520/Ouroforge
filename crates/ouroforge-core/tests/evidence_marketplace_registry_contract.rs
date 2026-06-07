@@ -27,7 +27,10 @@ fn raw_asset(name: &str) -> MarketplaceAsset {
 fn valid_asset_publishes_and_consumes_locally() {
     let asset = MarketplaceAsset::from_json_str(&fixture_text("valid.fixture.json"))
         .expect("valid asset passes validation");
-    assert_eq!(asset.schema_version, EVIDENCE_MARKETPLACE_REGISTRY_SCHEMA_VERSION);
+    assert_eq!(
+        asset.schema_version,
+        EVIDENCE_MARKETPLACE_REGISTRY_SCHEMA_VERSION
+    );
 
     let mut registry = LocalAssetRegistry::new();
     assert!(registry.is_empty());
@@ -62,7 +65,10 @@ fn valid_asset_publishes_and_consumes_locally() {
 #[test]
 fn proof_less_asset_is_rejected_on_publish() {
     let asset = raw_asset("proof-less.fixture.json");
-    assert!(asset.replay_proof.is_none(), "fixture omits the replay proof");
+    assert!(
+        asset.replay_proof.is_none(),
+        "fixture omits the replay proof"
+    );
 
     let mut registry = LocalAssetRegistry::new();
     let error = registry
@@ -110,10 +116,10 @@ fn consuming_unpublished_asset_fails_closed() {
 
 #[test]
 fn duplicate_publish_is_rejected() {
-    let first = MarketplaceAsset::from_json_str(&fixture_text("valid.fixture.json"))
-        .expect("valid asset");
-    let second = MarketplaceAsset::from_json_str(&fixture_text("valid.fixture.json"))
-        .expect("valid asset");
+    let first =
+        MarketplaceAsset::from_json_str(&fixture_text("valid.fixture.json")).expect("valid asset");
+    let second =
+        MarketplaceAsset::from_json_str(&fixture_text("valid.fixture.json")).expect("valid asset");
 
     let mut registry = LocalAssetRegistry::new();
     registry.publish(first).expect("first publish succeeds");

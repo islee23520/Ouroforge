@@ -68,9 +68,9 @@ pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
 pub mod asset_generation_proposal;
+pub mod audio_generation;
 pub mod evolve_campaign;
 pub mod generative_intake;
-pub mod audio_generation;
 pub use evolve_campaign::*;
 pub mod economy_system;
 pub mod meta_progression;
@@ -80,10 +80,10 @@ pub mod plugin_conflicts;
 pub mod source_apply_highrisk_blocker;
 pub mod trust_gradient_risk_tier;
 pub use source_apply_highrisk_blocker::*;
+pub mod performance_soak;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;
 pub mod plugin_manifest;
-pub mod performance_soak;
 pub mod plugin_permission;
 pub mod plugin_registry;
 pub mod plugin_threat_model;
@@ -105,8 +105,8 @@ pub mod qa_performance_budget;
 pub mod qa_playtest_demo;
 pub mod qa_regression_coverage;
 pub mod qa_run_matrix;
-pub mod visual_regression_scale;
 pub mod runtime_frame_budget;
+pub mod visual_regression_scale;
 pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,
     validate_evidence_artifact_path, write_evidence_index, EvidenceArtifact, EvidenceIndex,

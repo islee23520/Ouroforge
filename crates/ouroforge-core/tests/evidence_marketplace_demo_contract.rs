@@ -49,7 +49,8 @@ fn verify_on_consume(registry: &LocalAssetRegistry, asset_id: &str, root: &Path)
         .as_ref()
         .ok_or_else(|| anyhow!("asset has no provenance lineage"))?;
     let evaluation = bundle.evaluate_with_root(root);
-    if evaluation.computed_status != ProvenanceBundleStatus::Complete || !evaluation.status_consistent
+    if evaluation.computed_status != ProvenanceBundleStatus::Complete
+        || !evaluation.status_consistent
     {
         bail!(
             "provenance evidence does not verify: status {:?}, issues {:?}",
@@ -67,7 +68,9 @@ fn demo_publishes_consumes_and_verifies_a_valid_asset() {
     let asset_id = asset.asset_id.clone();
 
     let mut registry = LocalAssetRegistry::new();
-    let receipt = registry.publish(asset).expect("valid asset publishes locally");
+    let receipt = registry
+        .publish(asset)
+        .expect("valid asset publishes locally");
     assert!(receipt.has_replay_proof);
     assert_eq!(receipt.provenance_status, ProvenanceBundleStatus::Complete);
 

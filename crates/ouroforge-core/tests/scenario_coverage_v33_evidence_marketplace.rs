@@ -57,9 +57,13 @@ fn verify_on_consume(registry: &LocalAssetRegistry, asset_id: &str, root: &Path)
         .as_ref()
         .ok_or_else(|| anyhow!("asset has no provenance lineage"))?;
     let evaluation = bundle.evaluate_with_root(root);
-    if evaluation.computed_status != ProvenanceBundleStatus::Complete || !evaluation.status_consistent
+    if evaluation.computed_status != ProvenanceBundleStatus::Complete
+        || !evaluation.status_consistent
     {
-        bail!("provenance evidence does not verify: {:?}", evaluation.issues);
+        bail!(
+            "provenance evidence does not verify: {:?}",
+            evaluation.issues
+        );
     }
     Ok(())
 }
@@ -181,8 +185,7 @@ fn v33_milestone25_provenance_bundle_remains_valid_standalone() {
 
 #[test]
 fn v33_docs_and_fixtures_preserve_generated_state_wording_and_governance() {
-    let docs =
-        fs::read_to_string(repo_root().join("docs/scenario-coverage-v33.md")).expect("docs");
+    let docs = fs::read_to_string(repo_root().join("docs/scenario-coverage-v33.md")).expect("docs");
     let mut all = docs.clone();
     for relative in [
         "matrix.fixture.json",

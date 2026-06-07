@@ -61,7 +61,11 @@ pub struct MarketplaceAsset {
     pub acceptance_suite_ref: String,
     /// Deterministic replay proof, reusing the provenance bundle replay inputs.
     /// Absent => proof-less asset (rejected on publish, fail-closed).
-    #[serde(default, rename = "replayProof", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "replayProof",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub replay_proof: Option<ProvenanceBundleReplayInputs>,
     /// Provenance lineage, reusing the Milestone 25 provenance bundle.
     /// Absent or incomplete => provenance gap (rejected on publish).
@@ -253,9 +257,9 @@ fn validate_replay_proof(proof: &ProvenanceBundleReplayInputs) -> Result<()> {
 }
 
 fn validate_provenance_lineage(asset_id: &str, bundle: &ProvenanceBundleArtifact) -> Result<()> {
-    bundle
-        .validate_shape()
-        .with_context(|| format!("marketplace asset `{asset_id}` has an invalid provenance bundle"))?;
+    bundle.validate_shape().with_context(|| {
+        format!("marketplace asset `{asset_id}` has an invalid provenance bundle")
+    })?;
     if bundle.status != ProvenanceBundleStatus::Complete {
         return Err(anyhow!(
             "marketplace asset `{asset_id}` has a provenance gap: bundle status must be complete"
