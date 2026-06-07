@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "production-qa-matrix-v1",
+  "matrixId": "pqm-regression-001",
+  "status": "complete",
+  "gameBuildRef": "runs/build-collect-and-exit-002",
+  "baselineVariant": "base",
+  "contentVariants": ["base", "variant-a"],
+  "seeds": ["seed-1", "seed-2"],
+  "targets": ["web", "desktop"],
+  "cells": [
+    {
+      "cellId": "c-base-s1-web",
+      "contentVariant": "base",
+      "seed": "seed-1",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/base-s1-web/run.json"]
+    },
+    {
+      "cellId": "c-base-s1-desktop",
+      "contentVariant": "base",
+      "seed": "seed-1",
+      "target": "desktop",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/base-s1-desktop/run.json"]
+    },
+    {
+      "cellId": "c-base-s2-web",
+      "contentVariant": "base",
+      "seed": "seed-2",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/base-s2-web/run.json"]
+    },
+    {
+      "cellId": "c-base-s2-desktop",
+      "contentVariant": "base",
+      "seed": "seed-2",
+      "target": "desktop",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/base-s2-desktop/run.json"]
+    },
+    {
+      "cellId": "c-va-s1-web",
+      "contentVariant": "variant-a",
+      "seed": "seed-1",
+      "target": "web",
+      "verdict": "failed",
+      "failureClass": "objective-unreachable",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/va-s1-web/run.json", "runs/pqm/va-s1-web/trace.json"]
+    },
+    {
+      "cellId": "c-va-s1-desktop",
+      "contentVariant": "variant-a",
+      "seed": "seed-1",
+      "target": "desktop",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/va-s1-desktop/run.json"]
+    },
+    {
+      "cellId": "c-va-s2-web",
+      "contentVariant": "variant-a",
+      "seed": "seed-2",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/va-s2-web/run.json"]
+    },
+    {
+      "cellId": "c-va-s2-desktop",
+      "contentVariant": "variant-a",
+      "seed": "seed-2",
+      "target": "desktop",
+      "verdict": "failed",
+      "failureClass": "runtime-panic",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/va-s2-desktop/run.json", "runs/pqm/va-s2-desktop/crash.json"]
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["coordinate", "verdict", "regression"]
+  },
+  "boundary": "Production QA matrix cells are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; reuses existing runners with no new test engine."
+}

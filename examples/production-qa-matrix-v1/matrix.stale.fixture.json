@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "production-qa-matrix-v1",
+  "matrixId": "pqm-stale-001",
+  "status": "stale",
+  "gameBuildRef": "runs/build-collect-and-exit-004",
+  "baselineVariant": "base",
+  "contentVariants": ["base", "variant-a"],
+  "seeds": ["seed-1"],
+  "targets": ["web"],
+  "cells": [
+    {
+      "cellId": "c-base-s1-web",
+      "contentVariant": "base",
+      "seed": "seed-1",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/base-s1-web/run.json"]
+    },
+    {
+      "cellId": "c-va-s1-web",
+      "contentVariant": "variant-a",
+      "seed": "seed-1",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/va-s1-web/run.json"]
+    }
+  ],
+  "staleEvidenceRefs": ["runs/pqm/va-s1-web/run.json"],
+  "blockedReasons": ["variant-a seed-1 web evidence is stale and must be rerun before the verdict counts"],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["coordinate", "verdict", "regression"]
+  },
+  "boundary": "Production QA matrix cells are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; reuses existing runners with no new test engine."
+}

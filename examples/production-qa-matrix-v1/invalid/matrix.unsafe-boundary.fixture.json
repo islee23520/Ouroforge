@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "production-qa-matrix-v1",
+  "matrixId": "pqm-unsafe-boundary",
+  "status": "complete",
+  "gameBuildRef": "runs/build-x",
+  "baselineVariant": "base",
+  "contentVariants": ["base", "variant-a"],
+  "seeds": ["seed-1"],
+  "targets": ["web"],
+  "cells": [
+    {
+      "cellId": "c1",
+      "contentVariant": "base",
+      "seed": "seed-1",
+      "target": "web",
+      "verdict": "passed",
+      "qaRunMatrixRef": "examples/qa-swarm-run-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqm/a.json"]
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["verdict"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only"
+}
