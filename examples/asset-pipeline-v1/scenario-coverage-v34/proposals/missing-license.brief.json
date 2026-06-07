@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.asset-generation-proposal.v1",
+  "briefId": "v34-missing-license",
+  "title": "Coverage unlicensed tileset",
+  "description": "A 64x64 tileset with no license recorded.",
+  "assetKind": "tileset",
+  "assetId": "v34-tiles",
+  "format": "png",
+  "width": 64,
+  "height": 64,
+  "license": {
+    "license": "",
+    "source": "generator=asset-generation-proposal-v1; prompt=coverage tileset; upstream=unknown",
+    "allowedSource": true
+  }
+}

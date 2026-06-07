@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.asset-generation-proposal.v1",
+  "briefId": "v34-hero-sprite",
+  "title": "Coverage hero sprite",
+  "description": "A 32x32 hero sprite for Scenario Coverage v34.",
+  "assetKind": "sprite",
+  "assetId": "v34-hero",
+  "format": "png",
+  "width": 32,
+  "height": 32,
+  "license": {
+    "license": "CC0-1.0",
+    "source": "generator=asset-generation-proposal-v1; prompt=coverage hero; upstream=none",
+    "allowedSource": true
+  }
+}

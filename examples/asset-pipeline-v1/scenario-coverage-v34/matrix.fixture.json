@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "scenario-coverage-v34-asset-pipeline-matrix-v1",
+  "issue": 1639,
+  "scope": "Asset Generation and Asset-QA v1 regression coverage over asset proposal generation (#1635), the asset-QA gate (#1636), asset import/atlas (#1637), and four-gate backward compatibility.",
+  "generatedStatePolicy": "Generated runs, assets, dashboard exports, previews, screenshots, temporary files, browser profiles, and local tool state remain ignored unless explicitly fixture-scoped. This matrix and its fixtures are tracked source-like regression artifacts.",
+  "proposalCases": [
+    {
+      "id": "V34.proposal.valid",
+      "fixture": "proposals/valid.brief.json",
+      "expectedOutcome": "proposed"
+    },
+    {
+      "id": "V34.proposal.missing-license",
+      "fixture": "proposals/missing-license.brief.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "asset license"
+    },
+    {
+      "id": "V34.proposal.malformed",
+      "fixture": "proposals/malformed.brief.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "height must be in"
+    }
+  ],
+  "qaCases": [
+    {
+      "id": "V34.qa.pass",
+      "fixture": "qa/pass.json",
+      "expectedState": "pass"
+    },
+    {
+      "id": "V34.qa.style-fail",
+      "fixture": "qa/style-inconsistent.json",
+      "expectedState": "style-inconsistent"
+    },
+    {
+      "id": "V34.qa.provenance-fail",
+      "fixture": "qa/missing-provenance.json",
+      "expectedState": "missing-provenance"
+    }
+  ],
+  "importCases": [
+    {
+      "id": "V34.import.valid",
+      "manifest": "asset-manifest.json",
+      "expectedOutcome": "imported",
+      "expectedAssetCount": 5
+    },
+    {
+      "id": "V34.import.atlas-integrity",
+      "manifest": "invalid/atlas-frame-out-of-bounds.asset-manifest.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "outside atlas image bounds"
+    },
+    {
+      "id": "V34.import.hash-mismatch",
+      "manifest": "invalid/hash-mismatch.asset-manifest.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "contentHash mismatch"
+    }
+  ],
+  "backwardCompatibility": {
+    "id": "V34.compat.four-gate-and-visual",
+    "note": "The existing four-gate declared-gate-and aggregation and visual gate remain valid; the asset-QA gate composes additively without changing the base aggregation."
+  }
+}

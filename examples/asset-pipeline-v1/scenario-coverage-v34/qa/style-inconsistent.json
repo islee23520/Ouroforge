@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ouroforge.asset-qa-gate.v1",
+  "assetId": "v34-hero",
+  "styleConsistency": "fail",
+  "visualRegression": "pass",
+  "formatResolutionValid": true,
+  "licenseProvenanceComplete": true,
+  "evidenceRefs": [
+    "runs/v34/evidence/visual/v34-hero.json",
+    "runs/v34/evidence/compare/v34-hero.json"
+  ]
+}

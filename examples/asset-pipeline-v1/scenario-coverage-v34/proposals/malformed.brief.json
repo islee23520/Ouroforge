@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.asset-generation-proposal.v1",
+  "briefId": "v34-malformed",
+  "title": "Coverage oversize panel",
+  "description": "A UI panel whose declared height exceeds the supported maximum resolution.",
+  "assetKind": "ui-art",
+  "assetId": "v34-panel",
+  "format": "png",
+  "width": 256,
+  "height": 9000,
+  "license": {
+    "license": "CC0-1.0",
+    "source": "generator=asset-generation-proposal-v1; prompt=coverage panel; upstream=none",
+    "allowedSource": true
+  }
+}

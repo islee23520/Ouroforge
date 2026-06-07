@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.asset-qa-gate.v1",
+  "assetId": "v34-tiles",
+  "styleConsistency": "pass",
+  "visualRegression": "pass",
+  "formatResolutionValid": true,
+  "licenseProvenanceComplete": false,
+  "evidenceRefs": [
+    "runs/v34/evidence/visual/v34-tiles.json"
+  ]
+}
