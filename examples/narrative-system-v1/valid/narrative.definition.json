@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "narrative-system-v1",
+  "storyId": "demo-story",
+  "flags": ["metKing", "acceptedQuest", "audienceLogged", "questBlessed"],
+  "initialNode": "intro",
+  "nodes": [
+    {
+      "id": "intro",
+      "setFlags": ["metKing"],
+      "choices": [
+        { "action": "accept", "to": "accepted" },
+        { "action": "decline", "to": "farewell" }
+      ]
+    },
+    {
+      "id": "accepted",
+      "setFlags": ["acceptedQuest"],
+      "next": "farewell"
+    },
+    {
+      "id": "farewell",
+      "setFlags": []
+    }
+  ],
+  "events": [
+    {
+      "id": "logAudience",
+      "when": [{ "flag": "metKing", "equals": true }],
+      "setFlags": ["audienceLogged"]
+    },
+    {
+      "id": "blessQuest",
+      "when": [{ "flag": "acceptedQuest", "equals": true }],
+      "setFlags": ["questBlessed"]
+    }
+  ],
+  "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+}
