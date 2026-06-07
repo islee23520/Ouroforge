@@ -147,6 +147,7 @@
     activeCameraId: null,
     assetManifest: null,
     goalFlags: {},
+    rng: { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 },
     physics: {
       gravity: 1,
       maxFallSpeed: 8,
@@ -165,6 +166,49 @@
   function record(type, payload = {}) {
     events.push({ tick: world.tick, type, payload: clone(payload) });
     if (events.length > 64) events.shift();
+  }
+
+  // Seeded stochastic determinism (Era F Milestone 31, #1600). All runtime
+  // randomness derives from an explicit seed via a mulberry32 stream whose state
+  // lives on `world.rng`, so it is captured by snapshot/restore and contributes
+  // to the replay-state digest. No wall-clock, host entropy, or Math.random.
+  const RNG_INCREMENT = 0x6d2b79f5;
+
+  function normalizeSeed(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    return Math.floor(numeric) >>> 0;
+  }
+
+  function seedRng(seed = 0) {
+    const normalized = normalizeSeed(seed);
+    world.rng = {
+      schemaVersion: 'runtime-seeded-rng-v1',
+      algorithm: 'mulberry32',
+      seed: normalized,
+      state: normalized,
+      drawCount: 0,
+    };
+    record('runtime.rng.seeded', { seed: normalized, algorithm: 'mulberry32' });
+    return clone(world.rng);
+  }
+
+  function nextRandom() {
+    if (!world.rng || world.rng.algorithm !== 'mulberry32') seedRng(0);
+    const rng = world.rng;
+    rng.state = (rng.state + RNG_INCREMENT) >>> 0;
+    let t = rng.state;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    const raw = (t ^ (t >>> 14)) >>> 0;
+    rng.drawCount += 1;
+    const draw = { drawIndex: rng.drawCount, seed: rng.seed, state: rng.state, raw, unit: raw / 4294967296 };
+    record('runtime.rng.draw', { drawIndex: draw.drawIndex, state: draw.state, raw: draw.raw });
+    return draw;
+  }
+
+  function rngState() {
+    return clone(world.rng);
   }
 
   function player() {
@@ -1489,6 +1533,7 @@
     world.audioWarnings = [];
     world.vfxEvents = [];
     world.tick = 0;
+    seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
     const assetMetadata = assets.load(world, world.assetManifest);
     record('runtime.scene.loaded', {
@@ -1704,6 +1749,7 @@
         actionInput: clone(actionInput),
         actionState: resolvedActionState(),
       },
+      rng: clone(world.rng || { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 }),
     };
     state.digest = {
       algorithm: 'fnv1a64-canonical-json-v1',
@@ -1714,6 +1760,7 @@
         entities: state.entities,
         camera: state.camera,
         input: state.input,
+        rng: state.rng,
       }),
     };
     return state;
@@ -1774,6 +1821,15 @@
     Object.assign(rawKeys, clone(savedRaw.keys || {}));
     for (const actionId of Object.keys(actionInput)) delete actionInput[actionId];
     Object.assign(actionInput, clone(savedInput.actionInput || {}));
+    if (state.rng && state.rng.algorithm === 'mulberry32') {
+      world.rng = {
+        schemaVersion: 'runtime-seeded-rng-v1',
+        algorithm: 'mulberry32',
+        seed: normalizeSeed(state.rng.seed),
+        state: normalizeSeed(state.rng.state),
+        drawCount: Number.isFinite(state.rng.drawCount) ? Math.max(0, Math.floor(state.rng.drawCount)) : 0,
+      };
+    }
   }
 
   function loadSave(saveOrSlotId) {
@@ -1986,6 +2042,7 @@
         sceneId: runtimeStateEvidence.sceneId,
         tick: runtimeStateEvidence.tick,
         digest: runtimeStateEvidence.digest,
+        rng: clone(world.rng),
         authority: 'browser_runtime_evidence_input_not_trusted_persistence',
         readOnlyInspection: {
           trustedEmitter: 'browser-runtime-world-state',
@@ -2077,6 +2134,9 @@
       return api.getFrameStats();
     },
     setInput,
+    seedRng,
+    nextRandom,
+    rngState,
     snapshot,
     restore,
     runtimeState,

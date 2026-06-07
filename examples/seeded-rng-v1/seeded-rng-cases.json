@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.seeded-rng-cases.v1",
+  "algorithm": "mulberry32",
+  "description": "Shared seeded stochastic determinism contract cases (Era F Milestone 31, #1600). Consumed by both the Rust contract test (crates/ouroforge-core/tests/seeded_rng_contract.rs) and the runtime test (examples/game-runtime/seeded-rng.test.cjs). Fixture-scoped input only; no generated run output is committed.",
+  "cases": {
+    "sameSeed": { "seedA": 1337, "seedB": 1337, "draws": 8 },
+    "differentSeed": { "seedA": 1337, "seedB": 2024, "draws": 8 },
+    "snapshotAcrossDraw": { "seed": 1337, "drawsBeforeSnapshot": 3, "drawsAfter": 5 }
+  }
+}
