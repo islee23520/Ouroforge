@@ -1450,6 +1450,67 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Production-Scale QA Matrix v1 governance refresh
+
+Production-Scale QA Matrix v1 is recorded as **complete for Era G Milestone 40**
+under #1, on merged evidence, as a conservative, additive, local-only milestone.
+It scales QA from per-artifact checks to whole-game production QA — a regression
+matrix across content variants, seeds, and supported targets; visual-regression
+at scale; performance/soak testing; crash/flaky/accessibility/asset-UX checks;
+and a single consolidated production-QA verdict per build. Every capability
+**reuses an existing runner** (the QA / playtest swarm, the visual gate, the
+frame-budget surface, and the evaluator aggregation); it adds **no new test
+engine, profiler, or evaluator**.
+
+The merged evidence chain is the scope/contract gate #1665
+(`docs/production-qa-matrix-v1.md`, PR #1700) — defines the matrix, visual,
+soak, crash/accessibility, and verdict contracts and the reuse statement;
+Regression Matrix (Content x Seed x Target) v1 #1666
+(`crates/ouroforge-core/src/production_qa_matrix.rs`, PR #1710) — a regression
+matrix over existing runners that aggregates per-coordinate verdicts and detects
+cross-variant regressions with replayable evidence; Visual-Regression at Scale v1
+#1667 (`crates/ouroforge-core/src/visual_regression_scale.rs`, PR #1712) — scales
+the existing visual gate across screens/content variants, reusing the evaluator
+`VisualComparisonOutcome`, surfacing detected diffs and missing baselines
+explicitly; Performance and Soak Testing v1 #1668
+(`crates/ouroforge-core/src/performance_soak.rs`, PR #1718) — soak/performance
+runs over the existing frame-budget surface with a deterministic
+`pass`/`regressed`/`unstable` verdict on integer milli-unit samples (no live
+timing); Crash/Accessibility QA and Consolidated Production-QA Verdict v1 #1669
+(`crates/ouroforge-core/src/production_qa_verdict.rs`, PR #1723) — composes the
+per-check results into one descriptive verdict via the evaluator
+`declared-gate-and` aggregation, failing closed when any declared check fails;
+the Production-Scale QA Matrix Demo v1 #1670
+(`docs/production-qa-matrix-v1-demo.md`, PR #1742) — a deterministic,
+fixture-scoped slice where the matrix catches a planted cross-variant regression
+and the consolidated verdict fails closed; and Scenario Coverage v38 #1671
+(`docs/scenario-coverage-v38.md`, PR #1743) — an enumerated, state/shape-only
+regression suite over the matrix/visual/performance/verdict behaviors plus a
+backward-compatibility golden proving the existing per-artifact gates remain
+valid. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. **QA is descriptive, never a
+quality/fun guarantee**: the consolidated verdict aggregates bounded evidence
+signals and is not proof of fun, accessibility compliance, market readiness,
+production safety, current Godot replacement/parity, or shipped-game readiness;
+"looks good / sounds good / is fun" remains a human decision and the human
+release go/no-go is preserved. QA outputs are **evidence inputs only** — never a
+trusted mutation, auto-fix, auto-apply, auto-merge, self-approval, or reviewer
+bypass; generation/role-agent/producer output stays proposal-only through the
+existing review/apply/trust-gradient path; generated assets/content require
+license/provenance and the function-specific QA gate before promotion. Trusted
+logic is Rust/local; browser/Studio surfaces remain read-only. QA is **synthetic
+only** (no real-player Layer-3 data) with no flaky/timing-based assertions.
+Existing contracts remain backward-compatible, and generated runs/assets/content/
+artifacts remain ignored unless explicitly fixture-scoped. Shipping/hosted/cloud/
+live-ops stays **DEFER until a #1508 Layer-3 GO** (Layer-3 distributed
+orchestration / Elixir remains NO-GO under ADR #92). No production-readiness,
+quality, fun, or Godot replacement/parity claim is introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+G rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
