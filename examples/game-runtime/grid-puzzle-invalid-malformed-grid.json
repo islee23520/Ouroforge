@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1",
+  "id": "grid-puzzle-invalid-malformed-grid",
+  "entities": [],
+  "metadata": {
+    "gameClass": "grid-puzzle",
+    "note": "Fixture-scoped negative case: row 2 is shorter than the declared width, so the runtime must fail closed."
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "malformed-grid",
+    "width": 6,
+    "height": 5,
+    "objects": {
+      "floor": { "role": "background" },
+      "wall": { "role": "solid" },
+      "player": { "role": "player" },
+      "crate": { "role": "pushable" },
+      "target": { "role": "target" }
+    },
+    "legend": {
+      "#": ["floor", "wall"],
+      ".": ["floor"],
+      "@": ["floor", "target"],
+      "*": ["floor", "crate"],
+      "P": ["floor", "player"]
+    },
+    "rows": [
+      "######",
+      "#@...#",
+      "#.*P#",
+      "#....#",
+      "######"
+    ],
+    "win": { "type": "all-targets-covered" },
+    "intendedSolution": ["left"]
+  }
+}

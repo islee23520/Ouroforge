@@ -97,6 +97,7 @@
       boundary: 'Read-only bounded 3D render smoke evidence; no WebGPU, GLTF import, PBR, remote fetch, or production renderer claim.',
     }),
   };
+  const gridPuzzleModule = (typeof window !== 'undefined' && window.OuroforgeGridPuzzle) || null;
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -148,6 +149,7 @@
     assetManifest: null,
     goalFlags: {},
     rng: { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 },
+    gridPuzzle: null,
     physics: {
       gravity: 1,
       maxFallSpeed: 8,
@@ -614,7 +616,19 @@
       metadata: objectValue(scene.metadata),
       componentDefaults,
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
+      gridPuzzle: normalizeGridPuzzleSpec(scene.gridPuzzle),
     };
+  }
+
+  // Build the initial grid-puzzle state for a scene, or null when the scene
+  // declares no grid puzzle. Malformed grid-puzzle specs fail closed: the
+  // module throws a clear diagnostic that propagates out of loadScene.
+  function normalizeGridPuzzleSpec(spec) {
+    if (spec === undefined || spec === null) return null;
+    if (!gridPuzzleModule) {
+      throw new Error('grid puzzle scene requires the OuroforgeGridPuzzle module to be loaded');
+    }
+    return gridPuzzleModule.createState(spec);
   }
 
   function normalizeCamera(camera = {}, index = 0, activeCameraId = null, bounds = defaultScene.bounds, fallbackRenderer = rendererState) {
@@ -1460,6 +1474,17 @@
     processTriggerEvents(physics2dCollisions);
     emitVfxEvents('tick');
     updateCameraState();
+    if (world.gridPuzzle && gridPuzzleModule) {
+      const previousStatus = world.gridPuzzle.status;
+      world.gridPuzzle = gridPuzzleModule.advance(world.gridPuzzle, input);
+      if (world.gridPuzzle.status !== previousStatus) {
+        record('runtime.grid_puzzle.status_changed', {
+          status: world.gridPuzzle.status,
+          tick: world.gridPuzzle.tick,
+          moveCount: world.gridPuzzle.moveCount,
+        });
+      }
+    }
   }
 
   function renderCanvas() {
@@ -1532,6 +1557,7 @@
     world.audioEvents = [];
     world.audioWarnings = [];
     world.vfxEvents = [];
+    world.gridPuzzle = normalized.gridPuzzle ? clone(normalized.gridPuzzle) : null;
     world.tick = 0;
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
@@ -1751,6 +1777,10 @@
       },
       rng: clone(world.rng || { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 }),
     };
+    const gridPuzzleDigest = world.gridPuzzle && gridPuzzleModule
+      ? gridPuzzleModule.digestState(world.gridPuzzle)
+      : null;
+    if (gridPuzzleDigest) state.gridPuzzle = gridPuzzleDigest;
     state.digest = {
       algorithm: 'fnv1a64-canonical-json-v1',
       value: fnv1a64({
@@ -1761,6 +1791,9 @@
         camera: state.camera,
         input: state.input,
         rng: state.rng,
+        // Only grid-puzzle scenes contribute this key, so non-grid scene
+        // digests remain byte-identical to their pre-grid-puzzle values.
+        ...(gridPuzzleDigest ? { gridPuzzle: gridPuzzleDigest } : {}),
       }),
     };
     return state;
@@ -2009,6 +2042,9 @@
   const api = Object.freeze({
     getWorldState() {
       const state = clone(world);
+      state.gridPuzzle = world.gridPuzzle && gridPuzzleModule
+        ? gridPuzzleModule.worldStateView(world.gridPuzzle)
+        : null;
       state.input = clone(input);
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
       state.actionInput = clone(actionInput);

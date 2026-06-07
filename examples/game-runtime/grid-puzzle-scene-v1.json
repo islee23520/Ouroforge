@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1",
+  "id": "grid-puzzle-sokoban-micro-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "metadata": {
+    "gameClass": "grid-puzzle",
+    "note": "Fixture-scoped grid-puzzle scene for the Grid-Puzzle Game Class v1 runtime contract (#1574). Deterministic block-pushing micro-level."
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "sokoban-micro-v1",
+    "width": 6,
+    "height": 5,
+    "objects": {
+      "floor": { "role": "background" },
+      "wall": { "role": "solid" },
+      "player": { "role": "player" },
+      "crate": { "role": "pushable" },
+      "target": { "role": "target" }
+    },
+    "legend": {
+      "#": ["floor", "wall"],
+      ".": ["floor"],
+      "@": ["floor", "target"],
+      "*": ["floor", "crate"],
+      "P": ["floor", "player"]
+    },
+    "rows": [
+      "######",
+      "#@...#",
+      "#.*P.#",
+      "#....#",
+      "######"
+    ],
+    "win": { "type": "all-targets-covered" },
+    "lose": { "type": "none" },
+    "intendedSolution": ["left", "down", "left", "up"]
+  }
+}
