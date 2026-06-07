@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1",
+  "id": "grid-puzzle-unsolvable-micro-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "metadata": {
+    "gameClass": "grid-puzzle",
+    "note": "Fixture-scoped grid-puzzle scene for the deterministic solver contract (#1580). The single crate is wedged against the top and right walls, so it can never be pushed onto the target; the level is unsolvable and the bounded solver must report it after fully exploring the reachable space."
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "sokoban-unsolvable-micro-v1",
+    "width": 4,
+    "height": 4,
+    "objects": {
+      "floor": { "role": "background" },
+      "wall": { "role": "solid" },
+      "player": { "role": "player" },
+      "crate": { "role": "pushable" },
+      "target": { "role": "target" }
+    },
+    "legend": {
+      "#": ["floor", "wall"],
+      ".": ["floor"],
+      "@": ["floor", "target"],
+      "*": ["floor", "crate"],
+      "P": ["floor", "player"]
+    },
+    "rows": [
+      "####",
+      "#@*#",
+      "#P.#",
+      "####"
+    ],
+    "win": { "type": "all-targets-covered" },
+    "lose": { "type": "none" }
+  }
+}

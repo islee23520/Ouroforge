@@ -83,6 +83,7 @@ pub mod plugin_registry;
 pub mod plugin_threat_model;
 pub mod provenance_bundle;
 pub mod provenance_replay;
+pub mod puzzle_solver;
 pub mod seeded_rng;
 pub mod source_apply_audit_ledger;
 pub mod trust_gradient_audit;
