@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "deck-roguelike-scenario-coverage-v31",
+  "fixtureScoped": true,
+  "description": "Enumerated regression cases locking Deck-Roguelike Game Class v1 (#1601) seeded determinism and run reproducibility. Asserts states/shapes and digest goldens only; no flaky or timing assertions. Fixture-scoped input; no generated run output is committed.",
+  "sceneRef": "examples/game-runtime/deck-roguelike-scene-v1.json",
+  "frameId": "v31-deck",
+  "cases": [
+    {
+      "id": "same-seed-reproducible",
+      "kind": "seeded-determinism",
+      "seed": 12345,
+      "expect": {
+        "openingHand": ["strike", "strike", "bash", "defend", "defend"],
+        "finalStatus": "won",
+        "enemyHp": 0,
+        "playerSurvives": true,
+        "runtimeDigest": "e94ba2d0d5029ce1"
+      }
+    },
+    {
+      "id": "different-seed-divergent",
+      "kind": "seeded-divergence",
+      "seedA": 12345,
+      "seedB": 777,
+      "expect": {
+        "openingHandA": ["strike", "strike", "bash", "defend", "defend"],
+        "openingHandB": ["bash", "strike", "defend", "strike", "defend"],
+        "measuredAt": "opening-state",
+        "runtimeDigestA": "75b21cc06d0b5472",
+        "runtimeDigestB": "9b2d68ca32a8bc6b",
+        "digestDiverges": true
+      }
+    },
+    {
+      "id": "snapshot-across-draw",
+      "kind": "snapshot-restore",
+      "seed": 12345,
+      "playBeforeSnapshot": 2,
+      "continuation": ["end-turn", "play-card-0"],
+      "expect": {
+        "restoreReturnsToSnapshotDigest": true,
+        "continuationReproducesDigest": true,
+        "stateAdvancesBetweenSnapshotAndContinuation": true
+      }
+    },
+    {
+      "id": "run-reproducibility",
+      "kind": "run-reproducibility",
+      "seed": 12345,
+      "expect": {
+        "twoRunsIdenticalDigest": true,
+        "finalStatus": "won",
+        "runtimeDigest": "e94ba2d0d5029ce1"
+      }
+    }
+  ]
+}

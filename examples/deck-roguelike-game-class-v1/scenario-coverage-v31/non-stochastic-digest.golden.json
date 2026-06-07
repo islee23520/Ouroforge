@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "deck-roguelike-backward-compat-golden-v31",
+  "fixtureScoped": true,
+  "rationale": "The deck-roguelike digest key is additive: scenes that declare no deck run keep byte-identical replay-state digests. These goldens lock the prior non-stochastic grid-puzzle behavior; a change to a recorded digest is a backward-incompatible regression and must fail CI.",
+  "frameId": "v31-grid",
+  "cases": [
+    {
+      "id": "grid-puzzle-initial",
+      "sceneRef": "examples/game-runtime/grid-puzzle-scene-v1.json",
+      "moves": [],
+      "expectedStatus": "playing",
+      "expectedDigest": "d1bf1cc62a071c25"
+    },
+    {
+      "id": "grid-puzzle-intended-solution-solved",
+      "sceneRef": "examples/game-runtime/grid-puzzle-scene-v1.json",
+      "movesFromIntendedSolution": true,
+      "expectedStatus": "won",
+      "expectedDigest": "f86c5649c9d65580"
+    }
+  ]
+}
