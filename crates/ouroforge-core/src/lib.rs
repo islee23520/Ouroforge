@@ -71,6 +71,7 @@ pub mod asset_generation_proposal;
 pub mod evolve_campaign;
 pub mod generative_intake;
 pub use evolve_campaign::*;
+pub mod meta_progression;
 pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;
 pub mod plugin_conflicts;
