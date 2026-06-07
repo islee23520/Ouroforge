@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "scenario-coverage-v27-grid-puzzle-matrix-v1",
+  "issue": 1577,
+  "dslFixtures": {
+    "valid": "examples/grid-puzzle-dsl-ingest-v1/sokoban-micro.puzzlescript",
+    "malformed": "examples/grid-puzzle-dsl-ingest-v1/malformed-undeclared-glyph.puzzlescript",
+    "unsupported": "examples/grid-puzzle-dsl-ingest-v1/unsupported-rule.puzzlescript"
+  },
+  "gridScenes": {
+    "solvable": "examples/game-runtime/grid-puzzle-scene-v1.json",
+    "solution": [
+      "left",
+      "down",
+      "left",
+      "up"
+    ],
+    "oversolution": "examples/game-runtime/grid-puzzle-oversolution-v1.json"
+  },
+  "backwardCompat": {
+    "platformer": "examples/game-runtime/scene.json"
+  },
+  "wordingAudit": {
+    "doc": "docs/scenario-coverage-v27.md",
+    "anchors": [
+      "#1",
+      "#23",
+      "fixture-scoped",
+      "read-only"
+    ]
+  }
+}
