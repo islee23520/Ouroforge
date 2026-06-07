@@ -1006,6 +1006,41 @@ under ADR #92 and should be re-evaluated at Milestone 26.
 The recommended next milestone is **Era E Milestone 26: Era E Refresh and
 Layer-3 Re-evaluation Trigger**.
 
+### Evidence-Native Marketplace v1 governance refresh
+
+Evidence-Native Marketplace v1 is recorded as **complete for Era F Milestone 33**
+as a conservative, additive, local-only milestone under #1. It makes accumulated
+evidence compound into verifiable assets: a local verifiable-asset registry over
+the free OSS core where each asset binds its acceptance suite, a deterministic
+replay proof, and a Milestone 25 provenance lineage, and is re-verified locally
+on consume. The completion evidence chain is parent scope/design gate #1612
+(`docs/evidence-marketplace-v1.md`, PR #1623), the Local Verifiable-Asset
+Registry v1 #1613 (PR #1629), the Evidence-Native Marketplace Demo v1 #1615
+(`docs/evidence-marketplace-v1-demo.md`, PR #1632), and Scenario Coverage v33
+#1616 (`docs/scenario-coverage-v33.md`, PR #1633). #1 and #23 remain open
+governance anchors.
+
+The boundaries stay explicit and reaffirmed. The registry is **local only**: it
+publishes and consumes by reference and re-verifies locally; it performs no
+trusted write, executes nothing, installs nothing, and adds no hosted, paid, or
+network capability. Any hosted or paid marketplace — networked distribution, a
+transaction layer, or take-rate collection — stays **DEFER until a #1508 Layer-3
+GO** (Layer-3 distributed orchestration / Elixir remains NO-GO under ADR #92).
+The OSS core (engine, verification loop, registry, replay proofs, provenance
+bundles) is free; the transaction layer is paid and Layer-3-gated, recorded as a
+policy line and not a code path. The registry reuses the Milestone 25 provenance
+bundle and adds no parallel provenance engine. Adoption of a consumed asset flows
+through the existing review/apply/trust-gradient path, never a direct trusted
+write; generation stays proposal-only; browser/Studio surfaces remain read-only;
+existing contracts remain backward-compatible; and generated registry, replay,
+and evidence artifacts remain ignored unless explicitly fixture-scoped. No
+production-readiness claim, quality guarantee, fun or shippability claim, or
+Godot replacement/parity positioning is introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+F rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Foundation Hardening v1 governance refresh
 
 Foundation Hardening v1 is recorded as **complete for Milestone A.H**, closing
