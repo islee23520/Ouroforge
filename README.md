@@ -197,7 +197,13 @@ The roadmap and per-milestone completion records — with each milestone's
 evidence chain and non-goals — live in [`docs/roadmap.md`](docs/roadmap.md).
 Cross-cutting boundaries are in
 [Non-goals and maturity boundaries](#non-goals-and-maturity-boundaries); they are
-not repeated per milestone here.
+not repeated per milestone here. Earlier completed milestones — including
+Safe Source Mutation Apply, the GDD-to-Playable Prototype v1 prototype lane,
+the Plugin / Extension System v1 lane, the Full Studio Editor lane, the
+Godot-Plus Demo lane, and the Autonomous QA / Playtest Swarm v1 lane — keep
+their full evidence chain and per-issue records in
+[`docs/roadmap.md`](docs/roadmap.md); only the current Era's snapshot is
+summarised below.
 
 **Current state.** Era E (Milestones 20–25) is recorded as complete: Loop
 Coverage Metric v1 (M20), Second Game Class and Loop Generalization v1 (M21),
