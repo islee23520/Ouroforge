@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "design-regression-harness-v1",
+  "editRef": "edits/grid-puzzle-cosmetic-legend-rename",
+  "generatedOutputRoot": "runs/design-regression/demo/cosmetic-legend-rename",
+  "note": "DEMO (#1589): a clean edit re-proved across the same two affected grid-puzzle levels. This edit changes nothing that affects solvability or the intended-solution uniqueness, so re-running the solver + over-solution detector + difficulty suite and diffing against the recorded baseline leaves every level design-clean. The harness passes the edit with no false regression and no replayable counterexample.",
+  "levels": [
+    {
+      "levelId": "rule-edited-target",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-micro-v1",
+        "width": 6,
+        "height": 5,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "######",
+          "#@...#",
+          "#.*P.#",
+          "#....#",
+          "######"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["left", "down", "left", "up"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 0,
+        "evidenceWitness": ["left", "down", "left", "up"]
+      }
+    },
+    {
+      "levelId": "shared-mechanic-elsewhere",
+      "spec": {
+        "schemaVersion": "ouroforge.grid-puzzle.v1",
+        "id": "sokoban-scenic-micro-v1",
+        "width": 6,
+        "height": 5,
+        "objects": {
+          "floor": { "role": "background" },
+          "wall": { "role": "solid" },
+          "player": { "role": "player" },
+          "crate": { "role": "pushable" },
+          "target": { "role": "target" }
+        },
+        "legend": {
+          "#": ["floor", "wall"],
+          ".": ["floor"],
+          "@": ["floor", "target"],
+          "*": ["floor", "crate"],
+          "P": ["floor", "player"]
+        },
+        "rows": [
+          "######",
+          "#@...#",
+          "#.*P.#",
+          "#....#",
+          "######"
+        ],
+        "win": { "type": "all-targets-covered" },
+        "lose": { "type": "none" }
+      },
+      "intent": {
+        "intendedSolution": ["left", "down", "left", "up"],
+        "taughtMechanic": "push"
+      },
+      "baseline": {
+        "solvable": true,
+        "oversolutionCount": 0
+      }
+    }
+  ],
+  "guardrails": [
+    "Re-runs the existing #1580 solver, #1581 over-solution detector, and #1582 difficulty suite; no new comparison engine.",
+    "A clean edit passes with no false regression.",
+    "Detection only: no apply, auto-apply, promote, merge, or self-approve.",
+    "Deterministic and fixture-scoped; no network or live browser."
+  ]
+}
