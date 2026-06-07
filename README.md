@@ -193,128 +193,29 @@ docs are preparation artifacts, not a visibility toggle or publication event.
 
 ## Roadmap
 
-The roadmap and completed milestone references live in
-[`docs/roadmap.md`](docs/roadmap.md). Public-alpha readiness, launch governance,
-release artifact policy, communication-pack, and post-launch roadmap responses
-are documented as separate references rather than launch approval. Public Alpha
-Launch Governance v1 is recorded there as complete as a governance/documentation
-milestone only: it does not publish an announcement, change repository
-visibility, release packages, or approve public-launch execution. Source
-Mutation Preview v1 is also recorded there as complete but preview-only; it does
-not authorize trusted source apply, branch merge/rebase automation, browser
-command bridges, dependency/CI mutation, native export, plugin runtime, public
-launch automation, or Godot replacement claims. Production 2D Engine Core v1 is
-recorded as complete in `docs/roadmap.md` and
-`docs/production-2d-engine-core-v1.md` as a bounded local 2D vertical-slice
-evidence milestone; it is not a production-ready, shipped-game, broad
-compatibility, secure-sandbox, native-export, plugin-runtime, hosted/cloud,
-source-apply, public-launch, or Godot replacement claim. Multi-Agent Production
-Pipeline v1 is now recorded as complete in `docs/roadmap.md`,
-`docs/multi-agent-production-pipeline-v1.md`, and
-`docs/multi-agent-production-pipeline-governance-handoff.md` as a local
-evidence-gated collaboration/accountability milestone; it is not hidden-agent
-orchestration, cloud execution, auto-apply/auto-merge authority, release
-automation, public-launch approval, or production readiness. 3D Capability Gate
-v1 is recorded as complete in `docs/roadmap.md`,
-`docs/3d-capability-gate-v1.md`, and
-`docs/studio-3d-inspection-surface-v1.md` as a bounded local 3D evidence
-milestone; it is not production 3D readiness, broad 3D compatibility,
-advanced-import/rendering parity, native-export, plugin-runtime, hosted/cloud,
-source-apply, public-launch, or Godot replacement scope. Agentic Scene and Level
-Designer v1 is recorded as complete in `docs/roadmap.md`,
-`docs/agentic-scene-level-designer-v1.md`, and
-`docs/agentic-scene-level-designer-governance-handoff.md` as a bounded local
-level/scene-authoring evidence milestone; it is not autonomous full game
-generation, a production editor, visual scripting, browser trusted writes,
-native export, plugin runtime, hosted/cloud behavior, source-apply authority,
-public-launch approval, or Godot replacement scope. Gameplay Scripting /
-Logic System v1 is now recorded as complete in `docs/roadmap.md`,
-`docs/gameplay-scripting-logic-system-v1.md`, `examples/gameplay-logic-demo-v1/`,
-and `examples/gameplay-logic-regression-v9/` as a structured data-only behavior
-and evidence milestone; it is not arbitrary script execution, a production-stable
-scripting API, plugin runtime, browser trusted write path, command bridge,
-unrestricted source apply, public-launch approval, or Godot replacement scope.
-GDD-to-Playable Prototype v1 is recorded as complete in `docs/roadmap.md`,
-`docs/gdd-to-playable-prototype-v1.md`,
-`docs/gdd-to-prototype-governance-handoff.md`, the GDD prototype fixture/docs
-chain, and `examples/gdd-to-prototype-demo-v1/` as a bounded evidence-gated
-prototype path. Autonomous QA / Playtest Swarm v1 is now recorded as complete in
-`docs/roadmap.md`, `docs/autonomous-qa-playtest-swarm-v1.md`,
-`docs/autonomous-qa-playtest-swarm-governance-handoff.md`, the QA swarm fixture/docs
-chain, and `examples/qa-swarm-regression-suite-v13/` as bounded local QA/playtest
-evidence and backlog inputs. Safe Source Mutation Apply v1 is recorded as
-complete in `docs/roadmap.md`, `docs/safe-source-mutation-apply-v1.md`, and
-`docs/safe-source-apply-governance-handoff.md` as review-gated trusted apply for
-explicitly allowed low-risk source-like file classes only: validated previews,
-sandbox evidence, independent review, stale-target checks, rollback metadata,
-allowlisted verification, post-apply evidence, audit ledger entries, and
-emergency hold controls remain mandatory. Plugin / Extension System v1 is
-recorded as complete in `docs/roadmap.md`, `docs/plugin-extension-system-v1.md`,
-`docs/plugin-threat-model-v1.md`, `docs/plugin-extension-system-demo-v1.md`, and
-`docs/scenario-coverage-v16-plugin-extension.md` as a bounded declarative,
-allowlisted, evidence-backed extension foundation: declarative manifests, local
-registry/discovery, an allowlisted extension point catalog, capability/
-compatibility validation, descriptor evidence, read-only dashboard/Studio
-inspection, a fixture plugin pack, a fail-closed threat-model gate, CLI
-inspection, and regression coverage, with plugins declaring metadata only and
-never executing code. These milestones do not authorize
-autonomous unrestricted game creation, uncontrolled asset generation, hidden
-workers, remote/cloud swarm orchestration, unrestricted source/script mutation,
-forbidden file-class mutation, dependency/CI/build-script mutation, browser
-trusted writes, command bridges, auto-fix, auto-apply, auto-merge, native export,
-plugin runtime, hosted/cloud behavior, production readiness, public launch,
-secure-sandbox guarantees, autonomous source repair, or a current Godot
-replacement claim. With Safe Source Mutation Apply v1, Full Studio Editor v1,
-Plugin / Extension System v1, Godot-Plus Demo Game v1, Game Complexity Ladder v1
-/ Era E Milestone 24, and End-to-End Provenance Bundle and Audit Surface v1 /
-Era E Milestone 25 now recorded as complete, the next recommended governance
-milestone is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation
-Trigger. Engine growth remains demand-driven and rung-justified; Layer-3
-distributed orchestration / Elixir per ADR #92 remains deferred for
-re-evaluation at Milestone 26.
+The roadmap and per-milestone completion records — with each milestone's
+evidence chain and non-goals — live in [`docs/roadmap.md`](docs/roadmap.md).
+Cross-cutting boundaries are in
+[Non-goals and maturity boundaries](#non-goals-and-maturity-boundaries); they are
+not repeated per milestone here.
 
-Loop Coverage Metric v1 / Era E Milestone 20 is recorded in the roadmap as a
-descriptive authorship/verification fraction only; at that completion point, the
-recommended follow-on was Era E Milestone 21: Second Game Class and Loop
-Generalization.
-
-Second Game Class and Loop Generalization v1 / Era E Milestone 21 is now recorded
-in the roadmap as complete: the loop generalized to a second game class — the
-Signal Gate Platformer — measured by the loop coverage metric, demonstrating
-loop-produced generalization rather than broad genre support, production
-readiness, or a Godot replacement. At that completion point the recommended
-follow-on was Era E Milestone 22: Trust Gradient Design Gate.
-
-Trust Gradient v1 / Era E Milestone 22 is now recorded in the roadmap as complete
-after a GO design-gate decision: bounded, reversible, audited, default-off
-auto-apply for a narrow scope only (low-risk scene-only-data, high-confidence,
-all-gates-pass, in-budget proposals with a one-command rollback handle). It is
-not auto-merge, self-approval, source-affecting auto-apply, or a quality/Godot
-replacement claim, and autonomy stays opt-in behind a kill switch. At that
-completion point the recommended follow-on was Era E Milestone 23:
-Multi-Iteration Evolve Campaigns.
-
-Multi-Iteration Evolve Campaigns v1 / Era E Milestone 23 is now recorded in the
-roadmap as complete: a campaign is a bounded, audited, multi-iteration sequence
-of evolve proposals that stops on a declared acceptance condition or an exhausted
-budget, with convergence reported descriptively and a journal narrative over the
-iterations. Convergence is descriptive, not a quality or Godot replacement claim;
-campaigns respect the Trust Gradient, add no unsupervised unbounded looping, and
-grant no auto-merge or reviewer bypass. At that completion point the recommended
-follow-on was Era E Milestone 24: Game Complexity Ladder.
-
-Era E (Milestones 20-25) is now recorded in the roadmap as complete across Loop
+**Current state.** Era E (Milestones 20–25) is recorded as complete: Loop
 Coverage Metric v1 (M20), Second Game Class and Loop Generalization v1 (M21),
-Trust Gradient v1 (M22), Multi-Iteration Evolve Campaigns v1 (M23), Game
-Complexity Ladder v1 (M24), and End-to-End Provenance Bundle and Audit Surface v1
-(M25). Against #1's north-star (loop coverage x game complexity x trust), the
-descriptive, evidence-cited posture is: loop coverage evidenced across two game
-classes (collect-and-exit and the Signal Gate Platformer); one Game Complexity
-Ladder rung satisfied (collect-and-exit); and a GO Trust Gradient for bounded,
-reversible, audited, default-off auto-apply. These are descriptive metrics, not a
-maturity, production, or Godot replacement claim. The recommended next milestone
-is Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation, with the Layer-3
-go/defer decision made in the paired design gate.
+Trust Gradient v1 (M22, a GO design gate for bounded auto-apply), Multi-Iteration
+Evolve Campaigns v1 (M23), Game Complexity Ladder v1 (M24), and End-to-End
+Provenance Bundle and Audit Surface v1 (M25). Against #1's north-star (loop
+coverage × game complexity × trust), the descriptive, evidence-cited posture is:
+loop coverage across two game classes (collect-and-exit and the Signal Gate
+Platformer), one Game Complexity Ladder rung satisfied (collect-and-exit), and a
+GO Trust Gradient for bounded, reversible, audited, default-off auto-apply. These
+are descriptive metrics, not maturity, production, or Godot-replacement claims.
+
+**Next.** Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation. Engine
+growth stays demand-driven and rung-justified. The Layer-3 go/defer decision
+(native export, plugin runtime, hosted/cloud, and distributed orchestration /
+Elixir) is **DEFER** per
+[`docs/layer3-reevaluation-v1.md`](docs/layer3-reevaluation-v1.md), reaffirming
+the ADR #92 NO-GO; Rust-first / local-first is preserved absent a GO.
 
 ## Contributor guide
 
