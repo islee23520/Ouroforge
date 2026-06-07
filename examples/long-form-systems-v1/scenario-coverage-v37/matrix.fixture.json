@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "scenario-coverage-v37",
+  "suite": "long-form-game-systems-regression",
+  "anchor": "#1 Era G Milestone 39 (Long-Form Game Systems)",
+  "scenarios": [
+    { "id": "meta-accrual-unlock", "system": "meta-progression", "kind": "behavior", "expect": "counters accrue and threshold unlocks gate; replay is deterministic" },
+    { "id": "meta-unjustified-unlock-rejected", "system": "meta-progression", "kind": "fail-closed", "expect": "restored state with an unlock not justified by counters is rejected" },
+    { "id": "economy-earn-spend", "system": "economy", "kind": "behavior", "expect": "earn/spend balances are deterministic" },
+    { "id": "economy-non-negative", "system": "economy", "kind": "fail-closed", "expect": "an overspend that would go negative is rejected" },
+    { "id": "save-multi-profile-isolation", "system": "save-profile", "kind": "behavior", "expect": "a write to one profile never alters another" },
+    { "id": "save-large-history-integrity", "system": "save-profile", "kind": "behavior", "expect": "a large run-history round-trips with chained-digest integrity" },
+    { "id": "save-tamper-rejected", "system": "save-profile", "kind": "fail-closed", "expect": "a tampered history fails the integrity check" },
+    { "id": "uiux-flow-reachable", "system": "uiux-flow", "kind": "behavior", "expect": "flow screens are reachable and accessibility options are present" },
+    { "id": "uiux-unreachable-rejected", "system": "uiux-flow", "kind": "fail-closed", "expect": "an unreachable screen is rejected" },
+    { "id": "narrative-event-trigger", "system": "narrative", "kind": "behavior", "expect": "dialogue advances and events fire deterministically from flags" },
+    { "id": "narrative-bad-fired-state-rejected", "system": "narrative", "kind": "fail-closed", "expect": "a restored state with an unjustified fired event is rejected" },
+    { "id": "backcompat-single-run-save-restore", "system": "save-profile", "kind": "backward-compatibility", "expect": "a prior single-run save-profile-v0 migrates and round-trips; a single-run v1 store round-trips" }
+  ]
+}

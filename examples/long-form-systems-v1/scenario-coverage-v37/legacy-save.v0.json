@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "save-profile-v0",
+  "profileId": "legacy-solo",
+  "runHistory": [
+    {
+      "runId": "legacy-run-1",
+      "recordedAt": "2026-01-01T00:00:00Z",
+      "replayDigest": "0000000000000000000000000000000000000000000000000000000000000001"
+    }
+  ]
+}
