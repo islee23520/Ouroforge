@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "ouroforge.puzzle-solver-evidence.v1",
+  "note": "Fixture-scoped solver/detector evidence for the difficulty metric (#1582), computed over grid-puzzle-scene-v1.json. Records the solver witness (#1580) and the captured intended solution (#1581); the difficulty metric is re-derived from this evidence rather than asserted.",
+  "level": "grid-puzzle-scene-v1",
+  "witness": ["left", "down", "left", "up"],
+  "intendedSolution": ["left", "down", "left", "up"]
+}

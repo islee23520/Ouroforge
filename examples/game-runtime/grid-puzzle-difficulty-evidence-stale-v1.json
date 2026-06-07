@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "ouroforge.puzzle-solver-evidence.v1",
+  "note": "Fixture-scoped STALE solver evidence for the difficulty metric (#1582). The recorded witness no longer solves grid-puzzle-scene-v1.json (it was truncated), so difficulty computation must fail closed rather than report a metric from stale evidence.",
+  "level": "grid-puzzle-scene-v1",
+  "witness": ["left", "down"],
+  "intendedSolution": ["left", "down", "left", "up"]
+}

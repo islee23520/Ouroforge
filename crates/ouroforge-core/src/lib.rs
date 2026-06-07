@@ -88,6 +88,7 @@ pub mod plugin_threat_model;
 pub mod production_qa_matrix;
 pub mod provenance_bundle;
 pub mod provenance_replay;
+pub mod puzzle_difficulty_metric;
 pub mod puzzle_oversolution;
 pub mod puzzle_solver;
 pub mod seeded_rng;
