@@ -1,0 +1,1 @@
+{ "id": "collect-and-exit-acceptance-suite", "scenarios": ["reach-exit-after-collecting-all-keys", "blocked-exit-without-all-keys"], "summary": "Acceptance scenarios the asset must satisfy on local re-verification." }

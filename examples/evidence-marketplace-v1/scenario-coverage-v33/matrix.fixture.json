@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "scenario-coverage-v33-evidence-marketplace-matrix-v1",
+  "issue": 1616,
+  "scope": "Evidence-Native Marketplace v1 regression coverage over local registry validation, verify-on-consume, tamper detection, provenance lineage, and Milestone 25 provenance-bundle backward compatibility.",
+  "generatedStatePolicy": "Generated runs, replay workspaces, dashboard exports, temporary files, browser profiles, command logs, and local tool state remain ignored unless explicitly fixture-scoped. This matrix and its fixtures are tracked source-like regression artifacts.",
+  "registryCases": [
+    {
+      "id": "V33.registry.valid",
+      "fixture": "assets/valid.json",
+      "expectedOutcome": "published",
+      "expectsReplayProof": true,
+      "expectedProvenanceStatus": "complete"
+    },
+    {
+      "id": "V33.registry.proof-less",
+      "fixture": "assets/proof-less.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "replay proof"
+    },
+    {
+      "id": "V33.registry.provenance-gap",
+      "fixture": "assets/provenance-gap.json",
+      "expectedOutcome": "rejected",
+      "rejectReason": "provenance gap"
+    }
+  ],
+  "verifyCases": [
+    {
+      "id": "V33.verify.valid",
+      "fixture": "assets/valid.json",
+      "expectedVerify": "verified"
+    },
+    {
+      "id": "V33.verify.tampered",
+      "fixture": "assets/tampered.json",
+      "expectedVerify": "rejected",
+      "rejectReason": "tampered asset"
+    }
+  ],
+  "provenanceLineageCases": [
+    {
+      "id": "V33.lineage.valid-complete",
+      "fixture": "assets/valid.json",
+      "expectedStatus": "complete"
+    }
+  ],
+  "backwardCompatibility": {
+    "id": "V33.compat.m25-provenance-standalone",
+    "fixture": "compatibility/provenance-bundle-standalone.golden.json",
+    "expectedStatus": "complete",
+    "note": "The Milestone 25 provenance bundle remains valid standalone, independent of the marketplace registry."
+  }
+}
