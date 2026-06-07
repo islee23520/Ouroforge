@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-accessibility-verified-v1",
+  "title": "My first puzzle: push the box onto the dot",
+  "description": "I want a small room where the player pushes a single box onto a marked spot, and the only way to win is the path I sketched.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "accessibility-verified-v1",
+  "rows": [
+    "######",
+    "#@...#",
+    "#.*P.#",
+    "#....#",
+    "######"
+  ],
+  "intendedSolution": ["left", "down", "left", "up"]
+}

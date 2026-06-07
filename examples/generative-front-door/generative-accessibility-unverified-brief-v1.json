@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-accessibility-unverified-v1",
+  "title": "My puzzle with a shortcut I did not notice",
+  "description": "I sketched a scenic three-move path, but the box is already next to the dot, so a single push also wins; the engine room should catch the shortcut and report it instead of promoting the puzzle.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "accessibility-unverified-v1",
+  "rows": [
+    "#####",
+    "#@*P#",
+    "#...#",
+    "#####"
+  ],
+  "intendedSolution": ["down", "up", "left"]
+}

@@ -75,6 +75,7 @@ pub mod audio_generation;
 pub mod audio_hooks;
 pub mod audio_qa;
 pub mod evolve_campaign;
+pub mod generative_accessibility;
 pub mod generative_intake;
 pub mod generative_promotion_guard;
 pub use evolve_campaign::*;
